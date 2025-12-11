@@ -197,31 +197,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-check_rust_fmt:
-  image: ${rust_toolchain_image_name_protected}:master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.rs'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/check-format-rust.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 nix:
   image: nixos/nix:2.22.1
   stage: sanity
@@ -1861,6 +1836,29 @@ check_jsonnet:
   - cd ../
   - scripts/lint.sh --check-jsonnet-format
   - scripts/lint.sh --check-jsonnet-lint
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+check_rust_fmt:
+  image: ${rust_toolchain_image_name_protected}:master
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.rs'
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/check-format-rust.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

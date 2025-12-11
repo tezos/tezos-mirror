@@ -152,6 +152,16 @@ let job_check_jsonnet =
       "scripts/lint.sh --check-jsonnet-lint";
     ]
 
+let job_check_rust_fmt =
+  CI.job
+    "check_rust_fmt"
+    ~__POS__
+    ~description:"Check formatting on Rust source files."
+    ~image:Tezos_ci.Images.rust_toolchain_master
+    ~stage:Test
+    ~only_if_changed:["**/*.rs"]
+    ["scripts/check-format-rust.sh"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -161,6 +171,7 @@ let register () =
       (Immediate, job_semgrep);
       (Immediate, job_oc_misc_checks `full);
       (Immediate, job_check_jsonnet);
+      (Immediate, job_check_rust_fmt);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -170,5 +181,6 @@ let register () =
       (Immediate, job_semgrep);
       (Immediate, job_oc_misc_checks `no_license_check);
       (Immediate, job_check_jsonnet);
+      (Immediate, job_check_rust_fmt);
     ] ;
   ()

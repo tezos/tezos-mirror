@@ -262,16 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_check_rust_fmt : tezos_job =
-      job
-        ~__POS__
-        ~name:"check_rust_fmt"
-        ~image:Images.rust_toolchain_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
-        ["scripts/check-format-rust.sh"]
-    in
     let job_commit_titles : tezos_job =
       let allow_failure : allow_failure_job =
         match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
@@ -287,21 +277,18 @@ let jobs pipeline_type =
         (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
         ~allow_failure
     in
-    let mr_only_jobs =
-      match pipeline_type with
-      | Before_merging | Merge_train ->
-          [
-            (* This job shall only run in pipelines for MRs because it's not
+    match pipeline_type with
+    | Before_merging | Merge_train ->
+        [
+          (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
-            job_nix;
-            (* It makes no sense to test commit titles in scheduled
+          job_nix;
+          (* It makes no sense to test commit titles in scheduled
                pipelines (they run on master, where commit titles are
                unmutable) *)
-            job_commit_titles;
-          ]
-      | Schedule_extended_test -> []
-    in
-    job_check_rust_fmt :: mr_only_jobs
+          job_commit_titles;
+        ]
+    | Schedule_extended_test -> []
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in

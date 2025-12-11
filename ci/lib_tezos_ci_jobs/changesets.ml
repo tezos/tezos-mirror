@@ -171,9 +171,6 @@ let changeset_lint_files =
           "etherlink/**/*";
         ])
 
-(** Set of Rust files for formatting ([cargo fmt --check]). *)
-let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base
