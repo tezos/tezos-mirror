@@ -23,7 +23,6 @@ use struct_logger::StructLoggerInput;
 use tezos_evm_runtime::runtime::Runtime;
 
 pub mod call_tracer;
-pub mod noop;
 pub mod storage;
 pub mod struct_logger;
 
@@ -140,7 +139,6 @@ impl<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> InspectEvm
 
 #[derive(Debug, Clone, Copy)]
 pub enum TracerInput {
-    NoOp,
     CallTracer(CallTracerInput),
     StructLogger(StructLoggerInput),
 }
@@ -150,7 +148,6 @@ impl TracerInput {
         match self {
             TracerInput::StructLogger(input) => input.transaction_hash,
             TracerInput::CallTracer(input) => input.transaction_hash,
-            TracerInput::NoOp => None,
         }
     }
 }
