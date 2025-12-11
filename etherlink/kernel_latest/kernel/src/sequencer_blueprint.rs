@@ -14,8 +14,14 @@ use tezos_smart_rollup::types::Timestamp;
 
 use crate::delayed_inbox::Hash;
 
+#[cfg(test)]
+pub const LATEST_BLUEPRINT_VERSION: u8 = 0;
+
 #[derive(Debug, Clone)]
 pub struct BlueprintWithDelayedHashes {
+    // The `version` field tells how to decode the `transactions`
+    // field.
+    pub version: u8,
     pub parent_hash: H256,
     pub delayed_hashes: Vec<Hash>,
     // We are using `Vec<u8>` for the transaction instead of `EthereumTransactionCommon`
@@ -27,12 +33,14 @@ pub struct BlueprintWithDelayedHashes {
 impl Encodable for BlueprintWithDelayedHashes {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let BlueprintWithDelayedHashes {
+            version,
             parent_hash,
             delayed_hashes,
             transactions,
             timestamp,
         } = self;
-        stream.begin_list(4);
+        stream.begin_list(5);
+        stream.append(version);
         stream.append(parent_hash);
         stream.append_list(delayed_hashes);
         stream.append_list::<Vec<u8>, _>(transactions);
@@ -42,23 +50,66 @@ impl Encodable for BlueprintWithDelayedHashes {
 
 impl Decodable for BlueprintWithDelayedHashes {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
-        rlp_helpers::check_list(decoder, 4)?;
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        match decoder.item_count()? {
+            4 => {
+                // Only 4 fields means that this is a legacy blueprint
+                // missing the version field.
+                let version = 0;
 
-        let mut it = decoder.iter();
-        let parent_hash =
-            rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "parent_hash")?;
-        let delayed_hashes =
-            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "delayed_hashes")?;
-        let transactions =
-            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
-        let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+                let mut it = decoder.iter();
+                let parent_hash = rlp_helpers::decode_field(
+                    &rlp_helpers::next(&mut it)?,
+                    "parent_hash",
+                )?;
+                let delayed_hashes = rlp_helpers::decode_list(
+                    &rlp_helpers::next(&mut it)?,
+                    "delayed_hashes",
+                )?;
+                let transactions = rlp_helpers::decode_list(
+                    &rlp_helpers::next(&mut it)?,
+                    "transactions",
+                )?;
+                let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
 
-        Ok(Self {
-            delayed_hashes,
-            parent_hash,
-            transactions,
-            timestamp,
-        })
+                Ok(Self {
+                    version,
+                    delayed_hashes,
+                    parent_hash,
+                    transactions,
+                    timestamp,
+                })
+            }
+            5 => {
+                let mut it = decoder.iter();
+                let version =
+                    rlp_helpers::decode_field(&rlp_helpers::next(&mut it)?, "version")?;
+                let parent_hash = rlp_helpers::decode_field(
+                    &rlp_helpers::next(&mut it)?,
+                    "parent_hash",
+                )?;
+                let delayed_hashes = rlp_helpers::decode_list(
+                    &rlp_helpers::next(&mut it)?,
+                    "delayed_hashes",
+                )?;
+                let transactions = rlp_helpers::decode_list(
+                    &rlp_helpers::next(&mut it)?,
+                    "transactions",
+                )?;
+                let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
+
+                Ok(Self {
+                    version,
+                    delayed_hashes,
+                    parent_hash,
+                    transactions,
+                    timestamp,
+                })
+            }
+            _ => Err(DecoderError::RlpInvalidLength),
+        }
     }
 }
 

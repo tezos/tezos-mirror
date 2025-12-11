@@ -219,7 +219,10 @@ pub mod tests {
 
     use crate::{
         block::GENESIS_PARENT_HASH,
-        sequencer_blueprint::{BlueprintWithDelayedHashes, UnsignedSequencerBlueprint},
+        sequencer_blueprint::{
+            BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
+            LATEST_BLUEPRINT_VERSION,
+        },
     };
 
     use super::{fetch_and_parse_sequencer_blueprint_from_dal, DAL_BLUEPRINT_INPUT_TAG};
@@ -264,6 +267,7 @@ pub mod tests {
             .collect();
         let timestamp = Timestamp::from(123456);
         BlueprintWithDelayedHashes {
+            version: LATEST_BLUEPRINT_VERSION,
             timestamp,
             transactions,
             parent_hash: GENESIS_PARENT_HASH,
