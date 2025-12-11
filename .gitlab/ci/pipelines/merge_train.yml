@@ -197,36 +197,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.semgrep:
-  image: returntocorp/semgrep-agent:sha-c6cd7cf
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - devtools/**/*
-    - scripts/semgrep/**/*
-    - src/**/*
-    - tezt/**/*
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - echo "OCaml code linting. For information on how to reproduce locally, check out
-    scripts/semgrep/README.md"
-  - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
@@ -1840,6 +1810,34 @@ oc.ocaml_fmt:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+
+oc.semgrep:
+  image: returntocorp/semgrep-agent:sha-c6cd7cf
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - devtools/**/*
+    - scripts/semgrep/**/*
+    - src/**/*
+    - tezt/**/*
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - echo "OCaml code linting. For information on how to reproduce locally, check out
+    scripts/semgrep/README.md"
+  - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}

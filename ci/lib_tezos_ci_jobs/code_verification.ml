@@ -262,20 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_semgrep : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.semgrep"
-        ~image:Images.semgrep_agent
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_semgrep_files ())
-        [
-          "echo \"OCaml code linting. For information on how to reproduce \
-           locally, check out scripts/semgrep/README.md\"";
-          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
-        ]
-    in
     let job_oc_misc_checks : tezos_job =
       job
         ~__POS__
@@ -371,7 +357,6 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
-      job_semgrep;
       job_oc_misc_checks;
       job_check_jsonnet;
       job_check_rust_fmt;

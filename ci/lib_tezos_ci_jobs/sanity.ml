@@ -72,17 +72,34 @@ let job_oc_ocaml_fmt =
       "scripts/ci/dune.sh build --profile=dev @fmt";
     ]
 
+let job_semgrep =
+  CI.job
+    "oc.semgrep"
+    ~__POS__
+    ~description:"Run a linter on OCaml code."
+    ~image:Tezos_ci.Images.semgrep_agent
+    ~stage:Test
+    ~only_if_changed:
+      ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"]
+    [
+      "echo \"OCaml code linting. For information on how to reproduce locally, \
+       check out scripts/semgrep/README.md\"";
+      "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);
       (Immediate, job_oc_ocaml_fmt);
+      (Immediate, job_semgrep);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);
       (Immediate, job_oc_ocaml_fmt);
+      (Immediate, job_semgrep);
     ] ;
   ()
