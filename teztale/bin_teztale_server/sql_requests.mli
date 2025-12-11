@@ -41,6 +41,8 @@ module Mutex : sig
   val cycles : Lwt_mutex.t
 
   val missing_blocks : Lwt_mutex.t
+
+  val dal_shard_assignments : Lwt_mutex.t
 end
 
 val create_tables : string list
@@ -116,6 +118,12 @@ val insert_included_operation :
 
 val insert_received_block :
   ( Ptime.t option * Ptime.t option * Tezos_crypto.Hashed.Block_hash.t * string,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val insert_dal_shard_assignment :
+  ( int32 * Tezos_crypto.Signature.public_key_hash * int,
     unit,
     [`Zero] )
   Caqti_request.t

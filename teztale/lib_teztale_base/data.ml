@@ -101,6 +101,7 @@ module Delegate_operations = struct
     first_slot : int;
     attesting_power : int;
     operations : operation list;
+    assigned_shard_indices : int list;
   }
 
   let legacy_encoding =
@@ -110,7 +111,13 @@ module Delegate_operations = struct
       (fun (delegate, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
         | None, [] ->
-            {delegate; first_slot = 0; attesting_power = 0; operations = []}
+            {
+              delegate;
+              first_slot = 0;
+              attesting_power = 0;
+              operations = [];
+              assigned_shard_indices = [];
+            }
         | _, _ ->
             let mempool_inclusion =
               match reception_time with
@@ -132,6 +139,7 @@ module Delegate_operations = struct
                     block_inclusion;
                   };
                 ];
+              assigned_shard_indices = [];
             })
       (obj4
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
@@ -142,15 +150,38 @@ module Delegate_operations = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; first_slot; attesting_power; operations} ->
-        (delegate, first_slot, attesting_power, operations))
-      (fun (delegate, first_slot, attesting_power, operations) ->
-        {delegate; first_slot; attesting_power; operations})
-      (obj4
+      (fun {
+             delegate;
+             first_slot;
+             attesting_power;
+             operations;
+             assigned_shard_indices;
+           }
+         ->
+        ( delegate,
+          first_slot,
+          attesting_power,
+          operations,
+          assigned_shard_indices ))
+      (fun ( delegate,
+             first_slot,
+             attesting_power,
+             operations,
+             assigned_shard_indices )
+         ->
+        {
+          delegate;
+          first_slot;
+          attesting_power;
+          operations;
+          assigned_shard_indices;
+        })
+      (obj5
          (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (dft "first_slot" int16 0)
          (dft "endorsing_power" int16 0)
-         (dft "operations" (list operation_encoding) []))
+         (dft "operations" (list operation_encoding) [])
+         (dft "assigned_shard_indices" (list int16) []))
 
   let encoding =
     let open Data_encoding in
@@ -359,4 +390,26 @@ module Archiver = struct
             (req "endorsements" (list Consensus_ops.block_op_encoding))
             (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])
             (dft "baking_rights" (list baking_right_encoding) [])))
+end
+
+module Dal = struct
+  type shard_assignment = {
+    delegate : Tezos_crypto.Signature.public_key_hash;
+    assigned_shard_indices : int list;
+  }
+
+  type shard_assignments = shard_assignment list
+
+  let shard_assignment_encoding =
+    let open Data_encoding in
+    conv
+      (fun {delegate; assigned_shard_indices} ->
+        (delegate, assigned_shard_indices))
+      (fun (delegate, assigned_shard_indices) ->
+        {delegate; assigned_shard_indices})
+      (obj2
+         (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+         (dft "assigned_shard_indices" (list int16) []))
+
+  let shard_assignments_encoding = Data_encoding.list shard_assignment_encoding
 end
