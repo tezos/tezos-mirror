@@ -271,14 +271,22 @@ let register () =
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
-    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
+    ~legacy_jobs:
+      [
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
+          Schedule_extended_test;
+      ]
     [
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_noble `master);
       (Auto, job_install_python `ubuntu_jammy `master);
       (Auto, job_install_python `debian_bookworm `master);
-      (Auto, job_build_all `lite `static);
-      (Auto, job_linkcheck `lite `static);
+      (Auto, job_build_all `lite `dynamic);
+      (Auto, job_linkcheck `lite `dynamic);
     ] ;
   CI.register_scheduled_pipeline
     "update"
