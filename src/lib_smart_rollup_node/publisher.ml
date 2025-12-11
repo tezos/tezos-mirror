@@ -144,15 +144,12 @@ let genesis_pvm_state (module Plugin : Protocol_plugin_sig.S)
       | Some pvm_state -> return pvm_state
       | None -> failwith "PVM state for genesis commitment is not available")
   | _ ->
+      let mode = Context.access_mode_state ctxt in
       (* If there are unsafe patches that were applied to the genesis PVM state,
          we instead recompute the unpatched version to derive the commitment as
          all the following ones will need to be chained to it. *)
       let+ (Unpatched state) =
-        Interpreter.genesis_state
-          Unpatched
-          (module Plugin)
-          node_ctxt
-          (Context.PVMState.empty node_ctxt.context)
+        Interpreter.genesis_state (Unpatched mode) (module Plugin) node_ctxt
       in
       state
 

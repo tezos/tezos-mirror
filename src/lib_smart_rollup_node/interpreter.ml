@@ -80,29 +80,34 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
           Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
         patches
 
-type patched = Patched
+type 'a patched = Patched constraint 'a = [< `Read | `Write > `Read]
 
-type unpatched = Unpatched
+type 'a unpatched = Unpatched constraint 'a = [< `Read | `Write > `Read]
 
-type both = Both
+type ('a, 'b) both =
+  | Both
+  constraint 'a = [< `Read | `Write > `Read]
+  constraint 'b = [< `Read | `Write > `Read]
 
 type _ genesis_state =
-  | Patched : Context.pvmstate -> patched genesis_state
-  | Unpatched : Context.pvmstate -> unpatched genesis_state
+  | Patched : 'perm Context.pvmstate -> 'perm patched genesis_state
+  | Unpatched : 'perm Context.pvmstate -> 'perm unpatched genesis_state
   | Both : {
-      patched : Context.pvmstate;
-      original : Context.pvmstate;
+      patched : 'perm_patched Context.pvmstate;
+      original : 'perm_orig Context.pvmstate;
     }
-      -> both genesis_state
+      -> ('perm_orig, 'perm_patched) both genesis_state
 
 type _ genesis_state_mode =
-  | Patched : patched genesis_state_mode
-  | Unpatched : unpatched genesis_state_mode
-  | Both : both genesis_state_mode
+  | Patched : 'a Access_mode.t -> 'a patched genesis_state_mode
+  | Unpatched : 'a Access_mode.t -> 'a unpatched genesis_state_mode
+  | Both :
+      'a Access_mode.t * 'b Access_mode.t
+      -> ('a, 'b) both genesis_state_mode
 
 let genesis_state (type m) (mode : m genesis_state_mode)
-    (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block node_ctxt empty
-    : m genesis_state tzresult Lwt.t =
+    (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block ?empty
+    node_ctxt : m genesis_state tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* genesis_block_hash =
     match genesis_block with
@@ -113,24 +118,35 @@ let genesis_state (type m) (mode : m genesis_state_mode)
     get_boot_sector (module Plugin) genesis_block_hash node_ctxt
   in
   (* Genesis state *)
-  let state = empty in
+  let state =
+    match empty with
+    | Some s -> s
+    | None -> Context.PVMState.empty node_ctxt.context
+  in
   let*! () = Plugin.Pvm.set_initial_state node_ctxt.kind ~empty:state in
   (* Unpatched genesis state *)
   let*! () = Plugin.Pvm.install_boot_sector node_ctxt.kind state boot_sector in
   match mode with
-  | Unpatched -> return (Unpatched state : m genesis_state)
-  | Patched ->
+  | Unpatched access_mode ->
+      let state = Context.PVMState.maybe_readonly access_mode state in
+      return (Unpatched state : m genesis_state)
+  | Patched access_mode ->
       (* Patch genesis state *)
       let* () =
         apply_unsafe_patches (module Plugin) node_ctxt ~genesis_block_hash state
       in
+      let state = Context.PVMState.maybe_readonly access_mode state in
       return (Patched state : m genesis_state)
-  | Both ->
+  | Both (access_mode_orig, access_mode_patched) ->
       (* Copy and patch genesis state *)
-      let original = Context.PVMState.copy state in
+      let original =
+        Context.PVMState.copy state
+        |> Context.PVMState.maybe_readonly access_mode_orig
+      in
       let* () =
         apply_unsafe_patches (module Plugin) node_ctxt ~genesis_block_hash state
       in
+      let state = Context.PVMState.maybe_readonly access_mode_patched state in
       return (Both {patched = state; original} : m genesis_state)
 
 let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
@@ -140,9 +156,12 @@ let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
   | None ->
       let genesis_level = node_ctxt.Node_context.genesis_info.level in
       if level = genesis_level then
-        let empty = Context.PVMState.empty node_ctxt.context in
         let+ (Patched state) =
-          genesis_state Patched plugin ~genesis_block:hash node_ctxt empty
+          genesis_state
+            (Patched (Context.access_mode_state ctxt))
+            plugin
+            ~genesis_block:hash
+            node_ctxt
         in
         state
       else tzfail (Rollup_node_errors.Missing_PVM_state (hash, level))
@@ -187,14 +206,14 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
   if head.level >= first_inbox_level then
     transition_pvm plugin node_ctxt ctxt predecessor head inbox_and_messages
   else if head.level = node_ctxt.genesis_info.level then
-    let*! empty =
-      let*! state = Context.PVMState.find ctxt in
-      match state with
-      | None -> Lwt.return (Context.PVMState.empty (Context.index ctxt))
-      | Some s -> Lwt.return s
-    in
+    let*! empty_state = Context.PVMState.find ctxt in
     let* (Patched state) =
-      genesis_state Patched plugin ~genesis_block:head.hash node_ctxt empty
+      genesis_state
+        (Patched (Context.access_mode_state ctxt))
+        plugin
+        ~genesis_block:head.hash
+        ?empty:empty_state
+        node_ctxt
     in
     let*! () = Context.PVMState.set ctxt state in
     return (0, 0L, Z.zero)

@@ -132,6 +132,8 @@ type 'a t = {
   sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
   constraint 'a = < store : 'store ; context : 'context >
+  constraint 'store = [< `Read | `Write > `Read]
+  constraint 'context = [< `Read | `Write > `Read]
 
 (** Read/write node context {!t}. *)
 type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
@@ -197,7 +199,9 @@ val gc_lockfile_path : data_dir:string -> string
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context :
-  < store : _ ; context : 'a > t -> Block_hash.t -> 'a Context.t tzresult Lwt.t
+  < store : _ ; context : 'a > t ->
+  Block_hash.t ->
+  < index : 'a ; state : Access_mode.rw > Context.t tzresult Lwt.t
 
 (** Returns [true] if the rollup node supports the DAL and if DAL is enabled for
     the current protocol. *)
@@ -254,7 +258,7 @@ val find_l2_block_by_level :
 val get_full_l2_block :
   ?get_outbox_messages:
     ('a t ->
-    Context.pvmstate ->
+    Access_mode.rw Context.pvmstate ->
     outbox_level:int32 ->
     (int * Outbox_message.summary) list Lwt.t) ->
   'a t ->

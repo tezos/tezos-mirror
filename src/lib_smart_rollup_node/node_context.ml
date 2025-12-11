@@ -114,6 +114,8 @@ type 'a t = {
   sync : sync_info;
 }
   constraint 'a = < store : 'store ; context : 'context >
+  constraint 'store = [< `Read | `Write > `Read]
+  constraint 'context = [< `Read | `Write > `Read]
 
 type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
 
