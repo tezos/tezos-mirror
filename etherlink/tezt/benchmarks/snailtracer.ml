@@ -14,6 +14,8 @@ open Benchmark_utils
 open Floodgate_lib
 
 type env = {
+  container :
+    L2_types.evm_chain_family Evm_node_lib_dev.Services_backend_sig.tx_container;
   sequencer : Evm_node.t;
   rpc_node : Evm_node.t;
   infos : Network_info.t;
@@ -181,9 +183,10 @@ let ray_trace_scanlines ({width; height; _} as env) sender =
     speedup ;
   unit
 
-let call_one {infos; rpc_node; gas_limit; contract; spp; _} sender =
+let call_one {container; infos; rpc_node; gas_limit; contract; spp; _} sender =
   let* _ =
     call
+      ~container
       infos
       rpc_node
       contract
@@ -240,19 +243,34 @@ let test_snailtracer () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
-  let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
-      ()
+  let start_container, container =
+    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
   in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = 2 in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
+  let*? () =
+    start_container ~config ~keep_alive:true ~timeout:parameters.timeout ()
+  in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  let tx_queue =
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.5
+  in
   Log.report "Deploying SnailTracer contract" ;
   let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
@@ -264,6 +282,7 @@ let test_snailtracer () =
   Log.info "Will use gas limit %a" Z.pp_print gas_limit ;
   let env =
     {
+      container;
       sequencer;
       rpc_node;
       infos;
@@ -282,7 +301,7 @@ let test_snailtracer () =
   let* () = Lwt_list.iter_s (step env) (List.init parameters.iterations succ) in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
+  let*? () = Tx_container.shutdown () in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
@@ -325,19 +344,34 @@ let test_full_image_raytracing () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
-  let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
-      ()
+  let start_container, container =
+    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
   in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = 2 in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
+  let*? () =
+    start_container ~config ~keep_alive:true ~timeout:parameters.timeout ()
+  in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  let tx_queue =
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.5
+  in
   Log.report "Deploying SnailTracer contract" ;
   let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
@@ -346,9 +380,10 @@ let test_full_image_raytracing () =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
+  let*? () = Tx_container.shutdown () in
   let env =
     {
+      container;
       sequencer;
       rpc_node;
       infos;

@@ -317,9 +317,11 @@ let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
            pp_evm_value)
         l
 
-let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
-    ?name ?(check_success = false) abi params =
+let call ~container infos rpc_node contract sender ?gas_limit ?nonce
+    ?(value = Z.zero) ?name ?(check_success = false) abi params =
   let open Evm_node_lib_dev_encoding.Ethereum_types in
+  let open Tezos_error_monad.Error_monad in
+  let open Lwt_result_syntax in
   let pp_tx fmt () =
     Format.fprintf
       fmt
@@ -346,7 +348,7 @@ let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
     | Some g -> return g
     | None ->
         Log.debug " - Estimate gas limit" ;
-        let*? g =
+        let* g =
           estimate_gas
             infos
             rpc_node
@@ -358,49 +360,72 @@ let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
         Log.debug " - Gas limit: %a" Z.pp_print g ;
         return g
   in
-  let tx_hash = ref (Hash (Hex "")) in
-  let* () =
-    Tx_queue.transfer
-      ~gas_limit
-      ~infos
-      ~to_:(Efunc_core.Private.a contract)
-      ?data
-      ~value
-      ~from:sender
+
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
       ?nonce
+      ~infos
+      ~from:sender
+      ~to_:(Efunc_core.Private.a contract)
+      ~gas_limit
+      ~value
+      ?data
       ()
-      ~callback:(function
-      | `Accepted h ->
-          tx_hash := h ;
-          unit
-      | (`Refused | `Dropped | `Confirmed) as status ->
-          let c =
-            match status with
-            | `Refused -> nb_refused
-            | `Dropped -> nb_dropped
-            | `Confirmed -> nb_confirmed
-          in
-          incr c ;
-          Lwt.wakeup waker status ;
-          if check_success then
-            Lwt.async (fun () ->
-                let*? receipt =
-                  Floodgate.get_transaction_receipt
-                    (Evm_node.endpoint rpc_node |> Uri.of_string)
-                    !tx_hash
-                in
-                let tx_status = Qty.to_z receipt.status in
-                if Z.(equal tx_status one) then unit
-                else
-                  let (Hash (Hex h)) = !tx_hash in
-                  Test.fail
-                    "Transaction %s was included as failed:\n%a"
-                    h
-                    pp_tx
-                    ()) ;
-          unit)
   in
-  confirmed
+  let tx_hash = Evm_node_lib_dev.Transaction_object.hash transaction_object in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback status =
+    match status with
+    | `Accepted -> unit
+    | (`Refused | `Dropped | `Confirmed) as status ->
+        let c =
+          match status with
+          | `Refused -> nb_refused
+          | `Dropped -> nb_dropped
+          | `Confirmed ->
+              Account.debit sender Z.(value + fees) ;
+              Account.increment_nonce sender ;
+              nb_confirmed
+        in
+        incr c ;
+        Lwt.wakeup waker status ;
+        if check_success then
+          Lwt.async (fun () ->
+              let open Lwt.Syntax in
+              let* res =
+                Floodgate.get_transaction_receipt
+                  (Evm_node.endpoint rpc_node |> Uri.of_string)
+                  tx_hash
+              in
+              match res with
+              | Ok receipt ->
+                  let tx_status = Qty.to_z receipt.status in
+                  if Z.(equal tx_status Z.one) then Lwt.return_unit
+                  else
+                    let (Hash (Hex h)) = tx_hash in
+                    Test.fail
+                      "Transaction %s was included as failed:\n%a"
+                      h
+                      pp_tx
+                      ()
+              | Error trace ->
+                  Test.fail "Error fetching receipt: %a" pp_print_trace trace) ;
+        unit
+  in
+  let next_nonce = quantity_of_z sender.nonce in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let* add_res =
+    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+  in
+  let* () =
+    match add_res with
+    | Ok (_ : hash) -> return_unit
+    | Error e -> Test.fail "Error adding to the tx_queue: %s" e confirmed
+  in
+  return confirmed
 
 type gasometer = {mutable gas : Z.t; mutable time : Ptime.Span.t}
 

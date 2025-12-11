@@ -16,6 +16,7 @@ val run :
   controller:Signer.t ->
   max_active_eoa:int ->
   max_transaction_batch_length:int option ->
+  max_lifespan_s:int ->
   spawn_interval:float ->
   tick_interval:float ->
   base_fee_factor:float ->

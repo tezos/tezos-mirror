@@ -6,6 +6,82 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let start_container, container =
+  Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
+
+let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
+    ?nonce ?data ~gas_limit ~infos ~from () =
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let open Lwt_result_syntax in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback reason =
+    (match reason with
+    | `Confirmed ->
+        Account.debit from Z.(value + fees) ;
+        Account.increment_nonce from
+    | _ -> ()) ;
+    callback reason
+  in
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
+      ?nonce
+      ~infos
+      ~from
+      ?to_
+      ~gas_limit
+      ~value
+      ?data
+      ()
+  in
+  let next_nonce = Ethereum_types.quantity_of_z from.nonce in
+  let* add_res =
+    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+  in
+  match add_res with
+  | Ok (_ : Ethereum_types.hash) -> return_unit
+  | Error e ->
+      Lwt.fail_with @@ Format.asprintf "Error adding to the tx_queue: %s" e
+
+let send_raw_transaction ~relay_endpoint txn =
+  let open Lwt_result_syntax in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let module Srt = Rpc_encodings.Send_raw_transaction in
+  let uuid_seed = Random.get_state () in
+  let req_id = Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false) in
+  let txn =
+    Rpc_encodings.JSONRPC.
+      {
+        method_ = Srt.method_;
+        parameters = Some (Data_encoding.Json.construct Srt.input_encoding txn);
+        id = Some (Id_string req_id);
+      }
+  in
+
+  let* response =
+    Rollup_services.call_service
+      ~keep_alive:true
+      ~base:relay_endpoint
+      ~timeout:Network_info.timeout
+      (Batch.dispatch_service ~path:Resto.Path.root)
+      ()
+      ()
+      txn
+  in
+
+  match response.value with
+  | Ok res ->
+      let hash = Data_encoding.Json.destruct Srt.output_encoding res in
+      return hash
+  | Error error ->
+      let*! () = Floodgate_events.rpc_error error in
+      failwith "Could not send transaction"
+
 type attempt = Always | Never | Number of int
 
 let one_xtz = Z.(of_int 1_000_000_000 * of_int 1_000_000_000)
@@ -36,12 +112,12 @@ let controller_from_signer ~rpc_endpoint ~min_balance controller =
     wait for it to be confirmed. It will return an error if the transactions
     is not confirmed, either because it was dropped or refused. *)
 let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let result, waker = Lwt.wait () in
   let* () =
-    Tx_queue.transfer
+    transfer
       ~callback:(function
-        | `Accepted _ -> return_unit
+        | `Accepted -> Lwt.return_unit
         | `Confirmed ->
             Lwt.wakeup waker (Ok ()) ;
             Lwt.return_unit
@@ -119,7 +195,7 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
       in
       let callback reason =
         match reason with
-        | `Accepted _ -> return_unit
+        | `Accepted -> return_unit
         | `Refused ->
             let* () = Floodgate_events.transaction_refused account in
             maybe_retry ()
@@ -143,15 +219,8 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
             let* () = Floodgate_events.transaction_dropped account in
             maybe_retry ()
       in
-      Tx_queue.transfer
-        ~nonce
-        ~infos
-        ~callback
-        ~gas_limit
-        ~from:account
-        ~to_
-        ?data
-        ()
+      Misc.unwrap_error_monad @@ fun () ->
+      transfer ~nonce ~infos ~callback ~gas_limit ~from:account ~to_ ?data ()
     in
     let* () = retry_transfer 0 in
     if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
@@ -179,12 +248,26 @@ let rec get_transaction_receipt rpc_endpoint txn_hash =
       let*! () = Lwt_unix.sleep 0.1 in
       get_transaction_receipt rpc_endpoint txn_hash
 
-let wait_for_receipt ~rpc_endpoint ?to_ ?value ?data ?nonce ~gas_limit ~infos
-    ~from () =
-  let open Lwt_syntax in
+let wait_for_receipt ~rpc_endpoint ?to_ ?(value = Z.zero) ?data ?nonce
+    ~gas_limit ~infos ~from () =
+  let open Lwt_result_syntax in
   let res, waiter = Lwt.task () in
-  let txn_hash = ref Ethereum_types.(Hash (Hex "")) in
-  let callback = function
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
+      ?nonce
+      ~infos
+      ~from
+      ?to_
+      ~gas_limit
+      ~value
+      ?data
+      ()
+  in
+  let txn_hash = Transaction_object.hash transaction_object in
+  let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
+  let callback status =
+    let open Lwt_syntax in
+    match status with
     | `Refused ->
         Lwt.wakeup waiter
         @@ Result_syntax.tzfail
@@ -199,25 +282,27 @@ let wait_for_receipt ~rpc_endpoint ?to_ ?value ?data ?nonce ~gas_limit ~infos
                 "Could not get the transaction receipt: transaction was \
                  dropped]") ;
         return_unit
-    | `Accepted hash ->
-        txn_hash := hash ;
-        return_unit
+    | `Accepted -> return_unit
     | `Confirmed ->
-        let* result = get_transaction_receipt rpc_endpoint !txn_hash in
+        Account.debit from Z.(value + fees) ;
+        Account.increment_nonce from ;
+        let* result = get_transaction_receipt rpc_endpoint txn_hash in
         Lwt.wakeup waiter result ;
         return_unit
   in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let next_nonce = Ethereum_types.quantity_of_z from.nonce in
+  let* add_res =
+    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+  in
   let* () =
-    Tx_queue.transfer
-      ~callback
-      ?to_
-      ?value
-      ?data
-      ?nonce
-      ~gas_limit
-      ~infos
-      ~from
-      ()
+    match add_res with
+    | Ok (_ : Ethereum_types.hash) -> return_unit
+    | Error e ->
+        Lwt.fail_with @@ Format.asprintf "Error adding to the tx_queue: %s" e
   in
   res
 
@@ -266,8 +351,8 @@ let fund_fresh_account ~infos ~relay_endpoint ~initial_balance ~gas_limit
             ~value:Z.(node.balance - fees - fees)
             ()
         in
-        let* _ = Tx_queue.Misc.send_raw_transaction ~relay_endpoint txn in
-        let* _ = Tx_queue.Misc.send_raw_transaction ~relay_endpoint txn' in
+        let* _ = send_raw_transaction ~relay_endpoint txn in
+        let* _ = send_raw_transaction ~relay_endpoint txn' in
         let*! () = Floodgate_events.reimbursed_controller node in
         return_unit)
   in
@@ -384,6 +469,10 @@ let start_new_head_monitor ~ws_uri =
   in
   let* () = Websocket_client.connect ws_client in
   let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
   lwt_stream_iter_es
     (fun head ->
       let*? block = head in
@@ -393,7 +482,9 @@ let start_new_head_monitor ~ws_uri =
       match block.Ethereum_types.transactions with
       | TxHash hashes ->
           State.incr_transactions_count (List.length hashes) ;
-          List.iter_es Tx_queue.confirm hashes
+          Tx_container.confirm_transactions
+            ~clear_pending_queue_after:false
+            ~confirmed_txs:(List.to_seq hashes)
       | TxFull _ -> return_unit)
     heads_subscription.stream
 
@@ -414,6 +505,10 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       ~timeout:Network_info.timeout
       ()
   in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
@@ -427,7 +522,9 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
             State.incr_transactions_count (List.length hashes) ;
-            List.iter_es Tx_queue.confirm hashes
+            Tx_container.confirm_transactions
+              ~clear_pending_queue_after:false
+              ~confirmed_txs:(List.to_seq hashes)
         | Error _ -> return_unit
       in
       return (`Continue Blueprints_follower.{sbl_callbacks_activated = false}))
@@ -440,10 +537,12 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
 
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
-    ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
-    ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
-    =
+    ~max_lifespan_s ~spawn_interval ~tick_interval ~base_fee_factor
+    ~initial_balance ~txs_per_salvo ~elapsed_time_between_report
+    ~dummy_data_size ~retry_attempt =
   State.dummy_data_size := dummy_data_size ;
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_size = 999_999 in
   let open Lwt_result_syntax in
   let* controller =
     controller_from_signer
@@ -452,13 +551,23 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
       controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
-  let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let config : Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
+  let* () = start_container ~config ~keep_alive:true ~timeout:10. () in
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     match ws_endpoint with
     | Some ws_uri -> start_new_head_monitor ~ws_uri
     | None -> start_blueprint_follower ~relay_endpoint ~rpc_endpoint
-  and* () = Tx_queue.beacon ~tick_interval
+  and* () =
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc rpc_endpoint)
+      ~tick_interval
   and* () =
     let* token, gas_limit =
       prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
