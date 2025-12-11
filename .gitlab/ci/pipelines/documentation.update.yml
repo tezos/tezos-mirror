@@ -104,7 +104,7 @@ documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -181,7 +181,7 @@ documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
