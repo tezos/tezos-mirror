@@ -2085,3 +2085,26 @@ let get_chain_block_context_destination_index ?(chain = "main")
       "index";
     ]
   @@ JSON.as_int_opt
+
+let get_chain_block_context_clst_total_supply ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "clst"; "total_supply"]
+    Fun.id
+
+let get_chain_block_context_contract_clst_balance ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "clst_balance";
+    ]
+    Fun.id
