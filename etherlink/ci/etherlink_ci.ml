@@ -465,6 +465,8 @@ let job_republish_docker_image =
       ^ Runner.Arch.(show_easy_to_distinguish arch)
       ^ " $VERSION)";
       "export CI_COMMIT_TAG=\"octez-evm-node-v$VERSION\"";
+      (* TODO comment *)
+      "git tag octez-evm-node-v$VERSION";
       "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
        ./scripts/ci/octez-evm-node-release.sh";
     ]

@@ -47,6 +47,7 @@ etherlink.republish-docker-image:arm64:
   - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
   - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh arm64 $VERSION)
   - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
+  - git tag octez-evm-node-v$VERSION
   - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -78,6 +79,7 @@ etherlink.republish-docker-image:x86_64:
   - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
   - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh x86_64 $VERSION)
   - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
+  - git tag octez-evm-node-v$VERSION
   - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
