@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-smart-rollup-keyspace"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false

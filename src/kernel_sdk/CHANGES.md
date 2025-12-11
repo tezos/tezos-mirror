@@ -37,6 +37,7 @@
 - Add `Hash` implementation for `OwnedPath`.
 - Remove `tezos-smart-rollup-encoding::contract::Contract`. One may continue to use `tezos-smart-rollup::types::Contract`, which is exported
   from `tezos-protocol::contract::Contract`. This is a drop-in replacement that is fully backwards compatible.
+- Add `tezos-smart-rollup-keyspace` crate which defines the `KeySpace` high-level durable storage API
 
 ### Installer client/kernel
 
