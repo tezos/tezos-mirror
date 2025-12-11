@@ -108,7 +108,7 @@ let job_release_page =
   CI.job
     "release-page"
     ~__POS__
-    ~image:Images.CI.build
+    ~image:Images.CI.release_page
     ~stage:Publish
     ~description:
       "A job to update the rollup node release page. If running in a test \
@@ -144,8 +144,6 @@ let job_release_page =
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
     [
-      (* Required for creating the release page.*)
-      "sudo apk add aws-cli pandoc";
       "eval $(opam env)";
       "./scripts/rollup_node/releases/publish_release_page.sh";
       (* Prepare artifacts. *)

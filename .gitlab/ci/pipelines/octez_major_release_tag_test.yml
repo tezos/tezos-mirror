@@ -1291,7 +1291,7 @@ teztale.release_page:
   retry: 0
 
 octez-smart-rollup-node.release-page:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -1313,7 +1313,6 @@ octez-smart-rollup-node.release-page:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - sudo apk add aws-cli pandoc
   - eval $(opam env)
   - ./scripts/rollup_node/releases/publish_release_page.sh
   - cp /tmp/release_page*/index.md ./index.md
