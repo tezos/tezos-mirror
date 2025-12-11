@@ -454,10 +454,10 @@ let job_republish_docker_image =
     ~image:Tezos_ci.Images_external.docker
     ~variables:
       [
-        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
         ("DOCKER_VERSION", "24.0.7");
         ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
       ]
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     [
       "./scripts/ci/docker_initialize.sh";
       "VERSION=$(etherlink/scripts/get_latest_release_version.sh)";

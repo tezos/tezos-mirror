@@ -51,8 +51,9 @@ etherlink.republish-docker-image:arm64:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
 
@@ -81,7 +82,8 @@ etherlink.republish-docker-image:x86_64:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
   variables:
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
