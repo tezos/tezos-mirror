@@ -12,7 +12,6 @@ use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
-    noop::NoInspector,
     struct_logger::{StructLogger, StructLoggerInput},
     EvmInspection, TracerInput,
 };
@@ -220,9 +219,6 @@ fn get_inspector_from<'a, Host: Runtime + 'a>(
             transaction_hash,
         }) => Box::new(StructLogger::new(config, transaction_hash))
             as Box<dyn EtherlinkInspector<'a, Host>>,
-        TracerInput::NoOp => {
-            Box::new(NoInspector) as Box<dyn EtherlinkInspector<'a, Host>>
-        }
     }
 }
 

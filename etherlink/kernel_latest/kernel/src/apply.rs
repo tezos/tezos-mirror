@@ -351,7 +351,6 @@ pub fn revm_run_transaction<Host: Runtime>(
                     transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
                 },
             ),
-            TracerInput::NoOp => revm_etherlink::inspectors::TracerInput::NoOp,
         }),
         is_simulation,
     )
