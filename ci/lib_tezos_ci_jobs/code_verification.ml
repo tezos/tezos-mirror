@@ -262,28 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_oc_ocaml_fmt : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        [
-          (* Check .ocamlformat files. *)
-          "scripts/lint.sh --check-ocamlformat";
-          (* Check actual formatting. *)
-          "scripts/ci/dune.sh build --profile=dev @fmt";
-        ]
-      |> enable_dune_cache
-    in
     let job_semgrep : tezos_job =
       job
         ~__POS__
@@ -393,7 +371,6 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
-      job_oc_ocaml_fmt;
       job_semgrep;
       job_oc_misc_checks;
       job_check_jsonnet;

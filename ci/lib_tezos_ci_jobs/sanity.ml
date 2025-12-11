@@ -51,9 +51,38 @@ let job_docker_hadolint =
     ~only_if_changed:files_to_lint
     (List.map (( ^ ) "hadolint ") files_to_lint)
 
+let job_oc_ocaml_fmt =
+  CI.job
+    "oc.ocaml_fmt"
+    ~__POS__
+    ~description:
+      "Check that .ocamlformat files are all the same, and check that OCaml \
+       source files are correctly formatted using ocamlformat."
+    ~image:Tezos_ci.Images.CI.build_master
+    ~stage:Test
+    ~only_if_changed:["**/.ocamlformat"; "**/*.ml"; "**/*.mli"]
+    ~dune_cache:(Cacio.dune_cache ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      (* Check .ocamlformat files. *)
+      "scripts/lint.sh --check-ocamlformat";
+      (* Check actual formatting. *)
+      "scripts/ci/dune.sh build --profile=dev @fmt";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
-    [(Immediate, job_sanity_ci); (Immediate, job_docker_hadolint)] ;
+    [
+      (Immediate, job_sanity_ci);
+      (Immediate, job_docker_hadolint);
+      (Immediate, job_oc_ocaml_fmt);
+    ] ;
   CI.register_schedule_extended_test_jobs
-    [(Immediate, job_sanity_ci); (Immediate, job_docker_hadolint)] ;
+    [
+      (Immediate, job_sanity_ci);
+      (Immediate, job_docker_hadolint);
+      (Immediate, job_oc_ocaml_fmt);
+    ] ;
   ()

@@ -197,48 +197,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.ocaml_fmt:
-  image: ${ci_image_name_protected}/build:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.ml'
-    - '**/*.mli'
-    - '**/.ocamlformat'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/lint.sh --check-ocamlformat
-  - scripts/ci/dune.sh build --profile=dev @fmt
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-
 oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: sanity
@@ -1842,6 +1800,46 @@ docker:hadolint:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+oc.ocaml_fmt:
+  image: ${ci_image_name_protected}/build:amd64--master
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.ml'
+    - '**/*.mli'
+    - '**/.ocamlformat'
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - scripts/lint.sh --check-ocamlformat
+  - scripts/ci/dune.sh build --profile=dev @fmt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
