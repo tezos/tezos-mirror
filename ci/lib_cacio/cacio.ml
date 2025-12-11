@@ -623,7 +623,7 @@ module type COMPONENT_API = sig
     string ->
     job
 
-  val register_before_merging_jobs : (trigger * job) list -> unit
+  val register_merge_request_jobs : (trigger * job) list -> unit
 
   val register_schedule_extended_test_jobs : (trigger * job) list -> unit
 
@@ -1092,7 +1092,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
         ])
 
-  let register_before_merging_jobs jobs =
+  let register_merge_request_jobs jobs =
     (* Add [trigger] as a dependency of all [jobs]. *)
     let jobs =
       (* The actual [trigger] job is defined deep inside [code_verification.ml]

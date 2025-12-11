@@ -163,7 +163,7 @@ let job_check_rust_fmt =
     ["scripts/check-format-rust.sh"]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [
       (Immediate, job_sanity_ci);
       (Immediate, job_docker_hadolint);

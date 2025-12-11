@@ -74,7 +74,7 @@ let job_kaitai_e2e_checks =
     ]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [(Manual, job_kaitai_checks); (Manual, job_kaitai_e2e_checks)] ;
   CI.register_scheduled_pipeline
     "daily"

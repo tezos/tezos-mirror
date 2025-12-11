@@ -319,7 +319,7 @@ module type COMPONENT_API = sig
     job
 
   (** Register jobs to be included in [before_merging] and [merge_train] pipelines. *)
-  val register_before_merging_jobs : (trigger * job) list -> unit
+  val register_merge_request_jobs : (trigger * job) list -> unit
 
   (** Register jobs to be included in [schedule_extended_test] pipelines.
 

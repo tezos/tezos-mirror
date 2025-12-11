@@ -107,7 +107,7 @@ let job_release_page =
     ]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
   CI.register_scheduled_pipeline
     "daily"
