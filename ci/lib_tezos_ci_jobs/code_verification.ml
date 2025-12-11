@@ -262,37 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_oc_misc_checks : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.misc_checks"
-        ~image:Images.CI.test_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_lint_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             ~init_python_venv:true
-             [])
-        ([
-           "./scripts/ci/lint_misc_check.sh";
-           "scripts/check_wasm_pvm_regressions.sh check";
-           "etherlink/scripts/check_evm_store_migrations.sh check";
-           "./scripts/check_rollup_node_sql_migrations.sh check";
-           "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
-         ]
-        @
-        (* The license check only applies to new files (in the sense
-           of [git add]), so can only run in [before_merging]
-           pipelines. *)
-        match pipeline_type with
-        | Before_merging | Merge_train ->
-            ["./scripts/ci/lint_check_licenses.sh"]
-        | Schedule_extended_test -> [])
-    in
     let job_check_jsonnet =
       (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
       job
@@ -356,12 +325,7 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    [
-      job_oc_misc_checks;
-      job_check_jsonnet;
-      job_check_rust_fmt;
-    ]
-    @ mr_only_jobs
+    [job_check_jsonnet; job_check_rust_fmt] @ mr_only_jobs
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in

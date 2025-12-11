@@ -87,6 +87,52 @@ let job_semgrep =
       "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
     ]
 
+let job_oc_misc_checks =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "oc.misc_checks"
+    ~__POS__
+    ~description:
+      "Perform miscellaneous checks: lint, check WASM PVM regressions, check \
+       EVM store migrations, check rollup node SQL migrations, check DAL store \
+       migrations, check licences."
+    ~image:Tezos_ci.Images.CI.test_master
+    ~stage:Test
+    ~only_if_changed:
+      [
+        "src/**/*";
+        "tezt/**/*";
+        "devtools/**/*";
+        "scripts/**/*";
+        "docs/**/*";
+        "contrib/**/*";
+        "client-libs/**/*";
+        "etherlink/**/*";
+      ]
+    (List.flatten
+       [
+         (* Setup the environment. *)
+         [
+           "./scripts/ci/take_ownership.sh";
+           ". ./scripts/version.sh";
+           "eval $(opam env)";
+           ". $HOME/.venv/bin/activate";
+         ];
+         (* Perform the checks. *)
+         [
+           "./scripts/ci/lint_misc_check.sh";
+           "scripts/check_wasm_pvm_regressions.sh check";
+           "etherlink/scripts/check_evm_store_migrations.sh check";
+           "./scripts/check_rollup_node_sql_migrations.sh check";
+           "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
+         ];
+         (* The license check only applies to new files (in the sense of [git add]),
+            so can only run in merge request pipelines. *)
+         (match mode with
+         | `full -> ["./scripts/ci/lint_check_licenses.sh"]
+         | `no_license_check -> []);
+       ])
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -94,6 +140,7 @@ let register () =
       (Immediate, job_docker_hadolint);
       (Immediate, job_oc_ocaml_fmt);
       (Immediate, job_semgrep);
+      (Immediate, job_oc_misc_checks `full);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -101,5 +148,6 @@ let register () =
       (Immediate, job_docker_hadolint);
       (Immediate, job_oc_ocaml_fmt);
       (Immediate, job_semgrep);
+      (Immediate, job_oc_misc_checks `no_license_check);
     ] ;
   ()

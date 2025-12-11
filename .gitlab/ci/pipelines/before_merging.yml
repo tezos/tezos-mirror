@@ -197,47 +197,6 @@ trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.misc_checks:
-  image: ${ci_image_name_protected}/test:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - client-libs/**/*
-    - contrib/**/*
-    - devtools/**/*
-    - docs/**/*
-    - etherlink/**/*
-    - scripts/**/*
-    - src/**/*
-    - tezt/**/*
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/lint_misc_check.sh
-  - scripts/check_wasm_pvm_regressions.sh check
-  - etherlink/scripts/check_evm_store_migrations.sh check
-  - ./scripts/check_rollup_node_sql_migrations.sh check
-  - ./src/lib_dal_node/scripts/check_dal_store_migrations.sh check
-  - ./scripts/ci/lint_check_licenses.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 check_jsonnet:
   image: ${jsonnet_image_name_protected}:master
   stage: sanity
@@ -4333,6 +4292,45 @@ etherlink.build_evm_node_static_x86_64:
     paths:
     - octez-binaries/$ARCH/*
     when: on_success
+
+oc.misc_checks:
+  image: ${ci_image_name_protected}/test:amd64--master
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - client-libs/**/*
+    - contrib/**/*
+    - devtools/**/*
+    - docs/**/*
+    - etherlink/**/*
+    - scripts/**/*
+    - src/**/*
+    - tezt/**/*
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - ./scripts/ci/lint_misc_check.sh
+  - scripts/check_wasm_pvm_regressions.sh check
+  - etherlink/scripts/check_evm_store_migrations.sh check
+  - ./scripts/check_rollup_node_sql_migrations.sh check
+  - ./src/lib_dal_node/scripts/check_dal_store_migrations.sh check
+  - ./scripts/ci/lint_check_licenses.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
