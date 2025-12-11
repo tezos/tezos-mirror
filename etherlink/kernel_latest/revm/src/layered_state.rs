@@ -317,6 +317,15 @@ mod tests {
         ) -> Result<bool, CustomPrecompileError> {
             Ok(false)
         }
+
+        fn tezosx_transfer_tez(
+            &mut self,
+            _source: Address,
+            _destination: &str,
+            _amount: U256,
+        ) -> Result<(), CustomPrecompileError> {
+            Ok(())
+        }
     }
 
     #[test]

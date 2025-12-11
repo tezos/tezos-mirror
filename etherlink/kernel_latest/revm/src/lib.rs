@@ -409,6 +409,9 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
+    use crate::tezosx::{
+        get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
+    };
     use alloy_sol_types::{
         sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,
     };
@@ -439,7 +442,12 @@ mod test {
 
     use super::Error;
     use crate::helpers::storage::bytes_hash;
-    use crate::precompiles::constants::FEED_DEPOSIT_ADDR;
+    use crate::precompiles::constants::{
+        FEED_DEPOSIT_ADDR, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+    };
+    use crate::precompiles::runtime_gateway::RuntimeGateway::{
+        transferCall, RuntimeGatewayCalls,
+    };
     use crate::storage::code::CodeStorage;
     use crate::test::utilities::CreateAndRevert::{
         createAndRevertCall, CreateAndRevertCalls,
@@ -643,6 +651,79 @@ mod test {
                 panic!("Simple transfer should have reverted")
             }
         }
+    }
+
+    #[test]
+    fn test_tezosx_transfer_gateway_to_implicit_address() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = block_constants_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        let caller = Address::from(&[1; 20]);
+        let destination = Address::from(&[2; 20]);
+        let destination_pk_hash =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
+        set_ethereum_address_mapping(
+            &mut host,
+            &destination,
+            ForeignAddress::Tezos(destination_pk_hash.clone()),
+        )
+        .unwrap();
+        set_tezos_account_info(
+            &mut host,
+            &destination_pk_hash,
+            TezosAccountInfo {
+                balance: primitive_types::U256::from(0),
+                nonce: 0,
+                pub_key: None,
+            },
+        )
+        .unwrap();
+        let value_sent = U256::from(5);
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        let calldata = RuntimeGatewayCalls::transfer(transferCall {
+            implicitAddress: destination_pk_hash.to_b58check(),
+        })
+        .abi_encode();
+
+        let execution_result = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(RUNTIME_GATEWAY_PRECOMPILE_ADDRESS),
+            calldata.into(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_sent,
+            AccessList(vec![]),
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+
+        // Check the outcome of the transaction
+        match execution_result.result {
+            ExecutionResult::Success { .. } => (),
+            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                panic!("Transfer to implicit address should have succeeded")
+            }
+        }
+        let infos = get_tezos_account_info(&host, &destination_pk_hash)
+            .unwrap()
+            .unwrap();
+        assert_eq!(infos.balance, primitive_types::U256::from(5));
     }
 
     #[test]

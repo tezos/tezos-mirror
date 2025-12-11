@@ -37,7 +37,6 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tracing::trace_kernel;
 
-use crate::tezosx;
 use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
@@ -397,7 +396,8 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
         DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
             let amount = mutez_from_wei(deposit.amount)
                 .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
-            tezosx::add_balance(host, pkh, amount.into())
+            revm_etherlink::tezosx::add_balance(host, pkh, amount.into())
+                .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))
         }
         DepositReceiver::Tezos(Contract::Originated(kt1)) => {
             return Err(BridgeError::InvalidDepositReceiver(

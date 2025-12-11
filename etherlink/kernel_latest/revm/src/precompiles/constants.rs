@@ -70,19 +70,26 @@ pub(crate) const CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS: Address =
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
     ]));
 
+pub(crate) const RUNTIME_GATEWAY_PRECOMPILE_ADDRESS: Address =
+    Address(FixedBytes::new([
+        0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+    ]));
+
 #[cfg(test)]
 pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0xde, 0xad,
 ]));
 
-pub(crate) const CUSTOMS: [Address; 6] = [
+pub(crate) const CUSTOMS: [Address; 7] = [
     WITHDRAWAL_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
     TABLE_PRECOMPILE_ADDRESS,
     GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
     CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS,
+    RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
 ];
 
 // Rationale regarding the cost:
@@ -106,6 +113,9 @@ pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 24_200;
 // In particular, worst case for a cold read 2100 + the worst case for
 // cold write 22100 (inserting a non zero value to a zero value).
 pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
+
+// TODO Define the cost: https://linear.app/tezos/issue/L2-662/define-cost-of-precompile-gateway-on-ethereum
+pub(crate) const RUNTIME_GATEWAY_TRANSFER_BASE_COST: u64 = 1_000;
 
 // Rationale regarding the cost:
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
