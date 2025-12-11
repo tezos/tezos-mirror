@@ -226,42 +226,6 @@ let jobs pipeline_type =
       ~parent_pipeline_name:(code_verification_pipeline_name pipeline_type)
       child_pipeline_path
   in
-  (* Sanity jobs *)
-  let sanity =
-    let stage = Stages.sanity in
-    let dependencies = Dependent [] in
-    (* Necromantic nix-related rites. *)
-    let job_nix : tezos_job =
-      job
-        ~__POS__
-        ~name:"nix"
-        ~image:Images.nix
-        ~stage
-        ~dependencies
-        ~artifacts:(artifacts ~when_:On_failure ["flake.lock"])
-        ~rules:
-          (make_rules
-             ~changes:
-               (Changeset.make ["**/*.nix"; "flake.lock"; "scripts/version.sh"])
-             ())
-        ~before_script:
-          [
-            "mkdir -p ~/.config/nix";
-            "echo 'extra-experimental-features = flakes nix-command' > \
-             ~/.config/nix/nix.conf";
-          ]
-        ["nix run .#ci-check-version-sh-lock"]
-        ~cache:[cache ~key:"nix-store" ["/nix/store"]]
-    in
-    match pipeline_type with
-    | Before_merging | Merge_train ->
-        [
-          (* This job shall only run in pipelines for MRs because it's not
-               sensitive to changes in time. *)
-          job_nix;
-        ]
-    | Schedule_extended_test -> []
-  in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
@@ -681,4 +645,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ test @ manual
+  start_stage @ build @ test @ manual

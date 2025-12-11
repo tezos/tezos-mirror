@@ -191,41 +191,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-nix:
-  image: nixos/nix:2.22.1
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.nix'
-    - flake.lock
-    - scripts/version.sh
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  cache:
-    key: nix-store
-    paths:
-    - /nix/store
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - mkdir -p ~/.config/nix
-  - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - nix run .#ci-check-version-sh-lock
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    paths:
-    - flake.lock
-    when: on_failure
-
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -1758,6 +1723,42 @@ check_rust_fmt:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+nix:
+  image: nixos/nix:2.22.1
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.nix'
+    - flake.lock
+    - scripts/version.sh
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: nix-store
+    paths:
+    - /nix/store
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - mkdir -p ~/.config/nix
+  - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
+  - nix run .#ci-check-version-sh-lock
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    paths:
+    - flake.lock
+    when: on_failure
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
