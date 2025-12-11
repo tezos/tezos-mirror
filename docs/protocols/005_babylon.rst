@@ -142,6 +142,7 @@ moving average of the participation.
 
 `MR52. <https://gitlab.com/nomadic-labs/tezos/-/merge_requests/52>`_
 
+.. _babylon_introduced_delegation:
 
 Make implicit accounts delegatable
 ----------------------------------
@@ -393,6 +394,8 @@ Transactions that are emitted in the last moments of Athens and that
 do not get included in a block because of network latency will not
 survive the migration to Babylon. They will have to be emitted again
 in the new format.
+
+.. _migrating_scriptless_contracts:
 
 Migration from scriptless KT1s to ``manager.tz``
 ------------------------------------------------------------------

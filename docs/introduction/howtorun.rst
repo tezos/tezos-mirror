@@ -55,6 +55,12 @@ delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
 `the Michelson documentation <https://tezos.gitlab.io/michelson-reference/#instr-SET_DELEGATE>`__ for more
 details).
 
+.. note::
+
+   The possibility to choose a delegate for a user account :ref:`was introduced <babylon_introduced_delegation>` in the :doc:`Babylon protocol <../protocols/005_babylon>` back in 2019.
+   Even though this was long time ago, the simplest way to delegate tez at the time was to deposit them on a special kind of "scriptless" smart contract.
+   All these contracts have been converted during the Babylon update to regular smart contracts (keeping the same ``KT1`` address), and contain now a predefined manager script, which allows recovering funds using a :ref:`manual procedure <migrating_scriptless_contracts>`.
+   Some wallets such as the Kukai web wallet make it easier to recover the funds: they automatically recognize the old delegation situation when connecting to the delegating account.
 
 Notice that only user accounts can be delegates, so your delegate
 must be a *tz* address.
