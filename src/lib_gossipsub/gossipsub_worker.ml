@@ -990,7 +990,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           state
         [@profiler.span_f
           {verbosity = Notice} ["apply_event"; "Check_unknown_messages"]]
-    | Process_batch batch -> apply_batch_event state batch
+    | Process_batch batch ->
+        apply_batch_event
+          state
+          batch
+        [@profiler.span_f
+          {verbosity = Notice} ["apply_event"; "apply_batch_event"]]
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state; self = _; _} =
