@@ -262,16 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_docker_hadolint =
-      job
-        ~rules:(make_rules ~changes:changeset_docker_files ())
-        ~__POS__
-        ~name:"docker:hadolint"
-        ~dependencies
-        ~image:Images.hadolint
-        ~stage
-        ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
-    in
     let job_oc_ocaml_fmt : tezos_job =
       job
         ~__POS__
@@ -403,7 +393,6 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
-      job_docker_hadolint;
       job_oc_ocaml_fmt;
       job_semgrep;
       job_oc_misc_checks;

@@ -40,7 +40,20 @@ let job_sanity_ci =
       "make --silent -C ci check";
     ]
 
+let job_docker_hadolint =
+  let files_to_lint = ["build.Dockerfile"; "Dockerfile"] in
+  CI.job
+    "docker:hadolint"
+    ~__POS__
+    ~description:"Run hadolint on some Docker files."
+    ~image:Tezos_ci.Images.hadolint
+    ~stage:Test
+    ~only_if_changed:files_to_lint
+    (List.map (( ^ ) "hadolint ") files_to_lint)
+
 let register () =
-  CI.register_before_merging_jobs [(Immediate, job_sanity_ci)] ;
-  CI.register_schedule_extended_test_jobs [(Immediate, job_sanity_ci)] ;
+  CI.register_before_merging_jobs
+    [(Immediate, job_sanity_ci); (Immediate, job_docker_hadolint)] ;
+  CI.register_schedule_extended_test_jobs
+    [(Immediate, job_sanity_ci); (Immediate, job_docker_hadolint)] ;
   ()
