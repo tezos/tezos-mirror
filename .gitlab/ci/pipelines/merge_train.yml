@@ -1463,29 +1463,23 @@ oc.build_kernels:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
   - changes:
-    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*.ml*
     - contrib/mir/**/*.lalrpop
     - contrib/mir/**/*.rs
     - contrib/mir/**/*.toml
     - contrib/mir/**/Cargo.lock
     - data-encoding/**/*
-    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink.mk
     - etherlink/**/*
-    - grafazos/doc/**/*
     - images/create_image.sh
     - images/rust-toolchain/**/*
     - images/scripts/install_datadog_static.sh
@@ -1503,7 +1497,6 @@ oc.build_kernels:
     - src/**/*
     - tezt/**/*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
@@ -3142,12 +3135,10 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_kernels
   timeout: 60 minutes
   interruptible: true
   before_script:

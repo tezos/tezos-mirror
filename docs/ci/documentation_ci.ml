@@ -121,7 +121,6 @@ let job_manuals =
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
        executables."
-    ~needs:[(Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~needs_legacy:
       (* It's ok to assume Before_merging here because we only care about the job name. *)
       [
