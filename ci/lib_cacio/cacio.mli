@@ -318,7 +318,16 @@ module type COMPONENT_API = sig
     string ->
     job
 
-  (** Register jobs to be included in [before_merging] and [merge_train] pipelines. *)
+  (** Register jobs to be included in [before_merging]. *)
+  val register_before_merging_jobs : (trigger * job) list -> unit
+
+  (** Register jobs to be included in [merge_train] pipelines. *)
+  val register_merge_train_jobs : (trigger * job) list -> unit
+
+  (** Register jobs to be included in [before_merging] and [merge_train] pipelines.
+
+      This is equivalent to registering the job with both
+      [register_before_merging_jobs] and [register_merge_train_jobs]. *)
   val register_merge_request_jobs : (trigger * job) list -> unit
 
   (** Register jobs to be included in [schedule_extended_test] pipelines.
@@ -437,6 +446,9 @@ module Shared : COMPONENT_API
 
 (** Jobs for [before_merging]. *)
 val get_before_merging_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for [merge_train]. *)
+val get_merge_train_jobs : unit -> Tezos_ci.tezos_job list
 
 (** Jobs for [schedule_extended_test]. *)
 val get_schedule_extended_test_jobs : unit -> Tezos_ci.tezos_job list

@@ -140,7 +140,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_before_merging_jobs ())
+    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_merge_train_jobs ())
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
