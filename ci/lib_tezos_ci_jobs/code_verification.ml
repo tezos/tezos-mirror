@@ -138,10 +138,7 @@ let job_start =
     ]
 
 (* Short-cut for jobs that have no dependencies except [job_start] on
-   [Before_merging] pipelines. These jobs must also depend on all
-   jobs in the stage [sanity], such that they do not run if this
-   stage does not succeed. Since some sanity jobs are conditional,
-   we make these dependencies optional. *)
+   [Before_merging] pipelines. *)
 let dependencies_needs_start pipeline_type =
   match pipeline_type with
   | Before_merging | Merge_train -> Dependent [Job job_start]
