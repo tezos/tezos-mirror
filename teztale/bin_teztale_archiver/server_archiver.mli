@@ -19,6 +19,7 @@ type chunk =
         * Data.baking_right list)
   | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
   | Rights of (Int32.t (* level *) * Consensus_ops.rights)
+  | Dal_shards of Int32.t (* level *) * Data.Dal.shard_assignment list
 
 type ctx = {
   cohttp_ctx : Cohttp_lwt_unix.Net.ctx;

@@ -41,6 +41,8 @@ let supported_protocols = ref []
 
 let registered_rights_levels = Ring.create 120
 
+let registered_dal_shards_levels = Ring.create 120
+
 let rights_machine = Protocol_hash.Table.create 10
 
 let past_block_machine = Protocol_hash.Table.create 10
@@ -56,6 +58,12 @@ let maybe_add_rights (module A : Archiver.S) level rights =
   else
     let () = Ring.add registered_rights_levels level in
     A.add_rights ~level rights
+
+let maybe_add_dal_shards (module A : Archiver.S) level shard_assignments =
+  if Ring.mem registered_dal_shards_levels level then ()
+  else (
+    Ring.add registered_dal_shards_levels level ;
+    A.add_dal_shards ~level shard_assignments)
 
 let dump_my_current_attestations (module A : Archiver.S) ~unaccurate ~level
     rights attestations =
@@ -137,11 +145,15 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
       (Some cycle_info)
       reception_times
 
+  let dal_shards_of ctxt level =
+    let cctx = Services.wrap_full ctxt in
+    Services.dal_shards_of cctx level
+
   let () =
     Protocol_hash.Table.add
       live_block_machine
       Services.hash
-      (rights_of, get_applied_block)
+      (rights_of, get_applied_block, dal_shards_of)
 
   let rec pack_by_slot i e = function
     | ((i', l) as x) :: t ->
@@ -333,6 +345,17 @@ module Loops (Archiver : Archiver.S) = struct
         in
         Lwt.return_unit
 
+  let maybe_register_rights_and_dal_shards ~rights_of ~dal_shards_of cctx ~level
+      ops =
+    if List.is_empty ops then return_unit
+    else
+      let* rights = rights_of cctx (Int32.pred level) in
+      let pred_level = Int32.pred level in
+      let () = maybe_add_rights (module Archiver) pred_level rights in
+      let* dal_shards = dal_shards_of cctx pred_level in
+      let () = maybe_add_dal_shards (module Archiver) pred_level dal_shards in
+      return_unit
+
   let reception_blocks_loop cctx =
     let logger = Log.logger () in
     let*! block_stream =
@@ -381,7 +404,8 @@ module Loops (Archiver : Archiver.S) = struct
                                       current_protocol)
                               in
                               Lwt.return ((fun _ _ _ _ _ -> return_unit), None)
-                          | Some (rights_of, get_applied_block) ->
+                          | Some (rights_of, get_applied_block, dal_shards_of)
+                            ->
                               let recorder cctx level hash header reception_time
                                   =
                                 let* (( _block_info,
@@ -395,31 +419,23 @@ module Loops (Archiver : Archiver.S) = struct
                                     reception_time
                                 in
                                 let* () =
-                                  if List.is_empty attestations then return_unit
-                                  else
-                                    let* rights =
-                                      rights_of cctx (Int32.pred level)
-                                    in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        (Int32.pred level)
-                                        rights
-                                    in
-                                    return_unit
+                                  maybe_register_rights_and_dal_shards
+                                    ~rights_of
+                                    ~dal_shards_of
+                                    cctx
+                                    ~level:(Int32.pred level)
+                                    attestations
                                 in
                                 let* () =
                                   if List.is_empty preattestations then
                                     return_unit
                                   else
-                                    let* rights = rights_of cctx level in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        level
-                                        rights
-                                    in
-                                    return_unit
+                                    maybe_register_rights_and_dal_shards
+                                      ~rights_of
+                                      ~dal_shards_of
+                                      cctx
+                                      ~level
+                                      preattestations
                                 in
                                 let () = Archiver.add_block ~level block_data in
                                 return_unit

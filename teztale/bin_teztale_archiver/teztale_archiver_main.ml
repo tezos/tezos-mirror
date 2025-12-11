@@ -90,6 +90,7 @@ let server_to_json_chunk : Server_archiver.chunk -> Json_archiver.chunk option =
              baking_rights ))
   | Mempool (level, ops) -> Some (Mempool (None, level, ops))
   | Rights (_, _) -> None
+  | Dal_shards (_, _) -> None
 
 let select_commands _ctxt Client_config.{chain; _} =
   return
@@ -232,6 +233,7 @@ let select_commands _ctxt Client_config.{chain; _} =
                             | Block (level, _) -> (level, "/block")
                             | Mempool (level, _) -> (level, "/mempool")
                             | Rights (level, _) -> (level, "/rights")
+                            | Dal_shards (level, _) -> (level, "/dal_shards")
                           in
                           Printf.sprintf
                             "(%ld) Failed to send %s data and --backup-dir is \

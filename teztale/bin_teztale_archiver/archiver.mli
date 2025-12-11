@@ -35,4 +35,6 @@ module type S = sig
     unit
 
   val add_rights : level:Int32.t -> Consensus_ops.rights -> unit
+
+  val add_dal_shards : level:Int32.t -> Data.Dal.shard_assignment list -> unit
 end
