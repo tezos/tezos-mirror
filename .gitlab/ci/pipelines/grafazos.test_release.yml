@@ -133,7 +133,7 @@ grafazos.gitlab_release:
   retry: 0
 
 grafazos.release_page:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -154,7 +154,6 @@ grafazos.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - sudo apk add aws-cli pandoc
   - ./grafazos/scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
