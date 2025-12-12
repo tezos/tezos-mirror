@@ -604,7 +604,7 @@ etherlink.build_tezt:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push

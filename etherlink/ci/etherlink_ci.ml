@@ -293,7 +293,7 @@ let job_build_tezt =
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
          ["_build/default/etherlink/tezt/tests/main.exe"])
-    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ())
+    ~dune_cache:(Cacio.dune_cache ())
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
