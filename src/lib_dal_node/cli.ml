@@ -589,11 +589,13 @@ module Term = struct
   let disable_shard_validation_switch =
     make_switch
       ~doc:
-        "Disable the shard verification. This is used conjoyintly with the \
-         `TEZOS_DISABLE_SHARD_VERIFICATION_I_KNOW_WHAT_I_AM_DOING` environment \
-         variable. To actually disable the shard verification this option must \
-         be used and the environment variable must be set. If only the \
-         environment variable is set, the DAL node will refuse to start. "
+        (Format.asprintf
+           "Disable the shard verification. This is used conjointly with the \
+            `%s` environment variable. To actually disable the shard \
+            verification this option must be used and the environment variable \
+            must be set. If only the environment variable is set, the DAL node \
+            will refuse to start."
+           disable_shard_validation_environment_variable)
       "disable-shard-validation"
 
   let disable_shard_validation =
