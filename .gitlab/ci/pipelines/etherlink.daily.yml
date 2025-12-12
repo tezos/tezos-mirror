@@ -228,7 +228,7 @@ oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:rust-toolchain:amd64
   dependencies:

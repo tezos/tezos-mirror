@@ -1809,7 +1809,7 @@ oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success

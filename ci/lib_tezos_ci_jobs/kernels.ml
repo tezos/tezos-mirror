@@ -78,6 +78,7 @@ let job_build_kernels =
     ~__POS__
     ~stage:Build
     ~description:"Build the kernels, including the Etherlink kernel."
+    ~cpu:Very_high
     ~image:Tezos_ci.Images.rust_toolchain
     ~only_if_changed:
       [
