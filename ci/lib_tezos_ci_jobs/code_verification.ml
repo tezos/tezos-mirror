@@ -141,8 +141,8 @@ let job_start =
    [Before_merging] pipelines. *)
 let dependencies_needs_start pipeline_type =
   match pipeline_type with
-  | Before_merging | Merge_train -> Dependent [Job job_start]
-  | Schedule_extended_test -> Dependent []
+  | Before_merging -> Dependent [Job job_start]
+  | Schedule_extended_test | Merge_train -> Dependent []
 
 (* Use this function to define jobs that depend on the pipeline type.
    Without this function, you risk defining the same job multiple times
@@ -217,8 +217,8 @@ let jobs pipeline_type =
   (* Stages *)
   let start_stage =
     match pipeline_type with
-    | Schedule_extended_test -> [job_datadog_pipeline_trace]
-    | Before_merging | Merge_train -> [job_start]
+    | Schedule_extended_test | Merge_train -> [job_datadog_pipeline_trace]
+    | Before_merging -> [job_start]
   in
 
   (* Used in trigger job definitions. For code verification pipelines,

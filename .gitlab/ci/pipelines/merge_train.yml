@@ -170,26 +170,20 @@ oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-trigger:
+datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
   - gcp
-  rules:
-  - if: $GITLAB_USER_LOGIN != "nomadic-margebot" && $CI_MERGE_REQUEST_ASSIGNEES !~
-      /nomadic-margebot/ && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
-    when: manual
-    allow_failure: false
-  - when: always
   needs: []
   dependencies: []
-  timeout: 10 minutes
+  allow_failure: true
+  timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - echo 'Trigger pipeline!'
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
@@ -434,7 +428,6 @@ oc.build:static-x86_64-linux-binaries:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -506,7 +499,6 @@ oc.build:static-arm64-linux-binaries:
     allow_failure: true
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -582,7 +574,6 @@ oc.build_x86_64-released:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -662,7 +653,6 @@ oc.build_amd64-extra-dev:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -758,7 +748,6 @@ oc.build_amd64-exp:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -969,8 +958,7 @@ trigger:debian_repository_partial_auto:
     - scripts/packaging/octez/debian/*
     - scripts/version.sh
     when: on_success
-  needs:
-  - trigger
+  needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     strategy: depend
@@ -994,8 +982,7 @@ trigger:rpm_repository_partial_auto:
     - scripts/packaging/tests/rpm/*
     - scripts/version.sh
     when: on_success
-  needs:
-  - trigger
+  needs: []
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
     strategy: depend
@@ -1016,8 +1003,7 @@ trigger:homebrew_auto:
     - scripts/packaging/test_homebrew_install.sh
     - scripts/version.sh
     when: on_success
-  needs:
-  - trigger
+  needs: []
   trigger:
     include: .gitlab/ci/pipelines/homebrew_auto.yml
     strategy: depend
@@ -1040,7 +1026,6 @@ test_sdk_rust:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1091,7 +1076,6 @@ test_sdk_bindings:
     when: on_success
   needs:
   - oc.docker:rust-sdk-bindings:amd64
-  - trigger
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
@@ -1159,8 +1143,7 @@ oc.compile_sources_doc_master:
     when: on_success
   - when: manual
     allow_failure: true
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1385,7 +1368,6 @@ check_riscv_kernels:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1478,7 +1460,6 @@ test_kernels:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1790,7 +1771,6 @@ oc.check_lift_limits_patch:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1838,7 +1818,6 @@ oc.python_check:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1890,7 +1869,6 @@ oc.integration:compiler-rejections:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1956,7 +1934,6 @@ oc.script:test-gen-genesis:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1986,7 +1963,6 @@ oc.script:snapshot_alpha_and_link:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2040,7 +2016,6 @@ oc.script:b58_prefix:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2072,7 +2047,6 @@ oc.test-liquidity-baking-scripts:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -2107,7 +2081,6 @@ oc.script:test_octez_release_versions:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2138,7 +2111,6 @@ oc:scripts:release_script_values:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2187,7 +2159,6 @@ oc.unit:protocol_compiles:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2253,7 +2224,6 @@ oc.unit:webassembly-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
@@ -2304,7 +2274,6 @@ oc.unit:non-proto-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -2392,7 +2361,6 @@ oc.unit:non-proto-arm64:
     when: on_success
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -2470,7 +2438,6 @@ oc.unit:proto-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -2558,7 +2525,6 @@ oc.unit:other-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -2627,7 +2593,6 @@ ocaml-check:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2668,7 +2633,6 @@ etherlink.lint_wasm_runtime:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2714,7 +2678,6 @@ etherlink.unit_tests:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2787,7 +2750,6 @@ etherlink.test_kernel:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -2837,7 +2799,6 @@ etherlink.test_firehose:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -2887,7 +2848,6 @@ etherlink.test_evm_compatibility:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -2941,7 +2901,6 @@ etherlink.test_revm_compatibility:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - trigger
   - oc.build_kernels
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -2990,7 +2949,6 @@ etherlink.mir_unit:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3027,7 +2985,6 @@ etherlink.mir_tzt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3293,7 +3250,6 @@ client-libs.kaitai_checks:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3346,7 +3302,6 @@ client-libs.kaitai_e2e_checks:
     allow_failure: true
   needs:
   - oc.docker:client-libs-dependencies
-  - trigger
   - client-libs.kaitai_checks
   dependencies:
   - oc.docker:client-libs-dependencies
@@ -3377,7 +3332,6 @@ grafazos.build:
     when: on_success
   needs:
   - oc.docker:jsonnet:amd64
-  - trigger
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
@@ -3411,7 +3365,6 @@ teztale.build-arm64:
     when: on_success
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -3464,7 +3417,6 @@ teztale.build-x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3598,7 +3550,6 @@ documentation.build_all:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - documentation.odoc
   - documentation.manuals
   - documentation.docgen
@@ -3657,7 +3608,6 @@ documentation.linkcheck:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - documentation.manuals
   - documentation.docgen
   - documentation.build_all
@@ -3696,8 +3646,7 @@ documentation.install_python_bookworm:
     - poetry.lock
     - pyproject.toml
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: true
@@ -3747,7 +3696,6 @@ etherlink.tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -3845,7 +3793,6 @@ etherlink.tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -3942,7 +3889,6 @@ etherlink.tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -4037,7 +3983,6 @@ etherlink.tezt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -4113,7 +4058,6 @@ etherlink.build_evm_node_static_arm64:
     allow_failure: true
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -4167,7 +4111,6 @@ etherlink.build_evm_node_static_x86_64:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4279,7 +4222,6 @@ de.unit:arm64:
     when: on_success
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -4306,7 +4248,6 @@ de.unit:x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4333,7 +4274,6 @@ resto.unit:arm64:
     when: on_success
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 10 minutes
@@ -4360,7 +4300,6 @@ resto.unit:x86_64:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 10 minutes
@@ -4410,7 +4349,6 @@ tezt-static-binaries:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build:static-x86_64-linux-binaries
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4503,7 +4441,6 @@ tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4599,7 +4536,6 @@ tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4693,7 +4629,6 @@ tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4788,7 +4723,6 @@ tezt-riscv-slow-sequential:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4881,7 +4815,6 @@ tezt-time-sensitive:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4975,7 +4908,6 @@ tezt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
