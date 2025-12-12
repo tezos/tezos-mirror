@@ -6,11 +6,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type preconfirmed_data = {
+  timestamp : Ptime.t;
+  block_number : Ethereum_types.quantity;
+}
+
+type ic_bench = {
+  sent : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  included : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  preconfirmed : (Ethereum_types.hash, preconfirmed_data) Stdlib.Hashtbl.t;
+}
+
+type ic_data = {ic_bench : ic_bench; oc : out_channel}
+
+let ic_bench_size = 100
+
 let start_container, container =
   Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
 
 let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
-    ?nonce ?data ~gas_limit ~infos ~from () =
+    ?nonce ?raw_tx ?transaction_object ?data ~gas_limit ~infos ~from () =
   let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
          (module Tx_container)) =
     container
@@ -26,15 +41,18 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
     callback reason
   in
   let* raw_tx, transaction_object =
-    Craft.transfer_with_obj_exn
-      ?nonce
-      ~infos
-      ~from
-      ?to_
-      ~gas_limit
-      ~value
-      ?data
-      ()
+    match (raw_tx, transaction_object) with
+    | Some raw_tx, Some transaction_object -> return (raw_tx, transaction_object)
+    | _ ->
+        Craft.transfer_with_obj_exn
+          ?nonce
+          ~infos
+          ~from
+          ?to_
+          ~gas_limit
+          ~value
+          ?data
+          ()
   in
   let next_nonce = Ethereum_types.quantity_of_z from.nonce in
   let* add_res =
@@ -163,8 +181,8 @@ module State = struct
     report ~elapsed_time
 end
 
-let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
-    ~retry_attempt =
+let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit ~retry_attempt
+    ~ic_data account =
   let data, to_ =
     match token with
     | `Native data ->
@@ -193,9 +211,33 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
             return_unit
         | Number _ -> retry_transfer (attempt + 1)
       in
+      let* tx_data =
+        Craft.transfer_with_obj_exn
+          ~nonce
+          ~infos
+          ~from:account
+          ~to_
+          ~gas_limit
+          ~value:Z.zero
+          ?data
+          ()
+      in
+      let* raw_tx, tx_object =
+        match tx_data with
+        | Ok (raw_tx, tx_object) -> return (raw_tx, tx_object)
+        | Error _ -> Stdlib.failwith "Crafting transaction failed"
+      in
       let callback reason =
         match reason with
-        | `Accepted -> return_unit
+        | `Accepted ->
+            Option.iter
+              (fun {ic_bench; _} ->
+                Stdlib.Hashtbl.add
+                  ic_bench.sent
+                  (Transaction_object.hash tx_object)
+                  (Ptime_clock.now ()))
+              ic_data ;
+            return_unit
         | `Refused ->
             let* () = Floodgate_events.transaction_refused account in
             maybe_retry ()
@@ -220,7 +262,17 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
             maybe_retry ()
       in
       Misc.unwrap_error_monad @@ fun () ->
-      transfer ~nonce ~infos ~callback ~gas_limit ~from:account ~to_ ?data ()
+      transfer
+        ~nonce
+        ~infos
+        ~raw_tx
+        ~transaction_object:tx_object
+        ~callback
+        ~gas_limit
+        ~from:account
+        ~to_
+        ?data
+        ()
     in
     let* () = retry_transfer 0 in
     if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
@@ -488,7 +540,79 @@ let start_new_head_monitor ~ws_uri =
       | TxFull _ -> return_unit)
     heads_subscription.stream
 
-let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
+let start_new_preconfirmed_receipts ~ic_data ~ws_uri =
+  let open Lwt_result_syntax in
+  let ws_client =
+    Websocket_client.create
+      ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+      ~keep_alive:false
+      Media_type.json
+      ws_uri
+  in
+  let* () = Websocket_client.connect ws_client in
+  let* heads_subscription =
+    Websocket_client.subscribe_newPreconfirmedReceipts ws_client
+  in
+  lwt_stream_iter_es
+    (fun receipt ->
+      let*? Transaction_receipt.{transactionHash; blockNumber; _} = receipt in
+      match ic_data with
+      | Some {ic_bench; _} ->
+          Stdlib.Hashtbl.add
+            ic_bench.preconfirmed
+            transactionHash
+            {timestamp = Ptime_clock.now (); block_number = blockNumber} ;
+          return_unit
+      | None -> return_unit)
+    heads_subscription.stream
+
+let ic_bench_csv ?ic_data () =
+  Option.iter
+    (fun {ic_bench; oc} ->
+      Stdlib.Hashtbl.iter
+        (fun hash sent_t ->
+          match
+            ( Stdlib.Hashtbl.find_opt ic_bench.included hash,
+              Stdlib.Hashtbl.find_opt ic_bench.preconfirmed hash )
+          with
+          | Some included_t, Some {timestamp = preconf_t; block_number} ->
+              let (Qty block_number) = block_number in
+              let diff_sent_included =
+                Ptime.Span.to_float_s (Ptime.diff included_t sent_t)
+              in
+              let diff_sent_preconf =
+                Ptime.Span.to_float_s (Ptime.diff preconf_t sent_t)
+              in
+              let diff_included_preconf =
+                Ptime.Span.to_float_s (Ptime.diff preconf_t included_t)
+              in
+              Printf.fprintf
+                oc
+                "%d|%s|%.6f|%.6f|%.6f\n%!"
+                (Z.to_int block_number)
+                (Ethereum_types.hash_to_string hash)
+                diff_sent_included
+                diff_sent_preconf
+                diff_included_preconf ;
+              Stdlib.Hashtbl.remove ic_bench.sent hash ;
+              Stdlib.Hashtbl.remove ic_bench.included hash ;
+              Stdlib.Hashtbl.remove ic_bench.preconfirmed hash
+          | Some included_t, None ->
+              let diff_sent_included =
+                Ptime.Span.to_float_s (Ptime.diff included_t sent_t)
+              in
+              Printf.fprintf
+                oc
+                "-1|%s|%.6f|0,0|0,0\n%!"
+                (Ethereum_types.hash_to_string hash)
+                diff_sent_included ;
+              Stdlib.Hashtbl.remove ic_bench.sent hash ;
+              Stdlib.Hashtbl.remove ic_bench.included hash
+          | _ -> ())
+        ic_bench.sent)
+    ic_data
+
+let start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data () =
   let open Lwt_result_syntax in
   let* next_blueprint_number =
     Batch.call
@@ -509,13 +633,14 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
          (module Tx_container)) =
     container
   in
+  let instant_confirmations = Option.is_some ic_data in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
     ~evm_node_endpoint:relay_endpoint
     ~rpc_timeout:Network_info.timeout
     ~next_blueprint_number
-    ~instant_confirmations:false
+    ~instant_confirmations
     ~on_new_blueprint:(fun number blueprint ->
       let*! () = Floodgate_events.received_blueprint number in
       let* () =
@@ -527,13 +652,39 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
               ~confirmed_txs:(List.to_seq hashes)
         | Error _ -> return_unit
       in
-      return (`Continue Blueprints_follower.{sbl_callbacks_activated = false}))
+      return
+        (`Continue
+           Blueprints_follower.{sbl_callbacks_activated = instant_confirmations}))
     ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
       return_unit)
-    ~on_next_block_info:(fun _ _ -> return_unit)
-    ~on_inclusion:(fun _ _ -> return_unit)
+    ~on_next_block_info:(fun _ _ ->
+      ic_bench_csv ?ic_data () ;
+      return_unit)
+    ~on_inclusion:(fun _ hash ->
+      match ic_data with
+      | Some {ic_bench; _} ->
+          Stdlib.Hashtbl.add ic_bench.included hash (Ptime_clock.now ()) ;
+          return_unit
+      | None -> return_unit)
     ~on_dropped:(fun _ _ -> return_unit)
     ()
+
+let init_ic_data ~ic_bench_csv =
+  let ic_data =
+    {
+      ic_bench =
+        {
+          sent = Stdlib.Hashtbl.create ic_bench_size;
+          included = Stdlib.Hashtbl.create ic_bench_size;
+          preconfirmed = Stdlib.Hashtbl.create ic_bench_size;
+        };
+      oc = open_out ic_bench_csv;
+    }
+  in
+  Printf.fprintf
+    ic_data.oc
+    "block_number|hash|diff_sent_included|diff_sent_preconfirmed|diff_included_preconfirmed\n" ;
+  ic_data
 
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
@@ -544,6 +695,12 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   let tx_per_addr_limit = Int64.of_int 999_999 in
   let max_size = 999_999 in
   let open Lwt_result_syntax in
+  let ic_data =
+    Option.map
+      (fun ic_bench_csv -> init_ic_data ~ic_bench_csv)
+      benchmark_instant_confirmations
+  in
+  let benchmark_instant_confirmations_enabled = Option.is_some ic_data in
   let* controller =
     controller_from_signer
       ~rpc_endpoint
@@ -562,8 +719,19 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     match ws_endpoint with
-    | Some ws_uri -> start_new_head_monitor ~ws_uri
-    | None -> start_blueprint_follower ~relay_endpoint ~rpc_endpoint
+    (* When benchmarking the instant confirmations, we need a websocket endpoint
+       the blueprint follower but we don't want to start a stream to monitor heads.
+       It is required to use the blueprint follower, hence the following condition. *)
+    | Some ws_uri when not benchmark_instant_confirmations_enabled ->
+        start_new_head_monitor ~ws_uri
+    | Some _ | None ->
+        start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ()
+  and* () =
+    if benchmark_instant_confirmations_enabled then
+      match ws_endpoint with
+      | Some ws_uri -> start_new_preconfirmed_receipts ~ic_data ~ws_uri
+      | None -> return_unit
+    else return_unit
   and* () =
     Tx_container.tx_queue_beacon
       ~evm_node_endpoint:(Rpc rpc_endpoint)
@@ -601,12 +769,14 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
                  ~token
                  ~infos
                  ~gas_limit
-                 node
-                 ~retry_attempt)
+                 ~retry_attempt
+                 ~ic_data
+                 node)
           in
           return_unit)
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
   and* () = State.report ~elapsed_time:elapsed_time_between_report in
+  Option.iter (fun {oc; _} -> close_out oc) ic_data ;
   return_unit

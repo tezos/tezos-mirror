@@ -6,6 +6,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type preconfirmed_data = {
+  timestamp : Ptime.t;
+  block_number : Ethereum_types.quantity;
+}
+
+type ic_bench = {
+  sent : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  included : (Ethereum_types.hash, Ptime.t) Stdlib.Hashtbl.t;
+  preconfirmed : (Ethereum_types.hash, preconfirmed_data) Stdlib.Hashtbl.t;
+}
+
+type ic_data = {ic_bench : ic_bench; oc : out_channel}
+
 type attempt = Always | Never | Number of int
 
 val run :
@@ -40,7 +53,11 @@ val deploy :
 val start_new_head_monitor : ws_uri:Uri.t -> unit tzresult Lwt.t
 
 val start_blueprint_follower :
-  relay_endpoint:Uri.t -> rpc_endpoint:Uri.t -> 'a tzresult Lwt.t
+  relay_endpoint:Uri.t ->
+  rpc_endpoint:Uri.t ->
+  ?ic_data:ic_data ->
+  unit ->
+  'a tzresult Lwt.t
 
 val get_transaction_receipt :
   Uri.t -> Ethereum_types.hash -> Transaction_receipt.t tzresult Lwt.t
