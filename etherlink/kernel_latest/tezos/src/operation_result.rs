@@ -714,6 +714,7 @@ mod tests {
     use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
     use crate::operation::{
         ManagerOperation, OriginationContent, Parameters, TransferContent,
+        TARGET_TEZOS_PROTOCOL,
     };
     use pretty_assertions::assert_eq;
 
@@ -852,8 +853,11 @@ mod tests {
         dummy_test_result_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "tez_transfer");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "tez_transfer",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -864,8 +868,11 @@ mod tests {
         simple_origination_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "origination");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "origination",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -876,8 +883,11 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "failed");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "failed",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -932,8 +942,11 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.internal_and_metadata", "applied");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.internal_and_metadata",
+            "applied",
+        );
         assert_eq!(output, operation_and_receipt_bytes);
     }
 
@@ -991,7 +1004,7 @@ mod tests {
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
         let operation_and_receipt_bytes = fetch_generated_data(
-            "S023",
+            TARGET_TEZOS_PROTOCOL,
             "operation.internal_and_metadata",
             "backtracked",
         );

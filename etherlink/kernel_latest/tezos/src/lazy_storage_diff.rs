@@ -90,6 +90,7 @@ mod tests {
             Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff,
             Update,
         },
+        operation::TARGET_TEZOS_PROTOCOL,
     };
     use mir::ast::BinWriter;
     use primitive_types::H256;
@@ -107,8 +108,11 @@ mod tests {
             }),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-alloc");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-alloc",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -127,8 +131,11 @@ mod tests {
             }),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-copy");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-copy",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -144,8 +151,11 @@ mod tests {
             storage_diff: StorageDiff::Remove,
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-remove");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-remove",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
@@ -167,8 +177,11 @@ mod tests {
             }]),
         })
         .into();
-        let expected =
-            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-update");
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "lazy_storage_diff",
+            "big_map_diff-update",
+        );
         assert_eq!(
             diff.to_bytes()
                 .expect("Lazy storage diff encoding should have succeed"),
