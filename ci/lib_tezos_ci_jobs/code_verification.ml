@@ -31,7 +31,6 @@
    that it appears in both variants as applicable, with the
    appropriate rules. *)
 
-open Gitlab_ci
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
@@ -119,15 +118,7 @@ let job_start =
     ~__POS__
     ~image:Images.datadog_ci
     ~stage:Stages.start
-    ~rules:
-      [
-        job_rule
-          ~if_:(If.not Rules.is_final_pipeline)
-          ~allow_failure:No
-          ~when_:Manual
-          ();
-        job_rule ~when_:Always ();
-      ]
+    ~rules:[job_rule ~allow_failure:No ~when_:Manual ()]
     ~timeout:(Minutes 10)
     ~name:"trigger"
     [
