@@ -288,10 +288,9 @@ let job_oc_unit_non_proto_x86_64 =
     ~image:Tezos_ci.Images.CI.test
       (* use the test image because [lib_benchmark] require Python *)
     ~arch:Amd64
-    ~needs_legacy:needs_cache_from_x86_64_build_jobs
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:dune_cache_pull_from_pipeline
+    ~dune_cache:(Cacio.dune_cache ())
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
