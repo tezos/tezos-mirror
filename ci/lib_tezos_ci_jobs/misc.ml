@@ -365,11 +365,10 @@ let job_oc_unit_other_x86_64 =
     ~image:Tezos_ci.Images.CI.build
     ~arch:Amd64
     ~cpu:High
-    ~needs_legacy:needs_cache_from_x86_64_build_jobs
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:dune_cache_pull_from_pipeline
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-other-unit"]
+    ~dune_cache:(Cacio.dune_cache ())
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
 
