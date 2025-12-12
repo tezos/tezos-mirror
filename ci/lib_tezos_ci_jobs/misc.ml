@@ -81,19 +81,6 @@ let job_script_test_gen_genesis =
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     ["eval $(opam env)"; "dune build scripts/gen-genesis/gen_genesis.exe"]
 
-let dune_cache_pull_from_pipeline =
-  Cacio.dune_cache ~key:Pipeline ~policy:Pull ()
-
-(* Add these jobs to the [needs_legacy] of jobs that use [dune_cache_pull_from_pipeline]
-   so that the cache is actually available. *)
-let needs_cache_from_x86_64_build_jobs =
-  [
-    (* We don't need the artifacts, but we do want the cache from the build jobs. *)
-    (Cacio.Job, Code_verification.job_build_x86_64_release Before_merging);
-    (Job, Code_verification.job_build_x86_64_exp Before_merging);
-    (Job, Code_verification.job_build_x86_64_extra_dev Before_merging);
-  ]
-
 let job_script_snapshot_alpha_and_link =
   CI.job
     "oc.script:snapshot_alpha_and_link"
@@ -345,10 +332,9 @@ let job_oc_unit_proto_x86_64 =
     ~image:Tezos_ci.Images.CI.build
     ~arch:Amd64
     ~cpu:Very_high
-    ~needs_legacy:needs_cache_from_x86_64_build_jobs
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:dune_cache_pull_from_pipeline
+    ~dune_cache:(Cacio.dune_cache ())
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
