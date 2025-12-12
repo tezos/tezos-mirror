@@ -859,3 +859,8 @@ let subscribe_l1_l2_levels ?start_l1_level ?timeout client =
   @@ function
   | Ethereum_types.Subscription.(Etherlink (L1_l2_levels l)) -> Some l
   | _ -> None
+
+let subscribe_newPreconfirmedReceipts ?timeout client =
+  subscribe_filter ?timeout client NewPreconfirmedReceipts @@ function
+  | Ethereum_types.Subscription.NewPreconfirmedReceipts r -> Some r
+  | _ -> None
