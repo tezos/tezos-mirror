@@ -34,7 +34,7 @@ use tezos_smart_rollup::types::PublicKeyHash;
 use thiserror::Error;
 
 #[cfg(test)]
-pub const TARGET_TEZOS_PROTOCOL: &str = "S023";
+pub const TARGET_TEZOS_PROTOCOL: &str = "T024";
 
 /**
 

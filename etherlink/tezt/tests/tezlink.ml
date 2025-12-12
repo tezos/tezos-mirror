@@ -151,28 +151,33 @@ let test_tezlink_current_level =
   (* verify an answer by the current_level rpc *)
   let check_current_level res expected_level =
     (* cycle length is hardcoded for now it won't change for some time *)
-    let cycle_length = 10800 in
+    let cycle_length = 14400 in
     Check.(
       JSON.(res |-> "level" |> as_int = expected_level)
         int
+        ~__LOC__
         ~error_msg:"Level: expected %R but got %L") ;
     Check.(
       JSON.(res |-> "level_position" |> as_int = expected_level - 1)
         int
+        ~__LOC__
         ~error_msg:"Expected %R but got %L") ;
     Check.(
       JSON.(res |-> "cycle" |> as_int = expected_level / cycle_length)
         int
+        ~__LOC__
         ~error_msg:"Cycle: expected %R but got %L") ;
     Check.(
       JSON.(
         res |-> "cycle_position" |> as_int
         = (expected_level - 1) mod cycle_length)
         int
+        ~__LOC__
         ~error_msg:"Cycle_position: expected %R but got %L") ;
     Check.(
       JSON.(res |-> "expected_commitment" |> as_bool = false)
         bool
+        ~__LOC__
         ~error_msg:"Expected_commitment: expected %R but got %L") ;
     unit
   in
@@ -2054,7 +2059,7 @@ let test_tezlink_prevalidation =
   in
 
   let hard_gas_limit_per_operation = 1_040_000 in
-  let hard_gas_limit_per_block = 1_386_666 in
+  let hard_gas_limit_per_block = 1_040_000 in
 
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
@@ -2327,7 +2332,7 @@ let test_tezlink_validation_gas_limit =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   let* client_tezlink = Client.init ~endpoint () in
-  let hard_gas_limit_per_block = 1_386_666 in
+  let hard_gas_limit_per_block = 1_040_000 in
 
   (* make sure there are no transactions in the queue *)
   let* () = produce_block_and_wait_for ~sequencer 1 in

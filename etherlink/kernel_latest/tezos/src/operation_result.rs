@@ -404,6 +404,8 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+    #[encoding(dynamic, list)]
+    pub address_registry_diff: Vec<Empty>,
 }
 
 impl Default for TransferSuccess {
@@ -418,6 +420,7 @@ impl Default for TransferSuccess {
             paid_storage_size_diff: 0.into(),
             allocated_destination_contract: false,
             lazy_storage_diff: None,
+            address_registry_diff: vec![],
         }
     }
 }
@@ -784,7 +787,7 @@ mod tests {
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
-                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_milligas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
+                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_milligas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false, address_registry_diff: vec![] }
                             ))
 
                         , internal_operation_results: vec![] })
@@ -937,6 +940,7 @@ mod tests {
                 storage_size: 0.into(),
                 paid_storage_size_diff: 0.into(),
                 allocated_destination_contract: false,
+                address_registry_diff: vec![],
             })),
         });
         let output = operation
@@ -997,6 +1001,7 @@ mod tests {
                     storage_size: 0.into(),
                     paid_storage_size_diff: 0.into(),
                     allocated_destination_contract: false,
+                    address_registry_diff: vec![],
                 }),
             }),
         });
