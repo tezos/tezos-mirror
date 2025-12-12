@@ -25,6 +25,7 @@ val run :
   elapsed_time_between_report:float ->
   dummy_data_size:int option ->
   retry_attempt:attempt ->
+  benchmark_instant_confirmations:string option ->
   unit tzresult Lwt.t
 
 val deploy :

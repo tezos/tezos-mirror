@@ -539,7 +539,7 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
     ~max_lifespan_s ~spawn_interval ~tick_interval ~base_fee_factor
     ~initial_balance ~txs_per_salvo ~elapsed_time_between_report
-    ~dummy_data_size ~retry_attempt =
+    ~dummy_data_size ~retry_attempt ~benchmark_instant_confirmations =
   State.dummy_data_size := dummy_data_size ;
   let tx_per_addr_limit = Int64.of_int 999_999 in
   let max_size = 999_999 in
