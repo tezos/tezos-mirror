@@ -5,10 +5,9 @@
 //! Tezos operations
 
 use crate::lazy_storage_diff::LazyStorageDiffList;
-use crate::operation::OriginationContent;
 use crate::operation::{
-    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
-    TransferContent,
+    ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
+    OperationContent, OriginationContent, RevealContent, TransferContent,
 };
 use mir::gas;
 use mir::gas::interpret_cost::SigCostError;
@@ -75,7 +74,10 @@ pub enum ValidityError {
     GasLimitSetError(String),
     #[error("Gas exhaustion")]
     OutOfGas,
+    #[error("Operation not supported")]
+    UnsupportedOperation,
 }
+
 impl From<gas::OutOfGas> for ValidityError {
     fn from(_: gas::OutOfGas) -> Self {
         ValidityError::OutOfGas
@@ -683,17 +685,17 @@ pub fn produce_skipped_receipt(
 ) -> OperationWithMetadata {
     match &op.operation {
         OperationContent::Reveal(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Reveal(produce_skipped_result(balance_updates)),
         },
         OperationContent::Transfer(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Transfer(produce_skipped_result(
                 balance_updates,
             )),
         },
         OperationContent::Origination(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Origination(produce_skipped_result(
                 balance_updates,
             )),
@@ -733,7 +735,7 @@ impl NomReader<'_> for OperationWithMetadata {
     fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
         let (input, content) = ManagerOperationContent::nom_read(input)?;
         let (input, receipt) = match content {
-            ManagerOperationContent::Transfer(_) => {
+            ManagerOperationContent::Transaction(_) => {
                 let (input, receipt) =
                     OperationResult::<TransferContent>::nom_read(input)?;
                 (input, OperationResultSum::Transfer(receipt))
@@ -746,6 +748,12 @@ impl NomReader<'_> for OperationWithMetadata {
                 let (input, receipt) =
                     OperationResult::<OriginationContent>::nom_read(input)?;
                 (input, OperationResultSum::Origination(receipt))
+            }
+            _ => {
+                return Err(nom::Err::Error(tezos_nom::error::DecodeError::invalid_tag(
+                    input,
+                    format!("{content:?}"),
+                )))
             }
         };
         Ok((input, Self { content, receipt }))
@@ -767,14 +775,16 @@ impl BinWriter for OperationWithMetadata {
 mod tests {
     use super::*;
     use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
-    use crate::operation::{ManagerOperation, OriginationContent, TransferContent};
+    use crate::operation::{
+        ManagerOperation, OriginationContent, Parameters, TransferContent,
+    };
     use pretty_assertions::assert_eq;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
         OperationDataAndMetadata::OperationWithMetadata (
                 OperationBatchWithMetadata {
                     operations: vec![OperationWithMetadata {
-                        content: ManagerOperationContent::Transfer(
+                        content: ManagerOperationContent::Transaction(
                             ManagerOperation {
                                 source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
                                 fee: 255.into(),
@@ -784,7 +794,7 @@ mod tests {
                                 operation: TransferContent {
                                     amount: 27942405962072064.into(),
                                     destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                                    parameters: None,
+                                    parameters: Parameters::default(),
                                 }
                             }),
                         receipt: OperationResultSum::Transfer(
@@ -826,10 +836,10 @@ mod tests {
         OperationDataAndMetadata::OperationWithMetadata (
                  OperationBatchWithMetadata {
                     operations: vec![OperationWithMetadata {
-                        content: ManagerOperationContent::Transfer(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 468.into(), counter: 1.into(), gas_limit: 2169.into(), storage_limit: 0.into(), operation: TransferContent {
+                        content: ManagerOperationContent::Transaction(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 468.into(), counter: 1.into(), gas_limit: 2169.into(), storage_limit: 0.into(), operation: TransferContent {
                             amount: 42000000.into(),
                             destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                            parameters: None,
+                            parameters: Parameters::default(),
                         } }),
                         receipt: OperationResultSum::Transfer(OperationResult { balance_updates: vec![], result: ContentResult::Applied(
                             TransferTarget::ToContrat(
@@ -966,7 +976,7 @@ mod tests {
                     "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
                 )
                 .unwrap(),
-                parameters: None,
+                parameters: Parameters::default(),
             },
             sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
                 .unwrap(),
@@ -1021,7 +1031,7 @@ mod tests {
                     "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
                 )
                 .unwrap(),
-                parameters: None,
+                parameters: Parameters::default(),
             },
             sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
                 .unwrap(),

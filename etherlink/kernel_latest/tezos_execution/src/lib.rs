@@ -25,14 +25,16 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
-use tezos_tezlink::operation::{Operation, OriginationContent, Script};
+use tezos_tezlink::operation::{
+    ManagerOperationContentConv, Operation, OriginationContent, Script,
+};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
     OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
-    operation::{OperationContent, Parameter, RevealContent, TransferContent},
+    operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
         OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
@@ -192,10 +194,10 @@ fn execute_internal_operations<'a, Host: Runtime>(
                 let content = TransferContent {
                     amount,
                     destination: dest_contract,
-                    parameters: Some(Parameter {
+                    parameters: Parameters {
                         entrypoint: destination_address.entrypoint,
                         value: encoded_value,
-                    }),
+                    },
                 };
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -211,10 +213,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                         sender_account,
                         &content.amount,
                         &content.destination,
-                        content
-                            .parameters
-                            .as_ref()
-                            .map_or(&Entrypoint::default(), |param| &param.entrypoint),
+                        &content.parameters.entrypoint,
                         value,
                         parser,
                         all_internal_receipts,
@@ -468,23 +467,18 @@ fn transfer_external<'a, Host: Runtime>(
     operation_ctx: &mut OperationCtx<'a>,
     amount: &Narith,
     dest: &Contract,
-    parameter: &Option<Parameter>,
+    parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         tc_ctx.host,
         Debug,
-        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameter:?}",
+        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
         operation_ctx.source.pkh()
     );
-    let (entrypoint, value) = match parameter {
-        Some(param) => (
-            &param.entrypoint,
-            Micheline::decode_raw(&parser.arena, &param.value)?,
-        ),
-        None => (&Entrypoint::default(), Micheline::from(())),
-    };
+    let entrypoint = &parameters.entrypoint;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
 
     transfer(
         tc_ctx,
@@ -932,7 +926,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Reveal(manager_result),
             }
         }
@@ -973,7 +967,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Transfer(manager_result),
             }
         }
@@ -1012,7 +1006,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Origination(manager_result),
             }
         }
@@ -1045,9 +1039,9 @@ mod tests {
         block::TezBlock,
         enc_wrappers::OperationHash,
         operation::{
-            sign_operation, ManagerOperation, ManagerOperationContent, Operation,
-            OperationContent, OriginationContent, Parameter, RevealContent, Script,
-            TransferContent,
+            sign_operation, ManagerOperation, ManagerOperationContent,
+            ManagerOperationContentConv, Operation, OperationContent, OriginationContent,
+            Parameters, RevealContent, Script, TransferContent,
         },
         operation_result::{
             ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
@@ -1253,7 +1247,7 @@ mod tests {
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
                 }
-                .into()
+                .into_manager_operation_content()
             })
             .collect::<Vec<ManagerOperationContent>>();
 
@@ -1295,7 +1289,7 @@ mod tests {
         source: Bootstrap,
         amount: Narith,
         destination: Contract,
-        parameters: Option<Parameter>,
+        parameters: Parameters,
     ) -> Operation {
         make_operation(
             fee,
@@ -1787,7 +1781,7 @@ mod tests {
             source.clone(),
             100_u64.into(),
             Contract::Implicit(dest.pkh),
-            None,
+            Parameters::default(),
         );
 
         let receipt = validate_and_apply_operation(
@@ -1866,7 +1860,7 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dst.pkh.clone()),
-            None,
+            Parameters::default(),
         );
 
         let receipt = validate_and_apply_operation(
@@ -1958,7 +1952,7 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dest.pkh.clone()),
-            None,
+            Parameters::default(),
         );
 
         let receipt = validate_and_apply_operation(
@@ -2072,11 +2066,11 @@ mod tests {
             src.clone(),
             0.into(),
             Contract::Originated(desthash.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::try_from("fund")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(requested_amount as i128).encode(),
-            }),
+            },
         );
         let res = validate_and_apply_operation(
             &mut host,
@@ -2125,10 +2119,10 @@ mod tests {
                             content: TransferContent {
                                 amount: requested_amount.into(),
                                 destination: Contract::Implicit(src.pkh.clone()),
-                                parameters: Some(Parameter {
+                                parameters: Parameters {
                                     entrypoint: Entrypoint::default(),
                                     value: Micheline::from(()).encode(),
-                                }),
+                                },
                             },
                             sender: Contract::Originated(desthash.clone()),
                             nonce: 1,
@@ -2206,10 +2200,10 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Originated(dest),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: storage_value.clone(),
-            }),
+            },
         );
 
         let receipt = validate_and_apply_operation(
@@ -2321,10 +2315,10 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Originated(dest),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
 
         let receipt = validate_and_apply_operation(
@@ -2402,10 +2396,10 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dest.pkh),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(0).encode(),
-            }),
+            },
         );
 
         let receipt = validate_and_apply_operation(
@@ -2467,11 +2461,11 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Implicit(dest.pkh),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::try_from("non_default")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
 
         let receipt = validate_and_apply_operation(
@@ -2538,14 +2532,14 @@ mod tests {
         let transfer_content_1 = OperationContent::Transfer(TransferContent {
             amount: 10.into(),
             destination: Contract::Implicit(dest.pkh.clone()),
-            parameters: None,
+            parameters: Parameters::default(),
         });
 
         // op‑3: transfer 20ꜩ to dest
         let transfer_content_2 = OperationContent::Transfer(TransferContent {
             amount: 20.into(),
             destination: Contract::Implicit(dest.pkh.clone()),
-            parameters: None,
+            parameters: Parameters::default(),
         });
 
         let batch = make_operation(
@@ -2727,7 +2721,7 @@ mod tests {
         let transfer_content = OperationContent::Transfer(TransferContent {
             amount: 10.into(),
             destination: Contract::Implicit(dest.pkh.clone()),
-            parameters: None,
+            parameters: Parameters::default(),
         });
 
         let batch = make_operation(
@@ -2809,19 +2803,19 @@ mod tests {
         let succ_transfer = OperationContent::Transfer(TransferContent {
             amount: 1.into(),
             destination: Contract::Originated(succ_dest.clone()),
-            parameters: Some(Parameter {
+            parameters: Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from("Hello world").encode(),
-            }),
+            },
         });
 
         let fail_transfer = OperationContent::Transfer(TransferContent {
             amount: 1.into(),
             destination: Contract::Originated(fail_dest.clone()),
-            parameters: Some(Parameter {
+            parameters: Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         });
 
         let batch = make_operation(
@@ -3162,10 +3156,10 @@ mod tests {
                 OperationContent::Transfer(TransferContent {
                     amount: 0.into(),
                     destination: Contract::Originated(contract_chapo_hash),
-                    parameters: Some(Parameter {
+                    parameters: Parameters {
                         entrypoint: mir::ast::Entrypoint::default(),
                         value: param_value.encode(),
-                    }),
+                    },
                 }),
             ],
         );
@@ -3327,10 +3321,10 @@ mod tests {
             src.clone(),
             transfer_amount.into(),
             Contract::Originated(contract_hash.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
 
         let _receipt = validate_and_apply_operation(
@@ -3390,10 +3384,10 @@ mod tests {
             src.clone(),
             transfer_amount.into(),
             Contract::Originated(contract_hash.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
 
         let _receipt = validate_and_apply_operation(
@@ -3457,10 +3451,10 @@ mod tests {
             src.clone(),
             30_u64.into(),
             Contract::Originated(contract_hash.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
 
         let _receipt = validate_and_apply_operation(
@@ -3535,10 +3529,10 @@ mod tests {
             vec![OperationContent::Transfer(TransferContent {
                 amount: 1000.into(),
                 destination: Contract::Originated(contract_chapo_hash.clone()),
-                parameters: Some(Parameter {
+                parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
                     value: Micheline::from(()).encode(),
-                }),
+                },
             })],
         );
         let receipts = validate_and_apply_operation(
@@ -3735,10 +3729,10 @@ mod tests {
             vec![OperationContent::Transfer(TransferContent {
                 amount: 0.into(),
                 destination: Contract::Originated(contract_chapo_hash.clone()),
-                parameters: Some(Parameter {
+                parameters: Parameters {
                     entrypoint: mir::ast::Entrypoint::default(),
                     value: Micheline::from(()).encode(),
-                }),
+                },
             })],
         );
         let receipts = validate_and_apply_operation(
@@ -3949,7 +3943,7 @@ mod tests {
         let transfer_content = OperationContent::Transfer(TransferContent {
             amount: 1.into(),
             destination: src_acc.contract(),
-            parameters: None,
+            parameters: Parameters::default(),
         });
 
         let batch = make_operation(
@@ -4318,7 +4312,7 @@ mod tests {
             src.clone(),
             0.into(),
             Contract::Implicit(dst.pkh),
-            None,
+            Parameters::default(),
         );
         let receipts1 = validate_and_apply_operation(
             &mut host,
@@ -4355,11 +4349,11 @@ mod tests {
             src.clone(),
             0.into(),
             Contract::Originated(kt1_addr.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::try_from("default")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(()).encode(),
-            }),
+            },
         );
         let receipts2 = validate_and_apply_operation(
             &mut host,
@@ -4397,11 +4391,11 @@ mod tests {
             src.clone(),
             0.into(),
             Contract::Originated(kt1_addr.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::try_from("call")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(src.clone().pkh.to_b58check()).encode(),
-            }),
+            },
         );
         let receipts3 = validate_and_apply_operation(
             &mut host,
@@ -4447,11 +4441,11 @@ mod tests {
             src,
             0.into(),
             Contract::Originated(kt1_addr.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::try_from("call")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(kt1_addr.to_b58check()).encode(),
-            }),
+            },
         );
         let receipts4 = validate_and_apply_operation(
             &mut host,
@@ -4543,7 +4537,7 @@ mod tests {
             src.clone(),
             0.into(),
             Contract::Originated(caller_addr),
-            None,
+            Parameters::default(),
         );
 
         let receipts = validate_and_apply_operation(
@@ -4639,10 +4633,10 @@ mod tests {
             tz1.clone(),
             10.into(),
             Contract::Originated(sender_addr.clone()),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::default(),
                 value: Micheline::from(CONTRACT_2).encode(),
-            }),
+            },
         );
 
         let receipts = validate_and_apply_operation(
@@ -4939,7 +4933,7 @@ mod tests {
             tz1.clone(),
             0.into(),
             Contract::Originated(originator_addr),
-            None,
+            Parameters::default(),
         );
 
         let receipts = validate_and_apply_operation(
@@ -5176,10 +5170,10 @@ mod tests {
             tz1.clone(),
             0.into(),
             Contract::Originated(second_sender_contract),
-            Some(Parameter {
+            Parameters {
                 entrypoint: Entrypoint::default(),
                 value: Micheline::from(receiver.kt1().to_base58_check()).encode(),
-            }),
+            },
         );
 
         // After that call, the storage of the receiver should be 'False'

@@ -5,60 +5,52 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
-use mir::ast::michelson_address::Entrypoint;
+use crate::operation_result::ValidityError;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{BlsSignature, SecretKeyEd25519, UnknownSignature};
+use tezos_crypto_rs::hash::{SecretKeyEd25519, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     nom::NomReader,
 };
-use tezos_protocol::contract::Contract;
-use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+pub use tezos_protocol::operation::{
+    ManagerOperationContent as ManagerOperation,
+    OperationContent as ManagerOperationContent,
+    OriginationContent,
+    Parameters,
+    RevealContent,
+    Script,
+    // Transfers are often called "transactions" in the protocol, we try
+    // to consistently call them transfers to avoid confusion with the
+    // Ethereum notion of transaction which is more generic as it also
+    // encompasses the case of originations.
+    TransactionContent as TransferContent,
+};
+#[cfg(test)]
+use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup::types::PublicKeyHash;
 use thiserror::Error;
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Parameter {
-    pub entrypoint: Entrypoint,
-    #[encoding(dynamic, bytes)]
-    pub value: Vec<u8>,
-}
+/**
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct RevealContent {
-    pub pk: PublicKey,
-    pub proof: Option<BlsSignature>,
-}
+There is a distance between the binary format of manager operations
+and what we want to manipulate when applying them. The former is
+imposed by the protocol and corresponds to this
+ManagerOperationContent struct. The latter is
+ManagerOperation<OperationContent> and is the input type of the
+apply_operation function (in the lib.rs file of the tezos_execution
+crate).
 
-/// Transfers are often called "transactions" in the protocol, we try
-/// to consistently call them transfers to avoid confusion with the
-/// Ethereum notion of transaction which is more generic as it also
-/// encompasses the case of originations.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct TransferContent {
-    pub amount: Narith,
-    pub destination: Contract,
-    pub parameters: Option<Parameter>,
-}
+There are some fields common to all manager operations and some fields
+specific to each kind of operation. A lot can be done about a manager
+operation (in particular checking the signature and debiting the fees)
+before we dispatch on the operation kind but the binary format starts
+with the operation-kind tag, then the generic fields, and finally the
+kind-specific fields.
 
-// Original code is from sdk/rust/protocol/src/operation.rs
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct OriginationContent {
-    pub balance: Narith,
-    pub delegate: Option<PublicKeyHash>,
-    pub script: Script,
-}
-
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Script {
-    #[encoding(dynamic, bytes)]
-    pub code: Vec<u8>,
-    #[encoding(dynamic, bytes)]
-    pub storage: Vec<u8>,
-}
-
+*/
 #[derive(Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
@@ -68,16 +60,6 @@ pub enum OperationContent {
 
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct ManagerOperation<C> {
-    pub source: PublicKeyHash,
-    pub fee: Narith,
-    pub counter: Narith,
-    pub gas_limit: Narith,
-    pub storage_limit: Narith,
-    pub operation: C,
-}
-
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
@@ -110,55 +92,40 @@ impl Decodable for Operation {
     }
 }
 
-/**
-
-There is a distance between the binary format of manager operations
-and what we want to manipulate when applying them. The former is
-imposed by the protocol and corresponds to this
-ManagerOperationContent struct. The latter is
-ManagerOperation<OperationContent> and is the input type of the
-apply_operation function (in the lib.rs file of the tezos_execution
-crate).
-
-There are some fields common to all manager operations and some fields
-specific to each kind of operation. A lot can be done about a manager
-operation (in particular checking the signature and debiting the fees)
-before we dispatch on the operation kind but the binary format starts
-with the operation-kind tag, then the generic fields, and finally the
-kind-specific fields.
-
-*/
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-#[encoding(tags = "u8")]
-pub enum ManagerOperationContent {
-    #[encoding(tag = 107)]
-    Reveal(ManagerOperation<RevealContent>),
-    #[encoding(tag = 108)]
-    Transfer(ManagerOperation<TransferContent>),
-    #[encoding(tag = 109)]
-    Origination(ManagerOperation<OriginationContent>),
+pub trait ManagerOperationField {
+    fn gas_limit(&self) -> Result<&Narith, ValidityError>;
+    fn source(&self) -> Result<&PublicKeyHash, ValidityError>;
 }
 
-impl ManagerOperationContent {
-    pub fn gas_limit(&self) -> &Narith {
+impl ManagerOperationField for ManagerOperationContent {
+    fn gas_limit(&self) -> Result<&Narith, ValidityError> {
         match self {
-            ManagerOperationContent::Reveal(op) => &op.gas_limit,
-            ManagerOperationContent::Transfer(op) => &op.gas_limit,
-            ManagerOperationContent::Origination(op) => &op.gas_limit,
+            ManagerOperationContent::Reveal(op) => Ok(&op.gas_limit),
+            ManagerOperationContent::Transaction(op) => Ok(&op.gas_limit),
+            ManagerOperationContent::Origination(op) => Ok(&op.gas_limit),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 
-    pub fn source(&self) -> &PublicKeyHash {
+    fn source(&self) -> Result<&PublicKeyHash, ValidityError> {
         match self {
-            ManagerOperationContent::Reveal(op) => &op.source,
-            ManagerOperationContent::Transfer(op) => &op.source,
-            ManagerOperationContent::Origination(op) => &op.source,
+            ManagerOperationContent::Reveal(op) => Ok(&op.source),
+            ManagerOperationContent::Transaction(op) => Ok(&op.source),
+            ManagerOperationContent::Origination(op) => Ok(&op.source),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 }
 
-impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
-    fn from(op: ManagerOperation<OperationContent>) -> Self {
+pub trait ManagerOperationContentConv: Sized {
+    fn into_manager_operation_content(self) -> ManagerOperationContent;
+    fn try_from_manager_operation_content(
+        op: ManagerOperationContent,
+    ) -> Result<Self, ValidityError>;
+}
+
+impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
+    fn into_manager_operation_content(self) -> ManagerOperationContent {
         let ManagerOperation {
             source,
             fee,
@@ -166,7 +133,7 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
             gas_limit,
             storage_limit,
             operation,
-        } = op;
+        } = self;
         match operation {
             OperationContent::Reveal(c) => {
                 ManagerOperationContent::Reveal(ManagerOperation {
@@ -179,7 +146,7 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
                 })
             }
             OperationContent::Transfer(c) => {
-                ManagerOperationContent::Transfer(ManagerOperation {
+                ManagerOperationContent::Transaction(ManagerOperation {
                     source,
                     fee,
                     counter,
@@ -200,10 +167,10 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
             }
         }
     }
-}
 
-impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
-    fn from(op: ManagerOperationContent) -> Self {
+    fn try_from_manager_operation_content(
+        op: ManagerOperationContent,
+    ) -> Result<Self, ValidityError> {
         match op {
             ManagerOperationContent::Reveal(ManagerOperation {
                 source,
@@ -212,29 +179,29 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Reveal(c),
-            },
-            ManagerOperationContent::Transfer(ManagerOperation {
+            }),
+            ManagerOperationContent::Transaction(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Transfer(c),
-            },
+            }),
             ManagerOperationContent::Origination(ManagerOperation {
                 source,
                 fee,
@@ -242,14 +209,15 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Origination(c),
-            },
+            }),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 }
@@ -317,7 +285,7 @@ fn make_dummy_operation(
             storage_limit: 45_u64.into(),
             operation,
         }
-        .into()],
+        .into_manager_operation_content()],
         signature,
     }
 }
@@ -344,6 +312,7 @@ mod tests {
         encoding_test_data_helper::test_helpers::fetch_generated_data,
         operation::make_dummy_reveal_operation,
     };
+    use mir::ast::michelson_address::Entrypoint;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
     use rlp::{Decodable, Rlp, RlpStream};
@@ -433,7 +402,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ").unwrap();
         let expected_operation = Operation {
             branch,
-            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transaction(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -446,7 +415,7 @@ mod tests {
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
-                    parameters: None,
+                    parameters: Parameters::default(),
                 },
                 gas_limit: 9451117u64.into(),
                 storage_limit: 57024931117u64.into(),
@@ -512,7 +481,7 @@ mod tests {
 
         let expected_operation = Operation {
             branch,
-            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transaction(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -525,10 +494,10 @@ mod tests {
                         "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
                     )
                     .unwrap(),
-                    parameters: Some(Parameter {
+                    parameters: Parameters {
                         entrypoint: Entrypoint::try_from("action").unwrap(),
                         value: vec![0x02, 0x00, 0x00, 0x00, 0x02, 0x03, 0x4f],
-                    }),
+                    },
                 },
                 gas_limit: 9451117u64.into(),
                 storage_limit: 57024931117u64.into(),
@@ -594,7 +563,7 @@ mod tests {
                     gas_limit: 171_u64.into(),
                     storage_limit: 0_u64.into(),
                 }),
-                ManagerOperationContent::Transfer(ManagerOperation {
+                ManagerOperationContent::Transaction(ManagerOperation {
                     source: PublicKeyHash::from_b58check(
                         "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
                     )
@@ -607,7 +576,7 @@ mod tests {
                             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                         )
                         .unwrap(),
-                        parameters: None,
+                        parameters: Parameters::default(),
                     },
                     gas_limit: 2101_u64.into(),
                     storage_limit: 0_u64.into(),

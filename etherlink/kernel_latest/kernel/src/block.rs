@@ -626,7 +626,7 @@ mod tests {
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_tezlink::operation::sign_operation;
-    use tezos_tezlink::operation::Parameter;
+    use tezos_tezlink::operation::Parameters;
 
     fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
@@ -636,6 +636,7 @@ mod tests {
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::ManagerOperationContent;
+    use tezos_tezlink::operation::ManagerOperationContentConv;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
     use tezos_tezlink::operation::OriginationContent;
@@ -700,7 +701,7 @@ mod tests {
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
                 }
-                .into()
+                .into_manager_operation_content()
             })
             .collect::<Vec<ManagerOperationContent>>();
 
@@ -741,7 +742,7 @@ mod tests {
         source: Bootstrap,
         amount: Narith,
         destination: Contract,
-        parameters: Option<Parameter>,
+        parameters: Parameters,
     ) -> Operation {
         make_operation(
             fee,
@@ -1204,7 +1205,7 @@ mod tests {
             boostrap1,
             35_u64.into(),
             bootstrap2_contract,
-            None,
+            Parameters::default(),
         );
 
         // Bootstrap 1 reveals its manager and then
@@ -1321,7 +1322,7 @@ mod tests {
             boostrap1,
             0.into(),
             generated_contract.clone(),
-            None,
+            Parameters::default(),
         );
 
         let timestamp_of_call = 10i64;

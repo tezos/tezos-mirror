@@ -31,7 +31,7 @@ use tezos_execution::account_storage::{TezlinkAccount, TezlinkImplicitAccount};
 use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
-use tezos_tezlink::operation::TransferContent;
+use tezos_tezlink::operation::{Parameters, TransferContent};
 use tezos_tezlink::operation_result::{
     ApplyOperationErrors, BalanceUpdate, ContentResult, TransferError, TransferSuccess,
     TransferTarget,
@@ -486,7 +486,7 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
     let content = TransferContent {
         amount: amount.into(),
         destination: receiver.clone(),
-        parameters: None,
+        parameters: Parameters::default(),
     };
 
     let result = match tezlink_deposit(host, context, amount, receiver) {
