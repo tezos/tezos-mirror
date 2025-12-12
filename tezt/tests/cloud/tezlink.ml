@@ -215,6 +215,30 @@ module Faucet_frontend_process = struct
       ]
 end
 
+module Bridge_frontend_process = struct
+  module Parameters = struct
+    type persistent_state = unit
+
+    type session_state = unit
+
+    let base_default_name = "bridge-frontend"
+
+    let default_colors = Evm_node.daemon_default_colors
+  end
+
+  include Daemon.Make (Parameters)
+
+  let run ?runner ~path ~port () =
+    let daemon =
+      create ?runner ~name:Parameters.base_default_name ~path:"sh" ()
+    in
+    run
+      ?runner
+      daemon
+      ()
+      ["-c"; sf "cd %s && npm run dev -- --port %d" path port]
+end
+
 let polling_period = function
   | Evm_node.Nothing -> 500
   | Time_between_blocks t ->
@@ -394,6 +418,22 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
+let create_env_file ~agent destination env =
+  let temp_file = Temp.file "config" in
+  let ch = open_out temp_file in
+  let config_filtered =
+    List.filter_map
+      (function
+        | param, Some value -> Some (Format.sprintf "%s=%s" param value)
+        | _, None -> None)
+      env
+  in
+  let config_str = String.concat "\n" config_filtered in
+  Format.fprintf (Format.formatter_of_out_channel ch) "%s\n" config_str ;
+  let () = close_out ch in
+  let* (_ : string) = Agent.copy agent ~source:temp_file ~destination in
+  unit
+
 let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
   let tezlink_sandbox_endpoint =
@@ -409,30 +449,29 @@ let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
       "https://github.com/rafoo/tezos-faucet-backend.git"
       faucet_backend_dir
   in
+  let config =
+    [
+      ("API_PORT", sf "%d" faucet_api_port);
+      ("RPC_URL", tezlink_sandbox_endpoint);
+      ("FAUCET_PRIVATE_KEY", faucet_private_key);
+      ("AUTHORIZED_HOST", {|"*"|});
+      ("ENABLE_CAPTCHA", "false");
+      ("DISABLE_CHALLENGES", "true");
+      ("MAX_BALANCE", "6000");
+      ("MIN_TEZ", "1");
+      ("MAX_TEZ", "6000");
+      ("MIN_CHALLENGES", "1");
+      ("MAX_CHALLENGES", "550");
+      ("MAX_CHALLENGES_WITH_CAPTCHA", "66");
+      ("CHALLENGE_SIZE", "2048");
+      ("DIFFICULTY", "4");
+    ]
+  in
   let* () =
-    create_config_file
+    create_env_file
       ~agent
       (sf "%s/.env" faucet_backend_dir)
-      {|
-API_PORT=%d
-RPC_URL=%s
-FAUCET_PRIVATE_KEY=%s
-
-AUTHORIZED_HOST="*"
-ENABLE_CAPTCHA=false
-DISABLE_CHALLENGES=true
-MAX_BALANCE=6000
-MIN_TEZ=1
-MAX_TEZ=6000
-MIN_CHALLENGES=1
-MAX_CHALLENGES=550
-MAX_CHALLENGES_WITH_CAPTCHA=66
-CHALLENGE_SIZE=2048
-DIFFICULTY=4
-|}
-      faucet_api_port
-      tezlink_sandbox_endpoint
-      faucet_private_key
+      (List.map (fun (arg, param) -> (arg, Some param)) config)
   in
   let* () =
     run_cmd
@@ -441,6 +480,39 @@ DIFFICULTY=4
   in
   let runner = Agent.runner agent in
   Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
+
+let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
+    ~tzkt_api_url ~rollup ~bridge_proxy =
+  let bridge_frontend_port = proxy_internal_port bridge_proxy in
+  let bridge_dir = "bridge-tezlink" in
+  (* Clone bridge frontend *)
+  let* () =
+    git_clone
+      agent
+      "https://github.com/Arnaud-Bihan/tezlink_deposit.git"
+      bridge_dir
+  in
+  let* () =
+    create_env_file
+      ~agent
+      (sf "%s/.env" bridge_dir)
+      [
+        ("VITE_ENDPOINT", l1_endpoint);
+        ("VITE_CONTRACT", Some bridge_contract);
+        ("VITE_TZKT", tzkt_api_url);
+        ("VITE_ROLLUP", Some rollup);
+        ("VITE_NETWORK", network);
+      ]
+  in
+  let* () =
+    run_cmd agent (sf "cd %s && npm install && npm run build" bridge_dir)
+  in
+  let runner = Agent.runner agent in
+  Bridge_frontend_process.run
+    ?runner
+    ~path:bridge_dir
+    ~port:bridge_frontend_port
+    ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
     ~faucet_pkh ~tzkt_proxy ~faucet_frontend_proxy =
@@ -726,7 +798,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   add_service cloud ~name ~url:(url endpoint)
 
 let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
-    ~faucet_proxys_opt ~umami_proxys_opt =
+    ~faucet_proxys_opt ~umami_proxys_opt ~bridge_proxy_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
     let name_check = "Check Tezlink RPC endpoint" in
@@ -777,6 +849,11 @@ let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
     | None -> unit
     | Some {umami_proxy; _} -> add_proxy_service "Umami" umami_proxy
   in
+  let* () =
+    match bridge_proxy_opt with
+    | None -> unit
+    | Some bridge_proxy -> add_proxy_service "Bridge" bridge_proxy
+  in
   unit
 
 type dns_domains = {
@@ -785,6 +862,7 @@ type dns_domains = {
   faucet_domain : string;
   faucet_api_domain : string;
   umami_domain : string;
+  bridge_domain : string;
 }
 
 let nginx_config_of_proxy_opt agent = function
@@ -832,6 +910,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               faucet_domain = make_domain "faucet";
               faucet_api_domain = make_domain "faucet.api";
               umami_domain = make_domain "umami";
+              bridge_domain = make_domain "bridge";
             })
           Cli.parent_dns_domain
       in
@@ -908,6 +987,26 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             some {tzkt_proxy; umami_proxy}
         | _ -> none
       in
+      let* bridge_proxy_opt =
+        match (Cli.deposit_frontend, Cli.external_sequencer_endpoint) with
+        | false, _ -> none
+        | true, None ->
+            Test.fail
+              "Can't deploy the bridge frontend because \
+               --external-sequencer-endpoint is missing. You can't do deposit \
+               on a sandbox sequencer so the bridge would be useless."
+        | true, Some _ ->
+            let bridge_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.bridge_domain) dns_domains)
+                None
+                activate_ssl
+            in
+            some bridge_proxy
+      in
       let* () =
         add_services
           cloud
@@ -916,6 +1015,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
+          ~bridge_proxy_opt
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
@@ -977,6 +1077,31 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_frontend_proxy
             in
             unit
+      and* () =
+        match bridge_proxy_opt with
+        | None -> unit
+        | Some bridge_proxy ->
+            let () = toplog "Starting bridge frontend" in
+            let bridge_contract, rollup =
+              match (Cli.bridge_contract, Cli.rollup_address) with
+              | Some bridge_contract, Some rollup_address ->
+                  (bridge_contract, rollup_address)
+              | _ ->
+                  Test.fail
+                    "Options --bridge-contract and --rollup are required to \
+                     start the bridge frontend."
+            in
+            let _ =
+              init_bridge_frontend
+                ~agent:tezlink_sequencer_agent
+                ~network:Cli.l1_network
+                ~l1_endpoint:Cli.l1_endpoint
+                ~bridge_contract
+                ~tzkt_api_url:Cli.l1_tzkt_api
+                ~rollup
+                ~bridge_proxy
+            in
+            unit
       in
       let* () =
         let* rpc_nginx_config =
@@ -1010,9 +1135,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           in
           nginx_config_of_proxy_opt tezlink_sequencer_agent umami_proxy
         in
+        let* bridge_nginx_config =
+          nginx_config_of_proxy_opt tezlink_sequencer_agent bridge_proxy_opt
+        in
         match
           rpc_nginx_config @ tzkt_nginx_config @ faucet_api_nginx_config
-          @ faucet_nginx_config @ umami_nginx_config
+          @ faucet_nginx_config @ umami_nginx_config @ bridge_nginx_config
         with
         | [] -> unit
         | nginx_configs ->

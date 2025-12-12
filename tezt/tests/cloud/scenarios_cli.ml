@@ -1223,6 +1223,18 @@ module type Tezlink = sig
   val parent_dns_domain : string option
 
   val external_sequencer_endpoint : string option
+
+  val deposit_frontend : bool
+
+  val bridge_contract : string option
+
+  val rollup_address : string option
+
+  val l1_network : string option
+
+  val l1_endpoint : string option
+
+  val l1_tzkt_api : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1336,6 +1348,55 @@ module Tezlink () : Tezlink = struct
       ~description:
         "Don't run a sequencer and instead have services point to an external \
          one"
+      ()
+
+  let deposit_frontend =
+    Clap.flag
+      ~section
+      ~set_long:"deposit-frontend"
+      ~unset_long:"no-deposit-frontend"
+      ~description:
+        "Run the deposit frontend for Tezlink (requires tzkt and \
+         external-sequencer-endpoint on a non sandbox Tezlink)"
+      false
+
+  let l1_endpoint =
+    Clap.optional_string
+      ~section
+      ~long:"l1-endpoint"
+      ~description:"The L1 endpoint on which the Tezlink rollup is running"
+      ()
+
+  let l1_network =
+    Clap.optional_string
+      ~section
+      ~long:"l1-network"
+      ~description:"The L1 network on which the Tezlink rollup is running"
+      ()
+
+  let bridge_contract =
+    Clap.optional_string
+      ~section
+      ~long:"bridge-contract"
+      ~description:
+        "The bridge contract that will be called by the Tezlink frontend \
+         deposit"
+      ()
+
+  let rollup_address =
+    Clap.optional_string
+      ~section
+      ~long:"rollup-address"
+      ~description:"The address of the Tezlink rollup originated on l1_endpoint"
+      ()
+
+  let l1_tzkt_api =
+    Clap.optional_string
+      ~section
+      ~long:"l1-tzkt-api"
+      ~description:
+        "The url of the tzkt api for the Layer 1 chain on which Tezlink is \
+         running"
       ()
 end
 
