@@ -1584,3 +1584,18 @@ val get_chain_block_context_contract_clst_balance :
     [block] defaults to ["head"]. *)
 val get_chain_block_context_address_registry :
   ?chain:string -> ?block:string -> unit -> int t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/swrr_credits]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_helpers_swrr_credits :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/swrr_selected_bakers?cycle=<cycle>]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [cycle] doesn't have to be specified (defaults to current cycle). *)
+val get_chain_block_helpers_swrr_selected_bakers :
+  ?chain:string -> ?block:string -> ?cycle:int -> unit -> JSON.t t
