@@ -7559,6 +7559,11 @@ let register_riscv_kernel ~protocols ~kernel =
         (* The Jstz inbox is generated using the inbox-bench tool from https://github.com/tezos/riscv-pvm
          * `inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
         ("Jstz", "jstz-inbox.json")
+    | "etherlink" ->
+        (* The Etherlink inbox is generated using a version of the Etherlink benchmark tool
+         *  modified to address messages to sr1SboL6bEDznwdMkk2pV4i5t7L1iVHnEzDX:
+         *  `node etherlink/kernel_latest/benchmarks/scripts/benchmarks/bench_linear_erc20.js --count 1` *)
+        ("Etherlink", "etherlink-inbox.json")
     | _ -> failwith ("Unknown kernel: " ^ kernel)
   in
   let inbox_path = "tezt/tests/riscv-tests/" ^ inbox_file in
@@ -7741,6 +7746,7 @@ let register ~protocols =
   (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
   register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"jstz" ;
+  register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"etherlink" ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
