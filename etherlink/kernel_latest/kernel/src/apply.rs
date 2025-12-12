@@ -24,6 +24,7 @@ use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
+use revm_etherlink::tezosx::TezosXRuntime;
 use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
@@ -232,6 +233,7 @@ pub struct TransactionResult {
     execution_outcome: ExecutionOutcome,
     gas_used: U256,
     estimated_ticks_used: u64,
+    runtime: TezosXRuntime,
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -427,6 +429,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         execution_outcome,
         gas_used,
         estimated_ticks_used: 0,
+        runtime: TezosXRuntime::Ethereum,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -471,6 +474,7 @@ fn apply_deposit<Host: Runtime>(
     let DepositResult {
         outcome: execution_outcome,
         estimated_ticks_used,
+        runtime,
     } = execute_etherlink_deposit(host, deposit).map_err(|e| {
         Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
     })?;
@@ -488,6 +492,7 @@ fn apply_deposit<Host: Runtime>(
         gas_used: execution_outcome.result.gas_used().into(),
         estimated_ticks_used,
         execution_outcome,
+        runtime,
     }))
 }
 
@@ -629,6 +634,7 @@ fn apply_fa_deposit<Host: Runtime>(
         execution_outcome,
         gas_used,
         estimated_ticks_used: 0,
+        runtime: TezosXRuntime::Ethereum,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -642,6 +648,7 @@ pub struct ExecutionInfo {
     pub object_info: TransactionObjectInfo,
     pub estimated_ticks_used: u64,
     pub execution_gas_used: U256,
+    pub runtime: TezosXRuntime,
 }
 
 pub enum ExecutionResult<T> {
@@ -675,6 +682,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         mut execution_outcome,
         gas_used,
         estimated_ticks_used: ticks_used,
+        runtime,
     } = transaction_result;
 
     let to = transaction.to()?;
@@ -733,6 +741,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         object_info,
         estimated_ticks_used: ticks_used,
         execution_gas_used: gas_used,
+        runtime,
     })
 }
 

@@ -158,7 +158,18 @@ let test_deposit =
     (Tez.to_mutez balance = 1_000_000_000)
       int
       ~error_msg:"Expected %R mutez but got %L") ;
-  unit
+
+  (* We expect the deposit to be in the latest blueprint, but the latest
+       block should be empty from the POV of Etherlink *)
+  let* head = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let block_infos =
+    match head with
+    | Ok block -> block
+    | Error _ -> failwith "Should have find latest block"
+  in
+  match block_infos.transactions with
+  | Empty -> unit
+  | _ -> failwith "Latest block should be empty"
 
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test

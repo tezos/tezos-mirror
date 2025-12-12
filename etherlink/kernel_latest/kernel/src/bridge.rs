@@ -13,6 +13,7 @@ use revm::context::result::{ExecutionResult, Output, SuccessReason};
 use revm::primitives::{Address, Bytes, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::world_state_handler::StorageAccount;
+use revm_etherlink::tezosx::TezosXRuntime;
 use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
@@ -376,6 +377,7 @@ impl Decodable for Deposit {
 pub struct DepositResult<Outcome> {
     pub outcome: Outcome,
     pub estimated_ticks_used: u64,
+    pub runtime: TezosXRuntime,
 }
 
 #[trace_kernel]
@@ -383,7 +385,7 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
 ) -> Result<DepositResult<ExecutionOutcome>, BridgeError> {
-    let deposit_result = match &deposit.receiver {
+    let (deposit_result, runtime) = match &deposit.receiver {
         DepositReceiver::Ethereum(receiver) => {
             // We should be able to obtain an account for arbitrary H160 address
             // otherwise it is a fatal error.
@@ -391,13 +393,18 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
                 .map_err(|_| {
                 BridgeError::InvalidDepositReceiver(receiver.as_bytes().to_vec())
             })?;
-            to_account.add_balance(host, u256_to_alloy(&deposit.amount))
+            (
+                to_account.add_balance(host, u256_to_alloy(&deposit.amount)),
+                TezosXRuntime::Ethereum,
+            )
         }
         DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
             let amount = mutez_from_wei(deposit.amount)
                 .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
-            revm_etherlink::tezosx::add_balance(host, pkh, amount.into())
-                .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))
+            (
+                revm_etherlink::tezosx::add_balance(host, pkh, amount.into()),
+                TezosXRuntime::Tezos,
+            )
         }
         DepositReceiver::Tezos(Contract::Originated(kt1)) => {
             return Err(BridgeError::InvalidDepositReceiver(
@@ -431,6 +438,7 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     Ok(DepositResult {
         outcome,
         estimated_ticks_used: TICKS_FOR_DEPOSIT,
+        runtime,
     })
 }
 
@@ -491,6 +499,7 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
     let result = DepositResult {
         outcome: (result, content),
         estimated_ticks_used: TICKS_FOR_DEPOSIT,
+        runtime: TezosXRuntime::Tezos,
     };
 
     Ok(result)

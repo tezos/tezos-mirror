@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{TransactionObjectInfo, TransactionReceiptInfo};
+use crate::apply::{ExecutionInfo, TransactionObjectInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
@@ -20,6 +20,7 @@ use anyhow::Context;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
+use revm_etherlink::tezosx::TezosXRuntime;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -364,12 +365,16 @@ impl EthBlockInProgress {
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
         transaction: &Transaction,
-        object_info: TransactionObjectInfo,
-        receipt_info: TransactionReceiptInfo,
-        ticks_used: u64,
-        execution_gas_used: U256,
+        execution_info: ExecutionInfo,
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
+        let ExecutionInfo {
+            receipt_info,
+            object_info,
+            estimated_ticks_used,
+            execution_gas_used,
+            runtime,
+        } = execution_info;
         // account for gas
         host.add_execution_gas(receipt_info.execution_outcome.result.gas_used());
 
@@ -378,27 +383,30 @@ impl EthBlockInProgress {
         // account for transaction ticks
         self.add_ticks(tick_model::ticks_of_valid_transaction(
             transaction,
-            ticks_used,
+            estimated_ticks_used,
         ));
-
-        // register transaction as done
-        self.valid_txs.push(transaction.tx_hash);
-        self.index += 1;
-
-        // make receipt
-        let receipt = self.make_receipt(receipt_info);
-        let receipt_bloom_size: u64 = tick_model::bloom_size(&receipt.logs).try_into()?;
-        log!(host, Benchmarking, "bloom size: {}", receipt_bloom_size);
-        // extend BIP's logs bloom
-        self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
-
-        self.cumulative_receipts.push(receipt);
-        let tx_object = self.make_object(object_info);
-        self.cumulative_tx_objects.push(tx_object);
-
         // keep track of execution gas used
         self.cumulative_execution_gas += execution_gas_used;
+        match runtime {
+            TezosXRuntime::Ethereum => {
+                // register transaction as done
+                self.valid_txs.push(transaction.tx_hash);
+                self.index += 1;
 
+                // make receipt
+                let receipt = self.make_receipt(receipt_info);
+                let receipt_bloom_size: u64 =
+                    tick_model::bloom_size(&receipt.logs).try_into()?;
+                log!(host, Benchmarking, "bloom size: {}", receipt_bloom_size);
+                // extend BIP's logs bloom
+                self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
+
+                self.cumulative_receipts.push(receipt);
+                let tx_object = self.make_object(object_info);
+                self.cumulative_tx_objects.push(tx_object);
+            }
+            TezosXRuntime::Tezos => (),
+        };
         Ok(())
     }
 
