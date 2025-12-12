@@ -138,3 +138,9 @@ let required_short char =
   match res with
   | Some x -> return x
   | None -> fail "Expected option -%c which was missing" char
+
+let default_int_positive_long ?(default = 0) name =
+  let* v = default_long ~default:(string_of_int default) name in
+  match int_of_string_opt v with
+  | Some i when i >= 0 -> return i
+  | _ -> fail "Expected a positive integer for --%s" name

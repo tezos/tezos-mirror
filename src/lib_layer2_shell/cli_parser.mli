@@ -23,6 +23,8 @@ val long : string -> string option t
 
 val default_long : default:string -> string -> string t
 
+val default_int_positive_long : ?default:int -> string -> int t
+
 val short : char -> string option t
 
 val required_short : char -> string t

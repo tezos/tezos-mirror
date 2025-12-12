@@ -1101,3 +1101,18 @@ Debug commands:
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --block <BLOCK>: Block parameter as per Ethereum JSON RPC specification
       Defaults to `latest`.
+  
+  shell tree <PATH> [--data-dir <data-dir>] [--config-file <path>] [--block <BLOCK>]
+      [--depth <nb>]
+    Print the tree structure of the durable storage
+    <PATH>: The path of the directory whose tree structure needs to be printed
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --block <BLOCK>: Block parameter as per Ethereum JSON RPC specification
+      Defaults to `latest`.
+    --depth <nb>: Depth of the tree to display.
+      Defaults to `2`.

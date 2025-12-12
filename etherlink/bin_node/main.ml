@@ -1064,6 +1064,14 @@ let desync_index_dir_arg =
     ~placeholder:"path|url"
   @@ Params.string
 
+let depth_arg =
+  Tezos_clic.default_arg
+    ~long:"depth"
+    ~doc:"Depth of the tree to display."
+    ~placeholder:"nb"
+    ~default:"2"
+    Params.int
+
 module Groups = struct
   let run = Tezos_clic.{name = "run"; title = "Run commands"}
 
@@ -3741,6 +3749,28 @@ let shell_ls_command =
       in
       Evm_node_lib_dev.Shell.ls ~config block path)
 
+let shell_tree_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print the tree structure of the durable storage"
+    (args4 data_dir_arg config_path_arg block_param_arg depth_arg)
+    (prefixes ["shell"; "tree"]
+    @@ param
+         ~name:"PATH"
+         ~desc:
+           "The path of the directory whose tree structure needs to be printed"
+         Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block, depth) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.tree ~config block path depth)
+
 let list_events_command =
   let open Tezos_clic in
   command
@@ -3837,6 +3867,7 @@ let commands =
     shell_command;
     shell_cat_command;
     shell_ls_command;
+    shell_tree_command;
   ]
 
 let global_options = Tezos_clic.no_options
