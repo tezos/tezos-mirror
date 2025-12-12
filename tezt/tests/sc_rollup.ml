@@ -1546,9 +1546,19 @@ let test_rollup_node_boots_into_initial_state ?supports ~kind =
     ~error_msg:"Unexpected PVM status (%L = %R)" ;
   unit
 
+(* `inbox_file` is expected to be in the format produced by the Etherlink
+ * benchmarking tool *)
+let read_riscv_test_inbox inbox_file =
+  let inbox =
+    JSON.(
+      Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
+      |> List.concat)
+  in
+  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
+
 (* Originate a rollup with the given boot sector, then send 1 message per level
  * and record the output of the kernel debug log. *)
-let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
+let test_advances_state_with_kernel ~title ~boot_sector ~kind ~inbox_file =
   test_full_scenario
     ~regression:true
     ~kernel_debug_log:true
@@ -1576,21 +1586,7 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
       ~error_msg:"State hash has not changed (%L <> %R)" ;
     unit
   in
-  Lwt_list.iter_s test_message messages
-
-(* `inbox_file` is expected to be in the format produced by the `inbox_bench` tool
- * in `src/riscv/jstz` *)
-let read_jstz_inbox inbox_file =
-  let inbox =
-    JSON.(
-      Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
-      |> List.concat)
-  in
-  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
-
-let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
-  let messages = read_jstz_inbox inbox_file in
-  test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
+  Lwt_list.iter_s test_message (read_riscv_test_inbox inbox_file)
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ?boot_sector ~internal ~kind ?preimages_dir =
@@ -7555,21 +7551,30 @@ let register_riscv ~protocols =
     ~kernel_debug_log:true
     ~preimages_dir
 
-let register_riscv_jstz ~protocols =
+let register_riscv_kernel ~protocols ~kernel =
   let kind = "riscv" in
+  let variant, inbox_file =
+    match kernel with
+    | "jstz" ->
+        (* The Jstz inbox is generated using the inbox-bench tool from https://github.com/tezos/riscv-pvm
+         * `inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
+        ("Jstz", "jstz-inbox.json")
+    | _ -> failwith ("Unknown kernel: " ^ kernel)
+  in
+  let inbox_path = "tezt/tests/riscv-tests/" ^ inbox_file in
   let boot_sector =
     read_riscv_kernel
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz" ())
-      (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum" ())
+      (Uses.make ~tag:"riscv" ~path:("src/riscv/assets/" ^ kernel) ())
+      (Uses.make
+         ~tag:"riscv"
+         ~path:("src/riscv/assets/" ^ kernel ^ ".checksum")
+         ())
   in
-  (* The jstz inbox is generated using
-   * `./jstz/inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
-  let jstz_inbox_path = "tezt/tests/riscv-tests/jstz-inbox.json" in
-  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:jstz_inbox_path () in
-  test_advances_state_with_inbox
+  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:inbox_path () in
+  test_advances_state_with_kernel
     protocols
     ~kind
-    ~title:"node advances PVM state with jstz kernel"
+    ~title:("node advances PVM state with messages (" ^ variant ^ ")")
     ~boot_sector
     ~inbox_file:inbox_file_uses ;
   (* The refutation game scenario is too long to enable in merge pipelines and currently
@@ -7585,12 +7590,12 @@ let register_riscv_jstz ~protocols =
     ~timestamp:(Ago (Client.Time.Span.of_seconds_exn 200.))
       (* Setting the timestamp results in blocks being produced more slowly *)
     ~commitment_period:10
-    ~variant:"pvm_proof_0"
+    ~variant
     ~uses:(fun _protocol -> [inbox_file_uses])
     ~boot_sector
     (refutation_scenario_parameters
        ~loser_modes:["5 0 1000"]
-       (List.map (fun x -> [x]) (read_jstz_inbox inbox_file_uses))
+       (List.map (fun x -> [x]) (read_riscv_test_inbox inbox_file_uses))
        ~input_format:`Hex
        ~final_level:500
        ~priority:`No_priority)
@@ -7735,7 +7740,7 @@ let register ~protocols =
 
   (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
-  register_riscv_jstz ~protocols:[Protocol.Alpha] ;
+  register_riscv_kernel ~protocols:[Protocol.Alpha] ~kernel:"jstz" ;
   (* Shared tezts - will be executed for each PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
