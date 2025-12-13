@@ -1050,15 +1050,22 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~umami_proxy
       and* () =
         match faucet_proxys_opt with
+        | None when Cli.faucet_private_key <> None ->
+            Test.fail
+              "The private key for the faucet is set but the faucet option \
+               itself is disabled."
         | None -> unit
         | Some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy} ->
             let () = toplog "Starting faucet" in
             let faucet_account = Constant.bootstrap1 in
             let faucet_pkh = faucet_account.public_key_hash in
-            let faucet_private_key =
+            let default =
               match Constant.bootstrap1.secret_key with
               | Unencrypted key -> key
               | _ -> assert false
+            in
+            let faucet_private_key =
+              Option.value Cli.faucet_private_key ~default
             in
             let* () =
               init_faucet_backend
