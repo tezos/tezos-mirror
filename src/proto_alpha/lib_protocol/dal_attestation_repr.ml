@@ -30,6 +30,8 @@ let encoding = Bitset.encoding
 
 let empty = Bitset.empty
 
+let is_empty = Bitset.is_empty
+
 let to_z = Bitset.to_z
 
 let is_attested t index =
