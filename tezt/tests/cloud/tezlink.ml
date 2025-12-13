@@ -968,13 +968,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy}
         | None, true ->
             Test.fail
-              "The faucet service relies an TzKT, but the latter is \
+              "The faucet service relies on TzKT, but the latter is \
                deactivated (see the --tzkt option)."
         | (None | Some _), false -> none
       in
       let* umami_proxys_opt =
         match tzkt_proxy_opt with
-        | Some tzkt_proxy ->
+        | Some tzkt_proxy when Cli.umami ->
             let umami_proxy =
               make_proxy
                 tezlink_sequencer_agent
@@ -985,6 +985,10 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 activate_ssl
             in
             some {tzkt_proxy; umami_proxy}
+        | None when Cli.umami ->
+            Test.fail
+              "Umami relies on TzKT, but the latter is deactivated (see the \
+               --tzkt option)."
         | _ -> none
       in
       let* bridge_proxy_opt =
