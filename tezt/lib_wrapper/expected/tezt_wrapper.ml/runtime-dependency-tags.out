@@ -37,6 +37,8 @@ teztale_server: octez-teztale-server
 teztale_snitch: octez-teztale-snitch
 smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
+riscv: src/riscv/assets/etherlink
+riscv: src/riscv/assets/etherlink.checksum
 riscv: src/riscv/assets/jstz
 riscv: src/riscv/assets/jstz.checksum
 riscv: src/riscv/assets/preimages
@@ -45,6 +47,7 @@ riscv: src/riscv/assets/riscv-dummy.elf.checksum
 echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages.wasm
 echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages_high_target_pub_level.wasm
 echo_dal_reveal_parameters: tezt/tests/kernels/echo_dal_reveal_parameters.wasm
+riscv: tezt/tests/riscv-tests/etherlink-inbox.json
 riscv: tezt/tests/riscv-tests/jstz-inbox.json
 alpha_json: tezt/tests/weeklynet_configs/alpha.json
 last_snapshotted_protocol_json: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json

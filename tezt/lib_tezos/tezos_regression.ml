@@ -42,6 +42,7 @@ let replacements =
     ("sr1\\w{33}\\b", "[SMART_ROLLUP_HASH]");
     ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
     ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+    ("parent_hash: 0x\\w{64}\\b", "parent_hash: [EVM_BLOCK_PARENT_HASH]");
     (* Ports are non-deterministic when using -j. *)
     ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
     ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
