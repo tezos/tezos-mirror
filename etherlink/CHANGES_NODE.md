@@ -15,10 +15,12 @@
 - Add a collection of command to inspect the contents of an Etherlink instance
   durable storage: `shell cat PATH` to print the contents stored under the
   given `PATH`, `shell ls PATH` to list the subdirectories living under `PATH`,
-  and `shell` to start a REPL allowing users to use `ls` and `cat`
-  interactively. See `man shell` for more information. (!20183)
-- Add the `tree` command to the REPL to inspect Etherlink instance
-  durable storage. (!20221)
+  `shell tree` to list contents stored living under `PATH` directories in a
+  tree-like format, and `shell` to start a REPL allowing users to use `ls` and
+  `cat` interactively. See `man shell` for more information. (!20183 !20221)
+- Adds support for `--network` to `download kernel` to fallback to default
+  per-network preimages endpoint when `--preimages-endpoint` is omitted.
+  (!20241)
 
 ### Execution changes
 
