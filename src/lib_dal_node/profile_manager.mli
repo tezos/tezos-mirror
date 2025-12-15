@@ -63,6 +63,8 @@ val is_operator_slot : t -> slot_index:Types.slot_index -> bool
 
 val encoding : t Data_encoding.t
 
+val pp : Format.formatter -> t -> unit
+
 val unresolved_encoding : unresolved_profile Data_encoding.t
 
 (** The empty profile manager context. *)

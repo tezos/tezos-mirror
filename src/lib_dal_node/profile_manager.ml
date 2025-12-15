@@ -29,6 +29,8 @@ type t = Types.profile
 
 let encoding = Types.profile_encoding
 
+let pp = Types.pp_profile
+
 type unresolved_profile = Profile of t | Random_observer | Empty
 
 let unresolved_encoding =

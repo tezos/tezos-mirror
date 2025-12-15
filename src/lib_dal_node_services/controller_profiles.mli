@@ -52,6 +52,8 @@ type t
 
 val encoding : t Data_encoding.t
 
+val pp : Format.formatter -> t -> unit
+
 (** The empty controller; a controller with this profile does nothing *)
 val empty : t
 
