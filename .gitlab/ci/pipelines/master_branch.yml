@@ -390,7 +390,7 @@ oc.docker:amd64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
@@ -419,7 +419,7 @@ oc.docker:arm64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
@@ -448,7 +448,7 @@ docker:merge_manifests:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
   retry: 0
 
 publish_kernel_sdk:
