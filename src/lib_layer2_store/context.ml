@@ -259,3 +259,102 @@ module Version = struct
 
   let to_string = function V0 -> "0"
 end
+
+module Wrapper = struct
+  module type S = sig
+    type repo
+
+    type tree
+
+    type mut_state
+
+    val of_node_context : 'a index -> ('a, repo) Context_sigs.index
+
+    val to_node_context : ('a, repo) Context_sigs.index -> 'a index
+
+    val of_node_pvmstate : pvmstate -> tree
+
+    val to_node_pvmstate : tree -> pvmstate
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end
+
+  (* Context *)
+  let of_node_context : type repo tree.
+      (repo, tree) equality_witness -> 'a index -> ('a, repo) Context_sigs.index
+      =
+   fun eqw (Index {equality_witness; index; _}) ->
+    match equiv equality_witness eqw with
+    | Some Refl, Some Refl -> index
+    | _ ->
+        (* This could happen if the context backend was to change for a
+         given pvm/rollup. For now we only use Irmin, if this changes,
+         this will demand to provide migration functions from prior
+         pmv_context to the next one. *)
+        assert false
+
+  let to_node_context : type repo tree.
+      (module Context_sigs.S with type tree = tree and type repo = repo) ->
+      ('a, repo) Context_sigs.index ->
+      'a index =
+   fun (module C) index ->
+    make_index
+      ~index
+      ~pvm_context_impl:(module C)
+      ~equality_witness:C.equality_witness
+      ~impl_name:C.impl_name
+
+  (* PVMState *)
+  let of_node_pvmstate : type repo tree.
+      (repo, tree) equality_witness -> pvmstate -> tree =
+   fun eqw (PVMState {equality_witness; pvmstate; _}) ->
+    match equiv equality_witness eqw with
+    | Some Refl, Some Refl -> pvmstate
+    | _ -> assert false
+
+  let to_node_pvmstate : type tree.
+      (module Context_sigs.S with type tree = tree) -> tree -> pvmstate =
+   fun (module C) pvmstate ->
+    make_pvmstate
+      ~pvmstate
+      ~pvm_context_impl:(module C)
+      ~equality_witness:C.equality_witness
+      ~impl_name:C.impl_name
+
+  module Make (C : sig
+    include Context_sigs.S
+
+    type mut_state
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end) :
+    S
+      with type repo = C.repo
+       and type tree = C.tree
+       and type mut_state = C.mut_state = struct
+    type repo = C.repo
+
+    type tree = C.tree
+
+    type mut_state = C.mut_state
+
+    let of_node_context : 'a index -> ('a, repo) Context_sigs.index =
+     fun ctxt -> of_node_context C.equality_witness ctxt
+
+    let to_node_context : ('a, repo) Context_sigs.index -> 'a index =
+     fun ctxt -> to_node_context (module C) ctxt
+
+    let of_node_pvmstate : pvmstate -> tree =
+     fun c -> of_node_pvmstate C.equality_witness c
+
+    let to_node_pvmstate : tree -> pvmstate = to_node_pvmstate (module C)
+
+    let from_imm : tree -> mut_state = C.from_imm
+
+    let to_imm : mut_state -> tree = C.to_imm
+  end
+end

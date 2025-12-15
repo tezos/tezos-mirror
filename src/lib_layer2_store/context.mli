@@ -24,12 +24,10 @@
 (*****************************************************************************)
 
 (** This module is largely inspired from
-    {!module:Tezos_protocol_environment.Environement_context} *)
+    {!module:Tezos_protocol_environment.Environement_context}.
 
-open Context_sigs
-
-(** This module dipatches context calls to contexts/pvm_states
-    corresponding to the used pvm *)
+    This module dipatches context calls to contexts/pvm_states
+    corresponding to the used pvm. *)
 
 (** See {!module:Tezos_protocol_environment.Environement_context.ops} *)
 type ('repo, 'tree) pvm_context_impl =
@@ -38,18 +36,9 @@ type ('repo, 'tree) pvm_context_impl =
 (* Context existential that embeds the context_module associated to
    pvm protocol_plugins *)
 
-(** See {!module:Tezos_protocol_environment.Environement_context.t} *)
-type ('a, 'repo, 'tree, 'loaded_tree) container = private {
-  index : ('a, 'repo) index;
-  pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-  impl_name : string;
-  tree : 'loaded_tree;
-  equality_witness : ('repo, 'tree) equality_witness;
-}
+type 'a index
 
-type 'a index = private Index : ('a, 'repo, 'tree, unit) container -> 'a index
-
-type 'a t = private Context : ('a, 'repo, 'tree, 'tree) container -> 'a t
+type 'a t
 
 (** Read/write context {!t}. *)
 type rw = [`Read | `Write] t
@@ -62,18 +51,6 @@ type rw_index = [`Read | `Write] index
 
 (** Read-only {!index}. *)
 type ro_index = [`Read] index
-
-val make_index :
-  index:('a, 'b) Context_sigs.index ->
-  pvm_context_impl:('b, 'c) pvm_context_impl ->
-  equality_witness:('b, 'c) equality_witness ->
-  impl_name:string ->
-  'a index
-
-val equiv :
-  'a Equality_witness.t * 'b Equality_witness.t ->
-  'c Equality_witness.t * 'd Equality_witness.t ->
-  ('a, 'c) Equality_witness.eq option * ('b, 'd) Equality_witness.eq option
 
 module Hash = Smart_rollup_context_hash
 
@@ -140,21 +117,7 @@ val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
 
 (* Pvm_state that embeds the context_module embedded associated to pvm
    protocol_plugins *)
-type pvmstate =
-  | PVMState : {
-      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-      impl_name : string;
-      pvmstate : 'tree;
-      equality_witness : ('repo, 'tree) equality_witness;
-    }
-      -> pvmstate
-
-val make_pvmstate :
-  pvm_context_impl:('a, 'b) pvm_context_impl ->
-  equality_witness:('a, 'b) equality_witness ->
-  impl_name:string ->
-  pvmstate:'b ->
-  pvmstate
+type pvmstate
 
 (** State of the PVM that this rollup node deals with *)
 module PVMState : sig
@@ -202,4 +165,47 @@ module Internal_for_tests : sig
   (** [get_a_tree key] provides a value of internal type [tree] which can be
       used as a state to be set in the context directly. *)
   val get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t
+end
+
+module Wrapper : sig
+  (** Context wrappers translate from/to node-context and node-pvmstate PVMs
+      internal representation to those used in the PVM.  Also provides
+      conversion functions from/to mutable and immutable PVM types.  Each
+      different PVM context will imply a dedicated wrapper.*)
+  module type S = sig
+    type repo
+
+    type tree
+
+    (** Type used by the mutable API for PVMs *)
+    type mut_state
+
+    val of_node_context : 'a index -> ('a, repo) Context_sigs.index
+
+    val to_node_context : ('a, repo) Context_sigs.index -> 'a index
+
+    val of_node_pvmstate : pvmstate -> tree
+
+    val to_node_pvmstate : tree -> pvmstate
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end
+
+  (** Specialized module to handle translation to/from a specific context
+      backend implementation *)
+  module Make (C : sig
+    include Context_sigs.S
+
+    type mut_state
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end) :
+    S
+      with type repo = C.repo
+       and type tree = C.tree
+       and type mut_state = C.mut_state
 end

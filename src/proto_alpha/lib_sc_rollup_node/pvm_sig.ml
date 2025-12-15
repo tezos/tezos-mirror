@@ -69,7 +69,7 @@ module type S = sig
   type tree
 
   module Ctxt_wrapper :
-    Context_wrapper.S with type repo = repo and type tree = tree
+    Context.Wrapper.S with type repo = repo and type tree = tree
 
   include
     Sc_rollup.PVM.S

@@ -23,37 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This modules offers functions to translate from node-context and
-    node-pvmstate representation to those used in the PVM *)
-open Context_sigs
-
-(* Context *)
-val of_node_context :
-  ('repo, 'tree) equality_witness ->
-  [`Read | `Write] Context.index ->
-  ([`Read | `Write], 'repo) Context_sigs.index
-
-val to_node_context :
-  (module Context_sigs.S with type tree = 'tree and type repo = 'repo) ->
-  ('a, 'repo) Context_sigs.index ->
-  'a Context.index
-
-(* PVMState *)
-val of_node_pvmstate :
-  ('repo, 'tree) equality_witness -> Context.pvmstate -> 'tree
-
-val to_node_pvmstate :
-  (module Context_sigs.S with type tree = 'tree) -> 'tree -> Context.pvmstate
-
-(** Specialized module to handle translation to/from Irmin_context *)
-module Irmin : sig
-  val of_node_context :
-    'a Context.index -> ('a, Irmin_context.repo) Context_sigs.index
-
-  val to_node_context :
-    ('a, Irmin_context.repo) Context_sigs.index -> 'a Context.index
-
-  val of_node_pvmstate : Context.pvmstate -> Irmin_context.tree
-
-  val to_node_pvmstate : Irmin_context.tree -> Context.pvmstate
-end
+(** Specialized module to handle translation to/from Irmin_context.
+    Directly used in Arith, Wasm_2_0_0 and RISC-V PVM *)
+module Irmin :
+  Context.Wrapper.S
+    with type repo = Irmin_context.repo
+     and type tree = Irmin_context.tree
+     and type mut_state = Irmin_context.mut_state
