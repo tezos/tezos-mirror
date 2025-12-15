@@ -344,7 +344,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_attestation : Dal.Attestation.t;
+  dal_slot_availability : Dal.Slot_availability.t;
   abaab_activation_level : Level.t option;
   attestations : attestations_result option;
   preattestations : attestations_result option;

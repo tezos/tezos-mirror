@@ -42,6 +42,8 @@ module type T = sig
 
   type dal_attestation
 
+  type slot_availability
+
   type attestation_operation
 
   type tb_slot
@@ -77,9 +79,11 @@ module type T = sig
     level:int32 ->
     (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  val dal_attestation : block_info -> dal_attestation tzresult
+  val slot_availability : block_info -> slot_availability tzresult
 
-  val is_attested : dal_attestation -> slot_index -> bool
+  val is_baker_attested : dal_attestation -> slot_index -> bool
+
+  val is_protocol_attested : slot_availability -> slot_index -> bool
 
   val number_of_attested_slots : dal_attestation -> int
 

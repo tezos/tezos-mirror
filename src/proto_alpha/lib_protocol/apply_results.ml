@@ -2627,7 +2627,7 @@ type block_metadata = {
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_attestation : Dal.Attestation.t;
+  dal_slot_availability : Dal.Slot_availability.t;
   abaab_activation_level : Level.t option;
   attestations : attestations_result option;
   preattestations : attestations_result option;
@@ -2649,7 +2649,7 @@ let block_metadata_encoding =
               balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_attestation;
+              dal_slot_availability;
               abaab_activation_level;
               attestations;
               preattestations;
@@ -2667,7 +2667,7 @@ let block_metadata_encoding =
              proposer_active_key,
              baker_active_key,
              consumed_gas,
-             dal_attestation,
+             dal_slot_availability,
              abaab_activation_level,
              attestations,
              preattestations ) ))
@@ -2683,7 +2683,7 @@ let block_metadata_encoding =
                 proposer_active_key,
                 baker_active_key,
                 consumed_gas,
-                dal_attestation,
+                dal_slot_availability,
                 abaab_activation_level,
                 attestations,
                 preattestations ) )
@@ -2699,7 +2699,7 @@ let block_metadata_encoding =
            balance_updates;
            liquidity_baking_toggle_ema;
            implicit_operations_results;
-           dal_attestation;
+           dal_slot_availability;
            abaab_activation_level;
            attestations;
            preattestations;
@@ -2723,7 +2723,7 @@ let block_metadata_encoding =
              (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
-             (req "dal_attestation" Dal.Attestation.encoding)
+             (req "dal_attestation" Dal.Slot_availability.encoding)
              (req "all_bakers_attest_activation_level" (option Level.encoding))
              (req "attestations" (option attestations_result_encoding))
              (req "preattestations" (option attestations_result_encoding))))

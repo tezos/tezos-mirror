@@ -119,7 +119,7 @@ let inject_entrapment_evidences
                    shard_proof,
                    tb_slot )
                ->
-              if Plugin.is_attested dal_attestation slot_index then
+              if Plugin.is_baker_attested dal_attestation slot_index then
                 let*! () =
                   Event.emit_trap_injection
                     ~delegate

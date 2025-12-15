@@ -783,7 +783,9 @@ let test_dal_attestation_threshold () =
         in
         let attested_expected = power >= min_power in
         let attested =
-          Dal.Attestation.is_attested metadata.dal_attestation slot_index
+          Dal.Slot_availability.is_attested
+            metadata.dal_slot_availability
+            slot_index
         in
         Log.info "With %d power, the slot is attested: %b " power attested ;
         Check.(attested = attested_expected)

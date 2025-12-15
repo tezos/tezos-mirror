@@ -77,7 +77,7 @@ val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 val finalize_pending_slot_headers :
   Raw_context.t ->
   number_of_slots:int ->
-  (Raw_context.t * Dal_attestation_repr.t) tzresult Lwt.t
+  (Raw_context.t * Dal_attestation_repr.Slot_availability.t) tzresult Lwt.t
 
 (** [get_slot_headers_history ctxt] returns the current value of slots_history stored
    in [ctxt], or Slots_history.genesis if no value is stored yet. *)

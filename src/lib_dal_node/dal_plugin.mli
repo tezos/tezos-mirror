@@ -49,7 +49,11 @@ module type T = sig
 
   type block_info
 
+  (* The DAL content an attester includes in its attestation operation. *)
   type dal_attestation
+
+  (* The slot availability information from a block's metadata. *)
+  type slot_availability
 
   type attestation_operation
 
@@ -102,17 +106,21 @@ module type T = sig
     level:int32 ->
     (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
-  (** [dal_attestation block_info] returns the metadata of the given
-      [block_info] as an abstract value of type [dal_attestation] to be passed
-      to the [is_attested] function.
+  (** [slot_availability block_info] returns the metadata of the given
+      [block_info] as an abstract value of type [slot_availability] to be passed
+      to the [is_protocol_attested] function.
 
       Fails with [Cannot_read_block_metadata] if [block_info]'s metadata are
       stripped.  *)
-  val dal_attestation : block_info -> dal_attestation tzresult
+  val slot_availability : block_info -> slot_availability tzresult
 
-  (** [is_attested dal_attestation index] returns [true] if [index]
-      is one of the [dal_attestation] and [false] otherwise.  *)
-  val is_attested : dal_attestation -> slot_index -> bool
+  (** [is_baker_attested dal_attestation slot_index] returns [true] if [slot_index]
+      is set in the bitset of the [dal_attestation] and [false] otherwise.  *)
+  val is_baker_attested : dal_attestation -> slot_index -> bool
+
+  (** [is_protocol_attested slot_availability slot_index] returns [true] if [slot_index]
+      is one of the attested slots in [slot_availability] and [false] otherwise.  *)
+  val is_protocol_attested : slot_availability -> slot_index -> bool
 
   (** [number_of_attested_slots] returns the number of slots attested in the [dal_attestation]. *)
   val number_of_attested_slots : dal_attestation -> int

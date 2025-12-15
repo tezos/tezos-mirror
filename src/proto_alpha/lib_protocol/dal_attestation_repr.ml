@@ -65,8 +65,6 @@ let expected_size_in_bits ~max_index =
 
 let number_of_attested_slots = Bitset.cardinal
 
-let intersection = Bitset.inter
-
 type shard_index = int
 
 module Shard_map = Map.Make (struct
@@ -230,6 +228,26 @@ module Dal_dependent_signing = struct
       ~companion_agg:companion_sig
       ~op
       t
+end
+
+type attestation = t
+
+(** Slot availability represents the protocol's attestation result for a block.
+    It is an alias to the main attestation type. *)
+module Slot_availability = struct
+  type nonrec t = t
+
+  let empty = empty
+
+  let encoding = encoding
+
+  let is_attested = is_attested
+
+  let commit = commit
+
+  let number_of_attested_slots = number_of_attested_slots
+
+  let intersection = Bitset.inter
 end
 
 module Internal_for_tests = struct

@@ -99,7 +99,7 @@ let apply_publish_commitment ctxt operation ~source =
   let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
   return (ctxt, slot_header)
 
-let record_participation ctxt delegate tb_slot ~dal_power dal_attestation =
+let record_participation ctxt delegate tb_slot ~dal_power slot_availability =
   let open Lwt_result_syntax in
   let*? () = Dal.assert_feature_enabled ctxt in
   Dal.only_if_incentives_enabled
@@ -117,12 +117,12 @@ let record_participation ctxt delegate tb_slot ~dal_power dal_attestation =
           with
           | None -> 0
           | Some delegate_attestation ->
-              Dal.Attestation.(
-                intersection dal_attestation delegate_attestation
+              Dal.Slot_availability.(
+                intersection slot_availability delegate_attestation
                 |> number_of_attested_slots)
         in
         let number_of_protocol_attested_slots =
-          Dal.Attestation.number_of_attested_slots dal_attestation
+          Dal.Slot_availability.number_of_attested_slots slot_availability
         in
         Delegate.record_dal_participation
           ctxt
@@ -134,7 +134,7 @@ let finalisation ctxt =
   let open Lwt_result_syntax in
   Dal.only_if_feature_enabled
     ctxt
-    ~default:(fun ctxt -> return (ctxt, Dal.Attestation.empty))
+    ~default:(fun ctxt -> return (ctxt, Dal.Slot_availability.empty))
     (fun ctxt ->
       let*! ctxt = Dal.Slot.finalize_current_slot_headers ctxt in
       (* The fact that slots confirmation is done at finalization is very
@@ -153,7 +153,7 @@ let finalisation ctxt =
            level where the game started.
       *)
       let number_of_slots = Constants.dal_number_of_slots ctxt in
-      let+ ctxt, attestation =
+      let+ ctxt, slot_availability =
         Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
       in
-      (ctxt, attestation))
+      (ctxt, slot_availability))

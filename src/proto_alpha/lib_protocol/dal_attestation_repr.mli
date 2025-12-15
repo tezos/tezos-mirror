@@ -73,9 +73,6 @@ val expected_size_in_bits : max_index:Dal_slot_index_repr.t -> int
     slots in an attestation. *)
 val number_of_attested_slots : t -> int
 
-(** [intersection a1 a2] returns the slots attested in both [a1] and [a2]. *)
-val intersection : t -> t -> t
-
 (** A shard_index is a positive number. *)
 type shard_index = int
 
@@ -176,6 +173,39 @@ module Dal_dependent_signing : sig
     op:Bytes.t ->
     t ->
     Bls.t option
+end
+
+(** Type alias for use in submodules. *)
+type attestation = t
+
+(** Slot availability represents the protocol's attestation result for a block.
+
+    This wraps {!t} but is kept as a separate module to allow for potential
+    future interface differences between attestations in operations and
+    attestation results in block metadata. *)
+module Slot_availability : sig
+  (** The slot availability type. Currently identical to {!t}. *)
+  type t = private Bitset.t
+
+  (** [empty] is the empty slot availability. *)
+  val empty : t
+
+  (** [encoding] is the data encoding for slot availability (bitset). *)
+  val encoding : t Data_encoding.t
+
+  (** [is_attested t slot_index] returns [true] if the slot at [slot_index]
+      is attested as available. *)
+  val is_attested : t -> Dal_slot_index_repr.t -> bool
+
+  (** [commit t slot_index] marks the slot at [slot_index] as attested. *)
+  val commit : t -> Dal_slot_index_repr.t -> t
+
+  (** [number_of_attested_slots t] returns the number of attested slots. *)
+  val number_of_attested_slots : t -> int
+
+  (** [intersection slot_availability attestation] returns the slots attested in both
+      [sa] and [attestation]. *)
+  val intersection : t -> attestation -> t
 end
 
 module Internal_for_tests : sig

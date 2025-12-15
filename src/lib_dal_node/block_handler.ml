@@ -539,9 +539,9 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
   in
-  let*? dal_attestation =
-    (Plugin.dal_attestation
-       block_info [@profiler.record_f {verbosity = Notice} "dal_attestation"])
+  let*? slot_availability =
+    (Plugin.slot_availability
+       block_info [@profiler.record_f {verbosity = Notice} "slot_availability"])
   in
   let () =
     update_slot_headers_statuses
@@ -555,7 +555,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        proto_parameters
        ctxt
        ~attested_level:block_level
-       (Plugin.is_attested dal_attestation)
+       (Plugin.is_protocol_attested slot_availability)
      [@profiler.record_s
        {verbosity = Notice} "remove_unattested_slots_and_shards"])
   in
@@ -584,7 +584,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        proto_parameters
        ~block_level
        attestations
-       Plugin.is_attested
+       Plugin.is_baker_attested
        Plugin.tb_slot_to_int
      [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
   in

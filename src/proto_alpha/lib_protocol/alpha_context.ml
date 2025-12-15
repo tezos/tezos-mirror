@@ -147,6 +147,8 @@ module Dal = struct
     include Raw_context.Dal
   end
 
+  module Slot_availability = Dal_attestation_repr.Slot_availability
+
   type slot_id = Dal_slot_repr.Header.id = {
     published_level : Raw_level_repr.t;
     index : Dal_slot_index_repr.t;

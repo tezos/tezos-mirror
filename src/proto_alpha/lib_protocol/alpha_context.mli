@@ -2980,8 +2980,6 @@ module Dal : sig
 
     val number_of_attested_slots : t -> int
 
-    val intersection : t -> t -> t
-
     val record_number_of_attested_shards : context -> t -> int -> context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
@@ -3022,6 +3020,23 @@ module Dal : sig
       (** See {!Dal_attestation_repr.Internal_for_tests.of_z}. *)
       val of_z : Z.t -> t tzresult
     end
+  end
+
+  (** See {!Dal_attestation_repr.Slot_availability}. *)
+  module Slot_availability : sig
+    type t = private Bitset.t
+
+    val empty : t
+
+    val encoding : t Data_encoding.t
+
+    val is_attested : t -> Slot_index.t -> bool
+
+    val commit : t -> Slot_index.t -> t
+
+    val number_of_attested_slots : t -> int
+
+    val intersection : t -> Attestation.t -> t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -3109,7 +3124,9 @@ module Dal : sig
     val finalize_current_slot_headers : context -> context Lwt.t
 
     val finalize_pending_slot_headers :
-      context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
+      context ->
+      number_of_slots:int ->
+      (context * Slot_availability.t) tzresult Lwt.t
   end
 
   module Shard_with_proof : sig
