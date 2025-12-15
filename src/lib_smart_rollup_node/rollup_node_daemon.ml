@@ -1066,7 +1066,7 @@ module Replay = struct
         ~bail_on_disagree:false
         ~profiling
         ~force_etherlink:false
-        ~l1_monitor_finalized:false
+        ~l1_monitor_finalized:None
     in
     let* cleanup = setup_opentelemetry ~data_dir configuration in
     let* node_ctxt =
