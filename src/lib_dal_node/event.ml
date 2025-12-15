@@ -1278,7 +1278,7 @@ open struct
       ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-      ("error", Data_encoding.list Error_monad.trace_encoding)
+      ("error", Error_monad.trace_encoding)
 
   let slot_from_backup_has_unexpected_size =
     declare_5
