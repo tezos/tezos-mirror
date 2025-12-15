@@ -315,6 +315,9 @@ pub struct SequencerParsingContext {
     // before this is useless.
     pub next_blueprint_number: U256,
     pub experimental_features: ExperimentalFeatures,
+    // When true, legacy DAL slot import signals are disabled.
+    // The kernel will rely on DalAttestedSlots internal messages instead.
+    pub legacy_dal_signals_disabled: bool,
 }
 
 fn check_unsigned_blueprint_chunk(
@@ -415,6 +418,12 @@ impl SequencerInput {
         context.allocated_ticks = context
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
+
+        // If legacy DAL signals are disabled, ignore this message.
+        // The kernel now relies on DalAttestedSlots internal messages from the protocol.
+        if context.legacy_dal_signals_disabled {
+            return InputResult::Unparsable;
+        }
 
         let Some(dal) = &context.dal_configuration else {
             return InputResult::Unparsable;

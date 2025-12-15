@@ -190,6 +190,13 @@ pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
 // is not used.
 pub const ENABLE_DAL: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_dal");
 
+// Path to the flag that disables legacy DAL slot import signals.
+// If there is something at this path, the kernel ignores DalSlotImportSignals
+// external messages and instead relies on DalAttestedSlots internal messages
+// from the protocol.
+pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
+    RefPath::assert_from(b"/evm/feature_flags/disable_legacy_dal_signals");
+
 // Path to the DAL slot indices to use.
 pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/evm/dal_slots");
 
@@ -766,6 +773,15 @@ pub fn store_dal_slots<Host: Runtime>(
     slots: &[u8],
 ) -> anyhow::Result<()> {
     Ok(host.store_write_all(&DAL_SLOTS, slots)?)
+}
+
+/// Returns true if legacy DAL slot import signals are disabled.
+/// When disabled, the kernel ignores `DalSlotImportSignals` external messages
+/// and instead relies on `DalAttestedSlots` internal messages.
+pub fn is_legacy_dal_signals_disabled<Host: Runtime>(
+    host: &Host,
+) -> anyhow::Result<bool> {
+    Ok(host.store_has(&DISABLE_LEGACY_DAL_SIGNALS)?.is_some())
 }
 
 pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> {
