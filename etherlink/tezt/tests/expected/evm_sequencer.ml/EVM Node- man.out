@@ -1063,3 +1063,41 @@ Debug commands:
       `notice` `info`, `debug`.
       Defaults to `none`.
     -j --json: Enables the display of json schemas.
+  
+  shell [--data-dir <data-dir>] [--config-file <path>] [--block <BLOCK>]
+    Interactive environment to explore the content of the durable storage
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --block <BLOCK>: Block parameter as per Ethereum JSON RPC specification
+      Defaults to `latest`.
+  
+  shell cat <PATH> [--data-dir <data-dir>] [--config-file <path>] [--block <BLOCK>]
+      [--pp <PP>]
+    Print a value stored in the durable storage
+    <PATH>: The path of the value to print
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --block <BLOCK>: Block parameter as per Ethereum JSON RPC specification
+      Defaults to `latest`.
+    --pp <PP>: Specify how to print the stored value
+      Defaults to `hex`.
+  
+  shell ls <PATH> [--data-dir <data-dir>] [--config-file <path>] [--block <BLOCK>]
+    Print a value stored in the durable storage
+    <PATH>: The path of the directory whose entries need to be listed
+    --data-dir <data-dir>: The path to the EVM node data directory. Default is
+      $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
+      data directory of the node.
+      If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
+    --block <BLOCK>: Block parameter as per Ethereum JSON RPC specification
+      Defaults to `latest`.

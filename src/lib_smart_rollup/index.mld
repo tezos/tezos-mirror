@@ -10,6 +10,7 @@ It contains the following libraries:
 - {{!module-Rollup_node_sqlite_migrations}Rollup_node_sqlite_migrations}: SQL migrations for the Rollup node store
 - {{!module-Tezos_layer2_irmin_context}Tezos_layer2_irmin_context}: Irmin context for the smart rollup PVMs
 - {{!module-Tezos_layer2_riscv_context}Tezos_layer2_riscv_context}: RiscV implementation of the context for Layer2
+- {{!module-Tezos_layer2_shell}Tezos_layer2_shell}
 - {{!module-Tezos_layer2_store}Tezos_layer2_store}: layer2 storage utils
 - {{!module-Tezos_scoru_wasm_durable_snapshot}Tezos_scoru_wasm_durable_snapshot}: Durable storage reference implementation
 - {{!module-Tezos_scoru_wasm_fast}Tezos_scoru_wasm_fast}: WASM functionality for SCORU Fast Execution

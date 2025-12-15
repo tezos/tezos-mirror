@@ -42,7 +42,8 @@
   octez-performance-metrics
   opentelemetry-lwt
   octez-libs.octez-telemetry
-  octez-lwt-domain)
+  octez-lwt-domain
+  octez-l2-libs.layer2_shell)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

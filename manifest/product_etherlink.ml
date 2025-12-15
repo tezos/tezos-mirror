@@ -354,6 +354,7 @@ let evm_node_lib_dev =
         opentelemetry_lwt;
         octez_telemetry;
         lwt_domain;
+        octez_layer2_shell;
       ]
 
 let floodgate_lib =

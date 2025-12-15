@@ -5258,6 +5258,18 @@ let octez_layer2_irmin_context =
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
 
+let octez_layer2_shell =
+  octez_l2_lib
+    "layer2_shell"
+    ~internal_name:"Tezos_layer2_shell"
+    ~path:"src/lib_layer2_shell"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_layer2_irmin_context;
+        lambda_term;
+      ]
+
 let octez_layer2_riscv_context =
   octez_l2_lib
     "riscv_context"

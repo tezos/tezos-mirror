@@ -51,6 +51,8 @@ val octez_layer2_irmin_context : Manifest.target
 
 val octez_layer2_riscv_context : Manifest.target
 
+val octez_layer2_shell : Manifest.target
+
 val octez_openapi : Manifest.target
 
 val octez_sqlite : Manifest.target

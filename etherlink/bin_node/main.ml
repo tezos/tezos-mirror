@@ -83,6 +83,18 @@ end
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
 
+  let block_param =
+    Tezos_clic.parameter (fun _ s ->
+        let open Lwt_result_syntax in
+        let block =
+          Data_encoding.Json.(
+            destruct
+              Evm_node_lib_dev_encoding.Ethereum_types.Block_parameter
+              .extended_encoding)
+            (`String s)
+        in
+        return block)
+
   let hex_string =
     Tezos_clic.parameter (fun _ s ->
         match `Hex s |> Hex.to_string with
@@ -276,6 +288,25 @@ module Params = struct
          number of days of history to retain."
       history_param
       next
+
+  module Shell = struct
+    let pp =
+      Tezos_clic.parameter @@ fun () s ->
+      let open Lwt_result_syntax in
+      match Tezos_layer2_shell.Pp.of_string s with
+      | Some pp -> return pp
+      | _ -> failwith "Unexpected value %s" s
+  end
+end
+
+module Shell = struct
+  let pp_arg =
+    Tezos_clic.default_arg
+      ~long:"pp"
+      ~placeholder:"PP"
+      ~default:"hex"
+      ~doc:"Specify how to print the stored value"
+      Params.Shell.pp
 end
 
 let wallet_dir_arg =
@@ -359,6 +390,14 @@ let block_number_arg ~doc =
       Lwt_result_syntax.return
         (Option.map (fun i -> Ethereum_types.Qty Z.(of_int i)) i))
   @@ Tezos_clic.arg ~long:"block-number" ~placeholder:"N" ~doc Params.int
+
+let block_param_arg =
+  Tezos_clic.default_arg
+    ~doc:"Block parameter as per Ethereum JSON RPC specification"
+    ~long:"block"
+    ~placeholder:"BLOCK"
+    ~default:"latest"
+    Params.block_param
 
 let maximum_blueprints_lag_arg =
   Tezos_clic.arg
@@ -3646,6 +3685,62 @@ let list_metrics_command =
       Format.printf "%s\n" metrics ;
       return_unit)
 
+let shell_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:
+      "Interactive environment to explore the content of the durable storage"
+    (args3 data_dir_arg config_path_arg block_param_arg)
+    (prefixes ["shell"] stop)
+    (fun (data_dir, config_file, block) () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.main ~config block)
+
+let shell_cat_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print a value stored in the durable storage"
+    (args4 data_dir_arg config_path_arg block_param_arg Shell.pp_arg)
+    (prefixes ["shell"; "cat"]
+    @@ param ~name:"PATH" ~desc:"The path of the value to print" Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block, pp) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.cat ~config block pp path)
+
+let shell_ls_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.debug
+    ~desc:"Print a value stored in the durable storage"
+    (args3 data_dir_arg config_path_arg block_param_arg)
+    (prefixes ["shell"; "ls"]
+    @@ param
+         ~name:"PATH"
+         ~desc:"The path of the directory whose entries need to be listed"
+         Params.string
+    @@ stop)
+    (fun (data_dir, config_file, block) path () ->
+      let open Lwt_result_syntax in
+      let* config =
+        Cli.create_or_read_config
+          ~data_dir
+          (config_filename ~data_dir ?config_file ())
+      in
+      Evm_node_lib_dev.Shell.ls ~config block path)
+
 let list_events_command =
   let open Tezos_clic in
   command
@@ -3739,6 +3834,9 @@ let commands =
     debug_print_store_schemas_command;
     list_metrics_command;
     list_events_command;
+    shell_command;
+    shell_cat_command;
+    shell_ls_command;
   ]
 
 let global_options = Tezos_clic.no_options
