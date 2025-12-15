@@ -165,38 +165,6 @@ documentation.docgen:
     - docs/api/errors.rst
     - docs/shell/p2p_api.rst
 
-documentation.manuals:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - eval $(opam env)
-  - scripts/ci/documentation:manuals_static.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - docs/*/octez-*.html
-    - docs/api/octez-*.txt
-    - docs/developer/metrics.csv
-    - docs/developer/rollup_metrics.csv
-    - docs/user/node-config.json
-
 documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
@@ -239,6 +207,38 @@ documentation.odoc:
     - docs/_build/api/odoc/
     - docs/odoc.log
     when: always
+
+documentation.manuals:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - scripts/ci/documentation:manuals_static.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/developer/rollup_metrics.csv
+    - docs/user/node-config.json
 
 documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
