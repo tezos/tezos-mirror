@@ -65,7 +65,7 @@ let job_release_page =
   CI.job
     "release_page"
     ~__POS__
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Tezos_ci.Images.CI.release_page
     ~stage:Publish
     ~description:
       "Update the Teztale release page. If running in a test pipeline, the \
@@ -100,11 +100,7 @@ let job_release_page =
             ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    [
-      "eval $(opam env)";
-      "sudo apk add aws-cli pandoc";
-      "./teztale/scripts/releases/publish_release_page.sh";
-    ]
+    ["eval $(opam env)"; "./teztale/scripts/releases/publish_release_page.sh"]
 
 let register () =
   CI.register_merge_request_jobs
