@@ -55,6 +55,8 @@ module Prefix : sig
 
   val bls12_381_public_key_hash : string
 
+  val mldsa44_public_key_hash : string
+
   val smart_rollup_address : string
 
   val smart_rollup_commitment : string
@@ -116,6 +118,14 @@ module Prefix : sig
   val bls12_381_public_key : string
 
   val bls12_381_secret_key : string
+
+  val mldsa44_secret_key : string
+
+  val mldsa44_public_key : string
+
+  val mldsa44_encrypted_secret_key : string
+
+  val mldsa44_signature : string
 
   val slot_header : string
 end
