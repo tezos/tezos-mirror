@@ -1237,6 +1237,8 @@ module type Tezlink = sig
   val l1_tzkt_api : string option
 
   val faucet_private_key : string option
+
+  val umami : bool
 end
 
 module Tezlink () : Tezlink = struct
@@ -1408,6 +1410,14 @@ module Tezlink () : Tezlink = struct
       ~description:
         "Set the private key used for the faucet account (requires --faucet)"
       ()
+
+  let umami =
+    Clap.flag
+      ~section
+      ~set_long:"umami"
+      ~unset_long:"no-umami"
+      ~description:"Run an Umami v2 instance (requires --tzkt)"
+      false
 end
 
 module type Etherlink = sig
