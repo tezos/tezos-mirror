@@ -10,18 +10,21 @@ type public_key_hash =
   | Secp256k1 of Secp256k1.Public_key_hash.t
   | P256 of P256.Public_key_hash.t
   | Bls of Bls.Public_key_hash.t
+  | Mldsa44 of Mldsa44.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
   | P256 of P256.Public_key.t
   | Bls of Bls.Public_key.t
+  | Mldsa44 of Mldsa44.Public_key.t
 
 type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
   | P256 of P256.Secret_key.t
   | Bls of Bls.Secret_key.t
+  | Mldsa44 of Mldsa44.Secret_key.t
 
 type watermark = Signature_v0.watermark =
   | Block_header of Chain_id.t
@@ -38,6 +41,7 @@ type signature =
   | Secp256k1 of Secp256k1.t
   | P256 of P256.t
   | Bls of Bls.t
+  | Mldsa44 of Mldsa44.t
   | Unknown of Bytes.t
 
 (** A signature prefix holds data only for signature that are more than 64 bytes
@@ -70,7 +74,8 @@ val concat : Bytes.t -> t -> Bytes.t
 include S.RAW_DATA with type t := t
 
 (** The size of the signature in bytes. Can be [64] for Ed25519, Secp256k1 and
-    P256 signatures or [96] for BLS signatures.  *)
+    P256 signatures, [96] for BLS signatures and [2420] for ML-DSA-44
+    signatures. *)
 val size : t -> int
 
 (** [of_secp256k1 s] returns a wrapped version of the Secp256k1 signature [s] in
@@ -87,8 +92,12 @@ val of_p256 : P256.t -> t
 (** [of_bls s] returns a wrapped version of the BLS signature [s] in {!t}. *)
 val of_bls : Bls.t -> t
 
+(** [of_mldsa44 s] returns a wrapped version of the Mldsa44 signature [s] in
+    {!t}. *)
+val of_mldsa44 : Mldsa44.t -> t
+
 (** The type of signing algorithms. *)
-type algo = Ed25519 | Secp256k1 | P256 | Bls
+type algo = Ed25519 | Secp256k1 | P256 | Bls | Mldsa44
 
 (** The list of signing algorithm supported, i.e. all constructors of type
     {!algo}. *)

@@ -51,6 +51,7 @@ module Signature = struct
   module Ed25519 = Ed25519
   module P256 = P256
   module Secp256k1 = Secp256k1
+  module Mldsa44 = Mldsa44
   include Signature
 end
 

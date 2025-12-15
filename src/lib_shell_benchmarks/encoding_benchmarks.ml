@@ -48,6 +48,7 @@ struct
     | Tezos_crypto.Signature.Secp256k1 -> "secp256k1"
     | Tezos_crypto.Signature.P256 -> "p256"
     | Tezos_crypto.Signature.Bls -> "bls"
+    | Tezos_crypto.Signature.Mldsa44 -> "mldsa44"
 
   module Sampler = Crypto_samplers.Make_finite_key_pool (struct
     let size = 256

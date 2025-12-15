@@ -12,18 +12,21 @@ type public_key_hash =
   | Secp256k1 of Secp256k1.Public_key_hash.t
   | P256 of P256.Public_key_hash.t
   | Bls of Bls.Public_key_hash.t
+  | Mldsa44 of Mldsa44.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
   | P256 of P256.Public_key.t
   | Bls of Bls.Public_key.t
+  | Mldsa44 of Mldsa44.Public_key.t
 
 type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
   | P256 of P256.Secret_key.t
   | Bls of Bls.Secret_key.t
+  | Mldsa44 of Mldsa44.Secret_key.t
 
 type watermark = Signature_v0.watermark =
   | Block_header of Chain_id.t
@@ -37,14 +40,15 @@ module Public_key_hash = struct
     | Secp256k1 of Secp256k1.Public_key_hash.t
     | P256 of P256.Public_key_hash.t
     | Bls of Bls.Public_key_hash.t
+    | Mldsa44 of Mldsa44.Public_key_hash.t
 
   let name = "Signature.Public_key_hash"
 
-  let title = "A Ed25519, Secp256k1, P256, or BLS public key hash"
+  let title = "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash"
 
   let is_bls : t -> bool = function
     | Bls _ -> true
-    | Ed25519 _ | Secp256k1 _ | P256 _ -> false
+    | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> false
 
   type Base58.data += Data of t (* unused *)
 
@@ -86,6 +90,12 @@ module Public_key_hash = struct
              Bls.Public_key_hash.encoding
              (function Bls x -> Some x | _ -> None)
              (function x -> Bls x);
+           case
+             (Tag 4)
+             ~title:"Mldsa44"
+             Mldsa44.Public_key_hash.encoding
+             (function Mldsa44 x -> Some x | _ -> None)
+             (function x -> Mldsa44 x);
          ]
 
   let to_bytes s = Data_encoding.Binary.to_bytes_exn raw_encoding s
@@ -118,6 +128,7 @@ module Public_key_hash = struct
     | Some (Secp256k1.Public_key_hash.Data pkh) -> Some (Secp256k1 pkh)
     | Some (P256.Public_key_hash.Data pkh) -> Some (P256 pkh)
     | Some (Bls.Public_key_hash.Data pkh) -> Some (Bls pkh)
+    | Some (Mldsa44.Public_key_hash.Data pkh) -> Some (Mldsa44 pkh)
     | _ -> None
 
   let of_b58check_exn s =
@@ -136,12 +147,14 @@ module Public_key_hash = struct
     | Secp256k1 pkh -> Secp256k1.Public_key_hash.to_b58check pkh
     | P256 pkh -> P256.Public_key_hash.to_b58check pkh
     | Bls pkh -> Bls.Public_key_hash.to_b58check pkh
+    | Mldsa44 pkh -> Mldsa44.Public_key_hash.to_b58check pkh
 
   let to_short_b58check = function
     | Ed25519 pkh -> Ed25519.Public_key_hash.to_short_b58check pkh
     | Secp256k1 pkh -> Secp256k1.Public_key_hash.to_short_b58check pkh
     | P256 pkh -> P256.Public_key_hash.to_short_b58check pkh
     | Bls pkh -> Bls.Public_key_hash.to_short_b58check pkh
+    | Mldsa44 pkh -> Mldsa44.Public_key_hash.to_short_b58check pkh
 
   let to_path key l =
     match key with
@@ -149,6 +162,7 @@ module Public_key_hash = struct
     | Secp256k1 h -> "secp256k1" :: Secp256k1.Public_key_hash.to_path h l
     | P256 h -> "p256" :: P256.Public_key_hash.to_path h l
     | Bls h -> "bls" :: Bls.Public_key_hash.to_path h l
+    | Mldsa44 h -> "mldsa44" :: Mldsa44.Public_key_hash.to_path h l
 
   let of_path = function
     | "ed25519" :: q -> (
@@ -167,6 +181,10 @@ module Public_key_hash = struct
         match Bls.Public_key_hash.of_path q with
         | Some pkh -> Some (Bls pkh)
         | None -> None)
+    | "mldsa44" :: q -> (
+        match Mldsa44.Public_key_hash.of_path q with
+        | Some pkh -> Some (Mldsa44 pkh)
+        | None -> None)
     | _ -> assert false
 
   (* FIXME classification des erreurs *)
@@ -176,6 +194,7 @@ module Public_key_hash = struct
     | "secp256k1" :: q -> Secp256k1 (Secp256k1.Public_key_hash.of_path_exn q)
     | "p256" :: q -> P256 (P256.Public_key_hash.of_path_exn q)
     | "bls" :: q -> Bls (Bls.Public_key_hash.of_path_exn q)
+    | "mldsa44" :: q -> Mldsa44 (Mldsa44.Public_key_hash.of_path_exn q)
     | _ -> assert false
 
   (* FIXME classification des erreurs *)
@@ -184,10 +203,12 @@ module Public_key_hash = struct
     let l1 = Ed25519.Public_key_hash.path_length
     and l2 = Secp256k1.Public_key_hash.path_length
     and l3 = P256.Public_key_hash.path_length
-    and l4 = Bls.Public_key_hash.path_length in
+    and l4 = Bls.Public_key_hash.path_length
+    and l5 = Mldsa44.Public_key_hash.path_length in
     assert (Compare.Int.(l1 = l2)) ;
     assert (Compare.Int.(l1 = l3)) ;
     assert (Compare.Int.(l1 = l4)) ;
+    assert (Compare.Int.(l1 = l5)) ;
     1 + l1
 
   let prefix_path _ = assert false (* unused *)
@@ -205,7 +226,13 @@ module Public_key_hash = struct
       | Secp256k1 x, Secp256k1 y -> Secp256k1.Public_key_hash.compare x y
       | P256 x, P256 y -> P256.Public_key_hash.compare x y
       | Bls x, Bls y -> Bls.Public_key_hash.compare x y
-      | _ -> Stdlib.compare a b
+      | Mldsa44 x, Mldsa44 y -> Mldsa44.Public_key_hash.compare x y
+      | Ed25519 _, (Secp256k1 _ | P256 _ | Bls _ | Mldsa44 _)
+      | Secp256k1 _, (Ed25519 _ | P256 _ | Bls _ | Mldsa44 _)
+      | P256 _, (Ed25519 _ | Secp256k1 _ | Bls _ | Mldsa44 _)
+      | Bls _, (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _)
+      | Mldsa44 _, (Ed25519 _ | Secp256k1 _ | P256 _ | Bls _) ->
+          Stdlib.compare a b
   end)
 
   include Helpers.MakeEncoder (struct
@@ -259,10 +286,11 @@ module Public_key = struct
     | Secp256k1 of Secp256k1.Public_key.t
     | P256 of P256.Public_key.t
     | Bls of Bls.Public_key.t
+    | Mldsa44 of Mldsa44.Public_key.t
 
   let name = "Signature.Public_key"
 
-  let title = "A Ed25519, Secp256k1, P256 or a BLS public key"
+  let title = "A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key"
 
   let hash pk =
     match pk with
@@ -270,6 +298,7 @@ module Public_key = struct
     | Secp256k1 pk -> Public_key_hash.Secp256k1 (Secp256k1.Public_key.hash pk)
     | P256 pk -> Public_key_hash.P256 (P256.Public_key.hash pk)
     | Bls pk -> Public_key_hash.Bls (Bls.Public_key.hash pk)
+    | Mldsa44 pk -> Public_key_hash.Mldsa44 (Mldsa44.Public_key.hash pk)
 
   include Compare.Make (struct
     type nonrec t = t
@@ -280,9 +309,12 @@ module Public_key = struct
       | Secp256k1 x, Secp256k1 y -> Secp256k1.Public_key.compare x y
       | P256 x, P256 y -> P256.Public_key.compare x y
       | Bls x, Bls y -> Bls.Public_key.compare x y
-      | Ed25519 _, (Secp256k1 _ | P256 _ | Bls _) -> -1
-      | Secp256k1 _, (P256 _ | Bls _) -> -1
-      | P256 _, Bls _ -> -1
+      | Mldsa44 x, Mldsa44 y -> Mldsa44.Public_key.compare x y
+      | Ed25519 _, (Secp256k1 _ | P256 _ | Bls _ | Mldsa44 _) -> -1
+      | Secp256k1 _, (P256 _ | Bls _ | Mldsa44 _) -> -1
+      | P256 _, (Bls _ | Mldsa44 _) -> -1
+      | Bls _, Mldsa44 _ -> -1
+      | Mldsa44 _, (Bls _ | P256 _ | Secp256k1 _ | Ed25519 _) -> 1
       | Bls _, (P256 _ | Secp256k1 _ | Ed25519 _) -> 1
       | P256 _, (Secp256k1 _ | Ed25519 _) -> 1
       | Secp256k1 _, Ed25519 _ -> 1
@@ -305,6 +337,7 @@ module Public_key = struct
     | Some (Secp256k1.Public_key.Data public_key) -> Some (Secp256k1 public_key)
     | Some (P256.Public_key.Data public_key) -> Some (P256 public_key)
     | Some (Bls.Public_key.Data public_key) -> Some (Bls public_key)
+    | Some (Mldsa44.Public_key.Data public_key) -> Some (Mldsa44 public_key)
     | _ -> None
 
   let of_b58check_exn s =
@@ -323,12 +356,14 @@ module Public_key = struct
     | Secp256k1 pk -> Secp256k1.Public_key.to_b58check pk
     | P256 pk -> P256.Public_key.to_b58check pk
     | Bls pk -> Bls.Public_key.to_b58check pk
+    | Mldsa44 pk -> Mldsa44.Public_key.to_b58check pk
 
   let to_short_b58check = function
     | Ed25519 pk -> Ed25519.Public_key.to_short_b58check pk
     | Secp256k1 pk -> Secp256k1.Public_key.to_short_b58check pk
     | P256 pk -> P256.Public_key.to_short_b58check pk
     | Bls pk -> Bls.Public_key.to_short_b58check pk
+    | Mldsa44 pk -> Mldsa44.Public_key.to_short_b58check pk
 
   let of_bytes_without_validation b =
     let tag = Bytes.(get_int8 b 0) in
@@ -348,6 +383,10 @@ module Public_key = struct
     | 3 ->
         Option.bind (Bls.Public_key.of_bytes_without_validation b) (fun pk ->
             Some (Bls pk))
+    | 4 ->
+        Option.bind
+          (Mldsa44.Public_key.of_bytes_without_validation b)
+          (fun pk -> Some (Mldsa44 pk))
     | _ -> None
 
   include Helpers.MakeEncoder (struct
@@ -386,6 +425,12 @@ module Public_key = struct
                Bls.Public_key.encoding
                (function Bls x -> Some x | _ -> None)
                (function x -> Bls x);
+             case
+               ~title:"Mldsa44"
+               (Tag 4)
+               Mldsa44.Public_key.encoding
+               (function Mldsa44 x -> Some x | _ -> None)
+               (function x -> Mldsa44 x);
            ]
 
     let of_b58check = of_b58check
@@ -410,10 +455,11 @@ module Secret_key = struct
     | Secp256k1 of Secp256k1.Secret_key.t
     | P256 of P256.Secret_key.t
     | Bls of Bls.Secret_key.t
+    | Mldsa44 of Mldsa44.Secret_key.t
 
   let name = "Signature.Secret_key"
 
-  let title = "A Ed25519, Secp256k1, P256 or a BLS secret key"
+  let title = "A Ed25519, Secp256k1, P256, Bls or Mldsa44 secret key"
 
   let to_public_key = function
     | Ed25519 sk -> Public_key.Ed25519 (Ed25519.Secret_key.to_public_key sk)
@@ -421,6 +467,7 @@ module Secret_key = struct
         Public_key.Secp256k1 (Secp256k1.Secret_key.to_public_key sk)
     | P256 sk -> Public_key.P256 (P256.Secret_key.to_public_key sk)
     | Bls sk -> Public_key.Bls (Bls.Secret_key.to_public_key sk)
+    | Mldsa44 sk -> Public_key.Mldsa44 (Mldsa44.Secret_key.to_public_key sk)
 
   include Compare.Make (struct
     type nonrec t = t
@@ -431,7 +478,13 @@ module Secret_key = struct
       | Secp256k1 x, Secp256k1 y -> Secp256k1.Secret_key.compare x y
       | P256 x, P256 y -> P256.Secret_key.compare x y
       | Bls x, Bls y -> Bls.Secret_key.compare x y
-      | _ -> Stdlib.compare a b
+      | Mldsa44 x, Mldsa44 y -> Mldsa44.Secret_key.compare x y
+      | Ed25519 _, (Secp256k1 _ | P256 _ | Bls _ | Mldsa44 _)
+      | Secp256k1 _, (Ed25519 _ | P256 _ | Bls _ | Mldsa44 _)
+      | P256 _, (Ed25519 _ | Secp256k1 _ | Bls _ | Mldsa44 _)
+      | Bls _, (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _)
+      | Mldsa44 _, (Ed25519 _ | Secp256k1 _ | P256 _ | Bls _) ->
+          Stdlib.compare a b
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -451,6 +504,7 @@ module Secret_key = struct
     | Some (Secp256k1.Secret_key.Data sk) -> Some (Secp256k1 sk)
     | Some (P256.Secret_key.Data sk) -> Some (P256 sk)
     | Some (Bls.Secret_key.Data sk) -> Some (Bls sk)
+    | Some (Mldsa44.Secret_key.Data sk) -> Some (Mldsa44 sk)
     | _ -> None
 
   let of_b58check_exn s =
@@ -469,12 +523,14 @@ module Secret_key = struct
     | Secp256k1 sk -> Secp256k1.Secret_key.to_b58check sk
     | P256 sk -> P256.Secret_key.to_b58check sk
     | Bls sk -> Bls.Secret_key.to_b58check sk
+    | Mldsa44 sk -> Mldsa44.Secret_key.to_b58check sk
 
   let to_short_b58check = function
     | Ed25519 sk -> Ed25519.Secret_key.to_short_b58check sk
     | Secp256k1 sk -> Secp256k1.Secret_key.to_short_b58check sk
     | P256 sk -> P256.Secret_key.to_short_b58check sk
     | Bls sk -> Bls.Secret_key.to_short_b58check sk
+    | Mldsa44 sk -> Mldsa44.Secret_key.to_short_b58check sk
 
   include Helpers.MakeEncoder (struct
     type nonrec t = t
@@ -512,6 +568,12 @@ module Secret_key = struct
                Bls.Secret_key.encoding
                (function Bls x -> Some x | _ -> None)
                (function x -> Bls x);
+             case
+               (Tag 4)
+               ~title:"Mldsa44"
+               Mldsa44.Secret_key.encoding
+               (function Mldsa44 x -> Some x | _ -> None)
+               (function x -> Mldsa44 x);
            ]
 
     let of_b58check = of_b58check
@@ -533,6 +595,7 @@ type signature =
   | Secp256k1 of Secp256k1.t
   | P256 of P256.t
   | Bls of Bls.t
+  | Mldsa44 of Mldsa44.t
   | Unknown of Bytes.t
 
 type prefix = Bls_prefix of Bytes.t
@@ -543,13 +606,14 @@ type t = signature
 
 let name = "Signature.V3"
 
-let title = "A Ed25519, Secp256k1, P256 or BLS signature"
+let title = "A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature"
 
 let to_bytes = function
   | Ed25519 b -> Ed25519.to_bytes b
   | Secp256k1 b -> Secp256k1.to_bytes b
   | P256 b -> P256.to_bytes b
   | Bls b -> Bls.to_bytes b
+  | Mldsa44 b -> Mldsa44.to_bytes b
   | Unknown b -> b
 
 let of_bytes_opt s =
@@ -562,7 +626,8 @@ let () =
   assert (Ed25519.size = 64) ;
   assert (Secp256k1.size = 64) ;
   assert (P256.size = 64) ;
-  assert (Bls.size = 96)
+  assert (Bls.size = 96) ;
+  assert (Mldsa44.size = 2420)
 
 type Base58.data += Data_unknown of Bytes.t
 
@@ -605,6 +670,8 @@ let of_b58check_opt s =
   then Option.map (fun x -> P256 x) (P256.of_b58check_opt s)
   else if TzString.has_prefix ~prefix:Bls.b58check_encoding.encoded_prefix s
   then Option.map (fun x -> Bls x) (Bls.of_b58check_opt s)
+  else if TzString.has_prefix ~prefix:Mldsa44.b58check_encoding.encoded_prefix s
+  then Option.map (fun x -> Mldsa44 x) (Mldsa44.of_b58check_opt s)
   else
     Option.map
       (fun x -> Unknown x)
@@ -625,6 +692,7 @@ let to_b58check = function
   | Secp256k1 b -> Secp256k1.to_b58check b
   | P256 b -> P256.to_b58check b
   | Bls b -> Bls.to_b58check b
+  | Mldsa44 b -> Mldsa44.to_b58check b
   | Unknown b -> Base58.simple_encode unknown_b58check_encoding b
 
 let to_short_b58check = function
@@ -632,6 +700,7 @@ let to_short_b58check = function
   | Secp256k1 b -> Secp256k1.to_short_b58check b
   | P256 b -> P256.to_short_b58check b
   | Bls b -> Bls.to_short_b58check b
+  | Mldsa44 b -> Mldsa44.to_short_b58check b
   | Unknown b -> Base58.simple_encode unknown_b58check_encoding b
 
 let raw_encoding =
@@ -700,6 +769,8 @@ let of_p256 s = P256 s
 
 let of_bls s = Bls s
 
+let of_mldsa44 s = Mldsa44 s
+
 let zero = of_ed25519 Ed25519.zero
 
 (* NOTE: At the moment, only BLS signatures can be encoded with a tag. We impose
@@ -724,7 +795,7 @@ let prefix_encoding =
        ]
 
 let split_signature = function
-  | (Ed25519 _ | Secp256k1 _ | P256 _) as s ->
+  | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _) as s ->
       {prefix = None; suffix = to_bytes s}
   | Bls s ->
       let s = Bls.to_bytes s in
@@ -771,6 +842,7 @@ let sign ?watermark secret_key message =
   | Secp256k1 sk -> of_secp256k1 (Secp256k1.sign ?watermark sk message)
   | P256 sk -> of_p256 (P256.sign ?watermark sk message)
   | Bls sk -> of_bls (Bls.sign ?watermark sk message)
+  | Mldsa44 sk -> of_mldsa44 (Mldsa44.sign ?watermark sk message)
 
 let check ?watermark public_key signature message =
   let watermark = Option.map bytes_of_watermark watermark in
@@ -791,6 +863,10 @@ let check ?watermark public_key signature message =
       match Bls.of_bytes_opt signature with
       | Some s -> Bls.check ?watermark pk s message
       | None -> false)
+  | Public_key.Mldsa44 pk, Unknown signature -> (
+      match Mldsa44.of_bytes_opt signature with
+      | Some s -> Mldsa44.check ?watermark pk s message
+      | None -> false)
   | Public_key.Ed25519 pk, Ed25519 signature ->
       Ed25519.check ?watermark pk signature message
   | Public_key.Secp256k1 pk, Secp256k1 signature ->
@@ -799,12 +875,18 @@ let check ?watermark public_key signature message =
       P256.check ?watermark pk signature message
   | Public_key.Bls pk, Bls signature ->
       Bls.check ?watermark pk signature message
-  | _ -> false
+  | Public_key.Mldsa44 pk, Mldsa44 signature ->
+      Mldsa44.check ?watermark pk signature message
+  | Public_key.Ed25519 _, (Secp256k1 _ | P256 _ | Bls _ | Mldsa44 _) -> false
+  | Public_key.Secp256k1 _, (Ed25519 _ | P256 _ | Bls _ | Mldsa44 _) -> false
+  | Public_key.P256 _, (Ed25519 _ | Secp256k1 _ | Bls _ | Mldsa44 _) -> false
+  | Public_key.Bls _, (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _) -> false
+  | Public_key.Mldsa44 _, (Ed25519 _ | Secp256k1 _ | P256 _ | Bls _) -> false
 
-type algo = Ed25519 | Secp256k1 | P256 | Bls
+type algo = Ed25519 | Secp256k1 | P256 | Bls | Mldsa44
 
 let hardcoded_sk =
-  let ed, secp, p, bls =
+  let ed, secp, p, bls, mldsa44 =
     ( Secret_key.of_b58check_exn
         "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh",
       Secret_key.of_b58check_exn
@@ -812,31 +894,51 @@ let hardcoded_sk =
       Secret_key.of_b58check_exn
         "p2sk2k6YAkNJ8CySZCS3vGA5Ht6Lj6LXG3yb8UrHvMKZy7Ab8JUtWh",
       Secret_key.of_b58check_exn
-        "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG" )
+        "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG",
+      Secret_key.of_b58check_exn
+        "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"
+    )
   in
-  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+  function
+  | Ed25519 -> ed
+  | Secp256k1 -> secp
+  | P256 -> p
+  | Bls -> bls
+  | Mldsa44 -> mldsa44
 
 let hardcoded_pk =
   (* precompute signatures *)
-  let ed, secp, p, bls =
+  let ed, secp, p, bls, mldsa44 =
     ( Secret_key.to_public_key (hardcoded_sk Ed25519),
       Secret_key.to_public_key (hardcoded_sk Secp256k1),
       Secret_key.to_public_key (hardcoded_sk P256),
-      Secret_key.to_public_key (hardcoded_sk Bls) )
+      Secret_key.to_public_key (hardcoded_sk Bls),
+      Secret_key.to_public_key (hardcoded_sk Mldsa44) )
   in
-  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+  function
+  | Ed25519 -> ed
+  | Secp256k1 -> secp
+  | P256 -> p
+  | Bls -> bls
+  | Mldsa44 -> mldsa44
 
 let hardcoded_msg = Bytes.of_string "Cheers"
 
 let hardcoded_sig =
   (* precompute signatures *)
-  let ed, secp, p, bls =
+  let ed, secp, p, bls, mldsa44 =
     ( sign (hardcoded_sk Ed25519) hardcoded_msg,
       sign (hardcoded_sk Secp256k1) hardcoded_msg,
       sign (hardcoded_sk P256) hardcoded_msg,
-      sign (hardcoded_sk Bls) hardcoded_msg )
+      sign (hardcoded_sk Bls) hardcoded_msg,
+      sign (hardcoded_sk Mldsa44) hardcoded_msg )
   in
-  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
+  function
+  | Ed25519 -> ed
+  | Secp256k1 -> secp
+  | P256 -> p
+  | Bls -> bls
+  | Mldsa44 -> mldsa44
 
 let fast_fake_sign ?watermark:_ (sk : Secret_key.t) _msg =
   let algo =
@@ -845,6 +947,7 @@ let fast_fake_sign ?watermark:_ (sk : Secret_key.t) _msg =
     | Secp256k1 _ -> Secp256k1
     | P256 _ -> P256
     | Bls _ -> Bls
+    | Mldsa44 _ -> Mldsa44
   in
   hardcoded_sig algo
 
@@ -859,6 +962,7 @@ let fake_check ?watermark:_ (pk : Public_key.t) _signature _msg =
     | Secp256k1 _ -> Secp256k1
     | P256 _ -> P256
     | Bls _ -> Bls
+    | Mldsa44 _ -> Mldsa44
   in
   ignore (check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg) ;
   true
@@ -884,7 +988,7 @@ let append ?watermark sk msg = Bytes.cat msg (to_bytes (sign ?watermark sk msg))
 
 let concat msg signature = Bytes.cat msg (to_bytes signature)
 
-let algos = [Ed25519; Secp256k1; P256; Bls]
+let algos = [Ed25519; Secp256k1; P256; Bls; Mldsa44]
 
 let fake_generate_key (pkh, pk, _) =
   let sk_of_pk (pk : public_key) : secret_key =
@@ -912,6 +1016,9 @@ let generate_key ?(algo = Ed25519) ?seed () =
   | Bls ->
       let pkh, pk, sk = Bls.generate_key ?seed () in
       (Public_key_hash.Bls pkh, Public_key.Bls pk, Secret_key.Bls sk)
+  | Mldsa44 ->
+      let pkh, pk, sk = Mldsa44.generate_key ?seed () in
+      (Public_key_hash.Mldsa44 pkh, Public_key.Mldsa44 pk, Secret_key.Mldsa44 sk)
 
 let fake_generate_key ?(algo = Ed25519) ?seed () =
   let true_keys = generate_key ~algo ?seed () in
@@ -931,6 +1038,7 @@ let deterministic_nonce sk msg =
   | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce sk msg
   | Secret_key.P256 sk -> P256.deterministic_nonce sk msg
   | Secret_key.Bls sk -> Bls.deterministic_nonce sk msg
+  | Secret_key.Mldsa44 sk -> Mldsa44.deterministic_nonce sk msg
 
 let deterministic_nonce_hash sk msg =
   match sk with
@@ -938,6 +1046,7 @@ let deterministic_nonce_hash sk msg =
   | Secret_key.Secp256k1 sk -> Secp256k1.deterministic_nonce_hash sk msg
   | Secret_key.P256 sk -> P256.deterministic_nonce_hash sk msg
   | Secret_key.Bls sk -> Bls.deterministic_nonce_hash sk msg
+  | Secret_key.Mldsa44 sk -> Mldsa44.deterministic_nonce_hash sk msg
 
 let pop_verify pubkey ?msg proof =
   match pubkey with

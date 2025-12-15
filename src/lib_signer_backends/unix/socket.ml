@@ -54,6 +54,7 @@ struct
           | _, None -> Pkh pkh
           | (Ed25519 _ | Secp256k1 _ | P256 _), Some _ -> Pkh pkh
           | Bls _, Some version -> Pkh_with_version (pkh, version)
+          | Mldsa44 _, Some version -> Pkh_with_version (pkh, version)
         in
         Request.Sign {Sign.Request.pkh; data; signature}
     | Deterministic_nonce_request ->

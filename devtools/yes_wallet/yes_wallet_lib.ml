@@ -63,6 +63,9 @@ let fake_sk_of_pk (pk_s : string) : string =
         let sk_b = Bytes.sub pk_b 0 33 in
         (* Extracting fake secret key from the associated public key.*)
         Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b
+    | Mldsa44 _ ->
+        let _pkh, _pk, sk = Signature.Mldsa44.generate_key () in
+        Mldsa44 sk
     | Bls _ ->
         (* For BLS we cannot easily encode secret key from public key bytes. It
            is simpler to generate a new random secret key with the public key as
