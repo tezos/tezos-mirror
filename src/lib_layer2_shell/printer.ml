@@ -19,12 +19,20 @@ let lterm_printer term : (module PRINTER) =
 
     let ln fmt =
       Format.kasprintf
-        (fun l -> LTerm.fprintls term LTerm_text.(eval [S l]))
+        (fun l ->
+          let open Lwt_syntax in
+          let* () = LTerm.fprintls term LTerm_text.(eval [S l]) in
+          LTerm.flush term)
         fmt
 
     let errorln fmt =
       Format.kasprintf
-        (fun l -> LTerm.fprintls term LTerm_text.(eval [B_fg lred; S l; E_fg]))
+        (fun l ->
+          let open Lwt_syntax in
+          let* () =
+            LTerm.fprintls term LTerm_text.(eval [B_fg lred; S l; E_fg])
+          in
+          LTerm.flush term)
         fmt
   end)
 

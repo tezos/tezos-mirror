@@ -45,12 +45,13 @@ class read_line cmds ~term ~history =
   end
 
 let loop cmds tree term =
+  Sys.catch_break true ;
   let printer = Printer.lterm_printer term in
   let rec loop history =
     let open Lwt_result_syntax in
     let*! exec_result =
-      let*! line = (new read_line ~term ~history cmds)#run in
       protect @@ fun () ->
+      let*! line = (new read_line ~term ~history cmds)#run in
       let input = Zed_string.to_utf8 line in
       let*! () =
         Commands.read_eval ~args:(String.split ' ' input) cmds printer tree
@@ -59,6 +60,13 @@ let loop cmds tree term =
     in
     match exec_result with
     | Ok line -> loop (line :: history)
+    | Error [Exn Sys.Break] ->
+        let*! () = Printer.ln printer "Interrupted (^C). Use ^D to exit." in
+        loop history
+    | Error [Exn LTerm_read_line_base.Interrupt] ->
+        let*! () = LTerm.flush term in
+        let*! () = Printer.ln printer "Exiting (^D)." in
+        Lwt.return_unit
     | Error _ -> loop history
   in
   loop []
