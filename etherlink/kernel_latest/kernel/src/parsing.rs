@@ -138,6 +138,13 @@ pub enum Input<Mode> {
     RemoveSequencer,
     Info(LevelWithInfo),
     ForceKernelUpgrade,
+    /// DAL attested slots from the protocol - contains published_level, slot parameters, and list of attested slot indices.
+    DalAttestedSlots {
+        published_level: i32,
+        slot_size: u64,
+        page_size: u64,
+        slot_indices: Vec<u8>,
+    },
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -915,6 +922,27 @@ impl<Mode: Parsable> InputResult<Mode> {
                 enable_fa_deposits,
             ),
             InternalInboxMessage::EndOfLevel => InputResult::NoInput,
+            InternalInboxMessage::DalAttestedSlots(dal_attested) => {
+                // Extract all slot indices from the slots_by_publisher vector.
+                // Each PublisherSlots contains a Zarith bitset where bit i is
+                // set if slot index i is attested.
+                let slot_indices: Vec<u8> = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .flat_map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .map(|i| i as u8)
+                    })
+                    .collect();
+
+                InputResult::Input(Input::DalAttestedSlots {
+                    published_level: dal_attested.published_level,
+                    slot_size: dal_attested.slot_size as u64,
+                    page_size: dal_attested.page_size as u64,
+                    slot_indices,
+                })
+            }
             _ => InputResult::Unparsable,
         }
     }

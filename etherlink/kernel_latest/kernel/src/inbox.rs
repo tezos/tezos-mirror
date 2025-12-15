@@ -400,6 +400,9 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             Mode::handle_fa_deposit(host, fa_deposit, chain_id, inbox_content)?
         }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
+        Input::DalAttestedSlots { .. } => {
+            // TODO: DalAttestedSlots handling will be added in a later commit
+        }
     }
     Ok(())
 }
