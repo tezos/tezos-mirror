@@ -5,8 +5,8 @@ set -e
 # This script wraps dune to compute and report cache hit ratio in CI when DUNE_CACHE_INFO=true.
 # It analyzes dune's cache debug output to show how many files were restored vs rebuilt.
 
-# Set DUNE_CACHE_INFO to "true" if we are in a CI scheduled pipeline
-if [ -n "$TZ_SCHEDULE_KIND" ]; then
+# Set DUNE_CACHE_INFO to "true" if the CI pipeline is scheduled or triggered via api
+if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$CI_PIPELINE_SOURCE" = "api" ]; then
   DUNE_CACHE_INFO="true"
 fi
 
