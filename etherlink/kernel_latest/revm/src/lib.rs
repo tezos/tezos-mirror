@@ -679,7 +679,7 @@ mod test {
             },
         )
         .unwrap();
-        let value_sent = U256::from(5);
+        let value_sent = U256::from(5000000000000u64);
         let caller_info = AccountInfo {
             balance: U256::MAX,
             nonce: 0,

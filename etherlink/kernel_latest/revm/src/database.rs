@@ -29,7 +29,7 @@ use tezos_crypto_rs::{
     public_key::PublicKey,
     public_key_hash::PublicKeyHash,
 };
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -264,20 +264,20 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
             })?;
         let tezos_pub_key_hash = PublicKeyHash::from_b58check(destination).unwrap();
         let mut tezos_destination_account =
-            crate::tezosx::get_tezos_account_info(self.host, &tezos_pub_key_hash)
-                .map_err(|e| {
-                    CustomPrecompileError::Revert(format!(
-                        "failed to read destination Tezos account: {e:?}"
-                    ))
-                })?
+            crate::tezosx::get_tezos_account_info(self.host, &tezos_pub_key_hash)?
                 .ok_or_else(|| {
                     CustomPrecompileError::Revert(
                         "destination Tezos account not found".to_string(),
                     )
                 })?;
+        let mutez = U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+            CustomPrecompileError::Revert(format!(
+                "failed to convert amount from wei to mutez: {e:?}"
+            ))
+        })?);
         tezos_destination_account.balance = tezos_destination_account
             .balance
-            .checked_add(alloy_to_u256(&amount))
+            .checked_add(alloy_to_u256(&mutez))
             .ok_or_else(|| {
                 CustomPrecompileError::Revert(
                     "overflow in destination balance calculation".to_string(),
