@@ -1,22 +1,22 @@
-From c280e48256a57ab5fd92a70215be5298f7703368 Mon Sep 17 00:00:00 2001
-From: mattiasdrp <mattias@kojin.tech>
-Date: Mon, 22 Sep 2025 11:31:38 +0200
-Subject: [PATCH] Patch Seoul and add v15/profiler.mli
+From 497b07152eed59b5f25e9a1fd8a719a90bc6bafc Mon Sep 17 00:00:00 2001
+From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
+Date: Mon, 15 Dec 2025 15:29:34 +0100
+Subject: [PATCH 1/1] Profiler: update patch for Seoul (profiler api changed)
 
 ---
  src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
- src/lib_protocol_environment/sigs/v15.ml      | 82 ++++++++++++++-----
- .../sigs/v15/profiler.mli                     | 36 ++++++++
+ src/lib_protocol_environment/sigs/v15.ml      | 85 ++++++++++++++-----
+ .../sigs/v15/profiler.mli                     | 39 +++++++++
  src/proto_023_PtSeouLo/lib_protocol/apply.ml  | 17 ++--
  src/proto_023_PtSeouLo/lib_protocol/baking.ml |  4 +-
- .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++----
+ .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++---
  src/proto_023_PtSeouLo/lib_protocol/dune      |  2 +
  .../lib_protocol/init_storage.ml              | 36 ++++++--
  .../lib_protocol/raw_context.ml               | 13 +--
  .../lib_protocol/script_cache.ml              | 19 +++--
  .../lib_protocol/script_interpreter.ml        | 11 +--
  .../lib_protocol/script_ir_translator.ml      | 40 +++++----
- 12 files changed, 254 insertions(+), 86 deletions(-)
+ 12 files changed, 260 insertions(+), 86 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v15/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v15.in.ml b/src/lib_protocol_environment/sigs/v15.in.ml
@@ -24,22 +24,22 @@ index e86731c9cb..05291026e6 100644
 --- a/src/lib_protocol_environment/sigs/v15.in.ml
 +++ b/src/lib_protocol_environment/sigs/v15.in.ml
 @@ -105,6 +105,8 @@ module type T = sig
-
+ 
    module Operation_list_list_hash : [%sig "v15/operation_list_list_hash.mli"]
-
+ 
 +  module Profiler : [%sig "v15/profiler.mli"]
 +
    module Protocol_hash : [%sig "v15/protocol_hash.mli"]
-
+ 
    module Context_hash : [%sig "v15/context_hash.mli"]
 diff --git a/src/lib_protocol_environment/sigs/v15.ml b/src/lib_protocol_environment/sigs/v15.ml
-index f412c985e9..437c499bb4 100644
+index f412c985e9..b597eecb32 100644
 --- a/src/lib_protocol_environment/sigs/v15.ml
 +++ b/src/lib_protocol_environment/sigs/v15.ml
-@@ -10060,6 +10060,48 @@ end
+@@ -10060,6 +10060,51 @@ end
  # 106 "v15.in.ml"
-
-
+ 
+ 
 +  module Profiler : sig
 +# 1 "v15/profiler.mli"
 +(*****************************************************************************)
@@ -57,25 +57,28 @@ index f412c985e9..437c499bb4 100644
 +
 +type verbosity = Notice | Info | Debug
 +
-+val record : verbosity -> id -> unit
++val record : cpu:bool option -> verbosity -> id -> unit
 +
-+val record_f : verbosity -> id -> (unit -> 'a) -> 'a
++val record_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 +
-+val record_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val record_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
-+val aggregate : verbosity -> id -> unit
++val aggregate : cpu:bool option -> verbosity -> id -> unit
 +
-+val aggregate_f : verbosity -> id -> (unit -> 'a) -> 'a
++val aggregate_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 +
-+val aggregate_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val aggregate_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
-+val span_f : verbosity -> ids -> (unit -> 'a) -> 'a
++val span_f : cpu:bool option -> verbosity -> ids -> (unit -> 'a) -> 'a
 +
-+val span_s : verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val span_s :
++  cpu:bool option -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
 +val stop : unit -> unit
 +
-+val stamp : verbosity -> id -> unit
++val stamp : cpu:bool option -> verbosity -> id -> unit
 +
 +val mark : verbosity -> ids -> unit
 +end
@@ -85,191 +88,191 @@ index f412c985e9..437c499bb4 100644
    module Protocol_hash : sig
  # 1 "v15/protocol_hash.mli"
  (*****************************************************************************)
-@@ -10090,7 +10132,7 @@ end
+@@ -10090,7 +10135,7 @@ end
  (** Protocol hashes / IDs. *)
  include S.HASH
  end
 -# 108 "v15.in.ml"
 +# 110 "v15.in.ml"
-
-
+ 
+ 
    module Context_hash : sig
-@@ -10143,7 +10185,7 @@ end
-
+@@ -10143,7 +10188,7 @@ end
+ 
  type version = Version.t
  end
 -# 110 "v15.in.ml"
 +# 112 "v15.in.ml"
-
-
+ 
+ 
    module Sapling : sig
-@@ -10291,7 +10333,7 @@ module Verification : sig
+@@ -10291,7 +10336,7 @@ module Verification : sig
    val final_check : t -> UTXO.transaction -> string -> bool
  end
  end
 -# 112 "v15.in.ml"
 +# 114 "v15.in.ml"
-
-
+ 
+ 
    module Timelock : sig
-@@ -10348,7 +10390,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
+@@ -10348,7 +10393,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
      Used for gas accounting*)
  val get_plaintext_size : chest -> int
  end
 -# 114 "v15.in.ml"
 +# 116 "v15.in.ml"
-
-
+ 
+ 
    module Vdf : sig
-@@ -10436,7 +10478,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
+@@ -10436,7 +10481,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
      @raise Invalid_argument when inputs are invalid *)
  val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
  end
 -# 116 "v15.in.ml"
 +# 118 "v15.in.ml"
-
-
+ 
+ 
    module Micheline : sig
-@@ -10496,7 +10538,7 @@ val annotations : ('l, 'p) node -> string list
-
+@@ -10496,7 +10541,7 @@ val annotations : ('l, 'p) node -> string list
+ 
  val strip_locations : (_, 'p) node -> 'p canonical
  end
 -# 118 "v15.in.ml"
 +# 120 "v15.in.ml"
-
-
+ 
+ 
    module Block_header : sig
-@@ -10553,7 +10595,7 @@ type t = {shell : shell_header; protocol_data : bytes}
-
+@@ -10553,7 +10598,7 @@ type t = {shell : shell_header; protocol_data : bytes}
+ 
  include S.HASHABLE with type t := t and type hash := Block_hash.t
  end
 -# 120 "v15.in.ml"
 +# 122 "v15.in.ml"
-
-
+ 
+ 
    module Bounded : sig
-@@ -10702,7 +10744,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
+@@ -10702,7 +10747,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
  module Uint8 (B : BOUNDS with type ocaml_type := int) :
    S with type ocaml_type := int
  end
 -# 122 "v15.in.ml"
 +# 124 "v15.in.ml"
-
-
+ 
+ 
    module Fitness : sig
-@@ -10736,7 +10778,7 @@ end
+@@ -10736,7 +10781,7 @@ end
      compared in a lexicographical order (longer list are greater). *)
  include S.T with type t = bytes list
  end
 -# 124 "v15.in.ml"
 +# 126 "v15.in.ml"
-
-
+ 
+ 
    module Operation : sig
-@@ -10780,7 +10822,7 @@ type t = {shell : shell_header; proto : bytes}
-
+@@ -10780,7 +10825,7 @@ type t = {shell : shell_header; proto : bytes}
+ 
  include S.HASHABLE with type t := t and type hash := Operation_hash.t
  end
 -# 126 "v15.in.ml"
 +# 128 "v15.in.ml"
-
-
+ 
+ 
    module Context : sig
-@@ -11417,7 +11459,7 @@ module Cache :
+@@ -11417,7 +11462,7 @@ module Cache :
       and type key = cache_key
       and type value = cache_value
  end
 -# 128 "v15.in.ml"
 +# 130 "v15.in.ml"
-
-
+ 
+ 
    module Updater : sig
-@@ -11953,7 +11995,7 @@ end
+@@ -11953,7 +11998,7 @@ end
      not complete until [init] in invoked. *)
  val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
  end
 -# 130 "v15.in.ml"
 +# 132 "v15.in.ml"
-
-
+ 
+ 
    module RPC_context : sig
-@@ -12107,7 +12149,7 @@ val make_opt_call3 :
+@@ -12107,7 +12152,7 @@ val make_opt_call3 :
    'i ->
    'o option shell_tzresult Lwt.t
  end
 -# 132 "v15.in.ml"
 +# 134 "v15.in.ml"
-
-
+ 
+ 
    module Context_binary : sig
-@@ -12150,7 +12192,7 @@ module Tree :
-
+@@ -12150,7 +12195,7 @@ module Tree :
+ 
  val make_empty_context : ?root:string -> unit -> t
  end
 -# 134 "v15.in.ml"
 +# 136 "v15.in.ml"
-
-
+ 
+ 
    module Wasm_2_0_0 : sig
-@@ -12224,7 +12266,7 @@ module Make
+@@ -12224,7 +12269,7 @@ module Make
    val get_info : Tree.tree -> info Lwt.t
  end
  end
 -# 136 "v15.in.ml"
 +# 138 "v15.in.ml"
-
-
+ 
+ 
    module Plonk : sig
-@@ -12343,7 +12385,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
+@@ -12343,7 +12388,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
      on the given [inputs] according to the [public_parameters]. *)
  val verify : public_parameters -> verifier_inputs -> proof -> bool
  end
 -# 138 "v15.in.ml"
 +# 140 "v15.in.ml"
-
-
+ 
+ 
    module Dal : sig
-@@ -12498,7 +12540,7 @@ val share_is_trap :
+@@ -12498,7 +12543,7 @@ val share_is_trap :
    traps_fraction:Q.t ->
    (bool, [> `Decoding_error]) Result.t
  end
 -# 140 "v15.in.ml"
 +# 142 "v15.in.ml"
-
-
+ 
+ 
    module Skip_list : sig
-@@ -12730,7 +12772,7 @@ module Make (_ : sig
+@@ -12730,7 +12775,7 @@ module Make (_ : sig
    val basis : int
  end) : S
  end
 -# 142 "v15.in.ml"
 +# 144 "v15.in.ml"
-
-
+ 
+ 
    module Smart_rollup : sig
-@@ -12787,7 +12829,7 @@ module Inbox_hash : S.HASH
+@@ -12787,7 +12832,7 @@ module Inbox_hash : S.HASH
  (** Smart rollup merkelized payload hashes' hash *)
  module Merkelized_payload_hashes_hash : S.HASH
  end
 -# 144 "v15.in.ml"
 +# 146 "v15.in.ml"
-
-
+ 
+ 
    module Riscv : sig
-@@ -12850,6 +12892,6 @@ val bytes_to_output_proof : bytes -> (output_proof, string) result
-
+@@ -12850,6 +12895,6 @@ val bytes_to_output_proof : bytes -> (output_proof, string) result
+ 
  val get_current_level : state -> int32 option Lwt.t
  end
 -# 146 "v15.in.ml"
 +# 148 "v15.in.ml"
-
+ 
  end
 diff --git a/src/lib_protocol_environment/sigs/v15/profiler.mli b/src/lib_protocol_environment/sigs/v15/profiler.mli
 new file mode 100644
-index 0000000000..3dc7a1c702
+index 0000000000..efbc52c38a
 --- /dev/null
 +++ b/src/lib_protocol_environment/sigs/v15/profiler.mli
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,39 @@
 +(*****************************************************************************)
 +(*                                                                           *)
 +(* SPDX-License-Identifier: MIT                                              *)
@@ -285,25 +288,28 @@ index 0000000000..3dc7a1c702
 +
 +type verbosity = Notice | Info | Debug
 +
-+val record : verbosity -> id -> unit
++val record : cpu:bool option -> verbosity -> id -> unit
 +
-+val record_f : verbosity -> id -> (unit -> 'a) -> 'a
++val record_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 +
-+val record_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val record_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
-+val aggregate : verbosity -> id -> unit
++val aggregate : cpu:bool option -> verbosity -> id -> unit
 +
-+val aggregate_f : verbosity -> id -> (unit -> 'a) -> 'a
++val aggregate_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 +
-+val aggregate_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val aggregate_s :
++  cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
-+val span_f : verbosity -> ids -> (unit -> 'a) -> 'a
++val span_f : cpu:bool option -> verbosity -> ids -> (unit -> 'a) -> 'a
 +
-+val span_s : verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
++val span_s :
++  cpu:bool option -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 +
 +val stop : unit -> unit
 +
-+val stamp : verbosity -> id -> unit
++val stamp : cpu:bool option -> verbosity -> id -> unit
 +
 +val mark : verbosity -> ids -> unit
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/apply.ml b/src/proto_023_PtSeouLo/lib_protocol/apply.ml
@@ -338,7 +344,7 @@ index b8e5d86d62..a77f59c744 100644
 +       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
 +       (ctxt, balance_updates, deactivated))
 +      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
-
+ 
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/baking.ml b/src/proto_023_PtSeouLo/lib_protocol/baking.ml
@@ -360,7 +366,7 @@ index 3bad0551af..0e39978be2 100644
      (ctxt, Signature.Public_key_hash.Map.empty)
 -    slots
 +    slots) [@profiler.record_s {verbosity = Notice} "attesting_rights_by_first_slot"]
-
+ 
  let attesting_rights_by_first_slot ctxt level =
    let open Lwt_result_syntax in
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/delegate_cycles.ml b/src/proto_023_PtSeouLo/lib_protocol/delegate_cycles.ml
@@ -577,7 +583,7 @@ index 024d92cb2b..7eb6ddc076 100644
 +     [@profiler.record_s {verbosity = Notice} "Prepare"])
    in
    (previous_proto, previous_proto_constants, ctxt)
-
+ 
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/script_cache.ml b/src/proto_023_PtSeouLo/lib_protocol/script_cache.ml
 index 70a79eb8f4..9724bc4246 100644
 --- a/src/proto_023_PtSeouLo/lib_protocol/script_cache.ml
@@ -605,7 +611,7 @@ index 70a79eb8f4..9724bc4246 100644
 +           in
 +           return (ctxt, identifier, Some (unparsed_script, script_ir)))
 +      [@profiler.record_s {verbosity = Notice} "cache_miss"])
-
+ 
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/script_interpreter.ml b/src/proto_023_PtSeouLo/lib_protocol/script_interpreter.ml
@@ -641,7 +647,7 @@ index 90ac344bdd..2a29e2854e 100644
        },
 -      ctxt )
 +      ctxt )) [@profiler.record_s {verbosity = Notice} "execute"]
-
+ 
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml b/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml
@@ -680,7 +686,7 @@ index 6f1d8b6bee..43f5715b4a 100644
      ( Ex_script
          (Script
 @@ -5938,15 +5942,15 @@ let list_of_big_map_ids ids =
-
+ 
  let parse_data ~elab_conf ctxt ~allow_forged_tickets
      ~allow_forged_lazy_storage_id ty t =
 -  parse_data
@@ -701,8 +707,9 @@ index 6f1d8b6bee..43f5715b4a 100644
 +     ctxt
 +     ty
 +     t [@profiler.record_s {verbosity = Notice} "parse_data"])
-
+ 
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
---
-2.51.0
+-- 
+2.52.0
+
