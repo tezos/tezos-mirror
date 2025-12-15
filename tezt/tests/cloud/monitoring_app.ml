@@ -9,6 +9,21 @@
 (* time interval in hours at which to submit report *)
 let report_interval = 6
 
+(* `group_by n l` outputs the list of lists with the same elements as `l`
+    but with `n` elements per list (except the last one).
+    For instance
+    `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
+*)
+let group_by n =
+  let rec bis local_acc main_acc k = function
+    | [] -> List.rev (List.rev local_acc :: main_acc)
+    | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
+    | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
+  in
+  bis [] [] n
+
+let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"]
+
 let pp_delegate fmt delegate_pkh =
   match Hashtbl.find_opt Metrics.aliases delegate_pkh with
   | None -> Format.fprintf fmt "%s" delegate_pkh
@@ -545,19 +560,6 @@ module Tasks = struct
         dal_on
     in
     let dal_off = List.sort stake_descending dal_off in
-    (* `group_by n l` outputs the list of lists with the same elements as `l`
-       but with `n` elements per list (except the last one).
-       For instance
-       `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
-    *)
-    let group_by n =
-      let rec bis local_acc main_acc k = function
-        | [] -> List.rev (List.rev local_acc :: main_acc)
-        | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
-        | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
-      in
-      bis [] [] n
-    in
     let agglomerate_infos bakers =
       let nb, stake =
         List.fold_left
@@ -571,7 +573,6 @@ module Tasks = struct
         nb
         (stake *. 100.)
     in
-    let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"] in
     let display catch_phrase printer bakers =
       if bakers = [] then []
       else
@@ -703,31 +704,49 @@ module Alert = struct
     let data =
       let header =
         Format.sprintf
-          "*[lost-dal-rewards]* On network `%s`, delegates have lost DAL \
+          "*[lost-dal-rewards]* On network `%s`, %d delegates have lost DAL \
            rewards at cycle `%d`, level `%d`. \
            <https://%s.tzkt.io/%d/implicit_operations/dal_attestation_reward \
            |See online>"
           (Network.to_string network)
+          (List.length lost_dal_rewards)
           cycle
           level
           (Network.to_string network)
           level
       in
-      let content =
-        List.map
-          (fun (`delegate delegate, `change change) ->
-            Format.asprintf
-              ":black_small_square: %a has missed ~%.1f tez DAL attestation \
-               rewards"
-              pp_delegate
-              delegate
-              (float_of_int change /. 1_000_000.))
-          lost_dal_rewards
-      in
-      Format_app.section (header :: content) ()
+      Format_app.section [header] ()
     in
-    let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
-    Lwt.return_unit
+    let* ts = post_message ~slack_channel_id ~slack_bot_token data in
+    (* Lost DAL rewards are sorted to get the biggest amount first. *)
+    let lost_dal_rewards =
+      List.sort
+        (fun (_, `change c1) (_, `change c2) -> -Int.compare c1 c2)
+        lost_dal_rewards
+    in
+    let lost_dal_rewards =
+      List.map
+        encapsulate_in_code_block
+        (group_by
+           15
+           (List.map
+              (fun (`delegate delegate, `change change) ->
+                Format.asprintf
+                  "%a has missed ~%.2f tez"
+                  pp_delegate
+                  delegate
+                  (float_of_int change /. 1_000_000.))
+              lost_dal_rewards))
+    in
+    Lwt_list.iter_s
+      (fun to_post ->
+        let data =
+          let open Format_app in
+          section to_post ()
+        in
+        let* _ts = post_message ~ts ~slack_channel_id ~slack_bot_token data in
+        unit)
+      lost_dal_rewards
 
   let check_for_lost_dal_rewards ~cloud ~network ~metadata =
     match Cloud.notifier cloud with
