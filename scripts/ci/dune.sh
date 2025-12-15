@@ -13,6 +13,7 @@ fi
 # Check if DUNE_CACHE_INFO is set to "true"
 # If not, just run dune build normally without cache reporting
 if [ "${DUNE_CACHE_INFO}" != "true" ]; then
+  echo "dune cache stats (via [dune.sh]) disabled"
   dune "$@"
   exit $?
 fi
