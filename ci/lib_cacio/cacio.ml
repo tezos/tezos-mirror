@@ -1211,8 +1211,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
          so there is no risk of actually duplicating them. *)
       Fun.flip List.map jobs @@ fun (trigger, job) ->
       match trigger with
-      | Immediate -> (trigger, job)
-      | Auto | Manual ->
+      | Immediate | Manual -> (trigger, job)
+      | Auto ->
           let job =
             {job with needs_legacy = (Job, job_trigger) :: job.needs_legacy}
           in

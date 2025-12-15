@@ -2665,7 +2665,6 @@ build_octez_source:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3338,7 +3337,6 @@ client-libs.kaitai_checks:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3391,7 +3389,6 @@ client-libs.kaitai_e2e_checks:
     allow_failure: true
   needs:
   - oc.docker:client-libs-dependencies
-  - trigger
   - client-libs.kaitai_checks
   dependencies:
   - oc.docker:client-libs-dependencies
@@ -3702,7 +3699,6 @@ documentation.linkcheck:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - documentation.manuals
   - documentation.docgen
   - documentation.build_all
@@ -3792,7 +3788,6 @@ etherlink.tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -3890,7 +3885,6 @@ etherlink.tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -3987,7 +3981,6 @@ etherlink.tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - select_tezts
@@ -4158,7 +4151,6 @@ etherlink.build_evm_node_static_arm64:
     allow_failure: true
   needs:
   - oc.docker:ci:arm64
-  - trigger
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -4212,7 +4204,6 @@ etherlink.build_evm_node_static_x86_64:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4547,7 +4538,6 @@ tezt-flaky:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4643,7 +4633,6 @@ tezt-extra:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4737,7 +4726,6 @@ tezt-slow:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
@@ -4832,7 +4820,6 @@ tezt-riscv-slow-sequential:
     allow_failure: true
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
