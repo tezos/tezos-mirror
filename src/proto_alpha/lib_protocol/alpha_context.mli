@@ -4632,6 +4632,12 @@ module Address_registry : sig
   end
 end
 
+module Clst : sig
+  (** [total_amount_of_tez ctxt] returns the total amount of tez available for
+      staking in the CLST contract. *)
+  val total_amount_of_tez : context -> Tez.t tzresult Lwt.t
+end
+
 (** See {!Block_payload_repr}. *)
 module Block_payload : sig
   (** See {!Block_payload_repr.hash}. *)
