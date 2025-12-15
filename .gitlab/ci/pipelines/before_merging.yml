@@ -4317,8 +4317,7 @@ commit_titles:
   tags:
   - gcp
   rules:
-  - changes: []
-    when: on_success
+  - when: on_success
   needs: []
   dependencies: []
   allow_failure:

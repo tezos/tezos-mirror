@@ -452,12 +452,25 @@ let convert_graph ?(interruptible_pipeline = true)
                         ]
                   in
                   let changes =
-                    [
-                      Gitlab_ci.Util.job_rule
-                        ~changes:(Tezos_ci.Changeset.encode only_if.changed)
-                        ~when_
-                        ();
-                    ]
+                    let changes =
+                      match Tezos_ci.Changeset.encode only_if.changed with
+                      | [] ->
+                          (* TODO: rework the [condition] type.
+                             This special case was made to be able to migrate [commit_titles].
+                             Ideally we would have the user explicitly specify
+                             that [changes] is not to be taken into account to trigger
+                             the job. But the [condition] type is unsafe in general.
+                             Currently, an empty condition implicitly means "true"
+                             (always run), but is implemented by [merge_conditions]
+                             as "false" (never runs). What this means is that a job A
+                             could always run, until suddenly another job B that depends
+                             on A is added, and A would inherit the conditions of B
+                             and only run when B runs even though it should continue
+                             to always run. *)
+                          None
+                      | changes -> Some changes
+                    in
+                    [Gitlab_ci.Util.job_rule ?changes ~when_ ()]
                   in
                   Some (labels @ changes)
                 else
