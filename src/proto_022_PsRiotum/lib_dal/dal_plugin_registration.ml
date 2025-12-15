@@ -35,6 +35,8 @@ module Plugin = struct
 
   type dal_attestation = Environment.Bitset.t
 
+  type slot_availability = Environment.Bitset.t
+
   type attestation_operation = Kind.attestation Alpha_context.operation
 
   type tb_slot = int
@@ -269,7 +271,7 @@ module Plugin = struct
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
-  let dal_attestation (block : block_info) =
+  let slot_availability (block : block_info) =
     let open Result_syntax in
     let* metadata =
       Option.to_result
@@ -279,8 +281,13 @@ module Plugin = struct
     in
     return (metadata.protocol_data.dal_attestation :> Environment.Bitset.t)
 
-  let is_attested attestation slot_index =
+  let is_baker_attested attestation slot_index =
     match Environment.Bitset.mem attestation slot_index with
+    | Ok b -> b
+    | Error _ -> false
+
+  let is_protocol_attested slot_availability slot_index =
+    match Environment.Bitset.mem slot_availability slot_index with
     | Ok b -> b
     | Error _ -> false
 
