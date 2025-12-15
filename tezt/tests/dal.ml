@@ -2397,7 +2397,7 @@ let test_dal_node_snapshot_export ~operators _protocol parameters cryptobox node
   Log.info "Snapshot export test passed: file created at %s" file ;
   unit
 
-let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
+let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
     dal_node =
   let* commitment, proof =
     Helpers.(
@@ -11538,10 +11538,10 @@ let register ~protocols =
     test_attester_with_daemon
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["snapshot"; "import"]
+    ~tags:["l1_snapshot"; "import"]
     ~operator_profiles:[0]
-    "dal node import snapshot"
-    test_dal_node_import_snapshot
+    "dal node import l1 snapshot"
+    test_dal_node_import_l1_snapshot
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["snapshot"; "export"]
