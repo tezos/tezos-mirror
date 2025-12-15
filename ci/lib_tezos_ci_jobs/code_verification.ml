@@ -138,10 +138,7 @@ let job_start =
     ]
 
 (* Short-cut for jobs that have no dependencies except [job_start] on
-   [Before_merging] pipelines. These jobs must also depend on all
-   jobs in the stage [sanity], such that they do not run if this
-   stage does not succeed. Since some sanity jobs are conditional,
-   we make these dependencies optional. *)
+   [Before_merging] pipelines. *)
 let dependencies_needs_start pipeline_type =
   match pipeline_type with
   | Before_merging | Merge_train -> Dependent [Job job_start]
@@ -242,23 +239,6 @@ let jobs pipeline_type =
   let sanity =
     let stage = Stages.sanity in
     let dependencies = Dependent [] in
-    let job_sanity_ci : tezos_job =
-      (* Quick, CI-related sanity checks.
-
-         Verifies that manifest and CIAO are up to date. *)
-      job
-        ~__POS__
-        ~name:"sanity_ci"
-        ~image:Images.CI.build_master
-        ~stage
-        ~dependencies
-        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-        [
-          "make --silent -C manifest check";
-          (* Check that .gitlab-ci.yml is up to date. *)
-          "make --silent -C ci check";
-        ]
-    in
     (* Necromantic nix-related rites. *)
     let job_nix : tezos_job =
       job
@@ -282,117 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_docker_hadolint =
-      job
-        ~rules:(make_rules ~changes:changeset_docker_files ())
-        ~__POS__
-        ~name:"docker:hadolint"
-        ~dependencies
-        ~image:Images.hadolint
-        ~stage
-        ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
-    in
-    let job_oc_ocaml_fmt : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        [
-          (* Check .ocamlformat files. *)
-          "scripts/lint.sh --check-ocamlformat";
-          (* Check actual formatting. *)
-          "scripts/ci/dune.sh build --profile=dev @fmt";
-        ]
-      |> enable_dune_cache
-    in
-    let job_semgrep : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.semgrep"
-        ~image:Images.semgrep_agent
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_semgrep_files ())
-        [
-          "echo \"OCaml code linting. For information on how to reproduce \
-           locally, check out scripts/semgrep/README.md\"";
-          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
-        ]
-    in
-    let job_oc_misc_checks : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.misc_checks"
-        ~image:Images.CI.test_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~changes:changeset_lint_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             ~init_python_venv:true
-             [])
-        ([
-           "./scripts/ci/lint_misc_check.sh";
-           "scripts/check_wasm_pvm_regressions.sh check";
-           "etherlink/scripts/check_evm_store_migrations.sh check";
-           "./scripts/check_rollup_node_sql_migrations.sh check";
-           "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
-         ]
-        @
-        (* The license check only applies to new files (in the sense
-           of [git add]), so can only run in [before_merging]
-           pipelines. *)
-        match pipeline_type with
-        | Before_merging | Merge_train ->
-            ["./scripts/ci/lint_check_licenses.sh"]
-        | Schedule_extended_test -> [])
-    in
-    let job_check_jsonnet =
-      (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
-      job
-        ~__POS__
-        ~name:"check_jsonnet"
-        ~image:Images.jsonnet_master
-        ~stage
-        ~dependencies
-        ~rules:
-          (make_rules ~dependent:true ~changes:changeset_jsonnet_fmt_files ())
-        ~before_script:
-          [
-            "cd grafazos/";
-            (* For security, we explicitly install v11.1.0
-               which corresponds to commit [1ce5aec]. *)
-            "jb install \
-             github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
-            "cd ../";
-          ]
-        [
-          "scripts/lint.sh --check-jsonnet-format";
-          "scripts/lint.sh --check-jsonnet-lint";
-        ]
-    in
-    let job_check_rust_fmt : tezos_job =
-      job
-        ~__POS__
-        ~name:"check_rust_fmt"
-        ~image:Images.rust_toolchain_master
-        ~stage
-        ~dependencies
-        ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
-        ["scripts/check-format-rust.sh"]
-    in
     let job_commit_titles : tezos_job =
       let allow_failure : allow_failure_job =
         match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
@@ -408,30 +277,18 @@ let jobs pipeline_type =
         (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
         ~allow_failure
     in
-    let mr_only_jobs =
-      match pipeline_type with
-      | Before_merging | Merge_train ->
-          [
-            (* This job shall only run in pipelines for MRs because it's not
+    match pipeline_type with
+    | Before_merging | Merge_train ->
+        [
+          (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
-            job_nix;
-            (* It makes no sense to test commit titles in scheduled
+          job_nix;
+          (* It makes no sense to test commit titles in scheduled
                pipelines (they run on master, where commit titles are
                unmutable) *)
-            job_commit_titles;
-          ]
-      | Schedule_extended_test -> []
-    in
-    [
-      job_sanity_ci;
-      job_docker_hadolint;
-      job_oc_ocaml_fmt;
-      job_semgrep;
-      job_oc_misc_checks;
-      job_check_jsonnet;
-      job_check_rust_fmt;
-    ]
-    @ mr_only_jobs
+          job_commit_titles;
+        ]
+    | Schedule_extended_test -> []
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in

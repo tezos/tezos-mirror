@@ -171,21 +171,6 @@ let changeset_lint_files =
           "etherlink/**/*";
         ])
 
-(** Set of Rust files for formatting ([cargo fmt --check]). *)
-let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
-
-(** Set of OCaml files for formatting ([dune build @fmt]). *)
-let changeset_ocaml_fmt_files =
-  Changeset.(changeset_base @ make ["**/.ocamlformat"; "**/*.ml"; "**/*.mli"])
-
-let changeset_semgrep_files =
-  Changeset.(
-    changeset_base
-    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"])
-
-(** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
-let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base

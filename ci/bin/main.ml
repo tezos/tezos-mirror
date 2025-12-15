@@ -112,6 +112,8 @@ let () = Etherlink_ci.register ()
 
 let () = Client_libs_ci.register ()
 
+let () = Tezos_ci_jobs.Sanity.register ()
+
 let () = Tezos_ci_jobs.Misc.register ()
 
 let () = Tezos_ci_jobs.Kernels.register ()
