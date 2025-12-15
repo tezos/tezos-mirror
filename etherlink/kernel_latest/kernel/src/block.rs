@@ -9,11 +9,9 @@ use crate::apply::{apply_transaction, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
-    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
+    store_current_block_header, BlockHeader, ChainHeader,
 };
-use crate::chains::{
-    BlockInProgressTrait, ChainConfigTrait, ChainHeaderTrait, EvmChainConfig, EvmLimits,
-};
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, EvmLimits, TransactionTrait};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -26,12 +24,12 @@ use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
-use block_in_progress::EthBlockInProgress;
+use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TransactionReceipt};
 use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
 use tezos_evm_runtime::safe_storage::SafeStorage;
@@ -90,14 +88,14 @@ enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Host: Runtime>(
+fn on_invalid_transaction<Host: Runtime, Tx: TransactionTrait, Receipt>(
     host: &mut Host,
-    transaction: &Transaction,
-    block_in_progress: &mut EthBlockInProgress,
+    transaction: &Tx,
+    block_in_progress: &mut BlockInProgress<Tx, Receipt>,
     data_size: u64,
 ) {
     if transaction.is_delayed() {
-        block_in_progress.register_delayed_transaction(transaction.tx_hash);
+        block_in_progress.register_delayed_transaction(transaction.tx_hash());
     }
 
     block_in_progress.account_for_invalid_transaction(data_size);
@@ -129,7 +127,7 @@ fn can_fit_in_reboot(
 fn compute<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut EthBlockInProgress,
+    block_in_progress: &mut BlockInProgress<Transaction, TransactionReceipt>,
     block_constants: &BlockConstants,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -214,24 +212,20 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn eth_bip_from_blueprint<Host: Runtime>(
+pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &Host,
-    chain_config: &EvmChainConfig,
+    chain_config: &ChainConfig,
     tick_counter: &TickCounter,
     next_bip_number: U256,
-    header: EVMBlockHeader,
-    blueprint: Blueprint<Transaction>,
-) -> EthBlockInProgress {
-    let gas_price = crate::gas_price::base_fee_per_gas(
-        host,
-        blueprint.timestamp,
-        chain_config.get_limits().minimum_base_fee_per_gas,
-    );
+    hash: H256,
+    blueprint: Blueprint<ChainConfig::Transaction>,
+) -> BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt> {
+    let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
-    let bip = EthBlockInProgress::from_blueprint(
+    let bip = BlockInProgress::from_blueprint(
         blueprint,
         next_bip_number,
-        header.hash,
+        hash,
         tick_counter.c,
         gas_price,
     );
@@ -247,7 +241,11 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> Result<BlueprintParsing<ChainConfig::BlockInProgress>, anyhow::Error> {
+) -> anyhow::Result<
+    BlueprintParsing<
+        BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt>,
+    >,
+> {
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -283,14 +281,17 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let bip: ChainConfig::BlockInProgress = chain_config
-                .block_in_progress_from_blueprint(
-                    host,
-                    tick_counter,
-                    next_bip_number,
-                    chain_header,
-                    blueprint,
-                )?;
+            let bip: BlockInProgress<
+                ChainConfig::Transaction,
+                ChainConfig::TransactionReceipt,
+            > = bip_from_blueprint(
+                host,
+                chain_config,
+                tick_counter,
+                next_bip_number,
+                chain_header.hash(),
+                blueprint,
+            );
             Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),
@@ -301,7 +302,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: EthBlockInProgress,
+    mut block_in_progress: BlockInProgress<Transaction, TransactionReceipt>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -500,7 +501,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             }
         };
 
-    let processed_blueprint = block_in_progress.number();
+    let processed_blueprint = block_in_progress.number;
     let computation_result = chain_config.compute_bip(
         &mut safe_host,
         &outbox_queue,
@@ -1713,7 +1714,7 @@ mod tests {
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress = EthBlockInProgress::new(
+        let mut block_in_progress = BlockInProgress::new(
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),

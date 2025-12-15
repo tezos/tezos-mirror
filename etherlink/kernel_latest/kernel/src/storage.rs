@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_in_progress::EthBlockInProgress;
+use crate::block_in_progress::BlockInProgress;
 use crate::chains::ChainFamily;
 use crate::event::Event;
 use crate::simulation::SimulationResult;
@@ -665,9 +665,9 @@ pub fn store_kernel_version<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_block_in_progress<Host: Runtime>(
+pub fn store_block_in_progress<Host: Runtime, Tx: Encodable, Receipt: Encodable>(
     host: &mut Host,
-    bip: &EthBlockInProgress,
+    bip: &BlockInProgress<Tx, Receipt>,
 ) -> anyhow::Result<()> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
@@ -685,9 +685,9 @@ pub fn store_block_in_progress<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn read_block_in_progress<Host: Runtime>(
+pub fn read_block_in_progress<Host: Runtime, Tx: Decodable, Receipt: Decodable>(
     host: &Host,
-) -> anyhow::Result<Option<EthBlockInProgress>> {
+) -> anyhow::Result<Option<BlockInProgress<Tx, Receipt>>> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
         let bytes = host
@@ -700,7 +700,7 @@ pub fn read_block_in_progress<Host: Runtime>(
             bytes.len()
         );
         let decoder = Rlp::new(bytes.as_slice());
-        let bip = EthBlockInProgress::decode(&decoder)
+        let bip = BlockInProgress::decode(&decoder)
             .context("Failed to decode current block in progress")?;
         Ok(Some(bip))
     } else {
