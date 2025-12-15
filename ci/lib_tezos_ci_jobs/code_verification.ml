@@ -37,7 +37,6 @@ open Tezos_ci
 open Tezos_ci.Cache
 open Common.Docker
 open Common.Build
-open Common.Helpers
 open Changesets
 
 (** Variants of the code verification pipeline.
@@ -262,7 +261,6 @@ let jobs pipeline_type =
 
   (* Build jobs *)
   let build =
-    let stage = Stages.build in
     (* TODO: The code is a bit convoluted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
@@ -271,38 +269,6 @@ let jobs pipeline_type =
     let bin_packages_jobs =
       match pipeline_type with
       | Schedule_extended_test | Before_merging | Merge_train -> []
-    in
-    let build_octez_source =
-      (* We check compilation of the octez tarball on scheduled
-         pipelines because it's not worth testing it for every merge
-         request pipeline. The job is manual on regular MR
-         pipelines. *)
-      job
-        ~__POS__
-        ~stage
-        ~image:Images.CI.build
-        ~cpu:Very_high
-        ~storage:Ramfs
-        ~rules:(make_rules ~manual:Yes ())
-        ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~name:"build_octez_source"
-        [
-          "./scripts/ci/restrict_export_to_octez_source.sh";
-          "./scripts/ci/create_octez_tarball.sh octez";
-          "mv octez.tar.bz2 ../";
-          "cd ../";
-          "tar xf octez.tar.bz2";
-          "cd octez/";
-          "eval $(opam env)";
-          "make octez";
-        ]
-      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
@@ -313,7 +279,6 @@ let jobs pipeline_type =
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
-      build_octez_source;
       job_build_layer1_profiling
         ~rules:(make_rules ~changes:changeset_octez ())
         ();
