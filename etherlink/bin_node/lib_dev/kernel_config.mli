@@ -38,6 +38,7 @@ val make :
   ?enable_revm:string * string ->
   ?enable_dal:string * string ->
   ?dal_slots:string * string ->
+  ?disable_legacy_dal_signals:string * string ->
   ?enable_fast_withdrawal:string * string ->
   ?enable_fast_fa_withdrawal:string * string ->
   ?enable_multichain:string * string ->

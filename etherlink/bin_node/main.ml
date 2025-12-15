@@ -2680,8 +2680,9 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args11
+       (args12
           (config_key_flag ~name:"enable_dal")
+          (config_key_flag ~name:"disable_legacy_dal_signals")
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
           (config_key_arg
@@ -2725,6 +2726,7 @@ let make_kernel_config_command =
              enable_revm,
              dal_slots ),
            ( enable_dal,
+             disable_legacy_dal_signals,
              enable_multichain,
              l2_chain_ids,
              max_delayed_inbox_blueprint_length,
@@ -2766,6 +2768,7 @@ let make_kernel_config_command =
         ?enable_dal
         ?enable_revm
         ?dal_slots
+        ?disable_legacy_dal_signals
         ?enable_multichain
         ?set_account_code
         ?max_delayed_inbox_blueprint_length
