@@ -47,6 +47,12 @@ let get_clst_hash ctxt =
   let*@ hash = Contract.get_clst_contract_hash alpha_ctxt in
   return hash
 
+let total_amount_of_tez ctxt =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ hash = Clst.total_amount_of_tez alpha_ctxt in
+  return hash
+
 let create_funded_account ~funder ~amount_mutez b =
   let open Lwt_result_wrap_syntax in
   let account = Account.new_account () in
@@ -448,3 +454,23 @@ let () =
     | _ -> Test.fail "Unexpected output"
   in
   return_unit
+
+let () =
+  register_test ~title:"Deposits are not spendable" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, sender = Context.init1 () in
+  let* clst_contract = get_clst_hash (Context.B b) in
+  let amount = Tez.of_mutez_exn 100000000L in
+  let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+  (* The balance as retrieved from the context is the spendable balance, the one
+     the contract can transfer directly. Since deposits move all the transferred
+     assets to the 'deposits balance', it should always be empty. *)
+  let* spendable_balance =
+    Context.Contract.balance (B b) (Contract.Originated clst_contract)
+  in
+  let* () = Assert.equal_tez ~loc:__LOC__ spendable_balance Tez.zero in
+  (* The deposits balance should contain the total amount of tez transferred
+     during the deposit. *)
+  let* deposited_balance = total_amount_of_tez (Context.B b) in
+  Assert.equal_tez ~loc:__LOC__ deposited_balance amount
