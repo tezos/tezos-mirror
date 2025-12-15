@@ -140,6 +140,9 @@ Smart Rollup node
 - Fix issue when connecting to Octez nodes behind a proxy that can rearrange
   chunks. (MR :gl:`!20057`)
 
+- Fix issue where setting for ``l1_monitor_finalized`` would be ignored from the
+  configuration file. (MR :gl:`!20239`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
