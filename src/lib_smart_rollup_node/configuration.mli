@@ -283,6 +283,9 @@ val default_irmin_cache_size : int
    details such as a timestamp, message content, severity level, etc. *)
 val default_index_buffer_size : int
 
+(** Default setting for monitoring finalized heads of L1 node. *)
+val default_l1_monitor_finalized : bool
+
 (** Encoding for configuration. *)
 val encoding : t Data_encoding.t
 
@@ -332,7 +335,7 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
-    l1_monitor_finalized:bool ->
+    l1_monitor_finalized:bool option ->
     t tzresult Lwt.t
 
   val create_or_read_config :
@@ -370,6 +373,6 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
-    l1_monitor_finalized:bool ->
+    l1_monitor_finalized:bool option ->
     t tzresult Lwt.t
 end
