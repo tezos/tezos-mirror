@@ -2980,8 +2980,6 @@ module Dal : sig
 
     val number_of_attested_slots : t -> int
 
-    val intersection : t -> t -> t
-
     val record_number_of_attested_shards : context -> t -> int -> context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context

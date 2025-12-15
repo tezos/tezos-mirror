@@ -73,9 +73,6 @@ val expected_size_in_bits : max_index:Dal_slot_index_repr.t -> int
     slots in an attestation. *)
 val number_of_attested_slots : t -> int
 
-(** [intersection a1 a2] returns the slots attested in both [a1] and [a2]. *)
-val intersection : t -> t -> t
-
 (** A shard_index is a positive number. *)
 type shard_index = int
 

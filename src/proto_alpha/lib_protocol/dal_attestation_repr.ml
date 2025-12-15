@@ -65,8 +65,6 @@ let expected_size_in_bits ~max_index =
 
 let number_of_attested_slots = Bitset.cardinal
 
-let intersection = Bitset.inter
-
 type shard_index = int
 
 module Shard_map = Map.Make (struct
@@ -249,7 +247,7 @@ module Slot_availability = struct
 
   let number_of_attested_slots = number_of_attested_slots
 
-  let intersection = intersection
+  let intersection = Bitset.inter
 end
 
 module Internal_for_tests = struct
