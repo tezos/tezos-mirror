@@ -1235,6 +1235,8 @@ module type Tezlink = sig
   val l1_endpoint : string option
 
   val l1_tzkt_api : string option
+
+  val faucet_private_key : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1397,6 +1399,14 @@ module Tezlink () : Tezlink = struct
       ~description:
         "The url of the tzkt api for the Layer 1 chain on which Tezlink is \
          running"
+      ()
+
+  let faucet_private_key =
+    Clap.optional_string
+      ~section
+      ~long:"faucet-private-key"
+      ~description:
+        "Set the private key used for the faucet account (requires --faucet)"
       ()
 end
 
