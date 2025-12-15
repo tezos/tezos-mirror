@@ -1338,8 +1338,6 @@ let with_interruptible value tezos_job =
   map_non_trigger_job tezos_job @@ fun job ->
   {job with interruptible = Some value}
 
-let script_propagate_exit_code script = [script ^ " || exit $?"]
-
 (* Define [stages:]
 
    The "manual" stage exists to fix a UI problem that occurs when mixing

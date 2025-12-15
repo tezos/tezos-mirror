@@ -397,7 +397,7 @@ let job_ocaml_check =
     ]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [
       (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);

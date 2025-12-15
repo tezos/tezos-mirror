@@ -452,12 +452,25 @@ let convert_graph ?(interruptible_pipeline = true)
                         ]
                   in
                   let changes =
-                    [
-                      Gitlab_ci.Util.job_rule
-                        ~changes:(Tezos_ci.Changeset.encode only_if.changed)
-                        ~when_
-                        ();
-                    ]
+                    let changes =
+                      match Tezos_ci.Changeset.encode only_if.changed with
+                      | [] ->
+                          (* TODO: rework the [condition] type.
+                             This special case was made to be able to migrate [commit_titles].
+                             Ideally we would have the user explicitly specify
+                             that [changes] is not to be taken into account to trigger
+                             the job. But the [condition] type is unsafe in general.
+                             Currently, an empty condition implicitly means "true"
+                             (always run), but is implemented by [merge_conditions]
+                             as "false" (never runs). What this means is that a job A
+                             could always run, until suddenly another job B that depends
+                             on A is added, and A would inherit the conditions of B
+                             and only run when B runs even though it should continue
+                             to always run. *)
+                          None
+                      | changes -> Some changes
+                    in
+                    [Gitlab_ci.Util.job_rule ?changes ~when_ ()]
                   in
                   Some (labels @ changes)
                 else
@@ -625,6 +638,10 @@ module type COMPONENT_API = sig
 
   val register_before_merging_jobs : (trigger * job) list -> unit
 
+  val register_merge_train_jobs : (trigger * job) list -> unit
+
+  val register_merge_request_jobs : (trigger * job) list -> unit
+
   val register_schedule_extended_test_jobs : (trigger * job) list -> unit
 
   val register_custom_extended_test_jobs : (trigger * job) list -> unit
@@ -663,6 +680,11 @@ let before_merging_jobs = ref []
 
 let get_before_merging_jobs () =
   convert_jobs ~with_condition:true !before_merging_jobs
+
+let merge_train_jobs = ref []
+
+let get_merge_train_jobs () =
+  convert_jobs ~with_condition:true !merge_train_jobs
 
 let schedule_extended_test_jobs = ref []
 
@@ -1092,7 +1114,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
         ])
 
-  let register_before_merging_jobs jobs =
+  let register_merge_request_jobs_into reference jobs =
     (* Add [trigger] as a dependency of all [jobs]. *)
     let jobs =
       (* The actual [trigger] job is defined deep inside [code_verification.ml]
@@ -1113,7 +1135,17 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           in
           (trigger, job)
     in
-    before_merging_jobs := jobs @ !before_merging_jobs
+    reference := jobs @ !reference
+
+  let register_before_merging_jobs =
+    register_merge_request_jobs_into before_merging_jobs
+
+  let register_merge_train_jobs =
+    register_merge_request_jobs_into merge_train_jobs
+
+  let register_merge_request_jobs jobs =
+    register_before_merging_jobs jobs ;
+    register_merge_train_jobs jobs
 
   let register_schedule_extended_test_jobs jobs =
     match Component.name with

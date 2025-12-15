@@ -523,20 +523,6 @@ val append_after_script : string list -> tezos_job -> tezos_job
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
 
-(** A [script:] that executes a given command and propagates its exit code.
-
-    This might seem like a noop but is in fact necessary to please his majesty GitLab.
-
-    For more info, see:
-     - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
-     - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
-     - https://gitlab.com/groups/gitlab-org/-/epics/6074
-
-   TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
-   {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
-   Runner feature flags}. *)
-val script_propagate_exit_code : string -> string list
-
 val job_docker_authenticated :
   ?skip_docker_initialization:bool ->
   ?ci_docker_hub:bool ->

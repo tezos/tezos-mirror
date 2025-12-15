@@ -262,31 +262,12 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_commit_titles : tezos_job =
-      let allow_failure : allow_failure_job =
-        match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
-      in
-      job
-        ~__POS__
-        ~name:"commit_titles"
-        ~image:Images.CI.prebuild_master
-        ~stage
-        ~dependencies
-        (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
-           invalid commits titles in situations where that is allowed. *)
-        (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
-        ~allow_failure
-    in
     match pipeline_type with
     | Before_merging | Merge_train ->
         [
           (* This job shall only run in pipelines for MRs because it's not
                sensitive to changes in time. *)
           job_nix;
-          (* It makes no sense to test commit titles in scheduled
-               pipelines (they run on master, where commit titles are
-               unmutable) *)
-          job_commit_titles;
         ]
     | Schedule_extended_test -> []
   in

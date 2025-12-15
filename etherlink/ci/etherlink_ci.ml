@@ -442,7 +442,7 @@ let job_docker_promote_to_latest =
 
 let register () =
   let open Runner.Arch in
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [
       (Manual, job_build_evm_node_static Amd64 Test);
       (Manual, job_build_evm_node_static Arm64 Test);

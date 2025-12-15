@@ -108,7 +108,7 @@ let job_build_kernels =
     ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [
       (Auto, job_check_riscv_kernels);
       (Immediate, job_audit_riscv_deps);

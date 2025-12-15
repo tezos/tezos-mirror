@@ -261,7 +261,7 @@ let job_publish =
     ]
 
 let register () =
-  CI.register_before_merging_jobs
+  CI.register_merge_request_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);

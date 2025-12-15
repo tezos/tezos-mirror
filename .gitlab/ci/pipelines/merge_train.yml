@@ -232,25 +232,6 @@ nix:
     - flake.lock
     when: on_failure
 
-commit_titles:
-  image: ${ci_image_name_protected}/prebuild:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  allow_failure: false
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/check_commit_messages.sh || exit $?
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -4261,6 +4242,28 @@ oc.misc_checks:
   - ./scripts/check_rollup_node_sql_migrations.sh check
   - ./src/lib_dal_node/scripts/check_dal_store_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+commit_titles:
+  image: ${ci_image_name_protected}/prebuild:amd64--master
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs: []
+  dependencies: []
+  allow_failure: false
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/check_commit_messages.sh || exit $?
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
