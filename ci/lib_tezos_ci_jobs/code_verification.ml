@@ -261,15 +261,6 @@ let jobs pipeline_type =
 
   (* Build jobs *)
   let build =
-    (* TODO: The code is a bit convoluted here because these jobs are
-       either in the build or in the manual stage depending on the
-       pipeline type. However, we can put them in the build stage on
-       [before_merging] pipelines as long as we're careful to put
-       [allow_failure: true]. *)
-    let bin_packages_jobs =
-      match pipeline_type with
-      | Schedule_extended_test | Before_merging | Merge_train -> []
-    in
     [
       job_build_arm64_release;
       job_build_arm64_extra_dev;
@@ -283,7 +274,6 @@ let jobs pipeline_type =
         ~rules:(make_rules ~changes:changeset_octez ())
         ();
     ]
-    @ bin_packages_jobs
   in
 
   (* Test jobs*)
