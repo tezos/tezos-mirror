@@ -4175,8 +4175,6 @@ commit_titles:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - when: on_success
   needs: []
   dependencies: []
   allow_failure: false

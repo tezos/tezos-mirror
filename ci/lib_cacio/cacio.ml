@@ -41,19 +41,145 @@ type sccache_config = {
 
 let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 
-(* Conditions are disjunctions: the job is included in the pipeline if
-   ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
-type condition = {changed : Tezos_ci.Changeset.t; label : String_set.t}
+(* The [Condition] module provides an interface that makes it look like Cacio
+   supports generic predicates for job rules,
+   because predicates are easier to reason with than GitLab's rules.
+   This module can then encode those predicates into GitLab rules.
 
-let empty_condition =
-  {changed = Tezos_ci.Changeset.make []; label = String_set.empty}
+   This module does not support conjunctions because GitLab rules are not general enough.
+   To convince yourself, try to encode [(changes a.ml or b.ml) and (changes c.ml or d.ml)]
+   into GitLab rules.
 
-let merge_conditions {changed = changed1; label = label1}
-    {changed = changed2; label = label2} =
-  {
-    changed = Tezos_ci.Changeset.union changed1 changed2;
-    label = String_set.union label1 label2;
-  }
+   And since the negation of a disjunction is a conjunction,
+   this module does not support negations
+   for the same reason it does not support disjunctions. *)
+module Condition : sig
+  (** Conditions for a job to be included.
+
+      Conditions are ignored for pipelines which are not merge request pipelines:
+      jobs are included unconditionally for those pipelines. *)
+  type t
+
+  (** Condition that never holds (never include the job). *)
+  val false_ : t
+
+  (** Condition that always holds (always include the job). *)
+  val true_ : t
+
+  (** Include the job if the merge request modifies
+      at least one of the files in a given changeset. *)
+  val changes : Tezos_ci.Changeset.t -> t
+
+  (** Include the job if the merge request labels include any of the given labels. *)
+  val label : string list -> t
+
+  (** Disjunction: include the job if at least one condition holds. *)
+  val or_ : t -> t -> t
+
+  (** Convert a condition to a set of GitLab [rules].
+
+      [when_] should be positive ([Always], [On_success] or [Manual]).
+      It is the [when_] clause for rules when the condition holds. *)
+  val encode :
+    ?when_:Gitlab_ci.Types.when_ -> t -> Gitlab_ci.Types.job_rule list option
+end = struct
+  type base_predicate =
+    | False
+    | True
+    | Changes of Tezos_ci.Changeset.t
+    | Label of string list
+
+  (* Conditions are disjunctions of base predicates.
+     Following the usual conventions, the empty disjunction is equivalent to [True]. *)
+  type t = base_predicate list
+
+  let false_ = [False]
+
+  let true_ = [True]
+
+  let changes set = [Changes set]
+
+  let label label = [Label label]
+
+  let or_ = ( @ )
+
+  let empty_changeset = Tezos_ci.Changeset.make []
+
+  let encode ?when_ condition =
+    if List.mem True condition then
+      (* If any of the base predicate is [True],
+         the whole condition is equivalent to [True]. *)
+      match when_ with
+      | None -> None
+      | Some when_ -> Some [Gitlab_ci.Util.job_rule ~when_ ()]
+    else
+      (* Else, the condition can be rewritten to have the form
+         [changes or labels] where [changes] is a disjunction of [Changes] predicates
+         and labels is a disjunction of [Label] predicates.
+         We ignore [False] while doing so because [False] has no effect on disjunctions. *)
+      let changes =
+        Fun.flip List.concat_map condition @@ function
+        | False -> []
+        | True ->
+            (* Impossible due to the check above. *)
+            assert false
+        | Changes set -> [set]
+        | Label _ -> []
+      in
+      let labels =
+        Fun.flip List.concat_map condition @@ function
+        | False -> []
+        | True ->
+            (* Impossible due to the check above. *)
+            assert false
+        | Changes _ -> []
+        | Label label -> label
+      in
+      (* The condition is [changes or labels].
+         We encode it into the following GitLab rules:
+         - if changes => include the job (named [rules_from_changes] below)
+         - else if labels => include the job (named [rules_from_labels] below)
+         - (implicitly) else => do not include the job *)
+      let rules_from_changes =
+        (* Changesets are disjunctions themselves.
+           So the big disjunction of changesets, [changes],
+           can simply be merged into one big changeset. *)
+        let changes =
+          changes
+          |> List.fold_left Tezos_ci.Changeset.union empty_changeset
+          |> Tezos_ci.Changeset.encode
+        in
+        match changes with
+        | [] ->
+            (* The [changes] part of the disjunction is equivalent to [False].
+                 Don't add a rule. *)
+            []
+        | _ :: _ -> [Gitlab_ci.Util.job_rule ~changes ?when_ ()]
+      in
+      let rules_from_labels =
+        (* Simplify the disjunction by observing that [a or b] is equivalent to [a]
+           when [b = a]. In our case, this means when labels are equal. *)
+        let labels = labels |> String_set.of_list |> String_set.elements in
+        match labels with
+        | [] ->
+            (* The [labels] part of the disjunction is equivalent to [False].
+                 Don't add a rule. *)
+            []
+        | first_label :: other_labels ->
+            [
+              Gitlab_ci.Util.job_rule
+                ~if_:
+                  (List.fold_left
+                     (fun acc label ->
+                       Gitlab_ci.If.(acc || Tezos_ci.Rules.has_mr_label label))
+                     (Tezos_ci.Rules.has_mr_label first_label)
+                     other_labels)
+                ?when_
+                ();
+            ]
+      in
+      Some (rules_from_labels @ rules_from_changes)
+end
 
 type job = {
   uid : int;
@@ -69,7 +195,7 @@ type job = {
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
-  only_if : condition;
+  only_if : Condition.t;
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
@@ -236,7 +362,7 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
 type fixed_job_graph_node = {
   job : job;
   trigger : trigger;
-  only_if : condition;
+  only_if : Condition.t;
   explicit : bool;
 }
 
@@ -303,11 +429,11 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                     (* This job is only present because it is a dependency of another job.
                        So its trigger conditions are irrelevant: we only want this job
                        to be present if one of its reverse dependencies is present. *)
-                    empty_condition
+                    Condition.false_
                 in
                 rev_deps
                 |> List.map (fun node -> node.only_if)
-                |> List.fold_left merge_conditions initial_only_if
+                |> List.fold_left Condition.or_ initial_only_if
               in
               {job; trigger; only_if; explicit}
         in
@@ -423,55 +549,15 @@ let convert_graph ?(interruptible_pipeline = true)
                  whether we actually want the condition ([with_condition]),
                  and the [trigger]. *)
               let rules =
-                if with_condition then
-                  let when_ : Gitlab_ci.Types.when_ =
-                    match trigger with
-                    | Auto | Immediate -> On_success
-                    | Manual -> Manual
-                  in
-                  let labels =
-                    match String_set.elements only_if.label with
-                    | [] -> []
-                    | first_label :: other_labels ->
-                        [
-                          Gitlab_ci.Util.job_rule
-                            ~if_:
-                              (List.fold_left
-                                 (fun acc label ->
-                                   Gitlab_ci.If.(
-                                     acc || Tezos_ci.Rules.has_mr_label label))
-                                 (Tezos_ci.Rules.has_mr_label first_label)
-                                 other_labels)
-                            ~when_
-                            ();
-                        ]
-                  in
-                  let changes =
-                    let changes =
-                      match Tezos_ci.Changeset.encode only_if.changed with
-                      | [] ->
-                          (* TODO: rework the [condition] type.
-                             This special case was made to be able to migrate [commit_titles].
-                             Ideally we would have the user explicitly specify
-                             that [changes] is not to be taken into account to trigger
-                             the job. But the [condition] type is unsafe in general.
-                             Currently, an empty condition implicitly means "true"
-                             (always run), but is implemented by [merge_conditions]
-                             as "false" (never runs). What this means is that a job A
-                             could always run, until suddenly another job B that depends
-                             on A is added, and A would inherit the conditions of B
-                             and only run when B runs even though it should continue
-                             to always run. *)
-                          None
-                      | changes -> Some changes
-                    in
-                    [Gitlab_ci.Util.job_rule ?changes ~when_ ()]
-                  in
-                  Some (labels @ changes)
-                else
+                let when_ : Gitlab_ci.Types.when_ option =
                   match trigger with
                   | Auto | Immediate -> None
-                  | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+                  | Manual -> Some Manual
+                in
+                let condition =
+                  if with_condition then only_if else Condition.true_
+                in
+                Condition.encode ?when_ condition
               in
               let interruptible_stage =
                 match stage with
@@ -585,6 +671,7 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
+    ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
@@ -806,8 +893,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?parallel ?variables ?artifacts ?cache
+      ?storage ~image ?only_if_changed ?(force = false) ?(force_if_label = [])
+      ?(needs = []) ?(needs_legacy = []) ?parallel ?variables ?artifacts ?cache
       ?(cargo_cache = false) ?sccache ?(dune_cache = false) ?allow_failure
       ?retry ?timeout ?(image_dependencies = []) ?services name script =
     incr number_of_declared_jobs ;
@@ -838,13 +925,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       needs_legacy;
       parallel;
       only_if =
-        {
-          changed =
-            (match only_if_changed with
-            | None -> default_only_if_changed
-            | Some list -> Tezos_ci.Changeset.make list);
-          label = String_set.of_list force_if_label;
-        };
+        (if force then Condition.true_
+         else
+           Condition.or_
+             (Condition.changes
+                (match only_if_changed with
+                | None -> default_only_if_changed
+                | Some list -> Tezos_ci.Changeset.make list))
+             (Condition.label force_if_label));
       variables;
       script;
       artifacts;

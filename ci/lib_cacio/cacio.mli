@@ -168,7 +168,8 @@ module type COMPONENT_API = sig
       When added to the [before_merging] or [merge_train] pipeline,
       jobs are only included to the pipeline if
       any file listed in [only_if_changed] has been modified,
-      or if the merge request has any label listed in [force_if_label].
+      or if the merge request has any label listed in [force_if_label],
+      or if [force] is set to [true].
       [only_if_changed] can include glob patterns such as [dir/**/*.ml].
       Its default value is the [paths] of the current component.
 
@@ -207,6 +208,7 @@ module type COMPONENT_API = sig
     ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
+    ?force:bool ->
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
