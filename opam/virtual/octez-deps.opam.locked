@@ -340,4 +340,8 @@ pin-depends: [
     "dream-httpaf.1.0.0~alpha4-octez"
     "git+https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee"
   ]
+  [
+    "memtrace.0.2.3"
+    "git+https://github.com/mattiasdrp/memtrace.git#16f4b8dfd3956768526c78ce3795276bed176360"
+  ]
 ]

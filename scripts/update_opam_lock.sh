@@ -93,6 +93,16 @@ opam pin add cohttp.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.
 opam pin add cohttp-lwt.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
 opam pin add cohttp-lwt-unix.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
 
+# Pin memtrace to a working version
+#
+# Memtrace has a mechanism that makes it flush its trace file whenever the program stops.
+# This mechanism only triggers at exit, not when another kill signal is sent.
+# This is an issue for octez since it doesn't stop unless being killed.
+# The pinned commit adds the flush mechanism when such signals are received, allowing to have
+# trace files that are complete.
+echo "---- Pinning memtrace"
+opam pin add https://github.com/mattiasdrp/memtrace.git#16f4b8dfd3956768526c78ce3795276bed176360 -n -y
+
 # Pin base to a commit that's compatible with latest versions of Mac OS.
 #
 # Base has a mechanism to detect if `-mpopcnt` is compatible with `cc`, it works
