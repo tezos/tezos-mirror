@@ -1114,7 +1114,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
         ])
 
-  let register_merge_request_jobs_into reference jobs =
+  let register_before_merging_jobs jobs =
     (* Add [trigger] as a dependency of all [jobs]. *)
     let jobs =
       (* The actual [trigger] job is defined deep inside [code_verification.ml]
@@ -1135,13 +1135,10 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           in
           (trigger, job)
     in
-    reference := jobs @ !reference
+    before_merging_jobs := jobs @ !before_merging_jobs
 
-  let register_before_merging_jobs =
-    register_merge_request_jobs_into before_merging_jobs
-
-  let register_merge_train_jobs =
-    register_merge_request_jobs_into merge_train_jobs
+  let register_merge_train_jobs jobs =
+    merge_train_jobs := jobs @ !merge_train_jobs
 
   let register_merge_request_jobs jobs =
     register_before_merging_jobs jobs ;

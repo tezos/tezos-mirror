@@ -176,11 +176,8 @@ trigger:
   tags:
   - gcp
   rules:
-  - if: $GITLAB_USER_LOGIN != "nomadic-margebot" && $CI_MERGE_REQUEST_ASSIGNEES !~
-      /nomadic-margebot/ && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
-    when: manual
+  - when: manual
     allow_failure: false
-  - when: always
   needs: []
   dependencies: []
   timeout: 10 minutes
