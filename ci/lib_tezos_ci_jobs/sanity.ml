@@ -162,6 +162,24 @@ let job_check_rust_fmt =
     ~only_if_changed:["**/*.rs"]
     ["scripts/check-format-rust.sh"]
 
+(* Necromantic nix-related rites. *)
+let job_nix =
+  CI.job
+    "nix"
+    ~__POS__
+    ~description:"Check that the Nix lock file is up-to-date."
+    ~image:Tezos_ci.Images.nix
+    ~stage:Test
+    ~artifacts:(Gitlab_ci.Util.artifacts ~when_:On_failure ["flake.lock"])
+    ~only_if_changed:["**/*.nix"; "flake.lock"; "scripts/version.sh"]
+    ~cache:[Gitlab_ci.Util.cache ~key:"nix-store" ["/nix/store"]]
+    [
+      "mkdir -p ~/.config/nix";
+      "echo 'extra-experimental-features = flakes nix-command' > \
+       ~/.config/nix/nix.conf";
+      "nix run .#ci-check-version-sh-lock";
+    ]
+
 (* Note: checking commit titles only makes sense in merge request pipelines.
    In scheduled pipelines, it is too late to change commit titles. *)
 let job_commit_titles =
@@ -203,6 +221,7 @@ let register () =
       (Immediate, job_oc_misc_checks `full);
       (Immediate, job_check_jsonnet);
       (Immediate, job_check_rust_fmt);
+      (Immediate, job_nix);
     ] ;
   CI.register_before_merging_jobs [(Immediate, job_commit_titles `lenient)] ;
   CI.register_merge_train_jobs [(Immediate, job_commit_titles `strict)] ;

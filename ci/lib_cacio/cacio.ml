@@ -80,6 +80,7 @@ type job = {
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
+  cache : Gitlab_ci.Types.cache list option;
   cargo_cache : bool;
   sccache : sccache_config option;
   dune_cache : dune_cache_config option;
@@ -398,6 +399,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     variables;
                     script;
                     artifacts;
+                    cache;
                     cargo_cache;
                     sccache;
                     dune_cache;
@@ -539,6 +541,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?variables
                 ?artifacts
                 ?allow_failure
+                ?cache
                 script
               |> maybe_enable_cargo_cache |> maybe_enable_sccache
               |> maybe_enable_dune_cache
@@ -598,6 +601,7 @@ module type COMPONENT_API = sig
     ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?cache:Gitlab_ci.Types.cache list ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
@@ -813,7 +817,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?parallel ?variables ?artifacts
+      ?(needs_legacy = []) ?parallel ?variables ?artifacts ?cache
       ?(cargo_cache = false) ?sccache ?dune_cache ?allow_failure ?retry ?timeout
       ?(image_dependencies = []) ?services name script =
     incr number_of_declared_jobs ;
@@ -854,6 +858,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       variables;
       script;
       artifacts;
+      cache;
       cargo_cache;
       sccache;
       dune_cache;

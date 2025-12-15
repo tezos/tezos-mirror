@@ -225,6 +225,7 @@ module type COMPONENT_API = sig
     ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?cache:Gitlab_ci.Types.cache list ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
