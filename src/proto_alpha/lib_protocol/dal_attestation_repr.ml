@@ -232,6 +232,26 @@ module Dal_dependent_signing = struct
       t
 end
 
+type attestation = t
+
+(** Slot availability represents the protocol's attestation result for a block.
+    It is an alias to the main attestation type. *)
+module Slot_availability = struct
+  type nonrec t = t
+
+  let empty = empty
+
+  let encoding = encoding
+
+  let is_attested = is_attested
+
+  let commit = commit
+
+  let number_of_attested_slots = number_of_attested_slots
+
+  let intersection = intersection
+end
+
 module Internal_for_tests = struct
   let of_z = Bitset.from_z
 end

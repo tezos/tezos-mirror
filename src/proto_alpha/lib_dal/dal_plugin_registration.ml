@@ -410,7 +410,8 @@ module Plugin = struct
         ~none:
           (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
-    return (metadata.protocol_data.dal_attestation :> Environment.Bitset.t)
+    return
+      (metadata.protocol_data.dal_slot_availability :> Environment.Bitset.t)
 
   let is_attested attestation slot_index =
     match Environment.Bitset.mem attestation slot_index with

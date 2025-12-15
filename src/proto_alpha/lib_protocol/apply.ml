@@ -3035,7 +3035,7 @@ let are_attestations_required ctxt ~level =
   Compare.Int32.(level_position_in_protocol > 1l)
 
 (* It also records participation in the DAL. *)
-let record_attesting_participation ctxt dal_attestation =
+let record_attesting_participation ctxt dal_slot_availability =
   let open Lwt_result_syntax in
   match Consensus.allowed_attestations ctxt with
   | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
@@ -3062,7 +3062,7 @@ let record_attesting_participation ctxt dal_attestation =
             consensus_key.delegate
             initial_slot
             ~dal_power
-            dal_attestation)
+            dal_slot_availability)
         validators
         ctxt
 
@@ -3258,13 +3258,13 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     | Some nonce_hash ->
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
-  let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
+  let* ctxt, dal_slot_availability = Dal_apply.finalisation ctxt in
   let* ctxt, reward_bonus, attestation_result =
     let* required_attestations =
       are_attestations_required ctxt ~level:current_level.level
     in
     if required_attestations then
-      let* ctxt = record_attesting_participation ctxt dal_attestation in
+      let* ctxt = record_attesting_participation ctxt dal_slot_availability in
       (* The attested level is the predecessor of the block's level. *)
       match Level.pred ctxt current_level with
       | None ->
@@ -3358,7 +3358,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         balance_updates;
         liquidity_baking_toggle_ema;
         implicit_operations_results;
-        dal_attestation;
+        dal_slot_availability;
         abaab_activation_level;
         attestations = attestation_result;
         preattestations = preattestation_result;
@@ -3480,7 +3480,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
-              dal_attestation = Dal.Attestation.empty;
+              dal_slot_availability = Dal.Slot_availability.empty;
               abaab_activation_level = None;
               attestations = None;
               preattestations = None;

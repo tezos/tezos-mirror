@@ -44,7 +44,10 @@ let compute_slot_headers_statuses ~is_slot_attested published_slot_headers =
     let attestation =
       if
         attestation_status.Dal_attestation_repr.Accountability.is_proto_attested
-      then Dal_attestation_repr.commit attestation slot.Header.id.index
+      then
+        Dal_attestation_repr.Slot_availability.commit
+          attestation
+          slot.Header.id.index
       else attestation
     in
     (rev_attested_slot_headers, attestation)
@@ -52,7 +55,7 @@ let compute_slot_headers_statuses ~is_slot_attested published_slot_headers =
   let rev_attested_slot_headers, bitset =
     List.fold_left
       fold_attested_slots
-      ([], Dal_attestation_repr.empty)
+      ([], Dal_attestation_repr.Slot_availability.empty)
       published_slot_headers
   in
   (List.rev rev_attested_slot_headers, bitset)
@@ -126,7 +129,7 @@ let finalize_slot_headers_for_published_level ctxt ~number_of_slots
   let*! ctxt = remove_old_headers ctxt ~published_level in
   let* ctxt, attestation, slot_headers_statuses =
     match published_slots with
-    | None -> return (ctxt, Dal_attestation_repr.empty, [])
+    | None -> return (ctxt, Dal_attestation_repr.Slot_availability.empty, [])
     | Some published_slots ->
         let slot_headers_statuses, attestation =
           compute_slot_headers_statuses ~is_slot_attested published_slots
@@ -191,7 +194,10 @@ let finalize_slot_headers_at_lag_migration ctxt ~target_published_level
     match Raw_level_repr.(sub target_published_level current_gap) with
     | None ->
         (* Defensive: not expected on our networks. *)
-        return (ctxt, Dal_attestation_repr.empty, cells_of_pub_levels)
+        return
+          ( ctxt,
+            Dal_attestation_repr.Slot_availability.empty,
+            cells_of_pub_levels )
     | Some published_level ->
         (* Finalize this published level. *)
         let* ctxt, attestation_bitset =
@@ -231,7 +237,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
   let curr_attestation_lag = dal.attestation_lag in
   match Raw_level_repr.(sub raw_level curr_attestation_lag) with
-  | None -> return (ctxt, Dal_attestation_repr.empty)
+  | None -> return (ctxt, Dal_attestation_repr.Slot_availability.empty)
   | Some published_level ->
       (* DAL/TODO: remove after P1->P2 migration:
 

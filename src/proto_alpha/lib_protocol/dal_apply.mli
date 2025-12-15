@@ -68,8 +68,8 @@ val apply_publish_commitment :
   source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
 
-(** [record_dal_participation ctxt delegate tb_slot ~dal_power dal_attestation]
-    records the number of protocol-attested slots (given in [dal_attestation]
+(** [record_participation ctxt delegate tb_slot ~dal_power slot_availability]
+    records the number of protocol-attested slots (given in [slot_availability])
     attested by [delegate] (with the initial TB slot [tb_slot] and [dal_power]
     assigned shards per slot) in the current block. *)
 val record_participation :
@@ -77,7 +77,7 @@ val record_participation :
   Signature.Public_key_hash.t ->
   Slot.t ->
   dal_power:int ->
-  Dal.Attestation.t ->
+  Dal.Slot_availability.t ->
   t tzresult Lwt.t
 
 (** [finalisation ctxt] should be executed at block finalisation
@@ -86,4 +86,4 @@ val record_participation :
 
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
-val finalisation : t -> (t * Dal.Attestation.t) tzresult Lwt.t
+val finalisation : t -> (t * Dal.Slot_availability.t) tzresult Lwt.t
