@@ -488,6 +488,7 @@ open struct
         "slot header status storage error for level {published_level}, slot \
          index {slot_index}: {error}"
       ~level:Error
+      ~pp3:Error_monad.pp_print_trace
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("error", Error_monad.trace_encoding)
@@ -527,6 +528,7 @@ open struct
       ~msg:
         "removing shards for level {published_level} and index {slot_index} \
          failed: {error}"
+      ~pp3:Error_monad.pp_print_trace
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("error", Error_monad.trace_encoding)
@@ -540,6 +542,7 @@ open struct
       ~msg:
         "removing slot for level {published_level} and index {slot_index} \
          failed: {error}"
+      ~pp3:Error_monad.pp_print_trace
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("error", Error_monad.trace_encoding)
@@ -551,6 +554,7 @@ open struct
       ~name:"removing_skip_list_cells_failed"
       ~level:Warning
       ~msg:"removing skip list cells for level {level} failed: {error}"
+      ~pp2:Error_monad.pp_print_trace
       ("level", Data_encoding.int32)
       ("error", Error_monad.trace_encoding)
 
@@ -708,6 +712,7 @@ open struct
       ~name:"loading_profiles_failed"
       ~msg:"loading profiles failed: {error}"
       ~level:Info
+      ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let saving_profiles_failed =
@@ -717,6 +722,7 @@ open struct
       ~name:"saving_profiles_failed"
       ~msg:"saving profiles failed: {error}"
       ~level:Error
+      ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let reconstruct_starting_in =
@@ -796,6 +802,7 @@ open struct
       ("level", Data_encoding.int32)
       ~pp2:Format.pp_print_int
       ("slot_index", Data_encoding.int31)
+      ~pp3:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let store_upgrade_error_moving_directory =
@@ -1276,6 +1283,7 @@ open struct
          at level {published_level} and index {slot_index} from neither \
          memory, on-disk store, nor the L1 context. Error {error}"
       ~level:Warning
+      ~pp3:Error_monad.pp_print_trace
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("error", Error_monad.trace_encoding)
@@ -1525,6 +1533,7 @@ open struct
       ~name:"closing_store_failed"
       ~msg:"failed to close the store: {error}"
       ~level:Warning
+      ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
   let l1_history_check_bypassed =
