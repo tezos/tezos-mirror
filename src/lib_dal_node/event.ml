@@ -715,6 +715,16 @@ open struct
       ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
+  let running_profiles =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"running_profiles"
+      ~msg:"running profiles: {profiles}"
+      ~level:Notice
+      ~pp1:Profile_manager.pp
+      ("profiles", Profile_manager.encoding)
+
   let saving_profiles_failed =
     declare_1
       ~section
@@ -1787,6 +1797,8 @@ let emit_metrics_server_is_ready ~host ~port =
 let emit_loading_profiles_failed ~error = emit loading_profiles_failed error
 
 let emit_saving_profiles_failed ~error = emit saving_profiles_failed error
+
+let emit_running_profiles ~profiles = emit running_profiles profiles
 
 let emit_reconstruct_starting_in ~level ~slot_index ~delay =
   emit reconstruct_starting_in (level, slot_index, delay)

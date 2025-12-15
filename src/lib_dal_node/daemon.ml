@@ -642,6 +642,7 @@ let run ?(disable_shard_validation = false) ?(ignore_l1_history_check = false)
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  let*! () = Event.emit_running_profiles ~profiles:profile_ctxt in
   let identity = p2p_config.P2p.identity in
   (* Create and start a GS worker *)
   let gs_worker =
