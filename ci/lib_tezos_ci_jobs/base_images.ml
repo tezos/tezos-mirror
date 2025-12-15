@@ -66,7 +66,8 @@ let jobs =
      a native runner. In this case we also must add a merge manifest job.
      *)
   let make_job_base_images ~__POS__ ~name ~matrix ~image_name ?base_name
-      ?(changes = Changeset.make []) ?(compilation = Emulated) dockerfile =
+      ?(changes = Changeset.make []) ?(compilation = Emulated) ~version
+      dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -92,6 +93,7 @@ let jobs =
           if Option.is_none base_name then image_name else Option.get base_name
         );
         ("PLATFORM", platform);
+        ("VERSION", Images.Base_images.(Format.asprintf "%a" version_pp version));
       ]
     in
     job_docker_authenticated
@@ -116,6 +118,7 @@ let jobs =
       ~image_name:"debian"
       ~matrix:debian_matrix
       ~changes
+      ~version:Images.Base_images.debian_version
       "images/base-images/Dockerfile.debian"
   in
   let job_ubuntu_based_images =
@@ -126,6 +129,7 @@ let jobs =
       ~image_name:"ubuntu"
       ~matrix:ubuntu_matrix
       ~changes
+      ~version:Images.Base_images.debian_version
       "images/base-images/Dockerfile.debian"
   in
   let job_fedora_based_images =
@@ -136,6 +140,7 @@ let jobs =
       ~image_name:"fedora"
       ~matrix:fedora_matrix
       ~changes
+      ~version:Images.Base_images.rpm_version
       "images/base-images/Dockerfile.rpm"
   in
   let job_rockylinux_based_images =
@@ -147,6 +152,7 @@ let jobs =
       ~base_name:"rockylinux/rockylinux"
       ~matrix:rockylinux_matrix
       ~changes
+      ~version:Images.Base_images.rpm_version
       "images/base-images/Dockerfile.rpm"
   in
   let job_rust_based_images, job_rust_based_images_merge =
@@ -158,6 +164,7 @@ let jobs =
         ~base_name:"debian"
         ~matrix:[("RELEASE", ["trixie"])]
         ~compilation:Native
+        ~version:Images.Base_images.rust_toolchain_version
         "images/base-images/Dockerfile.rust"
     in
     let merge =
@@ -169,6 +176,9 @@ let jobs =
         ~variables:
           [
             ("RELEASE", "trixie");
+            ( "VERSION",
+              Images.Base_images.(
+                Format.asprintf "%a" version_pp rust_toolchain_version) );
             ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
           ]
         ["scripts/ci/docker-merge-base-images.sh"]
@@ -187,6 +197,7 @@ let jobs =
       ~matrix:[("RELEASE", ["trixie"])]
       ~compilation:Amd64_only
       ~changes
+      ~version:Images.Base_images.homebrew_version
       "images/base-images/Dockerfile.debian-homebrew"
   in
   [
