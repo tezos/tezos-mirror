@@ -64,6 +64,8 @@ Smart Rollup node
 
 - Fix issue where setting for ``l1_monitor_finalized`` would be ignored from the
   configuration file. (MR :gl:`!20239`)
+- Fix issue where finalized blocks would not be notified when using
+  ``--l1-monitor-finalized``. (MR :gl:`!20256`)
 
 Smart Rollup WASM Debugger
 --------------------------
