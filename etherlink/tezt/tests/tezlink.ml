@@ -1467,7 +1467,7 @@ let test_tezlink_execution =
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
     ~title:"Test of tezlink execution"
-    ~tags:["execution"; "hello"]
+    ~tags:["execution"; "hello"; "storage"]
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1501,7 +1501,7 @@ let test_tezlink_bigmap_option =
   let option_contract = Michelson_contracts.big_map_option () in
   register_tezlink_test
     ~title:"Test which syntax is used for big maps in contract storages"
-    ~tags:["syntax"; "big_map"; "option"]
+    ~tags:["syntax"; "big_map"; "option"; "storage"]
     ~bootstrap_contracts:[option_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1534,7 +1534,7 @@ let test_tezlink_bigmap_counter =
   let counter_contract = Michelson_contracts.big_map_counter () in
   register_tezlink_test
     ~title:"Test of tezlink big_map persistency"
-    ~tags:["persistency"; "big_map"; "counter"]
+    ~tags:["persistency"; "big_map"; "counter"; "storage"]
     ~bootstrap_contracts:[counter_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
