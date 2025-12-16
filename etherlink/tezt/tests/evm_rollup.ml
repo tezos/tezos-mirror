@@ -2277,14 +2277,14 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~produce_block
       client
   in
   let* () =
-    repeat 3 (fun () ->
+    repeat 4 (fun () ->
         let* () = Client.bake_for_and_wait ~keys:[] client in
         unit)
   in
 
   let* () =
-    repeat 2 (fun () ->
-        let* _ = produce_block () in
+    repeat 4 (fun () ->
+        let*@ _ = produce_block () in
         unit)
   in
   unit
@@ -3508,7 +3508,7 @@ let test_cannot_prepayed_with_delay_leads_to_no_injection =
 let test_deposit_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "migration"; "deposit"; Tag.flaky]
+    ~tags:["evm"; "migration"; "deposit"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
