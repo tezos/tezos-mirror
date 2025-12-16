@@ -13,6 +13,8 @@
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file tezosx.ml
  *)
 
+open Rpc.Syntax
+
 let runtime_tags = List.map Tezosx_runtime.tag
 
 (* /!\ Read this before adding a new test
@@ -194,8 +196,99 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
         tezos_address
         err.Rpc.message
 
+let test_eth_rpc_with_alias ~runtime =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Test ETH RPC on Ethereum address alias from Tezos account"
+    ~tags:["rpc"; "alias"]
+    ~with_runtimes:[runtime]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {
+        client;
+        observer;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        proxy;
+        _;
+      }
+      _protocol
+    ->
+  (* Deposit to instantiate the alias on ethereum side *)
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let* receiver_account = Client.gen_and_show_keys client in
+
+  let receiver =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         receiver_account.public_key_hash
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Contract_repr.encoding
+      receiver
+  in
+  let (`Hex receiver) = Hex.of_bytes bytes in
+  let deposit_info =
+    Delayed_inbox.{receiver = TezosAddr receiver; chain_id = None}
+  in
+  let* () =
+    Delayed_inbox.send_deposit_to_delayed_inbox
+      ~rlp:true
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let*@ evm_address =
+    Rpc.Tezosx.tez_getTezosEthereumAddress
+      receiver_account.public_key_hash
+      observer
+  in
+  (* Balance should be 0 *)
+  let*@ balance = Rpc.get_balance ~address:evm_address observer in
+  Check.((balance = Wei.zero) Wei.typ ~error_msg:"Expected %R wei but got %L") ;
+  (* Code should have data *)
+  let*@ code = Rpc.get_code ~address:evm_address observer in
+  Check.(
+    (code
+   = "0x6080604052348015600e575f5ffd5b5060a280601a5f395ff3fe608060405236603a576040517f47e794ec00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040517f47e794ec00000000000000000000000000000000000000000000000000000000815260040160405180910390fdfea264697066735822122020f56a12d5d4b6faadf04140b08a9a4af043d02dff2e9363f6d5f11382e5ad5264736f6c634300081e0033"
+    )
+      string
+      ~error_msg:"Expected %R but got %L") ;
+  (* Transaction count should be 0 *)
+  let*@ transaction_count =
+    Rpc.get_transaction_count ~address:evm_address observer
+  in
+  Check.((transaction_count = 0L) int64 ~error_msg:"Expected %R but got %L") ;
+  (* Get storage at 0x0 *)
+  let*@ storage = Rpc.get_storage_at ~address:evm_address ~pos:"0x0" observer in
+  Check.(
+    (storage
+   = "0x0000000000000000000000000000000000000000000000000000000000000000")
+      string
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
+  test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos ()
