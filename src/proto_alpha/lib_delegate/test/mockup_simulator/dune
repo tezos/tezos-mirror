@@ -34,4 +34,4 @@
 
 (rule
  (targets client_keys.ml)
- (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v3")))
