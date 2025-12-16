@@ -23,6 +23,7 @@ type env = {
   factory_addr : string;
   router_addr : string;
   nb_hops : int;
+  total_confirmed : int ref;
 }
 
 let max_uint256 =
@@ -324,6 +325,7 @@ let swap_xtz ~nb_hops env iteration sender_index =
       ~name:"swapExactETHForTokens" (* "swapETHForExactTokens" *)
       params_ty
       params
+      ~total_confirmed:env.total_confirmed
       ~check_success:false
     (* Don't check success as this is an additional RPC and will slow the
        benchmark down. It can be set to true for debugging. *)
@@ -400,9 +402,9 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
     container
   in
   let max_size = 999_999 in
-  let tx_per_addr_limit = Int64.of_int 999_999 in
-  let max_transaction_batch_length = Some 300 in
-  let max_lifespan_s = 2 in
+  let tx_per_addr_limit = Int64.max_int in
+  let max_transaction_batch_length = None in
+  let max_lifespan_s = int_of_float parameters.timeout in
   let config : Evm_node_config.Configuration.tx_queue =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
@@ -465,6 +467,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
       wxtz_addr;
       gld_tokens;
       nb_hops;
+      total_confirmed = ref 0;
     }
   in
 

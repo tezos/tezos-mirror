@@ -318,10 +318,10 @@ let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
         l
 
 let call ~container infos rpc_node contract sender ?gas_limit ?nonce
-    ?(value = Z.zero) ?name ?(check_success = false) abi params =
+    ?total_confirmed ?(value = Z.zero) ?name ?(check_success = false) abi params
+    : [> `Confirmed | `Dropped | `Refused] Lwt.t =
   let open Evm_node_lib_dev_encoding.Ethereum_types in
   let open Tezos_error_monad.Error_monad in
-  let open Lwt_result_syntax in
   let pp_tx fmt () =
     Format.fprintf
       fmt
@@ -348,7 +348,7 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
     | Some g -> return g
     | None ->
         Log.debug " - Estimate gas limit" ;
-        let* g =
+        let*? g =
           estimate_gas
             infos
             rpc_node
@@ -361,7 +361,7 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
         return g
   in
 
-  let* raw_tx, transaction_object =
+  let*? raw_tx, transaction_object =
     Craft.transfer_with_obj_exn
       ?nonce
       ~infos
@@ -372,7 +372,6 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
       ?data
       ()
   in
-  let tx_hash = Evm_node_lib_dev.Transaction_object.hash transaction_object in
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
   let callback status =
     match status with
@@ -385,13 +384,16 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
           | `Confirmed ->
               Account.debit sender Z.(value + fees) ;
               Account.increment_nonce sender ;
+              Option.iter incr total_confirmed ;
               nb_confirmed
         in
         incr c ;
         Lwt.wakeup waker status ;
         if check_success then
           Lwt.async (fun () ->
-              let open Lwt.Syntax in
+              let tx_hash =
+                Evm_node_lib_dev.Transaction_object.hash transaction_object
+              in
               let* res =
                 Floodgate.get_transaction_receipt
                   (Evm_node.endpoint rpc_node |> Uri.of_string)
@@ -400,7 +402,7 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
               match res with
               | Ok receipt ->
                   let tx_status = Qty.to_z receipt.status in
-                  if Z.(equal tx_status Z.one) then Lwt.return_unit
+                  if Z.(equal tx_status one) then unit
                   else
                     let (Hash (Hex h)) = tx_hash in
                     Test.fail
@@ -417,15 +419,15 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
          (module Tx_container)) =
     container
   in
-  let* add_res =
+  let*? add_res =
     Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
   in
   let* () =
     match add_res with
-    | Ok (_ : hash) -> return_unit
-    | Error e -> Test.fail "Error adding to the tx_queue: %s" e confirmed
+    | Ok (_ : hash) -> unit
+    | Error e -> Test.fail "Error adding to the tx_queue: %s" e
   in
-  return confirmed
+  confirmed
 
 type gasometer = {mutable gas : Z.t; mutable time : Ptime.Span.t}
 
