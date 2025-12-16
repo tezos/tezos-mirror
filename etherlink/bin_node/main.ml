@@ -3600,12 +3600,13 @@ let preemptive_kernel_download_command =
   command
     ~group:Groups.kernel
     ~desc:"Preemptively download a kernel before running the EVM node."
-    (args5
+    (args6
        data_dir_arg
        config_path_arg
        preimages_arg
        preimages_endpoint_arg
-       num_download_retries)
+       num_download_retries
+       (supported_network_arg ()))
     (prefixes ["download"; "kernel"]
     @@ param
          ~name:"kernel-id"
@@ -3631,7 +3632,8 @@ let preemptive_kernel_download_command =
            config_file,
            preimages,
            preimages_endpoint,
-           num_download_retries )
+           num_download_retries,
+           network )
          root_hash
          ()
        ->
@@ -3644,6 +3646,7 @@ let preemptive_kernel_download_command =
           ~data_dir
           ?preimages
           ?preimages_endpoint
+          ?network
           config_file
       in
       let*! () = init_logs ~daily_logs:false configuration in
