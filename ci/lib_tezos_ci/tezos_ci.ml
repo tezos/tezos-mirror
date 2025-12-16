@@ -1559,8 +1559,9 @@ module Images = struct
 
     let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
-    let make_img distro _version =
-      Image.mk_external ~image_path:(sf "%s/%s" path_prefix distro)
+    let make_img distro version =
+      Image.mk_external
+        ~image_path:(sf "%s/%s-%a" path_prefix distro version_pp version)
 
     let debian_version = {major = 1; minor = 0}
 

@@ -102,7 +102,12 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            [
              ("DISTRIBUTION", distribution);
              ( "BASE_IMAGE",
-               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
+               Images.Base_images.(
+                 sf
+                   "%s/${DISTRIBUTION}:${RELEASE}-%a"
+                   path_prefix
+                   version_pp
+                   rpm_version) );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -136,7 +141,12 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            [
              ("DISTRIBUTION", distribution);
              ( "BASE_IMAGE",
-               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
+               Images.Base_images.(
+                 sf
+                   "%s/${DISTRIBUTION}:${RELEASE}-%a"
+                   path_prefix
+                   version_pp
+                   rpm_version) );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
