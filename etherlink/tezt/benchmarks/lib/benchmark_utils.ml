@@ -318,8 +318,8 @@ let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
         l
 
 let call ~container infos rpc_node contract sender ?gas_limit ?nonce
-    ?(value = Z.zero) ?name ?(check_success = false) abi params :
-    [> `Confirmed | `Dropped | `Refused] Lwt.t =
+    ?total_confirmed ?(value = Z.zero) ?name ?(check_success = false) abi params
+    : [> `Confirmed | `Dropped | `Refused] Lwt.t =
   let open Evm_node_lib_dev_encoding.Ethereum_types in
   let open Tezos_error_monad.Error_monad in
   let pp_tx fmt () =
@@ -384,6 +384,7 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
           | `Confirmed ->
               Account.debit sender Z.(value + fees) ;
               Account.increment_nonce sender ;
+              Option.iter incr total_confirmed ;
               nb_confirmed
         in
         incr c ;

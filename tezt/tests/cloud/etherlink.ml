@@ -208,8 +208,19 @@ let register (module Cli : Scenarios_cli.Etherlink) =
       ~rpc_node:sequencer
   in
   let () = toplog "Setup UniswapV2 benchmark complete" in
-  monitor_gasometer sequencer @@ fun () ->
   let* () =
-    Lwt_list.iter_s (Uniswap.step env) (List.init parameters.iterations succ)
+    monitor_gasometer sequencer @@ fun () ->
+    let* () =
+      Lwt_list.iter_s (Uniswap.step env) (List.init parameters.iterations succ)
+    in
+    shutdown ()
   in
-  shutdown ()
+  let total_confirmed = !(env.total_confirmed) in
+  let total_sent = nb_accounts * parameters.iterations in
+  if total_confirmed <= total_sent / 2 then
+    Test.fail
+      ~__LOC__
+      "Less than half operations confirmed (%d/%d)"
+      total_confirmed
+      total_sent ;
+  unit

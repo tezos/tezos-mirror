@@ -23,6 +23,7 @@ type env = {
   factory_addr : string;
   router_addr : string;
   nb_hops : int;
+  total_confirmed : int ref;
 }
 
 let max_uint256 =
@@ -324,6 +325,7 @@ let swap_xtz ~nb_hops env iteration sender_index =
       ~name:"swapExactETHForTokens" (* "swapETHForExactTokens" *)
       params_ty
       params
+      ~total_confirmed:env.total_confirmed
       ~check_success:false
     (* Don't check success as this is an additional RPC and will slow the
        benchmark down. It can be set to true for debugging. *)
@@ -465,6 +467,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
       wxtz_addr;
       gld_tokens;
       nb_hops;
+      total_confirmed = ref 0;
     }
   in
 
