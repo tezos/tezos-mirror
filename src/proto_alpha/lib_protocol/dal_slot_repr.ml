@@ -1444,6 +1444,10 @@ module History = struct
 
     let proof_error reason = error @@ dal_proof_error reason
 
+    (* Currently, when called from produce_proof or verify_proof, the parameters
+       provided to this function are those of the inbox level at which the DAL
+       page was imported. We should probably rather provide the parameters at
+       publication level of the page's slot. *)
     let check_page_proof dal_params proof data ({Page.page_index; _} as pid)
         commitment =
       let open Result_syntax in

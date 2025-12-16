@@ -356,6 +356,11 @@ let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
 let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
     ~number_of_pages ~dal_activation_level ~origination_level ~inbox_level
     Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
+  (* The number_of_slots and number_of_pages used here are fetched from the
+   [dal_constants] parameter of function page_content_int below. Those
+   parameters rather correspond to the import level, not to the level at which
+   the slot of the page was published. In case of DAL parameters change, this
+   should be adapted. *)
   Result.is_ok (Dal.Page.Index.check_is_in_range ~number_of_pages page_index)
   && slot_id_is_valid
        chain_id

@@ -284,10 +284,7 @@ module Dal_helpers : sig
 
       - [published_level] + [dal_attestation_lag] <= [import_inbox_level]: this
       means that the slot of the page has been attested before or at the
-      [import_inbox_level].
-
-      We also check that the given slot ID's index is within the range of
-      allowed slots thanks to [dal_number_of_slots].  *)
+      [import_inbox_level]. *)
   val import_level_is_valid :
     dal_activation_level:Raw_level_repr.t option ->
     dal_attestation_lag:int ->
