@@ -747,6 +747,10 @@ val get_version : t -> string Lwt.t
     See [rpc_endpoint] for a description of the [local] argument. *)
 val as_rpc_endpoint : ?local:bool -> t -> Endpoint.t
 
+(** Returns the cycle of the current head, as observed via the RPC
+    {!RPC.get_chain_block_helper_current_level}. *)
+val current_cycle : t -> int Lwt.t
+
 module RPC : sig
   include RPC_core.CALLERS with type uri_provider := t
 

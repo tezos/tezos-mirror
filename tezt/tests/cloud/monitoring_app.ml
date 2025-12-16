@@ -312,18 +312,20 @@ module Baker_helpers = struct
           let* bakers = get_bakers_with_staking_power endpoint cycle in
           let total_baking_power =
             List.fold_left
-              (fun acc RPC.{baking_power; _} -> acc + baking_power)
+              (fun acc RPC.{delegate = _; staked; weighted_delegated} ->
+                acc + staked + weighted_delegated)
               0
               bakers
           in
           let* bakers_info =
             Lwt_list.map_s
-              (fun RPC.{delegate; baking_power} ->
+              (fun RPC.{delegate; staked; weighted_delegated} ->
                 let* attest_infos =
                   fetch_baker_info
                     ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
                     ~tz1:delegate
                 in
+                let baking_power = staked + weighted_delegated in
                 let stake_fraction =
                   float_of_int baking_power /. float_of_int total_baking_power
                 in

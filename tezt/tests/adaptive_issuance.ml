@@ -76,6 +76,10 @@ module Helpers = struct
       current_level
       (current_level + nb_blocks_to_bake) ;
     repeat nb_blocks_to_bake (fun () -> bake ?keys client)
+
+  let ceil_q q =
+    let floor = Q.to_int q in
+    if Q.equal q (Q.of_int floor) then floor else floor + 1
 end
 
 let log_step counter msg =
@@ -238,8 +242,8 @@ let check_with_roundings ?(margin = 1) got expected =
 let assert_with_roundings ~__LOC__ ?margin got expected =
   if not (check_with_roundings ?margin got expected) then
     Test.fail
-      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %d, expected \
-       %d.@]@."
+      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %#d, expected \
+       %#d.@]@."
       __LOC__
       got
       expected
@@ -260,7 +264,7 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
       then
         Test.fail
           "@[<v 2>Inconsistent balance update, could it be a regression.@. \
-           Expected:@ @[%s, change amount: %d@]@.Got:@ @[%s@]@]"
+           Expected:@ @[%s, change amount: %#d@]@.Got:@ @[%s@]@]"
           msg
           change
           (List.fold_left
@@ -312,6 +316,12 @@ let test_staking =
   in
 
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
+  let* constants =
+    Client.RPC.call client_1 @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -586,7 +596,7 @@ let test_staking =
     @@ RPC.get_chain_block_context_contract_staking_numerator
          Constant.bootstrap2.public_key_hash
   in
-  Log.info "Numerator/denominator before: %d/%d " numerator denominator ;
+  Log.info "Numerator/denominator before: %#d/%#d " numerator denominator ;
   let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
   let* () = Helpers.bake_n_cycles bake 1 client_1 in
 
@@ -614,7 +624,7 @@ let test_staking =
          staker0.public_key_hash
   in
   Log.info
-    "Numerator/denominator after for %s: %d/%d "
+    "Numerator/denominator after for %s: %#d/%#d "
     staker0.alias
     numerator0
     (JSON.as_int denominator) ;
@@ -628,7 +638,7 @@ let test_staking =
   assert (numerator0 + numerator1 = JSON.as_int denominator) ;
 
   Log.info
-    "Numerator/denominator after for %s: %d/%d "
+    "Numerator/denominator after for %s: %#d/%#d "
     staker1.alias
     numerator1
     (JSON.as_int denominator) ;
@@ -658,7 +668,7 @@ let test_staking =
            contract.public_key_hash
     in
     Log.info
-      "Balance of %s: spendable : %s, staked_balance : %d"
+      "Balance of %s: spendable : %s, staked_balance : %#d"
       contract.alias
       (Tez.to_string balance)
       staked_balance ;
@@ -791,7 +801,7 @@ let test_staking =
     Client.spawn_unstake (Tez.of_int 500000) ~staker:staker0.alias client_1
   in
 
-  let* _ = Helpers.bake_n_cycles bake 2 client_1 in
+  let* _ = Helpers.bake_n_cycles bake consensus_rights_delay client_1 in
 
   let* () = Process.check ~expect_failure:false unstake0 in
 
@@ -868,6 +878,7 @@ let test_staking =
       ~keys:[Constant.bootstrap2.public_key_hash]
       client_2
   in
+  let* misbehaviour_cycle = Node.current_cycle node_2 in
 
   let* _ = Node.wait_for_level node_2 (common_ancestor + node_2_branch_size) in
 
@@ -914,7 +925,9 @@ let test_staking =
   and* _ = Node.wait_for_level node_2 node_3_final_level
   and* _ = Node.wait_for_level node_3 node_3_final_level in
 
-  log_step 20 "Check denunciation is in the last block." ;
+  log_step
+    20
+    "Check denunciation is in the last block, and culprit is now forbidden." ;
   (* Getting the operations of the current head. *)
   let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
   let* () = Accuser.terminate accuser_3 in
@@ -923,7 +936,7 @@ let test_staking =
     else Test.fail "Double baking evidence was not found"
   in
 
-  (* Bootstrap2 has been denounced, check it is not forbidden *)
+  (* Bootstrap2 has been denounced, check it is forbidden. *)
   let* is_forbidden =
     Client.RPC.call client_1
     @@ RPC.get_chain_block_context_delegate_is_forbidden
@@ -931,20 +944,121 @@ let test_staking =
   in
   assert is_forbidden ;
 
-  (* Bake a cycle to wait for the slashing *)
+  log_step
+    21
+    "Bake until the slashing is applied at the end of the next cycle, and \
+     check that the block receipt contains the expected slashed and rewarded \
+     amounts." ;
+
+  (* Bake until the block right before the slashing (second-to-last
+     block of cycle [misbehaviour_cycle + 1]), so that we can retrieve
+     data that will be needed to compute expected slashed amounts. *)
   let* () =
-    Helpers.bake_n_cycles
-      bake
+    Client.bake_until_cycle_end
+      ~target_cycle:(misbehaviour_cycle + 1)
       ~keys:[Constant.bootstrap1.public_key_hash]
-      1
       client_1
   in
+  let* bootstrap2_info_right_before_slashing =
+    Node.RPC.call node_2
+    @@ RPC.get_chain_block_context_delegate Constant.bootstrap2.public_key_hash
+  in
+  let* misbehaviour_stake_distribution =
+    (* Last chance to retrieve this, because it gets cleared from the
+       context at the end of cycle [misbehaviour_cycle + 1]. *)
+    Node.RPC.call node_2
+    @@ RPC.get_stake_distribution ~cycle:misbehaviour_cycle ()
+  in
 
+  (* Bake the block that applies the slashing (last block of cycle
+     [misbehaviour_cycle + 1]). We will now check the slashed and
+     rewarded amounts in this block's receipts. *)
+  let* () = bake ~keys:[Constant.bootstrap1.public_key_hash] client_1 in
   let* bu = Operation_receipt.get_block_metadata client_1 in
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
-  (* check slashed and rewarded amounts *)
-  let global_limit_of_staking_over_baking = 9 in
+  (* Compute the expected amount slashed from unstaked requests
+     (baker's and external stakers' are counted together) *)
+  let unstake_requests_earliest_slashable_cycle =
+    (* Rights for the misbehaviour cycle were determined at the end of
+       cycle [misbehaviour_cycle - consensus_rights_delay - 1], so any
+       funds unstaked in cycle [misbehaviour_cycle -
+       consensus_rights_delay] and up have contributed to those
+       rights. *)
+    misbehaviour_cycle - consensus_rights_delay
+  in
+  let total_amount_in_slashable_unstake_requests =
+    let open JSON in
+    let unstake_requests =
+      bootstrap2_info_right_before_slashing |-> "total_unstaked_per_cycle"
+      |> as_list
+    in
+    List.fold_left
+      (fun total_amount unstake_request ->
+        if
+          unstake_request |-> "cycle" |> as_int
+          >= unstake_requests_earliest_slashable_cycle
+        then total_amount + (unstake_request |-> "deposit" |> as_int)
+        else total_amount)
+      0
+      unstake_requests
+  in
+  let percentage_of_frozen_deposits_slashed_per_double_baking =
+    JSON.(
+      constants |-> "percentage_of_frozen_deposits_slashed_per_double_baking"
+      |> as_int)
+  in
+  let double_baking_penalty =
+    Q.(percentage_of_frozen_deposits_slashed_per_double_baking // 10_000)
+  in
+  let amount_slashed_from_unstake_requests =
+    Q.(
+      of_int total_amount_in_slashable_unstake_requests * double_baking_penalty
+      |> to_int)
+  in
+
+  (* Compute the expected amounts slashed from the baker's and the
+     external stakers' staked tez respectively.
+
+     Note: we're skipping over some steps of slashing computation,
+     e.g. applying the delegate's and global
+     limit_of_staking_over_baking (we're very far from reaching it
+     here), and bounding the amount to slash from the baker by its
+     currently staked amount (which is more than high enough). *)
+  let own_staked =
+    JSON.(bootstrap2_info_right_before_slashing |-> "own_staked" |> as_int)
+  in
+  let external_staked =
+    JSON.(bootstrap2_info_right_before_slashing |-> "external_staked" |> as_int)
+  in
+  let total_staked = own_staked + external_staked in
+  let baker_share = Q.(own_staked // total_staked) in
+  let total_staked_recorded_for_misbehaviour_rights =
+    List.find_map
+      (fun RPC.{delegate; staked; weighted_delegated = _} ->
+        if String.equal delegate Constant.bootstrap2.public_key_hash then
+          Some staked
+        else None)
+      misbehaviour_stake_distribution
+    |> Option.get
+  in
+  let amount_slashed_from_total_staked =
+    Q.(
+      of_int total_staked_recorded_for_misbehaviour_rights
+      * double_baking_penalty
+      |> to_int)
+  in
+  let amount_slashed_from_own_staked =
+    Q.(baker_share * of_int amount_slashed_from_total_staked) |> Helpers.ceil_q
+  in
+  let amount_slashed_from_external_staked =
+    amount_slashed_from_total_staked - amount_slashed_from_own_staked
+  in
+
+  (* Compute rewarded vs burned amounts. *)
+  let global_limit_of_staking_over_baking =
+    JSON.(constants |-> "global_limit_of_staking_over_baking" |> as_int)
+  in
   (* It's critical that the rewarded amount cannot exceed the amount
      slashed from the baker's own deposits; otherwise, the baker may
      actually gain tez by purposefully double signing and denuncing
@@ -952,59 +1066,31 @@ let test_staking =
      (global_limit_of_staking_over_baking + 2) of the slashed
      amount. *)
   let reward_denominator = global_limit_of_staking_over_baking + 2 in
-
-  (* slashed stakers (including baker) unstake deposit *)
-  let amount_slashed_from_unstake_stakers_deposits =
-    if Protocol.(number protocol > number S023) then
-      (* From T on, when activating the protocol from Genesis, the
-         initialization of consensus rights for the first cycles is
-         done with AI already in effect, so delegation already counts
-         less than staking. This slightly skews the balances in the
-         whole test. *)
-      50_000_004
-    else 50_000_003
+  let amount_rewarded_from_unstake_requests =
+    amount_slashed_from_unstake_requests / reward_denominator
   in
-  let amount_rewarded_from_unstake_stakers_deposits =
-    amount_slashed_from_unstake_stakers_deposits / reward_denominator
+  let amount_burned_from_unstake_requests =
+    amount_slashed_from_unstake_requests - amount_rewarded_from_unstake_requests
   in
-  let amount_burned_from_unstake_stakers_deposits =
-    amount_slashed_from_unstake_stakers_deposits
-    - amount_rewarded_from_unstake_stakers_deposits
+  let amount_rewarded_from_own_staked =
+    amount_slashed_from_own_staked / reward_denominator
   in
-
-  (* slashed stake *)
-  let amount_slashed_from_stakers_deposits =
-    if Protocol.(number protocol > number S023) then 50_248_756 else 50_248_756
+  let amount_burned_from_own_staked =
+    amount_slashed_from_own_staked - amount_rewarded_from_own_staked
   in
-  let amount_rewarded_from_stakers_deposits =
-    amount_slashed_from_stakers_deposits / reward_denominator
+  let amount_rewarded_from_external_staked =
+    amount_slashed_from_external_staked / reward_denominator
   in
-  let amount_burned_from_stakers_deposits =
-    amount_slashed_from_stakers_deposits - amount_rewarded_from_stakers_deposits
+  let amount_burned_from_external_staked =
+    amount_slashed_from_external_staked - amount_rewarded_from_external_staked
   in
-
-  (* slashing baker (bootstrap2) stake*)
-  let amount_slashed_from_baker_deposits =
-    if Protocol.(number protocol > number S023) then 10_049_785_808
-    else 10_049_764_732
-  in
-
-  let amount_rewarded_from_baker_deposits =
-    amount_slashed_from_baker_deposits / reward_denominator
-  in
-  let amount_burned_from_baker_deposits =
-    amount_slashed_from_baker_deposits - amount_rewarded_from_baker_deposits
-  in
-
-  (* total amounts *)
   let total_amount_rewarded =
-    amount_rewarded_from_unstake_stakers_deposits
-    + amount_rewarded_from_stakers_deposits
-    + amount_rewarded_from_baker_deposits
+    amount_rewarded_from_unstake_requests + amount_rewarded_from_external_staked
+    + amount_rewarded_from_own_staked
   in
   let total_amount_burned =
-    amount_burned_from_unstake_stakers_deposits
-    + amount_burned_from_stakers_deposits + amount_burned_from_baker_deposits
+    amount_burned_from_unstake_requests + amount_burned_from_external_staked
+    + amount_burned_from_own_staked
   in
 
   let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
@@ -1021,14 +1107,13 @@ let test_staking =
       msg;
     }
   in
-
   check_balance_updates
     bu
     [
       check_opr
         ~kind:"freezer"
         ~category:(Some "unstaked_deposits")
-        ~change:(-amount_burned_from_unstake_stakers_deposits)
+        ~change:(-amount_burned_from_unstake_requests)
         ~staker:
           (Some
              (Delegate
@@ -1041,7 +1126,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_burned_from_baker_deposits)
+        ~change:(-amount_burned_from_own_staked)
         ~staker:
           (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~msg:"Slashed from baker deposits"
@@ -1049,7 +1134,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_burned_from_stakers_deposits)
+        ~change:(-amount_burned_from_external_staked)
         ~staker:
           (Some
              (Delegate
@@ -1069,7 +1154,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "unstaked_deposits")
-        ~change:(-amount_rewarded_from_unstake_stakers_deposits)
+        ~change:(-amount_rewarded_from_unstake_requests)
         ~staker:
           (Some
              (Delegate
@@ -1082,7 +1167,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_rewarded_from_baker_deposits)
+        ~change:(-amount_rewarded_from_own_staked)
         ~staker:
           (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~delayed_operation_hash:(Some denunciation_oph)
@@ -1090,7 +1175,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_rewarded_from_stakers_deposits)
+        ~change:(-amount_rewarded_from_external_staked)
         ~staker:
           (Some
              (Delegate
@@ -1112,7 +1197,7 @@ let test_staking =
       };
     ] ;
 
-  log_step 21 "Test finalize_unstake" ;
+  log_step 22 "Test finalize_unstake" ;
   let* balance = Client.get_balance_for ~account:staker0.alias client_1 in
   Log.info
     "Balance of %s before unstake: spendable : %s"
@@ -1132,14 +1217,14 @@ let test_staking =
   assert (List.length finalizable == 1) ;
   assert (List.length unfinalizable == 1) ;
 
-  Log.info "Unstaked frozen balance: %d" unstaked_frozen_balance ;
+  Log.info "Unstaked frozen balance: %#d" unstaked_frozen_balance ;
   let* unstaked_finalizable_balance =
     Client.RPC.call client_1
     @@ RPC.get_chain_block_context_contract_unstaked_finalizable_balance
          staker0.public_key_hash
   in
-  Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
-  assert (check_with_roundings unstaked_finalizable_balance 1000000000) ;
+  Log.info "Unstaked finalizable balance: %#d" unstaked_finalizable_balance ;
+  assert (check_with_roundings unstaked_finalizable_balance 1_000_000_000) ;
 
   let finalize_unstake =
     Client.spawn_finalize_unstake ~staker:staker0.public_key_hash client_1
@@ -1220,7 +1305,7 @@ let test_staking =
     @@ RPC.get_chain_block_context_contract_unstaked_finalizable_balance
          staker0.public_key_hash
   in
-  Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
+  Log.info "Unstaked finalizable balance: %#d" unstaked_finalizable_balance ;
   assert (unstaked_finalizable_balance = 0) ;
   let* () =
     repeat 2 (fun () ->
@@ -1348,14 +1433,9 @@ let test_delegate_parameter_UX =
       "Staking - test set_delegate_parameters and update_delegate_parameters UX"
     ~tags:["staking"; "node"; "client"]
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node_1 = init protocol in
+  let* _proto_hash, endpoint, client, node = init protocol in
   let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
-  let current_cycle () =
-    let* level =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
-    return level.cycle
-  in
+  let current_cycle () = Node.current_cycle node in
 
   let* delegate_parameters_activation_delay =
     let* json =

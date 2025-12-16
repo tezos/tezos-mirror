@@ -1470,7 +1470,18 @@ val nonexistent_path : JSON.t t
 val get_chain_block_context_denunciations :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-type baker_with_power = {delegate : string; baking_power : int}
+(** Delegate's pkh and staked/delegated portions of its baking power.
+
+    [weighted_delegated] is the part that comes from delegated tez,
+    already divided by the [edge_of_staking_over_delegation] constant.
+
+    The total baking power of the delegate is [staked +
+    weighted_delegated]. *)
+type baker_with_power = {
+  delegate : string;
+  staked : int;
+  weighted_delegated : int;
+}
 
 val get_stake_distribution :
   ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t
