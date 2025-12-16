@@ -265,6 +265,7 @@ let test_snailtracer () =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
   let tx_queue =
     Tx_container.tx_queue_beacon
@@ -366,6 +367,7 @@ let test_full_image_raytracing () =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
   let tx_queue =
     Tx_container.tx_queue_beacon

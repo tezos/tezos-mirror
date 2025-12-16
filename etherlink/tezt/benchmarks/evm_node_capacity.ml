@@ -242,6 +242,7 @@ let test_erc20_capacity () =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
+      ()
   in
   let tx_queue =
     Tx_container.tx_queue_beacon
