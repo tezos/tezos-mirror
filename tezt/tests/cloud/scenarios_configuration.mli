@@ -21,8 +21,7 @@ module DAL : sig
     producers : int option;
     producers_delay : int option;
     producer_machine_type : string option;
-    observer_slot_indices : int list;
-    observers_multi_slot_indices : int list list;
+    observers_slot_indices : int list list;
     observer_machine_type : string list;
     archivers_slot_indices : int list list;
     observer_pkhs : string list;

@@ -95,9 +95,7 @@ module type Dal = sig
 
   val producer_machine_type : string option
 
-  val observer_slot_indices : int list
-
-  val observers_multi_slot_indices : int list list
+  val observers_slot_indices : int list list
 
   val observer_machine_type : string list
 
@@ -392,27 +390,17 @@ module Dal () : Dal = struct
     in
     Option.fold ~none:config.producer_machine_type ~some:Option.some from_cli
 
-  let observer_slot_indices =
-    config.observer_slot_indices
+  let observers_slot_indices =
+    config.observers_slot_indices
     @ Clap.default
         ~section
-        ~long:"observer-slot-indices"
-        ~placeholder:"<slot_index>,<slot_index>,<slot_index>, ..."
-        ~description:
-          "For each slot index specified, an observer will be created to \
-           observe this slot index."
-        (Clap.list_of_int "observer_slot_indices")
-        []
-
-  let observers_multi_slot_indices =
-    config.observers_multi_slot_indices
-    @ Clap.default
-        ~section
-        ~long:"observers-multi-slot-indices"
+        ~long:"observers-slot-indices"
         ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
         ~description:
-          "For each list of slots, an observer will be created to observe them."
-        (Clap.list_of_list_of_int "observer_multi_slot_indices")
+          "For each list of slots, an observer will be created to observe \
+           them. Note that one can mix the following syntax:\n\
+           <slot_index>,[<slot_index>], [<slot_index>;...]"
+        (Clap.list_of_list_of_int "observer_slot_indices")
         []
 
   let observer_machine_type =

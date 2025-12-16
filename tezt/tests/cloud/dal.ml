@@ -21,8 +21,7 @@ type configuration = {
   stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
   publish_slots_regularly : bool;
-  observer_slot_indices : int list;
-  observers_multi_slot_indices : int list list;
+  observers_slot_indices : int list list;
   observer_machine_type : string list;
   archivers_slot_indices : int list list;
   observer_pkhs : string list;
@@ -878,19 +877,11 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* observers_slot_index_agents =
     Lwt_list.map_s
-      (fun slot_index ->
-        let name = name_of (Observer (`Indexes [slot_index])) in
-        let* agent = next_agent ~name in
-        return (`Slot_indexes [slot_index], agent))
-      configuration.observer_slot_indices
-  in
-  let* observers_multi_slot_index_agents =
-    Lwt_list.map_s
       (fun slot_indexes ->
         let name = name_of (Observer (`Indexes slot_indexes)) in
         let* agent = next_agent ~name in
         return (`Slot_indexes slot_indexes, agent))
-      configuration.observers_multi_slot_indices
+      configuration.observers_slot_indices
   in
   let* archivers_slot_index_agents =
     Lwt_list.map_s
@@ -1009,8 +1000,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~topic
           i
           agent)
-      (observers_slot_index_agents @ observers_multi_slot_index_agents
-     @ observers_bakers_agents)
+      (observers_slot_index_agents @ observers_bakers_agents)
   and* archivers =
     Lwt_list.mapi_p
       (fun i (topic, agent) ->
@@ -1333,8 +1323,7 @@ let register (module Cli : Scenarios_cli.Dal) =
               last_index := index ;
               index)
     in
-    let observer_slot_indices = Cli.observer_slot_indices in
-    let observers_multi_slot_indices = Cli.observers_multi_slot_indices in
+    let observers_slot_indices = Cli.observers_slot_indices in
     let observer_machine_type = Cli.observer_machine_type in
     let archivers_slot_indices = Cli.archivers_slot_indices in
     let observer_pkhs = Cli.observer_pkhs in
@@ -1405,8 +1394,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         stake;
         stake_machine_type;
         dal_node_producers;
-        observer_slot_indices;
-        observers_multi_slot_indices;
+        observers_slot_indices;
         observer_machine_type;
         archivers_slot_indices;
         observer_pkhs;
@@ -1466,11 +1454,8 @@ let register (module Cli : Scenarios_cli.Dal) =
            List.init baker_daemon_count (fun i -> Baker i);
            List.map (fun i -> Producer i) configuration.dal_node_producers;
            List.map
-             (fun index -> Observer (`Indexes [index]))
-             configuration.observer_slot_indices;
-           List.map
              (fun indexes -> Observer (`Indexes indexes))
-             configuration.observers_multi_slot_indices;
+             configuration.observers_slot_indices;
            List.map
              (fun indexes -> Archiver (`Indexes indexes))
              configuration.archivers_slot_indices;
