@@ -635,6 +635,21 @@ end
 module Clst : sig
   module Deposits_balance :
     Single_data_storage with type t := Raw_context.t and type value = Tez_repr.t
+
+  (** Tez that were part of CLST frozen deposits but have been requested to be
+      redeemed by a staker.
+      They won't be part of CLST provided stake for future distributions.
+
+      For cycles [current_cycle - consensus_rights_delay - max_slashing_period + 1] to
+      [current_cycle] they are still slashable.
+      For cycle [current_cycle - consensus_rights_delay - max_slashing_period] they are
+      not slashable anymore and hence any other older cycles must be squashed
+      into this one at cycle end.
+  *)
+  module Redeemed_frozen_deposits :
+    Single_data_storage
+      with type value = Unstaked_frozen_deposits_repr.t
+       and type t := Raw_context.t
 end
 
 type consensus_pk_in_R = {
