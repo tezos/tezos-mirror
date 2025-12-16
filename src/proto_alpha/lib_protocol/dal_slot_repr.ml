@@ -755,6 +755,23 @@ module History = struct
       in
       fun ~deref ~cell ~target_slot_id ->
         Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
+
+    (* Wrapper around [Skip_list.search] that enforces using the same ordering
+      as the one used to build the list: slot ids are primarily ordered by their
+      effective attestation level [published_level + lag] (with [lag] derived
+      from the attestation-lag kind), and then by [published_level] and
+      [slot_index] as tie-breakers.
+
+      The caller must provide [target_dynamic_lag], i.e. the lag to use when
+      interpreting the target slot id in this ordering. *)
+    let _search ~deref ~cell ~target_slot_id ~target_dynamic_lag =
+      Lwt.search ~deref ~cell ~compare:(fun content ->
+          let cid = Content.content_id content in
+          compare_slot_ids_by_dynamic_attested_level
+            cid.header_id
+            ~dynamic_lag1:cid.attestation_lag
+            target_slot_id
+            ~dynamic_lag2:target_dynamic_lag)
   end
 
   module V2 = struct
