@@ -2225,6 +2225,7 @@ module Receipt : sig
     | Deposits : frozen_staker -> Tez.t balance
     | Unstaked_deposits : unstaked_frozen_staker * Cycle.t -> Tez.t balance
     | CLST_deposits : Tez.t balance
+    | CLST_redeemed_deposits : Contract.t * Cycle.t -> Tez.t balance
     | Nonce_revelation_rewards : Tez.t balance
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
