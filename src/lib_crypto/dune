@@ -11,6 +11,7 @@
   octez-libs.lwt-result-stdlib
   lwt
   octez-libs.hacl
+  octez-ml-dsa
   secp256k1-internal
   octez-libs.error-monad
   octez-libs.rpc

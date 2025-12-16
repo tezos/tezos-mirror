@@ -834,6 +834,66 @@ let octez_event_logging_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
 
+let octez_libcrux_ml_dsa =
+  public_lib
+    "octez-libcrux-ml-dsa"
+    ~internal_name:"octez_libcrux_ml_dsa"
+    ~path:"src/rust_libcrux/src"
+    ~opam:"octez-libcrux-ml-dsa"
+    ~synopsis:"Rust foreign archive for libcrux_ml_dsa"
+    ~foreign_archives:["octez_libcrux_ml_dsa"]
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [
+              S "targets";
+              S "liboctez_libcrux_ml_dsa.a";
+              S "dlloctez_libcrux_ml_dsa.so";
+            ];
+            [
+              S "deps";
+              [S "glob_files"; S "*.rs"];
+              [S "file"; S "../Cargo.toml"];
+              [S "file"; S "../Cargo.lock"];
+              [S "file"; S "../../../rust-toolchain"];
+              [S "source_tree"; S "../.cargo"];
+            ];
+            [
+              S "action";
+              [
+                S "progn";
+                [S "run"; S "sh"; S "-c"; S "cargo build --release"];
+                [
+                  S "run";
+                  S "sh";
+                  S "-c";
+                  S
+                    "mv ../target/release/liboctez_libcrux_ml_dsa.so \
+                     ./dlloctez_libcrux_ml_dsa.so 2> /dev/null || mv \
+                     ../target/release/liboctez_libcrux_ml_dsa.dylib \
+                     ./dlloctez_libcrux_ml_dsa.so";
+                ];
+                [
+                  S "run";
+                  S "mv";
+                  S "../target/release/liboctez_libcrux_ml_dsa.a";
+                  S "liboctez_libcrux_ml_dsa.a";
+                ];
+              ];
+            ];
+          ];
+        ]
+
+let octez_ml_dsa =
+  public_lib
+    "octez-ml-dsa"
+    ~path:"src/lib_ml_dsa"
+    ~synopsis:"ML-DSA-44 signature scheme"
+    ~deps:[octez_libcrux_ml_dsa]
+
 let octez_crypto =
   octez_lib
     "crypto"
@@ -847,6 +907,7 @@ let octez_crypto =
         octez_lwt_result_stdlib;
         lwt;
         octez_hacl;
+        octez_ml_dsa;
         secp256k1_internal;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc;
@@ -5210,6 +5271,20 @@ let _octez_riscv_pvm_test =
         octez_base_test_helpers |> open_;
         alcotezt;
         octez_riscv_pvm;
+      ]
+
+let _octez_libcrux_ml_dsa_tests =
+  tezt
+    ["test_main"; "test_bindings"]
+    ~path:"src/rust_libcrux/test"
+    ~opam:"octez-libcrux-ml-dsa-test"
+    ~synopsis:"Tests for the libcrux ML-DSA bindings"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib_unix |> open_;
+        alcotezt;
+        octez_ml_dsa;
       ]
 
 let octez_layer2_store =
