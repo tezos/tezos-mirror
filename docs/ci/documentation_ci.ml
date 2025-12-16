@@ -113,7 +113,6 @@ let job_odoc =
     ["eval $(opam env)"; "make -C docs " ^ target]
 
 let job_manuals =
-  Cacio.parameterize @@ fun executables_to_use ->
   CI.job
     "manuals"
     ~__POS__
@@ -122,26 +121,19 @@ let job_manuals =
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
        executables."
-    ~needs:
-      (match executables_to_use with
-      | `dynamic -> [(Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels)]
-      | `static -> [])
+    ~needs:[(Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~needs_legacy:
-      (match executables_to_use with
-      | `dynamic ->
-          (* It's ok to assume Before_merging here because we only care about the job name. *)
-          [
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_release
-                Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-                Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
-                Before_merging );
-          ]
-      | `static -> [(Artifacts, Tezos_ci_jobs.Master_branch.job_static_x86_64)])
+      (* It's ok to assume Before_merging here because we only care about the job name. *)
+      [
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+            Before_merging );
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
+            Before_merging );
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
+      ]
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
@@ -154,11 +146,7 @@ let job_manuals =
            "docs/developer/rollup_metrics.csv";
            "docs/user/node-config.json";
          ])
-    ("eval $(opam env)"
-    ::
-    (match executables_to_use with
-    | `dynamic -> ["make -C docs -j octez-gen"]
-    | `static -> ["scripts/ci/documentation:manuals_static.sh"]))
+    ["eval $(opam env)"; "make -C docs -j octez-gen"]
 
 let job_docgen =
   CI.job
@@ -188,7 +176,6 @@ let job_docgen =
 
 let job_build_all =
   Cacio.parameterize @@ fun mode ->
-  Cacio.parameterize @@ fun executables_to_use ->
   CI.job
     "build_all"
     ~__POS__
@@ -200,7 +187,7 @@ let job_build_all =
     ~needs:
       [
         (Artifacts, job_odoc mode);
-        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_manuals);
         (Artifacts, job_docgen);
       ]
     ~artifacts:
@@ -217,7 +204,7 @@ let job_build_all =
     ]
 
 let job_linkcheck =
-  Cacio.parameterize @@ fun mode executables_to_use ->
+  Cacio.parameterize @@ fun mode ->
   CI.job
     "linkcheck"
     ~__POS__
@@ -228,9 +215,9 @@ let job_linkcheck =
     ~force_if_label:["ci--docs"]
     ~needs:
       [
-        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_manuals);
         (Artifacts, job_docgen);
-        (Artifacts, job_build_all mode executables_to_use);
+        (Artifacts, job_build_all mode);
       ]
     ~allow_failure:Yes
     [
@@ -248,7 +235,7 @@ let job_publish =
     ~image:Tezos_ci.Images.CI.test
     ~stage:Publish
     ~description:"Publish the documentation to octez.com/docs."
-    ~needs:[(Artifacts, job_build_all `full `dynamic)]
+    ~needs:[(Artifacts, job_build_all `full)]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
@@ -265,20 +252,28 @@ let register () =
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);
-      (Auto, job_build_all `lite `dynamic);
-      (Manual, job_linkcheck `lite `dynamic);
+      (Auto, job_build_all `lite);
+      (Manual, job_linkcheck `lite);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
-    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
+    ~legacy_jobs:
+      [
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
+          Schedule_extended_test;
+      ]
     [
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_noble `master);
       (Auto, job_install_python `ubuntu_jammy `master);
       (Auto, job_install_python `debian_bookworm `master);
-      (Auto, job_build_all `lite `static);
-      (Auto, job_linkcheck `lite `static);
+      (Auto, job_build_all `lite);
+      (Auto, job_linkcheck `lite);
     ] ;
   CI.register_scheduled_pipeline
     "update"
