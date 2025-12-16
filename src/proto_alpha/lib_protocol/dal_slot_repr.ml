@@ -689,7 +689,7 @@ module History = struct
        When all cells use [Legacy] (or, more generally, when all lags map to
        [0]), this reduces to the historical lexicographic ordering over
        [(published_level, slot_index)]. *)
-    let _compare_slot_ids_by_dynamic_attested_level =
+    let compare_slot_ids_by_dynamic_attested_level =
       let key_of_slot_id slot_id ~dlag =
         let dlag_value = match dlag with Legacy -> 0 | Dynamic d -> d in
         let Header.{published_level; index} = slot_id in
@@ -704,46 +704,29 @@ module History = struct
           let c = Raw_level_repr.compare p1 p2 in
           if Compare.Int.(c <> 0) then c else Dal_slot_index_repr.compare i1 i2
 
-    (** All Dal slot indices for all levels will be stored in a skip list
-        (with or without a commitment depending on attestation status of each
-        slot), where only the last cell is needed to be remembered in the L1
-        context. The skip list is used in the proof phase of a refutation game
-        to verify whether a given slot is inserted as [Attested] or not in the
-        skip list. The skip list is supposed to be sorted, as its 'search'
-        function explicitly uses a given `compare` function during the list
-        traversal to quickly (in log(size)) reach the target slot header id.
-        Two cells compare in lexicographic ordering of their levels and slot indexes.
+    (* All DAL slot ids are stored in a skip list (with or without a commitment
+       depending on attestation status). The skip list must remain sorted
+       because its [search] procedure relies on a [compare] function to reach a
+       target slot id in logarithmic time.
 
-        Below, we redefine the [next] function (that allows adding elements
-        on top of the list) to enforce that the constructed skip list is
-        well-sorted. We also define a wrapper around the [search] function to
-        guarantee that it can only be called with the adequate compare function.
-    *)
-    let next ~prev_cell ~prev_cell_ptr ~number_of_slots elt =
-      (* When migrating from protocol P1 to P2 and activate non-legacy
-         attestation lag, we ignore attestation_lag when pushing new
-         cells. We'll still use the existing invariant, which is expected to
-         hold after the lag reduction and with the planned migration process. *)
+       With dynamic attestation lag, the insertion order is no longer
+       necessarily the lexicographic order on [(published_level,
+       slot_index)]. We therefore enforce sortedness using the same ordering as
+       [search], i.e. primarily by the slot effective attestation level
+       [published_level + lag] (where [lag] is derived from the attestation-lag
+       kind), and then by [published_level] and [slot_index] as tie-breakers. *)
+    let next ~prev_cell ~prev_cell_ptr ~number_of_slots:_number_of_slots elt =
       let open Result_syntax in
+      let prev_cid = content prev_cell |> Content.content_id in
+      let elt_cid = Content.content_id elt in
       let well_ordered =
-        (* For each cell we insert in the skip list, we ensure that it complies
-           with the following invariant:
-           - Either the published levels are successive (no gaps). In this case:
-             * The last inserted slot's index for the previous level is
-               [number_of_slots - 1];
-             * The first inserted slot's index for the current level is 0
-           - Or, levels are equal, but slot indices are successive. *)
-        let Header.{published_level = l1; index = i1} =
-          (content prev_cell |> Content.content_id).header_id
-        in
-        let Header.{published_level = l2; index = i2} =
-          (Content.content_id elt).header_id
-        in
-        (Raw_level_repr.equal l2 (Raw_level_repr.succ l1)
-        && Compare.Int.(Dal_slot_index_repr.to_int i1 = number_of_slots - 1)
-        && Compare.Int.(Dal_slot_index_repr.to_int i2 = 0))
-        || Raw_level_repr.equal l2 l1
-           && Dal_slot_index_repr.is_succ i1 ~succ:i2
+        Compare.Int.(
+          compare_slot_ids_by_dynamic_attested_level
+            prev_cid.header_id
+            ~dynamic_lag1:prev_cid.attestation_lag
+            elt_cid.header_id
+            ~dynamic_lag2:elt_cid.attestation_lag
+          < 0)
       in
       let* () =
         error_unless
