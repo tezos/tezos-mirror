@@ -116,6 +116,9 @@ let test_observer_starts =
     ~title:"Test Tezlink observer does not crash at startup"
     ~tags:["observer"]
   @@ fun {sequencer; observer; _} _protocol ->
+  (* Wait 60s that the drift monitor process starts *)
+  let* () = Lwt_unix.sleep 60. in
+
   let observer_promise = Evm_node.wait_for_blueprint_applied observer 1 in
   let* () =
     let*@ _ = Rpc.produce_block sequencer in
