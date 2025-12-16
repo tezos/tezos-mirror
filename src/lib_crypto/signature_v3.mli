@@ -46,7 +46,7 @@ type signature =
 
 (** A signature prefix holds data only for signature that are more than 64 bytes
     long.  *)
-type prefix = Bls_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t | Mldsa44_prefix of Bytes.t
 
 include
   S.SPLIT_SIGNATURE

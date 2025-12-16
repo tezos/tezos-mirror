@@ -9973,7 +9973,7 @@ type signature =
   | Mldsa44 of Mldsa44.t
   | Unknown of Bytes.t
 
-type prefix = Bls_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t | Mldsa44_prefix of Bytes.t
 
 include
   S.SPLIT_SIGNATURE
