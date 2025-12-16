@@ -19,6 +19,13 @@ val start : parameters -> unit tzresult Lwt.t
 (** [shutdown ()] stops the events follower. *)
 val shutdown : unit -> unit Lwt.t
 
+(** [produce_genesis ~timestamp ~parent_hash] creates the first empty block with
+    the provided timestamp and parent hash *)
+val produce_genesis :
+  timestamp:Time.Protocol.t ->
+  parent_hash:Ethereum_types.block_hash ->
+  (unit, error trace) result Lwt.t
+
 (** [produce_block ~force ~timestamp] takes the transactions in the tx
     pool and produces a block from it, returns the number of
     transaction in the block. The block is not produced if the list of

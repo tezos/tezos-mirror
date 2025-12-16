@@ -71,7 +71,7 @@ module Types = struct
     mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
-    mutable validation_state : Validation_types.validation_state;
+    mutable validation_state : Validation_types.validation_state option;
     mutable next_block_timestamp : Time.System.t option;
   }
 end
@@ -90,6 +90,9 @@ end
 
 module Request = struct
   type ('a, 'b) t =
+    | Produce_genesis :
+        (Time.Protocol.t * Ethereum_types.block_hash)
+        -> (unit, tztrace) t
     | Produce_block :
         (bool * Time.Protocol.t * bool)
         -> ([`Block_produced of int | `No_block], tztrace) t
@@ -98,6 +101,7 @@ module Request = struct
         -> (Ethereum_types.hash list, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
+    | Produce_genesis _ -> "Produce_genesis"
     | Produce_block _ -> "Produce_block"
     | Preconfirm_transactions _ -> "Preconfirm_transactions"
 
@@ -427,10 +431,7 @@ let clear_preconfirmation_data ~(state : Types.state) =
   let open Lwt_result_syntax in
   state.validated_txns <- [] ;
   state.selected_delayed_txns <- [] ;
-  let* validation_state =
-    init_validation_state ~tx_container:state.tx_container
-  in
-  state.validation_state <- validation_state ;
+  state.validation_state <- None ;
   return_unit
 
 (* [now] is the timestamp of the previously created block.
@@ -447,6 +448,30 @@ let compute_next_block_timestamp ~now =
     Ptime.add_span now t_500 |> WithExceptions.Option.get ~loc:__LOC__
   in
   Time.System.(max now_plus now')
+
+let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
+  let open Lwt_result_syntax in
+  let delayed_transactions = [] in
+  let chunks =
+    Sequencer_blueprint.make_blueprint_chunks
+      ~number:Ethereum_types.(Qty Z.zero)
+      {parent_hash; delayed_transactions; transactions = []; timestamp}
+  in
+  let* genesis_chunks, genesis_payload, _ =
+    Evm_context.apply_chunks
+      ~signer:state.signer
+      timestamp
+      chunks
+      delayed_transactions
+  in
+  state.next_block_timestamp <-
+    Some
+      (compute_next_block_timestamp
+         ~now:(Time.System.of_protocol_exn timestamp)) ;
+  Blueprints_publisher.publish
+    Z.zero
+    (Blueprints_publisher_types.Request.Blueprint
+       {chunks = genesis_chunks; inbox_payload = genesis_payload})
 
 (* Required while the preconfirmation system and previous block production co-exist *)
 let choose_block_timestamp preconfirmation_stream_enabled next_block_timestamp
@@ -608,9 +633,14 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         preconfirm_delayed_transactions ~state ~head_info
       in
       return (Int.sub maximum_cumulative_size remaining_cumulative_size))
-    else return state.validation_state.current_size
+    else return 0
   in
-  let input_validation_state = {state.validation_state with current_size} in
+  let* validation_state =
+    match state.validation_state with
+    | Some state -> return state
+    | None -> init_validation_state ~tx_container:state.tx_container
+  in
+  let input_validation_state = {validation_state with current_size} in
   let validate (validation_state, (rev_txns, rev_accepted_hashes))
       ((raw, tx_object) as entry) =
     let* res, wrapped_raw, hash =
@@ -652,7 +682,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     List.fold_left_es validate (input_validation_state, ([], [])) transactions
   in
   state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
-  state.validation_state <- validation_state ;
+  state.validation_state <- Some validation_state ;
   return (List.rev rev_accepted_hashes)
 
 module Handlers = struct
@@ -664,6 +694,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
+    | Request.Produce_genesis (timestamp, parent_hash) ->
+        produce_genesis ~state ~timestamp ~parent_hash
     | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
         produce_block state ~force ~timestamp ~with_delayed_transactions
@@ -687,9 +719,7 @@ module Handlers = struct
          preconfirmation_stream_enabled;
        } :
         Types.parameters) =
-    let open Lwt_result_syntax in
-    let* validation_state = init_validation_state ~tx_container in
-    return
+    Lwt_result_syntax.return
       Types.
         {
           sunset = false;
@@ -698,7 +728,7 @@ module Handlers = struct
           tx_container;
           sequencer_sunset_sec;
           preconfirmation_stream_enabled;
-          validation_state;
+          validation_state = None;
           selected_delayed_txns = [];
           validated_txns = [];
           next_block_timestamp = None;
@@ -754,6 +784,14 @@ let shutdown () =
   | Ok w ->
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
+
+let produce_genesis ~timestamp ~parent_hash =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Produce_genesis (timestamp, parent_hash))
+  |> handle_request_error
 
 let produce_block ~with_delayed_transactions ~force ~timestamp =
   let open Lwt_result_syntax in

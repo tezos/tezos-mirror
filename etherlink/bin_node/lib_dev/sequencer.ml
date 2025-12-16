@@ -440,41 +440,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~tx_container
       ()
   in
-  let* () =
-    if status = Created then
-      (* Create the first empty block. *)
-      let chunks =
-        Sequencer_blueprint.make_blueprint_chunks
-          ~number:Ethereum_types.(Qty Z.zero)
-          {
-            parent_hash = L2_types.genesis_parent_hash ~chain_family;
-            delayed_transactions = [];
-            transactions = [];
-            timestamp = genesis_timestamp;
-          }
-      in
-      let* sequencer_pk =
-        Durable_storage.sequencer (fun path ->
-            let*! res = Evm_state.inspect head.evm_state path in
-            return res)
-      in
-      let*? signer = Signer.get_signer signer sequencer_pk in
-      let* genesis_chunks = Sequencer_blueprint.sign ~signer ~chunks in
-      let genesis_payload =
-        Sequencer_blueprint.create_inbox_payload
-          ~smart_rollup_address:smart_rollup_address_b58
-          ~chunks:genesis_chunks
-      in
-      let* _tx_hashes =
-        Evm_context.apply_blueprint genesis_timestamp genesis_payload []
-      in
-      Blueprints_publisher.publish
-        Z.zero
-        (Blueprints_publisher_types.Request.Blueprint
-           {chunks = genesis_chunks; inbox_payload = genesis_payload})
-    else return_unit
-  in
-
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
     Rpc_backend.single_chain_id_and_family
@@ -496,6 +461,12 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         preconfirmation_stream_enabled =
           configuration.experimental_features.preconfirmation_stream_enabled;
       }
+  in
+  let* () =
+    when_ (status = Created) @@ fun () ->
+    Block_producer.produce_genesis
+      ~timestamp:genesis_timestamp
+      ~parent_hash:(L2_types.genesis_parent_hash ~chain_family)
   in
   let* () =
     if is_sandbox then
