@@ -735,27 +735,6 @@ module History = struct
       in
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
-    let search =
-      (* When migrating from protocol P1 to P2 and activate non-legacy
-         attestation lag, we ignore attestation_lag when comparing
-         values. We'll still use the existing compare, which is expected to
-         behave as expected after the lag reduction and with the planned
-         migration process . *)
-      let compare_with_slot_id (target_slot_id : Header.id)
-          (content : Content.t) =
-        let Header.{published_level = target_level; index = target_index} =
-          target_slot_id
-        in
-        let Header.{published_level; index} =
-          (Content.content_id content).header_id
-        in
-        let c = Raw_level_repr.compare published_level target_level in
-        if Compare.Int.(c <> 0) then c
-        else Dal_slot_index_repr.compare index target_index
-      in
-      fun ~deref ~cell ~target_slot_id ->
-        Lwt.search ~deref ~cell ~compare:(compare_with_slot_id target_slot_id)
-
     (* Wrapper around [Skip_list.search] that enforces using the same ordering
       as the one used to build the list: slot ids are primarily ordered by their
       effective attestation level [published_level + lag] (with [lag] derived
@@ -764,7 +743,7 @@ module History = struct
 
       The caller must provide [target_dynamic_lag], i.e. the lag to use when
       interpreting the target slot id in this ordering. *)
-    let _search ~deref ~cell ~target_slot_id ~target_dynamic_lag =
+    let search ~deref ~cell ~target_slot_id ~target_dynamic_lag =
       Lwt.search ~deref ~cell ~compare:(fun content ->
           let cid = Content.content_id content in
           compare_slot_ids_by_dynamic_attested_level
@@ -772,6 +751,39 @@ module History = struct
             ~dynamic_lag1:cid.attestation_lag
             target_slot_id
             ~dynamic_lag2:target_dynamic_lag)
+
+    (* When the attestation lag of the target slot is unknown, try all
+       admissible interpretations of the target position in the skip-list
+       ordering: [Legacy] then [Dynamic 1..max_lag] (here max_lag =
+       legacy_attestation_lag = 8).  Return the first result whose [last_cell]
+       is [Found _]; otherwise return the last obtained search result.
+
+       This function allows to plug the search function above, adapted to the
+       dynamic_lag-compatible ordering, while keeping the interface unchanged on
+       the proofs production side. *)
+    let search_with_any_attestation_lag ~deref ~cell ~target_slot_id =
+      let open Lwt_syntax in
+      let max_lag = legacy_attestation_lag in
+      let rec loop last_res curr_lag =
+        if Compare.Int.(curr_lag > max_lag) then return last_res
+        else
+          let* res =
+            search
+              ~deref
+              ~cell
+              ~target_slot_id
+              ~target_dynamic_lag:(Dynamic curr_lag)
+          in
+          match res.last_cell with
+          | Found _ -> return res
+          | _ -> loop res (curr_lag + 1)
+      in
+      let* res_legacy =
+        search ~deref ~cell ~target_slot_id ~target_dynamic_lag:Legacy
+      in
+      match res_legacy.last_cell with
+      | Found _ -> return res_legacy
+      | _ -> loop res_legacy 1
   end
 
   module V2 = struct
@@ -1547,7 +1559,10 @@ module History = struct
         let Page.{slot_id = target_slot_id; page_index = _} = page_id in
         (* We first search for the slots attested at level [published_level]. *)
         let*! search_result =
-          Skip_list.search ~deref:get_history ~target_slot_id ~cell:slots_hist
+          Skip_list.search_with_any_attestation_lag
+            ~deref:get_history
+            ~target_slot_id
+            ~cell:slots_hist
         in
         (* The search should necessarily find a cell in the skip list (assuming
          enough cache is given) under the assumptions made when calling
