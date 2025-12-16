@@ -29,12 +29,14 @@ type public_key_hash =
   | Secp256k1 of Secp256k1.Public_key_hash.t
   | P256 of P256.Public_key_hash.t
   | Bls of Bls.Public_key_hash.t
+  | Mldsa44 of Mldsa44.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
   | P256 of P256.Public_key.t
   | Bls of Bls.Public_key.t
+  | Mldsa44 of Mldsa44.Public_key.t
 
 type watermark =
   | Block_header of Chain_id.t
@@ -47,6 +49,7 @@ type signature =
   | Secp256k1 of Secp256k1.t
   | P256 of P256.t
   | Bls of Bls.t
+  | Mldsa44 of Mldsa44.t
   | Unknown of Bytes.t
 
 type prefix = Bls_prefix of Bytes.t

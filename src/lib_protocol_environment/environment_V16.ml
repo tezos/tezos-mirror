@@ -82,12 +82,17 @@ module type T = sig
         Tezos_crypto.Signature.Bls.Public_key_hash.t
        and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
        and type Bls.t = Tezos_crypto.Signature.Bls.t
+       and type Mldsa44.Public_key_hash.t =
+        Tezos_crypto.Signature.Mldsa44.Public_key_hash.t
+       and type Mldsa44.Public_key.t =
+        Tezos_crypto.Signature.Mldsa44.Public_key.t
+       and type Mldsa44.t = Tezos_crypto.Signature.Mldsa44.t
        and type Signature.public_key_hash =
-        Tezos_crypto.Signature.V2.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.V2.public_key
-       and type Signature.signature = Tezos_crypto.Signature.V2.signature
-       and type Signature.t = Tezos_crypto.Signature.V2.t
-       and type Signature.watermark = Tezos_crypto.Signature.V2.watermark
+        Tezos_crypto.Signature.V3.public_key_hash
+       and type Signature.public_key = Tezos_crypto.Signature.V3.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V3.signature
+       and type Signature.t = Tezos_crypto.Signature.V3.t
+       and type Signature.watermark = Tezos_crypto.Signature.V3.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -336,9 +341,10 @@ struct
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
   module Bls = Tezos_crypto.Signature.Bls
+  module Mldsa44 = Tezos_crypto.Signature.Mldsa44
 
   module Signature = struct
-    include Tezos_crypto.Signature.V2
+    include Tezos_crypto.Signature.V3
 
     let pop_verify pk proof = Bls.pop_verify pk proof
 
@@ -355,7 +361,8 @@ struct
             | Ed25519 _ -> "check_signature_ed25519"
             | Secp256k1 _ -> "check_signature_secp256k1"
             | P256 _ -> "check_signature_p256"
-            | Bls _ -> "check_signature_bls");
+            | Bls _ -> "check_signature_bls"
+            | Mldsa44 _ -> "check_signature_mldsa44");
           ]]
   end
 

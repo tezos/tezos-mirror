@@ -85,6 +85,8 @@ module type T = sig
 
   module Blake2B : [%sig "v16/blake2B.mli"]
 
+  module Mldsa44 : [%sig "v16/mldsa44.mli"]
+
   module Bls : [%sig "v16/bls.mli"]
 
   module Ed25519 : [%sig "v16/ed25519.mli"]
