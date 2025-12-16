@@ -23,7 +23,7 @@ use crate::{
     Error,
 };
 
-// Path where is stored the correspondance between an EVM address and the native
+// Path where is stored the correspondence between an EVM address and the native
 // Tezos account it was derived from.
 const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");

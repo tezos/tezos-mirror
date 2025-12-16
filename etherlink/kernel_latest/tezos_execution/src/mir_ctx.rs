@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::account_storage::{
-    TezlinkAccount, TezlinkImplicitAccount, TezlinkOriginatedAccount,
+    TezlinkAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
@@ -38,20 +38,20 @@ use tezos_tezlink::lazy_storage_diff::{
 use tezos_tezlink::operation_result::TransferError;
 use typed_arena::Arena;
 
-pub struct TcCtx<'operation, Host: Runtime> {
+pub struct TcCtx<'operation, Host: Runtime, C: Context> {
     pub host: &'operation mut Host,
-    pub context: &'operation Context,
+    pub context: &'operation C,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub next_temporary_id: &'operation mut BigMapId,
 }
 
-pub struct OperationCtx<'operation> {
+pub struct OperationCtx<'operation, A: TezosImplicitAccount> {
     // In reality, 'source' and 'origination_nonce' have
     // a 'batch lifetime. Downgrade it to an 'operation
     // lifetime is not a problem for the compiler.
     // However, it could be misleading in terms of comprehension
-    pub source: &'operation TezlinkImplicitAccount,
+    pub source: &'operation A,
     pub origination_nonce: &'operation mut OriginationNonce,
     pub counter: &'operation mut u128,
     // 'level', 'now' and 'chain_id' should outlive operation in reality
@@ -68,10 +68,10 @@ pub struct ExecCtx {
     pub balance: i64,
 }
 
-pub struct Ctx<'a, 'operation, Host: Runtime> {
-    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
+pub struct Ctx<'a, 'operation, Host: Runtime, C: Context> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host, C>,
     pub exec_ctx: ExecCtx,
-    pub operation_ctx: &'a mut OperationCtx<'operation>,
+    pub operation_ctx: &'a mut OperationCtx<'operation, C::ImplicitAccountType>,
 }
 
 pub struct BlockCtx<'block> {
@@ -91,7 +91,7 @@ impl ExecCtx {
     pub fn create(
         host: &mut impl Runtime,
         sender_account: &impl TezlinkAccount,
-        dest_account: &TezlinkOriginatedAccount,
+        dest_account: &impl TezosOriginatedAccount,
         amount: &Narith,
     ) -> Result<Self, TransferError> {
         let sender = address_from_contract(sender_account.contract());
@@ -118,7 +118,7 @@ impl ExecCtx {
     }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
+impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         &mut self.gas.current_gas
     }
@@ -159,7 +159,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, Host> {
+impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for Ctx<'_, '_, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -179,7 +179,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, Host> {
     }
 }
 
-impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
+impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -253,8 +253,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
         mir::typechecker::MichelineView<Micheline<'a>>,
         (Micheline<'a>, Vec<u8>),
     )> {
-        let account =
-            TezlinkOriginatedAccount::from_kt1(self.tc_ctx.context, &contract).ok()?;
+        let account = self.tc_ctx.context.originated_from_kt1(&contract).ok()?;
         let serialized_script = account.code(self.tc_ctx.host).ok()?;
         let MichelineContractScript {
             code: _,
@@ -276,13 +275,13 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
     }
 }
 
-impl<Host: Runtime> Ctx<'_, '_, Host> {
+impl<Host: Runtime, C: Context> Ctx<'_, '_, Host, C> {
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
 }
 
-impl<Host: Runtime> TcCtx<'_, Host> {
+impl<Host: Runtime, C: Context> TcCtx<'_, Host, C> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -347,9 +346,9 @@ impl<Host: Runtime> TcCtx<'_, Host> {
     }
 }
 
-fn remove_big_map<Host: Runtime>(
+fn remove_big_map<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     id: &BigMapId,
 ) -> Result<(), LazyStorageError> {
     // Remove the key type of the big_map
@@ -369,9 +368,9 @@ fn remove_big_map<Host: Runtime>(
 /// Function to clear temporary big_maps create for an operation
 ///
 /// This function also reset the next temporary id to minus one
-pub fn clear_temporary_big_maps<Host: Runtime>(
+pub fn clear_temporary_big_maps<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     next_temp_id: &mut BigMapId,
 ) -> Result<(), LazyStorageError> {
     while next_temp_id.dec() {
@@ -416,14 +415,14 @@ struct BigMapKeys {
 
 impl BigMapKeys {
     #[cfg(test)]
-    fn get(host: &mut impl Runtime, context: &Context, id: &BigMapId) -> Self {
+    fn get<C: Context>(host: &mut impl Runtime, context: &C, id: &BigMapId) -> Self {
         let path = keys_of_big_map(context, id).unwrap();
         read_nom_value(host, &path).unwrap_or(BigMapKeys { keys: vec![] })
     }
 
-    fn add_key(
+    fn add_key<C: Context>(
         host: &mut impl Runtime,
-        context: &Context,
+        context: &C,
         id: &BigMapId,
         key: &[u8],
     ) -> Result<(), LazyStorageError> {
@@ -433,9 +432,9 @@ impl BigMapKeys {
         Ok(())
     }
 
-    fn remove_key(
+    fn remove_key<C: Context>(
         host: &mut impl Runtime,
-        context: &Context,
+        context: &C,
         id: &BigMapId,
         key: &[u8],
     ) -> Result<(), LazyStorageError> {
@@ -449,9 +448,9 @@ impl BigMapKeys {
         Ok(())
     }
 
-    fn remove_keys_in_storage(
+    fn remove_keys_in_storage<C: Context>(
         host: &mut impl Runtime,
-        context: &Context,
+        context: &C,
         id: &BigMapId,
     ) -> Result<(), LazyStorageError> {
         let path = keys_of_big_map(context, id)?;
@@ -476,9 +475,9 @@ impl BigMapKeys {
         Ok(())
     }
 
-    fn copy_keys_in_storage(
+    fn copy_keys_in_storage<C: Context>(
         host: &mut impl Runtime,
-        context: &Context,
+        context: &C,
         source: &BigMapId,
         dest: &BigMapId,
     ) -> Result<(), LazyStorageError> {
@@ -512,7 +511,7 @@ impl BigMapKeys {
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
+impl<'a, Host: Runtime, C: Context> LazyStorage<'a> for TcCtx<'a, Host, C> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -653,7 +652,10 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::gas::TezlinkOperationGas;
+    use crate::{
+        context::{Context, TezlinkContext},
+        gas::TezlinkOperationGas,
+    };
     use mir::ast::big_map::{
         dump_big_map_updates, BigMap, BigMapContent, BigMapFromId, BigMapId,
     };
@@ -684,8 +686,8 @@ pub mod tests {
         };
     }
 
-    pub fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut TcCtx<'a, Host>,
+    pub fn assert_big_map_eq<'a, Host: Runtime, C: Context>(
+        ctx: &mut TcCtx<'a, Host, C>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -714,8 +716,8 @@ pub mod tests {
         }
     }
 
-    fn assert_big_map_removed<'a, Host: Runtime>(
-        ctx: &TcCtx<'a, Host>,
+    fn assert_big_map_removed<'a, Host: Runtime, C: Context>(
+        ctx: &TcCtx<'a, Host, C>,
         id: &BigMapId,
         removed_keys: &BigMapKeys,
     ) {
@@ -749,7 +751,7 @@ pub mod tests {
     #[test]
     fn test_map_from_memory() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &Context::init_context());
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -777,7 +779,7 @@ pub mod tests {
     #[test]
     fn test_map_updates_to_storage() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &Context::init_context());
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
         let map_id = storage
             .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
@@ -854,7 +856,7 @@ pub mod tests {
     #[test]
     fn test_copy() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &Context::init_context());
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -889,7 +891,7 @@ pub mod tests {
     fn test_remove_big_map() {
         // Setup the context and big_map for the test
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &Context::init_context());
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
         let key_type = Type::Int;
         let value_type = Type::Int;
         let map_id = storage.big_map_new(&key_type, &value_type, false).unwrap();
@@ -921,7 +923,7 @@ pub mod tests {
     #[test]
     fn test_remove_with_dump() {
         let mut host = MockKernelHost::default();
-        make_default_ctx!(storage, &mut host, &Context::init_context());
+        make_default_ctx!(storage, &mut host, &TezlinkContext::init_context());
         let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))

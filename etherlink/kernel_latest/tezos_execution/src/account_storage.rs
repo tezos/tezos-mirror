@@ -78,8 +78,8 @@ pub trait TezlinkAccount {
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkImplicitAccount {
-    pub path: OwnedPath,
-    pub pkh: PublicKeyHash,
+    pub(crate) path: OwnedPath,
+    pub(crate) pkh: PublicKeyHash,
 }
 
 impl TezlinkAccount for TezlinkImplicitAccount {
@@ -92,27 +92,11 @@ impl TezlinkAccount for TezlinkImplicitAccount {
     }
 }
 
-impl TezlinkImplicitAccount {
-    pub fn pkh(&self) -> &PublicKeyHash {
-        &self.pkh
-    }
-    // We must provide the context object to get the full path in the durable storage
-    pub fn from_contract(
-        context: &context::Context,
-        contract: &Contract,
-    ) -> Result<Self, tezos_storage::error::Error> {
-        context.implicit_from_contract(contract)
-    }
-
-    pub fn from_public_key_hash(
-        context: &context::Context,
-        pkh: &PublicKeyHash,
-    ) -> Result<Self, tezos_storage::error::Error> {
-        context.from_public_key_hash(pkh)
-    }
+pub trait TezosImplicitAccount: TezlinkAccount + Sized {
+    fn pkh(&self) -> &PublicKeyHash;
 
     /// Get the **counter** for the Tezlink account.
-    pub fn counter(
+    fn counter(
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
@@ -121,7 +105,7 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **counter** for the Tezlink account.
-    pub fn set_counter(
+    fn set_counter(
         &self,
         host: &mut impl Runtime,
         counter: &Narith,
@@ -131,7 +115,7 @@ impl TezlinkImplicitAccount {
     }
 
     /// Set the **counter** for the Tezlink account to the successor of the current value.
-    pub fn increment_counter(
+    fn increment_counter(
         &self,
         host: &mut impl Runtime,
         validated_operations_count: usize,
@@ -142,7 +126,7 @@ impl TezlinkImplicitAccount {
         )
     }
 
-    pub fn manager(
+    fn manager(
         &self,
         host: &impl Runtime,
     ) -> Result<Manager, tezos_storage::error::Error> {
@@ -151,7 +135,7 @@ impl TezlinkImplicitAccount {
         Ok(manager)
     }
 
-    pub fn set_manager_public_key_hash(
+    fn set_manager_public_key_hash(
         &self,
         host: &mut impl Runtime,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -179,7 +163,7 @@ impl TezlinkImplicitAccount {
     /// This function is used to test a situation in which we have an
     /// inconsistent manager pkh for an implicit account.
     #[cfg(test)]
-    pub fn force_set_manager_public_key_hash(
+    fn force_set_manager_public_key_hash(
         &self,
         host: &mut impl Runtime,
         pkh: &PublicKeyHash,
@@ -190,7 +174,7 @@ impl TezlinkImplicitAccount {
     /// This function updates the manager with the public key in parameter.
     /// Most of the time, we're dealing with references so this function is here to avoid cloning
     /// the public key hash to build a [Manager] object
-    pub fn set_manager_public_key(
+    fn set_manager_public_key(
         &self,
         host: &mut impl Runtime,
         public_key: &PublicKey,
@@ -207,7 +191,7 @@ impl TezlinkImplicitAccount {
 
     /// Allocate an account in the durable storage. Does nothing if account was
     /// already allocated.
-    pub fn allocate(
+    fn allocate(
         &self,
         host: &mut impl Runtime,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -224,7 +208,7 @@ impl TezlinkImplicitAccount {
     // Below this comment is multiple functions useful for validate an operation
 
     /// Verify if an account is allocated by attempting to read its balance
-    pub fn allocated(
+    fn allocated(
         &self,
         host: &impl Runtime,
     ) -> Result<bool, tezos_storage::error::Error> {
@@ -233,10 +217,16 @@ impl TezlinkImplicitAccount {
     }
 }
 
+impl TezosImplicitAccount for TezlinkImplicitAccount {
+    fn pkh(&self) -> &PublicKeyHash {
+        &self.pkh
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
-    pub path: OwnedPath,
-    pub kt1: ContractKt1Hash,
+    pub(crate) path: OwnedPath,
+    pub(crate) kt1: ContractKt1Hash,
 }
 
 impl TezlinkAccount for TezlinkOriginatedAccount {
@@ -249,28 +239,10 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
     }
 }
 
-impl TezlinkOriginatedAccount {
-    pub fn kt1(&self) -> &ContractKt1Hash {
-        &self.kt1
-    }
-    pub fn from_kt1(
-        context: &context::Context,
-        kt1: &ContractKt1Hash,
-    ) -> Result<Self, tezos_storage::error::Error> {
-        context.from_kt1(kt1)
-    }
+pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
+    fn kt1(&self) -> &ContractKt1Hash;
 
-    pub fn from_contract(
-        context: &context::Context,
-        contract: &Contract,
-    ) -> Result<Self, tezos_storage::error::Error> {
-        context.originated_from_contract(contract)
-    }
-
-    pub fn code(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+    fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, tezos_storage::error::Error> {
         let code_path = context::code::code_path(self)?;
         let code_size_path = context::code::code_size_path(self)?;
         let Narith(code_size) = read_nom_value(host, &code_size_path)?;
@@ -287,7 +259,7 @@ impl TezlinkOriginatedAccount {
         store_bin(len, host, &path)
     }
 
-    pub fn set_code(
+    fn set_code(
         &self,
         host: &mut impl Runtime,
         data: &[u8],
@@ -299,7 +271,7 @@ impl TezlinkOriginatedAccount {
         Ok(code_size)
     }
 
-    pub fn storage(
+    fn storage(
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
@@ -319,7 +291,7 @@ impl TezlinkOriginatedAccount {
         store_bin(len, host, &path)
     }
 
-    pub fn set_storage(
+    fn set_storage(
         &self,
         host: &mut impl Runtime,
         data: &[u8],
@@ -349,7 +321,7 @@ impl TezlinkOriginatedAccount {
         store_bin(used, host, &path)
     }
 
-    pub fn init(
+    fn init(
         &self,
         host: &mut impl Runtime,
         code: &[u8],
@@ -374,8 +346,16 @@ impl TezlinkOriginatedAccount {
     }
 }
 
+impl TezosOriginatedAccount for TezlinkOriginatedAccount {
+    fn kt1(&self) -> &ContractKt1Hash {
+        &self.kt1
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use crate::context::Context;
+
     use super::*;
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -431,12 +411,13 @@ mod test {
         );
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let read_balance = account
@@ -457,12 +438,13 @@ mod test {
         set_bootstrap1_key(&mut host, &RefPath::assert_from(b"/counter"), &bytes);
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let read_counter = account
@@ -479,12 +461,13 @@ mod test {
         let balance = 4579_u64.into();
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -505,12 +488,13 @@ mod test {
         let counter: Narith = 6u64.into();
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -537,12 +521,13 @@ mod test {
         );
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let manager = account.manager(&host).expect("Can't read manager");
@@ -562,13 +547,14 @@ mod test {
         let mut host = MockKernelHost::default();
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
@@ -591,14 +577,15 @@ mod test {
         let mut host = MockKernelHost::default();
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
@@ -622,14 +609,15 @@ mod test {
         let mut host = MockKernelHost::default();
 
         // Initialize path for Tezlink context at /tezlink/context
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         // Create an account for bootstrap1
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let exist = account
