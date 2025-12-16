@@ -37,6 +37,8 @@ module Parameter = struct
           (int_of_string_opt n)
         |> Lwt.return)
 
+  let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
+
   let float =
     Tezos_clic.parameter (fun _ n ->
         Option.to_result
@@ -276,6 +278,13 @@ module Arg = struct
                      (int_of_string_opt s)
                  in
                  return (Number n)))
+
+  let benchmark_instant_confirmations =
+    Tezos_clic.arg
+      ~placeholder:"CSV"
+      ~long:"benchmark-instant-confirmations"
+      ~doc:"Benchmark instant confirmations"
+      Parameter.string
 end
 
 let log_config ~verbose () =
@@ -294,7 +303,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args17
+      args18
         verbose
         relay_endpoint
         rpc_endpoint
@@ -311,7 +320,8 @@ let run_command =
         txs_salvo_eoa
         elapsed_time_between_report
         dummy_data_size
-        retry_attempt)
+        retry_attempt
+        benchmark_instant_confirmations)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -329,7 +339,8 @@ let run_command =
            txs_per_salvo,
            elapsed_time_between_report,
            dummy_data_size,
-           retry_attempt )
+           retry_attempt,
+           benchmark_instant_confirmations )
          ()
        ->
       let open Lwt_result_syntax in
@@ -360,7 +371,8 @@ let run_command =
         ~elapsed_time_between_report
         ~scenario
         ~dummy_data_size
-        ~retry_attempt)
+        ~retry_attempt
+        ~benchmark_instant_confirmations)
 
 let commands = [run_command]
 
