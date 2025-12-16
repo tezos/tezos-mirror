@@ -29,6 +29,7 @@ type container =
   | `Frozen_deposits of Frozen_staker_repr.t
   | `Unstaked_frozen_deposits of Unstaked_frozen_staker_repr.t * Cycle_repr.t
   | `CLST_deposits
+  | `CLST_redeemed_frozen_deposits of Contract_repr.t * Cycle_repr.t
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
@@ -124,6 +125,7 @@ let credit ctxt receiver amount origin =
               Clst_storage.increase_deposit_only_call_from_token ctxt amount
             in
             (ctxt, CLST_deposits)
+        | `CLST_redeemed_frozen_deposits (_staker, _cycle) -> assert false
         | `Block_fees ->
             let*? ctxt =
               Raw_context.credit_collected_fees_only_call_from_token ctxt amount
@@ -204,6 +206,7 @@ let spend ctxt giver amount origin =
               Clst_storage.decrease_deposit_only_call_from_token ctxt amount
             in
             (ctxt, CLST_deposits)
+        | `CLST_redeemed_frozen_deposits (_staker, _cycle) -> assert false
         | `Block_fees ->
             let*? ctxt =
               Raw_context.spend_collected_fees_only_call_from_token ctxt amount
@@ -274,7 +277,7 @@ module Internal_for_tests = struct
         let*! allocated = Commitment_storage.exists ctxt bpkh in
         return (ctxt, allocated)
     | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees
-    | `CLST_deposits ->
+    | `CLST_deposits | `CLST_redeemed_frozen_deposits _ ->
         return (ctxt, true)
     | `Frozen_bonds (contract, bond_id) ->
         Contract_storage.bond_allocated ctxt contract bond_id

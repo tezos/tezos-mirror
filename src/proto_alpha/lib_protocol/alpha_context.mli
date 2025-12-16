@@ -5753,6 +5753,7 @@ module Token : sig
     | `Frozen_deposits of Receipt.frozen_staker
     | `Unstaked_frozen_deposits of Receipt.unstaked_frozen_staker * Cycle.t
     | `CLST_deposits
+    | `CLST_redeemed_frozen_deposits of Contract.t * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 
