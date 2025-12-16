@@ -106,6 +106,43 @@ let cat ~inspect =
           return_unit
       | None -> return_unit)
 
+let tree ~subkeys =
+  command
+    ~name:"tree"
+    ~parse:
+      (let open Cli_parser in
+       let* path = Cli.path in
+       let* depth = default_int_positive_long ~default:2 "depth" in
+       return (path, depth))
+    ~run:(fun p tree (path, depth) ->
+      let open Lwt_syntax in
+      let* () = Printer.ln p "%s" (if path = "" then "." else path) in
+      let rec aux prefix current_path current_depth =
+        if current_depth <= 0 then return_unit
+        else
+          let* keys = subkeys tree current_path in
+          let rec loop = function
+            | [] -> return_unit
+            | "" :: ks -> loop ks
+            | [k] -> print_entry ~is_last:true k
+            | k :: ks ->
+                let* () = print_entry ~is_last:false k in
+                loop ks
+          and print_entry ~is_last k =
+            let branch = if is_last then "└── " else "├── " in
+            let* () = Printer.ln p "%s%s%s" prefix branch k in
+            let next_prefix = prefix ^ if is_last then "    " else "│   " in
+            let next_path =
+              if current_path = "" then k
+              else String.concat "/" [current_path; k]
+            in
+            aux next_prefix next_path (current_depth - 1)
+          in
+          loop keys
+      in
+      let* () = aux "" path depth in
+      return_ok_unit)
+
 type eval_read = Eval_read : 'a * ('a -> unit tzresult Lwt.t) -> eval_read
 
 let read_eval (type state) ~args (cmds : state command list) p (tree : state) =

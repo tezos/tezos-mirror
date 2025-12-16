@@ -30,3 +30,12 @@ val ls :
   Ethereum_types.Block_parameter.extended ->
   string ->
   unit tzresult Lwt.t
+
+(** [tree ~config block path depth] prints the tree structure under [path] up
+    to [depth] levels for the specified [block]. *)
+val tree :
+  config:Configuration.t ->
+  Ethereum_types.Block_parameter.extended ->
+  string ->
+  int ->
+  unit tzresult Lwt.t

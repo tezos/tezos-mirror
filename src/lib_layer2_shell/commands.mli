@@ -50,3 +50,6 @@ val ls :
     using a specified pretty-printer (hex by default). *)
 val cat :
   inspect:('state -> string -> bytes option Lwt.t) -> (string * Pp.t, 'state) t
+
+val tree :
+  subkeys:('state -> string -> string trace Lwt.t) -> (string * int, 'state) t

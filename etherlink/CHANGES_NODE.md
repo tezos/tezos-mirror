@@ -17,6 +17,8 @@
   given `PATH`, `shell ls PATH` to list the subdirectories living under `PATH`,
   and `shell` to start a REPL allowing users to use `ls` and `cat`
   interactively. See `man shell` for more information. (!20183)
+- Add the `tree` command to the REPL to inspect Etherlink instance
+  durable storage. (!20221)
 
 ### Execution changes
 

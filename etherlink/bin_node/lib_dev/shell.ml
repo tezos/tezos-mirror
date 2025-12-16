@@ -58,7 +58,9 @@ let ls = Commands.ls ~subkeys:Evm_state.subkeys ~inspect:Evm_state.inspect
 
 let cat = Commands.cat ~inspect:Evm_state.inspect
 
-let commands = [Commands.Command ls; Command cat]
+let tree = Commands.tree ~subkeys:Evm_state.subkeys
+
+let commands = [Commands.Command ls; Command cat; Command tree]
 
 let main ~config block_param =
   let open Lwt_result_syntax in
@@ -74,3 +76,11 @@ let cat ~(config : Configuration.t) block_param pp path =
 let ls ~(config : Configuration.t) block_param path =
   run ~config block_param @@ fun _ro_ctxt tree ->
   Commands.run (Printer.format_printer Format.std_formatter) tree ls path
+
+let tree ~(config : Configuration.t) block_param path depth =
+  run ~config block_param @@ fun _ro_ctxt tree_state ->
+  Commands.run
+    (Printer.format_printer Format.std_formatter)
+    tree_state
+    tree
+    (path, depth)
