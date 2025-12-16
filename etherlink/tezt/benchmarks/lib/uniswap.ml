@@ -400,9 +400,9 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
     container
   in
   let max_size = 999_999 in
-  let tx_per_addr_limit = Int64.of_int 999_999 in
-  let max_transaction_batch_length = Some 300 in
-  let max_lifespan_s = 2 in
+  let tx_per_addr_limit = Int64.max_int in
+  let max_transaction_batch_length = None in
+  let max_lifespan_s = int_of_float parameters.timeout in
   let config : Evm_node_config.Configuration.tx_queue =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
