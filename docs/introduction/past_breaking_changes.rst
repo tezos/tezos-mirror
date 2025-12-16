@@ -1,5 +1,5 @@
-Deprecated features
-===================
+Past Breaking Changes and Deprecated Features
+=============================================
 
 This page list breaking changes and deprecated features in old Octez versions and protocols, that are normally no longer being run.
 

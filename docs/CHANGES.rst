@@ -41,11 +41,13 @@ Node
 Baker
 -----
 
-- **Deprecation** The ``adaptive-issuance-vote`` argument (placeholder
-  ``vote``) is now deprecated, and will be removed in the next major
-  version of Octez. It was meant to decide the activation of the
-  Adaptive Issuance feature, and has had no effects since the Paris
-  protocol has been voted in. (MR :gl:`!19215`)
+- **Deprecation** The optional baker argument
+  ``--adaptive-issuance-vote <vote>`` is now deprecated, and will be
+  removed in the next major version of Octez. It was meant to decide
+  the activation of the Adaptive Issuance feature, and has had no
+  effects since the Paris protocol has been voted in. The
+  ``adaptive_issuance_vote`` field of the per-block-vote configuration
+  file is similarly deprecated. (MR :gl:`!19215`)
 
 - **Deprecation** The ``octez-baker-<protocol>`` binaries are
    deprecated, and will be removed in the next major version of
@@ -120,10 +122,6 @@ DAL node
   a 500 error if querying a level at which the DAL was not supported instead
   of a 404 error. (MR :gl:`!19471`)
 
-- **Breaking change** Enforced stricter validation for the JSON configuration
-  file. Previously, the parser would silently ignore any content that appeared
-  after the first valid JSON object. Now, any extraneous data will cause the
-  function to return an error. (MR :gl:`!18745`)
 
 Version 23.3
 ============

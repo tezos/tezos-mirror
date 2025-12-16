@@ -22,6 +22,13 @@ or which will affect users in the future (deprecated features),
 not refactorings or tests. Changes to the documentation do not need to
 be documented here either.
 
+Breaking changes and deprecated features should be prefixed with the
+appropriate tag **Breaking change** or **Deprecation**, and also added
+to the breaking changes page in
+``docs/introduction/breaking_changes.rst``, section "Upcoming Octez
+Release".
+
+
 General
 -------
 

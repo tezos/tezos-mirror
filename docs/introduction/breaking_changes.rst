@@ -6,15 +6,109 @@ between successive protocols or successive Octez versions. It
 complements the respective :ref:`protocol changelogs
 <protocol_changelogs>` and :doc:`Octez changelog <../CHANGES>` by
 gathering all breaking changes in one place and providing more context
-when appropriate.
+when appropriate. Deprecated features are also presented here.
 
-For each change, there may be subsections ``Deprecation`` and ``Breaking
-changes``. The former subsection will explain what changes can be made during a
-deprecation phase to adapt smoothly to the new changes. The latter subsection
-will present the changes that can not be done by the deprecation mechanism and
-that may be breaking.
+In the particular case of RPC changes, you may consult complementary
+information on :ref:`RPC versioning <rpc_versioning>`, covering how
+new versions are introduced, the deprecation policy, and a concrete
+calendar of RPCs planned to be removed.
 
-In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
+This page contains the breaking changes and deprecated features of
+current or recent protocols, protocol proposals, and Octez versions:
+
+- :ref:`tallinn_breaking_changes`
+- :ref:`seoul_breaking_changes`
+- :ref:`v24_breaking_changes`
+- :ref:`v23_breaking_changes`
+- :ref:`v22_breaking_changes`
+
+as well as a preview of future breaking changes and deprecated
+features in upcoming releases:
+
+- :ref:`alpha_breaking_changes`
+- :ref:`octez_dev_breaking_changes`
+
+For features deprecated or broken in older protocols and Octez
+versions, see :doc:`past_breaking_changes`.
+
+.. toctree::
+   :hidden:
+
+   past_breaking_changes
+
+.. _v24_breaking_changes:
+
+Octez Version 24
+----------------
+
+:doc:`Full Octez Version 24 Changelog<../releases/version-24>`
+
+Deprecation of protocol-specific bakers and accusers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Octez v24 deprecates the ``octez-baker-<protocol>`` and
+``octez-accuser-<protocol>`` binaries. They will be removed in a
+future version. Please use the protocol-independent binaries
+``octez-baker`` and ``octez-accuser`` instead, which automatically
+handle protocol switches.
+
+
+Deprecation of Adaptive Issuance vote in the baker
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Octez v24 deprecates the optional argument ``--adaptive-issuance-vote
+<vote>`` of the baker. This argument will be removed in a future
+version. It was meant to decide the activation of the Adaptive
+Issuance feature, and has had no effects since the Paris protocol has
+been voted in, so it can already be removed without any impact on the
+baker.
+
+The ``adaptive_issuance_vote`` field of the per-block-vote
+configuration file is similarly deprecated.
+
+
+Node events
+^^^^^^^^^^^
+
+As of Octez v24, the following node events contain the short hash of
+blocks instead of the full hash:
+
+- from the block validator: events
+  ``validation_or_application_failed``, ``application_failed``,
+  ``application_failure_after_validation``, ``validation_failure``,
+  ``validation_canceled``, ``commit_block_failure``,
+  ``validated_block``, ``validation_and_application_success`` and
+  ``updated_to_checkpoint``,
+
+- from the prevalidator: event ``request_completed_info``,
+
+- and from the store: ``<block_hash> (level: <level>)`` has become
+  ``<short_block_hash> (level: <level>)``.
+
+The level of event ``validator.block.validating_block`` has changed
+from ``Debug`` to ``Info``, so it now appears in the daily logs by
+default. Moreover, this event now shows the long block hash, level,
+predecessor, fitness, and timestamp of the block.
+
+The level of event ``validator.chain.block_info`` has changed from
+``Info`` to ``Debug``, so it no longer appears in the daily logs by
+default.
+
+
+DAL node RPCs
+^^^^^^^^^^^^^
+
+As of Octez v24, the
+``/levels/<slot_level>/slots/<slot_index>/status`` RPC answers with
+``unpublished`` status for unpublished slots instead of a 404 empty
+response.
+
+Slots status are not stored in dedicated files on disk anymore, but
+found in a cache and the skip list. A consequence of this is that the
+``/levels/<slot_level>/slots/<slot_index>/status`` RPC now only works
+with nodes that store the skip list, and therefore not with observer
+nodes. Also, the RPC now answers with a 500 error if querying a level
+at which the DAL was not supported, instead of a 404 error.
 
 
 
@@ -126,10 +220,6 @@ omitted in cache functions. As a result, gas costs for smart contract
 calls has increased by at most 2 units of gas each time the cache is
 accessed.
 
-.. _v24_breaking_changes:
-
-Octez Version 24
-----------------
 
 .. _v23_breaking_changes:
 
@@ -225,6 +315,8 @@ This proof may be generated using the client command::
 	octez-client create bls proof for <alias>
 
 
+.. _v22_breaking_changes:
+
 Octez Version 22
 ----------------
 
@@ -240,30 +332,46 @@ Starting from Octez ``v22``, launching a baker daemon requires an explicit menti
 The recommended approach is to run a DAL node and start the baker using the ``--dal-node <uri>`` option.
 If you do not wish to use a DAL node, you can opt-out by using the ``--without-dal`` option.
 
-Older changes
--------------
 
-For features deprecated or broken in older Octez versions and protocols, see :doc:`deprecated`.
 
-.. toctree::
-   :hidden:
-
-   deprecated
-
-Upcoming changes
+Upcoming Changes
 ================
 
 .. warning::
 
    Changes described in this section concern code that has been merged into the master branch but **has not been released yet**!
    They are meant as a heads-up for developers wanting to known in advance how future releases and protocols may impact developers and users.
+   Note that they may also be modified or discarded before being released.
 
-Upcoming release
-----------------
+.. _octez_dev_breaking_changes:
+
+Upcoming Octez Release
+----------------------
+
+.. This section gathers the breaking changes and deprecations listed
+   in the development changelog:
+   https://octez.tezos.com/docs/CHANGES-dev.html (file CHANGES.rst at
+   the root of the tezos repository) -- not to be confused with the
+   released changelog https://octez.tezos.com/docs/CHANGES.html (file
+   docs/CHANGES.rst)
+
+   When releasing the changes described here, don't forget to:
+   - move them to a new section "Octez Version X" at the top of this page
+   - add a link to the new "releases/version-X" page, cf other sections
+   - in the introduction of the current page, add a link to the new section
+   - update tense used to present/past if needed
+   - reset the content of the "Upcoming Octez Release" section to just
+     "N/A" (unless there are already changes planned for the version
+     after the newly released one, of course)
 
 N/A
 
-Development protocol Alpha
+
+.. _alpha_breaking_changes:
+
+Development Protocol Alpha
 --------------------------
+
+:doc:`Full Protocol Alpha Changelog<../protocols/alpha>`
 
 N/A
