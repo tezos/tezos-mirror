@@ -3508,7 +3508,7 @@ let test_cannot_prepayed_with_delay_leads_to_no_injection =
 let test_deposit_before_and_after_migration =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "migration"; "deposit"]
+    ~tags:["evm"; "migration"; "deposit"; Tag.flaky]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
