@@ -125,7 +125,14 @@ let credit ctxt receiver amount origin =
               Clst_storage.increase_deposit_only_call_from_token ctxt amount
             in
             (ctxt, CLST_deposits)
-        | `CLST_redeemed_frozen_deposits (_staker, _cycle) -> assert false
+        | `CLST_redeemed_frozen_deposits (staker, cycle) ->
+            let+ ctxt =
+              Clst_storage.increase_redeemed_frozen_deposit_only_call_from_token
+                ctxt
+                cycle
+                amount
+            in
+            (ctxt, CLST_redeemed_deposits (staker, cycle))
         | `Block_fees ->
             let*? ctxt =
               Raw_context.credit_collected_fees_only_call_from_token ctxt amount
@@ -206,7 +213,14 @@ let spend ctxt giver amount origin =
               Clst_storage.decrease_deposit_only_call_from_token ctxt amount
             in
             (ctxt, CLST_deposits)
-        | `CLST_redeemed_frozen_deposits (_staker, _cycle) -> assert false
+        | `CLST_redeemed_frozen_deposits (staker, cycle) ->
+            let+ ctxt =
+              Clst_storage.decrease_redeemed_frozen_deposit_only_call_from_token
+                ctxt
+                cycle
+                amount
+            in
+            (ctxt, CLST_redeemed_deposits (staker, cycle))
         | `Block_fees ->
             let*? ctxt =
               Raw_context.spend_collected_fees_only_call_from_token ctxt amount

@@ -23,3 +23,15 @@ val increase_deposit_only_call_from_token :
     amount of tez in the CLST contract. *)
 val decrease_deposit_only_call_from_token :
   Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [increase_redeemed_frozen_deposit_only_call_from_token ctxt cycle
+    amount] increases the [amount] of [tez] redeemed for the given
+    [cycle]. *)
+val increase_redeemed_frozen_deposit_only_call_from_token :
+  Raw_context.t -> Cycle_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [decrease_redeemed_frozen_deposit_only_call_from_token ctxt cycle
+    amount] decreases the [amount] of [tez] redeemed for the given
+    [cycle]. *)
+val decrease_redeemed_frozen_deposit_only_call_from_token :
+  Raw_context.t -> Cycle_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
