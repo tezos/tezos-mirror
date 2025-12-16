@@ -241,11 +241,11 @@ Note that:
 Quickstart baker
 ~~~~~~~~~~~~~~~~
 
-Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as Shadownet as follows (after :ref:`starting an Octez node <quickstart_node>`)::
+Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as currentnet as follows (after :ref:`starting an Octez node <quickstart_node>`)::
 
     octez-client gen keys mybaker
     BAKER_ADDRESS=$(octez-client show address mybaker | grep Hash | cut -d' ' -f2)
-    # Fund BAKER_ADDRESS with > 6000 tez, e.g. at https://faucet.shadownet.teztnets.com
+    # Fund BAKER_ADDRESS with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
     octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=$BAKER_ADDRESS
