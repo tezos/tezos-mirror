@@ -99,7 +99,7 @@ let job_script_snapshot_alpha_and_link =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
@@ -277,7 +277,7 @@ let job_oc_unit_non_proto_x86_64 =
     ~arch:Amd64
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
@@ -334,7 +334,7 @@ let job_oc_unit_proto_x86_64 =
     ~cpu:Very_high
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -354,7 +354,7 @@ let job_oc_unit_other_x86_64 =
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-other-unit"]
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
 
@@ -369,7 +369,7 @@ let job_ocaml_check =
     ~only_if_changed:
       ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"]
     ~variables:[("CARGO_NET_OFFLINE", "false")]
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";

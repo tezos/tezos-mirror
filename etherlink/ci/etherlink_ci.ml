@@ -181,7 +181,7 @@ let job_unit_tests =
          ~when_:Always)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~retry:{max = 2; when_ = []}
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
@@ -293,7 +293,7 @@ let job_build_tezt =
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
          ["_build/default/etherlink/tezt/tests/main.exe"])
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [

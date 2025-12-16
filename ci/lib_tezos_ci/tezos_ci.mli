@@ -184,29 +184,17 @@ module Pipeline : sig
 end
 
 module Cache : sig
-  (* Possible values for [~key] arguments.
-
-     - [Job]: share the cache between all instances of the job, across all pipelines.
-     - [Pipeline]: share the cache between all jobs of each pipeline, but not across pipelines. *)
-  type cache_key = Job | Pipeline
-
-  (** Add variable enabling dune cache.
+  (** Adds a GitLab CI cache for the DUNE_CACHE_ROOT folder.
 
     This function can be applied to jobs that run dune.
 
-    - [key] specifies which jobs the cache should be shared with.
-      See {!cache_key}.
+    It adds variables enabling dune cache. It also adds a [cache] where
+    the {!cache_key} is the job name and with a [pull-push] cache policy: i.e. the
+    cache is pulled when the job starts, and is pushed when the job
+    finishes.
 
-    - [policy] specifies whether to pull the cache when the job starts,
-      and whether to push the cache when the job finishes.
-
-    *)
-
-  val enable_dune_cache :
-    ?key:cache_key ->
-    ?policy:Gitlab_ci.Types.cache_policy ->
-    tezos_job ->
-    tezos_job
+   *)
+  val enable_dune_cache : tezos_job -> tezos_job
 
   (** Add variable enabling sccache.
 

@@ -59,18 +59,6 @@ val sccache :
   unit ->
   sccache_config
 
-(** Configuration of Dune's cache. *)
-type dune_cache_config
-
-(** Make a configuration for Dune's cache.
-
-    See {!Tezos_ci.Cache.enable_dune_cache}. *)
-val dune_cache :
-  ?key:Tezos_ci.Cache.cache_key ->
-  ?policy:Gitlab_ci.Types.cache_policy ->
-  unit ->
-  dune_cache_config
-
 (** Pipeline jobs.
 
     Jobs are basically code to run in a given pipeline stage. *)
@@ -197,8 +185,8 @@ module type COMPONENT_API = sig
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
 
-      If [dune_cache] is specified, the resulting job is modified with
-      {!Tezos_ci.Cache.enable_dune_cache}.
+      If [dune_cache] is [true], the resulting job is modified with
+      {!Tezos_ci.Cache.enable_dune_cache}. Default is [false].
 
       [?image_dependencies] is temporary,
       it will be removed once the image feature is implemented in Cacio.
@@ -228,7 +216,7 @@ module type COMPONENT_API = sig
     ?cache:Gitlab_ci.Types.cache list ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
-    ?dune_cache:dune_cache_config ->
+    ?dune_cache:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
