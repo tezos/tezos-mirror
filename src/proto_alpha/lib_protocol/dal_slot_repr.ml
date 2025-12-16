@@ -668,6 +668,42 @@ module History = struct
   struct
     include Skip_list.Make (Skip_list_parameters)
 
+    (* [compare_slot_ids_by_dynamic_attested_level id1 ~dynamic_lag1 id2
+      ~dynamic_lag2] defines a total and deterministic ordering over DAL slot
+      identifiers.
+
+       The primary sort key is the slot's effective attestation level
+       [published_level + lag], where [lag] is derived from the attestation-lag
+       kind:
+
+       - [Legacy] is mapped to [0] (so legacy cells are ordered by their
+         [published_level] first, as before);
+
+       - [Dynamic d] is mapped to [d].
+
+       This ordering is intended to match the insertion order of skip-list cells
+       when the protocol may attest different slots with different lags (dynamic
+       attestation lag). We then break ties with [published_level] and finally
+       [slot_index] to preserve a total order.
+
+       When all cells use [Legacy] (or, more generally, when all lags map to
+       [0]), this reduces to the historical lexicographic ordering over
+       [(published_level, slot_index)]. *)
+    let _compare_slot_ids_by_dynamic_attested_level =
+      let key_of_slot_id slot_id ~dlag =
+        let dlag_value = match dlag with Legacy -> 0 | Dynamic d -> d in
+        let Header.{published_level; index} = slot_id in
+        (Raw_level_repr.add published_level dlag_value, published_level, index)
+      in
+      fun slot_id1 ~dynamic_lag1 slot_id2 ~dynamic_lag2 ->
+        let a1, p1, i1 = key_of_slot_id slot_id1 ~dlag:dynamic_lag1 in
+        let a2, p2, i2 = key_of_slot_id slot_id2 ~dlag:dynamic_lag2 in
+        let c = Raw_level_repr.compare a1 a2 in
+        if Compare.Int.(c <> 0) then c
+        else
+          let c = Raw_level_repr.compare p1 p2 in
+          if Compare.Int.(c <> 0) then c else Dal_slot_index_repr.compare i1 i2
+
     (** All Dal slot indices for all levels will be stored in a skip list
         (with or without a commitment depending on attestation status of each
         slot), where only the last cell is needed to be remembered in the L1
