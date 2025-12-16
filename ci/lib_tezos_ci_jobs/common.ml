@@ -327,8 +327,8 @@ module Docker = struct
     let arch_string = Runner.Arch.show_uniform arch in
     let ci_docker_hub =
       match docker_build_type with
-      | Release | Octez_evm_node_release | Experimental -> true
-      | Test | Test_manual -> false
+      | Release | Octez_evm_node_release -> true
+      | Experimental | Test | Test_manual -> false
     in
     (* Whether to include evm artifacts.
      Including these artifacts requires the rust-toolchain image. *)

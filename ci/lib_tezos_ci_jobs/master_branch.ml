@@ -61,7 +61,7 @@ let octez_distribution_docker_jobs =
   let job_docker_merge_manifests =
     job_docker_merge_manifests
       ~__POS__
-      ~ci_docker_hub:true
+      ~ci_docker_hub:false
       ~job_docker_amd64:job_docker_amd64_experimental
       ~job_docker_arm64:job_docker_arm64_experimental
   in
