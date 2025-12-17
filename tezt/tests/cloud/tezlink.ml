@@ -539,7 +539,7 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
     ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
-    ~faucet_pkh ~tzkt_api_proxy ~tzkt_url ~faucet_frontend_proxy =
+    ~faucet_pkh ~tzkt_api_endpoint ~tzkt_url ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
@@ -550,12 +550,13 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
     let in_tzkt_sandbox api_url =
       sf "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s" api_url
     in
-    match tzkt_url with
-    | Some tzkt_url -> Filename.concat tzkt_url "<hash>"
-    | None ->
+    match (tzkt_api_endpoint, tzkt_url) with
+    | _, Some tzkt_url -> Filename.concat tzkt_url "<hash>"
+    | Internal tzkt_api_proxy, None ->
         let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
         let api_url = Client.url_encoded_string_of_endpoint tzkt_api in
         in_tzkt_sandbox api_url
+    | External tzkt_api_url, None -> in_tzkt_sandbox tzkt_api_url
   in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
@@ -838,7 +839,7 @@ let rec loop n =
   loop n
 
 type faucet_proxys = {
-  tzkt_api_proxy : proxy_info;
+  tzkt_api_endpoint : service_endpoint;
   faucet_api_proxy : proxy_info;
   faucet_frontend_proxy : proxy_info;
 }
@@ -1031,8 +1032,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | None -> none
       in
       let* faucet_proxys_opt =
-        match (tzkt_api_proxy_opt, Cli.faucet) with
-        | Some tzkt_api_proxy, true ->
+        match (tzkt_api_endpoint_opt, Cli.faucet) with
+        | Some tzkt_api_endpoint, true ->
             let faucet_api_proxy =
               make_proxy
                 tezlink_sequencer_agent
@@ -1051,7 +1052,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 None
                 activate_ssl
             in
-            some {tzkt_api_proxy; faucet_api_proxy; faucet_frontend_proxy}
+            some {tzkt_api_endpoint; faucet_api_proxy; faucet_frontend_proxy}
         | None, true ->
             Test.fail
               "The faucet service relies on TzKT, but the latter is \
@@ -1120,9 +1121,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tezlink_sequencer_agent
         | External _ -> unit
       and* () =
-        match tzkt_api_proxy_opt with
-        | None -> unit
-        | Some tzkt_proxy ->
+        match tzkt_api_endpoint_opt with
+        | None | Some (External _) -> unit
+        | Some (Internal tzkt_proxy) ->
             let () = toplog "Starting TzKT" in
             init_tzkt
               ~tzkt_proxy
@@ -1150,7 +1151,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               "The private key for the faucet is set but the faucet option \
                itself is disabled."
         | None -> unit
-        | Some {tzkt_api_proxy; faucet_api_proxy; faucet_frontend_proxy} ->
+        | Some {tzkt_api_endpoint; faucet_api_proxy; faucet_frontend_proxy} ->
             let () = toplog "Starting faucet" in
             let faucet_account = Constant.bootstrap1 in
             let faucet_pkh = faucet_account.public_key_hash in
@@ -1175,7 +1176,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_api_proxy
                 ~sequencer_endpoint
                 ~faucet_pkh
-                ~tzkt_api_proxy
+                ~tzkt_api_endpoint
                 ~tzkt_url:Cli.external_tzkt
                 ~faucet_frontend_proxy
             in
