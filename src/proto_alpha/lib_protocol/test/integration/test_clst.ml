@@ -221,7 +221,7 @@ let test_deposit_from_originated_contract =
       Error_helpers.expect_clst_non_implicit_depositer ~loc:__LOC__ trace
 
 let () =
-  register_test ~title:"Test simple withdraw" @@ fun () ->
+  register_test ~title:"Test simple redeem" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
   let initial_bal_mutez = 300_000_000L in
@@ -243,77 +243,76 @@ let () =
   in
 
   let* balance_before = Context.Contract.balance (B b) account in
-  let withdrawal_amount_mutez = 30_000_000L in
-  let* withdraw_tx =
-    Op.clst_withdraw ~fee:Tez.zero (B b) account withdrawal_amount_mutez
+  let redeemed_amount_mutez = 30_000_000L in
+  let* redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) account redeemed_amount_mutez
   in
-  let* b = Block.bake ~operation:withdraw_tx b in
+  let* b = Block.bake ~operation:redeem_tx b in
   let* () =
     Assert.balance_was_credited
       ~loc:__LOC__
       (B b)
       account
       balance_before
-      (Tez.of_mutez_exn withdrawal_amount_mutez)
+      (Tez.of_mutez_exn redeemed_amount_mutez)
   in
   let* () =
     check_clst_balance_diff
       ~loc:__LOC__
       initial_clst_bal_mutez
-      (Int64.neg withdrawal_amount_mutez)
+      (Int64.neg redeemed_amount_mutez)
       b
       account
   in
   return_unit
 
 let () =
-  register_test ~title:"Test overwithdraw" @@ fun () ->
+  register_test ~title:"Test overredeem" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
   let initial_bal_mutez = 300_000_000L in
   let* account, b =
     create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
   in
-  let withdrawal_amount_mutez = 30_000_000L in
-  let* withdraw_tx =
-    Op.clst_withdraw
+  let redeemed_amount_mutez = 30_000_000L in
+  let* redeem_tx =
+    Op.clst_redeem
       ~force_reveal:true
       ~fee:Tez.zero
       (B b)
       account
-      withdrawal_amount_mutez
+      redeemed_amount_mutez
   in
-  let*! b = Block.bake ~operation:withdraw_tx b in
+  let*! b = Block.bake ~operation:redeem_tx b in
   match b with
   | Ok _ ->
-      Test.fail
-        "Withdrawing more clst tokens than the contract has is forbidden"
+      Test.fail "Redeeming more clst tokens than the contract has is forbidden"
   | Error trace -> Error_helpers.expect_clst_balance_too_low ~loc:__LOC__ trace
 
 let () =
-  register_test ~title:"Test zero withdraw" @@ fun () ->
+  register_test ~title:"Test zero redeem" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
   let initial_bal_mutez = 300_000_000L in
   let* account, b =
     create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
   in
-  let withdrawal_amount_mutez = 0L in
-  let* withdraw_tx =
-    Op.clst_withdraw
+  let redeemed_amount_mutez = 0L in
+  let* redeem_tx =
+    Op.clst_redeem
       ~force_reveal:true
       ~fee:Tez.zero
       (B b)
       account
-      withdrawal_amount_mutez
+      redeemed_amount_mutez
   in
-  let*! b = Block.bake ~operation:withdraw_tx b in
+  let*! b = Block.bake ~operation:redeem_tx b in
   match b with
-  | Ok _ -> Test.fail "Withdrawing 0 tez is forbidden"
+  | Ok _ -> Test.fail "Redeeming 0 tez is forbidden"
   | Error trace -> Error_helpers.expect_clst_empty_transfer ~loc:__LOC__ trace
 
 let () =
-  register_test ~title:"Test withdraw with non-zero transfer" @@ fun () ->
+  register_test ~title:"Test redeem with non-zero transfer" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
   let initial_bal_mutez = 300_000_000L in
@@ -321,7 +320,7 @@ let () =
     create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
   in
   let* clst_hash = get_clst_hash (Context.B b) in
-  let withdrawal_amount_mutez = 10L in
+  let redeemed_amount_mutez = 10L in
   let* withdraw_tx =
     Op.transaction
       ~force_reveal:true
@@ -330,14 +329,14 @@ let () =
       account
       (Contract.Originated clst_hash)
       (Tez.of_mutez_exn 30_000L)
-      ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
+      ~entrypoint:(Entrypoint.of_string_strict_exn "redeem")
       ~parameters:
         (Alpha_context.Script.lazy_expr
-           (Expr.from_string (Int64.to_string withdrawal_amount_mutez)))
+           (Expr.from_string (Int64.to_string redeemed_amount_mutez)))
   in
   let*! b = Block.bake ~operation:withdraw_tx b in
   match b with
-  | Ok _ -> Test.fail "Transferring to withdraw is forbidden"
+  | Ok _ -> Test.fail "Transferring to redeem is forbidden"
   | Error trace ->
       Error_helpers.expect_clst_non_empty_transfer ~loc:__LOC__ trace
 
@@ -428,13 +427,13 @@ let test_total_supply (total_supply_f : Block.t -> int64 tzresult Lwt.t) =
     Int64.add initial_clst_bal_mutez_a initial_clst_bal_mutez_b
   in
   let* () = check_rpcs ~loc:__LOC__ b expected_total_supply in
-  let withdrawal_amount_mutez = 40_000_000L in
+  let redeemed_amount_mutez = 40_000_000L in
   let* withdraw_tx =
-    Op.clst_withdraw ~fee:Tez.zero (B b) account_a withdrawal_amount_mutez
+    Op.clst_redeem ~fee:Tez.zero (B b) account_a redeemed_amount_mutez
   in
   let* b = Block.bake ~operation:withdraw_tx b in
   let expected_total_supply =
-    Int64.sub expected_total_supply withdrawal_amount_mutez
+    Int64.sub expected_total_supply redeemed_amount_mutez
   in
   check_rpcs ~loc:__LOC__ b expected_total_supply
 

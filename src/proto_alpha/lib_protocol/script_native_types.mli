@@ -26,7 +26,7 @@ module CLST_types : sig
 
   type deposit = unit
 
-  type withdraw = nat
+  type redeem = nat
 
   type transfer =
     ( address (* from_ *),
@@ -36,7 +36,7 @@ module CLST_types : sig
     pair
     Script_list.t
 
-  type arg = (deposit, (withdraw, transfer) or_) or_
+  type arg = (deposit, (redeem, transfer) or_) or_
 
   type ledger = (address, nat) big_map
 
@@ -52,7 +52,7 @@ module CLST_types : sig
 
   type entrypoint =
     | Deposit of deposit
-    | Withdraw of withdraw
+    | Redeem of redeem
     | Transfer of transfer
 
   val entrypoint_from_arg : arg -> entrypoint

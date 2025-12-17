@@ -73,11 +73,11 @@ val deposit_to_clst_deposits :
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
 
-(** [withdraw_from_clst_deposits context ~clst_contract_hash amount] withdraws
-    [amount] tez from the CLST deposits container to [clst_contract_hash]
-    balance. *)
-val withdraw_from_clst_deposits :
+(** [redeem_from_clst_deposits context ~staker amount] redeems
+    [amount] tez from the CLST deposits container to [staker]'s redeemed frozen
+    deposits. *)
+val redeem_from_clst_deposits :
   context ->
-  clst_contract_hash:Contract_hash.t ->
+  staker:Contract.t ->
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t

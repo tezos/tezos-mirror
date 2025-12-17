@@ -102,6 +102,10 @@ let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
   let clst_contract = Contract.Originated clst_contract_hash in
   Token.transfer ctxt (`Contract clst_contract) `CLST_deposits amount
 
-let withdraw_from_clst_deposits ctxt ~clst_contract_hash amount =
-  let clst_contract = Contract.Originated clst_contract_hash in
-  Token.transfer ctxt `CLST_deposits (`Contract clst_contract) amount
+let redeem_from_clst_deposits ctxt ~staker amount =
+  let current_cycle = (Level.current ctxt).cycle in
+  Token.transfer
+    ctxt
+    `CLST_deposits
+    (`CLST_redeemed_frozen_deposits (staker, current_cycle))
+    amount
