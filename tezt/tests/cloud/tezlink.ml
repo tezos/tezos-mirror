@@ -146,14 +146,14 @@ let make_proxy agent ~path ~dns_domain public_port activate_ssl =
           activate_ssl;
         }
 
-type sequencer_endpoint =
+type service_endpoint =
   | Internal of proxy_info
   | External of string (* the address of the end-point *)
 
 (* The internal end-point if the sequencer node is local to the scenario.
    Otherwise, i.e. when the scenario relies on an external end-point, return the
    latter. *)
-let sequencer_internal_endpoint = function
+let service_internal_endpoint = function
   | Internal proxy_info ->
       proxy_internal_endpoint proxy_info |> Client.string_of_endpoint
   | External endpoint -> endpoint
@@ -161,7 +161,7 @@ let sequencer_internal_endpoint = function
 (* The exposed end-point if the sequencer node is local to the scenario.
    Otherwise, i.e. when the scenario relies on an external end-point, return the
    latter. *)
-let sequencer_external_endpoint ~runner = function
+let service_external_endpoint ~runner = function
   | Internal proxy_info ->
       proxy_external_endpoint ~runner proxy_info |> Client.string_of_endpoint
   | External endpoint -> endpoint
@@ -291,9 +291,7 @@ let git_clone agent ?branch repo_url directory =
 let init_tzkt ~tzkt_proxy ~agent ~sequencer_endpoint ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
-  let tezlink_sandbox_endpoint =
-    sequencer_internal_endpoint sequencer_endpoint
-  in
+  let tezlink_sandbox_endpoint = service_internal_endpoint sequencer_endpoint in
   let tzkt_api_port = proxy_internal_port tzkt_proxy in
   (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
@@ -464,9 +462,7 @@ let create_env_file ~agent destination env =
 
 let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
-  let tezlink_sandbox_endpoint =
-    sequencer_internal_endpoint sequencer_endpoint
-  in
+  let tezlink_sandbox_endpoint = service_internal_endpoint sequencer_endpoint in
   let faucet_api_port = proxy_internal_port faucet_api_proxy in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -547,7 +543,7 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
-    sequencer_external_endpoint ~runner sequencer_endpoint
+    service_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
@@ -699,7 +695,7 @@ index 1d28850f..39a15d9b 100644
 let init_umami agent ~sequencer_endpoint ~tzkt_proxy ~umami_proxy =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
-  let rpc_url = sequencer_external_endpoint ~runner sequencer_endpoint in
+  let rpc_url = service_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
   (* Create a local patch file with its contents. *)
