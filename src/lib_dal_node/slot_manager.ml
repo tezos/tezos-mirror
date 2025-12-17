@@ -28,6 +28,10 @@ type error +=
   | Missing_shards of {provided : int; required : int}
   | Illformed_pages
   | Invalid_slot_size of {provided : int; expected : int}
+  | Invalid_commitment of {
+      expected : Cryptobox.commitment;
+      obtained : Cryptobox.commitment;
+    }
   | Invalid_degree of string
   | No_prover_SRS
   | Unable_to_fetch_the_commitment_of_slot_id of Types.Slot_id.t
@@ -85,6 +89,28 @@ let () =
       | Invalid_slot_size {provided; expected} -> Some (provided, expected)
       | _ -> None)
     (fun (provided, expected) -> Invalid_slot_size {provided; expected}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.invalid_commitment"
+    ~title:"Invalid commitment"
+    ~description:"The commitment of the slot does not match the expected one"
+    ~pp:(fun ppf (expected, obtained) ->
+      Format.fprintf
+        ppf
+        "The commitment of the slot (%a) does not match the expected \
+         commitment (%a)"
+        Cryptobox.Commitment.pp
+        obtained
+        Cryptobox.Commitment.pp
+        expected)
+    Data_encoding.(
+      obj2
+        (req "expected" Cryptobox.Commitment.encoding)
+        (req "obtained" Cryptobox.Commitment.encoding))
+    (function
+      | Invalid_commitment {expected; obtained} -> Some (expected, obtained)
+      | _ -> None)
+    (fun (expected, obtained) -> Invalid_commitment {expected; obtained}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.invalid_degree_string"
@@ -272,6 +298,13 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
       tzfail (Exn (Failure (Format.sprintf "URI scheme %S not supported" s)))
   | None -> tzfail (Exn (Failure (Format.sprintf "Bad URI. No URI scheme")))
 
+let verify_commitment cryptobox expected slot =
+  let open Result_syntax in
+  let* polynomial = polynomial_from_slot cryptobox slot in
+  let* obtained = commit cryptobox polynomial in
+  if Cryptobox.Commitment.equal expected obtained then return_unit
+  else fail (`Other [Invalid_commitment {expected; obtained}])
+
 let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
     expected_commitment_hash backup_uri =
   let open Lwt_result_syntax in
@@ -323,21 +356,21 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
   | Some slot, None ->
       (* We trust the backup URI, no extra checks to do. *)
       return_some slot
-  | Some slot, Some expected_commitment ->
-      let*? polynomial = polynomial_from_slot cryptobox slot in
-      let*? obtained_commitment = commit cryptobox polynomial in
-      if Cryptobox.Commitment.equal expected_commitment obtained_commitment then
-        return_some slot
-      else
-        let*! () =
-          Event.emit_slot_from_backup_has_unexpected_commitment
-            ~published_level
-            ~slot_index
-            ~backup_uri
-            ~expected_commitment
-            ~obtained_commitment
-        in
-        return_none
+  | Some slot, Some expected_commitment -> (
+      let res = verify_commitment cryptobox expected_commitment slot in
+      match res with
+      | Ok () -> return_some slot
+      | Error (`Other [Invalid_commitment {expected; obtained}]) ->
+          let*! () =
+            Event.emit_slot_from_backup_has_unexpected_commitment
+              ~published_level
+              ~slot_index
+              ~backup_uri
+              ~expected_commitment:expected
+              ~obtained_commitment:obtained
+          in
+          return_none
+      | Error e -> fail e)
 
 (* Attempt to retrieve the commitment associated with [slot_id] from the
    in-memory finalized commitments store.
