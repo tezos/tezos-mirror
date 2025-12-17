@@ -6,7 +6,7 @@
 //! Ethereum code storage
 
 use revm::{
-    primitives::{hex::FromHex, Bytes, B256},
+    primitives::{Bytes, B256},
     state::Bytecode,
 };
 use tezos_evm_runtime::runtime::Runtime;
@@ -18,9 +18,7 @@ use tezos_smart_rollup_host::{
 use crate::{
     helpers::storage::{bytes_hash, concat, read_u64_le_default, write_u64_le},
     precompiles::constants::{
-        FA_BRIDGE_SOL_CODE_HASH, FA_BRIDGE_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_CONTRACT,
     },
     Error,
 };
@@ -137,21 +135,18 @@ impl CodeStorage {
 }
 
 pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, Error> {
-    if code_hash == &WITHDRAWAL_SOL_CODE_HASH {
-        Ok(Some(Bytecode::new_legacy(
-            Bytes::from_hex(WITHDRAWAL_SOL_CONTRACT)
-                .map_err(|err| Error::Custom(err.to_string()))?,
-        )))
-    } else if code_hash == &FA_BRIDGE_SOL_CODE_HASH {
-        Ok(Some(Bytecode::new_legacy(
-            Bytes::from_hex(FA_BRIDGE_SOL_CONTRACT)
-                .map_err(|err| Error::Custom(err.to_string()))?,
-        )))
-    } else if code_hash == &INTERNAL_FORWARDER_SOL_CODE_HASH {
-        Ok(Some(Bytecode::new_legacy(
-            Bytes::from_hex(INTERNAL_FORWARDER_SOL_CONTRACT)
-                .map_err(|err| Error::Custom(err.to_string()))?,
-        )))
+    if code_hash == &WITHDRAWAL_SOL_CONTRACT.code_hash {
+        Ok(Some(Bytecode::new_legacy(Bytes::from_static(
+            WITHDRAWAL_SOL_CONTRACT.code,
+        ))))
+    } else if code_hash == &FA_BRIDGE_SOL_CONTRACT.code_hash {
+        Ok(Some(Bytecode::new_legacy(Bytes::from_static(
+            FA_BRIDGE_SOL_CONTRACT.code,
+        ))))
+    } else if code_hash == &INTERNAL_FORWARDER_SOL_CONTRACT.code_hash {
+        Ok(Some(Bytecode::new_legacy(Bytes::from_static(
+            INTERNAL_FORWARDER_SOL_CONTRACT.code,
+        ))))
     } else {
         Ok(None)
     }

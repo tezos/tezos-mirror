@@ -34,7 +34,12 @@ let job_kernel ?(sccache = Cacio.sccache ()) =
   CI.job
     ~cargo_cache:true
     ~sccache
-    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~variables:
+      [
+        ("CC", "clang");
+        ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
+        ("EVM_KERNEL_SKIP_BYTECODE", "yes");
+      ]
 
 let job_check_riscv_kernels =
   job_kernel

@@ -27,11 +27,11 @@ COPY .cargo/config.toml /root/.cargo/
 # Foundry releases nightly build. We pick the commit of the day (at the time
 # of proposing the change)
 RUN cargo install \
- --git https://github.com/foundry-rs/foundry/ cast \
+ --git https://github.com/foundry-rs/foundry/ cast forge \
  --profile release \
  --force --locked \
  --tag nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e \
- && cp /root/.cargo/bin/cast /bin
+ && cp /root/.cargo/bin/cast /bin && cp /root/.cargo/bin/forge /bin
 
 # runtime + end-to-end test dependencies
 #
@@ -74,6 +74,7 @@ COPY --from=build \
     /bin/
 
 COPY --from=cast-binary /bin/cast /bin/
+COPY --from=cast-binary /bin/forge /bin/
 
 # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
 # We could install npm via nvm if we tackle this issue.
