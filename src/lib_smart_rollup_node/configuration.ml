@@ -967,7 +967,10 @@ module Cli = struct
         l1_blocks_cache_size = default_l1_blocks_cache_size;
         l2_blocks_cache_size = default_l2_blocks_cache_size;
         prefetch_blocks = None;
-        l1_monitor_finalized;
+        l1_monitor_finalized =
+          Option.value
+            l1_monitor_finalized
+            ~default:default_l1_monitor_finalized;
         l1_rpc_timeout = default_l1_rpc_timeout;
         loop_retry_delay = default_loop_retry_delay;
         index_buffer_size;
@@ -1112,7 +1115,10 @@ module Cli = struct
           (match profiling with
           | None -> configuration.opentelemetry
           | Some enable -> {configuration.opentelemetry with enable});
-        l1_monitor_finalized;
+        l1_monitor_finalized =
+          Option.value
+            l1_monitor_finalized
+            ~default:configuration.l1_monitor_finalized;
       }
 
   let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
