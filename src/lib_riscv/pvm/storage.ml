@@ -17,6 +17,13 @@ module State = struct
   let equal state1 state2 = Api.octez_riscv_storage_state_equal state1 state2
 end
 
+module Mutable_state = struct
+  type t = Api.mut_state
+
+  let equal state1 state2 =
+    Api.octez_riscv_storage_mut_state_equal state1 state2
+end
+
 module Id = struct
   type t = Api.id
 

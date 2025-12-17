@@ -295,9 +295,24 @@ pub fn octez_riscv_storage_state_equal(
 }
 
 #[ocaml::func]
+#[ocaml::sig("mut_state -> mut_state -> bool")]
+pub fn octez_riscv_storage_mut_state_equal(
+    state1: SafePointer<MutState>,
+    state2: SafePointer<MutState>,
+) -> bool {
+    state1.apply_ro(|pvm1| state2.apply_ro(|pvm2| pvm1 == pvm2))
+}
+
+#[ocaml::func]
 #[ocaml::sig("unit -> state")]
 pub fn octez_riscv_storage_state_empty() -> SafePointer<State> {
     ImmutableState::new(NodePvm::empty()).into()
+}
+
+#[ocaml::func]
+#[ocaml::sig("unit -> mut_state")]
+pub fn octez_riscv_storage_mut_state_empty() -> SafePointer<MutState> {
+    MutableState::owned(NodePvm::empty()).into()
 }
 
 #[ocaml::func]
@@ -456,32 +471,40 @@ fn read_boot_sector_binary(path: &str, checksum: &str) -> Vec<u8> {
     binary
 }
 
+// RISC-V kernels are too large to be originated directly. In order to
+// temporarily bypass this limitation (TODO: RV-109 Port kernel installer to RISC-V)
+// the boot sector is installed by loading it from a path passed at origination
+// after checking consistency with the provided checksum.
+// "kernel:<path to kernel>:<kernel checksum>"
+// Any string not matching this format will be treated as an actual kernel to be installed.
+fn install_boot_sector(pvm: &mut NodePvm, boot_sector: &[u8]) {
+    if let Ok(boot_sector) = str::from_utf8(boot_sector) {
+        let parts: Vec<&str> = boot_sector.split(':').collect();
+        if let ["kernel", kernel_path, kernel_checksum] = parts.as_slice() {
+            let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
+            return pvm.install_boot_sector(&kernel);
+        } else {
+            return pvm.install_boot_sector(boot_sector.as_bytes());
+        }
+    }
+    pvm.install_boot_sector(boot_sector);
+}
+
 #[ocaml::func]
 #[ocaml::sig("state -> bytes -> state")]
 pub fn octez_riscv_install_boot_sector(
     state: SafePointer<State>,
     boot_sector: &[u8],
 ) -> SafePointer<State> {
-    // RISC-V kernels are too large to be originated directly. In order to
-    // temporarily bypass this limitation (TODO: RV-109 Port kernel installer to RISC-V)
-    // the boot sector is installed by loading it from a path passed at origination
-    // after checking consistency with the provided checksum.
-    // "kernel:<path to kernel>:<kernel checksum>"
-    // Any string not matching this format will be treated as an actual kernel to be installed.
-    let install_kernel = |pvm: &mut NodePvm| {
-        if let Ok(boot_sector) = str::from_utf8(boot_sector) {
-            let parts: Vec<&str> = boot_sector.split(':').collect();
-            if let ["kernel", kernel_path, kernel_checksum] = parts.as_slice() {
-                let kernel = read_boot_sector_binary(kernel_path, kernel_checksum);
-                return pvm.install_boot_sector(&kernel);
-            } else {
-                return pvm.install_boot_sector(boot_sector.as_bytes());
-            }
-        }
-        pvm.install_boot_sector(boot_sector);
-    };
+    state
+        .apply_imm(|pvm| install_boot_sector(pvm, boot_sector))
+        .0
+}
 
-    state.apply_imm(install_kernel).0
+#[ocaml::func]
+#[ocaml::sig("mut_state -> bytes -> unit")]
+pub fn octez_riscv_mut_install_boot_sector(state: SafePointer<MutState>, boot_sector: &[u8]) {
+    state.apply(|pvm| install_boot_sector(pvm, boot_sector))
 }
 
 #[ocaml::func]

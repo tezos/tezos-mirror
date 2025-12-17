@@ -15,6 +15,12 @@ module State : sig
   val equal : t -> t -> bool
 end
 
+module Mutable_state : sig
+  type t = Octez_riscv_api.mut_state
+
+  val equal : t -> t -> bool
+end
+
 module Id : sig
   type t
 
