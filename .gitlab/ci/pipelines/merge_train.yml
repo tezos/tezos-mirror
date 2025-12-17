@@ -2998,7 +2998,7 @@ etherlink.build_tezt:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
-  - dune build etherlink/tezt/tests/main.exe
+  - scripts/ci/dune.sh build etherlink/tezt/tests/main.exe
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
