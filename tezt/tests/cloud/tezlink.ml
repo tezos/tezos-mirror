@@ -633,7 +633,7 @@ module Umami_process = struct
       ]
 end
 
-let umami_patch ~rpc_url ~tzkt_api_url =
+let umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
      for now. *)
@@ -680,7 +680,7 @@ index 1d28850f..39a15d9b 100644
 +  name: "custom",
 +  rpcUrl: "%s",
 +  tzktApiUrl: "%s",
-+  tzktExplorerUrl: "",
++  tzktExplorerUrl: "%s",
 +  buyTezUrl: "",
 +};
 +
@@ -691,15 +691,22 @@ index 1d28850f..39a15d9b 100644
     |}
     rpc_url
     tzkt_api_url
+    tzkt_url
 
-let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~umami_proxy =
+let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~tzkt_url ~umami_proxy
+    =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint =
     proxy_external_endpoint ~runner tzkt_api_proxy
   in
   let rpc_url = service_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
-  let patch = umami_patch ~rpc_url ~tzkt_api_url in
+  (* Umami can directly reference an explorer, and will concatenate the operation
+     hash of a transaction. This means that it does not work with the sandbox
+     scheme where the suffix is the TzKT API parameter. In this case, we don't
+     point to an explorer and simply leave the value empty (`""`). *)
+  let tzkt_url = Option.value ~default:"" tzkt_url in
+  let patch = umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url in
   (* Create a local patch file with its contents. *)
   let patch_filename = Temp.file "umami.patch" in
   let out_chan = Stdlib.open_out patch_filename in
@@ -1091,6 +1098,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tezlink_sequencer_agent
               ~sequencer_endpoint
               ~tzkt_api_proxy
+              ~tzkt_url:Cli.external_tzkt
               ~umami_proxy
       and* () =
         match faucet_proxys_opt with
