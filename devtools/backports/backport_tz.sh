@@ -29,6 +29,16 @@
 set -e
 set -u
 
+# Self-relocation to a temporary directory to prevent modification by git
+# checkout while the script is running.
+_IN_TEMP=${_IN_TEMP:-}
+if [ -z "$_IN_TEMP" ]; then
+  export _IN_TEMP=1
+  tmp_dir=$(mktemp -d)
+  cp "$0" "$tmp_dir/"
+  exec "$tmp_dir/$(basename "$0")" "$@"
+fi
+
 #------------------------------------------------------------------------------
 # Global variables
 #------------------------------------------------------------------------------
@@ -49,7 +59,7 @@ ARGS=$*
 #------------------------------------------------------------------------------
 
 usage() {
-  echo "Usage: $0 [options]"
+  echo "Usage: $(basename "$0") [options]"
   echo
   echo "Backport commits from a GitLab merge request to a release branch and open an MR."
   echo
