@@ -32,7 +32,7 @@ Closes L2-
 - [ ] Select suitable reviewers using the `Reviewers` field below.
 - [ ] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
 
-/assign @ArnaudBihan @brahima.dibassi @luciano.freitas @naih @pe.cornilleau @rafoo\_
+/assign @ArnaudBihan @brahima.dibassi @luciano.freitas @naih @pe.cornilleau @rafoo\_ @spalmer25
 
 /unassign me
 
