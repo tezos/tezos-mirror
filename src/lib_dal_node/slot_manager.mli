@@ -102,6 +102,12 @@ val get_slot_content :
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
+(** [get_commitment_from_slot_id node_ctxt slot_id] retrieves the commitment
+    associated with the given [slot_id] from the node's store.
+*)
+val get_commitment_from_slot_id :
+  Node_context.t -> Types.slot_id -> Cryptobox.commitment tzresult Lwt.t
+
 (** [try_get_slot_header_from_indexed_skip_list plugin node_ctxt ~attested_level
     slot_id] retrieves the slot header associated with [slot_id], based on the
     local skip list cell stored in the SQLite store.
