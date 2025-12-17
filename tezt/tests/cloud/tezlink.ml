@@ -517,7 +517,7 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
   let* () =
     git_clone
       agent
-      "https://github.com/Arnaud-Bihan/tezlink_deposit.git"
+      "https://github.com/luciano-fs/tezlink_deposit.git"
       bridge_dir
   in
   let* () =
