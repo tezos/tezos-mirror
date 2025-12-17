@@ -1214,7 +1214,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             sequencer_endpoint
         in
         let* tzkt_nginx_config =
-          nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_api_proxy_opt
+          match tzkt_api_endpoint_opt with
+          | None -> Lwt.return_nil
+          | Some tzkt_api_endpoint ->
+              nginx_config_of_service_endpoint
+                tezlink_sequencer_agent
+                tzkt_api_endpoint
         in
         let* faucet_api_nginx_config =
           let faucet_api_proxy =
