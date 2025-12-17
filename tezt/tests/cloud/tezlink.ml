@@ -905,6 +905,10 @@ let nginx_config_of_proxy_opt agent = function
   | None -> Lwt.return_nil
   | Some proxy -> nginx_reverse_proxy_config ~agent ~proxy
 
+let nginx_config_of_service_endpoint agent = function
+  | Internal proxy -> nginx_reverse_proxy_config ~agent ~proxy
+  | External _ -> Lwt.return_nil
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -1152,12 +1156,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* () =
         let* rpc_nginx_config =
-          match sequencer_endpoint with
-          | Internal sequencer_proxy ->
-              nginx_reverse_proxy_config
-                ~agent:tezlink_sequencer_agent
-                ~proxy:sequencer_proxy
-          | External _ -> Lwt.return_nil
+          nginx_config_of_service_endpoint
+            tezlink_sequencer_agent
+            sequencer_endpoint
         in
         let* tzkt_nginx_config =
           nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_api_proxy_opt
