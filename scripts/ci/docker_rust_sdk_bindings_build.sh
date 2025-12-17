@@ -3,8 +3,8 @@
 # Build rust-sdk-bindings image for CI jobs and Octez docker distribution.
 #
 # Reads the following environment variables:
-#  - 'rust_toolchain2_image_name'
 #  - 'rust_sdk_bindings_image_tag' (optional)
+#  - 'DOCKER_FORCE_BUILD': set by the operator
 #  - 'CI_COMMIT_REF_NAME': set by GitLab CI
 #  - 'CI_DEFAULT_BRANCH': set by GitLab CI
 #  - 'CI_PIPELINE_ID': set by GitLab CI
@@ -67,6 +67,23 @@ fi
 # Store the image name for jobs that use it.
 echo "rust_sdk_bindings_image_tag=$image_tag" > rust_sdk_bindings_image_tag.env
 
+# Build image unless it already exists in the registry.
+
+# Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
+# for security updates purposes)
+skip_registry_cache_check=${DOCKER_FORCE_BUILD:-"false"}
+docker_no_cache_option_placeholder="--no-cache"
+
+if [ "$skip_registry_cache_check" != "true" ]; then
+  docker_no_cache_option_placeholder=""
+  if docker manifest inspect "${image_name}" > /dev/null; then
+    echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${CI_COMMIT_REF_SLUG}."
+    regctl image copy "${image_name}" "${image_base}:${CI_COMMIT_REF_SLUG}"
+    exit 0
+  fi
+else
+  echo "Force rebuild of CI images, using no cached layers"
+fi
 echo "Build ${image_name}"
 
 # shellcheck disable=SC2046
@@ -83,5 +100,5 @@ echo "Build ${image_name}"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi) \
-  -t "${image_base}:${docker_image_ref_tag}"
+  -t "${image_base}:${docker_image_ref_tag}" \
+  $docker_no_cache_option_placeholder
