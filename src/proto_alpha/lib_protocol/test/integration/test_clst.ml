@@ -242,18 +242,23 @@ let () =
     check_clst_balance_diff ~loc:__LOC__ 0L initial_clst_bal_mutez b account
   in
 
-  let* balance_before = Context.Contract.balance (B b) account in
+  let* frozen_redeemed_balance_before =
+    Context.CLST.redeemed_frozen_balance (B b) account
+  in
+  let frozen_redeemed_balance_before =
+    Option.value ~default:Tez.zero frozen_redeemed_balance_before
+  in
   let redeemed_amount_mutez = 30_000_000L in
   let* redeem_tx =
     Op.clst_redeem ~fee:Tez.zero (B b) account redeemed_amount_mutez
   in
   let* b = Block.bake ~operation:redeem_tx b in
   let* () =
-    Assert.balance_was_credited
+    Assert.clst_frozen_redeemed_balance_was_credited
       ~loc:__LOC__
       (B b)
       account
-      balance_before
+      frozen_redeemed_balance_before
       (Tez.of_mutez_exn redeemed_amount_mutez)
   in
   let* () =

@@ -736,6 +736,11 @@ module Sc_rollup = struct
       ()
 end
 
+module CLST = struct
+  let redeemed_frozen_balance ctxt staker =
+    Plugin.Contract_services.clst_redeemed_frozen_balance rpc_ctxt ctxt staker
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup
