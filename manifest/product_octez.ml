@@ -2671,6 +2671,7 @@ let _octez_bees_tests =
       "test_bees_unit";
       "test_bees_unit_eio";
       "test_bees_task_worker";
+      "test_bees_lwt_async";
     ]
     ~path:"src/lib_bees/test"
     ~opam:"octez-libs"
