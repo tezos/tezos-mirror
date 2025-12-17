@@ -55,10 +55,10 @@ val export_snapshot : Repo.t -> Id.t -> string -> unit tzresult Lwt.t
 
 val pvm_state_key : string list
 
-val find : State.t -> string list -> State.t option Lwt.t
+val find : Mutable_state.t -> string list -> Mutable_state.t option Lwt.t
 
-val lookup : State.t -> string list -> bytes option Lwt.t
+val lookup : Mutable_state.t -> string list -> bytes option Lwt.t
 
-val set : State.t -> string list -> State.t -> State.t Lwt.t
+val set : Mutable_state.t -> string list -> Mutable_state.t -> unit Lwt.t
 
 val add : State.t -> string list -> bytes -> State.t Lwt.t
