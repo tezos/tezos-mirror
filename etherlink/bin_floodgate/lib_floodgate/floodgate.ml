@@ -24,13 +24,15 @@ let ic_bench_size = 100
 let start_container, container =
   Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
 
-let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
-    ?nonce ?raw_tx ?transaction_object ?data ~gas_limit ~infos ~from () =
+let raw_transfer ?(callback = fun _ -> Lwt.return_unit) ~raw_tx
+    ~transaction_object ~infos ~from () =
+  let open Lwt_result_syntax in
   let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
          (module Tx_container)) =
     container
   in
-  let open Lwt_result_syntax in
+  let (Qty gas_limit) = Transaction_object.gas transaction_object in
+  let (Qty value) = Transaction_object.value transaction_object in
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
   let callback reason =
     (match reason with
@@ -40,20 +42,6 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
     | _ -> ()) ;
     callback reason
   in
-  let* raw_tx, transaction_object =
-    match (raw_tx, transaction_object) with
-    | Some raw_tx, Some transaction_object -> return (raw_tx, transaction_object)
-    | _ ->
-        Craft.transfer_with_obj_exn
-          ?nonce
-          ~infos
-          ~from
-          ?to_
-          ~gas_limit
-          ~value
-          ?data
-          ()
-  in
   let next_nonce = Ethereum_types.quantity_of_z from.nonce in
   let* add_res =
     Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
@@ -62,6 +50,22 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
   | Ok (_ : Ethereum_types.hash) -> return_unit
   | Error e ->
       Lwt.fail_with @@ Format.asprintf "Error adding to the tx_queue: %s" e
+
+let transfer ?callback ?to_ ?(value = Z.zero) ?nonce ?data ~gas_limit ~infos
+    ~from () =
+  let open Lwt_result_syntax in
+  let* raw_tx, transaction_object =
+    Craft.transfer_with_obj_exn
+      ?nonce
+      ~infos
+      ~from
+      ?to_
+      ~gas_limit
+      ~value
+      ?data
+      ()
+  in
+  raw_transfer ?callback ~raw_tx ~transaction_object ~infos ~from ()
 
 let send_raw_transaction ~relay_endpoint txn =
   let open Lwt_result_syntax in
@@ -181,8 +185,114 @@ module State = struct
     report ~elapsed_time
 end
 
+let retry_transfer ?confirmation_wakener ~start ~infos ~gas_limit ~nonce
+    ~ic_data retry_attempt account data to_ =
+  let open Lwt_syntax in
+  let* tx_data =
+    Craft.transfer_with_obj_exn
+      ~nonce
+      ~infos
+      ~from:account
+      ~to_
+      ~gas_limit
+      ~value:Z.zero
+      ?data
+      ()
+  in
+  let* raw_tx, tx_object =
+    match tx_data with
+    | Ok (raw_tx, tx_object) -> return (raw_tx, tx_object)
+    | Error _ -> Stdlib.failwith "Crafting transaction failed"
+  in
+  let rec maybe_retry ~attempt =
+    match retry_attempt with
+    | Always -> aux ~attempt:(attempt + 1)
+    | Never -> return_unit
+    | Number max_attempt when attempt >= max_attempt ->
+        let* () = Floodgate_events.transaction_retried_failed account attempt in
+        return_unit
+    | Number _ -> aux ~attempt:(attempt + 1)
+  and aux ~attempt =
+    let callback reason =
+      match reason with
+      | `Accepted ->
+          Option.iter
+            (fun {ic_bench; _} ->
+              Stdlib.Hashtbl.add
+                ic_bench.sent
+                (Transaction_object.hash tx_object)
+                (Ptime_clock.now ()))
+            ic_data ;
+          return_unit
+      | `Refused ->
+          let* () = Floodgate_events.transaction_refused account in
+          maybe_retry ~attempt
+      | `Confirmed ->
+          let end_ = Time.System.now () in
+          let* () =
+            Floodgate_events.transaction_confirmed
+              account
+              Ptime.(diff end_ start)
+          in
+          let* () =
+            if attempt > 0 then
+              Floodgate_events.transaction_retried_confirmed
+                account
+                attempt
+                Ptime.(diff end_ start)
+            else return_unit
+          in
+          Option.iter (fun u -> Lwt.wakeup u ()) confirmation_wakener ;
+          return_unit
+      | `Dropped ->
+          let* () = Floodgate_events.transaction_dropped account in
+          maybe_retry ~attempt
+    in
+    Misc.unwrap_error_monad @@ fun () ->
+    raw_transfer
+      ~infos
+      ~raw_tx
+      ~transaction_object:tx_object
+      ~callback
+      ~from:account
+      ()
+  in
+  aux ~attempt:0
+
+let salvo ~txs_per_salvo retry_attempt ~infos ~gas_limit ~ic_data account data
+    to_ =
+  let open Lwt_syntax in
+  let last_confirmation, confirmation_wakener = Lwt.wait () in
+  let rec aux ~start ~nonce ~last_nonce =
+    let is_last_nonce = Compare.Z.(Z.succ nonce >= last_nonce) in
+    let confirmation_wakener =
+      if is_last_nonce then Some confirmation_wakener else None
+    in
+    let* () =
+      retry_transfer
+        ?confirmation_wakener
+        ~nonce
+        ~start
+        ~infos
+        ~gas_limit
+        ~ic_data
+        retry_attempt
+        account
+        data
+        to_
+    in
+    if not is_last_nonce then aux ~start ~last_nonce ~nonce:(Z.succ nonce)
+    else return_unit
+  in
+  let start = Time.System.now () in
+  let start_nonce = account.Account.nonce in
+  let last_nonce = Z.(of_int txs_per_salvo + start_nonce) in
+  let* () = aux ~start ~last_nonce ~nonce:start_nonce in
+  last_confirmation
+
 let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit ~retry_attempt
     ~ic_data account =
+  let open Lwt_syntax in
   let data, to_ =
     match token with
     | `Native data ->
@@ -196,93 +306,24 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit ~retry_attempt
         in
         (Some data, Efunc_core.Private.a contract)
   in
-  let rec salvo ~start ~nonce_limit ~nonce =
-    let is_last_nonce = Compare.Z.(Z.succ nonce = nonce_limit) in
-    let open Lwt_syntax in
-    let rec retry_transfer attempt =
-      let maybe_retry () =
-        match retry_attempt with
-        | Always -> retry_transfer (attempt + 1)
-        | Never -> return_unit
-        | Number max_attempt when attempt >= max_attempt ->
-            let* () =
-              Floodgate_events.transaction_retried_failed account attempt
-            in
-            return_unit
-        | Number _ -> retry_transfer (attempt + 1)
-      in
-      let* tx_data =
-        Craft.transfer_with_obj_exn
-          ~nonce
-          ~infos
-          ~from:account
-          ~to_
-          ~gas_limit
-          ~value:Z.zero
-          ?data
-          ()
-      in
-      let* raw_tx, tx_object =
-        match tx_data with
-        | Ok (raw_tx, tx_object) -> return (raw_tx, tx_object)
-        | Error _ -> Stdlib.failwith "Crafting transaction failed"
-      in
-      let callback reason =
-        match reason with
-        | `Accepted ->
-            Option.iter
-              (fun {ic_bench; _} ->
-                Stdlib.Hashtbl.add
-                  ic_bench.sent
-                  (Transaction_object.hash tx_object)
-                  (Ptime_clock.now ()))
-              ic_data ;
-            return_unit
-        | `Refused ->
-            let* () = Floodgate_events.transaction_refused account in
-            maybe_retry ()
-        | `Confirmed ->
-            let end_ = Time.System.now () in
-            let* () =
-              Floodgate_events.transaction_confirmed
-                account
-                Ptime.(diff end_ start)
-            in
-            let* () =
-              if attempt > 0 then
-                Floodgate_events.transaction_retried_confirmed
-                  account
-                  attempt
-                  Ptime.(diff end_ start)
-              else return_unit
-            in
-            if is_last_nonce then loop () else return_unit
-        | `Dropped ->
-            let* () = Floodgate_events.transaction_dropped account in
-            maybe_retry ()
-      in
-      Misc.unwrap_error_monad @@ fun () ->
-      transfer
-        ~nonce
+  let rec loop () =
+    let* () =
+      salvo
+        ~txs_per_salvo
         ~infos
-        ~raw_tx
-        ~transaction_object:tx_object
-        ~callback
         ~gas_limit
-        ~from:account
-        ~to_
-        ?data
-        ()
+        ~ic_data
+        retry_attempt
+        account
+        data
+        to_
     in
-    let* () = retry_transfer 0 in
-    if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
-    else return_unit
-  and loop () =
-    let start = Time.System.now () in
-    let nonce_limit = Z.(of_int txs_per_salvo + account.nonce) in
-    salvo ~start ~nonce_limit ~nonce:account.nonce
+    loop ()
   in
-  loop ()
+  let Ethereum_types.(Address (Hex hex_address)) = Account.address_et account in
+  let task_name = Format.sprintf "%s spammer" hex_address in
+  let () = Misc.background_task ~name:task_name @@ fun () -> loop () in
+  return_unit
 
 let rec get_transaction_receipt rpc_endpoint txn_hash =
   let open Lwt_result_syntax in
