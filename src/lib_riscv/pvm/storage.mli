@@ -39,7 +39,7 @@ val checkout : Repo.t -> Id.t -> State.t option Lwt.t
 
 val empty : unit -> Mutable_state.t
 
-val commit : ?message:string -> Repo.t -> State.t -> Id.t Lwt.t
+val commit : ?message:string -> Repo.t -> Mutable_state.t -> Id.t Lwt.t
 
 val is_gc_finished : Repo.t -> bool
 

@@ -329,10 +329,10 @@ pub fn octez_riscv_storage_load(path: String) -> OcamlFallible<SafePointer<Repo>
 pub fn octez_riscv_storage_close(_repo: SafePointer<Repo>) {}
 
 #[ocaml::func]
-#[ocaml::sig("repo -> state -> id")]
+#[ocaml::sig("repo -> mut_state -> id")]
 pub fn octez_riscv_storage_commit(
     repo: SafePointer<Repo>,
-    state: SafePointer<State>,
+    state: SafePointer<MutState>,
 ) -> OcamlFallible<SafePointer<Id>> {
     state.apply_ro(|pvm| {
         let mut guard = repo.0.write();
