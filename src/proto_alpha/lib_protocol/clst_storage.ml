@@ -57,3 +57,31 @@ let decrease_redeemed_frozen_deposit_only_call_from_token ctxt cycle amount =
     Deposits_repr.{initial_amount; current_amount}
   in
   update_frozen_redeemed_deposit ~f ctxt cycle
+
+(* Adapted from {Unstake_requests_storage.set_stored_requests}.
+
+   Update the storage with the given requests.
+
+   If the given structure contains an empty list of requests, it means that
+   there are no more funds to unstake, and thus there is no need to keep an
+   entry for the contract.
+*)
+let set_stored_requests ctxt contract updated_requests =
+  match updated_requests with
+  | [] -> Storage.Clst.Redemption_requests.remove ctxt contract
+  | _ :: _ ->
+      Storage.Clst.Redemption_requests.add ctxt contract updated_requests
+
+(* At some point, this function will also include implicit finalization of
+   finalizable redemption requests. *)
+let add_redemption_request ctxt contract cycle amount =
+  let open Lwt_result_syntax in
+  let* requests_opt = Storage.Clst.Redemption_requests.find ctxt contract in
+  let requests = Option.value ~default:[] requests_opt in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8228
+
+     Storage.Unstake_request implements the logic to merge requests, but it DOES
+     NOT update anything in the storage.  *)
+  let*? requests = Storage.Unstake_request.add cycle amount requests in
+  let*! ctxt = set_stored_requests ctxt contract requests in
+  return ctxt

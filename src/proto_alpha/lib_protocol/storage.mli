@@ -650,6 +650,15 @@ module Clst : sig
     Single_data_storage
       with type value = Unstaked_frozen_deposits_repr.t
        and type t := Raw_context.t
+
+  (** The contract's redemption requests from CLST that haven't been finalized
+      yet. Redemption requests and unstake requests share the same underlying
+      implementation. *)
+  module Redemption_requests :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Unstake_request.requests
+       and type t := Raw_context.t
 end
 
 type consensus_pk_in_R = {

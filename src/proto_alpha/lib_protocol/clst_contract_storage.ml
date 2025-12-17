@@ -103,9 +103,14 @@ let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
   Token.transfer ctxt (`Contract clst_contract) `CLST_deposits amount
 
 let redeem_from_clst_deposits ctxt ~staker amount =
+  let open Lwt_result_syntax in
   let current_cycle = (Level.current ctxt).cycle in
-  Token.transfer
-    ctxt
-    `CLST_deposits
-    (`CLST_redeemed_frozen_deposits (staker, current_cycle))
-    amount
+  let* ctxt, redeem_balance_update =
+    Token.transfer
+      ctxt
+      `CLST_deposits
+      (`CLST_redeemed_frozen_deposits (staker, current_cycle))
+      amount
+  in
+  let* ctxt = Clst.add_redemption_request ctxt staker current_cycle amount in
+  return (ctxt, redeem_balance_update)

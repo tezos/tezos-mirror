@@ -4640,6 +4640,11 @@ module Clst : sig
   (** [total_amount_of_tez ctxt] returns the total amount of tez available for
       staking in the CLST contract. *)
   val total_amount_of_tez : context -> Tez.t tzresult Lwt.t
+
+  (** [add_redemption_request ctxt contract cycle amount] adds a redemption
+      requests from [contract] at the given [cycle] of [amount] tez. *)
+  val add_redemption_request :
+    context -> Contract.t -> Cycle.t -> Tez.t -> context tzresult Lwt.t
 end
 
 (** See {!Block_payload_repr}. *)
