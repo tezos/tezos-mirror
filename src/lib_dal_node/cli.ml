@@ -1044,8 +1044,8 @@ module Snapshot = struct
         required
         & pos 0 (some string) None
         & info
-            ~docv:"FILE"
-            ~doc:"Path to the snapshot file to export."
+            ~docv:"DIR"
+            ~doc:"Path to the snapshot directory where to export."
             ~docs:"OPTIONS"
             [])
 
