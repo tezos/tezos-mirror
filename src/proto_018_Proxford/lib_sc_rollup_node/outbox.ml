@@ -51,7 +51,7 @@ let proof_of_output node_ctxt output =
       let*! proof =
         PVM.produce_output_proof
           (of_node_context node_ctxt.context)
-          (of_node_pvmstate state)
+          !(of_node_pvmstate state)
           output
       in
       match proof with

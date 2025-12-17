@@ -38,7 +38,7 @@ let check_pvm_initial_state_hash {Node_context.cctxt; config; kind; _} =
       (cctxt#chain, cctxt#block)
       config.sc_rollup_address
   in
-  let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
+  let*! s = PVM.initial_state ~empty:!(PVM.Mutable_state.empty ()) in
   let*! l2_initial_state_hash = PVM.state_hash s in
   let l1_reference_initial_state_hash =
     Sc_rollup_proto_types.State_hash.to_octez l1_reference_initial_state_hash
