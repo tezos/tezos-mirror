@@ -53,12 +53,19 @@ START=$(date +%s.%N)
 exitcode_file=$(mktemp)
 {
   echo "0" > "$exitcode_file"
+  # [dune.sh] is a wrapper around [dune] that does not change the core build logic
+  # but enables cache monitoring when DUNE_CACHE_INFO=true.
+  # In CI (detected via GITLAB_CI), use dune.sh for cache metrics reporting.
+  # For local development, use dune directly.
+  # More information about GITLAB_CI detection available at
+  # https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+  DUNE=${GITLAB_CI:+./scripts/ci/dune.sh}
   # If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
   # We need this to be word split for the arguments to be properly parsed by dune.
   # The same holds for ${group_target:-$all_targets} which may contain multiple targets
   # and must be word split.
   # shellcheck disable=SC2086
-  dune build ${DUNE_ARGS:-} --error-reporting=twice ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets} 2>&1 ||
+  ${DUNE:-dune} build ${DUNE_ARGS:-} --error-reporting=twice ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets} 2>&1 ||
     echo "$?" > "$exitcode_file"
 } | tee "test_results/$name.log"
 EXITCODE=$(cat "$exitcode_file")
