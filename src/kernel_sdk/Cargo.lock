@@ -1554,6 +1554,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-smart-rollup-keyspace"
+version = "0.0.0"
+
+[[package]]
 name = "tezos-smart-rollup-macros"
 version = "0.2.2"
 dependencies = [
