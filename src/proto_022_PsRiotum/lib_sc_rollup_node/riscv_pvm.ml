@@ -13,9 +13,8 @@ module Storage = Octez_riscv_pvm.Storage
 
 type repo = Context.repo
 
-type tree = Context.tree
+type tree = Context.state
 
-module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
@@ -97,7 +96,7 @@ module PVM :
 
   let state_hash state = Lwt.return @@ Backend.state_hash state
 
-  let initial_state ~empty:_ = Lwt.return (Storage.empty ())
+  let initial_state ~empty = Lwt.return empty
 
   let install_boot_sector state boot_sector =
     Backend.install_boot_sector state boot_sector
@@ -181,10 +180,18 @@ let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
 module Mutable_state :
   Pvm_sig.MUTABLE_STATE_S
     with type hash = PVM.hash
+     and type repo = repo
+     and type status = status
      and type t = Ctxt_wrapper.mut_state = struct
+  include Riscv_context.PVMState
+
   type t = Backend.Mutable_state.t
 
   type hash = PVM.hash
+
+  type repo = Context.repo
+
+  type nonrec status = status
 
   let get_tick state =
     let open Lwt_syntax in
@@ -192,6 +199,13 @@ module Mutable_state :
     return (Sc_rollup.Tick.of_z tick)
 
   let state_hash state = Lwt.return @@ Backend.Mutable_state.state_hash state
+
+  let get_current_level state = Backend.Mutable_state.get_current_level state
+
+  let get_outbox _level _state = Lwt.return []
+
+  let get_status ~is_reveal_enabled:_ state =
+    Backend.Mutable_state.get_status state
 
   let is_input_state =
     make_is_input_state
@@ -201,6 +215,11 @@ module Mutable_state :
 
   let set_input input state =
     Backend.Mutable_state.set_input state @@ to_pvm_input input
+
+  let set_initial_state ~empty:_ = Lwt.return_unit
+
+  let install_boot_sector state boot_sector =
+    Backend.Mutable_state.install_boot_sector state boot_sector
 
   let eval_many ?check_invalid_kernel:_ ~reveal_builtins:_ ~write_debug
       ~is_reveal_enabled:_ ?stop_at_snapshot ~max_steps initial_state =
@@ -214,6 +233,11 @@ module Mutable_state :
       ?write_debug:debug_printer
       ~max_steps
       initial_state
+
+  module Inspect_durable_state = struct
+    let lookup _state _keys =
+      raise (Invalid_argument "No durable storage for riscv PVM")
+  end
 
   module Internal_for_tests = Insert_failure_impl
 end
@@ -236,4 +260,6 @@ module Unsafe_patches = struct
     | Patch_PVM_version _ -> assert false
 
   let apply _state (x : t) = match x with _ -> .
+
+  let apply_mutable _ (x : t) = match x with _ -> .
 end
