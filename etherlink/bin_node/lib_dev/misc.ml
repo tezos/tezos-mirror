@@ -98,8 +98,10 @@ let with_timeout t k =
     ]
 
 let background_task ~name f =
-  Lwt.dont_wait
-    (fun () -> unwrap_error_monad @@ fun () -> f ())
+  let open Lwt_syntax in
+  Lwt.async @@ fun () ->
+  Lwt.catch
+    (fun () -> unwrap_error_monad f)
     (fun exn ->
-      Events.background_task_error ~name exn ;
+      let* () = Events.background_task_error ~name exn in
       Lwt_exit.exit_and_raise Node_error.exit_code_when_background_task_fails)

@@ -97,7 +97,7 @@ val private_server_is_ready :
 
 val rpc_server_error : exn -> unit
 
-val background_task_error : name:string -> exn -> unit
+val background_task_error : name:string -> exn -> unit Lwt.t
 
 (** [shutdown_rpc_server ~private_ ()] advertises that the RPC server
     was shut down, [private_] tells whether it is the private server

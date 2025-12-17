@@ -594,9 +594,7 @@ let rpc_server_error exn =
   emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)
 
 let background_task_error ~name exn =
-  emit__dont_wait__use_with_care
-    background_task_error
-    (name, Printexc.to_string exn)
+  emit background_task_error (name, Printexc.to_string exn)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()
