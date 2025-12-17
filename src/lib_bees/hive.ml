@@ -37,10 +37,16 @@ type t = {
   lwt_tasks_stream : (unit -> unit Lwt.t) Eio.Stream.t;
 }
 
+(* This arbitrary value aims to limit the number of elements that can be
+   accumulated in the [lwt_tasks_stream] closure buffer. The upper bound is not
+   expected to be reached but it is set to high value to avoid Eio.Stream.push
+   to be blocking if reached at some point. *)
+let tasks_stream_max_size = 16_384
+
 let hive =
   {
     workers = WorkerTbl.create ~initial_size:64;
-    lwt_tasks_stream = Eio.Stream.create max_int;
+    lwt_tasks_stream = Eio.Stream.create tasks_stream_max_size;
   }
 
 let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
