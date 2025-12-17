@@ -704,14 +704,11 @@ index 1d28850f..39a15d9b 100644
     tzkt_url
     faucet_url
 
-let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~tzkt_url ~umami_proxy
-    ~faucet_proxy_opt =
+let init_umami agent ~sequencer_endpoint ~tzkt_api_endpoint ~tzkt_url
+    ~umami_proxy ~faucet_proxy_opt =
   let runner = Agent.runner agent in
-  let external_tzkt_api_endpoint =
-    proxy_external_endpoint ~runner tzkt_api_proxy
-  in
   let rpc_url = service_external_endpoint ~runner sequencer_endpoint in
-  let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
+  let tzkt_api_url = service_external_endpoint ~runner tzkt_api_endpoint in
   (* Umami can directly reference an explorer, and will concatenate the operation
      hash of a transaction. This means that it does not work with the sandbox
      scheme where the suffix is the TzKT API parameter. In this case, we don't
@@ -846,7 +843,10 @@ type faucet_proxys = {
   faucet_frontend_proxy : proxy_info;
 }
 
-type umami_proxys = {tzkt_api_proxy : proxy_info; umami_proxy : proxy_info}
+type umami_proxys = {
+  tzkt_api_endpoint : service_endpoint;
+  umami_proxy : proxy_info;
+}
 
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
@@ -1009,7 +1009,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           some tzkt_proxy
         else none
       in
-      let* _tzkt_api_endpoint_opt =
+      let* tzkt_api_endpoint_opt =
         match Cli.external_tzkt_api with
         | Some _ when Cli.tzkt ->
             Test.fail
@@ -1059,8 +1059,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | (None | Some _), false -> none
       in
       let* umami_proxys_opt =
-        match tzkt_api_proxy_opt with
-        | Some tzkt_api_proxy when Cli.umami ->
+        match tzkt_api_endpoint_opt with
+        | Some tzkt_api_endpoint when Cli.umami ->
             let umami_proxy =
               make_proxy
                 tezlink_sequencer_agent
@@ -1070,7 +1070,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 None
                 activate_ssl
             in
-            some {tzkt_api_proxy; umami_proxy}
+            some {tzkt_api_endpoint; umami_proxy}
         | None when Cli.umami ->
             Test.fail
               "Umami relies on TzKT, but the latter is deactivated (see the \
@@ -1132,11 +1132,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       and* () =
         match umami_proxys_opt with
         | None -> unit
-        | Some {tzkt_api_proxy; umami_proxy} ->
+        | Some {tzkt_api_endpoint; umami_proxy} ->
             init_umami
               tezlink_sequencer_agent
               ~sequencer_endpoint
-              ~tzkt_api_proxy
+              ~tzkt_api_endpoint
               ~tzkt_url:Cli.external_tzkt
               ~umami_proxy
               ~faucet_proxy_opt:
