@@ -52,6 +52,9 @@ val encoding : t Data_encoding.t
    every slot are unavailable. *)
 val empty : t
 
+(** [is_empty slot_attestation] returns [true] if no slots are attested. *)
+val is_empty : t -> bool
+
 (** [is_attested slot_attestation ~index] returns [true] if the
    [slot_attestation] commits that the slot at [index] is
    available. *)
