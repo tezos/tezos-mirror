@@ -60,7 +60,7 @@ let init_durable_storage l =
         in
         set_next_key tree rst
   in
-  set_next_key (Irmin_context.PVMState.empty ()) l
+  set_next_key (Irmin_context.Tree.empty ()) l
 
 let test_store_has () =
   register ~tags:["store_has"] ~title:"store_has host function" @@ fun () ->

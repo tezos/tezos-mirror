@@ -130,14 +130,13 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
     Node_context.save_messages node_ctxt inbox_witness ~level:head.level []
   in
   let ctxt = Context.empty node_ctxt.context in
+  let state = Context.PVMState.empty node_ctxt.context in
   let num_ticks = 0L in
   let initial_tick = Z.zero in
-  let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
-  let*! state =
-    Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
-  in
+  let*! () = Plugin.Pvm.set_initial_state node_ctxt.kind ~empty:state in
+  let*! () = Plugin.Pvm.install_boot_sector node_ctxt.kind state boot_sector in
   let*! genesis_state_hash = Plugin.Pvm.state_hash node_ctxt.kind state in
-  let*! ctxt = Context.PVMState.set ctxt state in
+  let*! () = Context.PVMState.set ctxt state in
   let*! context_hash = Context.commit ctxt in
   let commitment =
     Commitment.genesis_commitment

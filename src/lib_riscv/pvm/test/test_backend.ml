@@ -12,8 +12,7 @@ let test_advance_dummy_kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
   let* kernel = Utils.read_riscv_dummy_kernel () in
-  let* state = Backend.install_boot_sector state kernel in
-  let state = Backend.Mutable_state.from_imm state in
+  let* () = Backend.Mutable_state.install_boot_sector state kernel in
 
   (* This relies on the kernel being able to step at least `sum(step_count)` steps
    * without requiring input *)
@@ -29,8 +28,9 @@ let test_proof_regression kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
   let* kernel_path = Utils.read_riscv_kernel kernel in
-  let* state = Backend.install_boot_sector state kernel_path in
+  let* () = Backend.Mutable_state.install_boot_sector state kernel_path in
 
+  let state = Backend.Mutable_state.to_imm state in
   match Backend.produce_proof None state with
   | Some proof ->
       let proof_bytes = Backend.serialise_proof proof in
@@ -63,8 +63,9 @@ let test_proof_immutability kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
   let* kernel_path = Utils.read_riscv_kernel kernel in
-  let* state = Backend.install_boot_sector state kernel_path in
+  let* () = Backend.Mutable_state.install_boot_sector state kernel_path in
 
+  let state = Backend.Mutable_state.to_imm state in
   match Backend.produce_proof None state with
   | Some proof ->
       (* Unlike the proof_regression test, now we first call verify_proof
