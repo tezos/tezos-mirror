@@ -37,7 +37,7 @@ val close : Repo.t -> unit Lwt.t
 
 val checkout : Repo.t -> Id.t -> State.t option Lwt.t
 
-val empty : unit -> State.t
+val empty : unit -> Mutable_state.t
 
 val commit : ?message:string -> Repo.t -> State.t -> Id.t Lwt.t
 

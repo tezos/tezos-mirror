@@ -45,7 +45,7 @@ let close repo =
 
 let checkout repo id = Lwt.return (Api.octez_riscv_storage_checkout repo id)
 
-let empty () = Api.octez_riscv_storage_state_empty ()
+let empty () = Api.octez_riscv_storage_mut_state_empty ()
 
 let commit ?message:_ repo state =
   Lwt.return (Api.octez_riscv_storage_commit repo state)
