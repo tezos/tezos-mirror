@@ -141,7 +141,16 @@ module Prometheus = struct
         (function k, [v] -> Some (k, v) | _k, _ -> None)
         (Uri.query uri)
     in
-    let path = String.split_on_char '/' (Uri.path uri) in
+    let path =
+      (* Remove empty string introduced by a leading slash, if any, to avoid
+         redirection due to path containing double slashes.
+         [RPC_core.make_uri] makes [String.concat "/" (endpoint.path :: rpc.path)]
+         and in our case [endpoint.path] is empty, so if [rpc.path] also starts
+         with an empty string, then the concat adds 2 slashes. *)
+      match String.split_on_char '/' (Uri.path uri) with
+      | "" :: path -> path
+      | path -> path
+    in
     let endpoint = Endpoint.make ~host ~scheme ~port () in
     (`endpoint endpoint, `query query_string, `path path)
 
