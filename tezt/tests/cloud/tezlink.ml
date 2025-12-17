@@ -859,7 +859,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   in
   add_service cloud ~name ~url:(url endpoint)
 
-let add_services cloud runner ~sequencer_endpoint ~tzkt_api_proxy_opt
+let add_services cloud runner ~sequencer_endpoint ~tzkt_api_endpoint_opt
     ~faucet_proxys_opt ~umami_proxys_opt ~bridge_proxy_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
@@ -881,9 +881,17 @@ let add_services cloud runner ~sequencer_endpoint ~tzkt_api_proxy_opt
         add_service cloud ~name:name_endpoint ~url:sequencer_endpoint
   in
   let* () =
-    match tzkt_api_proxy_opt with
+    let name_endpoint = "TzKT API" in
+    let name_check = sf "Check %s" name_endpoint in
+    match tzkt_api_endpoint_opt with
     | None -> unit
-    | Some tzkt_proxy ->
+    | Some (External tzkt_api_url) ->
+        let* () = add_service cloud ~name:name_endpoint ~url:tzkt_api_url in
+        add_service
+          cloud
+          ~name:name_check
+          ~url:(Filename.concat tzkt_api_url "v1/head")
+    | Some (Internal tzkt_proxy) ->
         let* () = add_proxy_service "TzKT API" tzkt_proxy in
         let* () =
           add_proxy_service "Check TzKT API" ~url:(sf "%s/v1/head") tzkt_proxy
@@ -996,20 +1004,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             Internal sequencer_proxy
         | Some endpoint -> External endpoint
       in
-      let* tzkt_api_proxy_opt =
-        if Cli.tzkt then
-          let tzkt_proxy =
-            make_proxy
-              tezlink_sequencer_agent
-              ~path:None
-              ~dns_domain:
-                (Option.map (fun doms -> doms.tzkt_api_domain) dns_domains)
-              Cli.tzkt_api_port
-              activate_ssl
-          in
-          some tzkt_proxy
-        else none
-      in
       let* tzkt_api_endpoint_opt =
         match Cli.external_tzkt_api with
         | Some _ when Cli.tzkt ->
@@ -1103,7 +1097,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           cloud
           runner
           ~sequencer_endpoint
-          ~tzkt_api_proxy_opt
+          ~tzkt_api_endpoint_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
           ~bridge_proxy_opt
