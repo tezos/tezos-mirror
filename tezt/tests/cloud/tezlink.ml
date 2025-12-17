@@ -539,7 +539,7 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
     ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
-    ~faucet_pkh ~tzkt_api_proxy ~faucet_frontend_proxy =
+    ~faucet_pkh ~tzkt_api_proxy ~tzkt_url ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
@@ -550,9 +550,12 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
     let in_tzkt_sandbox api_url =
       sf "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s" api_url
     in
-    let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
-    let api_url = Client.url_encoded_string_of_endpoint tzkt_api in
-    in_tzkt_sandbox api_url
+    match tzkt_url with
+    | Some tzkt_url -> Filename.concat tzkt_url "<hash>"
+    | None ->
+        let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
+        let api_url = Client.url_encoded_string_of_endpoint tzkt_api in
+        in_tzkt_sandbox api_url
   in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
@@ -1140,6 +1143,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~sequencer_endpoint
                 ~faucet_pkh
                 ~tzkt_api_proxy
+                ~tzkt_url:Cli.external_tzkt
                 ~faucet_frontend_proxy
             in
             unit
