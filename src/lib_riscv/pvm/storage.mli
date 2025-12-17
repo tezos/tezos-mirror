@@ -35,7 +35,7 @@ val load : cache_size:int -> readonly:bool -> string -> Repo.t Lwt.t
 
 val close : Repo.t -> unit Lwt.t
 
-val checkout : Repo.t -> Id.t -> State.t option Lwt.t
+val checkout : Repo.t -> Id.t -> Mutable_state.t option Lwt.t
 
 val empty : unit -> Mutable_state.t
 

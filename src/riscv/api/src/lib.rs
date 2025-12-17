@@ -344,15 +344,15 @@ pub fn octez_riscv_storage_commit(
 }
 
 #[ocaml::func]
-#[ocaml::sig("repo -> id -> state option")]
+#[ocaml::sig("repo -> id -> mut_state option")]
 pub fn octez_riscv_storage_checkout(
     repo: SafePointer<Repo>,
     id: SafePointer<Id>,
-) -> OcamlFallible<Option<SafePointer<State>>> {
+) -> OcamlFallible<Option<SafePointer<MutState>>> {
     let id = &id.0;
     let guard = repo.0.read();
     match guard.checkout(id) {
-        Ok(pvm) => Ok(Some(ImmutableState::new(pvm).into())),
+        Ok(pvm) => Ok(Some(MutableState::owned(pvm).into())),
         Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
         Err(e) => Err(ocaml::Error::Error(Box::new(e))),
     }
