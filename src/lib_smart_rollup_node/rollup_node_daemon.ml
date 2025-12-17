@@ -203,6 +203,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let l2_block =
     Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
+  let* () = Node_context.save_l2_block node_ctxt l2_block in
   let* () =
     if finalized then
       Node_context.set_finalized node_ctxt header.block_hash header.level
@@ -212,7 +213,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       let finalized_hash = predecessor.header.predecessor in
       Node_context.set_finalized node_ctxt finalized_hash finalized_level)
   in
-  let* () = Node_context.save_l2_block node_ctxt l2_block in
   let end_timestamp = Time.System.now () in
   let total_time = Ptime.diff end_timestamp start_timestamp in
   let process_time = Ptime.diff end_timestamp fetch_timestamp in
