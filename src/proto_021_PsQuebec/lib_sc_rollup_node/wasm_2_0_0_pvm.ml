@@ -150,8 +150,6 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 
   let new_dissection = Game_helpers.Wasm.new_dissection
 
-  module State = Irmin_context.PVMState
-
   module Inspect_durable_state = struct
     let lookup state keys =
       let key = "/" ^ String.concat "/" keys in
@@ -159,6 +157,109 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
   end
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
+
+  let string_of_status : status -> string = function
+    | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
+        Format.asprintf
+          "Waiting for preimage reveal %a"
+          Sc_rollup_reveal_hash.pp
+          hash
+    | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
+    | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
+        Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
+    | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
+        "Waiting for DAL parameters"
+    | Computing -> "Computing"
+
+  let eval_many ?(check_invalid_kernel = true) ~reveal_builtins ~write_debug
+      ~is_reveal_enabled:_ =
+    Backend.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
+      ~hooks:(Wasm_2_0_0_utilities.hooks ~check_invalid_kernel)
+
+  (** WASM PVM Mutable API works by holding a reference to an immutable state
+      and wrapping all immutable functionality around the reference *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type repo = repo
+       and type status = status
+       and type t = Ctxt_wrapper.mut_state = struct
+    include Irmin_context.PVMState
+
+    type t = tree ref
+
+    type hash = Sc_rollup.State_hash.t
+
+    type repo = Irmin_context.repo
+
+    type nonrec status = status
+
+    let get_tick state = get_tick !state
+
+    let state_hash state = state_hash !state
+
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ level = get_current_level !state in
+      Option.map Raw_level.to_int32 level
+
+    let get_outbox level state =
+      get_outbox (Raw_level.of_int32_exn level) !state
+
+    let get_status ~is_reveal_enabled state =
+      get_status ~is_reveal_enabled !state
+
+    let set_initial_state ~empty =
+      let open Lwt_syntax in
+      let+ state = initial_state ~empty:!empty in
+      empty := state
+
+    let install_boot_sector state boot_sector =
+      let open Lwt_syntax in
+      let+ new_state = install_boot_sector !state boot_sector in
+      state := new_state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled !state
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input !state in
+      state := imm_state ;
+      return_unit
+
+    let eval_many ?check_invalid_kernel ~reveal_builtins ~write_debug
+        ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ?check_invalid_kernel
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          !mut_state
+      in
+      mut_state := imm_state ;
+      return steps
+
+    module Inspect_durable_state = struct
+      let lookup state keys = Inspect_durable_state.lookup !state keys
+    end
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state = Internal_for_tests.insert_failure !state in
+        state := imm_state ;
+        return_unit
+    end
+  end
 
   module Unsafe_patches = struct
     type t = unsafe_patch
@@ -199,29 +300,12 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
                 (Format.sprintf
                    "Unsafe patch: unknown PVM version %s"
                    version_str))
+
+    let apply_mutable state patch =
+      let open Lwt_syntax in
+      let+ patched_state = apply !state patch in
+      state := patched_state
   end
-
-  let string_of_status : status -> string = function
-    | Waiting_for_input_message -> "Waiting for input message"
-    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
-        Format.asprintf
-          "Waiting for preimage reveal %a"
-          Sc_rollup_reveal_hash.pp
-          hash
-    | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
-    | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
-        Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
-    | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
-        "Waiting for DAL parameters"
-    | Computing -> "Computing"
-
-  let eval_many ?(check_invalid_kernel = true) ~reveal_builtins ~write_debug
-      ~is_reveal_enabled:_ =
-    Backend.compute_step_many
-      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
-      ~reveal_builtins
-      ~write_debug
-      ~hooks:(Wasm_2_0_0_utilities.hooks ~check_invalid_kernel)
 end
 
 include Impl
