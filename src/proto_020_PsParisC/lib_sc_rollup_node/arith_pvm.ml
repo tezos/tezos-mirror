@@ -56,8 +56,6 @@ module Impl : Pvm_sig.S = struct
 
   let kind = Sc_rollup.Kind.Example_arith
 
-  module State = Irmin_context.PVMState
-
   module Inspect_durable_state = struct
     let lookup _state _keys =
       raise (Invalid_argument "No durable storage for arith PVM")
@@ -69,11 +67,12 @@ module Impl : Pvm_sig.S = struct
 
     let of_patch (p : Pvm_patches.unsafe_patch) =
       match p with
-      | Increase_max_nb_ticks _ -> assert false
-      | Patch_durable_storage _ -> assert false
+      | Increase_max_nb_ticks _ | Patch_durable_storage _ -> assert false
       | Patch_PVM_version _ -> assert false
 
     let apply _state (x : t) = match x with _ -> .
+
+    let apply_mutable _ (x : t) = match x with _ -> .
   end
 
   let new_dissection = Game_helpers.default_new_dissection
@@ -110,6 +109,87 @@ module Impl : Pvm_sig.S = struct
       else Lwt.return (state, step)
     in
     go initial_state 0L
+
+  (** Arith PVM Mutable API works by holding a reference to an immutable state
+      and wrapping all immutable functionality around the reference *)
+  module Mutable_state :
+    Pvm_sig.MUTABLE_STATE_S
+      with type hash = hash
+       and type repo = repo
+       and type status = status
+       and type t = Ctxt_wrapper.mut_state = struct
+    include Irmin_context.PVMState
+
+    type t = tree ref
+
+    type hash = Sc_rollup.State_hash.t
+
+    type repo = Irmin_context.repo
+
+    type nonrec status = status
+
+    let get_tick state = get_tick !state
+
+    let state_hash state = state_hash !state
+
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ level = get_current_level !state in
+      Option.map Raw_level.to_int32 level
+
+    let get_outbox level state =
+      get_outbox (Raw_level.of_int32_exn level) !state
+
+    let get_status ~is_reveal_enabled state =
+      get_status ~is_reveal_enabled !state
+
+    let set_initial_state ~empty =
+      let open Lwt_syntax in
+      let+ state = initial_state ~empty:!empty in
+      empty := state
+
+    let install_boot_sector state boot_sector =
+      let open Lwt_syntax in
+      let+ new_state = install_boot_sector !state boot_sector in
+      state := new_state
+
+    let is_input_state ~is_reveal_enabled state =
+      is_input_state ~is_reveal_enabled !state
+
+    let set_input input state =
+      let open Lwt_syntax in
+      let* imm_state = set_input input !state in
+      state := imm_state ;
+      return_unit
+
+    let eval_many ?check_invalid_kernel ~reveal_builtins ~write_debug
+        ~is_reveal_enabled ?stop_at_snapshot ~max_steps mut_state =
+      let open Lwt_syntax in
+      let* imm_state, steps =
+        eval_many
+          ?check_invalid_kernel
+          ~reveal_builtins
+          ~write_debug
+          ~is_reveal_enabled
+          ?stop_at_snapshot
+          ~max_steps
+          !mut_state
+      in
+      mut_state := imm_state ;
+      return steps
+
+    module Inspect_durable_state = struct
+      let lookup state keys = Inspect_durable_state.lookup !state keys
+    end
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let open Lwt_syntax in
+        let* imm_state = Internal_for_tests.insert_failure !state in
+        state := imm_state ;
+        return_unit
+    end
+  end
 end
 
 include Impl
