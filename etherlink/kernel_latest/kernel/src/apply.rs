@@ -7,6 +7,8 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
+use anyhow::anyhow;
+use mir::ast::ChainId;
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, Log, B256};
@@ -30,6 +32,7 @@ use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome,
 };
+use tezos_crypto_rs::hash::HashTrait;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
@@ -41,12 +44,17 @@ use tezos_ethereum::tx_common::{
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_execution::context::Context;
+use tezos_execution::mir_ctx::BlockCtx;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezos_tezlink::operation_result::OperationError;
 use tezos_tracing::trace_kernel;
 
 use crate::bridge::{execute_etherlink_deposit, Deposit, DepositResult};
-use crate::chains::EvmLimits;
+use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
@@ -117,7 +125,9 @@ fn make_object_info(
         TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
-        TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
+        TransactionContent::Deposit(_)
+        | TransactionContent::FaDeposit(_)
+        | TransactionContent::TezosDelayed(_) => {
             (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
         }
     };
@@ -798,6 +808,91 @@ pub fn apply_transaction<Host: Runtime>(
                 spec_id,
                 limits,
             )?
+        }
+        TransactionContent::TezosDelayed(op) => {
+            // TODO: If we need to use storage root of tezlink pass it as parameter.
+            let context = crate::tezosx::TezosRuntimeContext::from_root(
+                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            )?;
+            let skip_signature_check = false;
+            let i128_timestamp: i128 = block_constants
+                .timestamp
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert timestamp: {e}"))?;
+            let i64_timestamp: i64 = i128_timestamp
+                .try_into()
+                .map_err(|e| anyhow!("Failed to convert timestamp to i64: {e}"))?;
+            let mut chain_id_bytes = vec![0u8; 32];
+            block_constants
+                .chain_id
+                .to_little_endian(&mut chain_id_bytes);
+            match tezos_execution::validate_and_apply_operation(
+                host,
+                &context,
+                op.hash().map_err(|e| {
+                    Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                        e.to_string(),
+                    ))
+                })?,
+                // TODO: !20198 avoid this clone.
+                op.clone(),
+                &BlockCtx {
+                    level: &BlockNumber {
+                        block_number: block_constants
+                            .number
+                            .try_into()
+                            .map_err(|e| anyhow!("{e}"))?,
+                    },
+                    now: &Timestamp::from(i64_timestamp),
+                    // SAFETY: chain_id_bytes is defined as 32 bytes long.
+                    chain_id: &ChainId::try_from_bytes(&chain_id_bytes[..4])?,
+                },
+                skip_signature_check,
+            ) {
+                Ok(res) => {
+                    log!(
+                        host,
+                        Debug,
+                        "Delayed Tezos operation status: SUCCESS - {:?}",
+                        res
+                    );
+                    Ok::<_, anyhow::Error>(ExecutionResult::Valid(TransactionResult {
+                        caller: H160::zero(),
+                        execution_outcome: ExecutionOutcome {
+                            result: revm::context::result::ExecutionResult::Success {
+                                // TODO: use `Revert` when the operation isn't applied.
+                                reason: revm::context::result::SuccessReason::Return,
+                                gas_used: 0,
+                                gas_refunded: 0,
+                                logs: vec![],
+                                output: revm::context::result::Output::Call(Bytes::new()),
+                            },
+                            withdrawals: vec![],
+                        },
+                        gas_used: U256::zero(),
+                        estimated_ticks_used: 0,
+                        runtime: TezosXRuntime::Tezos,
+                    }))
+                }
+                Err(OperationError::Validation(err)) => {
+                    log!(
+                        host,
+                        Info,
+                        "Delayed Tezos operation status: ERROR - {:?}",
+                        err
+                    );
+                    Ok::<_, anyhow::Error>(ExecutionResult::Invalid)
+                }
+                Err(OperationError::RuntimeError(err)) => {
+                    log!(
+                        host,
+                        Info,
+                        "Delayed Tezos operation runtime error: {:?}",
+                        err
+                    );
+                    return Err(err.into());
+                }
+            }?
         }
     };
 

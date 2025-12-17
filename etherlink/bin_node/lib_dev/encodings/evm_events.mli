@@ -10,7 +10,7 @@
 open Ethereum_types
 
 module Delayed_transaction : sig
-  type kind = Transaction | Deposit | Fa_deposit
+  type kind = EthereumTransaction | Deposit | Fa_deposit | TezosOperation
 
   type t = {kind : kind; hash : hash; raw : string}
 
@@ -21,6 +21,7 @@ module Delayed_transaction : sig
   val of_rlp_content :
     ?transaction_tag:string ->
     ?fa_deposit_tag:string ->
+    ?operation_tag:string ->
     hash ->
     Rlp.item ->
     t option

@@ -535,6 +535,9 @@ pub fn handle_run_transaction<Host: Runtime>(
                 gas: None,
             }
         }
+        TransactionContent::TezosDelayed(_) => Err(Error::TcError(
+            "TezosDelayed transactions are not supported".to_string(),
+        ))?,
     };
 
     let result_data = get_result_data(result);
