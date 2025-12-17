@@ -5,14 +5,15 @@ set -e
 # This script wraps dune to compute and report cache hit ratio in CI when DUNE_CACHE_INFO=true.
 # It analyzes dune's cache debug output to show how many files were restored vs rebuilt.
 
-# Set DUNE_CACHE_INFO to "true" if we are in a CI scheduled pipeline
-if [ -n "$TZ_SCHEDULE_KIND" ]; then
+# Set DUNE_CACHE_INFO to "true" if the CI pipeline is scheduled or triggered via api
+if [ "$CI_PIPELINE_SOURCE" = "schedule" ] || [ "$CI_PIPELINE_SOURCE" = "api" ]; then
   DUNE_CACHE_INFO="true"
 fi
 
 # Check if DUNE_CACHE_INFO is set to "true"
 # If not, just run dune build normally without cache reporting
 if [ "${DUNE_CACHE_INFO}" != "true" ]; then
+  echo "dune cache stats (via [dune.sh]) disabled"
   dune "$@"
   exit $?
 fi
@@ -63,15 +64,15 @@ if [ -f "${CACHE_DEBUG_LOG}" ]; then
   TOTAL_OPS=$((CACHE_HITS + FS_MISS))
 
   if [ ${TOTAL_OPS} -gt 0 ]; then
-    HIT_RATIO=$(awk -v h="${CACHE_HITS}" -v t="${TOTAL_OPS}" 'BEGIN { printf "%.2f", (h / t) * 100 }')
+    HIT_RATIO=$(awk -v h="${CACHE_HITS}" -v t="${TOTAL_OPS}" 'BEGIN { printf "%f", (h / t) }')
   else
-    HIT_RATIO="0.00"
+    HIT_RATIO="0."
   fi
 else
   CACHE_HITS=0
   FS_MISS=0
   TOTAL_OPS=0
-  HIT_RATIO="0.00"
+  HIT_RATIO="0."
 fi
 
 echo
@@ -80,7 +81,7 @@ echo "Cache hit ratio analysis:"
 printf "  Files restored from cache:    %s\n" "${CACHE_HITS}"
 printf "  Files built (cache miss):     %s\n" "${FS_MISS}"
 printf "  Total operations:             %s\n" "${TOTAL_OPS}"
-printf "  Cache hit ratio:              %s%%\n" "${HIT_RATIO}"
+printf "  Cache hit ratio:              %s\n" "${HIT_RATIO}"
 echo "---------------------------------------------------------------"
 echo
 
