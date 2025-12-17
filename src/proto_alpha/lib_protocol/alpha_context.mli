@@ -4645,6 +4645,11 @@ module Clst : sig
       requests from [contract] at the given [cycle] of [amount] tez. *)
   val add_redemption_request :
     context -> Contract.t -> Cycle.t -> Tez.t -> context tzresult Lwt.t
+
+  module For_RPC : sig
+    val get_redeemed_balance :
+      context -> Contract.t -> Tez.t option tzresult Lwt.t
+  end
 end
 
 (** See {!Block_payload_repr}. *)

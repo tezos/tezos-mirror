@@ -44,3 +44,8 @@ val add_redemption_request :
   Cycle_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+module For_RPC : sig
+  val get_redeemed_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+end

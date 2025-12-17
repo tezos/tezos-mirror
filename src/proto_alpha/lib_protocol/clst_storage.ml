@@ -85,3 +85,26 @@ let add_redemption_request ctxt contract cycle amount =
   let*? requests = Storage.Unstake_request.add cycle amount requests in
   let*! ctxt = set_stored_requests ctxt contract requests in
   return ctxt
+
+module For_RPC = struct
+  let get_redeemed_balance ctxt =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8227
+       Handle slashing in the RPC. *)
+    let open Lwt_result_syntax in
+    function
+    | Contract_repr.Originated _ -> return_none
+    | Implicit _ as contract -> (
+        let* redeemed_frozen_requests =
+          Storage.Clst.Redemption_requests.find ctxt contract
+        in
+        match redeemed_frozen_requests with
+        | None -> return_some Tez_repr.zero
+        | Some redeemed_frozen_requests ->
+            let*? sum =
+              List.fold_left_e
+                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+                Tez_repr.zero
+                redeemed_frozen_requests
+            in
+            return_some sum)
+end
