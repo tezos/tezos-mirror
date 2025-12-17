@@ -165,55 +165,51 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
        happens, received data are considered as spam (invalid), and the remote
        peer might be punished, depending on the Gossipsub implementation. *)
     `Invalid
-  else
-    (* Have some slack for outdated messages. *)
-    let slack = 4 in
-    if
-      Int32.(
-        sub head_level message_id.Types.Message_id.level
-        > of_int (proto_parameters.Types.attestation_lag + slack))
-    then
-      (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
+  else if
+    Int32.(
+      sub head_level message_id.Types.Message_id.level
+      > of_int
+          (proto_parameters.Types.attestation_lag + Constants.validation_slack))
+  then
+    (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
          should only be used for the dissemination of fresh data. Old data could
          be retrieved using another method. *)
-      `Outdated
-    else
-      match
-        gossipsub_message_id_validation ctxt proto_parameters message_id
-      with
-      | `Valid ->
-          (* 3. Only check for message validity if the message_id is valid. *)
-          let res =
-            Option.fold
-              message
-              ~none:`Valid
-              ~some:
-                (gossipsub_app_message_payload_validation
-                   ~disable_shard_validation:
-                     (Node_context.get_disable_shard_validation ctxt)
-                   cryptobox
-                   message_id)
-          in
-          (if res = `Valid then
-             let store = Node_context.get_store ctxt in
-             let traps_store = Store.traps store in
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+    `Outdated
+  else
+    match gossipsub_message_id_validation ctxt proto_parameters message_id with
+    | `Valid ->
+        (* 3. Only check for message validity if the message_id is valid. *)
+        let res =
+          Option.fold
+            message
+            ~none:`Valid
+            ~some:
+              (gossipsub_app_message_payload_validation
+                 ~disable_shard_validation:
+                   (Node_context.get_disable_shard_validation ctxt)
+                 cryptobox
+                 message_id)
+        in
+        (if res = `Valid then
+           let store = Node_context.get_store ctxt in
+           let traps_store = Store.traps store in
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
                 The [proto_parameters] are those for the last known finalized
                 level, which may differ from those of the slot level. This
                 will be an issue when the value of the [traps_fraction]
                 changes. (We cannot use {!Node_context.get_proto_parameters},
                 as it is not monad-free; we'll need to use mapping from levels
                 to parameters.) *)
-             Option.iter
-               (Slot_manager.maybe_register_trap
-                  traps_store
-                  ~traps_fraction:proto_parameters.traps_fraction
-                  message_id)
-               message) ;
-          res
-      | other ->
-          (* 4. In the case the message_id is not valid. *)
-          other
+           Option.iter
+             (Slot_manager.maybe_register_trap
+                traps_store
+                ~traps_fraction:proto_parameters.traps_fraction
+                message_id)
+             message) ;
+        res
+    | other ->
+        (* 4. In the case the message_id is not valid. *)
+        other
 
 type batch_identifier = {level : int32; slot_index : int}
 
@@ -254,12 +250,12 @@ let triage ctxt head_level proto_parameters batch =
              message,
              _peers )
          ->
-        (* Have some slack for outdated messages. *)
-        let slack = 4 in
         if
           Int32.(
             sub head_level level
-            > of_int (proto_parameters.Types.attestation_lag + slack))
+            > of_int
+                (proto_parameters.Types.attestation_lag
+               + Constants.validation_slack))
         then (index, `Outdated) :: not_valid
         else
           match gossipsub_message_id_validation ctxt proto_parameters id with

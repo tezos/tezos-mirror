@@ -262,13 +262,16 @@ module Export = struct
       | Some requested -> max first_seen_level requested
     in
     (* The DAL node stops validating shards published at a level older than
-       last_processed_level - (4 + attestation_lag), which means that data
+       last_processed_level - (slack + attestation_lag), which means that data
        before this point won't be updated by the DAL node. We cap the
        max_published_level to this value to avoid exporting stale data. *)
     let max_published_level =
       let latest_frozen_level =
         Int32.(
-          sub last_processed_level (of_int (4 + Constants.attestation_lag + 1)))
+          sub
+            last_processed_level
+            (of_int
+               (Constants.validation_slack + Constants.attestation_lag + 1)))
       in
       match max_published_level with
       | None -> latest_frozen_level

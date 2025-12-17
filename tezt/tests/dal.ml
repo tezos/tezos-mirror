@@ -2334,7 +2334,8 @@ let test_dal_node_snapshot_export ~operators _protocol parameters cryptobox node
   let expected_exported_levels = 5 in
   let stop =
     start + expected_exported_levels
-    + parameters.Dal_common.Parameters.attestation_lag + 4 + 1
+    + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 1
   in
   let* published =
     publish_and_bake
