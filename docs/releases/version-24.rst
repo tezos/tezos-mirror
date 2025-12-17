@@ -96,4 +96,5 @@ If you are using Docker instead, use the ``octez-v24.0-rc2`` Docker images of Oc
 Changelog
 ---------
 
+- `Version 24.0~rc2 <../CHANGES.html#version-24-0-rc2>`_
 - `Version 24.0~rc1 <../CHANGES.html#version-24-0-rc1>`_
