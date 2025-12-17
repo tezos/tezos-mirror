@@ -249,17 +249,18 @@ let () =
     Option.value ~default:Tez.zero frozen_redeemed_balance_before
   in
   let redeemed_amount_mutez = 30_000_000L in
+  let redeemed_amount = Tez.of_mutez_exn redeemed_amount_mutez in
   let* redeem_tx =
     Op.clst_redeem ~fee:Tez.zero (B b) account redeemed_amount_mutez
   in
-  let* b = Block.bake ~operation:redeem_tx b in
+  let* b, full_metadata = Block.bake_with_metadata ~operation:redeem_tx b in
   let* () =
     Assert.clst_frozen_redeemed_balance_was_credited
       ~loc:__LOC__
       (B b)
       account
       frozen_redeemed_balance_before
-      (Tez.of_mutez_exn redeemed_amount_mutez)
+      redeemed_amount
   in
   let* () =
     check_clst_balance_diff
@@ -269,6 +270,19 @@ let () =
       b
       account
   in
+  let cycle = Block.current_cycle b in
+  let expected_balance_updates =
+    [
+      Alpha_context.Receipt.(
+        item CLST_deposits (Debited redeemed_amount) Block_application);
+      Receipt.(
+        item
+          (CLST_redeemed_deposits (account, cycle))
+          (Credited redeemed_amount)
+          Block_application);
+    ]
+  in
+  let* () = check_balance_updates full_metadata expected_balance_updates in
   return_unit
 
 let () =
