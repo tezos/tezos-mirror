@@ -1009,6 +1009,27 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           some tzkt_proxy
         else none
       in
+      let* _tzkt_api_endpoint_opt =
+        match Cli.external_tzkt_api with
+        | Some _ when Cli.tzkt ->
+            Test.fail
+              ~__LOC__
+              "TzKT has been specified to be run both locally (--tzkt) and \
+               externally (--external-tzkt-api)"
+        | Some external_tzkt_api -> some (External external_tzkt_api)
+        | None when Cli.tzkt ->
+            let tzkt_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.tzkt_api_domain) dns_domains)
+                Cli.tzkt_api_port
+                activate_ssl
+            in
+            some (Internal tzkt_proxy)
+        | None -> none
+      in
       let* faucet_proxys_opt =
         match (tzkt_api_proxy_opt, Cli.faucet) with
         | Some tzkt_api_proxy, true ->
