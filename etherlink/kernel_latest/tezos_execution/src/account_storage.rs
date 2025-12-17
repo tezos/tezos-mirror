@@ -225,8 +225,8 @@ impl TezosImplicitAccount for TezlinkImplicitAccount {
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
-    pub(crate) path: OwnedPath,
-    pub(crate) kt1: ContractKt1Hash,
+    pub path: OwnedPath,
+    pub kt1: ContractKt1Hash,
 }
 
 impl TezlinkAccount for TezlinkOriginatedAccount {

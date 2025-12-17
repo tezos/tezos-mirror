@@ -61,11 +61,6 @@ pub trait Context {
     fn from_root(root: &impl Path) -> Result<Self, PathError>
     where
         Self: Sized;
-
-    #[cfg(test)]
-    fn init_context() -> Self
-    where
-        Self: Sized;
 }
 
 impl Context for TezlinkContext {
@@ -108,9 +103,11 @@ impl Context for TezlinkContext {
     fn path(&self) -> OwnedPath {
         self.path.clone()
     }
+}
 
+impl TezlinkContext {
     #[cfg(test)]
-    fn init_context() -> Self {
+    pub fn init_context() -> Self {
         let path = RefPath::assert_from(b"/tezlink/context");
         Self {
             path: OwnedPath::from(path),
@@ -127,15 +124,15 @@ pub mod contracts {
 
     const GLOBAL_COUNTER: RefPath = RefPath::assert_from(b"/global_counter");
 
-    pub fn root(context: &TezlinkContext) -> Result<OwnedPath, PathError> {
-        concat(&context.path, &ROOT)
+    pub fn root<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
+        concat(&context.path(), &ROOT)
     }
 
-    pub fn index(context: &TezlinkContext) -> Result<OwnedPath, PathError> {
+    pub fn index<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &INDEX)
     }
 
-    pub fn global_counter(context: &TezlinkContext) -> Result<OwnedPath, PathError> {
+    pub fn global_counter<C: Context>(context: &C) -> Result<OwnedPath, PathError> {
         concat(&root(context)?, &GLOBAL_COUNTER)
     }
 }
