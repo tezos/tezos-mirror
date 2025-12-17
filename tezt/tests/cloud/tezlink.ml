@@ -13,6 +13,32 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
+(* This is a temporary fix to https://linear.app/tezos/issue/L2-730.
+   It allows to make sure the error message is printed when it occurs (with
+   `Log.error`).
+   Remove this module when the issue is fixed. *)
+module Test = struct
+  include Test
+
+  exception Failed of string
+
+  let fail ?__LOC__ x =
+    Format.kasprintf
+      (fun message ->
+        let message =
+          match __LOC__ with
+          | None ->
+              Log.error "%s" message ;
+              message
+          | Some loc ->
+              let message = sf "%s: %s" loc message in
+              Log.error "%s" message ;
+              message
+        in
+        raise (Failed message))
+      x
+end
+
 let build_endpoint ?path ~runner ~dns_domain port =
   let host = Option.value ~default:(Runner.address runner) dns_domain in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
