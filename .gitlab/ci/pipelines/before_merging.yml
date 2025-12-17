@@ -1818,7 +1818,7 @@ oc.check_lift_limits_patch:
   - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
     "src/proto_alpha/lib_protocol/main.ml" ]'
   - git apply src/bin_tps_evaluation/lift_limits.patch
-  - dune build @src/proto_alpha/lib_protocol/check
+  - scripts/ci/dune.sh build @src/proto_alpha/lib_protocol/check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1915,7 +1915,7 @@ oc.integration:compiler-rejections:
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
-  - dune build @runtest_rejections
+  - scripts/ci/dune.sh build @runtest_rejections
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1974,7 +1974,7 @@ oc.script:test-gen-genesis:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
-  - dune build scripts/gen-genesis/gen_genesis.exe
+  - scripts/ci/dune.sh build scripts/gen-genesis/gen_genesis.exe
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -2212,7 +2212,7 @@ oc.unit:protocol_compiles:
   script:
   - . ./scripts/version.sh
   - eval $(opam env)
-  - dune build @runtest_compile_protocol
+  - scripts/ci/dune.sh build @runtest_compile_protocol
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

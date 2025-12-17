@@ -35,7 +35,7 @@ let job_check_lift_limits_patch =
       "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut \
        -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
       "git apply src/bin_tps_evaluation/lift_limits.patch";
-      "dune build @src/proto_alpha/lib_protocol/check";
+      "scripts/ci/dune.sh build @src/proto_alpha/lib_protocol/check";
     ]
 
 let job_python_check =
@@ -68,7 +68,7 @@ let job_integration_compiler_rejections =
     [
       ". ./scripts/version.sh";
       "eval $(opam env)";
-      "dune build @runtest_rejections";
+      "scripts/ci/dune.sh build @runtest_rejections";
     ]
 
 let job_script_test_gen_genesis =
@@ -79,7 +79,10 @@ let job_script_test_gen_genesis =
     ~description:"Check that scripts/gen-genesis/gen_genesis.exe still builds."
     ~image:Tezos_ci.Images.CI.build
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
-    ["eval $(opam env)"; "dune build scripts/gen-genesis/gen_genesis.exe"]
+    [
+      "eval $(opam env)";
+      "scripts/ci/dune.sh build scripts/gen-genesis/gen_genesis.exe";
+    ]
 
 let job_script_snapshot_alpha_and_link =
   CI.job
@@ -232,7 +235,7 @@ let job_oc_unit_protocol_compiles =
     [
       ". ./scripts/version.sh";
       "eval $(opam env)";
-      "dune build @runtest_compile_protocol";
+      "scripts/ci/dune.sh build @runtest_compile_protocol";
     ]
 
 let job_oc_unit_webassembly_x86_64 =
