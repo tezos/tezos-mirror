@@ -546,7 +546,14 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
     service_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
-  let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
+  let viewer =
+    let in_tzkt_sandbox api_url =
+      sf "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s" api_url
+    in
+    let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
+    let api_url = Client.url_encoded_string_of_endpoint tzkt_api in
+    in_tzkt_sandbox api_url
+  in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
      not yet support using sandbox.tzkt.io as explorer. *)
@@ -576,14 +583,14 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
       "name": "Custom",
       "rpcUrl": %S,
       "faucetAddress": %S,
-      "viewer": "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s"
+      "viewer": "%s"
     }
 }
 |}
       (Client.string_of_endpoint faucet_api)
       tezlink_sandbox_endpoint
       faucet_pkh
-      (Client.url_encoded_string_of_endpoint tzkt_api)
+      viewer
   in
   let* () =
     run_cmd
