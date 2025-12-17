@@ -643,7 +643,7 @@ module Umami_process = struct
       ]
 end
 
-let umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url =
+let umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url ~faucet_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
      for now. *)
@@ -691,7 +691,7 @@ index 1d28850f..39a15d9b 100644
 +  rpcUrl: "%s",
 +  tzktApiUrl: "%s",
 +  tzktExplorerUrl: "%s",
-+  buyTezUrl: "",
++  buyTezUrl: "%s",
 +};
 +
  export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
@@ -702,9 +702,10 @@ index 1d28850f..39a15d9b 100644
     rpc_url
     tzkt_api_url
     tzkt_url
+    faucet_url
 
 let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~tzkt_url ~umami_proxy
-    =
+    ~faucet_proxy_opt =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint =
     proxy_external_endpoint ~runner tzkt_api_proxy
@@ -716,7 +717,14 @@ let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~tzkt_url ~umami_proxy
      scheme where the suffix is the TzKT API parameter. In this case, we don't
      point to an explorer and simply leave the value empty (`""`). *)
   let tzkt_url = Option.value ~default:"" tzkt_url in
-  let patch = umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url in
+  let faucet_url =
+    Option.map
+      (fun proxy ->
+        proxy_external_endpoint ~runner proxy |> Client.string_of_endpoint)
+      faucet_proxy_opt
+    |> Option.value ~default:""
+  in
+  let patch = umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url ~faucet_url in
   (* Create a local patch file with its contents. *)
   let patch_filename = Temp.file "umami.patch" in
   let out_chan = Stdlib.open_out patch_filename in
@@ -1110,6 +1118,10 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~tzkt_api_proxy
               ~tzkt_url:Cli.external_tzkt
               ~umami_proxy
+              ~faucet_proxy_opt:
+                (Option.map
+                   (fun proxys -> proxys.faucet_frontend_proxy)
+                   faucet_proxys_opt)
       and* () =
         match faucet_proxys_opt with
         | None when Cli.faucet_private_key <> None ->
