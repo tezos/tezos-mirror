@@ -100,7 +100,7 @@ let loop_sequencer (type f) multichain
         ~evm_node_endpoint
         ~rpc_timeout
         ~next_blueprint_number:head.next_blueprint_number
-        ~instant_confirmations
+        ~instant_confirmations:false
         ~on_new_blueprint:(fun (Qty number) blueprint ->
           let*! {next_blueprint_number = Qty expected_number; _} =
             Evm_context.head_info ()
@@ -121,7 +121,7 @@ let loop_sequencer (type f) multichain
             let* _ =
               Block_producer.produce_block
                 ~force:true
-                ~timestamp:blueprint.blueprint.timestamp
+                ~timestamp:(Some blueprint.blueprint.timestamp)
             in
             let*! head = Evm_context.head_info () in
             let* storage_version = Evm_state.storage_version head.evm_state in
@@ -156,8 +156,9 @@ let loop_sequencer (type f) multichain
               let diff = Time.Protocol.(diff now last_produced_block) in
               diff >= Int64.of_float time_between_blocks
             in
+            let timestamp = if instant_confirmations then None else Some now in
             let* has_produced_block =
-              Block_producer.produce_block ~force ~timestamp:now
+              Block_producer.produce_block ~force ~timestamp
             and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
             match has_produced_block with
             | `Block_produced _nb_transactions -> loop now
