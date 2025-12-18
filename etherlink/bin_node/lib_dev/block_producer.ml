@@ -541,10 +541,21 @@ let produce_block (state : Types.state) ~force
         else
           let* delayed_hashes, transactions_and_objects =
             if state.preconfirmation_stream_enabled then
-              let delayed_hashes =
-                List.map
-                  (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
-                  state.selected_delayed_txns
+              let* delayed_hashes =
+                match (state.selected_delayed_txns, state.validated_txns) with
+                | [], [] ->
+                    let* delayed_hashes, _rem_size =
+                      head_info_and_delayed_transactions
+                        ~with_delayed_transactions
+                        head_info.evm_state
+                        state.maximum_number_of_chunks
+                    in
+                    return delayed_hashes
+                | selected_delayed_txns, _validated_txns ->
+                    return
+                    @@ List.map
+                         (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
+                         selected_delayed_txns
               in
               return
                 ( delayed_hashes,
