@@ -130,7 +130,6 @@ octez-smart-rollup-node-Proxford: src/proto_018_Proxford/lib_sc_rollup_node
 octez-smart-rollup-node-PsParisC: src/proto_020_PsParisC/lib_sc_rollup_node
 octez-smart-rollup-node-PsQuebec: src/proto_021_PsQuebec/lib_sc_rollup_node
 octez-smart-rollup-node-PsRiotum: src/proto_022_PsRiotum/lib_sc_rollup_node
-octez-smart-rollup-node-PtNairob: src/proto_017_PtNairob/lib_sc_rollup_node
 octez-smart-rollup-node-PtParisB: src/proto_019_PtParisB/lib_sc_rollup_node
 octez-smart-rollup-node-PtSeouLo: src/proto_023_PtSeouLo/lib_sc_rollup_node
 octez-smart-rollup-node-PtTALLiN: src/proto_024_PtTALLiN/lib_sc_rollup_node

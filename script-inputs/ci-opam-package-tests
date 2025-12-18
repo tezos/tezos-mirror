@@ -22,14 +22,14 @@ octez-internal-libs	all	7
 octez-l2-libs	all	6
 octez-lib-upnp	all	6
 octez-lib-upnp-args	all	7
-octez-libs	all	7
+octez-libs	all	6
 octez-lwt-domain	all	7
 octez-node	exec	1
 octez-node-config	all	4
 octez-performance-metrics	all	6
 octez-proto-libs	all	6
 octez-protocol-000-Ps9mPmXa-libs	all	2
-octez-protocol-001-PtCJ7pwo-libs	all	3
+octez-protocol-001-PtCJ7pwo-libs	all	2
 octez-protocol-002-PsYLVpVv-libs	all	3
 octez-protocol-003-PsddFKi3-libs	all	3
 octez-protocol-004-Pt24m4xi-libs	all	3
@@ -69,7 +69,6 @@ octez-smart-rollup-node-Proxford	all	2
 octez-smart-rollup-node-PsParisC	all	2
 octez-smart-rollup-node-PsQuebec	all	2
 octez-smart-rollup-node-PsRiotum	all	2
-octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
 octez-smart-rollup-node-PtSeouLo	all	1
 octez-smart-rollup-node-PtTALLiN	all	1
@@ -78,7 +77,7 @@ octez-smart-rollup-node-lib	all	2
 octez-version	exec	6
 tezos-benchmark	all	6
 tezos-client-demo-counter	all	3
-tezos-client-genesis	all	4
+tezos-client-genesis	all	3
 tezos-dal-node-lib	all	4
 tezos-dal-node-services	all	6
 tezos-openapi	all	6
@@ -93,7 +92,7 @@ tezos-protocol-006-PsCARTHA	all	4
 tezos-protocol-007-PsDELPH1	all	4
 tezos-protocol-008-PtEdo2Zk	all	4
 tezos-protocol-008-PtEdoTez	all	4
-tezos-protocol-009-PsFLoren	all	5
+tezos-protocol-009-PsFLoren	all	4
 tezos-protocol-010-PtGRANAD	all	5
 tezos-protocol-011-PtHangz2	all	5
 tezos-protocol-012-Psithaca	all	5
@@ -110,7 +109,7 @@ tezos-protocol-022-PsRiotum	all	5
 tezos-protocol-023-PtSeouLo	all	5
 tezos-protocol-024-PtTALLiN	all	5
 tezos-protocol-alpha	all	5
-tezos-protocol-demo-counter	all	6
+tezos-protocol-demo-counter	all	5
 tezos-protocol-demo-noops	all	6
 tezos-protocol-genesis	all	6
 tezt-tezos	all	6

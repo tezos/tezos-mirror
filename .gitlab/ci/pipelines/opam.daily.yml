@@ -145,7 +145,6 @@ opam:all_6:
       - tezt-tezos
       - tezos-protocol-genesis
       - tezos-protocol-demo-noops
-      - tezos-protocol-demo-counter
       - tezos-openapi
       - tezos-dal-node-services
       - tezos-benchmark
@@ -153,6 +152,7 @@ opam:all_6:
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
+      - octez-libs
       - octez-lib-upnp
       - octez-l2-libs
       - efunc_core
@@ -275,7 +275,6 @@ opam:all_2:
     - package:
       - octez-smart-rollup-node-lib
       - octez-smart-rollup-node-PtParisB
-      - octez-smart-rollup-node-PtNairob
       - octez-smart-rollup-node-PsRiotum
       - octez-smart-rollup-node-PsQuebec
       - octez-smart-rollup-node-PsParisC
@@ -287,6 +286,7 @@ opam:all_2:
       - octez-protocol-018-Proxford-libs
       - octez-protocol-017-PtNairob-libs
       - octez-protocol-016-PtMumbai-libs
+      - octez-protocol-001-PtCJ7pwo-libs
       - octez-protocol-000-Ps9mPmXa-libs
       - octez-injector
       - octez-baker-lib
@@ -410,6 +410,7 @@ opam:all_3:
   parallel:
     matrix:
     - package:
+      - tezos-client-genesis
       - tezos-client-demo-counter
       - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
@@ -426,7 +427,6 @@ opam:all_3:
       - octez-protocol-004-Pt24m4xi-libs
       - octez-protocol-003-PsddFKi3-libs
       - octez-protocol-002-PsYLVpVv-libs
-      - octez-protocol-001-PtCJ7pwo-libs
 
 opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -542,6 +542,7 @@ opam:all_4:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-009-PsFLoren
       - tezos-protocol-008-PtEdoTez
       - tezos-protocol-008-PtEdo2Zk
       - tezos-protocol-007-PsDELPH1
@@ -554,7 +555,6 @@ opam:all_4:
       - tezos-protocol-001-PtCJ7pwo
       - tezos-protocol-000-Ps9mPmXa
       - tezos-dal-node-lib
-      - tezos-client-genesis
       - octez-node-config
       - octez-crawler
       - octez-baking-common-lib
@@ -683,6 +683,7 @@ opam:all_5:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-demo-counter
       - tezos-protocol-alpha
       - tezos-protocol-024-PtTALLiN
       - tezos-protocol-023-PtSeouLo
@@ -699,7 +700,6 @@ opam:all_5:
       - tezos-protocol-012-Psithaca
       - tezos-protocol-011-PtHangz2
       - tezos-protocol-010-PtGRANAD
-      - tezos-protocol-009-PsFLoren
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -763,7 +763,6 @@ opam:all_7:
       - octez-riscv-api
       - octez-protocol-compiler-compat
       - octez-lwt-domain
-      - octez-libs
       - octez-lib-upnp-args
       - octez-internal-libs
       - octez-igd-next
