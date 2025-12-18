@@ -17,6 +17,10 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError};
 use tezos_storage::error::Error;
 
+pub const TEZOS_RUNTIME_TAG: u8 = 0x01;
+
+pub const ETHEREUM_RUNTIME_TAG: u8 = 0x02;
+
 pub struct TezosImplicitAccount {
     pub(crate) pkh: PublicKeyHash,
     pub(crate) path: OwnedPath,

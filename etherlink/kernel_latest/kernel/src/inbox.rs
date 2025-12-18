@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ChainConfigTrait, EvmChainConfig};
+use crate::chains::{ChainConfigTrait, EvmChainConfig, ExperimentalFeatures};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -544,6 +544,7 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let mut inbox_is_empty = true;
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(host)?;
+    let experimental_features = ExperimentalFeatures::read_from_storage(host);
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -552,6 +553,7 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
         dal_configuration: dal,
         buffer_transaction_chunks: None,
         next_blueprint_number,
+        experimental_features,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of
