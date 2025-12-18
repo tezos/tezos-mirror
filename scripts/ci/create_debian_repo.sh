@@ -144,15 +144,7 @@ for release in $RELEASES; do             # unstable, jammy, noble ...
   cd "$oldPWD"
 done
 
-if [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
-  echo "### Logging into protected repo ..."
-  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
-  gcloud auth activate-service-account --key-file=protected_sa.json
-else
-  echo "### Logging into standard repo ..."
-  # Nothing to do
-fi
-
+./scripts/ci/gcp_auth.sh
 GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
 export GOOGLE_OAUTH_ACCESS_TOKEN
 
