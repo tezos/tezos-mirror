@@ -8,7 +8,34 @@
 
 ### RPCs changes
 
-### Monitoring changes
+### Metrics changes
+
+### Command-line interface changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.50 (2025-12-19)
+
+This release most notably adds support for [Etherlink 6.1] native execution. In
+the event of a successful governance vote, this version will be required to
+preserve RPC performances. As a consequence, we strongly advise node operators
+to upgrade to this version ahead of the activation of Etherlink 6.1.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+[Etherlink 6.1]: https://medium.com/@etherlink/announcing-etherlink-6-1-a-bugfix-proposal-for-fa-token-deposits-2cc08ffd6fad
 
 ### Command-line interface changes
 
@@ -25,17 +52,6 @@
 ### Execution changes
 
 - Supports executing Farfadet-r1 natively. (!20285)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.49 (2025-12-04)
 
