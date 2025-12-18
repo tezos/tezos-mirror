@@ -25,4 +25,4 @@
   (source_tree ../riscv)
   (source_tree ../kernel_sdk)
   (source_tree ../../sdk/rust))
- (action (no-infer (bash ./build.sh))))
+ (action (no-infer (system ./build.sh))))

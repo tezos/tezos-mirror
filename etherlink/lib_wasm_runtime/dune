@@ -31,4 +31,4 @@
   (source_tree ../../src/kernel_sdk)
   (source_tree ../../sdk/rust)
   (source_tree src))
- (action (no-infer (bash ./build.sh))))
+ (action (no-infer (system ./build.sh))))

@@ -525,7 +525,7 @@ let lib_rustzcash =
                  [S "source_tree"; S "include"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
              ];
            ])
 
@@ -569,7 +569,7 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S "../kernel_sdk"];
                 [S "source_tree"; S "../../sdk/rust"];
               ];
-              [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+              [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
             ];
           ]
   in

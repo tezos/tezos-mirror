@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
@@ -22,10 +22,10 @@ cargo build --release --locked --target-dir="$CARGO_TARGET_DIR"
 # Copy the built artifacts to the output directory.
 cp -f "$CARGO_TARGET_DIR/release/liboctez_rust_deps.a" "$OUT_DIR/liboctez_rust_deps.a"
 
-if [[ -r "$CARGO_TARGET_DIR/release/liboctez_rust_deps.so" ]]; then
+if [ -r "$CARGO_TARGET_DIR/release/liboctez_rust_deps.so" ]; then
   cp -f "$CARGO_TARGET_DIR/release/liboctez_rust_deps.so" "$OUT_DIR/dlloctez_rust_deps.so"
 fi
 
-if [[ -r "$CARGO_TARGET_DIR/release/liboctez_rust_deps.dylib" ]]; then
+if [ -r "$CARGO_TARGET_DIR/release/liboctez_rust_deps.dylib" ]; then
   cp -f "$CARGO_TARGET_DIR/release/liboctez_rust_deps.dylib" "$OUT_DIR/dlloctez_rust_deps.so"
 fi
