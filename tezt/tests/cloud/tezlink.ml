@@ -445,7 +445,7 @@ let create_config_file ~agent destination format =
     format
 
 let create_env_file ~agent destination env =
-  let temp_file = Temp.file "config" in
+  let temp_file = Temp.file @@ Format.sprintf "config_%s" destination in
   let ch = open_out temp_file in
   let config_filtered =
     List.filter_map
