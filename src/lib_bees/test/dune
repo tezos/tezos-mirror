@@ -33,7 +33,8 @@
   mocked_worker
   test_bees_unit
   test_bees_unit_eio
-  test_bees_task_worker))
+  test_bees_task_worker
+  test_bees_lwt_async))
 
 (executable
  (name main)
