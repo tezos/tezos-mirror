@@ -50,8 +50,8 @@ let get_clst_hash ctxt =
 let total_amount_of_tez ctxt =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
-  let*@ hash = Clst.total_amount_of_tez alpha_ctxt in
-  return hash
+  let*@ amount = Clst.total_amount_of_tez alpha_ctxt in
+  return amount
 
 let create_funded_account ~funder ~amount_mutez b =
   let open Lwt_result_wrap_syntax in
@@ -76,14 +76,49 @@ let check_clst_balance_diff ~loc initial_balance_mutez diff_mutez b account =
   let expected_balance = Int64.add initial_balance_mutez diff_mutez in
   Assert.equal_int64 ~loc expected_balance balance
 
+(* Checks the block's balance updates contains the given balance updates, in the
+   given order. *)
+let check_balance_updates full_metadata expected_balance_updates =
+  let balance_updates = Block.get_balance_updates_from_metadata full_metadata in
+  (* The encoding for the single balance update is not exported, so
+     balance_update_item are wrapped as a singleton. *)
+  let pp_balance_update ppf bal =
+    Format.fprintf
+      ppf
+      "%s"
+      Data_encoding.Json.(
+        to_string (construct Receipt.balance_updates_encoding [bal]))
+  in
+  Assert.assert_is_subset_list
+    ~loc:__LOC__
+    ( = )
+    "Unexpected balance update"
+    pp_balance_update
+    expected_balance_updates
+    balance_updates
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
   let* b, sender = Context.init1 () in
   let amount = Tez.of_mutez_exn 100000000L in
   let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
-  let* b = Block.bake ~operation:deposit_tx b in
-  check_clst_balance_diff ~loc:__LOC__ 0L (Tez.to_mutez amount) b sender
+  let* b, full_metadata = Block.bake_with_metadata ~operation:deposit_tx b in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ 0L (Tez.to_mutez amount) b sender
+  in
+  let* clst_contract_hash = get_clst_hash (Context.B b) in
+  let expected_balance_updates =
+    [
+      Alpha_context.Receipt.(
+        item
+          (Contract (Originated clst_contract_hash))
+          (Debited amount)
+          Block_application);
+      Receipt.(item CLST_deposits (Credited amount) Block_application);
+    ]
+  in
+  check_balance_updates full_metadata expected_balance_updates
 
 let test_deposit_zero =
   register_test ~title:"Test depositing 0 tez amount is forbidden" @@ fun () ->
