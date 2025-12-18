@@ -262,7 +262,9 @@ module Bridge_frontend_process = struct
       ?runner
       daemon
       ()
-      ["-c"; sf "cd %s && npm run dev -- --port %d" path port]
+      [
+        "-c"; sf "cd %s && npx vite preview --host 127.0.0.1 --port %d" path port;
+      ]
 end
 
 let polling_period = function
