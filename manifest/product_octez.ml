@@ -6605,6 +6605,7 @@ end = struct
             ("test_sampler", N.(number >= 012));
             ("test_script_comparison", true);
             ("test_script_roundtrip", N.(number >= 019));
+            ("test_script_normalization", true);
             ("test_tez_repr", true);
             ("test_sc_rollup_tick_repr", N.(number >= 016));
             ("test_sc_rollup_encoding", N.(number >= 016));
@@ -6650,6 +6651,7 @@ end = struct
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
               parameters |> if_some |> if_ N.(number >= 016) |> open_;
+              plugin |> if_some |> open_;
             ]
       in
       let _unit =

@@ -22,7 +22,8 @@
   octez-protocol-023-PtSeouLo-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
-  tezos-protocol-023-PtSeouLo.parameters)
+  tezos-protocol-023-PtSeouLo.parameters
+  octez-protocol-023-PtSeouLo-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -40,7 +41,8 @@
   -open Tezos_smart_rollup_023_PtSeouLo
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_023_PtSeouLo_parameters)
+  -open Tezos_protocol_023_PtSeouLo_parameters
+  -open Tezos_protocol_plugin_023_PtSeouLo)
  (modules
   liquidity_baking_pbt
   saturation_fuzzing
@@ -49,6 +51,7 @@
   test_sampler
   test_script_comparison
   test_script_roundtrip
+  test_script_normalization
   test_tez_repr
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
