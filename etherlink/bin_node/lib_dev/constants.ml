@@ -36,6 +36,7 @@ type kernel =
   | DionysusR1
   | Ebisu
   | Farfadet
+  | FarfadetR1
 
 let kernel_from_string = function
   | "bifrost" -> Some Bifrost
@@ -45,6 +46,7 @@ let kernel_from_string = function
   | "dionysus-r1" -> Some DionysusR1
   | "ebisu" -> Some Ebisu
   | "farfadet" -> Some Farfadet
+  | "farfadet-r1" -> Some FarfadetR1
   | _ -> None
 
 let root_hash_from_kernel = function
@@ -62,3 +64,5 @@ let root_hash_from_kernel = function
       `Hex "00fea18ffecd0563f942b8b4c67911302754d7e505b5b5672ff03cb927b79ba830"
   | Farfadet ->
       `Hex "0079e0f348b608ce486c9e5e1fdf84b650019922bf3383b562522c2c8f60a098da"
+  | FarfadetR1 ->
+      `Hex "0056aea7f98b2bc4d18edb450b2f098f6e95e5356f30a1fac2b50080f3e482bad1"

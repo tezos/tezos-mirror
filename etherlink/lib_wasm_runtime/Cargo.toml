@@ -52,3 +52,7 @@ runtime-ebisu = { package = "tezos-evm-runtime-ebisu", path = "../kernel_ebisu/r
 # Farfadet
 kernel-farfadet = { package = "evm_kernel_farfadet", path = "../kernel_farfadet/kernel", default-features = false }
 runtime-farfadet = { package = "tezos-evm-runtime-farfadet", path = "../kernel_farfadet/runtime", default-features = false }
+
+# Farfadet R1
+kernel-farfadet-r1 = { package = "evm_kernel_farfadet_r1", path = "../kernel_farfadet_r1/kernel", default-features = false }
+runtime-farfadet-r1 = { package = "tezos-evm-runtime-farfadet-r1", path = "../kernel_farfadet_r1/runtime", default-features = false }
