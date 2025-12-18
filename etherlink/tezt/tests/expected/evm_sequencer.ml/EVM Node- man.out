@@ -793,28 +793,42 @@ Kernel commands:
     -f --password-filename <filename>: path to the password filename
   
   make upgrade payload with root hash <preimage_hash> at activation timestamp
-      <activation_timestamp>
+      <activation_timestamp> [-f --password-filename <filename>] [-d --wallet-dir <path>]
+      [--rollup <sr1...>]
     Create bytes payload for the upgrade entrypoint.
     <preimage_hash>: Root hash of the kernel to upgrade to.
-    <activation_timestamp>: After activation timestamp, the kernel will upgrade to this value.
+    <activation_timestamp>: After activation timestamp, the kernel will upgrade to this
+      value.
+      Must follow one of the following format:
+      - An RFC3399 timestamp: "[TIMESTAMP]",
+      - A number of second since the {!Time.Protocol.epoch},
+      - A delay from now: `+<n><T>` where <n> is an integer and <T> a unit `h`,`m`, or `s`.
+    -f --password-filename <filename>: path to the password filename
+    -d --wallet-dir <path>: The directory where the Tezos client stores all its wallet
+      data.
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR` if it exists, or
+      `$HOME/.tezos-client` otherwise.
+    --rollup <sr1...>: A rollup address or alias used to create the string that must be passed
+      to an admin contract
   
   make sequencer upgrade payload with pool address <pool_address> at activation timestamp
-      <activation_timestamp> for <sequencer-key> [--config-file <path>]
-      [--data-dir <data-dir>] [-d --wallet-dir <path>]
+      <activation_timestamp> for <sequencer-key> [-f --password-filename <filename>]
+      [-d --wallet-dir <path>] [--config-file <path>] [--data-dir <data-dir>]
     Create bytes payload for the sequencer upgrade entrypoint.
     <pool_address>: Pool address of the sequencer
     <activation_timestamp>: After activation timestamp, the kernel will upgrade to this value.
     <sequencer-key>: Key to sign the blueprints.
+    -f --password-filename <filename>: path to the password filename
+    -d --wallet-dir <path>: The directory where the Tezos client stores all its wallet
+      data.
+      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR` if it exists, or
+      `$HOME/.tezos-client` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to `config.json` inside the
       data directory of the node.
       If set, defaults to the value of the environment variable `$EVM_NODE_CONFIG_FILE`.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
-    -d --wallet-dir <path>: The directory where the Tezos client stores all its wallet
-      data.
-      Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR` if it exists, or
-      `$HOME/.tezos-client` otherwise.
   
   patch kernel with <kernel_path> [--data-dir <data-dir>] [--config-file <path>]
       [--block-number <N>] [-f --force]
