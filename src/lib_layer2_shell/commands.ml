@@ -94,9 +94,8 @@ let cat ~inspect =
     ~name:"cat"
     ~parse:
       (let open Cli_parser in
-       let* path = Cli.path in
-       let* pp = Cli.pp in
-       return (path, pp))
+       let+ pp = Cli.pp and+ path = Cli.path in
+       (path, pp))
     ~run:(fun p tree (path, pp) ->
       let open Lwt_result_syntax in
       let*! inspect_res = inspect tree path in
@@ -111,9 +110,9 @@ let tree ~subkeys =
     ~name:"tree"
     ~parse:
       (let open Cli_parser in
-       let* path = Cli.path in
-       let* depth = default_int_positive_long ~default:2 "depth" in
-       return (path, depth))
+       let+ depth = default_int_positive_long ~default:2 "depth"
+       and+ path = Cli.path in
+       (path, depth))
     ~run:(fun p tree (path, depth) ->
       let open Lwt_syntax in
       let* () = Printer.ln p "%s" (if path = "" then "." else path) in

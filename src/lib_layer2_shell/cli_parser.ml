@@ -79,8 +79,9 @@ let short char =
   in
   loop []
 
-let rec pos_arg placeholder = function
-  | x :: rst when String.starts_with ~prefix:"-" x -> pos_arg placeholder rst
+let pos_arg placeholder = function
+  | x :: _ when String.starts_with ~prefix:"-" x ->
+      fail "Expected positional argument %s, got %s" placeholder x
   | x :: rst -> Ok (x, rst)
   | [] -> fail "Missing positional argument %s" placeholder
 
