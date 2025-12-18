@@ -287,12 +287,16 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ?evm_version ?with_runtimes ~sequencer ~preimages_dir ~kernel () =
+    ?evm_version ?with_runtimes ~sequencer ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
     if not Tezosx_runtime.(mem Tezos with_runtimes) then []
     else tez_bootstrap_accounts
+  in
+  (* Legacy DAL signals are used until Tallinn (which is protocol 024) *)
+  let disable_legacy_dal_signals =
+    Protocol.number protocol > 024 && enable_dal
   in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -314,6 +318,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
+      ~disable_legacy_dal_signals
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
       ~eth_bootstrap_accounts
@@ -384,7 +389,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ~sequencer ~preimages_dir ?evm_version ~kernel ~client () =
+    ~sequencer ~preimages_dir ?evm_version ~kernel ~client protocol () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
   let* l2_configs =
     Lwt_list.map_s (fun s -> generate_l2_kernel_config s client) l2_setups
@@ -431,6 +436,10 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
   let chain_id =
     match l2_chain_ids with [chain_id] -> Some chain_id | _ -> None
   in
+  (* Legacy DAL signals are used until Tallinn (which is protocol 024) *)
+  let disable_legacy_dal_signals =
+    Protocol.number protocol > 024 && enable_dal
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
       ?chain_id
@@ -453,6 +462,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
+      ~disable_legacy_dal_signals
       ~enable_multichain:true
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts
@@ -474,7 +484,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
-    ?evm_version ?with_runtimes ~client () =
+    ?evm_version ?with_runtimes ~client protocol () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -502,6 +512,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?with_runtimes
       ~preimages_dir
       ~kernel
+      protocol
       ())
   else
     setup_kernel_multichain
@@ -523,6 +534,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ~preimages_dir
       ~kernel
       ~client
+      protocol
       ()
 
 let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
@@ -643,6 +655,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~preimages_dir
       ~kernel
       ~client
+      protocol
       ()
   in
   let* sc_rollup_address =
