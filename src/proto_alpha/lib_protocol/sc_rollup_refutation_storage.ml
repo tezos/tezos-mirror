@@ -256,16 +256,6 @@ let remove_game ctxt rollup stakers =
   in
   return ctxt
 
-(** [check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash
-    ~defender ~defender_commitment_hash] checks that the refuter is staked on
-    [commitment] with hash [refuter_commitment_hash], res. for [defender] and
-    [defender_commitment] with hash [defender_commitment_hash]. Fails with
-    {!Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment}.
-
-    It also verifies that both are pointing to the same predecessor and thus are
-    in conflict, fails with
-    {!Sc_rollup_errors.Sc_rollup_not_first_conflict_between_stakers} otherwise.
-*)
 let check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash ~defender
     ~defender_commitment_hash =
   let open Lwt_result_syntax in

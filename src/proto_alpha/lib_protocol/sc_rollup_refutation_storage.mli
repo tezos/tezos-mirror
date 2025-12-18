@@ -195,6 +195,25 @@ val apply_game_result :
 val migrate_clean_refutation_games :
   Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** [check_conflict_point ctxt rollup ~refuter ~refuter_commitment_hash
+    ~defender ~defender_commitment_hash] checks that the refuter is staked on
+    [commitment] with hash [refuter_commitment_hash], res. for [defender] and
+    [defender_commitment] with hash [defender_commitment_hash]. Fails with
+    {!Sc_rollup_errors.Sc_rollup_wrong_staker_for_conflict_commitment}.
+
+    It also verifies that both are pointing to the same predecessor and thus are
+    in conflict, fails with
+    {!Sc_rollup_errors.Sc_rollup_not_first_conflict_between_stakers} otherwise.
+    Finally it returns the defender's commitment. *)
+val check_conflict_point :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  refuter:Signature.public_key_hash ->
+  refuter_commitment_hash:Commitment_hash.t ->
+  defender:Signature.public_key_hash ->
+  defender_commitment_hash:Commitment_hash.t ->
+  (Sc_rollup_commitment_repr.t * Raw_context.t) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig
