@@ -20,10 +20,10 @@ use crate::migration::legacy::{
     WITHDRAWAL_ADDRESS,
 };
 use crate::storage::{
-    read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
+    clear_events, read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
     read_storage_version, store_backlog, store_dal_slots, store_storage_version,
     tweak_dal_activation, StorageVersion, DELAYED_BRIDGE, ENABLE_FA_BRIDGE,
-    EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, KERNEL_GOVERNANCE,
+    EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, KEEP_EVENTS, KERNEL_GOVERNANCE,
     KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
 };
 use crate::transaction::{Transaction, TransactionContent};
@@ -681,6 +681,8 @@ fn migrate_to<Host: Runtime>(
             // Re-inject locked FA deposit 0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38,
             // affected by the regression introduced by Farfadet
             if is_etherlink_network(host, MAINNET_CHAIN_ID)? && !evm_node_flag(host) {
+                clear_events(host)?;
+                host.store_write(&KEEP_EVENTS, &[], 0)?;
                 let mut delayed_inbox = DelayedInbox::new(host)?;
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
