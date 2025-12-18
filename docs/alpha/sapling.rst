@@ -100,7 +100,7 @@ transparent token.
 It suffices to add more values in the outputs than in the inputs
 to mint and to have more in inputs than outputs to burn.
 
-Preventing Malleability
+Preventing malleability
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 A Sapling transaction contains a ``bound_data`` field with arbitrary
@@ -272,7 +272,7 @@ Shielded tez
 An example contract implementing a shielded set of tokens with a 1 to 1 conversion rate to mutez is available in the tests of the protocol at
 :src:`src/proto_alpha/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz`.
 
-Simple Voting Contract
+Simple voting contract
 ^^^^^^^^^^^^^^^^^^^^^^
 
 One might envision using Sapling to implement private voting (i.e., a secret ballot).
@@ -454,7 +454,7 @@ the chain in case of loss. However disclosure of this file will reveal
 the balance and the unspent outputs of all viewing keys.
 
 Memo
-^^^^^^
+^^^^
 
 Sapling offers the possibility to add an arbitrary memo to any
 created output. The memo is encrypted and available to anyone
