@@ -378,6 +378,8 @@ let jobs pipeline_type =
           ~image:
             (Image.mk_external
                ~image_path:
+                 (* this is not a base image, but the dependency image
+                    from the packages pipelines *)
                  (Images.Base_images.path_prefix ^ "/build-ubuntu-noble:master"))
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
