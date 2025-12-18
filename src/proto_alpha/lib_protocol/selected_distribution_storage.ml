@@ -22,15 +22,14 @@ module Selected_distribution_for_cycle = struct
 
   let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
 
+  (* that's symbolic: 1 cycle = 1 entry *)
+  let size = 1
+
   let init ctxt cycle stakes =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
     let* ctxt =
       Storage.Stake.Selected_distribution_for_cycle.init ctxt cycle stakes
-    in
-    let size =
-      1
-      (* that's symbolic: 1 cycle = 1 entry *)
     in
     let*? ctxt = Cache.update ctxt id (Some (stakes, size)) in
     return ctxt
@@ -42,6 +41,7 @@ module Selected_distribution_for_cycle = struct
     match value_opt with
     | None ->
         let* v = Storage.Stake.Selected_distribution_for_cycle.get ctxt cycle in
+        let*? ctxt = Cache.update ctxt id (Some (v, size)) in
         return (ctxt, v)
     | Some v -> return (ctxt, v)
 
@@ -54,6 +54,7 @@ module Selected_distribution_for_cycle = struct
         let* v =
           Storage.Stake.Selected_distribution_for_cycle.find ctxt cycle
         in
+        let*? ctxt = Cache.update ctxt id (Option.map (fun v -> (v, size)) v) in
         return (ctxt, v)
     | Some _ as some_v -> return (ctxt, some_v)
 
