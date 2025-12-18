@@ -78,6 +78,7 @@ let job_script_test_gen_genesis =
     ~stage:Test
     ~description:"Check that scripts/gen-genesis/gen_genesis.exe still builds."
     ~image:Tezos_ci.Images.CI.build
+    ~cargo_cache:true
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     [
       "eval $(opam env)";
@@ -244,6 +245,7 @@ let job_oc_unit_webassembly_x86_64 =
     ~description:"Run the tests for WASM."
     ~arch:Amd64 (* The wasm tests are written in Python *)
     ~image:Tezos_ci.Images.CI.test
+    ~cargo_cache:true
     ~stage:Test
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~timeout:(Minutes 20)
