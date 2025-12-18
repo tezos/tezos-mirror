@@ -188,7 +188,7 @@ let test_more_than_one_slot_per_l1_level =
     ~tags:["evm"; "sequencer"; "chunks"]
     ~title:
       "Sequencer publishes entire blueprints on more than one slot to the DAL"
-  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; _} protocol ->
   let number_of_blueprints_sent_to_inbox = ref 0 in
   let inbox_counter_p =
     count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
@@ -205,45 +205,67 @@ let test_more_than_one_slot_per_l1_level =
   Check.((n = nb_transac) int)
     ~error_msg:
       (Format.sprintf "Expected %d transactions in the block" nb_transac) ;
-  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ()
-  and* _smart_rollup_address, signals =
-    Evm_node.wait_for_signal_signed sequencer
-  in
-  (* We check that there was a level at which at least 2 slots were
-     published. We do so by turning the list of signals into a map of
-     levels (ML) associating to each level a set of the signaled slot
-     (SSL) indices published at this level. *)
-  let module SSL = Set.Make (Int) in
-  let module ML = Map.Make (Int) in
-  let m =
-    List.fold_left
-      (fun acc (slot_index, published_level) ->
-        ML.update
-          published_level
-          (Option.fold
-             ~none:(Some (SSL.singleton slot_index))
-             ~some:(fun slots -> Some (SSL.add slot_index slots)))
-          acc)
-      ML.empty
-      signals
-  in
-  let more_than_one_slot =
-    ML.exists (fun _ signaled_slots -> SSL.cardinal signaled_slots >= 2) m
-  in
-  Check.(
-    is_true
-      more_than_one_slot
-      ~error_msg:
-        "Only one DAL slot has been used for each L1 level, expected at least \
-         two.") ;
-  Check.(
-    (!number_of_blueprints_sent_to_inbox = 0)
-      int
-      ~error_msg:
-        "No blueprint should've been sent through the inbox, otherwise it \
-         means that the data has been sent via the catchup mechanism") ;
-  Lwt.cancel inbox_counter_p ;
-  unit
+  (* For protocols <= 024 (Tallinn), legacy DAL signals are used and we can wait for them.
+     For protocols > 024, signals are disabled and replaced with DalAttestedSlots. *)
+  if Protocol.number protocol <= 024 then (
+    let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ()
+    and* _smart_rollup_address, signals =
+      Evm_node.wait_for_signal_signed sequencer
+    in
+    (* We check that there was a level at which at least 2 slots were
+       published. We do so by turning the list of signals into a map of
+       levels (ML) associating to each level a set of the signaled slot
+       (SSL) indices published at this level. *)
+    let module SSL = Set.Make (Int) in
+    let module ML = Map.Make (Int) in
+    let m =
+      List.fold_left
+        (fun acc (slot_index, published_level) ->
+          ML.update
+            published_level
+            (Option.fold
+               ~none:(Some (SSL.singleton slot_index))
+               ~some:(fun slots -> Some (SSL.add slot_index slots)))
+            acc)
+        ML.empty
+        signals
+    in
+    let more_than_one_slot =
+      ML.exists (fun _ signaled_slots -> SSL.cardinal signaled_slots >= 2) m
+    in
+    Check.(
+      is_true
+        more_than_one_slot
+        ~error_msg:
+          "Only one DAL slot has been used for each L1 level, expected at \
+           least two.") ;
+    Check.(
+      (!number_of_blueprints_sent_to_inbox = 0)
+        int
+        ~error_msg:
+          "No blueprint should've been sent through the inbox, otherwise it \
+           means that the data has been sent via the catchup mechanism") ;
+    Lwt.cancel inbox_counter_p ;
+    unit)
+  else
+    (* When legacy signals are disabled, just check that baking completes successfully
+       and no blueprints were sent to inbox. The DalAttestedSlots mechanism
+       doesn't emit signals to check. *)
+    let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
+    (* Bake 2 more blocks so DalAttestedSlots messages are processed with finality *)
+    let* () =
+      repeat 2 (fun () ->
+          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+          unit)
+    in
+    Check.(
+      (!number_of_blueprints_sent_to_inbox = 0)
+        int
+        ~error_msg:
+          "No blueprint should've been sent through the inbox, otherwise it \
+           means that the data has been sent via the catchup mechanism") ;
+    Lwt.cancel inbox_counter_p ;
+    unit
 
 let protocols = Protocol.all
 
