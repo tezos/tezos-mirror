@@ -14,7 +14,7 @@ use tezos_smart_rollup::{
     host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath};
+use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -31,18 +31,6 @@ pub enum Manager {
     // protocol and therefore is deprecated
     #[encoding(tag = 2)]
     Revealed(PublicKey),
-}
-
-fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
-    // uses the same encoding as in the octez node's representation of the context
-    // see `octez-codec describe alpha.contract binary schema`
-    let mut contract_encoded = Vec::new();
-    contract
-        .bin_write(&mut contract_encoded)
-        .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
-
-    let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
-    Ok(OwnedPath::try_from(path_string)?)
 }
 
 pub trait TezlinkAccount {
@@ -90,8 +78,8 @@ pub trait TezlinkAccount {
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkImplicitAccount {
-    path: OwnedPath,
-    pkh: PublicKeyHash,
+    pub path: OwnedPath,
+    pub pkh: PublicKeyHash,
 }
 
 impl TezlinkAccount for TezlinkImplicitAccount {
@@ -113,23 +101,14 @@ impl TezlinkImplicitAccount {
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
-        match contract {
-            Contract::Implicit(pkh) => Self::from_public_key_hash(context, pkh),
-            _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
-        }
+        context.implicit_from_contract(contract)
     }
 
     pub fn from_public_key_hash(
         context: &context::Context,
         pkh: &PublicKeyHash,
     ) -> Result<Self, tezos_storage::error::Error> {
-        let index = context::contracts::index(context)?;
-        let contract = Contract::Implicit(pkh.clone());
-        let path = concat(&index, &account_path(&contract)?)?;
-        Ok(TezlinkImplicitAccount {
-            path,
-            pkh: pkh.clone(),
-        })
+        context.from_public_key_hash(pkh)
     }
 
     /// Get the **counter** for the Tezlink account.
@@ -256,8 +235,8 @@ impl TezlinkImplicitAccount {
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
-    path: OwnedPath,
-    kt1: ContractKt1Hash,
+    pub path: OwnedPath,
+    pub kt1: ContractKt1Hash,
 }
 
 impl TezlinkAccount for TezlinkOriginatedAccount {
@@ -278,23 +257,14 @@ impl TezlinkOriginatedAccount {
         context: &context::Context,
         kt1: &ContractKt1Hash,
     ) -> Result<Self, tezos_storage::error::Error> {
-        let index = context::contracts::index(context)?;
-        let contract = Contract::Originated(kt1.clone());
-        let path = concat(&index, &account_path(&contract)?)?;
-        Ok(TezlinkOriginatedAccount {
-            path,
-            kt1: kt1.clone(),
-        })
+        context.from_kt1(kt1)
     }
 
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
-        match contract {
-            Contract::Originated(kt1) => Self::from_kt1(context, kt1),
-            _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
-        }
+        context.originated_from_contract(contract)
     }
 
     pub fn code(
@@ -410,6 +380,7 @@ mod test {
     use tezos_crypto_rs::PublicKeyWithHash;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::host::Runtime;
+    use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_host::path::RefPath;
 

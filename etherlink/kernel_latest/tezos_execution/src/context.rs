@@ -2,8 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::ast::big_map::BigMapId;
+use mir::ast::{big_map::BigMapId, PublicKeyHash};
+use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
+
+use crate::account_storage::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/7867: add the missing paths
 
@@ -30,6 +34,52 @@ impl Context {
         let path = RefPath::assert_from(b"/tezlink/context");
         Self {
             path: OwnedPath::from(path),
+        }
+    }
+
+    pub(crate) fn from_public_key_hash(
+        &self,
+        pkh: &PublicKeyHash,
+    ) -> Result<TezlinkImplicitAccount, tezos_storage::error::Error> {
+        let index = contracts::index(self)?;
+        let contract = Contract::Implicit(pkh.clone());
+        let path = concat(&index, &account::account_path(&contract)?)?;
+        Ok(TezlinkImplicitAccount {
+            path,
+            pkh: pkh.clone(),
+        })
+    }
+
+    pub(crate) fn implicit_from_contract(
+        &self,
+        contract: &Contract,
+    ) -> Result<TezlinkImplicitAccount, tezos_storage::error::Error> {
+        match contract {
+            Contract::Implicit(pkh) => self.from_public_key_hash(pkh),
+            _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
+        }
+    }
+
+    pub(crate) fn from_kt1(
+        &self,
+        kt1: &ContractKt1Hash,
+    ) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+        let index = contracts::index(self)?;
+        let contract = Contract::Originated(kt1.clone());
+        let path = concat(&index, &account::account_path(&contract)?)?;
+        Ok(TezlinkOriginatedAccount {
+            path,
+            kt1: kt1.clone(),
+        })
+    }
+
+    pub(crate) fn originated_from_contract(
+        &self,
+        contract: &Contract,
+    ) -> Result<TezlinkOriginatedAccount, tezos_storage::error::Error> {
+        match contract {
+            Contract::Originated(kt1) => self.from_kt1(kt1),
+            _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
         }
     }
 }
@@ -171,6 +221,8 @@ pub mod code {
 }
 
 pub mod account {
+    use mir::ast::BinWriter;
+
     use crate::account_storage::TezlinkAccount;
 
     use super::*;
@@ -180,6 +232,20 @@ pub mod account {
     const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
 
     const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
+
+    pub fn account_path(
+        contract: &Contract,
+    ) -> Result<OwnedPath, tezos_storage::error::Error> {
+        // uses the same encoding as in the octez node's representation of the context
+        // see `octez-codec describe alpha.contract binary schema`
+        let mut contract_encoded = Vec::new();
+        contract
+            .bin_write(&mut contract_encoded)
+            .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
+
+        let path_string = alloc::format!("/{}", hex::encode(&contract_encoded));
+        Ok(OwnedPath::try_from(path_string)?)
+    }
 
     pub fn balance_path<A: TezlinkAccount + ?Sized>(
         account: &A,
