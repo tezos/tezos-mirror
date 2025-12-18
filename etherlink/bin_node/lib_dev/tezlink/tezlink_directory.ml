@@ -6,6 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Tezos_services
+module Micheline = Tezos_micheline.Micheline
 
 type error +=
   | Unsupported_chain_parameter of string
@@ -349,12 +350,38 @@ let build_block_static_directory ~l2_chain_id
          Backend.list_contracts chain block)
   |> register
        ~service:Tezos_services.get_storage_normalized
-         (* TODO: #7995
-            Take unparsing_mode argument into account *)
-       ~impl:(fun ((((), chain), block), contract) () _unparsing_mode ->
+       ~impl:(fun ((((), chain), block), contract) () unparsing_mode ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         Backend.get_storage chain block contract)
+         let* script = Backend.get_script chain block contract in
+         match script with
+         | None -> return_none
+         | Some script -> (
+             match Data_encoding.force_decode script.storage with
+             | None -> return_none
+             | Some storage ->
+                 let elab_conf =
+                   Imported_protocol.Script_ir_translator_config.make
+                     ~legacy:true
+                     ()
+                 in
+                 let* ctxt = Tezlink_mock.init_dummy_context () in
+                 let open Imported_protocol_test_helpers.Lwt_result_wrap_syntax in
+                 let*@ Ex_code (Code {storage_type; _}), ctxt =
+                   Imported_protocol.Script_ir_translator.parse_code
+                     ~elab_conf
+                     ctxt
+                     ~code:script.code
+                 in
+                 let storage =
+                   Imported_protocol_plugin.RPC.Scripts.Normalize_data
+                   .normalize_data
+                     ~unparsing_mode
+                     storage_type
+                     ctxt
+                     (Micheline.root storage)
+                 in
+                 return_some (Micheline.strip_locations storage)))
   |> opt_register
        ~service:Tezos_services.get_storage
        ~impl:(fun ((((), chain), block), contract) _ _ ->
