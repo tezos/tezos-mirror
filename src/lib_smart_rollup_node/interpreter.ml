@@ -155,12 +155,10 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     predecessor Layer1.{hash = _; _} inbox_messages =
   let open Lwt_result_syntax in
   (* Retrieve the previous PVM state from store. *)
-  let* predecessor_state =
-    state_of_head (module Plugin) node_ctxt ctxt predecessor
-  in
-  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
+  let* state = state_of_head (module Plugin) node_ctxt ctxt predecessor in
+  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind state in
   let* {
-         state = {state; state_hash; inbox_level; tick; _};
+         state_info = {state_hash; inbox_level; tick; _};
          num_messages;
          num_ticks;
        } =
@@ -171,7 +169,7 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
       ~fuel:(Fuel.Free.of_ticks 0L)
       node_ctxt
       inbox_messages
-      predecessor_state
+      state
   in
   let*! () = Context.PVMState.set ctxt state in
   (* Produce events. *)
@@ -226,10 +224,9 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let* messages =
     Node_context.get_messages node_ctxt block.header.inbox_witness
   in
-  return
+  let info =
     Pvm_plugin_sig.
       {
-        state;
         state_hash;
         inbox_level;
         tick;
@@ -237,6 +234,8 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
         remaining_fuel = Fuel.Accounted.of_ticks 0L;
         remaining_messages = messages;
       }
+  in
+  return Pvm_plugin_sig.{state; info}
 
 (** [run_for_ticks plugin node_ctxt start_state tick_distance] starts the
     evaluation of messages in the [start_state] for at most [tick_distance]. *)
@@ -244,16 +243,21 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
     start_state tick =
   let open Lwt_result_syntax in
   let tick_distance =
-    Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
+    Z.sub tick start_state.Pvm_plugin_sig.info.tick |> Z.to_int64
   in
   let+ eval_result =
     Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_messages"
     @@ fun _ ->
-    Plugin.Pvm.Fueled.Accounted.eval_messages
-      node_ctxt
-      {start_state with remaining_fuel = Fuel.Accounted.of_ticks tick_distance}
+    (* Set remaining fuel to needed tick for evaluation *)
+    let info =
+      {
+        start_state.info with
+        remaining_fuel = Fuel.Accounted.of_ticks tick_distance;
+      }
+    in
+    Plugin.Pvm.Fueled.Accounted.eval_messages node_ctxt {start_state with info}
   in
-  eval_result.state
+  eval_result.state_info
 
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
@@ -261,17 +265,31 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   let* start_state =
     match start_state with
     | Some start_state
-      when start_state.Pvm_plugin_sig.inbox_level = event.header.level ->
+      when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
            starting state on hand. *)
         start_state_of_block plugin node_ctxt event
   in
+  let state = start_state.state in
   (* TODO: #3384
      We should test that we always have enough blocks to find the tick
      because [state_of_tick] is a critical function. *)
-  run_to_tick plugin node_ctxt start_state tick
+  let+ run_info = run_to_tick plugin node_ctxt start_state tick in
+  Pvm_plugin_sig.{state; info = run_info}
+
+(** This function memoizes [f tick], but puts an immutable state copy in the
+    cache, and returns a mutable version. Either the one obtained from [f]
+    directly or a copy of the one in the cache. *)
+let memo_tick_state cache tick f =
+  match Pvm_plugin_sig.Tick_state_cache.bind cache tick Lwt.return with
+  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+  | None ->
+      let p_mut = f tick in
+      let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
+      Pvm_plugin_sig.Tick_state_cache.put cache tick p_imm ;
+      p_mut
 
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
@@ -280,20 +298,14 @@ let global_tick_state_cache =
 (* Memoized version of [state_of_tick_aux] using global cache. *)
 let global_memo_state_of_tick_aux plugin node_ctxt ~start_state
     (event : Sc_rollup_block.t) tick =
-  Pvm_plugin_sig.Tick_state_cache.bind_or_put
-    global_tick_state_cache
-    tick
-    (state_of_tick_aux plugin node_ctxt ~start_state event)
-    Lwt.return
+  memo_tick_state global_tick_state_cache tick
+  @@ state_of_tick_aux plugin node_ctxt ~start_state event
 
 (* Memoized version of [state_of_tick_aux] using both global and local caches. *)
 let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     (event : Sc_rollup_block.t) tick =
-  Pvm_plugin_sig.Tick_state_cache.bind_or_put
-    state_cache
-    tick
-    (global_memo_state_of_tick_aux plugin node_ctxt ~start_state event)
-    Lwt.return
+  memo_tick_state state_cache tick
+  @@ global_memo_state_of_tick_aux plugin node_ctxt ~start_state event
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
     end_state] for [tick] if [tick] happened before
@@ -303,7 +315,7 @@ let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
   let min_level =
     match start_state with
     | None -> None
-    | Some s -> Some s.Pvm_plugin_sig.inbox_level
+    | Some s -> Some s.Pvm_plugin_sig.info.inbox_level
   in
   let* event =
     Node_context.block_with_tick node_ctxt ?min_level ~max_level:level tick

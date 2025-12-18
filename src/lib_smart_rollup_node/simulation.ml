@@ -123,10 +123,9 @@ let simulate_messages_no_checks
   let open (val plugin) in
   let*! state_hash = Pvm.state_hash node_ctxt.kind state in
   let*! tick = Pvm.get_tick node_ctxt.kind state in
-  let eval_state =
+  let eval_state_info =
     Pvm_plugin_sig.
       {
-        state;
         state_hash;
         tick;
         inbox_level;
@@ -136,8 +135,11 @@ let simulate_messages_no_checks
       }
   in
   (* Build new state *)
-  let* Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
-    Pvm.Fueled.Free.eval_messages ?reveal_map node_ctxt eval_state
+  let* Pvm_plugin_sig.{num_ticks; num_messages; _} =
+    Pvm.Fueled.Free.eval_messages
+      ?reveal_map
+      node_ctxt
+      {state; info = eval_state_info}
   in
   let*! () = Context.PVMState.set ctxt state in
   let nb_messages_inbox = nb_messages_inbox + num_messages in

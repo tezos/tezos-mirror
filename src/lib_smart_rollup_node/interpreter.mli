@@ -86,10 +86,11 @@ val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
   Pvm_plugin_sig.state_cache ->
-  ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
+  ?start_state:(Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->
-  Fuel.Accounted.t Pvm_plugin_sig.eval_state option tzresult Lwt.t
+  (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state option tzresult
+  Lwt.t
 
 (** [state_of_head plugin node_ctxt ctxt head] returns the state corresponding
     to the block [head], or the state at rollup genesis if the block is before

@@ -168,12 +168,23 @@ type pvmstate =
     }
       -> pvmstate
 
+type imm_pvmstate =
+  | Imm_PVMState : {
+      pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
+      impl_name : string;
+      pvmstate : 'state;
+      equality_witness : ('repo, 'state, 'mut_state) equality_witness;
+    }
+      -> imm_pvmstate
+
 let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
   PVMState {pvm_context_impl; impl_name; pvmstate; equality_witness}
 
 (** State of the PVM that this rollup node deals with *)
 module PVMState = struct
   type value = pvmstate
+
+  type immutable_value = imm_pvmstate
 
   let empty : type a. a index -> value =
    fun (Index
@@ -243,6 +254,39 @@ module PVMState = struct
         pvmstate =
           pvmstate |> Pvm_Context_Impl.to_imm |> Pvm_Context_Impl.from_imm;
       }
+
+  let imm_copy : value -> immutable_value =
+   fun (PVMState
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            pvmstate;
+            impl_name;
+            equality_witness;
+          }) ->
+    Imm_PVMState
+      {
+        pvm_context_impl = (module Pvm_Context_Impl);
+        pvmstate = Pvm_Context_Impl.to_imm pvmstate;
+        impl_name;
+        equality_witness;
+      }
+
+  let mut_copy : immutable_value -> value =
+   fun (Imm_PVMState
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            pvmstate;
+            impl_name;
+            equality_witness;
+          }) ->
+    PVMState
+      {
+        pvm_context_impl = (module Pvm_Context_Impl);
+        pvmstate = Pvm_Context_Impl.from_imm pvmstate;
+        impl_name;
+        equality_witness;
+      }
+    |> copy
 end
 
 module Internal_for_tests = struct

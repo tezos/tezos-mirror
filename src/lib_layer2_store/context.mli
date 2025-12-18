@@ -127,6 +127,10 @@ module PVMState : sig
   (** The value of a PVM state *)
   type value = pvmstate
 
+  (** Immutable representation of {!value}. In practice these are copies of
+      values. *)
+  type immutable_value
+
   (** [empty ()] is the empty PVM state. *)
   val empty : 'a index -> value
 
@@ -148,6 +152,14 @@ module PVMState : sig
 
   (** Copy a PVM state. WARNING: Can incur a significant memory allocation. *)
   val copy : value -> value
+
+  (** Create an immutable copy.
+      WARNING: Can incur a significant memory allocation. *)
+  val imm_copy : value -> immutable_value
+
+  (** Create a mutable copy.
+      WARNING: Can incur a significant memory allocation. *)
+  val mut_copy : immutable_value -> value
 end
 
 module Version : sig
