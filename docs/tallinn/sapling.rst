@@ -1,18 +1,17 @@
 Sapling support
 ===============
 
-This page first give some details on Sapling and its underlying concepts, and then describes the support for Sapling in Octez and in the Michelson language (part of the Tezos protocol).
+This page first gives some details on Sapling and its underlying concepts, and then describes the support for Sapling in Octez and in the Michelson language (part of the Tezos protocol).
 For support in high-level smart contract languages, see the `Sapling documentation in OpenTezos <https://opentezos.com/smart-contracts/smart-contracts-concepts/#sapling>`__.
 
 Sapling
 -------
 
-Sapling is a protocol enabling privacy-preserving transactions of fungible
-tokens in a decentralised
-environment. It was designed and implemented by the Electric Coin
-Company as the last iteration over a series of previous protocols and
-academic works starting with the `Zerocoin seminal
-paper <https://ieeexplore.ieee.org/document/6547123>`__.
+Sapling is a protocol enabling privacy-preserving transactions of fungible tokens.
+It creates a set of transactions called a *shielded set*
+that can be viewed only by specific entities. It was designed and
+implemented by the Electric Coin Company, itself building upon the contributions from previous protocols and academic research, starting with the
+`Zerocoin seminal paper <https://ieeexplore.ieee.org/document/6547123>`__.
 
 Keys
 ~~~~
@@ -28,9 +27,9 @@ privacy.
 On the other hand a viewing key can willingly be shared with a third
 party, for example with an auditor for regulatory compliance purposes.
 
-A viewing key can also derive several diversified addresses.
-An address can be used to receive funds, much like the address of a
-user account.
+Viewing keys also allow users to generate multiple recipient addresses.
+Users can send funds to these recipient addresses and the funds go to
+the spending key without exposing its identity to the senders.
 
 Additionally *proving keys* can be used to allow the creation of proofs,
 thus revealing private information, without being able to spend funds.
@@ -63,12 +62,12 @@ Transactions of this form are privacy preserving and are referred to
 as *shielded*, because they reveal neither the amount, the sender nor
 the receiver.
 
-The existing set of transactions is referred to as the *shielded pool*.
+The existing set of transactions is referred to as the *shielded set*.
 Unlike Bitcoin, where everybody can compute the set of unspent
 outputs of every user, in Sapling only the owner of a viewing key can
 find their outputs and verify that they are not already spent.
 For this reason, to an external
-observer, the shielded pool is always increasing in size and the more
+observer, the shielded set is always increasing in size and the more
 transactions are added the harder it is to pinpoint the commitments
 belonging to a user.
 
@@ -79,14 +78,14 @@ This data is encrypted under a symmetric key resulting from a
 Diffie-Hellman key exchange using the recipient address and an
 ephemeral key.
 In principle this *ciphertext* can be transmitted off-chain as it's
-not needed to verify the integrity of the pool. For convenience, in
+not needed to verify the integrity of the set. For convenience, in
 Tezos, it is stored together with the commitment and the nullifier on
 chain.
 
 For reasons of efficiency the commitments are stored in an incremental
 `Merkle tree <https://en.wikipedia.org/wiki/Merkle_tree>`_ which
 allows for compact proofs of membership. The root of the tree is all
-that is needed to refer to a certain state of the shielded pool.
+that is needed to refer to a certain state of the shielded set.
 
 In order to ensure the correctness of a transaction, given that there
 is information that we wish to remain secret, the spender must also
@@ -120,7 +119,7 @@ account in the ``bound_data``, which is signed by the owner of the
 Sapling keys, and that can be used by the Smart Contract to transfer
 the tokens.
 
-**All Smart Contracts managing a Sapling shielded pool must include a
+**All smart contracts managing a Sapling shielded set must include a
 `bound_data` field in their unshield operations.**
 
 Note that the ``bound_data`` field is not encrypted and could leak
@@ -132,7 +131,7 @@ linking a shielded and a transparent address.
 Privacy guarantees
 ~~~~~~~~~~~~~~~~~~
 
-We explained that the shielded pool contains one commitment for each
+We explained that the shielded set contains one commitment for each
 input (spent or not), and one nullifier for each spent input.
 These cryptographic commitments hide the amount and the owner of the
 tokens they represent.
@@ -144,9 +143,9 @@ transaction is public, which could help link a class of
 transactions. This problem can be mitigated by adding any number of
 dummy inputs or outputs at the cost of wasting some space.
 
-The shielded pool communicates with the public ledger by minting and
+The shielded set communicates with the public ledger by minting and
 burning shielded tokens in exchange for public coins.
-Therefore going in and out of the shielded pool is public: we know
+Therefore going in and out of the shielded set is public: we know
 which address shielded or unshielded and how much.
 We can among other things infer the total number of shielded coins.
 
@@ -173,7 +172,7 @@ unshield 15.3 tez to tz1-bob. It's fairly clear from timing and
 amounts that Alice transferred 15.3 tez to Bob.
 To decorrelate the two transfers it is important to change the
 amounts, let some time pass between the two and perform the
-transactions when there is traffic in the pool.
+transactions when there is traffic in the set.
 Similar problems exist in Zcash and they are illustrated in this
 introductory `blog post
 <https://electriccoin.co/blog/transaction-linkability/>`_.
@@ -270,7 +269,7 @@ Example contracts
 Shielded tez
 ^^^^^^^^^^^^
 
-An example contract implementing a shielded pool of tokens with a 1 to 1 conversion rate to mutez is available in the tests of the protocol at
+An example contract implementing a shielded set of tokens with a 1 to 1 conversion rate to mutez is available in the tests of the protocol at
 :src:`src/proto_024_PtTALLiN/lib_protocol/test/integration/michelson/contracts/sapling_contract.tz`.
 
 Simple Voting Contract
@@ -308,7 +307,7 @@ Fees issue
 ~~~~~~~~~~
 
 The Sapling integration in Tezos exhibits a privacy issue that Z-cash doesn't have. When
-interacting with a shielded pool one interacts with a smart contract
+interacting with a shielded set one interacts with a smart contract
 via a normal transaction and therefore have to pay fees from a
 user account.
 One could guess that private transactions whose fees are paid by the
