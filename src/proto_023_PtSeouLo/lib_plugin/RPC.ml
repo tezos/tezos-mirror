@@ -354,7 +354,8 @@ module Scripts = struct
     let normalize_data =
       RPC_service.post_service
         ~description:
-          "Normalizes some data expression using the requested unparsing mode"
+          "Normalizes some data expression using the requested unparsing mode, \
+           input data does not need to be well-typed."
         ~input:
           (obj6
              (req "data" Script.expr_encoding)
@@ -1999,7 +2000,6 @@ module Scripts = struct
         ()
         (expr, typ, unparsing_mode, legacy, other_contracts, extra_big_maps)
       ->
-        let open Script_ir_translator in
         let other_contracts = Option.value ~default:[] other_contracts in
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
@@ -2008,19 +2008,15 @@ module Scripts = struct
         let*? Ex_ty typ, ctxt =
           Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
         in
-        let* data, ctxt =
-          parse_data
-            ctxt
-            ~elab_conf:(elab_conf ~legacy ())
-            ~allow_forged_tickets:true
-            ~allow_forged_lazy_storage_id:true
-            typ
-            (Micheline.root expr)
+        let normalized =
+          Micheline.strip_locations
+          @@ Normalize_data.normalize_data
+               ~unparsing_mode
+               typ
+               ctxt
+               (Micheline.root expr)
         in
-        let+ normalized, _ctxt =
-          Script_ir_translator.unparse_data ctxt unparsing_mode typ data
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_stack
