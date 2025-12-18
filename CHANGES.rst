@@ -69,6 +69,9 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Remove protocol plugin for Nairobi (17). This still allows to replay Etherlink
+  mainnet from genesis but not Etherlink testnet. (MR :gl:`!20301`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
