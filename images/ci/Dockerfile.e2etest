@@ -1,38 +1,3 @@
-# Helper image using the latest rust compiler
-# instead of using - && curl -sSf https://sh.rustup.rs | ash -s -- -y
-ARG BUILD_IMAGE
-# hadolint ignore=DL3006
-FROM ${BUILD_IMAGE} AS cast-binary
-
-# Use alpine /bin/ash and set shell options
-# See https://docs.docker.com/build/building/best-practices/#using-pipes
-SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
-
-ENV PATH="/root/.cargo/bin:${PATH}"
-ENV RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
-
-# hadolint ignore=DL3018,DL3019
-RUN apk update \
- && apk add --no-cache curl git file make jq websocat gcc clang lld \
- && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng
-# Install desync from edge repo as its not yet available in alpine 3.20
-# hadolint ignore=DL3018,DL3019
-RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y
-
-# add config.toml to use https://crates.io/crates/crates-io-proxy
-COPY .cargo/config.toml /root/.cargo/
-
-# Foundry releases nightly build. We pick the commit of the day (at the time
-# of proposing the change)
-RUN cargo install \
- --git https://github.com/foundry-rs/foundry/ cast forge \
- --profile release \
- --force --locked \
- --tag nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e \
- && cp /root/.cargo/bin/cast /bin && cp /root/.cargo/bin/forge /bin
-
 # runtime + end-to-end test dependencies
 #
 # This image builds on the runtime dependencies and additionally includes:
@@ -44,6 +9,54 @@ RUN cargo install \
 #
 # This image is intended for
 # - Running end-to-end tests (mostly Tezt) in the tezos/tezos CI.
+
+# hadolint ignore=DL3006
+FROM monitoring AS cast-binary
+
+# Satisfies DL4006: Ensure any failure in a pipe fails the build
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+
+USER root
+WORKDIR /tmp
+
+# Install required tools
+# NB: curl already in Dockerfile.monitoring
+# hadolint ignore=DL3018
+RUN apk update && apk add --no-cache tar ca-certificates
+
+ARG TARGETARCH
+
+# https://github.com/foundry-rs/foundry/releases/nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e
+ARG FOUNDRY_TAG=nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e
+ARG CHECKSUM_AMD64="628f6682e011247ecf9b92981fd0f5144060675416afb71355dfcd1e2ba6722b"
+ARG CHECKSUM_ARM64="0f38061652335e637f211e506206bc7e8c228123cde8de734b2a3e576a8cc6c4"
+
+# We use the 'alpine' version instead of the 'linux' one to avoid glibc incompatibility
+ARG BINARY_FILE="foundry_nightly_alpine_${TARGETARCH}.tar.gz"
+ARG URL_BASE="https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_TAG}"
+
+RUN curl -sSLO "${URL_BASE}/${BINARY_FILE}"; \
+    # Assign the correct hash based on the architecture
+    case "${TARGETARCH}" in \
+        "amd64") \
+            EXPECTED_HASH="${CHECKSUM_AMD64}" ;; \
+        "arm64") \
+            EXPECTED_HASH="${CHECKSUM_ARM64}" ;; \
+        *) \
+            echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
+    esac; \
+    \
+    # Verify the hash against the downloaded .tar.gz file
+    # We use the pipe method to avoid creating a checksum file on disk
+    echo "${EXPECTED_HASH}  ${BINARY_FILE}" | sha256sum -c -; \
+    # Extract cast and forge only
+    tar -xzf "$BINARY_FILE" -C /bin cast forge; \
+    chmod +x /bin/cast /bin/forge; \
+    # Clean-up
+    rm -rf /tmp/*
+
+USER tezos
+WORKDIR /home/tezos
 
 # this is needed because we COPY --from=build below
 # hadolint ignore=DL3006
