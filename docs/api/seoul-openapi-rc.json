@@ -3,11 +3,7 @@
   "info": {
     "title": "Octez Protocol seoul RPC",
     "description": "The RPC API for protocol seoul served by the Octez node.",
-<<<<<<< HEAD
-    "version": "Octez 24.0~rc1 (60afd4da)"
-=======
-    "version": "Octez 24.0~rc1 (60afd4da)"
->>>>>>> bcbfba3cc16 (Docs, Api: generate octez-v24.0~rc1 OpenApi specifications)
+    "version": "Octez 24.0~rc2 (60afd4da)"
   },
   "paths": {
     "/": {

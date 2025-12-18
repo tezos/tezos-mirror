@@ -1,4 +1,4 @@
-Version 24.0~rc1
+Version 24.0~rc2
 ================
 
 Changes
@@ -14,6 +14,10 @@ Version 24 introduces the following changes or new features:
 
 An overview of breaking changes and deprecations introduced in Octez
 v24 can be found :ref:`here <v24_breaking_changes>`.
+
+The second release candidate for v24.0 fixes a memory leak in v24.0~rc1. This has caused Octez nodes and DAL nodes deployed on different networks to consume increasing RAM, and crashing after a few hours of operation as a result.
+v24.0~rc2 addresses this bug, ensuring a stable memory management by Octez executables.
+If you have deployed Octez v24.0~rc1, please upgrade to v24.0~rc2 as soon as possible to prevent downtime.
 
 .. _protocol_support_v24:
 
@@ -40,7 +44,7 @@ New Octez releases page
 A new Octez Releases website is now available at https://octez.tezos.com/releases/. It replaces the `Gitlab Releases page <https://gitlab.com/tezos/tezos/-/releases>`__, which is now deprecated.
 This new Releases page centralizes  release information for the different Octez :ref:`components <component_releases>` developed on the tezos/tezos Gitlab repository: Octez, Grafazos, Teztale.
 
-Moreover, it provides predictable links to assets (for instance, https://octez.tezos.com/releases/octez-v24.0-rc1/binaries/x86_64/octez-v24.0-rc1.tar.gz), a `machine-readable releases summary <https://octez.tezos.com/releases/versions.json>`__ file, and an `RSS feed <https://octez.tezos.com/releases/feed.xml>`__.
+Moreover, it provides predictable links to assets (for instance, https://octez.tezos.com/releases/octez-v24.0-rc2/binaries/x86_64/octez-v24.0-rc2.tar.gz), a `machine-readable releases summary <https://octez.tezos.com/releases/versions.json>`__ file, and an `RSS feed <https://octez.tezos.com/releases/feed.xml>`__.
 
 Minimal hardware specifications
 -------------------------------
@@ -80,16 +84,17 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v24.0-rc1
+  git checkout octez-v24.0-rc2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v24.0-rc1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v24.0-rc2`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 24.0~rc2 <../CHANGES.html#version-24-0-rc2>`_
 - `Version 24.0~rc1 <../CHANGES.html#version-24-0-rc1>`_

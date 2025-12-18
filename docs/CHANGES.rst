@@ -3,6 +3,23 @@
 Changelog
 '''''''''
 
+Version 24.0~rc2
+================
+
+Nodes
+-----
+
+- Fixed a memory leak in lib_bees. (MR :gl:`!20261` and :gl:`!20258`)
+
+Smart Rollup node
+-----------------
+
+- Fixed an issue where setting for ``l1_monitor_finalized`` would be ignored from the
+  configuration file. (MR :gl:`!20239`)
+
+- Fixed an issue where finalized blocks would not be notified when using
+  ``--l1-monitor-finalized``. (MR :gl:`!20256`)
+
 Version 24.0~rc1
 ================
 
