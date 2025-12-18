@@ -1495,24 +1495,6 @@ module Cache = struct
             [cargo_home // "registry/cache"])
     (* Allow Cargo to access the network *)
     |> enable_networked_cargo
-
-  let enable_cargo_target_caches ?key job =
-    let key =
-      Option.value
-        ~default:
-          ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-        key
-    in
-    let cache_dir = "$CI_PROJECT_DIR/.cargo_targets" // "_target" in
-    job
-    |> append_variables
-         [
-           ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
-           ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
-           ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
-             cache_dir // "etherlink_wasm_runtime" );
-         ]
-    |> append_cache (cache ~key [cache_dir])
 end
 
 (** A set of internally and externally built images.

@@ -122,7 +122,6 @@ module Build = struct
       ["./scripts/ci/build_static_binaries.sh"]
     |> enable_cargo_cache
     |> enable_sccache ~cache_size:"2G"
-    |> enable_cargo_target_caches
 
   let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
       ?dependencies ?(sccache_size = "5G") () =
@@ -162,7 +161,6 @@ module Build = struct
         ["./scripts/ci/build_full_unreleased.sh"]
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:sccache_size
-      |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job

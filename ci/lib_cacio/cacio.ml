@@ -89,7 +89,6 @@ type job = {
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   cargo_cache : bool;
-  cargo_target_caches : bool;
   sccache : sccache_config option;
   dune_cache : dune_cache_config option;
   test_coverage : bool;
@@ -406,7 +405,6 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     script;
                     artifacts;
                     cargo_cache;
-                    cargo_target_caches;
                     sccache;
                     dune_cache;
                     test_coverage;
@@ -494,11 +492,6 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job
                 else job
               in
-              let maybe_enable_cargo_target_caches job =
-                if cargo_target_caches then
-                  Tezos_ci.Cache.enable_cargo_target_caches job
-                else job
-              in
               let maybe_enable_sccache job =
                 match sccache with
                 | None -> job
@@ -558,9 +551,8 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ?artifacts
                 ?allow_failure
                 script
-              |> maybe_enable_cargo_cache |> maybe_enable_cargo_target_caches
-              |> maybe_enable_sccache |> maybe_enable_dune_cache
-              |> maybe_enable_test_coverage
+              |> maybe_enable_cargo_cache |> maybe_enable_sccache
+              |> maybe_enable_dune_cache |> maybe_enable_test_coverage
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -615,7 +607,6 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
-    ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
     ?test_coverage:bool ->
@@ -823,9 +814,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?parallel ?variables ?artifacts
-      ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
-      ?(test_coverage = false) ?allow_failure ?retry ?timeout
-      ?(image_dependencies = []) ?services name script =
+      ?(cargo_cache = false) ?sccache ?dune_cache ?(test_coverage = false)
+      ?allow_failure ?retry ?timeout ?(image_dependencies = []) ?services name
+      script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -865,7 +856,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       script;
       artifacts;
       cargo_cache;
-      cargo_target_caches;
       sccache;
       dune_cache;
       test_coverage;
