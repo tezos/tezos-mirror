@@ -271,7 +271,8 @@ module Export = struct
           sub
             last_processed_level
             (of_int
-               (Constants.validation_slack + Constants.attestation_lag + 1)))
+               (Constants.validation_slack + proto_parameters.attestation_lag
+              + 1)))
       in
       match max_published_level with
       | None -> latest_frozen_level

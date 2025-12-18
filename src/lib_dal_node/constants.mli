@@ -29,10 +29,6 @@ val number_of_slots : int
 (** [number_of_shards] is the default number of shards per slot. *)
 val number_of_shards : int
 
-(** [attestation_lag] is the number of levels between slot publication and
-    attestation. *)
-val attestation_lag : int
-
 (** [validation_slack] is the slack (in blocks) for outdated message validation.
     Messages older than [attestation_lag + validation_slack] blocks from the
     head are considered too old and rejected. *)
