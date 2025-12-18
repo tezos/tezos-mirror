@@ -342,7 +342,7 @@ let get_dal_node cctxt_opt =
 let may_be_valid_in_our_range_of_lags chain_id ~number_of_slots ~number_of_pages
     ~dal_activation_level ~origination_level ~inbox_level page_id
     ~dal_attested_slots_validity_lag =
-  let f =
+  let page_id_is_valid =
     page_id_is_valid
       chain_id
       ~number_of_slots
@@ -353,8 +353,28 @@ let may_be_valid_in_our_range_of_lags chain_id ~number_of_slots ~number_of_pages
       ~dal_attested_slots_validity_lag
       page_id
   in
-  f ~dal_attestation_lag:0
-  || f ~dal_attestation_lag:Dal.Slots_history.legacy_attestation_lag
+  (* It is important to check that both [dal_attestation_lag = 0] and
+     [dal_attestation_lag = max_dal_attestation_lag] below in order
+     to be sure that the page id is not invalid.
+
+     In addition to the checks that do not depend on the lag value:
+
+     - The test with [dal_attestation_lag = 0] checks that the import level is
+       not before the slot's published level (however, it does not guarantee
+       that enough blocks have elapsed since publication).
+
+     - The test with [dal_attestation_lag = max_dal_attestation_lag] checks that
+       the import level is not beyond the [dal_attested_slots_validity_lag]
+       validity window.
+
+     Overall, this function returns an over-approximation: if it returns [true]
+     only because the import level is close to the validity boundaries, a more
+     precise check will be performed later using the exact attestation lag. The
+     exact lag will be fetched from DAL (either already indexed, or indexed
+     within at most [max_dal_attestation_lag] L1 blocks). *)
+  let max_dal_attestation_lag = Dal.Slots_history.legacy_attestation_lag in
+  page_id_is_valid ~dal_attestation_lag:0
+  || page_id_is_valid ~dal_attestation_lag:max_dal_attestation_lag
 
 let page_content_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
