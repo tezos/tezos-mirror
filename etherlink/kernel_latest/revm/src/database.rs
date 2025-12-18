@@ -264,8 +264,8 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
             })?;
         let tezos_pub_key_hash = PublicKeyHash::from_b58check(destination).unwrap();
         let mut tezos_destination_account =
-            crate::tezosx::get_tezos_account_info(self.host, &tezos_pub_key_hash)?
-                .ok_or_else(|| {
+            crate::tezosx::get_tezos_account_info_or_init(self.host, &tezos_pub_key_hash)
+                .map_err(|_| {
                     CustomPrecompileError::Revert(
                         "destination Tezos account not found".to_string(),
                     )
