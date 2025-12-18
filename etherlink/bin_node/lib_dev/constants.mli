@@ -27,6 +27,7 @@ type kernel =
   | DionysusR1
   | Ebisu
   | Farfadet
+  | FarfadetR1
 
 val kernel_from_string : string -> kernel option
 

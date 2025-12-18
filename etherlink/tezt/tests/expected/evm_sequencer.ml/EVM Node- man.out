@@ -946,8 +946,8 @@ Kernel commands:
       [--network <network>]
     Preemptively download a kernel before running the EVM node.
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
-      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu" or
-      "farfadet").
+      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu", "farfadet"
+      or "farfadet-r1").
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.

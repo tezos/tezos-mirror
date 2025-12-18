@@ -24,6 +24,8 @@
 
 ### Execution changes
 
+- Supports executing Farfadet-r1 natively. (!20285)
+
 ### Storage changes
 
 ### Documentation changes

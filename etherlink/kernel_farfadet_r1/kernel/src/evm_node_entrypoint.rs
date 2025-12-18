@@ -12,22 +12,25 @@
 use crate::{delayed_inbox::DelayedInbox, sub_block, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::{
-    internal_runtime::{InternalRuntime, WasmInternalHost},
-    runtime::KernelHost,
-};
-use tezos_smart_rollup_core::rollup_host::RollupHost;
+use tezos_evm_runtime::{internal_runtime::InternalRuntime, runtime::KernelHost};
 use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+
+#[cfg(target_arch = "wasm32")]
+use tezos_evm_runtime::internal_runtime::WasmInternalHost;
+#[cfg(target_arch = "wasm32")]
+use tezos_smart_rollup_core::rollup_host::RollupHost;
 
 const DELAYED_INPUT_PATH: RefPath = RefPath::assert_from(b"/__delayed_input");
 
 #[allow(dead_code)]
+#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn populate_delayed_inbox() {
     let mut sdk_host = unsafe { RollupHost::new() };
     populate_delayed_inbox_with_durable_storage(&mut sdk_host, WasmInternalHost());
 }
 
+#[allow(dead_code)]
 pub fn populate_delayed_inbox_with_durable_storage<Host, I>(host: &mut Host, internal: I)
 where
     Host: tezos_smart_rollup_host::runtime::Runtime,
@@ -43,12 +46,14 @@ where
 }
 
 #[allow(dead_code)]
+#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn single_tx_execution() {
     let mut sdk_host = unsafe { RollupHost::new() };
     single_tx_execution_fn(&mut sdk_host, WasmInternalHost());
 }
 
+#[allow(dead_code)]
 pub fn single_tx_execution_fn<Host, I>(host: &mut Host, internal: I)
 where
     Host: tezos_smart_rollup_host::runtime::Runtime,
@@ -89,12 +94,14 @@ where
 }
 
 #[allow(dead_code)]
+#[cfg(target_arch = "wasm32")]
 #[no_mangle]
 pub extern "C" fn assemble_block() {
     let mut sdk_host = unsafe { RollupHost::new() };
     assemble_block_fn(&mut sdk_host, WasmInternalHost());
 }
 
+#[allow(dead_code)]
 pub fn assemble_block_fn<Host, I>(host: &mut Host, internal: I)
 where
     Host: tezos_smart_rollup_host::runtime::Runtime,

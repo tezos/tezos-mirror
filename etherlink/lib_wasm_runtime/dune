@@ -25,6 +25,7 @@
   (source_tree ../kernel_dionysus_r1)
   (source_tree ../kernel_ebisu)
   (source_tree ../kernel_farfadet)
+  (source_tree ../kernel_farfadet_r1)
   (source_tree ../../src/rustzcash_deps)
   (source_tree ../../src/rust_deps/wasmer-3.3.0)
   (source_tree ../../src/riscv)
