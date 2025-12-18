@@ -371,7 +371,8 @@ module Scripts = struct
     let normalize_stack =
       RPC_service.post_service
         ~description:
-          "Normalize a Michelson stack using the requested unparsing mode"
+          "Normalize a Michelson stack using the requested unparsing mode, \
+           input stack does not need to be well-typed."
         ~query:RPC_query.empty
         ~input:normalize_stack_input_encoding
         ~output:normalize_stack_output_encoding
@@ -1026,6 +1027,29 @@ module Scripts = struct
   end
 
   module Normalize_stack = struct
+    let normalize_stack ctxt ~unparsing_mode ~legacy stack =
+      let open Result_syntax in
+      List.map_e
+        (fun (ty_node, data_node) ->
+          let* Ex_ty ty, ctxt =
+            Script_ir_translator.parse_ty
+              ctxt
+              ~legacy
+              ~allow_lazy_storage:true
+              ~allow_operation:true
+              ~allow_contract:true
+              ~allow_ticket:true
+              ty_node
+          in
+          let* ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
+          let normalized =
+            Normalize_data.normalize_data ~unparsing_mode ty ctxt data_node
+          in
+          return
+            ( Micheline.strip_locations ty_node,
+              Micheline.strip_locations normalized ))
+        stack
+
     type ex_stack =
       | Ex_stack : ('a, 's) Script_typed_ir.stack_ty * 'a * 's -> ex_stack
 
@@ -2036,13 +2060,10 @@ module Scripts = struct
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
         let* ctxt = initialize_big_maps ctxt extra_big_maps in
-        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
-          Normalize_stack.parse_stack ctxt ~legacy nodes
+        let*? normalized =
+          Normalize_stack.normalize_stack ctxt ~unparsing_mode ~legacy nodes
         in
-        let+ normalized, _ctxt =
-          Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_script
