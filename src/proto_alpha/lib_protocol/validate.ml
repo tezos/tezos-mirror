@@ -3112,7 +3112,8 @@ module Manager = struct
       (public_key : Signature.Public_key.t) proof
       (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
-    if Constants.allow_tz4_delegate_enable vi.ctxt then (* TODO: disallow Tz5 *)
+    let* () = Delegate.Consensus_key.check_not_tz5 kind public_key in
+    if Constants.allow_tz4_delegate_enable vi.ctxt then
       match (public_key, proof, kind) with
       | Bls _bls_public_key, None, kind ->
           result_error
@@ -3201,6 +3202,7 @@ module Manager = struct
         let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
         return_unit
     | Delegation (Some pkh) ->
+        let* () = Delegate.check_not_tz5 pkh in
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
         else Delegate.check_not_tz4 pkh
     | Update_consensus_key {public_key; proof; kind} ->

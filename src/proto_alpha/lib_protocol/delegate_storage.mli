@@ -52,6 +52,14 @@ module Contract : sig
     | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
     | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
     | (* `Temporary *) Current_delegate
+    | (* `Permanent *)
+        Tz5_cannot_be_a_delegate of
+        Mldsa44.Public_key_hash.t
+          (** tz5 accounts (i.e. ML-DSA-44 public key hashes) cannot be delegates.
+            This error is returned when we try to register such a delegate. *)
+
+  (** [check_not_tz5 pkh] checks that [pkh] is not a ML-DSA-44 address. *)
+  val check_not_tz5 : Signature.public_key_hash -> unit tzresult
 
   (** [init ctxt contract delegate] registers a delegate when
       creating a contract.
