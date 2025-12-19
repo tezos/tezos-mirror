@@ -81,6 +81,37 @@ let init config ~identity ~network_name profile_ctxt cryptobox
       Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
+let init_cryptobox config proto_parameters profile =
+  let open Lwt_result_syntax in
+  let prover_srs = Profile_manager.is_prover_profile profile in
+  let* () =
+    if prover_srs then
+      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+      Cryptobox.init_prover_dal
+        ~find_srs_files
+        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
+        ()
+    else return_unit
+  in
+  match Cryptobox.make proto_parameters.Types.cryptobox_parameters with
+  | Ok cryptobox ->
+      if prover_srs then
+        match Cryptobox.precompute_shards_proofs cryptobox with
+        | Ok precomputation -> return (cryptobox, Some precomputation)
+        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
+          ->
+            fail
+              [
+                Errors.Cryptobox_initialisation_failed
+                  (Printf.sprintf
+                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
+                      smaller than expected (= %d)"
+                     given
+                     expected);
+              ]
+      else return (cryptobox, None)
+  | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
+
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_identity ctxt = ctxt.identity

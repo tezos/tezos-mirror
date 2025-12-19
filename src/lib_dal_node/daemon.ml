@@ -50,37 +50,6 @@ let[@warning "-32"] may_start_profiler data_dir =
         backends
   | None -> ()
 
-let init_cryptobox config proto_parameters profile =
-  let open Lwt_result_syntax in
-  let prover_srs = Profile_manager.is_prover_profile profile in
-  let* () =
-    if prover_srs then
-      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.init_prover_dal
-        ~find_srs_files
-        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
-        ()
-    else return_unit
-  in
-  match Cryptobox.make proto_parameters.Types.cryptobox_parameters with
-  | Ok cryptobox ->
-      if prover_srs then
-        match Cryptobox.precompute_shards_proofs cryptobox with
-        | Ok precomputation -> return (cryptobox, Some precomputation)
-        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
-          ->
-            fail
-              [
-                Errors.Cryptobox_initialisation_failed
-                  (Printf.sprintf
-                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
-                      smaller than expected (= %d)"
-                     given
-                     expected);
-              ]
-      else return (cryptobox, None)
-  | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
-
 (* Monitor and process finalized heads. *)
 let on_new_finalized_head ctxt cctxt crawler =
   let open Lwt_result_syntax in
@@ -695,7 +664,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
      Instead of recomputing these parameters, they could be stored
      (for a given cryptobox). *)
   let* cryptobox, shards_proofs_precomputation =
-    init_cryptobox config proto_parameters profile_ctxt
+    Node_context.init_cryptobox config proto_parameters profile_ctxt
   in
   (* Set crypto box share size hook. *)
   Value_size_hooks.set_share_size

@@ -11,6 +11,30 @@
 
 open Cryptobox
 
+(** Store directory names within the DAL node's data directory. *)
+module Stores_dirs : sig
+  val shard : string
+
+  val slot : string
+
+  val skip_list_cells : string
+end
+
+module Shards_disk : sig
+  (** Low-level access to shards stored on disk. *)
+
+  (** [file_layout ~root_dir slot_id] returns the Key_value_store layout
+      for the given [slot_id] in the root directory.
+
+      Beware that cryptographic parameters must be initialized via
+      {!Node_context.init_cryptobox} or {!Value_size_hooks.set_share_size} before
+      using this function. *)
+  val file_layout :
+    root_dir:string ->
+    Types.slot_id ->
+    (int, Cryptobox.share) Key_value_store.layout
+end
+
 module Shards : sig
   (** A shard of some slot id consist of a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
@@ -59,6 +83,13 @@ module Slots : sig
   (** A store of slots, indexed by slot id. *)
 
   type t
+
+  (** [file_layout ~root_dir (slot_id, slot_size)] returns the Key_value_store
+      layout for the given slot_id and slot_size in the root directory. *)
+  val file_layout :
+    root_dir:string ->
+    Types.slot_id * int ->
+    (unit, bytes) Key_value_store.layout
 
   (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
       given slot id to the given slot content. *)

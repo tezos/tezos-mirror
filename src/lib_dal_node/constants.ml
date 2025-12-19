@@ -29,6 +29,11 @@ let number_of_shards = 512
 
 let attestation_lag = 8
 
+(* Slack (in blocks) for outdated message validation. Messages older than
+   [attestation_lag + validation_slack] blocks from the head are considered
+   too old and rejected. *)
+let validation_slack = 4
+
 let traps_fraction = Q.(1 // 2000)
 
 (* Each entry in the cache maintains two open file descriptors (one via

@@ -1000,6 +1000,94 @@ module Config = struct
     Cmdliner.Cmd.group ~default info [Init.cmd; Update.cmd]
 end
 
+module Snapshot = struct
+  let man =
+    [
+      `S "SNAPSHOT DESCRIPTION";
+      `P "Entrypoint for snapshot management commands.";
+    ]
+
+  module Export = struct
+    let man = [`S "DESCRIPTION"; `P "Export DAL node data to a snapshot file."]
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Export snapshot" ~man ~version "export"
+
+    let min_published_level_arg =
+      let open Term in
+      let parse, pp = positive_int_format "min-published-level" in
+      make_arg
+        ~doc:"Minimum published level to include in the snapshot."
+        ~parse
+        ~placeholder:"INT"
+        ~pp
+        "min-published-level"
+
+    let min_published_level = Term.arg_to_cmdliner min_published_level_arg
+
+    let max_published_level_arg =
+      let open Term in
+      let parse, pp = positive_int_format "max-published-level" in
+      make_arg
+        ~doc:"Maximum published level to include in the snapshot."
+        ~parse
+        ~placeholder:"INT"
+        ~pp
+        "max-published-level"
+
+    let max_published_level = Term.arg_to_cmdliner max_published_level_arg
+
+    let file_path =
+      let open Cmdliner in
+      Arg.(
+        required
+        & pos 0 (some string) None
+        & info
+            ~docv:"DIR"
+            ~doc:"Path to the snapshot directory where to export."
+            ~docs:"OPTIONS"
+            [])
+
+    let action min_published_level max_published_level data_dir endpoint
+        config_file file_path =
+      let data_dir =
+        Option.value ~default:Configuration_file.default.data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:(Configuration_file.default_config_file data_dir)
+          config_file
+      in
+      let min_level = Option.map Int32.of_int min_published_level in
+      let max_level = Option.map Int32.of_int max_published_level in
+      Snapshot.export
+        ~data_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level:min_level
+        ~max_published_level:max_level
+        file_path
+
+    let term =
+      Cmdliner.Term.(
+        map
+          wrap_action
+          (const action $ min_published_level $ max_published_level
+         $ Term.data_dir $ Term.endpoint $ Term.config_file $ file_path))
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  let cmd =
+    let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Snapshot management" ~man ~version "snapshot"
+    in
+    Cmdliner.Cmd.group ~default info [Export.cmd]
+end
+
 module Debug = struct
   let man = [`S "DEBUG DESCRIPTION"; `P "Entrypoint for the debug commands."]
 
@@ -1175,4 +1263,7 @@ let commands =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group ~default info [Run.cmd; Config.cmd; Debug.cmd]
+  Cmdliner.Cmd.group
+    ~default
+    info
+    [Run.cmd; Config.cmd; Snapshot.cmd; Debug.cmd]

@@ -1095,8 +1095,8 @@ let slot_idx parameters level =
 
     The [delegates] parameter is used to specify which delegates should
     participate in baking. *)
-let publish_and_bake ?delegates ~from_level ~to_level parameters cryptobox node
-    client dal_node =
+let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
+    cryptobox node client dal_node =
   let num_bakers = Array.length Account.Bootstrap.keys in
   let publish source ~index message =
     let* _op_hash =
@@ -1104,35 +1104,48 @@ let publish_and_bake ?delegates ~from_level ~to_level parameters cryptobox node
     in
     unit
   in
-  let publish_and_store level =
-    let source = Account.Bootstrap.keys.(level mod num_bakers) in
-    let index = slot_idx parameters level in
-    let slot_content =
-      Format.asprintf "content at level %d index %d" level index
+  let publish_and_store =
+    let slot_idx =
+      match slots with
+      | Some s ->
+          let num_slots = List.length s in
+          fun level -> List.nth s (slot_idx parameters level mod num_slots)
+      | None -> slot_idx parameters
     in
-    let* () = publish source ~index slot_content in
-    let* _commitment, _proof =
-      let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
-      Helpers.(
-        store_slot dal_node ~slot_index:index
-        @@ make_slot ~slot_size slot_content)
-    in
-    Log.info "Slot with %d index (normally) published at level %d" index level ;
-    unit
+    fun level ->
+      let source = Account.Bootstrap.keys.(level mod num_bakers) in
+      let index = slot_idx level in
+      let slot_content =
+        Format.asprintf "content at level %d index %d" level index
+      in
+      let* () = publish source ~index slot_content in
+      let* _commitment, _proof =
+        let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+        Helpers.(
+          store_slot dal_node ~slot_index:index
+          @@ make_slot ~slot_size slot_content)
+      in
+      Log.info "Slot with %d index (normally) published at level %d" index level ;
+      return (level, index)
   in
   Log.info
     "Publish (inject and bake) a slot header at each level from %d to %d."
     from_level
     to_level ;
-  let rec iter level =
-    if level > to_level then return ()
+  let rec iter acc level =
+    if level > to_level then return acc
     else
-      let* () = publish_and_store level in
-      let* () = bake_for ?delegates client in
+      let* level, index = publish_and_store level in
+      let* () =
+        bake_for
+          ?delegates
+          ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node)
+          client
+      in
       let* _ = Node.wait_for_level node level in
-      iter (level + 1)
+      iter ((level, index) :: acc) (level + 1)
   in
-  iter from_level
+  iter [] from_level
 
 (* We check that publishing a slot header with a proof for a different
    slot leads to a proof-checking error. *)
@@ -2315,7 +2328,77 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
        %L, got = %R)" ;
   unit
 
-let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
+let test_dal_node_snapshot_export ~operators _protocol parameters cryptobox node
+    client dal_node =
+  let* start = Node.get_level node in
+  let expected_exported_levels = 5 in
+  let stop =
+    start + expected_exported_levels
+    + parameters.Dal_common.Parameters.attestation_lag
+    + Tezos_dal_node_lib.Constants.validation_slack + 1
+  in
+  let* published =
+    publish_and_bake
+      ~slots:operators
+      ~from_level:start
+      ~to_level:stop
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let to_test =
+    List.filter
+      (fun (level, _index) -> level <= start + expected_exported_levels)
+      published
+  in
+  let file = Temp.file "export" in
+  (* Export with default levels (uses first_seen_level and last_processed_level) *)
+  let* () =
+    Dal_node.snapshot_export ~endpoint:(Node.as_rpc_endpoint node) dal_node file
+  in
+  (* Verify the snapshot file was created *)
+  let* file_exists = Lwt_unix.file_exists file in
+  let* () =
+    if file_exists then unit
+    else Test.fail "Snapshot export failed: file was not created at %s" file
+  in
+  (* Create a fresh DAL node using the exported snapshot data. *)
+  let fresh_dal_node = Dal_node.create ~node ~data_dir:file () in
+  let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
+  let* () = Dal_node.run fresh_dal_node in
+  (* Compare slot statuses between the original node and the fresh one built from snapshot. *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (slot_level, slot_index) ->
+        let* status_orig =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+        in
+        let* status_fresh =
+          Dal_RPC.(
+            call fresh_dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+        in
+        let pp_status s = Format.asprintf "%a" Dal_RPC.pp_slot_id_status s in
+        Check.(status_fresh = status_orig)
+          ~__LOC__
+          Dal.Check.slot_id_status_typ
+          ~error_msg:
+            (Format.sprintf
+               "Snapshot import mismatch for slot (level=%d,index=%d): got %s, \
+                expected %s"
+               slot_level
+               slot_index
+               (pp_status status_fresh)
+               (pp_status status_orig)) ;
+        unit)
+      to_test
+  in
+  Log.info "Snapshot export test passed: file created at %s" file ;
+  unit
+
+let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
     dal_node =
   let* commitment, proof =
     Helpers.(
@@ -2737,7 +2820,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
       "attestation_lag (%L) should be higher than [max_level - first_level] \
        (which is %R)" ;
   let wait_block_processing = wait_for_layer1_head dal_node max_level in
-  let* () =
+  let* _ =
     publish_and_bake
       ~from_level:first_level
       ~to_level:max_level
@@ -2859,7 +2942,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     wait_for_layer1_final_block dal_node (wait_level - 2)
   in
 
-  let* () =
+  let* _ =
     publish_and_bake
       ~from_level:first_level
       ~to_level:(intermediary_level + lag)
@@ -2870,7 +2953,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       client
       dal_node
   in
-  let* () =
+  let* _ =
     publish_and_bake
       ~from_level:(intermediary_level + lag + 1)
       ~to_level:last_level
@@ -11456,10 +11539,18 @@ let register ~protocols =
     test_attester_with_daemon
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["snapshot"; "import"]
+    ~tags:["l1_snapshot"; "import"]
     ~operator_profiles:[0]
-    "dal node import snapshot"
-    test_dal_node_import_snapshot
+    "dal node import l1 snapshot"
+    test_dal_node_import_l1_snapshot
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["snapshot"; "export"]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    "dal node snapshot export"
+    (test_dal_node_snapshot_export ~operators:[0])
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)

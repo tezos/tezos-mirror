@@ -23,6 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [number_of_slots] is the default number of DAL slots per level. *)
+val number_of_slots : int
+
+(** [number_of_shards] is the default number of shards per slot. *)
+val number_of_shards : int
+
+(** [validation_slack] is the slack (in blocks) for outdated message validation.
+    Messages older than [attestation_lag + validation_slack] blocks from the
+    head are considered too old and rejected. *)
+val validation_slack : int
+
 (** [shards_store_lru_size] is the maximum shards store LRU size. See
     {!Key_value_store.init} and {!Store.Shards.init}. *)
 val shards_store_lru_size : int

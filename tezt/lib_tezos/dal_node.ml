@@ -567,6 +567,36 @@ let debug_print_store_schemas ?path ?hooks () =
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
+let snapshot_export dal_node ?endpoint ?min_published_level ?max_published_level
+    output_file =
+  let data_dir = data_dir dal_node in
+  let endpoint_args =
+    match endpoint with
+    | None -> []
+    | Some ep -> ["--endpoint"; Endpoint.as_string ep]
+  in
+  let min_level_args =
+    match min_published_level with
+    | None -> []
+    | Some level -> ["--min-published-level"; Int32.to_string level]
+  in
+  let max_level_args =
+    match max_published_level with
+    | None -> []
+    | Some level -> ["--max-published-level"; Int32.to_string level]
+  in
+  let args =
+    ["snapshot"; "export"] @ ["--data-dir"; data_dir] @ endpoint_args
+    @ min_level_args @ max_level_args @ [output_file]
+  in
+  let path =
+    if use_baker_to_start_dal_node = Some true then
+      Uses.path Constant.octez_agnostic_baker
+    else Uses.path Constant.octez_dal_node
+  in
+  let process = Process.spawn path args in
+  Process.check process
+
 module Proxy = struct
   type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
 
