@@ -513,22 +513,23 @@ let multichain_node_singlechain_kernel =
     ()
 
 let event_next_block_info =
-  Internal_event.Simple.declare_2
+  Internal_event.Simple.declare_3
     ~section
     ~name:"next_block_info"
     ~msg:
-      "received info for the next block: level = {level}, timestamp = \
-       {timestamp}"
+      "{op} info for the next block: level = {level}, timestamp = {timestamp}"
     ~level:Debug
+    ("op", Data_encoding.string)
     ("level", Ethereum_types.quantity_encoding)
     ("timestamp", Time.Protocol.encoding)
 
 let event_tx_inclusion =
-  Internal_event.Simple.declare_1
+  Internal_event.Simple.declare_2
     ~section
     ~name:"inclusion"
-    ~msg:"received inclusion confirmation for the transaction {txn_hash}"
+    ~msg:"{op} inclusion confirmation for the transaction {txn_hash}"
     ~level:Debug
+    ("op", Data_encoding.string)
     ("txn_hash", Ethereum_types.hash_encoding)
 
 let patched_sequencer_key =
@@ -684,9 +685,15 @@ let replicate_transaction_dropped hash reason =
 let replicate_operation_dropped hash reason =
   emit replicate_operation_dropped (hash, reason)
 
-let next_block_info timestamp level = emit event_next_block_info (level, timestamp)
+let next_block_info timestamp level =
+  emit event_next_block_info ("received", level, timestamp)
 
-let inclusion t = emit event_tx_inclusion t
+let inclusion hash = emit event_tx_inclusion ("received", hash)
+
+let sent_next_block_info timestamp level =
+  emit event_next_block_info ("sent", level, timestamp)
+
+let sent_inclusion hash = emit event_tx_inclusion ("sent", hash)
 
 let patched_sequencer_key pk =
   emit patched_sequencer_key (pk, Signature.Public_key.hash pk)

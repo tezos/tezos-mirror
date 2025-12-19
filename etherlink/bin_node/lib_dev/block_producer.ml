@@ -617,13 +617,13 @@ let notify_next_block_with_delayed ~next_block_timestamp ~delayed_hashes ~number
     ~(state : Types.state) evm_state =
   let open Lwt_result_syntax in
   Broadcast.notify_next_block_info next_block_timestamp number ;
-  let*! () = Events.next_block_info next_block_timestamp number in
+  let*! () = Events.sent_next_block_info next_block_timestamp number in
   let* txns =
     List.map_es
       (fun delayed_hash ->
         let* tx = Evm_state.get_delayed_inbox_item evm_state delayed_hash in
         Broadcast.notify_inclusion (Delayed tx) delayed_hash ;
-        let*! () = Events.inclusion delayed_hash in
+        let*! () = Events.sent_inclusion delayed_hash in
         return tx)
       delayed_hashes
   in
@@ -707,7 +707,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
           | None -> return_unit
         in
         Broadcast.notify_inclusion (Common wrapped_raw) hash ;
-        let*! () = Events.inclusion hash in
+        let*! () = Events.sent_inclusion hash in
         return
           ( latest_validation_state,
             entry :: rev_txns,

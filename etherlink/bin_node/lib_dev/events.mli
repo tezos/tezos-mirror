@@ -215,6 +215,11 @@ val next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit Lwt.t
 
 val inclusion : Ethereum_types.hash -> unit Lwt.t
 
+val sent_next_block_info :
+  Time.Protocol.t -> Ethereum_types.quantity -> unit Lwt.t
+
+val sent_inclusion : Ethereum_types.hash -> unit Lwt.t
+
 (** [patched_sequencer_key pk] advertises that the sequencer key in
     state was patched with [pk] . *)
 val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t
