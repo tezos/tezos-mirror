@@ -20,7 +20,6 @@ depends: [
   "octez-smart-rollup-node-PtTALLiN" { = version }
 ]
 depopts: [
-  "octez-smart-rollup-node-PtNairob"
   "octez-smart-rollup-node-Proxford"
   "octez-smart-rollup-node-PtParisB"
   "octez-smart-rollup-node-PsParisC"
@@ -29,7 +28,6 @@ depopts: [
   "octez-smart-rollup-node-alpha"
 ]
 conflicts: [
-  "octez-smart-rollup-node-PtNairob" { != version }
   "octez-smart-rollup-node-Proxford" { != version }
   "octez-smart-rollup-node-PtParisB" { != version }
   "octez-smart-rollup-node-PsParisC" { != version }

@@ -99,7 +99,6 @@
 (package (name octez-smart-rollup-node-PsParisC)(allow_empty))
 (package (name octez-smart-rollup-node-PsQuebec)(allow_empty))
 (package (name octez-smart-rollup-node-PsRiotum)(allow_empty))
-(package (name octez-smart-rollup-node-PtNairob)(allow_empty))
 (package (name octez-smart-rollup-node-PtParisB)(allow_empty))
 (package (name octez-smart-rollup-node-PtSeouLo)(allow_empty))
 (package (name octez-smart-rollup-node-PtTALLiN)(allow_empty))

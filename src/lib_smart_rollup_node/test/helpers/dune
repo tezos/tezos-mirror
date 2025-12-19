@@ -16,9 +16,6 @@
   octez-l2-libs.smart-rollup
   octez-smart-rollup-node-lib
   octez-l2-libs.layer2_store
-  (select void_for_linking-octez_smart_rollup_node_PtNairob from
-   (octez_smart_rollup_node_PtNairob -> void_for_linking-octez_smart_rollup_node_PtNairob.empty)
-   (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
   (select void_for_linking-octez_smart_rollup_node_Proxford from
    (octez_smart_rollup_node_Proxford -> void_for_linking-octez_smart_rollup_node_Proxford.empty)
    (-> void_for_linking-octez_smart_rollup_node_Proxford.empty))
@@ -53,7 +50,6 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_Proxford.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PtParisB.empty "")
    (write-file void_for_linking-octez_smart_rollup_node_PsParisC.empty "")
