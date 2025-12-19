@@ -512,12 +512,15 @@ let multichain_node_singlechain_kernel =
        because the multichain feature is not yet enabled in the rollup"
     ()
 
-let event_next_block_timestamp =
-  Internal_event.Simple.declare_1
+let event_next_block_info =
+  Internal_event.Simple.declare_2
     ~section
-    ~name:"next_block_timestamp"
-    ~msg:"received timestamp of the next block {timestamp}"
-    ~level:Notice
+    ~name:"next_block_info"
+    ~msg:
+      "received info for the next block: level = {level}, timestamp = \
+       {timestamp}"
+    ~level:Debug
+    ("level", Ethereum_types.quantity_encoding)
     ("timestamp", Time.Protocol.encoding)
 
 let event_tx_inclusion =
@@ -525,7 +528,7 @@ let event_tx_inclusion =
     ~section
     ~name:"inclusion"
     ~msg:"received inclusion confirmation for the transaction {txn_hash}"
-    ~level:Notice
+    ~level:Debug
     ("txn_hash", Ethereum_types.hash_encoding)
 
 let patched_sequencer_key =
@@ -681,7 +684,7 @@ let replicate_transaction_dropped hash reason =
 let replicate_operation_dropped hash reason =
   emit replicate_operation_dropped (hash, reason)
 
-let next_block_timestamp t = emit event_next_block_timestamp t
+let next_block_info timestamp level = emit event_next_block_info (level, timestamp)
 
 let inclusion t = emit event_tx_inclusion t
 
