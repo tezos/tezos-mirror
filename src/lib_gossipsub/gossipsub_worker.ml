@@ -307,10 +307,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     mutable status : worker_status;
     mutable state : worker_state;
     self : Peer.t;
-    worker_crashed : unit Lwt.t * unit Lwt.u;
+    main_loop_promise : unit Lwt.t * unit Lwt.u;
   }
-
-  exception Worker_crashed
 
   let maybe_reachable_point = C.maybe_reachable_point
 
@@ -1032,7 +1030,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       that consumes pushed events in [t.events_stream], if any.
 
       When the loop is canceled, the returned monad will need an additional
-      extra event to consume in order to resolve. *)
+      extra event to consume in order to resolve.
+
+      When the loop catches an exception, it is raised to the main_loop promise
+      to help the handling of a failing gossipsub_worker. *)
   let event_loop t =
     let open Monad in
     let shutdown = ref false in
@@ -1052,9 +1053,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           in
           t.state <- new_state ;
           loop t
-        with (_ : exn) ->
+        with exn ->
           t.status <- Crashed ;
-          Lwt.wakeup (snd t.worker_crashed) () ;
+          Lwt.wakeup_exn (snd t.main_loop_promise) exn ;
           return ()
     in
     let promise = loop t in
@@ -1125,12 +1126,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | None -> Sequentially
             | Some time_interval -> In_batches {time_interval});
         };
-      worker_crashed = Lwt.wait ();
+      main_loop_promise = Lwt.wait ();
     }
 
   let stats t = t.state.stats
 
-  let worker_crashed t = fst t.worker_crashed
+  let main_loop_promise t = fst t.main_loop_promise
 
   let p2p_output_stream t = t.state.p2p_output_stream
 

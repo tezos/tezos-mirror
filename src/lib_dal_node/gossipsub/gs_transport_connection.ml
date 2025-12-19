@@ -304,22 +304,17 @@ let app_messages_handler gs_worker ~app_out_callback ~verbose =
 
 let activate gs_worker p2p_layer ~app_out_callback ~app_in_callback ~verbose =
   (* Register a handler to notify new P2P connections to GS. *)
-  let open Lwt_syntax in
   let () =
     new_connections_handler gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
   (* Register a handler to notify P2P disconnections to GS. *)
   let () = disconnections_handler gs_worker |> P2p.on_disconnection p2p_layer in
-  let* () =
-    Lwt.pick
-      [
-        Worker.worker_crashed gs_worker;
-        gs_worker_p2p_output_handler gs_worker p2p_layer;
-        transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback;
-        app_messages_handler gs_worker ~app_out_callback ~verbose;
-      ]
-  in
-  (* We are not expecting any of the above promises to fulfil, unless the worker
-     crashed. *)
-  Lwt.fail Worker.Worker_crashed
+  (* We are not expecting any of the promises below to fulfill, unless they are rejected. *)
+  Lwt.pick
+    [
+      Worker.main_loop_promise gs_worker;
+      gs_worker_p2p_output_handler gs_worker p2p_layer;
+      transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback;
+      app_messages_handler gs_worker ~app_out_callback ~verbose;
+    ]

@@ -1155,8 +1155,6 @@ module type WORKER = sig
   (** The state of a gossipsub worker. *)
   type t
 
-  exception Worker_crashed
-
   (** We (re-)export the GS, Monad and Stream modules. *)
   include WORKER_CONFIGURATION
 
@@ -1345,7 +1343,7 @@ module type WORKER = sig
 
   val state : t -> GS.Introspection.view
 
-  (* Returns a Lwt promise that will be fulfilled as soon as the worker will
-     crash because of an unexpected error. *)
-  val worker_crashed : t -> unit Lwt.t
+  (* Returns a Lwt promise that will run as long as the worker.
+     It will fail if the worker crashes because of an unexpected error. *)
+  val main_loop_promise : t -> unit Lwt.t
 end
