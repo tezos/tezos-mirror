@@ -517,8 +517,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       ~level:head_level
   in
 
-  (* Set proto number of slots hook. *)
-  Value_size_hooks.set_number_of_slots proto_parameters.number_of_slots ;
   let* profile_ctxt =
     let+ profile_ctxt = build_profile_context config in
     Profile_manager.resolve_profile
