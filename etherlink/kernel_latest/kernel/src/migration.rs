@@ -9,6 +9,7 @@ use crate::blueprint_storage::{
     blueprint_path, clear_all_blueprints, store_current_block_header,
 };
 use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
@@ -19,16 +20,19 @@ use crate::migration::legacy::{
     WITHDRAWAL_ADDRESS,
 };
 use crate::storage::{
-    read_chain_id, read_storage_version, store_backlog, store_dal_slots,
-    store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
-    ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS,
-    KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
+    clear_events, read_chain_id, read_l1_level, read_last_info_per_level_timestamp,
+    read_storage_version, store_backlog, store_dal_slots, store_storage_version,
+    tweak_dal_activation, StorageVersion, DELAYED_BRIDGE, ENABLE_FA_BRIDGE,
+    EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, KEEP_EVENTS, KERNEL_GOVERNANCE,
+    KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
 };
-use primitive_types::U256;
+use crate::transaction::{Transaction, TransactionContent};
+use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::{evm_node_flag, Runtime};
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -674,6 +678,45 @@ fn migrate_to<Host: Runtime>(
             Ok(MigrationStatus::Done)
         }
         StorageVersion::V45 => {
+            // Re-inject locked FA deposit 0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38,
+            // affected by the regression introduced by Farfadet
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? && !evm_node_flag(host) {
+                clear_events(host)?;
+                host.store_write(&KEEP_EVENTS, &[], 0)?;
+                let mut delayed_inbox = DelayedInbox::new(host)?;
+                let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+                let level = read_l1_level(host)?;
+                let tx = Transaction {
+                    tx_hash: [
+                        130, 245, 7, 188, 90, 186, 15, 63, 96, 136, 192, 135, 194, 252,
+                        216, 127, 199, 183, 243, 60, 148, 69, 227, 49, 236, 61, 31, 223,
+                        69, 228, 190, 56,
+                    ],
+                    content: TransactionContent::FaDeposit(FaDeposit {
+                        amount: U256::from_dec_str("3125423349").unwrap(),
+                        receiver: H160::from_slice(&[
+                            0x94, 0x6a, 0x4f, 0x7a, 0x4e, 0xc4, 0x40, 0x77, 0xc6, 0x8b,
+                            0x5a, 0x1b, 0x00, 0xfb, 0xe0, 0xb9, 0x61, 0x0c, 0xf6, 0x87,
+                        ]),
+                        proxy: Some(H160::from_slice(&[
+                            0x19, 0x41, 0x8d, 0x0a, 0xf0, 0xf3, 0x68, 0x65, 0xcd, 0xfb,
+                            0xb2, 0x43, 0x7d, 0xfe, 0xd2, 0x9b, 0xa3, 0x4d, 0x31, 0x90,
+                        ])),
+                        ticket_hash: H256::from_slice(&[
+                            0x23, 0x06, 0x44, 0xd9, 0xa1, 0xc4, 0x5d, 0x22, 0xfb, 0xe4,
+                            0x66, 0x61, 0xc0, 0xf5, 0xf8, 0x65, 0x8c, 0x45, 0x31, 0xbd,
+                            0xb1, 0xa8, 0xe9, 0x73, 0x1a, 0xad, 0x38, 0x6a, 0xdd, 0xb6,
+                            0x1d, 0xff,
+                        ]),
+                        inbox_level: 11228700,
+                        inbox_msg_id: 4,
+                    }),
+                };
+                delayed_inbox.save_transaction(host, tx, previous_timestamp, level)?;
+            }
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V46 => {
             // Clean remaining leftover block indexes from V41.
             if let Ok(current_number) =
                 read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)

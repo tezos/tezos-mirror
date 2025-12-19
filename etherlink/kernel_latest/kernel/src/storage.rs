@@ -78,6 +78,7 @@ pub enum StorageVersion {
     V43,
     V44,
     V45,
+    V46,
 }
 
 impl From<StorageVersion> for u64 {
@@ -92,7 +93,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V45;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V46;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -179,6 +180,8 @@ const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
 pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
+
+pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
 
 // Path to the DAL feature flag. If there is nothing at this path, DAL
 // is not used.
@@ -785,8 +788,13 @@ pub fn store_sequencer<Host: Runtime>(
 }
 
 pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    let index = IndexableStorage::new(&EVENTS)?;
-    index.clear(host).map_err(Into::into)
+    if host.store_has(&KEEP_EVENTS)?.is_some() {
+        host.store_delete(&KEEP_EVENTS)?;
+        Ok(())
+    } else {
+        let index = IndexableStorage::new(&EVENTS)?;
+        index.clear(host).map_err(Into::into)
+    }
 }
 
 pub fn store_event<Host: Runtime>(host: &mut Host, event: &Event) -> anyhow::Result<()> {
