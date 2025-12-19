@@ -69,11 +69,11 @@ let kvs_copy_value src_store dst_store file_layout file key =
       key
       value
 
-module Export = struct
+module Merge = struct
   (** Export a filtered subset of the skip_list SQLite database by iterating
       through levels in the range [min_published_level, max_published_level]
       and copying the data using Dal_store_sqlite3 functions. *)
-  let export_skip_list ~src ~dst ~min_published_level ~max_published_level =
+  let merge_skip_list ~src ~dst ~min_published_level ~max_published_level =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     (* Initialize destination database with empty schema *)
@@ -132,8 +132,8 @@ module Export = struct
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
-  let export_slots ~cryptobox ~src ~dst ~min_published_level
-      ~max_published_level =
+  let merge_slots ~cryptobox ~src ~dst ~min_published_level ~max_published_level
+      =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -159,7 +159,7 @@ module Export = struct
 
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
-  let export_shards ~src ~dst ~min_published_level ~max_published_level =
+  let merge_shards ~src ~dst ~min_published_level ~max_published_level =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -210,8 +210,8 @@ module Export = struct
         let* _ = Key_value_store.close dst_store in
         return_unit)
 
-  let export ~data_dir:src_data_dir ~config_file ~endpoint ~min_published_level
-      ~max_published_level dst_data_dir =
+  let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
+      ~min_published_level ~max_published_level ~dst_root_dir =
     let open Lwt_result_syntax in
     let* config = Configuration_file.load ~config_file in
     let endpoint = Option.value ~default:config.endpoint endpoint in
@@ -231,21 +231,6 @@ module Export = struct
     (* Set crypto box share size hook. *)
     Value_size_hooks.set_share_size
       (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-    let store_path data_dir =
-      (* We only need data_dir field, so we can just use default as base. *)
-      Configuration_file.store_path {Configuration_file.default with data_dir}
-    in
-    let src_root_dir = store_path src_data_dir in
-    let dst_root_dir = store_path dst_data_dir in
-    let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
-    let* () =
-      if dst_exists then
-        failwith
-          "Destination directory %s already exists. Please remove it or choose \
-           a different destination."
-          dst_root_dir
-      else return_unit
-    in
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
     in
@@ -267,12 +252,14 @@ module Export = struct
        max_published_level to this value to avoid exporting stale data. *)
     let max_published_level =
       let latest_frozen_level =
-        Int32.(
-          sub
-            last_processed_level
-            (of_int
-               (Constants.validation_slack + proto_parameters.attestation_lag
-              + 1)))
+        if frozen_only then
+          Int32.(
+            sub
+              last_processed_level
+              (of_int
+                 (Constants.validation_slack + proto_parameters.attestation_lag
+                + 1)))
+        else last_processed_level
       in
       match max_published_level with
       | None -> latest_frozen_level
@@ -282,7 +269,7 @@ module Export = struct
     let* () =
       let src_slot_dir = src_root_dir // Store.Stores_dirs.slot in
       let dst_slot_dir = dst_root_dir // Store.Stores_dirs.slot in
-      export_slots
+      merge_slots
         ~cryptobox
         ~src:src_slot_dir
         ~dst:dst_slot_dir
@@ -293,7 +280,7 @@ module Export = struct
     let* () =
       let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
       let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
-      export_shards
+      merge_shards
         ~src:src_shard_dir
         ~dst:dst_shard_dir
         ~min_published_level
@@ -307,7 +294,7 @@ module Export = struct
       let src_skip_list_dir =
         src_root_dir // Store.Stores_dirs.skip_list_cells
       in
-      export_skip_list
+      merge_skip_list
         ~src:src_skip_list_dir
         ~dst:dst_skip_list_dir
         ~min_published_level
@@ -318,16 +305,77 @@ module Export = struct
     let* first_seen_store =
       Store.First_seen_level.init ~root_dir:dst_root_dir
     in
+    let* existing_first_seen = Store.First_seen_level.load first_seen_store in
+    let new_first_seen_level =
+      match existing_first_seen with
+      | None -> min_published_level
+      | Some existing -> min existing min_published_level
+    in
     let* () =
-      Store.First_seen_level.save first_seen_store min_published_level
+      Store.First_seen_level.save first_seen_store new_first_seen_level
     in
     let* last_processed_store =
       Store.Last_processed_level.init ~root_dir:dst_root_dir
     in
+    let* existing_last_processed =
+      Store.Last_processed_level.load last_processed_store
+    in
+    let new_last_processed_level =
+      match existing_last_processed with
+      | None -> max_published_level
+      | Some existing -> max existing max_published_level
+    in
     let* () =
-      Store.Last_processed_level.save last_processed_store max_published_level
+      Store.Last_processed_level.save
+        last_processed_store
+        new_last_processed_level
     in
     return_unit
 end
 
-let export = Export.export
+let export ~data_dir ~config_file ~endpoint ~min_published_level
+    ~max_published_level dst =
+  let open Lwt_result_syntax in
+  let store_path data_dir =
+    Configuration_file.store_path {Configuration_file.default with data_dir}
+  in
+  let src_root_dir = store_path data_dir in
+  let dst_root_dir = store_path dst in
+  let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
+  let* () =
+    if dst_exists then
+      failwith
+        "Destination directory %s already exists. Please remove it or choose a \
+         different destination."
+        dst_root_dir
+    else return_unit
+  in
+  Merge.merge
+    ~frozen_only:true
+    ~src_root_dir
+    ~config_file
+    ~endpoint
+    ~min_published_level
+    ~max_published_level
+    ~dst_root_dir
+
+let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
+    ~min_published_level ~max_published_level src =
+  if check then
+    failwith
+      "Import with checks is not yet implemented. Use --no-check if you want \
+       to bypass imported data validation.\n"
+  else
+    let store_path data_dir =
+      Configuration_file.store_path {Configuration_file.default with data_dir}
+    in
+    let src_root_dir = store_path src in
+    let dst_root_dir = store_path dst in
+    Merge.merge
+      ~frozen_only:false
+      ~src_root_dir
+      ~config_file
+      ~endpoint
+      ~min_published_level
+      ~max_published_level
+      ~dst_root_dir

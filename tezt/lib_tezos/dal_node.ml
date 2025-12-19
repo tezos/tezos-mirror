@@ -567,8 +567,8 @@ let debug_print_store_schemas ?path ?hooks () =
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
-let snapshot_export dal_node ?endpoint ?min_published_level ?max_published_level
-    output_file =
+let snapshot_aux cmd dal_node ?(extra = []) ?endpoint ?min_published_level
+    ?max_published_level output_file =
   let data_dir = data_dir dal_node in
   let endpoint_args =
     match endpoint with
@@ -586,8 +586,8 @@ let snapshot_export dal_node ?endpoint ?min_published_level ?max_published_level
     | Some level -> ["--max-published-level"; Int32.to_string level]
   in
   let args =
-    ["snapshot"; "export"] @ ["--data-dir"; data_dir] @ endpoint_args
-    @ min_level_args @ max_level_args @ [output_file]
+    ["snapshot"; cmd] @ ["--data-dir"; data_dir] @ endpoint_args
+    @ min_level_args @ max_level_args @ extra @ [output_file]
   in
   let path =
     if use_baker_to_start_dal_node = Some true then
@@ -596,6 +596,12 @@ let snapshot_export dal_node ?endpoint ?min_published_level ?max_published_level
   in
   let process = Process.spawn path args in
   Process.check process
+
+let snapshot_export = snapshot_aux "export" ~extra:[]
+
+let snapshot_import t ?(no_check = false) =
+  let no_check_args = if no_check then ["--no-check"] else [] in
+  snapshot_aux ~extra:no_check_args "import" t
 
 module Proxy = struct
   type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
