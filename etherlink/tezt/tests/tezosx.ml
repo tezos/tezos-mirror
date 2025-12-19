@@ -36,7 +36,8 @@ module Setup = struct
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
 
-  let register_fullstack_test ~title ~tags ~with_runtimes =
+  let register_fullstack_test ~title ~tags ~with_runtimes
+      ?tez_bootstrap_accounts =
     Setup.register_test
       ~__FILE__
       ~rpc_server:Evm_node.Resto
@@ -46,6 +47,7 @@ module Setup = struct
       ~with_runtimes
       ~enable_dal:false
       ~enable_multichain:false
+      ?tez_bootstrap_accounts
 end
 
 let test_runtime_feature_flag ~runtime () =
@@ -84,6 +86,23 @@ let check_account sandbox (account : Account.key) =
   in
   unit
 
+let account_str_rpc sequencer account key =
+  let path =
+    sf "/tezlink/chains/main/blocks/head/context/contracts/%s/%s" account key
+  in
+
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      ~args:["-v"]
+      (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  return @@ JSON.parse ~origin:"curl_protocols" res
+
+let account_rpc sequencer account key =
+  account_str_rpc sequencer account.Account.public_key_hash key
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
@@ -94,6 +113,102 @@ let test_bootstrap_kernel_config () =
     ~with_runtimes:[Tezos]
   @@ fun sandbox ->
   Lwt_list.iter_p (check_account sandbox) tez_bootstrap_accounts
+
+let test_reveal =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Reveal tezos native account"
+    ~tags:["reveal"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+  @@
+  fun {
+        client;
+        sc_rollup_node;
+        proxy;
+        sc_rollup_address;
+        sequencer;
+        l1_contracts;
+        _;
+      }
+      _protocol
+    ->
+  (* Make a deposit to have an unrevealed account *)
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let receiver_account = Constant.bootstrap2 in
+
+  let receiver =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         receiver_account.public_key_hash
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Contract_repr.encoding
+      receiver
+  in
+  let (`Hex receiver) = Hex.of_bytes bytes in
+  let deposit_info =
+    Delayed_inbox.{receiver = TezosAddr receiver; chain_id = None}
+  in
+  let* () =
+    Delayed_inbox.send_deposit_to_delayed_inbox
+      ~rlp:true
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
+  let* reveal =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter:1
+            ~source:receiver_account
+            (reveal receiver_account ());
+        ])
+      client
+  in
+  let* _ =
+    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      reveal
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* manager_key = account_rpc sequencer receiver_account "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  unit
 
 let test_deposit =
   Setup.register_fullstack_test
@@ -280,6 +395,7 @@ let test_eth_rpc_with_alias ~runtime =
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
+  test_reveal [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos ()
