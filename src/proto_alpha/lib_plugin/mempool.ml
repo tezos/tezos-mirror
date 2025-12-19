@@ -894,7 +894,7 @@ let sources_from_operation ctxt
     | Single (Manager_operation {source; _}) -> return [source]
     | Cons (Manager_operation {source; _}, _) -> return [source]
   in
-  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V2.public_key_hash in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V3.public_key_hash in
   return @@ map_pkh_env sources
 
 module Internal_for_tests = struct

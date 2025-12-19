@@ -103,7 +103,7 @@ let injector_operation_of_manager : type kind.
       let refutation =
         Sc_rollup_proto_types.Game.refutation_to_octez refutation
       in
-      let opponent = Tezos_crypto.Signature.Of_V2.public_key_hash opponent in
+      let opponent = Tezos_crypto.Signature.Of_V3.public_key_hash opponent in
       Some (Refute {rollup; opponent; refutation})
   | Sc_rollup_timeout {rollup; stakers} ->
       let rollup = Sc_rollup_proto_types.Address.to_octez rollup in

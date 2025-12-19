@@ -601,7 +601,7 @@ module Make
 
     let signature rng_state =
       Script_signature.make
-        (Tezos_crypto.Signature.V2.Of_V_latest.get_signature_exn
+        (Tezos_crypto.Signature.V3.Of_V_latest.get_signature_exn
            (Michelson_base.signature rng_state))
 
     let rec value : type a ac. (a, ac) Script_typed_ir.ty -> a sampler =

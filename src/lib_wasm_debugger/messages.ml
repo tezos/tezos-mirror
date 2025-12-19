@@ -73,13 +73,13 @@ let input_encoding default_sender default_source default_destination :
               Sc_rollup.Inbox_message.(
                 Internal (Transfer {payload; sender; source; destination})) ->
               let source =
-                Tezos_crypto.Signature.Of_V2.public_key_hash source
+                Tezos_crypto.Signature.Of_V3.public_key_hash source
               in
               Some (payload, sender, source, destination)
           | _ -> None)
         (fun (payload, sender, source, destination) ->
           let source =
-            Signature.V2.Of_V_latest.get_public_key_hash_exn source
+            Signature.V3.Of_V_latest.get_public_key_hash_exn source
           in
           `Inbox_message
             (Internal (Transfer {payload; sender; source; destination})));

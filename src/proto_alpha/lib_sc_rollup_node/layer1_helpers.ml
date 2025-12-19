@@ -259,7 +259,7 @@ let find_whitelist cctxt ?block rollup_address =
   in
   return
   @@ Option.map
-       (List.map Tezos_crypto.Signature.Of_V2.public_key_hash)
+       (List.map Tezos_crypto.Signature.Of_V3.public_key_hash)
        whitelist
 
 let find_last_whitelist_update cctxt rollup_address =
