@@ -619,6 +619,10 @@ let signature_size_of_algo : Signature.algo -> int = function
       (* BLS signatures in operations are encoded with 2 extra bytes: a [ff]
          prefix and a tag [03]. *)
       Signature.Bls.size + 2
+  | Mldsa44 ->
+      (* ML-DSA-44 signatures in operations are encoded with 2 extra bytes: a
+         [ff] prefix and a tag [04]. *)
+      Signature.Mldsa44.size + 2
 
 (* This value is used as a safety guard for gas limit. *)
 let default_safety_guard = Gas.Arith.(integral_of_int_exn 100)
@@ -1496,6 +1500,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Secp256k1 _ -> Secp256k1
     | P256 _ -> P256
     | Bls _ -> Bls
+    | Mldsa44 _ -> Mldsa44
   in
   match key with
   | None when not (has_reveal operations) -> (

@@ -41,11 +41,18 @@ let random_seed ~rng_state =
       Char.chr (Random.State.int rng_state 256))
 
 let random_algo ~rng_state : Signature.algo =
-  match Random.State.int rng_state 3 with
+  match
+    Random.State.int rng_state 3
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8220
+
+     Should be 5 but adaptation for BLS gas cost and ML-DSA-44 delegate
+     forbidden are needed. *)
+  with
   | 0 -> Ed25519
   | 1 -> Secp256k1
   | 2 -> P256
   | 3 -> Bls
+  | 4 -> Mldsa44
   | _ -> assert false
 
 let new_account ?(rng_state = Random.State.make_self_init ())

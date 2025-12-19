@@ -702,7 +702,8 @@ let ir_model instr_or_cont =
       | N_IBlake2b | N_ISha256 | N_ISha512 | N_IKeccak | N_ISha3 ->
           (affine_model, const1_skip1_model) |> m2 name
       | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
-      | N_ICheck_signature_p256 | N_ICheck_signature_bls ->
+      | N_ICheck_signature_p256 | N_ICheck_signature_bls
+      | N_ICheck_signature_mldsa44 ->
           (affine_model, const1_skip1_model) |> m2 name
       | N_IContract | N_ITransfer_tokens | N_IImplicit_account
       | N_IIs_implicit_account | N_IIndex_address | N_IGet_address_index ->

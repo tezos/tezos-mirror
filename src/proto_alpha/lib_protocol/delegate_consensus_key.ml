@@ -191,7 +191,7 @@ let check_not_tz4 kind : Signature.Public_key.t -> unit tzresult =
   let open Result_syntax in
   function
   | Bls pk -> tzfail (Invalid_consensus_key_update_tz4 (pk, kind))
-  | Ed25519 _ | Secp256k1 _ | P256 _ -> return_unit
+  | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> return_unit
 
 let check_is_not_another_delegate ctxt kind pkh delegate =
   let open Lwt_result_syntax in

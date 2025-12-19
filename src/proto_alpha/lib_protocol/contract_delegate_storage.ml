@@ -45,7 +45,7 @@ let check_not_tz4 : Signature.Public_key_hash.t -> unit tzresult =
   let open Result_syntax in
   function
   | Bls tz4 -> tzfail (Forbidden_tz4_delegate tz4)
-  | Ed25519 _ | Secp256k1 _ | P256 _ -> return_unit
+  | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> return_unit
 
 let find = Storage.Contract.Delegate.find
 

@@ -85,19 +85,35 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
       (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
   else Empty
 
-type algo = Any_algo | Ed25519 | Secp256k1 | P256 | Bls | Not_Bls
+type algo =
+  | Any_algo
+  | Ed25519
+  | Secp256k1
+  | P256
+  | Bls
+  | Not_Bls_or_Mldsa44
+  | Mldsa44
+  | Not_Mldsa44
 
 let algo_to_algo ~rng_state = function
   | Ed25519 -> Some Signature.Ed25519
   | Secp256k1 -> Some Secp256k1
   | P256 -> Some P256
   | Bls -> Some Bls
+  | Mldsa44 -> Some Mldsa44
   | Any_algo -> None
-  | Not_Bls -> (
+  | Not_Bls_or_Mldsa44 -> (
       match Random.State.int rng_state 3 with
       | 0 -> Some Signature.Ed25519
       | 1 -> Some Secp256k1
       | 2 -> Some P256
+      | _ -> assert false)
+  | Not_Mldsa44 -> (
+      match Random.State.int rng_state 4 with
+      | 0 -> Some Signature.Ed25519
+      | 1 -> Some Secp256k1
+      | 2 -> Some P256
+      | 3 -> Some Bls
       | _ -> assert false)
 
 (* None = not set, Some None = set to None (not the same) *)

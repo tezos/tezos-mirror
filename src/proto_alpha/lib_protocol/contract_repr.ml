@@ -57,6 +57,7 @@ let implicit_of_b58data : Base58.data -> Signature.public_key_hash option =
   | Secp256k1.Public_key_hash.Data h -> Some (Signature.Secp256k1 h)
   | P256.Public_key_hash.Data h -> Some (Signature.P256 h)
   | Bls.Public_key_hash.Data h -> Some (Signature.Bls h)
+  | Mldsa44.Public_key_hash.Data h -> Some (Signature.Mldsa44 h)
   | _ -> None
 
 let originated_of_b58data = function

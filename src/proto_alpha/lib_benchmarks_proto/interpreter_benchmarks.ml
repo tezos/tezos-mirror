@@ -3105,6 +3105,7 @@ module Registration_section = struct
       | Signature.Secp256k1 -> Interpreter_workload.N_ICheck_signature_secp256k1
       | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
       | Signature.Bls -> Interpreter_workload.N_ICheck_signature_bls
+      | Signature.Mldsa44 -> Interpreter_workload.N_ICheck_signature_mldsa44
 
     let check_signature (algo : Signature.algo) ~benchmark_type ~for_intercept =
       benchmark_with_stack_sampler
@@ -3141,6 +3142,8 @@ module Registration_section = struct
     let () = check_signature Signature.P256
 
     let () = check_signature Signature.Bls
+
+    let () = check_signature Signature.Mldsa44
 
     let () =
       simple_time_alloc_benchmark

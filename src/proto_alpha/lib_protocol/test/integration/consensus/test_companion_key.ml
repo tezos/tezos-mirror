@@ -217,7 +217,7 @@ let test_init_with_cks_for_bootstraps =
         ~bootstrap_info_list:
           [
             make "no_ck";
-            make "with_consensus_key" ~consensus_key:(Some Any_algo);
+            make "with_consensus_key" ~consensus_key:(Some Not_Mldsa44);
             make "with_companion_key" ~companion_key:true;
             make "with_both_tz4" ~consensus_key:(Some Bls) ~companion_key:true;
           ]

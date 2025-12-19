@@ -169,6 +169,12 @@ let random_tz4 =
   let+ str = string_size (pure Signature.Bls.Public_key_hash.size) in
   (Bls (Signature.Bls.Public_key_hash.of_string_exn str) : public_key_hash)
 
+let random_tz5 =
+  let open QCheck2.Gen in
+  let+ str = string_size (pure Signature.Mldsa44.Public_key_hash.size) in
+  (Mldsa44 (Signature.Mldsa44.Public_key_hash.of_string_exn str)
+    : public_key_hash)
+
 let random_pkh =
   let open QCheck2.Gen in
   let* algo = gen_algo in
@@ -177,6 +183,7 @@ let random_pkh =
   | Secp256k1 -> random_tz2
   | P256 -> random_tz3
   | Bls -> random_tz4
+  | Mldsa44 -> random_tz5
 
 let random_pk =
   let open QCheck2.Gen in
@@ -203,6 +210,9 @@ let random_signature =
       let+ seed = random_seed in
       let _, _, sk = Signature.generate_key ~algo:Bls ~seed () in
       Signature.sign sk Bytes.empty
+  | Some Mldsa44 ->
+      let+ str = string_size (pure Signature.Mldsa44.size) in
+      (Mldsa44 (Signature.Mldsa44.of_string_exn str) : Signature.t)
 
 let random_signature =
   let open QCheck2.Gen in
@@ -214,6 +224,7 @@ let random_signature =
         of_secp256k1 Signature.Secp256k1.zero;
         of_p256 Signature.P256.zero;
         of_bls Signature.Bls.zero;
+        of_mldsa44 Signature.Mldsa44.zero;
         Unknown (Bytes.make 64 '\000');
       ]
     ()

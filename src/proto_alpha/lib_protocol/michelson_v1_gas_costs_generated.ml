@@ -21,6 +21,10 @@ let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 3600
 (* max 10 3300. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 3300
 
+(* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_mldsa44 *)
+(* max 10 3300. *)
+let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_mldsa44 = S.safe_int 3300
+
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 *)
 (* max 10 3300. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3300
@@ -37,6 +41,10 @@ let cost_B58CHECK_DECODING_PUBLIC_KEY_bls = S.safe_int 79000
 (* max 10 4200. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 4200
 
+(* model encoding/B58CHECK_DECODING_PUBLIC_KEY_mldsa44 *)
+(* max 10 4200. *)
+let cost_B58CHECK_DECODING_PUBLIC_KEY_mldsa44 = S.safe_int 4200
+
 (* model encoding/B58CHECK_DECODING_PUBLIC_KEY_p256 *)
 (* max 10 13450. *)
 let cost_B58CHECK_DECODING_PUBLIC_KEY_p256 = S.safe_int 13450
@@ -52,6 +60,10 @@ let cost_B58CHECK_DECODING_SIGNATURE_bls = S.safe_int 6400
 (* model encoding/B58CHECK_DECODING_SIGNATURE_ed25519 *)
 (* max 10 6400. *)
 let cost_B58CHECK_DECODING_SIGNATURE_ed25519 = S.safe_int 6400
+
+(* model encoding/B58CHECK_DECODING_SIGNATURE_mldsa44 *)
+(* max 10 6400. *)
+let cost_B58CHECK_DECODING_SIGNATURE_mldsa44 = S.safe_int 6400
 
 (* model encoding/B58CHECK_DECODING_SIGNATURE_p256 *)
 (* max 10 6400. *)
@@ -73,6 +85,10 @@ let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 3200
 (* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 3200
 
+(* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_mldsa44 *)
+(* max 10 3200. *)
+let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_mldsa44 = S.safe_int 3200
+
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 *)
 (* max 10 3200. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 3200
@@ -89,6 +105,10 @@ let cost_B58CHECK_ENCODING_PUBLIC_KEY_bls = S.safe_int 5900
 (* max 10 4500. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 4500
 
+(* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_mldsa44 *)
+(* max 10 4500. *)
+let cost_B58CHECK_ENCODING_PUBLIC_KEY_mldsa44 = S.safe_int 4500
+
 (* model encoding/B58CHECK_ENCODING_PUBLIC_KEY_p256 *)
 (* max 10 4550. *)
 let cost_B58CHECK_ENCODING_PUBLIC_KEY_p256 = S.safe_int 4550
@@ -104,6 +124,10 @@ let cost_B58CHECK_ENCODING_SIGNATURE_bls = S.safe_int 8300
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_ed25519 *)
 (* max 10 8300. *)
 let cost_B58CHECK_ENCODING_SIGNATURE_ed25519 = S.safe_int 8300
+
+(* model encoding/B58CHECK_ENCODING_SIGNATURE_mldsa44 *)
+(* max 10 8300. *)
+let cost_B58CHECK_ENCODING_SIGNATURE_mldsa44 = S.safe_int 8300
 
 (* model encoding/B58CHECK_ENCODING_SIGNATURE_p256 *)
 (* max 10 8300. *)
@@ -161,6 +185,10 @@ let cost_DECODING_PUBLIC_KEY_HASH_bls = S.safe_int 60
 (* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 60
 
+(* model encoding/DECODING_PUBLIC_KEY_HASH_mldsa44 *)
+(* max 10 60. *)
+let cost_DECODING_PUBLIC_KEY_HASH_mldsa44 = S.safe_int 60
+
 (* model encoding/DECODING_PUBLIC_KEY_HASH_p256 *)
 (* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_HASH_p256 = S.safe_int 60
@@ -177,6 +205,10 @@ let cost_DECODING_PUBLIC_KEY_bls = S.safe_int 74000
 (* max 10 60. *)
 let cost_DECODING_PUBLIC_KEY_ed25519 = S.safe_int 60
 
+(* model encoding/DECODING_PUBLIC_KEY_mldsa44 *)
+(* max 10 60. *)
+let cost_DECODING_PUBLIC_KEY_mldsa44 = S.safe_int 60
+
 (* model encoding/DECODING_PUBLIC_KEY_p256 *)
 (* max 10 9550. *)
 let cost_DECODING_PUBLIC_KEY_p256 = S.safe_int 9550
@@ -192,6 +224,10 @@ let cost_DECODING_SIGNATURE_bls = S.safe_int 40
 (* model encoding/DECODING_SIGNATURE_ed25519 *)
 (* max 10 35. *)
 let cost_DECODING_SIGNATURE_ed25519 = S.safe_int 35
+
+(* model encoding/DECODING_SIGNATURE_mldsa44 *)
+(* max 10 35. *)
+let cost_DECODING_SIGNATURE_mldsa44 = S.safe_int 35
 
 (* model encoding/DECODING_SIGNATURE_p256 *)
 (* max 10 35. *)
@@ -235,6 +271,10 @@ let cost_ENCODING_PUBLIC_KEY_HASH_bls = S.safe_int 80
 (* max 10 70. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_ed25519 = S.safe_int 70
 
+(* model encoding/ENCODING_PUBLIC_KEY_HASH_mldsa44 *)
+(* max 10 70. *)
+let cost_ENCODING_PUBLIC_KEY_HASH_mldsa44 = S.safe_int 70
+
 (* model encoding/ENCODING_PUBLIC_KEY_HASH_p256 *)
 (* max 10 70. *)
 let cost_ENCODING_PUBLIC_KEY_HASH_p256 = S.safe_int 70
@@ -251,6 +291,10 @@ let cost_ENCODING_PUBLIC_KEY_bls = S.safe_int 90
 (* max 10 80. *)
 let cost_ENCODING_PUBLIC_KEY_ed25519 = S.safe_int 80
 
+(* model encoding/ENCODING_PUBLIC_KEY_mldsa44 *)
+(* max 10 80. *)
+let cost_ENCODING_PUBLIC_KEY_mldsa44 = S.safe_int 80
+
 (* model encoding/ENCODING_PUBLIC_KEY_p256 *)
 (* max 10 90. *)
 let cost_ENCODING_PUBLIC_KEY_p256 = S.safe_int 90
@@ -266,6 +310,10 @@ let cost_ENCODING_SIGNATURE_bls = S.safe_int 55
 (* model encoding/ENCODING_SIGNATURE_ed25519 *)
 (* max 10 45. *)
 let cost_ENCODING_SIGNATURE_ed25519 = S.safe_int 45
+
+(* model encoding/ENCODING_SIGNATURE_mldsa44 *)
+(* max 10 45. *)
+let cost_ENCODING_SIGNATURE_mldsa44 = S.safe_int 45
 
 (* model encoding/ENCODING_SIGNATURE_p256 *)
 (* max 10 45. *)
@@ -887,6 +935,24 @@ let cost_N_ICheck_signature_ed25519_alloc _size = S.safe_int 10
      let time = 65800. + (1.125 * size) in
      let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_ICheck_signature_ed25519_synthesized size =
+  let size = S.safe_int size in
+  (size lsr 3) + size + S.safe_int 65800
+
+(* model interpreter/N_ICheck_signature_mldsa44 *)
+(* fun size -> max 10 (65800. + (1.125 * size)) *)
+let cost_N_ICheck_signature_mldsa44 size =
+  let size = S.safe_int size in
+  (size lsr 3) + size + S.safe_int 65800
+
+(* model interpreter/N_ICheck_signature_mldsa44_alloc *)
+(* fun size -> max 10 0. *)
+let cost_N_ICheck_signature_mldsa44_alloc _size = S.safe_int 10
+
+(* model interpreter/N_ICheck_signature_mldsa44_synthesized *)
+(* fun size ->
+     let time = 65800. + (1.125 * size) in
+     let alloc = 0. in max 10 (max time alloc) *)
+let cost_N_ICheck_signature_mldsa44_synthesized size =
   let size = S.safe_int size in
   (size lsr 3) + size + S.safe_int 65800
 
