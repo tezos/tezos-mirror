@@ -200,6 +200,19 @@ let context_init ?commitment_period_in_blocks
         };
     }
 
+let bake_until_refutation_game_can_start block =
+  (* A refutation game must not start too early: the protocol requires waiting
+     for one commitment period to ensure sufficient time has passed since the
+     commitment being challenged was published. This allows for potential
+     successor commitments to be observed and provides a more stable foundation
+     for dispute resolution. *)
+  let open Lwt_result_syntax in
+  let* constants = Context.get_constants (B block) in
+  let commitment_period_in_blocks =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  Block.bake_n (commitment_period_in_blocks - 1) block
+
 (** [test_disable_arith_pvm_feature_flag ()] tries to originate a Arith smart
     rollup when the Arith PVM feature flag is deactivated and checks that it
     fails. *)
@@ -1910,6 +1923,7 @@ let test_number_of_parallel_games_bounded () =
           "It should have failed with \
            [Sc_rollup_max_number_of_parallel_games_reached]"
   in
+  let* block = bake_until_refutation_game_can_start block in
   let* incr = Incremental.begin_construction block in
   let* _block, _counter =
     List.fold_left2_es
@@ -1976,6 +1990,7 @@ let test_timeout () =
 
   let* block = add_publish ~rollup block account1 commitment1 in
   let* block = add_publish ~rollup block account2 commitment2 in
+  let* block = bake_until_refutation_game_can_start block in
   let refutation =
     Sc_rollup.Game.Start
       {
@@ -2048,6 +2063,7 @@ let test_timeout () =
 
 let start_game block rollup (first_player, commitment1) (pkh2, commitment2) =
   let open Lwt_result_syntax in
+  let* block = bake_until_refutation_game_can_start block in
   let refutation =
     Sc_rollup.Game.Start
       {
@@ -2502,6 +2518,7 @@ let test_refute_set_input
      1 -> state just before the [set_input]
      2 -> tick in conflict with different evaluations of [set_input]
   *)
+  let* block = bake_until_refutation_game_can_start block in
   let* start_game_op =
     let refutation =
       Sc_rollup.Game.Start
@@ -3139,6 +3156,7 @@ let test_winner_by_forfeit () =
   let* block, rollup, (pA, pA_pkh), (pB, pB_pkh), (pC, pC_pkh), (pD, pD_pkh) =
     init_with_4_conflicts ()
   in
+  let* block = bake_until_refutation_game_can_start block in
 
   (* Refutation game starts: A against B, C and D. *)
   (* A starts against B and D so it can be timeouted. *)
@@ -3196,6 +3214,7 @@ let test_winner_by_forfeit_with_draw () =
   let Constants.Parametric.{timeout_period_in_blocks; stake_amount; _} =
     constants.parametric.sc_rollup
   in
+  let* block = bake_until_refutation_game_can_start block in
 
   (* A and B starts a refutation game against C. *)
   let* pA_against_pC_op =
@@ -3330,6 +3349,7 @@ let test_agreeing_stakers_cannot_play () =
   let commitments, _ = List.split commitments_and_hashes in
   let* block = publish_commitments block pA rollup commitments in
   let* block = publish_commitments block pB rollup commitments in
+  let* block = bake_until_refutation_game_can_start block in
   let _, agreed_commitment_hash =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.last_opt commitments_and_hashes
@@ -3374,6 +3394,7 @@ let test_start_game_on_cemented_commitment () =
       hashes
   in
 
+  let* block = bake_until_refutation_game_can_start block in
   (* We now check that pA and pB cannot start a refutation against on
      cemented commitments. *)
   List.iter_es

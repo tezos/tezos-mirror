@@ -426,6 +426,14 @@ let test_sc_rollup_refute =
         ~src:Constant.bootstrap2.public_key_hash
         tezos_client
     in
+    let* () =
+      (* Before starting refutations, we must wait for one commitment period as
+         required by the protocol. The test setup uses commitment_period=10. *)
+      let commitment_period_in_blocks = 10 in
+      Client.bake_for_and_wait
+        tezos_client
+        ~count:(commitment_period_in_blocks - 1)
+    in
     let refutation =
       Operation.Manager.Start {player_commitment_hash; opponent_commitment_hash}
     in
