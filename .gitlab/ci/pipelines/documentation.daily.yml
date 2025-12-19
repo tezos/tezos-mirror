@@ -34,32 +34,6 @@ oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:unstable
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
-
 datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
@@ -195,119 +169,6 @@ oc.build_amd64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_amd64-exp:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  rules:
-  - when: always
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/build_full_unreleased.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/experimental-executables
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-    DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-  artifacts:
-    name: build-$ARCH-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-*
-    - octez-teztale-*
-    - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
-    when: on_success
-
-oc.build_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f kernels.mk build
-  - make -f etherlink.mk evm_kernel.wasm
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-  artifacts:
-    name: build-kernels-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - evm_kernel.wasm
-    - smart-rollup-installer
-    - sequenced_kernel.wasm
-    - tx_kernel.wasm
-    - tx_kernel_dal.wasm
-    - dal_echo_kernel.wasm
-    when: on_success
-
 documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: test
@@ -337,14 +198,10 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-exp
-  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-exp
-  - oc.build_kernels
   timeout: 60 minutes
   interruptible: false
   before_script:
