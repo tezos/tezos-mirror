@@ -686,31 +686,28 @@ fn migrate_to<Host: Runtime>(
                 let mut delayed_inbox = DelayedInbox::new(host)?;
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
+                let fa_deposit = FaDeposit {
+                    amount: U256::from_dec_str("3125423349").unwrap(),
+                    receiver: H160::from_slice(&[
+                        0x94, 0x6a, 0x4f, 0x7a, 0x4e, 0xc4, 0x40, 0x77, 0xc6, 0x8b, 0x5a,
+                        0x1b, 0x00, 0xfb, 0xe0, 0xb9, 0x61, 0x0c, 0xf6, 0x87,
+                    ]),
+                    proxy: Some(H160::from_slice(&[
+                        0x19, 0x41, 0x8d, 0x0a, 0xf0, 0xf3, 0x68, 0x65, 0xcd, 0xfb, 0xb2,
+                        0x43, 0x7d, 0xfe, 0xd2, 0x9b, 0xa3, 0x4d, 0x31, 0x90,
+                    ])),
+                    ticket_hash: H256::from_slice(&[
+                        0x23, 0x06, 0x44, 0xd9, 0xa1, 0xc4, 0x5d, 0x22, 0xfb, 0xe4, 0x66,
+                        0x61, 0xc0, 0xf5, 0xf8, 0x65, 0x8c, 0x45, 0x31, 0xbd, 0xb1, 0xa8,
+                        0xe9, 0x73, 0x1a, 0xad, 0x38, 0x6a, 0xdd, 0xb6, 0x1d, 0xff,
+                    ]),
+                    inbox_level: 11228700,
+                    inbox_msg_id: 4,
+                };
+                let tx_hash = fa_deposit.hash(&[0u8; 20]).into();
                 let tx = Transaction {
-                    tx_hash: [
-                        130, 245, 7, 188, 90, 186, 15, 63, 96, 136, 192, 135, 194, 252,
-                        216, 127, 199, 183, 243, 60, 148, 69, 227, 49, 236, 61, 31, 223,
-                        69, 228, 190, 56,
-                    ],
-                    content: TransactionContent::FaDeposit(FaDeposit {
-                        amount: U256::from_dec_str("3125423349").unwrap(),
-                        receiver: H160::from_slice(&[
-                            0x94, 0x6a, 0x4f, 0x7a, 0x4e, 0xc4, 0x40, 0x77, 0xc6, 0x8b,
-                            0x5a, 0x1b, 0x00, 0xfb, 0xe0, 0xb9, 0x61, 0x0c, 0xf6, 0x87,
-                        ]),
-                        proxy: Some(H160::from_slice(&[
-                            0x19, 0x41, 0x8d, 0x0a, 0xf0, 0xf3, 0x68, 0x65, 0xcd, 0xfb,
-                            0xb2, 0x43, 0x7d, 0xfe, 0xd2, 0x9b, 0xa3, 0x4d, 0x31, 0x90,
-                        ])),
-                        ticket_hash: H256::from_slice(&[
-                            0x23, 0x06, 0x44, 0xd9, 0xa1, 0xc4, 0x5d, 0x22, 0xfb, 0xe4,
-                            0x66, 0x61, 0xc0, 0xf5, 0xf8, 0x65, 0x8c, 0x45, 0x31, 0xbd,
-                            0xb1, 0xa8, 0xe9, 0x73, 0x1a, 0xad, 0x38, 0x6a, 0xdd, 0xb6,
-                            0x1d, 0xff,
-                        ]),
-                        inbox_level: 11228700,
-                        inbox_msg_id: 4,
-                    }),
+                    tx_hash,
+                    content: TransactionContent::FaDeposit(fa_deposit),
                 };
                 delayed_inbox.save_transaction(host, tx, previous_timestamp, level)?;
             }
