@@ -42,7 +42,6 @@ val new_finalized_head :
   Node_context.t ->
   Rpc_context.t ->
   Crawler.t ->
-  Cryptobox.t ->
   Block_hash.t ->
   Block_header.shell_header ->
   launch_time:float ->

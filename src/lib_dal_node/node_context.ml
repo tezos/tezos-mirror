@@ -28,8 +28,7 @@ type t = {
   config : Configuration_file.t;
   identity : P2p_identity.t;
   network_name : Distributed_db_version.Name.t;
-  cryptobox : Cryptobox.t;
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
+  mutable proto_cryptoboxes : Proto_cryptoboxes.t;
   mutable proto_plugins : Proto_plugins.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
   mutable slots_under_reconstruction :
@@ -52,16 +51,14 @@ type t = {
   mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
 }
 
-let init config ~identity ~network_name profile_ctxt cryptobox
-    shards_proofs_precomputation proto_plugins store gs_worker transport_layer
-    cctxt ~last_finalized_level ~l1_current_level
-    ?(disable_shard_validation = false) ~ignore_pkhs () =
+let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
+    proto_plugins store gs_worker transport_layer cctxt ~last_finalized_level
+    ~l1_current_level ?(disable_shard_validation = false) ~ignore_pkhs () =
   {
     config;
     identity;
     network_name;
-    cryptobox;
-    shards_proofs_precomputation;
+    proto_cryptoboxes;
     proto_plugins;
     ongoing_amplifications = Types.Slot_id.Set.empty;
     slots_under_reconstruction = Types.Slot_id.Map.empty;
@@ -145,25 +142,48 @@ let may_reconstruct ~reconstruct slot_id t =
     Types.Slot_id.Map.remove slot_id t.slots_under_reconstruction ;
   Lwt.return res
 
-let may_add_plugin ctxt cctxt ~block_level ~proto_level =
+type error += Unexpected_empty_plugin_table
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unexpected_empty_plugin_table"
+    ~title:"DAL node: no plugins registered"
+    ~description:"DAL node: no plugins registered"
+    ~pp:(fun ppf () -> Format.fprintf ppf "No plugin registered.")
+    Data_encoding.unit
+    (function Unexpected_empty_plugin_table -> Some () | _ -> None)
+    (fun () -> Unexpected_empty_plugin_table)
+
+let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
   let old_proto_plugins = ctxt.proto_plugins in
-  let* new_proto_plugins =
-    Proto_plugins.may_add
-      cctxt
-      old_proto_plugins
-      ~first_level:block_level
-      ~proto_level
-  in
-  if
-    not
-    @@ Option.equal
-         Int.equal
-         (Proto_plugins.current_proto_level old_proto_plugins)
-         (Proto_plugins.current_proto_level new_proto_plugins)
-  then ctxt.last_migration_level <- block_level ;
-  ctxt.proto_plugins <- new_proto_plugins ;
-  return_unit
+  match Proto_plugins.current_proto_level old_proto_plugins with
+  | Some lvl when lvl = proto_level -> return_unit
+  | _ -> (
+      let* new_proto_plugins =
+        Proto_plugins.may_add
+          cctxt
+          old_proto_plugins
+          ~first_level:block_level
+          ~proto_level
+      in
+      ctxt.last_migration_level <- block_level ;
+      ctxt.proto_plugins <- new_proto_plugins ;
+      let proto_param_opt =
+        Proto_plugins.current_proto_parameters new_proto_plugins
+      in
+      match proto_param_opt with
+      | None -> tzfail Unexpected_empty_plugin_table
+      | Some params ->
+          let* new_cryptoboxes =
+            Proto_cryptoboxes.add
+              params
+              ~level:block_level
+              ctxt.proto_cryptoboxes
+          in
+          ctxt.proto_cryptoboxes <- new_cryptoboxes ;
+          return_unit)
 
 let get_plugin_and_parameters_for_level ctxt ~level =
   Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
@@ -238,7 +258,8 @@ let set_profile_ctxt ctxt ?(save = true) pctxt =
 
 let get_config ctxt = ctxt.config
 
-let get_cryptobox ctxt = ctxt.cryptobox
+let get_cryptobox_and_precomputations ~level ctxt =
+  Proto_cryptoboxes.get_for_level ctxt.proto_cryptoboxes ~level
 
 let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
 
@@ -247,8 +268,6 @@ let get_last_finalized_level ctxt = ctxt.last_finalized_level
 let set_l1_current_head_level ctxt level = ctxt.l1_current_level <- level
 
 let get_l1_current_head_level ctxt = ctxt.l1_current_level
-
-let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 
 let get_store ctxt = ctxt.store
 

@@ -653,7 +653,12 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let store = Node_context.get_store ctxt in
-  let cryptobox = Node_context.get_cryptobox ctxt in
+  let*? cryptobox, _ =
+    Errors.other_result
+    @@ Node_context.get_cryptobox_and_precomputations
+         ~level:slot_id.Types.Slot_id.slot_level
+         ctxt
+  in
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
     Store.Slots.find_slot (Store.slots store) ~slot_size slot_id

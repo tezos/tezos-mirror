@@ -28,6 +28,8 @@ val to_list : t -> (module Dal_plugin.T) list
     added protocol plugin. *)
 val current_proto_level : t -> int option
 
+val current_proto_parameters : t -> Types.proto_parameters option
+
 type error +=
   | No_plugin_for_level of {level : int32}
   | No_plugin_for_proto of {proto_hash : Protocol_hash.t}

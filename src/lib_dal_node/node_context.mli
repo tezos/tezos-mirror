@@ -34,8 +34,7 @@ val init :
   identity:P2p_identity.t ->
   network_name:Distributed_db_version.Name.t ->
   Profile_manager.t ->
-  Cryptobox.t ->
-  Cryptobox.shards_proofs_precomputation option ->
+  Proto_cryptoboxes.t ->
   Proto_plugins.t ->
   Store.t ->
   Gossipsub.Worker.t ->
@@ -86,7 +85,7 @@ val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
     It returns an error if the node is not ready, if the
     [Chain_services.Blocks.protocols] RPC fails, or if the plugin is not
     registered. *)
-val may_add_plugin :
+val may_add_plugin_and_cryptobox :
   t ->
   Rpc_context.t ->
   block_level:int32 ->
@@ -148,7 +147,10 @@ val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 val get_config : t -> Configuration_file.t
 
 (** [get_cryptobox ctxt] returns the DAL node's cryptobox *)
-val get_cryptobox : t -> Cryptobox.t
+val get_cryptobox_and_precomputations :
+  level:Int32.t ->
+  t ->
+  (Cryptobox.t * Cryptobox.shards_proofs_precomputation option) tzresult
 
 (** Update the node's last finalized level. *)
 val set_last_finalized_level : t -> int32 -> unit
@@ -168,10 +170,6 @@ val is_bootstrap_node : t -> bool
 
 (** Returns true if and only if the node's profile supports refutation games. *)
 val supports_refutations : t -> bool
-
-(** [get_shards_proofs_precomputation ctxt] returns the shards proof's precomputation. *)
-val get_shards_proofs_precomputation :
-  t -> Cryptobox.shards_proofs_precomputation option
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.t

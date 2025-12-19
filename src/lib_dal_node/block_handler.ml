@@ -729,7 +729,7 @@ let new_finalized_payload_level ctxt cctxt block_level =
    Tenderbake. However, plugin registration is based on the latest L1 head not
    on the finalized block. This ensures new plugins are registered
    immediately after migration, rather than waiting for finalization. *)
-let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
+let new_finalized_head ctxt cctxt l1_crawler finalized_block_hash
     finalized_shell_header ~launch_time =
   let open Lwt_result_syntax in
   let level = finalized_shell_header.Block_header.level in
@@ -746,7 +746,11 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
       | Some (_hash, head) -> Block_header.(head.level, head.proto_level)
       | None -> assert false (* Not reachable *)
     in
-    Node_context.may_add_plugin ctxt cctxt ~proto_level ~block_level
+    Node_context.may_add_plugin_and_cryptobox
+      ctxt
+      cctxt
+      ~proto_level
+      ~block_level
   in
 
   (* If L = HEAD~2, then HEAD~1 is payload final. *)
@@ -779,6 +783,9 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         committee
         ~committee_level ;
       return_unit
+  in
+  let*? cryptobox, _ =
+    Node_context.get_cryptobox_and_precomputations ~level ctxt
   in
   Gossipsub.Worker.Validate_message_hook.set_batch
     (Message_validation.gossipsub_batch_validation
