@@ -1,5 +1,4 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
 
 # create_and_push_manifest TAG
 #
@@ -30,7 +29,7 @@ LATEST_TAG="${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 LATEST_TAG_GENERIC="${RELEASE}-${CI_COMMIT_REF_SLUG}"
 
 create_and_push_manifest() {
-  local TAG="$1"
+  TAG="$1"
 
   echo "Inspect ${IMAGE_NAME}:${LATEST_TAG}-amd64"
   docker buildx imagetools inspect "${IMAGE_NAME}:${LATEST_TAG}-amd64"
@@ -51,6 +50,6 @@ create_and_push_manifest() {
 
 create_and_push_manifest "${LATEST_TAG}"
 create_and_push_manifest "${LATEST_TAG_GENERIC}"
-if [[ "${CI_COMMIT_REF_PROTECTED:-}" == "true" ]]; then
+if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
   create_and_push_manifest "${RELEASE}"
 fi
