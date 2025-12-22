@@ -183,6 +183,131 @@ let download_confirmed_slot_pages =
         Slot_id_cache.replace cache slot_id res ;
         res
 
+let slot_statuses_cache :
+    ([`Attested of int | `Unattested | `Unpublished] * int32 * Block_hash.t)
+    Slot_id_cache.t =
+  let number_of_slots = 32 in
+  let max_number_of_dynamic_lags = 5 in
+  let tb_finality = 2 in
+  Slot_id_cache.create
+  @@ (number_of_slots * max_number_of_dynamic_lags * tb_finality)
+
+module SI = Set.Make (Int)
+
+(* This function returns the (final) attestation status of [slot_id] (published
+   level, index) as seen from L1 at the inbox level identified by
+   [inbox_level_block_hash].
+
+   We deliberately do not rely on DAL nodes here: DAL nodes typically update their
+   context only after blocks finalization, while rollups advance optimistically
+   and may need this information earlier. Instead, we read the DAL skip-list
+   cells from L1 ([Dal.skip_list_cells_of_level] at `Hash
+   (inbox_level_block_hash, 0)), and derive the slot status from those cells.
+
+   The function maintains a small in-memory cache keyed by
+   (inbox_level_block_hash, slot_id) to avoid refetching/decoding the same
+   skip-list data multiple times within a run. The use of the inbox_level's
+   block hash protects from the use of wrong/reverted statuses in case of L1
+   reorg.
+
+   Note 1: this limitation only affects fetching header/attestation
+   metadata. Fetching the *slot contents* can still rely on a DAL node when the
+   data is already stored, even if the corresponding header attestation status
+   is not (yet) available in the DAL node context.
+
+   Note 2: Adaptive DAL is not supported. We check attestation status as
+   declared by the L1 protocol. *)
+let _get_slot_header_attestation_info (Node_context.{cctxt; _} as node_ctxt)
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants) slot_id
+    =
+  let open Lwt_result_syntax in
+  let find_opt () =
+    match Slot_id_cache.find_opt slot_statuses_cache slot_id with
+    | Some (status, indexed_block_level, indexed_block_hash) ->
+        let* current_block_hash =
+          Node_context.hash_of_level node_ctxt indexed_block_level
+        in
+        if Block_hash.equal indexed_block_hash current_block_hash then
+          return_some status
+        else
+          (* There was a reorg, we should re-fetch statuses from L1 *)
+          return_none
+    | None -> return_none
+  in
+  let* immediate_res = find_opt () in
+  match immediate_res with
+  | Some res -> return res
+  | None -> (
+      let init_cache_for_potential_attestation_lag ~lag =
+        let potential_attested_level =
+          Int32.(add slot_id.slot_level (of_int lag))
+        in
+        let* potential_attested_level_hash =
+          Node_context.hash_of_level node_ctxt potential_attested_level
+        in
+        let* cells =
+          let cctxt = new Protocol_client_context.wrap_full cctxt in
+          Plugin.RPC.Dal.skip_list_cells_of_level
+            cctxt
+            (cctxt#chain, `Hash (potential_attested_level_hash, 0))
+            ()
+        in
+        List.iter
+          (fun (_hash, cell) ->
+            let content = Dal.Slots_history.content cell in
+            let Dal.Slots_history.{header_id = {published_level; index}; _} =
+              Dal.Slots_history.content_id content
+            in
+            let published_level = Raw_level.to_int32 published_level in
+            let index = Dal.Slot_index.to_int index in
+            let slot_id =
+              Slot_id.{slot_level = published_level; slot_index = index}
+            in
+            let final_status =
+              match content with
+              | Unpublished _ -> `Unpublished
+              | Published {is_proto_attested = false; _} -> `Unattested
+              | Published {attestation_lag; _} ->
+                  `Attested
+                    (Dal.Slots_history.attestation_lag_value attestation_lag)
+            in
+            Slot_id_cache.replace
+              slot_statuses_cache
+              slot_id
+              ( final_status,
+                potential_attested_level,
+                potential_attested_level_hash ))
+          cells ;
+        return_unit
+      in
+      let attestation_lags =
+        (* init with dynamic lags, if enabled *)
+        (if dal_constants.dynamic_lag_enable then
+           SI.of_list dal_constants.attestation_lags
+         else SI.empty)
+        |>
+        (* Add current lag if not already present *)
+        SI.add dal_constants.attestation_lag
+        |>
+        (* Add legacy lag if not already present *)
+        SI.add Dal.Slots_history.legacy_attestation_lag
+      in
+      let* res =
+        List.fold_left_es
+          (fun res lag ->
+            if Option.is_some res then return res
+            else
+              let* () = init_cache_for_potential_attestation_lag ~lag in
+              find_opt ())
+          None
+          (SI.elements attestation_lags)
+      in
+      match res with
+      | Some status -> return status
+      | None ->
+          (* Fixed in the next commit*)
+          assert false)
+
 (* Adaptive DAL is not supported anymore *)
 let get_slot_header_attestation_info =
   let open Lwt_result_syntax in
