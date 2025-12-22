@@ -190,6 +190,7 @@ let job_commit_titles =
     ~description:"Check that commit titles match the developer guidelines."
     ~image:Tezos_ci.Images.CI.prebuild_master
     ~stage:Test
+    ~force:true
     ~allow_failure:
       (match mode with
       | `strict -> No
