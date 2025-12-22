@@ -34,7 +34,10 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_execution::{context, mir_ctx::BlockCtx};
+use tezos_execution::{
+    context::{self, Context as _},
+    mir_ctx::BlockCtx,
+};
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
@@ -545,7 +548,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.number
         );
 
-        let context = context::Context::from(&self.storage_root_path())?;
+        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
 
         let level = block_in_progress.number.try_into()?;
         let now = block_in_progress.timestamp;
@@ -725,7 +728,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
             operation_bytes.len()
         );
-        let context = context::Context::from(&self.storage_root_path())?;
+        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
 
         let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
         let block_ctx = BlockCtx {

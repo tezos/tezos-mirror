@@ -19,7 +19,7 @@ use tezos_tezlink::{
 };
 
 use crate::{
-    account_storage::{Manager, TezlinkAccount, TezlinkImplicitAccount},
+    account_storage::{Manager, TezlinkAccount, TezosImplicitAccount},
     context::Context,
     gas::TezlinkOperationGas,
     BalanceUpdate,
@@ -100,9 +100,9 @@ fn compute_fees_balance_updates(
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload. When processing a batch, the reveal operation is the
 /// first operation on it.
-fn get_revealed_key<Host: Runtime>(
+fn get_revealed_key<Host: Runtime, A: TezosImplicitAccount>(
     host: &Host,
-    account: &TezlinkImplicitAccount,
+    account: &A,
     first_content: &ManagerOperationContent,
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
@@ -133,11 +133,11 @@ fn check_storage_limit(
     }
 }
 
-fn validate_source<Host: Runtime>(
+fn validate_source<Host: Runtime, C: Context>(
     host: &Host,
-    context: &Context,
+    context: &C,
     content: &[ManagerOperationContent],
-) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
+) -> Result<(PublicKey, C::ImplicitAccountType), ValidityError> {
     let source = &content[0].source()?;
 
     for c in content {
@@ -146,7 +146,8 @@ fn validate_source<Host: Runtime>(
         }
     }
 
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, source)
+    let account = context
+        .implicit_from_public_key_hash(source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
@@ -218,8 +219,8 @@ pub struct ValidatedOperation {
     pub content: ManagerOperation<OperationContent>,
 }
 
-pub struct ValidatedBatch {
-    pub source_account: TezlinkImplicitAccount,
+pub struct ValidatedBatch<A: TezosImplicitAccount> {
+    pub source_account: A,
     pub validated_operations: Vec<ValidatedOperation>,
 }
 
@@ -245,12 +246,12 @@ pub fn verify_signature(
     Ok(check)
 }
 
-pub fn execute_validation<Host: Runtime>(
+pub fn execute_validation<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     operation: tezos_tezlink::operation::Operation,
     skip_signature_check: bool,
-) -> Result<ValidatedBatch, ValidityError> {
+) -> Result<ValidatedBatch<C::ImplicitAccountType>, ValidityError> {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }

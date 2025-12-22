@@ -615,11 +615,11 @@ mod tests {
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
-    use tezos_execution::account_storage::Manager;
     use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_execution::account_storage::TezlinkImplicitAccount;
-    use tezos_execution::account_storage::TezlinkOriginatedAccount;
-    use tezos_execution::context;
+    use tezos_execution::account_storage::{
+        Manager, TezosImplicitAccount, TezosOriginatedAccount,
+    };
+    use tezos_execution::context::{self, Context as _};
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
@@ -1091,12 +1091,13 @@ mod tests {
         let bootstrap = bootstrap1();
         let src = bootstrap.pkh.clone();
 
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeeded");
 
         let contract = Contract::Implicit(src.clone());
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account interface should be correct");
 
         // Allocate bootstrap 1
@@ -1148,14 +1149,14 @@ mod tests {
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
 
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeed");
+        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
 
-        let bootstrap1 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
-                .expect("Account interface should be correct");
+        let bootstrap1 = context
+            .implicit_from_contract(&bootstrap1_contract)
+            .expect("Account interface should be correct");
 
         // Allocate bootstrap 1 and give some mutez for a transfer
         bootstrap1
@@ -1188,9 +1189,9 @@ mod tests {
 
         let bootstrap2_contract = Contract::Implicit(dst.clone());
 
-        let bootstrap2 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap2_contract)
-                .expect("Contract creation should have succeed");
+        let bootstrap2 = context
+            .implicit_from_contract(&bootstrap2_contract)
+            .expect("Contract creation should have succeed");
 
         // Verify that bootstrap 2 is not allocated
         assert!(!bootstrap2
@@ -1276,13 +1277,13 @@ mod tests {
 
         let boostrap1 = bootstrap1();
         let src = boostrap1.pkh.clone();
-        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-            .expect("Context creation should have succeed");
+        let context = context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed");
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
-        let bootstrap1 =
-            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
-                .expect("Account interface should be correct");
+        let bootstrap1 = context
+            .implicit_from_contract(&bootstrap1_contract)
+            .expect("Account interface should be correct");
         // Allocate bootstrap 1 and give some mutez for a transfer
         bootstrap1
             .allocate(&mut host)
@@ -1358,7 +1359,8 @@ mod tests {
             parser.parse(&expected_storage).unwrap(),
             mir::ast::Micheline::decode_raw(
                 &parser.arena,
-                &TezlinkOriginatedAccount::from_contract(&context, &generated_contract)
+                &context
+                    .originated_from_contract(&generated_contract)
                     .unwrap()
                     .storage(&host)
                     .unwrap()

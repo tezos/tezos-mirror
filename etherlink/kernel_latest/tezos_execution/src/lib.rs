@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use account_storage::Manager;
 use account_storage::TezlinkAccount;
-use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
-use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
@@ -42,7 +41,9 @@ use tezos_tezlink::{
     },
 };
 
+use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
 use crate::address::OriginationNonce;
+use crate::context::Context;
 use crate::gas::Cost;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
@@ -57,9 +58,9 @@ mod gas;
 pub mod mir_ctx;
 mod validate;
 
-fn reveal<Host: Runtime>(
-    tc_ctx: &mut TcCtx<'_, Host>,
-    source_account: &TezlinkImplicitAccount,
+fn reveal<Host: Runtime, C: Context>(
+    tc_ctx: &mut TcCtx<'_, Host, C>,
+    source_account: &C::ImplicitAccountType,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError> {
     log!(tc_ctx.host, Debug, "Applying a reveal operation");
@@ -151,11 +152,11 @@ fn burn_tez(
     Ok(new_balance)
 }
 
-fn execute_internal_operations<'a, Host: Runtime>(
-    tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a>,
+fn execute_internal_operations<'a, Host: Runtime, C: Context>(
+    tc_ctx: &mut TcCtx<'a, Host, C>,
+    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_account: &TezlinkOriginatedAccount,
+    sender_account: &C::OriginatedAccountType,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<(), ApplyOperationError> {
@@ -333,9 +334,9 @@ fn execute_internal_operations<'a, Host: Runtime>(
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
-fn transfer<'a, Host: Runtime>(
-    tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a>,
+fn transfer<'a, Host: Runtime, C: Context>(
+    tc_ctx: &mut TcCtx<'a, Host, C>,
+    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
@@ -359,9 +360,10 @@ fn transfer<'a, Host: Runtime>(
                 return Err(TransferError::EmptyImplicitTransfer);
             };
 
-            let dest_account =
-                TezlinkImplicitAccount::from_public_key_hash(tc_ctx.context, pkh)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let dest_account = tc_ctx
+                .context
+                .implicit_from_public_key_hash(pkh)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
             let _allocated = dest_account
                 .allocate(tc_ctx.host)
@@ -379,7 +381,9 @@ fn transfer<'a, Host: Runtime>(
             })
         }
         Contract::Originated(kt1) => {
-            let dest_account = TezlinkOriginatedAccount::from_kt1(tc_ctx.context, kt1)
+            let dest_account = tc_ctx
+                .context
+                .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt =
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
@@ -431,14 +435,13 @@ fn transfer<'a, Host: Runtime>(
     }
 }
 
-fn get_contract_entrypoint(
+fn get_contract_entrypoint<C: Context>(
     host: &impl Runtime,
-    context: &context::Context,
+    context: &C,
     address: &AddressHash,
 ) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
     let contract = contract_from_address(address.clone()).ok()?;
-    let contract_account =
-        TezlinkOriginatedAccount::from_contract(context, &contract).ok()?;
+    let contract_account = context.originated_from_contract(&contract).ok()?;
     let code = contract_account.code(host).ok()?;
     let parser = Parser::new();
     let micheline = Micheline::decode_raw(&parser.arena, &code).ok()?;
@@ -462,9 +465,9 @@ fn get_contract_entrypoint(
 }
 
 // Handles manager transfer operations.
-fn transfer_external<'a, Host: Runtime>(
-    tc_ctx: &mut TcCtx<'a, Host>,
-    operation_ctx: &mut OperationCtx<'a>,
+fn transfer_external<'a, Host: Runtime, C: Context>(
+    tc_ctx: &mut TcCtx<'a, Host, C>,
+    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
@@ -496,8 +499,8 @@ fn transfer_external<'a, Host: Runtime>(
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-fn typecheck_code_and_storage<'a, Host: Runtime>(
-    ctx: &mut TcCtx<'a, Host>,
+fn typecheck_code_and_storage<'a, Host: Runtime, C: Context>(
+    ctx: &mut TcCtx<'a, Host, C>,
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
@@ -518,8 +521,8 @@ fn typecheck_code_and_storage<'a, Host: Runtime>(
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
-fn handle_storage_with_big_maps<'a, Host: Runtime>(
-    ctx: &mut TcCtx<'a, Host>,
+fn handle_storage_with_big_maps<'a, Host: Runtime, C: Context>(
+    ctx: &mut TcCtx<'a, Host, C>,
     mut storage: TypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
@@ -544,10 +547,10 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
-fn originate_contract<'a, Host: Runtime>(
-    ctx: &mut TcCtx<'a, Host>,
+fn originate_contract<'a, Host: Runtime, C: Context>(
+    ctx: &mut TcCtx<'a, Host, C>,
     contract: ContractKt1Hash,
-    source_account: &TezlinkImplicitAccount,
+    source_account: &C::ImplicitAccountType,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script_code: &[u8],
@@ -560,7 +563,9 @@ fn originate_contract<'a, Host: Runtime>(
         handle_storage_with_big_maps(ctx, script_storage)?;
 
     // Set the storage of the contract
-    let smart_contract = TezlinkOriginatedAccount::from_kt1(ctx.context, &contract)
+    let smart_contract = ctx
+        .context
+        .originated_from_kt1(&contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
@@ -585,14 +590,16 @@ fn originate_contract<'a, Host: Runtime>(
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
-        compute_storage_balance_updates(source_account, storage_fees.clone())
+        compute_storage_balance_updates(source_account.contract(), storage_fees.clone())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(storage_fees_balance_updates);
 
     // Balance updates for the base origination cost.
-    let origination_fees_balance_updates =
-        compute_storage_balance_updates(source_account, ORIGINATION_COST.into())
-            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let origination_fees_balance_updates = compute_storage_balance_updates(
+        source_account.contract(),
+        ORIGINATION_COST.into(),
+    )
+    .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
@@ -652,7 +659,7 @@ fn compute_balance_updates(
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
 fn compute_storage_balance_updates(
-    source: &TezlinkImplicitAccount,
+    source_contract: Contract,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if fee.eq(&0_u64.into()) {
@@ -662,7 +669,7 @@ fn compute_storage_balance_updates(
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source.contract()),
+        balance: Balance::Account(source_contract),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -751,9 +758,9 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-pub fn validate_and_apply_operation<Host: Runtime>(
+pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &context::Context,
+    context: &C,
     hash: OperationHash,
     operation: Operation,
     block_ctx: &BlockCtx,
@@ -822,11 +829,11 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     Ok(receipts)
 }
 
-fn apply_batch<Host: Runtime>(
+fn apply_batch<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     origination_nonce: &mut OriginationNonce,
-    validation_info: validate::ValidatedBatch,
+    validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
     block_ctx: &BlockCtx,
 ) -> (Vec<OperationWithMetadata>, bool) {
     let validate::ValidatedBatch {
@@ -893,11 +900,11 @@ fn apply_batch<Host: Runtime>(
     (receipts, true)
 }
 
-fn apply_operation<Host: Runtime>(
+fn apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
-    context: &Context,
+    context: &C,
     origination_nonce: &mut OriginationNonce,
-    source_account: &TezlinkImplicitAccount,
+    source_account: &C::ImplicitAccountType,
     validated_operation: validate::ValidatedOperation,
     next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
@@ -1015,9 +1022,13 @@ fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use crate::account_storage::{
+        TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    };
+    use crate::context::Context;
     use crate::{
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
-        mir_ctx::BlockCtx, TezlinkImplicitAccount,
+        mir_ctx::BlockCtx,
     };
     use mir::ast::big_map::BigMapId;
     use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
@@ -1339,9 +1350,10 @@ mod tests {
         let contract = Contract::from_b58check(&src.to_b58check())
             .expect("Contract b58 conversion should have succeed");
 
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
-        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = context
+            .implicit_from_contract(&contract)
             .expect("Account creation should have succeed");
 
         // Allocate the account
@@ -1358,8 +1370,9 @@ mod tests {
     }
 
     fn reveal_account(host: &mut impl Runtime, source: &Bootstrap) {
-        let context = context::Context::init_context();
-        let account = TezlinkImplicitAccount::from_public_key_hash(&context, &source.pkh)
+        let context = context::TezlinkContext::init_context();
+        let account = context
+            .implicit_from_public_key_hash(&source.pkh)
             .expect("Account creation should have succeed");
         account.set_manager_public_key(host, &source.pk).unwrap()
     }
@@ -1375,9 +1388,10 @@ mod tests {
         // Setting the account in TezlinkImplicitAccount
         let contract = Contract::Originated(src.clone());
 
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
-        let account = TezlinkOriginatedAccount::from_contract(&context, &contract)
+        let account = context
+            .originated_from_contract(&contract)
             .expect("Account creation should have succeeded");
 
         let parser = mir::parser::Parser::new();
@@ -1431,7 +1445,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
@@ -1464,7 +1478,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
@@ -1497,7 +1511,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
@@ -1544,7 +1558,7 @@ mod tests {
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -1609,7 +1623,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -1669,7 +1683,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
@@ -1711,7 +1725,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -1786,7 +1800,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -1865,7 +1879,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -1957,7 +1971,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -2026,7 +2040,7 @@ mod tests {
     #[test]
     fn apply_transfer_to_originated_faucet_with_success_receipt() {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
         let src = bootstrap1();
         let desthash =
@@ -2208,7 +2222,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -2323,7 +2337,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -2404,7 +2418,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -2470,7 +2484,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
             &block_ctx!(),
@@ -2511,7 +2525,7 @@ mod tests {
     #[test]
     fn apply_three_valid_operations() {
         let mut host = MockKernelHost::default();
-        let ctx = context::Context::init_context();
+        let ctx = context::TezlinkContext::init_context();
 
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -2702,7 +2716,7 @@ mod tests {
     #[test]
     fn apply_valid_then_invalid_operation_is_atomic() {
         let mut host = MockKernelHost::default();
-        let ctx = context::Context::init_context();
+        let ctx = context::TezlinkContext::init_context();
 
         let src = bootstrap1();
         let dest = bootstrap2();
@@ -2748,7 +2762,7 @@ mod tests {
         assert_eq!(receipts, Err(expected_error));
 
         assert_eq!(
-            TezlinkImplicitAccount::from_public_key_hash(&ctx, &src.pkh)
+            ctx.implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .balance(&host)
                 .unwrap(),
@@ -2756,7 +2770,7 @@ mod tests {
         );
 
         assert_eq!(
-            TezlinkImplicitAccount::from_public_key_hash(&ctx, &src.pkh)
+            ctx.implicit_from_public_key_hash(&src.pkh)
                 .unwrap()
                 .manager(&host)
                 .unwrap(),
@@ -2829,7 +2843,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             batch,
             &block_ctx!(),
@@ -2899,11 +2913,11 @@ mod tests {
         init_account(&mut host, &src.pkh, 1000000_u64);
         reveal_account(&mut host, &src);
 
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
-        let src_account =
-            TezlinkImplicitAccount::from_public_key_hash(&context, &src.pkh)
-                .expect("Should have succeeded to create an account");
+        let src_account = context
+            .implicit_from_public_key_hash(&src.pkh)
+            .expect("Should have succeeded to create an account");
 
         // Retrieve initial balance for the end of the test
         let initial_balance = src_account
@@ -3050,11 +3064,9 @@ mod tests {
             "Source current balance doesn't match the expected one"
         );
 
-        let smart_contract_account = TezlinkOriginatedAccount::from_contract(
-            &context,
-            &Contract::Originated(expected_kt1),
-        )
-        .expect("Should have been able to create an account from the KT1");
+        let smart_contract_account = context
+            .originated_from_contract(&Contract::Originated(expected_kt1))
+            .expect("Should have been able to create an account from the KT1");
 
         // Balance of the smart contract
         let current_kt1_balance = smart_contract_account
@@ -3163,7 +3175,7 @@ mod tests {
                 }),
             ],
         );
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         let receipts = validate_and_apply_operation(
             &mut host,
             &context,
@@ -3329,7 +3341,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -3392,7 +3404,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -3459,7 +3471,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
-            &context::Context::init_context(),
+            &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
@@ -3497,7 +3509,7 @@ mod tests {
         let expected_init_contract_balance = 1000000;
         init_account(&mut host, &src.pkh, 100000);
         reveal_account(&mut host, &src);
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let originated_code = "CDR;
                         NIL operation;
@@ -3639,19 +3651,15 @@ mod tests {
         );
 
         // Check Balances of everything is correct
-        let src_account =
-            TezlinkImplicitAccount::from_public_key_hash(&context, &src.pkh)
-                .expect("Should have succeeded to create an account");
-        let init_contract_account = TezlinkOriginatedAccount::from_contract(
-            &context,
-            &Contract::Originated(contract_chapo_hash),
-        )
-        .expect("Should have succeeded to create an account");
-        let originated_account = TezlinkOriginatedAccount::from_contract(
-            &context,
-            &Contract::Originated(expected_address),
-        )
-        .expect("Should have succeeded to create an account");
+        let src_account = context
+            .implicit_from_public_key_hash(&src.pkh)
+            .expect("Should have succeeded to create an account");
+        let init_contract_account = context
+            .originated_from_contract(&Contract::Originated(contract_chapo_hash))
+            .expect("Should have succeeded to create an account");
+        let originated_account = context
+            .originated_from_contract(&Contract::Originated(expected_address))
+            .expect("Should have succeeded to create an account");
         let expected_src_balance = init_src_balance
             - 10 // fee for the operation
             - 7500 // origination cost paid by the contract
@@ -3686,7 +3694,7 @@ mod tests {
         let src = bootstrap1();
         init_account(&mut host, &src.pkh, 1000000);
         reveal_account(&mut host, &src);
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
 
         let originated_code = "CDR;
                         NIL operation;
@@ -3893,7 +3901,7 @@ mod tests {
     #[test]
     fn test_try_apply_three_origination_batch() {
         let mut host = MockKernelHost::default();
-        let ctx = context::Context::init_context();
+        let ctx = context::TezlinkContext::init_context();
         let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
@@ -4197,11 +4205,9 @@ mod tests {
         // Check the originated contracts
         let expected_contracts = [expected_kt1_1, expected_kt1_2];
         for (i, expected_kt1) in expected_contracts.iter().enumerate() {
-            let account = TezlinkOriginatedAccount::from_contract(
-                &ctx,
-                &Contract::Originated(expected_kt1.clone()),
-            )
-            .unwrap();
+            let account = ctx
+                .originated_from_contract(&Contract::Originated(expected_kt1.clone()))
+                .unwrap();
             assert!(
                 account.code(&host).is_err(),
                 "Account {i} for KT1{expected_kt1} should not exist"
@@ -4218,7 +4224,7 @@ mod tests {
         init_account(&mut host, &src.pkh, 50000);
         reveal_account(&mut host, &src);
 
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         let balance = 10.into();
 
         let code = mir::parser::Parser::new()
@@ -4272,7 +4278,7 @@ mod tests {
     // succeed.
     fn test_empty_transfers() {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let dst = bootstrap2();
         let kt1_addr =
@@ -4480,7 +4486,7 @@ mod tests {
     #[test]
     fn test_view_instruction() {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
         let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
         let view_addr = orignation_nonce.generate_kt1();
@@ -4575,7 +4581,10 @@ mod tests {
             .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
     }
 
-    fn big_map_was_removed<Host: Runtime>(ctx: &mut TcCtx<'_, Host>, id: BigMapId) {
+    fn big_map_was_removed<Host: Runtime, C: Context>(
+        ctx: &mut TcCtx<'_, Host, C>,
+        id: BigMapId,
+    ) {
         let types = ctx
             .big_map_get_type(&id)
             .expect("Get big_map type should not panic");
@@ -4588,8 +4597,8 @@ mod tests {
         receipts: Vec<OperationWithMetadata>,
     }
 
-    fn transfer_big_map(
-        ctx: &mut TcCtx<'_, impl Runtime>,
+    fn transfer_big_map<C: Context>(
+        ctx: &mut TcCtx<'_, impl Runtime, C>,
         tz1: &Bootstrap,
         script_sender: &str,
         init_sender: &str,
@@ -4667,7 +4676,7 @@ mod tests {
         expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
     ) {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         make_default_ctx!(ctx, &mut host, &context);
         let tz1 = bootstrap1();
 
@@ -4902,7 +4911,7 @@ mod tests {
     #[test]
     fn big_map_transfer_with_creation() {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         make_default_ctx!(ctx, &mut host, &context);
         let tz1 = bootstrap1();
 
@@ -4981,23 +4990,26 @@ mod tests {
         let Originated {
             contract: created_addr_0,
         } = &contracts[0];
-        let created_acount_0 =
-            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_0)
-                .expect("Failed to retrieve generated account");
+        let created_acount_0 = ctx
+            .context
+            .originated_from_kt1(created_addr_0)
+            .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_1,
         } = &contracts[1];
-        let created_acount_1 =
-            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_1)
-                .expect("Failed to retrieve generated account");
+        let created_acount_1 = ctx
+            .context
+            .originated_from_kt1(created_addr_1)
+            .expect("Failed to retrieve generated account");
 
         let Originated {
             contract: created_addr_2,
         } = &contracts[2];
-        let created_acount_2 =
-            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_2)
-                .expect("Failed to retrieve generated account");
+        let created_acount_2 = ctx
+            .context
+            .originated_from_kt1(created_addr_2)
+            .expect("Failed to retrieve generated account");
 
         let storage_originator = originator_contract
             .storage(ctx.host)
@@ -5104,7 +5116,7 @@ mod tests {
     #[test]
     fn verify_temp_big_map_content_is_cleaned() {
         let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
+        let context = context::TezlinkContext::init_context();
         make_default_ctx!(ctx, &mut host, &context);
         let tz1 = bootstrap1();
         let parser = Parser::new();
