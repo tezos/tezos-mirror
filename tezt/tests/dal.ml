@@ -6865,16 +6865,16 @@ module Garbage_collection = struct
 
     let* current_level = Client.level client in
     let wait_for_producer =
-      wait_for_layer1_final_block slot_producer (current_level + 1)
+      wait_for_layer1_final_block slot_producer current_level
     in
     let wait_for_observer_opt =
       match observer_opt with
       | Some observer ->
-          Some (wait_for_layer1_final_block observer (current_level + 1))
+          Some (wait_for_layer1_final_block observer current_level)
       | None -> None
     in
     let wait_for_attester =
-      wait_for_layer1_final_block attester (current_level + 1)
+      wait_for_layer1_final_block attester current_level
     in
     let* ( published_level,
            _commitment,
@@ -6886,7 +6886,7 @@ module Garbage_collection = struct
         Constant.bootstrap1
         ~index:slot_index
         ~wait_slot
-        ~number_of_extra_blocks_to_bake:2
+        ~number_of_extra_blocks_to_bake:1
       @@ Helpers.make_slot ~slot_size "content"
     in
     let* () = wait_for_producer in
