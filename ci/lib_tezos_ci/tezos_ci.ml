@@ -706,6 +706,10 @@ module Image = struct
     image
 
   let image = function Internal {image; _} | External image -> image
+
+  let pp ppf img =
+    match image img with
+    | Image image_name -> Format.fprintf ppf "%s" image_name
 end
 
 module Changeset = struct
@@ -1596,6 +1600,8 @@ module Images = struct
 
     let rust_toolchain_trixie =
       make_img "debian-rust:trixie" rust_toolchain_version
+
+    let pp = Image.pp
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)
@@ -1641,7 +1647,10 @@ module Images = struct
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~variables:
-          [("IMAGE", Base_images.path_prefix ^ "/debian-rust:unstable")]
+          [
+            ( "IMAGE",
+              Base_images.(Format.asprintf "%a" pp rust_toolchain_trixie) );
+          ]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
