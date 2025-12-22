@@ -3635,8 +3635,10 @@ let test_refutation_with_dal_page_import protocols =
       (* One test name for each dimensions combination. *)
       let variant =
         Format.sprintf
-          "dal_page_flipped_at_inbox_level_%d_%s_%s"
+          "dal_page_published_at_level_%d_flipped_at_inbox_level_%d_dal_lag_is_%d_%s_%s"
+          published_level
           inbox_level
+          dal_lag
           (player_priority_to_string player_priority)
           (attestation_status_to_string attestation_status)
       in
