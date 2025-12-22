@@ -172,7 +172,7 @@ let job_build_x86_64_extra_dev =
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
     ~extra:true
     "script-inputs/dev-executables"
-  |> enable_dune_cache ~key:Pipeline ~policy:Push
+  |> enable_dune_cache
 
 let job_build_x86_64_exp =
   depending_on_pipeline_type @@ fun pipeline_type ->
@@ -184,7 +184,7 @@ let job_build_x86_64_exp =
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
     "script-inputs/experimental-executables"
-  |> enable_dune_cache ~key:Pipeline ~policy:Push
+  |> enable_dune_cache
 
 let build_arm_rules ~pipeline_type =
   make_rules ~pipeline_type ~label:"ci--arm64" ~manual:Yes ()

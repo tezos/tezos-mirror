@@ -61,7 +61,7 @@ let job_oc_ocaml_fmt =
     ~image:Tezos_ci.Images.CI.build_master
     ~stage:Test
     ~only_if_changed:["**/.ocamlformat"; "**/*.ml"; "**/*.mli"]
-    ~dune_cache:(Cacio.dune_cache ())
+    ~dune_cache:true
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";

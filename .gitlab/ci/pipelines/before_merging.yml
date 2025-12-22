@@ -633,10 +633,10 @@ oc.build_amd64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: push
+    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -729,10 +729,10 @@ oc.build_amd64-exp:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: push
+    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2051,10 +2051,10 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -2361,9 +2361,6 @@ oc.unit:non-proto-x86_64:
   needs:
   - oc.docker:ci:amd64
   - trigger
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2372,10 +2369,10 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -2527,9 +2524,6 @@ oc.unit:proto-x86_64:
   needs:
   - oc.docker:ci:amd64
   - trigger
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2538,10 +2532,10 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -2615,9 +2609,6 @@ oc.unit:other-x86_64:
   needs:
   - oc.docker:ci:amd64
   - trigger
-  - oc.build_x86_64-released
-  - oc.build_amd64-exp
-  - oc.build_amd64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2626,10 +2617,10 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -3147,7 +3138,7 @@ etherlink.build_tezt:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: dune-build-cache-$CI_PIPELINE_ID
+  - key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull-push
