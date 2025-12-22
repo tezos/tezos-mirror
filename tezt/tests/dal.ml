@@ -6933,33 +6933,19 @@ module Garbage_collection = struct
         attester
     in
 
-    let wait_remove_shards_attester_promise =
-      Log.info "Waiting for first shard to be removed by the attester" ;
-      wait_remove_shards ~published_level ~slot_index attester
+    (* We split the [bake_for] in two just in the hope this allows for the slot
+       to be attested (that is, to reduce flakiness). *)
+    let wait_block_p =
+      List.map
+        (fun dal_node ->
+          wait_for_layer1_final_block
+            dal_node
+            (published_level + dal_parameters.attestation_lag))
+        [attester; dal_bootstrap; slot_producer]
     in
-
-    Log.info "All nodes received a shard, waiting for blocks to be baked" ;
-    let rec bake_loop n =
-      if n <= 0 then unit
-      else
-        let* level = Client.level client in
-        let dal_nodes =
-          match observer_opt with
-          | Some observer -> [attester; observer; dal_bootstrap; slot_producer]
-          | None -> [attester; dal_bootstrap; slot_producer]
-        in
-        let wait_block_p =
-          List.map
-            (fun dal_node -> wait_for_layer1_head dal_node (level + 1))
-            dal_nodes
-        in
-        let* () = bake_for client in
-        let* () = Lwt.join wait_block_p in
-        bake_loop (n - 1)
-    in
-    let* () = bake_loop 180 in
-    Log.info "Blocks baked !" ;
-
+    let* () = bake_for ~count:(dal_parameters.attestation_lag - 2) client in
+    let* () = bake_for ~count:3 client in
+    let* () = Lwt.join wait_block_p in
     Log.info "Checking that the slot was attested" ;
     let* () =
       let* status =
@@ -6976,7 +6962,28 @@ module Garbage_collection = struct
       unit
     in
 
-    Log.info "Wait for first shard attester" ;
+    let wait_remove_shards_attester_promise =
+      Log.info "Waiting for first shard to be removed by the attester" ;
+      wait_remove_shards ~published_level ~slot_index attester
+    in
+
+    (* 150 because the default is to GC after 150 levels. Note that we already
+       have baked an additional [attestation_lag] blocks. *)
+    let blocks_to_bake = 150 in
+    Log.info
+      "All nodes received a shard, waiting for %d more blocks to be baked"
+      blocks_to_bake ;
+    let wait_block_p =
+      List.map
+        (fun dal_node ->
+          wait_for_layer1_head dal_node (published_level + blocks_to_bake))
+        [attester; dal_bootstrap; slot_producer]
+    in
+    let* () = bake_for ~count:blocks_to_bake client in
+    let* () = Lwt.join wait_block_p in
+    Log.info "Blocks baked !" ;
+
+    Log.info "Wait for shards to be removed by the attester" ;
     let* () = wait_remove_shards_attester_promise in
 
     Log.info "RPC deleted shard attester" ;
@@ -11706,7 +11713,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "attester"; Tag.slow]
+    ~tags:["gc"; "attester"]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
@@ -11714,7 +11721,7 @@ let register ~protocols =
     Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"; Tag.slow; Tag.memory_hungry]
+    ~tags:["gc"; "multi"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
