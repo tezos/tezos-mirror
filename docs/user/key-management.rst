@@ -48,14 +48,14 @@ Ledger Manager
 ~~~~~~~~~~~~~~
 
 The preferred way to set up your Ledger is to install `Ledger
-Live
-<https://www.ledger.com/ledger-live/>`_.
+Wallet
+<https://shop.ledger.com/pages/ledger-wallet/>`_ (formerly Ledger Live).
 On Linux make sure you correctly set up your ``udev`` rules as explained
 `here <https://github.com/trilitech/ledger-app-tezos-baking/tree/main?tab=readme-ov-file#udev-rules-linux-only>`_.
 Connect your Ledger, unlock it and go to the dashboard.
-In Ledger Live install ``Tezos Wallet`` from the applications list.
-To install the ``Tezos Baking`` app, you need to enable Developer Mode in the Ledger Live settings.
-Then you can install the app from the Manager tab in the Ledger Live.
+In Ledger Wallet install ``Tezos Wallet`` from the applications list.
+To install the ``Tezos Baking`` app, you need to enable Developer Mode in the Ledger Wallet settings.
+Then you can install the app from the Manager tab in the Ledger Wallet.
 
 .. warning::
 

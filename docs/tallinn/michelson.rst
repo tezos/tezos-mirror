@@ -2037,7 +2037,7 @@ need to independently test various parts of the smart contracts they
 develop and to the developers of new implementations of the Michelson
 interpreter who need to check that their new implementations behave as
 the reference implementation by passing `a conformance test suite
-<https://gitlab.com/tezos/tzt-reference-test-suite>`__.
+<https://gitlab.com/tezos/tezos/-/tree/master/tzt_reference_test_suite>`__.
 
 Similarly to Michelson scripts, the concrete syntax of TZT unit tests
 is :doc:`../shell/micheline`.
