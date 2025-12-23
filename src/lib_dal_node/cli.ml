@@ -351,12 +351,25 @@ module Term = struct
   let slots_backup_uris_arg =
     make_arg_list
       ~doc:
-        "List of base URIs to fetch missing DAL slots if they are unavailable \
-         locally or cannot be reconstructed from shards. Supported URI schemes \
-         include 'http://', 'https://', and 'file://'. The option accepts a \
-         list of fallback sources separated with commas."
+        "Base URIs to fetch missing DAL data (slots or shards) when \
+         unavailable locally or not reconstructible. Supported schemes: \
+         'http://', 'https://', and 'file://'. You may append a fragment to \
+         specify the resource kind: '#slots' or '#shards'. If omitted, \
+         '#slots' is assumed for backward compatibility. Multiple URIs can be \
+         provided, separated by commas; they are tried in order until one \
+         succeeds. For HTTP(S), the fragment selects a server-side subtree: \
+         '#slots'  -> \
+         <base>/v0/slots/by_published_level/<level>_<slot_index>_<slot_size> ; \
+         '#shards' -> \
+         <base>/v0/shards/by_published_level/<level>_<slot_index>. For \
+         file://, the fragment affects the filename pattern: '#slots'  -> \
+         <base>/<level>_<slot_index>_<slot_size> ; '#shards' -> \
+         <base>/<level>_<slot_index>. Examples: 'http://host:8080#shards', \
+         'file:///var/dal-backup#slots', or \
+         'http://host:8080#slots,http://host:8080#shards'."
       ~placeholder:"URI"
       ~format:uri_format
+      ~extra_long:["backup-uri"; "archive-uri"]
       "slots-backup-uri"
 
   let slots_backup_uris = arg_to_cmdliner slots_backup_uris_arg
@@ -364,12 +377,14 @@ module Term = struct
   let trust_slots_backup_uris_switch =
     make_switch
       ~doc:
-        "If set, skip cryptographic verification of slots downloaded from the \
-         backup URIs provided via --slots-backup-uri. This can speed up slot \
-         retrieval when replaying history or for debugging purposes. Use with \
-         caution during normal operation or when data integrity is critical, \
-         unless the backup source is fully trusted."
+        "If set, skip cryptographic verification of slots/shards downloaded \
+         (or reconstructed) from the backup URIs provided via \
+         --slots-backup-uri. This can speed up slot retrieval when replaying \
+         history or for debugging purposes. Use with caution during normal \
+         operation or when data integrity is critical, unless the backup \
+         source is fully trusted."
       "trust-slots-backup-uris"
+      ~extra_long:["trust-backup-uris"; "trust-archive-uris"]
 
   let trust_slots_backup_uris =
     switch_to_cmdliner trust_slots_backup_uris_switch
