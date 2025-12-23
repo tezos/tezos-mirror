@@ -300,7 +300,7 @@ let job_build_tezt =
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
       "eval $(opam env)";
-      "dune build etherlink/tezt/tests/main.exe";
+      "scripts/ci/dune.sh build etherlink/tezt/tests/main.exe";
     ]
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific to this component. *)
