@@ -232,28 +232,6 @@ let filter_one_tx :
   in
   filter_receipt ?bloom_inclusion_checked filter receipt
 
-(** [split_in_chunks ~chunk_size ~base ~length] returns a list of
-    lists (chunks) containing the consecutive numbers from [base]
-    to [base + length - 1].
-    Each chunk is at most of length [chunk_size]. Only the last
-    chunk can be shorter than [chunk_size].
-
-    Example [split_in_chunks ~chunk_size:2 ~base:1 ~length:5] is
-    <<1, 2>, <3,4>, <5>>.
- *)
-let split_in_chunks ~chunk_size ~base ~length =
-  (* nb_chunks = ceil(length / chunk_size)  *)
-  let nb_chunks = (length + chunk_size - 1) / chunk_size in
-  let rem = length mod chunk_size in
-  Stdlib.List.init nb_chunks (fun chunk ->
-      let chunk_length =
-        if chunk = nb_chunks - 1 && rem <> 0 then (* Last chunk isn't full *)
-          rem
-        else chunk_size
-      in
-      let chunk_offset = chunk * chunk_size in
-      (Z.(base + of_int chunk_offset), chunk_length))
-
 (* [get_logs (module Rollup_node_rpc) filter] applies the [filter].
 
    It does so using a chunking mechanism:
@@ -276,60 +254,40 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
       let (Qty from) = filter.from_block in
       let (Qty to_) = filter.to_block in
       let length = Z.(to_int (to_ - from)) + 1 in
-      let chunks =
-        split_in_chunks
-          ~chunk_size:log_filter_config.chunk_size
-          ~length
-          ~base:from
+      (* Apply the filter to the entire chunk concurrently *)
+      let* receipts =
+        Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
+          ?mask:filter.bloom
+          from
+          length
       in
-      let* logs, _n_logs =
-        List.fold_left_es
-          (function
-            | acc_logs, n_logs ->
-                fun (offset, len) ->
-                  (* Apply the filter to the entire chunk concurrently *)
-                  let* receipts =
-                    Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
-                      ?mask:filter.bloom
-                      offset
-                      len
-                  in
-                  Octez_telemetry.Trace.with_tzresult
-                    ~service_name:"get_logs"
-                    "filter_and_encode_logs"
-                  @@ fun _ ->
-                  let*! new_logs =
-                    List.concat_map_s
-                      (fun receipt ->
-                        let open Lwt_syntax in
-                        let* () = Lwt.pause () in
-                        let logs =
-                          filter_one_tx
-                            ~bloom_inclusion_checked:true
-                            filter
-                            receipt
-                        in
-                        (* Already encode logs individually, with yields to the
-                           Lwt scheduler, to allow the full encoding to not be
-                           blocking. *)
-                        List.map_s
-                          (fun log ->
-                            let+ () = Lwt.pause () in
-                            Ethereum_types.pre_encode
-                              Ethereum_types.transaction_log_encoding
-                              log)
-                          logs)
-                      receipts
-                  in
-                  let n_new_logs = List.length new_logs in
-                  if n_logs + n_new_logs > log_filter_config.max_nb_logs then
-                    tzfail
-                      (Too_many_logs {limit = log_filter_config.max_nb_logs})
-                  else return (acc_logs @ new_logs, n_logs + n_new_logs))
-          ([], 0)
-          chunks
-      in
-      return logs
+      Octez_telemetry.Trace.with_tzresult
+        ~service_name:"get_logs"
+        "filter_and_encode_logs"
+      @@ fun _ ->
+      let n_logs = ref 0 in
+      List.concat_map_es
+        (fun receipt ->
+          let open Lwt_syntax in
+          (* For long results, this can be quite intensive so we pause
+               between each transaction. *)
+          let*! () = Lwt.pause () in
+          let logs =
+            filter_one_tx ~bloom_inclusion_checked:true filter receipt
+          in
+          n_logs := !n_logs + List.length logs ;
+          if !n_logs > log_filter_config.max_nb_logs then
+            tzfail (Too_many_logs {limit = log_filter_config.max_nb_logs})
+          else
+            Lwt_result.ok
+            @@ List.map_s
+                 (fun log ->
+                   let+ () = Lwt.pause () in
+                   Ethereum_types.pre_encode
+                     Ethereum_types.transaction_log_encoding
+                     log)
+                 logs)
+        receipts
 
 (* Errors registration *)
 

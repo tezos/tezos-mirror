@@ -606,7 +606,9 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
           "chunk_size"
           ~description:
             "Number of blocks to be filter concurrently when executing a \
-             `eth_getLogs` request."
+             `eth_getLogs` request. DEPRECATED: this field is now ignore. You \
+             can still use `max_nb_blocks` and `max_nb_logs` to limit the \
+             computation done by `eth_getLogs`."
           strictly_positive_encoding
           default_filter_config.chunk_size))
 

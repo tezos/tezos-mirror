@@ -924,7 +924,10 @@ let log_filter_chunk_size_arg =
     ~long:"chunk-size"
     ~doc:
       "Blocks to be filtered are split in chunks, which will be filtered in \
-       sequence. Within each chunk, the block filtering is done concurrently."
+       sequence. Within each chunk, the block filtering is done concurrently. \
+       DEPRECATED: this argument does not have any effect anymore. Use \
+       `--maximum-number-logs` and `--maximum-number-blocks` to bound the \
+       computations performed by the `eth_getLogs` RPC request."
     ~placeholder:"10"
     Params.int
 
