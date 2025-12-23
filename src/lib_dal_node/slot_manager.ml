@@ -207,35 +207,33 @@ let polynomial_from_shards cryptobox shards =
       | `Invalid_shard_length msg ) ->
       Error (Errors.other [Merging_failed msg])
 
-let get_slot_content_from_shards cryptobox store slot_id =
-  let open Lwt_result_syntax in
-  let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
+let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
+  let open Lwt_syntax in
+  let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
-  let minimal_number_of_shards = number_of_shards / redundancy_factor in
-  let rec loop acc shard_id remaining =
-    if remaining <= 0 then return acc
-    else if shard_id >= number_of_shards then
-      let provided = minimal_number_of_shards - remaining in
-      fail
-        (Errors.other
-           [Missing_shards {provided; required = minimal_number_of_shards}])
-    else
-      let*! res = Store.Shards.read (Store.shards store) slot_id shard_id in
-      match res with
-      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-      | Error _ -> loop acc (shard_id + 1) remaining
+  let needed = number_of_shards / redundancy_factor in
+  let* rev_shards, count_elts =
+    Store.Shards.read_all
+      ?from_bytes
+      (Store.shards store)
+      slot_id
+      ~number_of_shards
+    |> Seq_s.fold_left
+         (fun (acc, count_elts) elt ->
+           match elt with
+           | _, index, Ok share ->
+               (Cryptobox.{index; share} :: acc, count_elts + 1)
+           | _ -> (acc, count_elts))
+         ([], 0)
   in
-  let* shards = loop Seq.empty 0 minimal_number_of_shards in
+  if needed > count_elts then return_none
+  else List.take_n needed rev_shards |> List.to_seq |> return_some
+
+let get_slot_content_from_shards cryptobox shards =
+  let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-  (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
-  let*! () =
-    Event.emit_reconstructed_slot
-      ~size:(Bytes.length slot)
-      ~shards:(Seq.length shards)
-  in
   return slot
 
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
@@ -574,13 +572,20 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
         if reconstruct_if_missing then
           (* The slot could not be obtained from the slot store, attempt a
              reconstruction. *)
-          let*! res_shard_store =
-            Node_context.may_reconstruct
-              ~reconstruct:(get_slot_content_from_shards cryptobox store)
-              slot_id
-              ctxt
+          let*! shards_opt =
+            read_minimal_shards_for_reconstruction cryptobox store slot_id
           in
-          Lwt.return_some res_shard_store
+          match shards_opt with
+          | None -> Lwt.return_none
+          | Some shards ->
+              let*! res_shard_store =
+                Node_context.may_reconstruct
+                  ~reconstruct:(fun _slot_id ->
+                    get_slot_content_from_shards cryptobox shards)
+                  slot_id
+                  ctxt
+              in
+              Lwt.return_some res_shard_store
         else Lwt.return_none
       in
       match res_shard_store with
