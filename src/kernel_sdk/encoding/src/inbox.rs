@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2022-2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2022-2023, 2025 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -128,13 +128,22 @@ impl Display for InfoPerLevel {
 #[derive(Debug, PartialEq, Eq, NomReader, HasEncoding, BinWriter)]
 pub enum InternalInboxMessage<Expr: Michelson> {
     /// Transfer message
+    #[encoding(tag = 0)]
     Transfer(Transfer<Expr>),
     /// Start of level message, pushed at the beginning of an inbox level.
+    #[encoding(tag = 1)]
     StartOfLevel,
     /// End of level message, pushed at the end of an inbox level.
+    #[encoding(tag = 2)]
     EndOfLevel,
     /// Info per level, goes after StartOfLevel
+    #[encoding(tag = 3)]
     InfoPerLevel(InfoPerLevel),
+    /// Protocol migration message, pushed after each protocol migration, at the
+    /// beginning of the level of the first block of the new protocol, after
+    /// [InfoPerLevel]. It contains the new protocol name.
+    #[encoding(tag = 4)]
+    ProtocolMigration(String),
 }
 
 impl<Expr: Michelson> Display for InternalInboxMessage<Expr> {
@@ -144,6 +153,9 @@ impl<Expr: Michelson> Display for InternalInboxMessage<Expr> {
             Self::StartOfLevel => write!(f, "StartOfLevel"),
             Self::EndOfLevel => write!(f, "EndOfLevel"),
             Self::InfoPerLevel(ipl) => write!(f, "{}", ipl),
+            Self::ProtocolMigration(proto) => {
+                write!(f, "ProtocolMigration {{protocol: {}}}", proto)
+            }
         }
     }
 }
@@ -266,6 +278,15 @@ mod test {
         let inbox_message = InboxMessage::Internal(InternalInboxMessage::EndOfLevel);
 
         test_encode_decode::<MichelsonUnit>(expected_bytes, inbox_message)
+    }
+
+    #[test]
+    fn test_encode_decode_protocol_migration() {
+        let inbox_message: InboxMessage<MichelsonUnit> = InboxMessage::Internal(
+            InternalInboxMessage::ProtocolMigration("PtAlphaProtocol".to_string()),
+        );
+
+        assert_encode_decode_inbox_message(inbox_message);
     }
 
     #[test]

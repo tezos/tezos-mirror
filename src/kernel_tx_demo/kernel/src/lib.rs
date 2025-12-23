@@ -255,7 +255,9 @@ fn filter_inbox_message<'a, Host: Runtime>(
         }
 
         InboxMessage::Internal(
-            _msg @ (InternalInboxMessage::EndOfLevel | InternalInboxMessage::InfoPerLevel(..)),
+            _msg @ (InternalInboxMessage::EndOfLevel
+            | InternalInboxMessage::InfoPerLevel(..)
+            | InternalInboxMessage::ProtocolMigration(..)),
         ) => {
             #[cfg(feature = "debug")]
             debug_msg!(host, "InboxMetadata: {}\n", _msg);

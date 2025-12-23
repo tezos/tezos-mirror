@@ -4,6 +4,7 @@
 
 ### SDK
 
+- Add support for the `ProtocolMigration` inbox message.
 - Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
 - Add an experimental rollup host for RISC-V with an in-memory store behind the `experimental-host-in-memory-store` flag.
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
