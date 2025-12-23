@@ -3493,6 +3493,11 @@ module Sc_rollup : sig
     module Hash : S.HASH
 
     val hash_serialized_message : serialized -> Hash.t
+
+    val dal_attested_slots_messages_of_cells :
+      (published_level:Raw_level.t -> (int * int * int) tzresult Lwt.t) ->
+      (Dal.Slots_history.Pointer_hash.t * Dal.Slots_history.t) list ->
+      internal_inbox_message list tzresult Lwt.t
   end
 
   module Inbox_merkelized_payload_hashes : sig

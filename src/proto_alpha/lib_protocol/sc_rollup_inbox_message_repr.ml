@@ -321,6 +321,71 @@ let dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
       assert false
   | Ok msg -> msg
 
+let dal_attested_slots_messages_of_cells fetch_dal_params cells =
+  let open Lwt_result_syntax in
+  let open Dal_slot_repr.History in
+  let module Pkh_map = Signature.Public_key_hash.Map in
+  let module Level_map = Raw_level_repr.Map in
+  (* Group cells by [published_level] *)
+  let by_level =
+    List.fold_left
+      (fun by_level (_hash, cell) ->
+        let cell_content = content cell in
+        let cell_id = content_id cell_content in
+        let published_level = cell_id.header_id.published_level in
+        match cell_content with
+        | Unpublished _ -> by_level
+        | Published {header; publisher; is_proto_attested; _} ->
+            if is_proto_attested then
+              match publisher with
+              | Contract_repr.Implicit pkh ->
+                  let slot_index = header.id.index in
+                  Level_map.update
+                    published_level
+                    (function
+                      | None -> Some (Pkh_map.singleton pkh [slot_index])
+                      | Some slots_by_publisher ->
+                          Some
+                            (Pkh_map.update
+                               pkh
+                               (function
+                                 | None -> Some [slot_index]
+                                 | Some slots -> Some (slot_index :: slots))
+                               slots_by_publisher))
+                    by_level
+              | Contract_repr.Originated _ ->
+                  (* Skip originated contracts *)
+                  by_level
+            else by_level)
+      Level_map.empty
+      cells
+  in
+  (* Convert to list of messages, ordered ascendingly by [published_level] *)
+  let* messages =
+    Level_map.fold_es
+      (fun published_level slots_by_publisher acc ->
+        (* Only add message if there are attested slots *)
+        if Pkh_map.is_empty slots_by_publisher then return acc
+        else
+          let* number_of_slots, slot_size, page_size =
+            fetch_dal_params ~published_level
+          in
+          let message =
+            Dal_attested_slots
+              {
+                published_level;
+                number_of_slots;
+                slot_size;
+                page_size;
+                slots_by_publisher;
+              }
+          in
+          return @@ (message :: acc))
+      by_level
+      []
+  in
+  return @@ List.rev messages
+
 let (_dummy_serialized_dal_attested_slots : serialized) =
   (* This allows to detect an error, at startup, we might have introduced in the
      encoding of serialization of dal attested slots messages. *)

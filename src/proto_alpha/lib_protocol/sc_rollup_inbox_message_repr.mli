@@ -128,3 +128,20 @@ val dal_attested_slots_serialized :
   page_size:int ->
   slots_by_publisher:Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t ->
   serialized
+
+(** [dal_attested_slots_messages_of_cells ~number_of_slots ~slot_size ~page_size
+    cells] constructs a list of [Dal_attested_slots] internal inbox messages
+    from skip list cells. The cells contain information about which slots were
+    protocol attested and who published them. Only slots published by implicit
+    accounts that are protocol attested are included.
+
+    Returns a list of messages, one per published level found in the cells,
+    ordered by increasing published levels. Only includes levels where at least
+    one slot is attested (non-empty [slots_by_publisher]).
+
+    This function ensures that both the protocol and rollup node use identical
+    logic to construct these messages from DAL skip list cells. *)
+val dal_attested_slots_messages_of_cells :
+  (published_level:Raw_level_repr.t -> (int * int * int) tzresult Lwt.t) ->
+  (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t) list ->
+  internal_inbox_message list tzresult Lwt.t
