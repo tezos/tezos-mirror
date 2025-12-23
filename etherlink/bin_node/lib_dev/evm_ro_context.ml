@@ -648,7 +648,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         | Some _hash ->
             Evm_store.Transactions.receipts_of_block_number conn (Qty level)
 
-      let block_range_receipts level len =
+      let block_range_receipts ?mask level len =
         let open Lwt_result_syntax in
         Evm_store.use ctxt.store @@ fun conn ->
         let start = Ethereum_types.Qty level in
@@ -663,7 +663,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
               start
               Ethereum_types.pp_quantity
               finish
-        | _ -> Evm_store.Transactions.receipts_of_block_range conn start len
+        | _ ->
+            Evm_store.Transactions.receipts_of_block_range ?mask conn start len
 
       let transaction_receipt hash =
         Evm_store.use ctxt.store @@ fun conn ->

@@ -45,13 +45,13 @@ open Ethereum_types
 type valid_filter = {
   from_block : quantity;
   to_block : quantity;
-  bloom : Ethbloom.t;
+  bloom : Ethbloom.t option;
   topics : Filter.topic option list;
   address : address list;
 }
 
 type bloom_filter = {
-  bloom : Ethbloom.t;
+  bloom : Ethbloom.t option;
   topics : Filter.topic option list;
   address : address list;
 }
@@ -104,18 +104,22 @@ let validate_range log_filter_config
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
 let make_bloom_address_topics address topics =
-  let bloom = Ethbloom.make () in
-  Option.iter
-    (function
-      | Filter.Single (Address address) -> Ethbloom.accrue ~input:address bloom
-      | _ -> ())
-    address ;
-  Option.iter
-    (List.iter (function
-      | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
-      | _ -> ()))
-    topics ;
-  bloom
+  let wildcard = Option.is_none address && Option.is_none topics in
+  if wildcard then None
+  else
+    let bloom = Ethbloom.make () in
+    Option.iter
+      (function
+        | Filter.Single (Address address) ->
+            Ethbloom.accrue ~input:address bloom
+        | _ -> ())
+      address ;
+    Option.iter
+      (List.iter (function
+        | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
+        | _ -> ()))
+      topics ;
+    Some bloom
 
 (* Constructs the bloom filter *)
 let make_bloom (filter : Filter.t) =
@@ -204,20 +208,29 @@ let filter_one_log : bloom_filter -> transaction_log -> transaction_log option =
   then Some log
   else None
 
-let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
-  if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom then
-    List.filter_map (filter_one_log filter) receipt.logs
-  else []
+let filter_receipt ?(bloom_inclusion_checked = false) (filter : bloom_filter)
+    (receipt : Transaction_receipt.t) =
+  match filter.bloom with
+  | None -> receipt.logs
+  | Some bloom ->
+      if
+        bloom_inclusion_checked
+        || Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) bloom
+      then List.filter_map (filter_one_log filter) receipt.logs
+      else []
 
 (* Apply a filter on one transaction *)
 
 let filter_one_tx :
-    valid_filter -> Transaction_receipt.t -> transaction_log list =
- fun filter receipt ->
+    ?bloom_inclusion_checked:bool ->
+    valid_filter ->
+    Transaction_receipt.t ->
+    transaction_log list =
+ fun ?bloom_inclusion_checked filter receipt ->
   let filter =
     {bloom = filter.bloom; topics = filter.topics; address = filter.address}
   in
-  filter_receipt filter receipt
+  filter_receipt ?bloom_inclusion_checked filter receipt
 
 (** [split_in_chunks ~chunk_size ~base ~length] returns a list of
     lists (chunks) containing the consecutive numbers from [base]
@@ -277,6 +290,7 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
                   (* Apply the filter to the entire chunk concurrently *)
                   let* receipts =
                     Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
+                      ?mask:filter.bloom
                       offset
                       len
                   in
@@ -289,7 +303,12 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
                       (fun receipt ->
                         let open Lwt_syntax in
                         let* () = Lwt.pause () in
-                        let logs = filter_one_tx filter receipt in
+                        let logs =
+                          filter_one_tx
+                            ~bloom_inclusion_checked:true
+                            filter
+                            receipt
+                        in
                         (* Already encode logs individually, with yields to the
                            Lwt scheduler, to allow the full encoding to not be
                            blocking. *)
