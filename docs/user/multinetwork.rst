@@ -30,7 +30,7 @@ Test Networks
 -------------
 
 Mainnet is the main Tezos network, but is not appropriate for testing.
-A number of `test networks <https://teztnets.com>`__ are available to this end. Test networks usually run
+A number of `predefined test networks <https://teztnets.com>`__ are available to this end. Test networks usually run
 with different :ref:`constants <protocol_constants>` to speed up the chain.
 
 .. _faucet:
@@ -49,7 +49,8 @@ Built-In Networks
 The simplest way to select the network to connect to is to use the ``--network``
 option for selecting a :ref:`test network<test_networks>` when you initialize your :doc:`node configuration <./node-configuration>`.
 
-For instance, to run on Shadowtnet::
+Some of the `predefined test networks <https://teztnets.com>`__ are built in Octez.
+For instance, to run on Shadownet::
 
   octez-node config init --data-dir ~/tezos-shadownet --network shadownet
   octez-node identity generate --data-dir ~/tezos-shadownet
@@ -71,7 +72,7 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``shadownet``
+- ``shadownet`` (starting from Octez v24)
 
 - ``ghostnet``
 
@@ -91,10 +92,26 @@ The list of built-in networks is in :src:`src/lib_node_config/config_file.ml`.
 Octez developers edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
 add or remove built-in networks.
 
+Pre-defined Networks
+--------------------
+
+Not all the `predefined test networks <https://teztnets.com>`__ are built in Octez.
+For instance, the "protocol testnets" or periodic teztnets are not built in.
+
+In this case, you can pass to the ``--network`` option the corresponding predefined network description file.
+For instance, for running on weeklynet, you may use ``--network https://teztnets.com/weeklynet``.
+Note that this also works for builtin networks, albeit a bit longer.
+
+There are also the following *predefined network aliases*:
+
+- ``currentnet``: designates the test network running the same protocol as mainnet
+
+For instance, for running on the current protocol's testnet, you may use ``--network https://teztnets.com/currentnet``.
+
 Custom Networks
 ---------------
 
-If the network you want to connect to is not in the list of built-in networks,
+If the network you want to connect to is not in the list of built-in or predefined networks,
 you need a corresponding network configuration file. There are several ways to
 set that up. If you have an appropriate file, you can specify it with the ``--network``
 argument when you initialize your node configuration (see above), and the node will load it. If you know a URL from which the file can be

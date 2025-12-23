@@ -245,10 +245,10 @@ Putting together all the above instructions, you may want to quickly start a nod
 
 .. code-block:: shell
 
-    # Download a snapshot for your target network, e.g. shadownet:
-    wget https://snapshots.tzinit.org/shadownet/rolling -O rolling
-    # Configure the node for running on your testnet, e.g. shadownet:
-    octez-node config init --network shadownet --rpc-addr 127.0.0.1
+    # Download a snapshot for your target network, e.g. currentnet:
+    wget https://snapshots.tzinit.org/currentnet/rolling -O rolling
+    # Configure the node for running on your testnet, e.g. currentnet:
+    octez-node config init --network https://teztnets.com/currentnet --rpc-addr 127.0.0.1
     # Import the snapshot file into the node:
     octez-node snapshot import rolling
     # Run the node:

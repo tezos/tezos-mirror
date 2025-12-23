@@ -1,0 +1,48 @@
+version: "3"
+services:
+  octez-node:
+    container_name: octez-node-seoul
+    image: tezos/tezos:latest
+    hostname: octez-node
+    command: octez-node
+    ports:
+      - 9732:9732
+      - 8732:8732
+    environment:
+      NODE_HOST: octez-node
+      PROTOCOL: PtSeouLo
+    volumes:
+      - node_data:/var/run/tezos/node
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  octez-baker:
+    container_name: octez-baker-seoul
+    image: tezos/tezos-bare:latest
+    hostname: octez-baker
+    command: octez-baker-PtSeouLo -E http://octez-node:8732 run with local node /var/run/tezos/node/data --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE --without-dal
+    environment:
+      NODE_HOST: octez-node
+      PROTOCOL: PtSeouLo
+    volumes:
+      - client_data:/var/run/tezos/client
+      - node_data:/var/run/tezos/node
+    restart: on-failure
+
+
+  octez-accuser:
+    container_name: octez-accuser-seoul
+    image: tezos/tezos:latest
+    hostname: octez-accuser
+    command: octez-accuser
+    environment:
+      NODE_HOST: octez-node
+      PROTOCOL: PtSeouLo
+    volumes:
+      - client_data:/var/run/tezos/client
+      - node_data:/var/run/tezos/node
+    restart: on-failure
+
+volumes:
+  node_data: {}
+  client_data: {}
