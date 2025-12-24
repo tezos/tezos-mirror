@@ -102,7 +102,6 @@ let job_script_snapshot_alpha_and_link =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:true
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
