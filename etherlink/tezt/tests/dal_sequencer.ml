@@ -48,7 +48,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
     ~dal_slots:(Some [dal_slot])
   (* We want this test in the CI so we put no extra tags when DAL
      is active to avoid having the [ci_disabled] or [slow] tag. *)
-  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  @@ fun {sequencer; client; sc_rollup_node; enable_dal; _} _protocol ->
   let number_of_blueprints = 5 in
 
   let number_of_blueprints_sent_to_inbox = ref 0 in
@@ -89,9 +89,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
 
   (* At this point, the evm node should call the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
 
   let* () =
     (* bake 2 block when DAL is enabled so evm_node sees it as
@@ -103,12 +101,9 @@ let test_publish_blueprints_on_dal ~dal_slot =
     else unit
   in
 
-  (* We have unfortunately noticed that the test can be flaky. Sometimes,
-     the following RPC is done before the proxy being initialised, even though
-     we wait for it. The source of flakiness is unknown but happens very rarely,
-     we put a small sleep to make the least flaky possible. *)
-  let* () = Lwt_unix.sleep 2. in
-  let* () = check_head_consistency ~left:sequencer ~right:proxy () in
+  let* () =
+    check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+  in
   let expected_nb_of_bp_on_dal, expected_nb_of_bp_on_inbox =
     if enable_dal then (number_of_blueprints, 0) else (0, number_of_blueprints)
   in
@@ -157,7 +152,7 @@ let test_chunked_blueprints_on_dal =
     ~tags:["evm"; "sequencer"; "chunks"]
     ~title:
       "Sequencer publishes entire blueprints of more than one chunk to the DAL"
-  @@ fun {sequencer; sc_rollup_node; client; proxy; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   let number_of_blueprints_sent_to_inbox = ref 0 in
 
   let inbox_counter_p =
@@ -178,9 +173,7 @@ let test_chunked_blueprints_on_dal =
         "The number of chunks injected should be at least %R but it is %L") ;
   (* bake until the sequencer and the rollup are in sync, to assess the input
      has been read correctly. *)
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
   Check.(
     (!number_of_blueprints_sent_to_inbox = 0)
       int
@@ -196,7 +189,7 @@ let test_more_than_one_slot_per_l1_level =
     ~tags:["evm"; "sequencer"; "chunks"]
     ~title:
       "Sequencer publishes entire blueprints on more than one slot to the DAL"
-  @@ fun {sequencer; sc_rollup_node; client; proxy; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   let number_of_blueprints_sent_to_inbox = ref 0 in
   let inbox_counter_p =
     count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
@@ -210,8 +203,7 @@ let test_more_than_one_slot_per_l1_level =
   in
   let* n, _txs = send_transactions_to_sequencer ~sends sequencer in
   Check.((n = 3) int) ~error_msg:"Expected three transactions in the block" ;
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ()
   and* _smart_rollup_address, signals =
     Evm_node.wait_for_signal_signed sequencer
   in

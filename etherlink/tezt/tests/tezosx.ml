@@ -102,15 +102,7 @@ let test_deposit =
     ~tags:["deposit"]
     ~with_runtimes:[Tezos]
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let amount = Tez.of_int 1000 in
@@ -149,7 +141,7 @@ let test_deposit =
       ~client
   in
   let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* client = tezos_client sequencer in
@@ -211,7 +203,6 @@ let test_eth_rpc_with_alias ~runtime =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         _;
       }
       _protocol
@@ -253,7 +244,7 @@ let test_eth_rpc_with_alias ~runtime =
       ~client
   in
   let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let*@ evm_address =

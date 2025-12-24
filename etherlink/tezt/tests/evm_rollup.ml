@@ -2590,7 +2590,7 @@ let get_kernel_boot_wasm ~sc_rollup_node =
 let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     ?(activation_timestamp = "0") ?evm_setup ?rollup_address
     ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
-    ?(admin = Constant.bootstrap1) ?proxy ?(upgrador = admin) protocol =
+    ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
          node;
          client;
@@ -2653,12 +2653,7 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
           unit)
     in
     let* _ = produce_block () in
-    let* () =
-      match proxy with
-      | Some proxy ->
-          bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node ~proxy ()
-      | None -> unit
-    in
+    let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node () in
     unit
   in
   let* kernel_boot_wasm_after_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
@@ -3180,14 +3175,6 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       protocol
   in
 
-  let patch_config = Evm_node.patch_config_with_experimental_feature () in
-  let mode = Evm_node.Proxy in
-  let* proxy =
-    Evm_node.init
-      ~patch_config
-      ~mode
-      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
-  in
   let* sanity_check = scenario_prior ~evm_setup in
   (* Upgrade the kernel. *)
   let* () =
@@ -3195,12 +3182,11 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       ~sc_rollup_node:evm_setup.sc_rollup_node
       ~client:evm_setup.client
       ~sequencer:evm_setup.evm_node
-      ~proxy
       ()
   in
   let _, to_use = Kernel.to_uses_and_tags to_ in
   let* _ =
-    gen_test_kernel_upgrade ~evm_setup ~installee:to_use ~admin protocol ~proxy
+    gen_test_kernel_upgrade ~evm_setup ~installee:to_use ~admin protocol
   in
   (* wait for the migration to be processed *)
   let* _l1_level =
@@ -3215,7 +3201,6 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       ~sc_rollup_node:evm_setup.sc_rollup_node
       ~client:evm_setup.client
       ~sequencer:evm_setup.evm_node
-      ~proxy
       ()
   in
   (* Verify migration v41 delete blocks *)
@@ -4838,27 +4823,22 @@ let test_migrate_proxy_to_sequencer_future =
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
   (* Produce a block in sequencer. *)
   let*@ _ = Rpc.produce_block sequencer_node in
   let* () =
-    bake_until_sync
-      ~sc_rollup_node
-      ~client
-      ~sequencer:sequencer_node
-      ~proxy:proxy_node
-      ()
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:sequencer_node ()
   in
   (* Same head after first sequencer produced block. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
@@ -4878,18 +4858,13 @@ let test_migrate_proxy_to_sequencer_future =
     check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
   in
   let* () =
-    bake_until_sync
-      ~sc_rollup_node
-      ~client
-      ~sequencer:sequencer_node
-      ~proxy:proxy_node
-      ()
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:sequencer_node ()
   in
   (* Same head after sequencer transaction. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
@@ -5004,9 +4979,9 @@ let test_migrate_proxy_to_sequencer_past =
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
@@ -5014,18 +4989,13 @@ let test_migrate_proxy_to_sequencer_past =
   (* Produce a block in sequencer. *)
   let*@ _ = Rpc.produce_block sequencer_node in
   let* () =
-    bake_until_sync
-      ~sc_rollup_node
-      ~client
-      ~sequencer:sequencer_node
-      ~proxy:proxy_node
-      ()
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:sequencer_node ()
   in
   (* Same head after first sequencer produced block. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
@@ -5045,18 +5015,13 @@ let test_migrate_proxy_to_sequencer_past =
     check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
   in
   let* () =
-    bake_until_sync
-      ~sc_rollup_node
-      ~client
-      ~sequencer:sequencer_node
-      ~proxy:proxy_node
-      ()
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:sequencer_node ()
   in
   (* Same head after sequencer transaction. *)
   let* () =
-    check_head_consistency
-      ~left:sequencer_node
-      ~right:proxy_node
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer_node
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)"
       ()
   in
