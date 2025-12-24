@@ -37,7 +37,7 @@ General
   with mutex protection, added retries under resource pressure, ensured worker
   launch/initialization runs on the Event_loop main switch, and exposed clean
   shutdown for tests. Improves reliability under domain contention and low
-  resources. (MR :gl:`!19990`)
+  resources. (MR :gl:`!19990`) (MR :gl:`!20258`) (MR :gl:`!20261`)
 
 Node
 ----
