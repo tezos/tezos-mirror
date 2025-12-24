@@ -134,6 +134,19 @@ module Request = struct
       [
         case
           Json_only
+          ~title:"Produce_genesis"
+          (obj3
+             (req "request" (constant "produce_genesis"))
+             (req "timestamp" Time.Protocol.encoding)
+             (req "hash" Ethereum_types.block_hash_encoding))
+          (function
+            | View (Produce_genesis (timestamp, hash)) ->
+                Some ((), timestamp, hash)
+            | _ -> None)
+          (fun ((), timestamp, hash) ->
+            View (Produce_genesis (timestamp, hash)));
+        case
+          Json_only
           ~title:"Produce_block"
           (obj4
              (req "request" (constant "produce_block"))
