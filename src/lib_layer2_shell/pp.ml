@@ -30,4 +30,7 @@ let supported_pp () = List.map fst !registered_pp
 let () =
   register_pp ~name:"hex" (fun fmt bytes ->
       let hex = Hex.of_bytes bytes in
-      Hex.pp fmt hex)
+      Hex.pp fmt hex) ;
+  register_pp ~name:"ascii" (fun fmt bytes ->
+      let ascii = String.of_bytes bytes in
+      Format.pp_print_string fmt ascii)
