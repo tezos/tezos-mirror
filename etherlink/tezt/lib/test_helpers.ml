@@ -252,6 +252,56 @@ let check_block_consistency ~left ~right ?error_msg ~block () =
 let check_head_consistency ~left ~right ?error_msg () =
   check_block_consistency ~left ~right ?error_msg ~block:`Latest ()
 
+type network = Etherlink | Tezlink
+
+let rollup_level_opt ?(network = Etherlink) sc_rollup_node =
+  let key =
+    match network with
+    | Etherlink -> "/evm/world_state/blocks/current/number"
+    | Tezlink -> "/tezlink/blocks/current/number"
+  in
+  let* block_number =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  match block_number with
+  | None -> return None
+  | Some bytes ->
+      return
+        (Some
+           (Hex.to_bytes (`Hex bytes)
+           |> Bytes.to_string |> Z.of_bits |> Z.to_int32))
+
+let rollup_level ?(network = Etherlink) sc_rollup_node =
+  let* level_opt = rollup_level_opt ~network sc_rollup_node in
+  match level_opt with
+  | None ->
+      return (Error Rpc.{code = 404; message = "Level not found"; data = None})
+  | Some level -> return (Ok level)
+
+let check_rollup_head_consistency ~evm_node ~sc_rollup_node ?error_msg () =
+  let open Rpc.Syntax in
+  let*@ evm_node_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let*@ sc_rollup_node_block_number = rollup_level sc_rollup_node in
+
+  Check.((evm_node_head.number = sc_rollup_node_block_number) int32)
+    ~error_msg:
+      (Option.value
+         ~default:
+           Format.(
+             sprintf
+               "EVM node head number (%ld) is different from the rollup node \
+                head number (%ld)"
+               evm_node_head.number
+               sc_rollup_node_block_number)
+         error_msg) ;
+
+  unit
+
 let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     ~sequencer_governance_contract ~client ~upgrade_to ~pool_address
     ~activation_timestamp =
@@ -300,19 +350,21 @@ let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
   | Some x -> return x
   | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
 
-let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
-    ~sequencer ~client () =
+let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ?(network = Etherlink)
+    ~sc_rollup_node ~sequencer ~client () =
   let bake () =
     let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let result_f () =
     let open Rpc.Syntax in
-    let* proxy_level_opt = Rpc.generic_block_number_opt proxy in
+    let* sc_rollup_node_block_number_opt =
+      rollup_level_opt ~network sc_rollup_node
+    in
     let*@ sequencer_level = Rpc.generic_block_number sequencer in
-    match proxy_level_opt with
-    | Error _ | Ok None -> Lwt.return_none
-    | Ok (Some proxy_level) ->
+    match sc_rollup_node_block_number_opt with
+    | None -> Lwt.return_none
+    | Some proxy_level ->
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__
