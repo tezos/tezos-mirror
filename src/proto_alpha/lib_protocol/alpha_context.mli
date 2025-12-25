@@ -3774,6 +3774,9 @@ module Sc_rollup : sig
 
     val add_external_messages : context -> string list -> context tzresult Lwt.t
 
+    val add_internal_message :
+      context -> Inbox_message.internal_inbox_message -> context tzresult Lwt.t
+
     val add_deposit :
       context ->
       payload:Script.expr ->
