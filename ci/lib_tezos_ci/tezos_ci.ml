@@ -1554,7 +1554,7 @@ module Images = struct
   include Images_external
 
   module Base_images = struct
-    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+    let path_prefix = "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos"
 
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)

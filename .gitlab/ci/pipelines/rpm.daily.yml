@@ -53,26 +53,23 @@ oc.docker-build-rockylinux-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
-      - "9"
-      - "10"
+      - "9.3"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-build-merge-manifest.rockylinux:
+oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
-  needs:
-  - oc.docker-build-rockylinux-dependencies
+  - $TAGS
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -82,7 +79,7 @@ oc.docker-build-merge-manifest.rockylinux:
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - scripts/ci/docker-merge-base-images.sh
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -90,26 +87,26 @@ oc.docker-build-merge-manifest.rockylinux:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    IMAGE_NAME: $DEP_IMAGE
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
-      - "9"
-      - "10"
+      - "9.3"
       TAGS:
       - gcp_very_high_cpu
+      - gcp_arm64
 
 oc.build-rockylinux:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-merge-manifest.rockylinux
+  - oc.docker-build-rockylinux-dependencies
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -127,8 +124,8 @@ oc.build-rockylinux:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -143,19 +140,18 @@ oc.build-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9"
-      - "10"
+      - "9.3"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 oc.build-rockylinux-data:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-merge-manifest.rockylinux
+  - oc.docker-build-rockylinux-dependencies
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -173,8 +169,8 @@ oc.build-rockylinux-data:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -188,14 +184,13 @@ oc.build-rockylinux-data:
   parallel:
     matrix:
     - RELEASE:
-      - "9"
-      - "10"
+      - "9.3"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -214,7 +209,7 @@ rpm_repo_rockylinux:
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_rpm_repo.sh rockylinux 9 10
+  - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -250,10 +245,10 @@ oc.docker-build-fedora-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -263,13 +258,11 @@ oc.docker-build-fedora-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-build-merge-manifest.fedora:
+oc.docker-systemd-tests-rpm-fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
-  needs:
-  - oc.docker-build-fedora-dependencies
+  - $TAGS
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -279,7 +272,7 @@ oc.docker-build-merge-manifest.fedora:
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - scripts/ci/docker-merge-base-images.sh
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -287,11 +280,11 @@ oc.docker-build-merge-manifest.fedora:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    IMAGE_NAME: $DEP_IMAGE
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -299,14 +292,15 @@ oc.docker-build-merge-manifest.fedora:
       - "42"
       TAGS:
       - gcp_very_high_cpu
+      - gcp_arm64
 
 oc.build-fedora:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-merge-manifest.fedora
+  - oc.docker-build-fedora-dependencies
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -324,8 +318,8 @@ oc.build-fedora:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -347,12 +341,12 @@ oc.build-fedora:
       - gcp_arm64
 
 oc.build-fedora-data:
-  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-merge-manifest.fedora
+  - oc.docker-build-fedora-dependencies
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -370,8 +364,8 @@ oc.build-fedora-data:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -392,7 +386,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-07a4c8c9
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -424,81 +418,8 @@ rpm_repo_fedora:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.docker-systemd-tests-rpm-fedora:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
-  parallel:
-    matrix:
-    - RELEASE:
-      - "39"
-      - "42"
-      TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
-
-oc.docker-systemd-merge-manifest.fedora:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-systemd-tests-rpm-fedora
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: fedora
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - "39"
-      - "42"
-      TAGS:
-      - gcp_very_high_cpu
-
 oc.install_bin_fedora_39.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-07a4c8c9
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
   stage: publishing_tests
   tags:
   - gcp
@@ -546,86 +467,13 @@ oc.install_bin_fedora_39_systemd:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     RELEASE: "39"
 
-oc.docker-systemd-tests-rpm-rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - $TAGS
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
-  parallel:
-    matrix:
-    - RELEASE:
-      - "9"
-      - "10"
-      TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
-
-oc.docker-systemd-merge-manifest.rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  needs:
-  - oc.docker-systemd-tests-rpm-rockylinux
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - scripts/ci/docker-merge-base-images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
-    DISTRIBUTION: rockylinux
-    IMAGE_NAME: $DEP_IMAGE
-  parallel:
-    matrix:
-    - RELEASE:
-      - "9"
-      - "10"
-      TAGS:
-      - gcp_very_high_cpu
-
-oc.install_bin_rockylinux_9.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
+oc.install_bin_rockylinux_9.3.doc:
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publishing_tests
   tags:
   - gcp
@@ -639,13 +487,13 @@ oc.install_bin_rockylinux_9.doc:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-rpm.sh rockylinux 9
+  - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_rockylinux_9_systemd:
+oc.install_bin_rockylinux_93_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -673,7 +521,7 @@ oc.install_bin_rockylinux_9_systemd:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    RELEASE: "9"
+    RELEASE: "9.3"

@@ -56,7 +56,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+    IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-rust:trixie-master-6253f76a
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
@@ -718,7 +718,7 @@ test_sdk_bindings:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.install_opam_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -744,7 +744,7 @@ oc.install_opam_noble:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -773,7 +773,7 @@ oc.compile_sources_doc_deps:
       - ubuntu:noble
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs

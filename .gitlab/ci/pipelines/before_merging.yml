@@ -108,7 +108,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+    IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-rust:trixie-master-6253f76a
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
@@ -888,6 +888,31 @@ trigger:debian_repository_partial_auto:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     strategy: depend
 
+trigger:rpm_repository_partial_auto:
+  stage: test
+  variables:
+    PIPELINE_TYPE: before_merging-rpm_repository_partial_auto
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
+  rules:
+  - changes:
+    - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
+    - manifest/**/*.ml*
+    - rpm-deps-build.Dockerfile
+    - scripts/ci/build-packages-dependencies.sh
+    - scripts/ci/build-rpm-packages.sh
+    - scripts/ci/create_rpm_repo.sh
+    - scripts/ci/prepare-apt-rpm-repo.sh
+    - scripts/packaging/build-rpm-local.sh
+    - scripts/packaging/octez/rpm/*
+    - scripts/packaging/tests/rpm/*
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - trigger
+  trigger:
+    include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
+    strategy: depend
+
 trigger:homebrew_auto:
   stage: test
   variables:
@@ -1011,7 +1036,7 @@ test_sdk_bindings:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.install_opam_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -1037,7 +1062,7 @@ oc.install_opam_noble:
     CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_master:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
@@ -1080,6 +1105,19 @@ trigger:homebrew:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/homebrew.yml
+    strategy: depend
+
+trigger:rpm_repository_partial:
+  stage: manual
+  variables:
+    PIPELINE_TYPE: before_merging-rpm_repository_partial
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/rpm_repository_partial.yml
     strategy: depend
 
 trigger:debian_repository_partial:
@@ -3734,7 +3772,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-07a4c8c9
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: test
   tags:
   - gcp

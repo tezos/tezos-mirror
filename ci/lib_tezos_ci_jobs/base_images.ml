@@ -169,7 +169,7 @@ let jobs =
         ~variables:
           [
             ("RELEASE", "trixie");
-            ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+            ("IMAGE_NAME", "${GCP_CI_REGISTRY}/tezos/tezos/debian-rust");
           ]
         ["scripts/ci/docker-merge-base-images.sh"]
     in
