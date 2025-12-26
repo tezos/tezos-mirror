@@ -68,9 +68,9 @@ oc.docker-build-rockylinux-dependencies:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -101,9 +101,9 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -135,7 +135,7 @@ oc.build-rockylinux:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -177,7 +177,7 @@ oc.build-rockylinux-data:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -196,7 +196,7 @@ oc.build-rockylinux-data:
       - gcp_very_high_cpu
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -228,7 +228,7 @@ rpm_repo_rockylinux:
   retry: 0
 
 oc.install_bin_rockylinux_9.3.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
   stage: publishing_tests
   tags:
   - gcp
@@ -275,6 +275,6 @@ oc.install_bin_rockylinux_93_systemd:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     RELEASE: "9.3"

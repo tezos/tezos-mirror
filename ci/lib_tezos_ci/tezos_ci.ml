@@ -1554,7 +1554,7 @@ module Images = struct
 
     let version_pp ppf v = Format.fprintf ppf "%d.%d" v.major v.minor
 
-    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+    let path_prefix = "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos"
 
     let make_img distro version =
       Image.mk_external

@@ -259,7 +259,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-homebrew:trixie-1.0
   stage: build
   tags:
   - gcp
@@ -375,9 +375,9 @@ oc.docker-build-debian-dependencies:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -411,7 +411,7 @@ oc.build-debian:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -454,7 +454,7 @@ oc.build-data_packages:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     RELEASE: trixie
     TAGS: gcp
@@ -463,7 +463,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:trixie-1.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -517,9 +517,9 @@ oc.docker-build-ubuntu-dependencies:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -553,7 +553,7 @@ oc.build-ubuntu:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -575,7 +575,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:noble-1.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -629,9 +629,9 @@ oc.docker-build-rockylinux-dependencies:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -663,9 +663,9 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -698,7 +698,7 @@ oc.build-rockylinux:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -742,7 +742,7 @@ oc.build-rockylinux-data:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -762,7 +762,7 @@ oc.build-rockylinux-data:
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -816,9 +816,9 @@ oc.docker-build-fedora-dependencies:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -851,9 +851,9 @@ oc.docker-systemd-tests-rpm-fedora:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
+    BASE_IMAGE: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-1.0
   parallel:
     matrix:
     - RELEASE:
@@ -887,7 +887,7 @@ oc.build-fedora:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -932,7 +932,7 @@ oc.build-fedora-data:
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -953,7 +953,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-1.0
+  image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:39-1.0
   stage: publish
   tags:
   - gcp_not_interruptible

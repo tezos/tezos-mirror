@@ -188,7 +188,7 @@ container_scanning_tezos-debian-unstable-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:unstable
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:unstable
     REPORT: gl-container-scanning-report-tezos-debian-unstable-master.json
   artifacts:
     paths:
@@ -219,7 +219,7 @@ container_scanning_tezos-debian-bookworm-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm
     REPORT: gl-container-scanning-report-tezos-debian-bookworm-master.json
   artifacts:
     paths:
@@ -250,7 +250,7 @@ container_scanning_tezos-debian-trixie-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:trixie
     REPORT: gl-container-scanning-report-tezos-debian-trixie-master.json
   artifacts:
     paths:
@@ -281,7 +281,7 @@ container_scanning_tezos-ubuntu-noble-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:noble
     REPORT: gl-container-scanning-report-tezos-ubuntu-noble-master.json
   artifacts:
     paths:
@@ -312,7 +312,7 @@ container_scanning_tezos-ubuntu-jammy-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:jammy
     REPORT: gl-container-scanning-report-tezos-ubuntu-jammy-master.json
   artifacts:
     paths:
@@ -343,7 +343,7 @@ container_scanning_tezos-ubuntu-plucky-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:plucky
     REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-master.json
   artifacts:
     paths:
@@ -374,7 +374,7 @@ container_scanning_tezos-fedora-39-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:39
     REPORT: gl-container-scanning-report-tezos-fedora-39-master.json
   artifacts:
     paths:
@@ -405,7 +405,7 @@ container_scanning_tezos-fedora-41-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:41
     REPORT: gl-container-scanning-report-tezos-fedora-41-master.json
   artifacts:
     paths:
@@ -436,7 +436,7 @@ container_scanning_tezos-fedora-42-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:42
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:42
     REPORT: gl-container-scanning-report-tezos-fedora-42-master.json
   artifacts:
     paths:
@@ -467,7 +467,7 @@ container_scanning_tezos-rockylinux-9.3-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3
     REPORT: gl-container-scanning-report-tezos-rockylinux-9.3-master.json
   artifacts:
     paths:
@@ -498,7 +498,7 @@ container_scanning_tezos-rockylinux-9.6-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.6
     REPORT: gl-container-scanning-report-tezos-rockylinux-9.6-master.json
   artifacts:
     paths:
@@ -529,7 +529,7 @@ container_scanning_tezos-rockylinux-10.0-master:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10.0
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:10.0
     REPORT: gl-container-scanning-report-tezos-rockylinux-10.0-master.json
   artifacts:
     paths:

@@ -29,7 +29,7 @@ let jobs : tezos_job list =
       (fun release ->
         {
           Container_scanning.name =
-            "${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian";
+            "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian";
           tag = release;
           dockerfile = "images/base-images/Dockerfile.debian";
           job_name = "tezos-debian-" ^ release ^ "-master";
@@ -39,7 +39,7 @@ let jobs : tezos_job list =
         (fun release ->
           {
             Container_scanning.name =
-              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu";
+              "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu";
             tag = release;
             dockerfile = "images/base-images/Dockerfile.debian";
             job_name = "tezos-ubuntu-" ^ release ^ "-master";
@@ -49,7 +49,7 @@ let jobs : tezos_job list =
         (fun release ->
           {
             Container_scanning.name =
-              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
+              "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora";
             tag = release;
             dockerfile = "images/base-images/Dockerfile.rpm";
             job_name = "tezos-fedora-" ^ release ^ "-master";
@@ -59,7 +59,7 @@ let jobs : tezos_job list =
         (fun release ->
           {
             Container_scanning.name =
-              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
+              "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux";
             tag = release;
             dockerfile = "images/base-images/Dockerfile.rpm";
             job_name = "tezos-rockylinux-" ^ release ^ "-master";

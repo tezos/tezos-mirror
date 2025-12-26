@@ -110,7 +110,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
        (* this second variable is for a read only registry and we want it to be
           tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+         "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
        )
     :: add
   in

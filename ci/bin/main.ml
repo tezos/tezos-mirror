@@ -26,28 +26,35 @@ let variables : variables =
        always contains the path to the unprotected Docker registry
        (unlike [GCP_REGISTRY], see below). This is used to locate the
        CI images, which are always pushed to the public repository. *)
-    ("ci_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci");
+    ("ci_image_name", "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/ci");
     ( "ci_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/ci" );
+      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/ci" );
     (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
        which docker images are produced and consumed. This variable is defined at tezos
        level with the value unprotected registry and at tezos/tezos level in its protected
        version. This mechanism allows pipelines from a protected tezos/tezos branch to
        read the protected variable from tezos/tezos and for others to not have access to
        the variable tezos/tezos but tezos. *)
+    (* /!\ GCP_CI_REGISTRY and GCP_PROTECTED_CI_REGISTRY point to dedicated registries
+       for CI tooling and base images (all tezos/tezos/* except the final tezos/tezos image).
+       This separation allows applying cleanup policies to intermediate images without
+       affecting the final tezos/tezos image. *)
     ( "rust_toolchain_image_name",
-      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
+      "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_toolchain_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
+      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_sdk_bindings_image_name",
-      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
+      "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
     ( "rust_sdk_bindings_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
-    ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
+      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
+    ("jsonnet_image_name", "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
     ( "jsonnet_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );
+      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );
     ( "client_libs_dependencies_image_name",
-      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
+      "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
+    ( "client_libs_dependencies_image_name_protected",
+      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies"
+    );
     ("GIT_STRATEGY", "fetch");
     ("GIT_DEPTH", "1");
     ("GET_SOURCES_ATTEMPTS", "2");
