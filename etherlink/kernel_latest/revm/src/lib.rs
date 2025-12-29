@@ -512,7 +512,7 @@ mod test {
 
         sol!("contracts/tests/create_and_revert.sol");
         sol!("contracts/tests/call_and_revert.sol");
-        sol!(FABridge, "contracts/abi/fa_bridge.abi");
+        sol!(FABridge, "contracts/predeployed/abi/fa_bridge.abi");
     }
 
     const GAS_LIMIT: u64 = 30_000_000;
@@ -1805,7 +1805,7 @@ mod test {
                 .unwrap()
         }
 
-        sol!("contracts/interfaces.sol");
+        sol!("contracts/predeployed/interfaces.sol");
         sol!("contracts/tests/static_caller.sol");
         sol!("contracts/tests/delegate_caller.sol");
         sol!("contracts/tests/reentrancy_tester.sol");

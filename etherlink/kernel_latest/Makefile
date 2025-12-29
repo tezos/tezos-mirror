@@ -19,6 +19,9 @@ else
 # of the EVM workspace.
 	$(eval EXCLUDE := --workspace --exclude evm-evaluation)
 endif
+ifndef EVM_KERNEL_SKIP_BYTECODE
+	@make -C revm/contracts/predeployed bytecode
+endif
 	@cargo build --target wasm32-unknown-unknown --release ${EXCLUDE} ${FEATURES}
 
 .PHONY: build-debug

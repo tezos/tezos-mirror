@@ -255,6 +255,7 @@ oc.build_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET

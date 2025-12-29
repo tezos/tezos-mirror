@@ -164,6 +164,27 @@ let job_lint_wasm_runtime =
       "etherlink/lib_wasm_runtime/lint.sh";
     ]
 
+let job_lint_solidity_artifacts =
+  CI.job
+    "lint_solidity_artifacts"
+    ~__POS__
+    ~stage:Test
+    ~description:"Check committed bytecode are up to date."
+    ~image:Images.CI.e2etest
+    ~only_if_changed:
+      [
+        "etherlink/kernel_latest/revm/contracts/predeployed/*.sol";
+        "etherlink/kernel_latest/revm/contracts/predeployed/*.bin";
+      ]
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode";
+      "forge --version";
+      "git status";
+      "git diff-index --quiet HEAD --";
+    ]
+
 let job_unit_tests =
   CI.job
     "unit_tests"
@@ -447,6 +468,7 @@ let register () =
       (Manual, job_build_evm_node_static Amd64 Test);
       (Manual, job_build_evm_node_static Arm64 Test);
       (Auto, job_lint_wasm_runtime);
+      (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
          returns an equivalent job for [Before_merging] and [Merge_train]. *)

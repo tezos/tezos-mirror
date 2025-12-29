@@ -506,7 +506,10 @@ mod tests {
 
         (ticketer.try_into().unwrap(), content)
     }
-    sol!(kernel_wrapper, "../revm/contracts/abi/fa_bridge.abi");
+    sol!(
+        kernel_wrapper,
+        "../revm/contracts/predeployed/abi/fa_bridge.abi"
+    );
 
     #[test]
     fn load_block_fees_new() {

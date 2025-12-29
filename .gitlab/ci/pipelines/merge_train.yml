@@ -1308,6 +1308,7 @@ check_riscv_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -1350,6 +1351,7 @@ audit_riscv_deps:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -1400,6 +1402,7 @@ test_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -1475,6 +1478,7 @@ oc.build_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    EVM_KERNEL_SKIP_BYTECODE: "yes"
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -2591,6 +2595,37 @@ etherlink.lint_wasm_runtime:
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+
+etherlink.lint_solidity_artifacts:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - etherlink/kernel_latest/revm/contracts/predeployed/*.bin
+    - etherlink/kernel_latest/revm/contracts/predeployed/*.sol
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode
+  - forge --version
+  - git status
+  - git diff-index --quiet HEAD --
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 etherlink.unit_tests:
   image: ${ci_image_name}/build:${ci_image_tag}
