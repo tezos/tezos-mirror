@@ -88,13 +88,17 @@ module Name = struct
   let equal () () = true
 end
 
+type force = True | False | With_timestamp of Time.Protocol.t
+
 module Request = struct
   type ('a, 'b) t =
     | Produce_genesis :
         (Time.Protocol.t * Ethereum_types.block_hash)
         -> (unit, tztrace) t
-    | Produce_block :
-        (bool * Time.Protocol.t option * bool)
+    | Produce_block : {
+        with_delayed_transactions : bool;
+        force : force;
+      }
         -> ([`Block_produced of int | `No_block], tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
@@ -154,12 +158,23 @@ module Request = struct
              (opt "timestamp" Time.Protocol.encoding)
              (req "force" bool))
           (function
-            | View (Produce_block (with_delayed_transactions, timestamp, force))
-              ->
+            | View (Produce_block {with_delayed_transactions; force}) ->
+                let timestamp, force =
+                  match force with
+                  | True -> (None, true)
+                  | False -> (None, false)
+                  | With_timestamp timestamp -> (Some timestamp, true)
+                in
                 Some ((), with_delayed_transactions, timestamp, force)
             | _ -> None)
           (fun ((), with_delayed_transactions, timestamp, force) ->
-            View (Produce_block (with_delayed_transactions, timestamp, force)));
+            let force =
+              match (timestamp, force) with
+              | Some t, true -> With_timestamp t
+              | None, true -> True
+              | _ -> False
+            in
+            View (Produce_block {with_delayed_transactions; force}));
         case
           Json_only
           ~title:"Preconfirm_transactions"
@@ -365,15 +380,15 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         return l
 
-(** Produces a block if we find at least one valid transaction in the transaction
-    pool or if [force] is true. *)
-let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
+(** Produces a block if we find at least one valid transaction in the
+    transaction pool. *)
+let produce_block_if_needed (type f) ~signer ~timestamp ~delayed_hashes
     ~transactions_and_objects
     ~(tx_container : f Services_backend_sig.tx_container)
     ~clear_pending_queue_after head_info =
   let open Lwt_result_syntax in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
-  if force || n > 0 then
+  if n > 0 then
     let* confirmed_txs =
       produce_block_with_transactions
         ~signer
@@ -499,16 +514,15 @@ let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
     (Blueprints_publisher_types.Request.Blueprint
        {chunks = genesis_chunks; inbox_payload = genesis_payload})
 
-let choose_block_timestamp next_block_timestamp external_timestamp =
-  let provided_timestamp =
-    Option.either
-      external_timestamp
-      (Option.map Time.System.to_protocol next_block_timestamp)
-  in
-  match provided_timestamp with Some ts -> ts | None -> Misc.now ()
+let choose_block_timestamp next_block_timestamp (force : force) =
+  match force with
+  | With_timestamp t -> t
+  | _ -> (
+      match Option.map Time.System.to_protocol next_block_timestamp with
+      | Some ts -> ts
+      | None -> Misc.now ())
 
-let produce_block (state : Types.state) ~force
-    ~(timestamp : Time.Protocol.t option) ~with_delayed_transactions =
+let produce_block (state : Types.state) ~force ~with_delayed_transactions =
   let open Lwt_result_syntax in
   let (Ex_tx_container tx_container) = state.tx_container in
   let (module Tx_container) =
@@ -521,7 +535,7 @@ let produce_block (state : Types.state) ~force
        ensuring consistency between preconfirmation and block creation.
   *)
   let now = Ptime_clock.now () in
-  let timestamp = choose_block_timestamp state.next_block_timestamp timestamp in
+  let timestamp = choose_block_timestamp state.next_block_timestamp force in
   let*! head_info = Evm_context.head_info () in
   let* () =
     when_ (not state.sunset) @@ fun () ->
@@ -601,12 +615,17 @@ let produce_block (state : Types.state) ~force
         produce_block_if_needed
           ~signer
           ~timestamp
-          ~force
           ~transactions_and_objects
           ~delayed_hashes
           ~tx_container
           ~clear_pending_queue_after:(not state.preconfirmation_stream_enabled)
           head_info
+      in
+      let* result =
+        match (result, force) with
+        | `No_block, (True | With_timestamp _) ->
+            produce_empty_block ~signer ~timestamp head_info
+        | result, _ -> return result
       in
       state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
       let* () = clear_preconfirmation_data ~state in
@@ -735,9 +754,9 @@ module Handlers = struct
     match request with
     | Request.Produce_genesis (timestamp, parent_hash) ->
         produce_genesis ~state ~timestamp ~parent_hash
-    | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
+    | Request.Produce_block {with_delayed_transactions; force} ->
         protect @@ fun () ->
-        produce_block state ~force ~timestamp ~with_delayed_transactions
+        produce_block state ~force ~with_delayed_transactions
     | Request.Preconfirm_transactions transactions -> (
         protect @@ fun () ->
         (* If we are before the first created block and block producer
@@ -832,12 +851,12 @@ let produce_genesis ~timestamp ~parent_hash =
     (Request.Produce_genesis (timestamp, parent_hash))
   |> handle_request_error
 
-let produce_block ~with_delayed_transactions ~force ~timestamp =
+let produce_block ~with_delayed_transactions ~force =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     worker
-    (Request.Produce_block (with_delayed_transactions, timestamp, force))
+    (Request.Produce_block {with_delayed_transactions; force})
   |> handle_request_error
 
 let preconfirm_transactions ~transactions =

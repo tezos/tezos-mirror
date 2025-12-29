@@ -120,8 +120,7 @@ let loop_sequencer (type f) multichain
             let* () = List.iter_es (validate_and_add_tx ~tx_container) txns in
             let* _ =
               Block_producer.produce_block
-                ~force:true
-                ~timestamp:(Some blueprint.blueprint.timestamp)
+                ~force:(With_timestamp blueprint.blueprint.timestamp)
             in
             let*! head = Evm_context.head_info () in
             let* storage_version = Evm_state.storage_version head.evm_state in
@@ -156,9 +155,13 @@ let loop_sequencer (type f) multichain
               let diff = Time.Protocol.(diff now last_produced_block) in
               diff >= Int64.of_float time_between_blocks
             in
-            let timestamp = if instant_confirmations then None else Some now in
-            let* has_produced_block =
-              Block_producer.produce_block ~force ~timestamp
+            let force =
+              if force then
+                if instant_confirmations then Block_producer.True
+                else With_timestamp now
+              else False
+            in
+            let* has_produced_block = Block_producer.produce_block ~force
             and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
             match has_produced_block with
             | `Block_produced _nb_transactions -> loop now

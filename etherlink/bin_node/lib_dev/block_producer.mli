@@ -13,6 +13,14 @@ type parameters = {
   preconfirmation_stream_enabled : bool;
 }
 
+(** [force] defines if the block producer should force the creation of
+    a block even if there is no txs to be included.*)
+type force =
+  | True  (** Force the creation of a block with the computed timestamp *)
+  | False  (** Create a block iff there is txs to be included *)
+  | With_timestamp of Time.Protocol.t
+      (** Force the creation of a block with the provided timestamp *)
+
 (** [start parameters] starts the events follower. *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -26,14 +34,12 @@ val produce_genesis :
   parent_hash:Ethereum_types.block_hash ->
   (unit, error trace) result Lwt.t
 
-(** [produce_block ~force ~timestamp] takes the transactions in the tx
-    pool and produces a block from it, returns the number of
-    transaction in the block. The block is not produced if the list of
-    transactions is empty and [force] is set to [false].*)
+(** [produce_block ~force] takes the transactions in the tx pool and
+    produces a block from it, returns the number of transaction in the
+    block. The block is not produced if the list of transactions is
+    empty and [force] is set to [False].*)
 val produce_block :
-  force:bool ->
-  timestamp:Time.Protocol.t option ->
-  [`Block_produced of int | `No_block] tzresult Lwt.t
+  force:force -> [`Block_produced of int | `No_block] tzresult Lwt.t
 
 (** [preconfirm_transactions ~transactions] validates each transaction in
     [transactions] and streams every successfully validated one to the
@@ -45,7 +51,6 @@ val preconfirm_transactions :
 module Internal_for_tests : sig
   val produce_block :
     with_delayed_transactions:bool ->
-    force:bool ->
-    timestamp:Time.Protocol.t option ->
+    force:force ->
     [`Block_produced of int | `No_block] tzresult Lwt.t
 end
