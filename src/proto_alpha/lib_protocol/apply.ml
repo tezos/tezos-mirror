@@ -2340,9 +2340,9 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt level slot ~dal_power dal_content =
+let record_dal_content ctxt level slot ~dal_power dal_content_opt =
   let open Lwt_result_syntax in
-  match dal_content with
+  match dal_content_opt with
   | None -> return ctxt
   | Some {attestation} ->
       let* proto_activation_level = Protocol_activation_level.get ctxt in
@@ -2364,7 +2364,7 @@ let record_dal_content ctxt level slot ~dal_power dal_content =
       return ctxt
 
 let record_attestation ctxt (mode : mode) (consensus : consensus_content)
-    (dal : dal_content option) :
+    (dal_content_opt : dal_content option) :
     (context * Kind.attestation contents_result_list) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
@@ -2396,7 +2396,12 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
           ~power:attesting_power
       in
       let* ctxt =
-        record_dal_content ctxt consensus.level consensus.slot ~dal_power dal
+        record_dal_content
+          ctxt
+          consensus.level
+          consensus.slot
+          ~dal_power
+          dal_content_opt
       in
       return (ctxt, mk_attestation_result consensus_key attesting_power)
   | Partial_construction _ ->
