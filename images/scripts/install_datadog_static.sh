@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-DATAGOG_RELEASE="v4.1.0"
+DATAGOG_RELEASE="v5.1.0"
 
 # Detect architecture
 ARCH=$(uname -m)
