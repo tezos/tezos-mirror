@@ -888,11 +888,11 @@ module Produce_block = struct
 end
 
 module Propose_next_block_timestamp = struct
-  type input = Time.System.t
+  type input = Time.Protocol.t
 
   type output = unit
 
-  let input_encoding = Time.System.encoding
+  let input_encoding = Time.Protocol.encoding
 
   let output_encoding = Data_encoding.unit
 

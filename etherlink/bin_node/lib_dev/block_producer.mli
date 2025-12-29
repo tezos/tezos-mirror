@@ -70,5 +70,5 @@ module Internal_for_tests : sig
     [`Block_produced of int | `No_block] tzresult Lwt.t
 
   val propose_next_block_timestamp :
-    next_block_timestamp:Time.System.t -> unit tzresult Lwt.t
+    next_block_timestamp:Time.Protocol.t -> unit tzresult Lwt.t
 end

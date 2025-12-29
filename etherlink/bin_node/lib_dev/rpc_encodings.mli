@@ -323,7 +323,7 @@ module Produce_block :
      and type output = Ethereum_types.quantity
 
 module Propose_next_block_timestamp :
-  METHOD with type input = Time.System.t and type output = unit
+  METHOD with type input = Time.Protocol.t and type output = unit
 
 module Produce_proposal :
   METHOD with type input = Time.Protocol.t and type output = unit
