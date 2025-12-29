@@ -243,6 +243,19 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
   in
   return confirmed_txs
 
+let produce_empty_block ~signer ~timestamp head_info =
+  let open Lwt_result_syntax in
+  let* hashes =
+    produce_block_with_transactions
+      ~signer
+      ~timestamp
+      ~transactions_and_objects:[]
+      ~delayed_hashes:[]
+      head_info
+  in
+  (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
+  return (`Block_produced (Seq.length hashes))
+
 let validate_etherlink_tx ~maximum_cumulative_size
     (validation_state : Validation_types.validation_state) raw_tx
     (tx_object : Transaction_object.t) =
@@ -536,17 +549,9 @@ let produce_block (state : Types.state) ~force
     in
     let signer = state.signer in
     if is_going_to_upgrade_kernel then (
-      let* hashes =
-        produce_block_with_transactions
-          ~signer
-          ~timestamp
-          ~transactions_and_objects:[]
-          ~delayed_hashes:[]
-          head_info
-      in
+      let* result = produce_empty_block ~signer ~timestamp head_info in
       state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-      (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
-      return (`Block_produced (Seq.length hashes)))
+      return result)
     else
       let* delayed_hashes, transactions_and_objects =
         if state.preconfirmation_stream_enabled then
