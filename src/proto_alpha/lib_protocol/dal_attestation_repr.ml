@@ -81,8 +81,7 @@ module Accountability = struct
   module SlotMap = Map.Make (Compare.Int)
 
   type t = {
-    number_of_attested_shards :
-      (Signature.Public_key_hash.Set.t * int) SlotMap.t;
+    shard_attestations : (Signature.Public_key_hash.Set.t * int) SlotMap.t;
     number_of_slots : int;
   }
 
@@ -94,7 +93,7 @@ module Accountability = struct
   }
 
   let init ~number_of_slots =
-    {number_of_attested_shards = SlotMap.empty; number_of_slots}
+    {shard_attestations = SlotMap.empty; number_of_slots}
 
   (* This function must be called at most once for a given attester; otherwise
      the count will be flawed. *)
@@ -129,8 +128,8 @@ module Accountability = struct
         in
         iter (slot_index + 1) map
     in
-    let number_of_attested_shards = iter 0 t.number_of_attested_shards in
-    {t with number_of_attested_shards}
+    let shard_attestations = iter 0 t.shard_attestations in
+    {t with shard_attestations}
 
   (* Given a slot encoded as [number_of_shards] shards and for which
      [number_of_attested_shards] are attested by the bakers. The slot is
@@ -154,7 +153,7 @@ module Accountability = struct
   let is_slot_attested t ~threshold ~number_of_shards slot_index =
     let index = Dal_slot_index_repr.to_int slot_index in
     let attesters, number_of_attested_shards =
-      match SlotMap.find index t.number_of_attested_shards with
+      match SlotMap.find index t.shard_attestations with
       | None -> (Signature.Public_key_hash.Set.empty, 0)
       | Some v -> v
     in
