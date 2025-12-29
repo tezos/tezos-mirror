@@ -497,121 +497,115 @@ let choose_block_timestamp next_block_timestamp external_timestamp =
 let produce_block (state : Types.state) ~force
     ~(timestamp : Time.Protocol.t option) ~with_delayed_transactions =
   let open Lwt_result_syntax in
-  match state.tx_container with
-  | Ex_tx_container tx_container ->
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
+  let (Ex_tx_container tx_container) = state.tx_container in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
+  (* now and timestamp serve distinct but complementary purposes:
+     - now: taken at the start of the request, used to predict the next timestamp
+       and keep it aligned with real time.
+     - timestamp: derived from the previously computed `next_block_timestamp`,
+       ensuring consistency between preconfirmation and block creation.
+  *)
+  let now = Ptime_clock.now () in
+  let timestamp = choose_block_timestamp state.next_block_timestamp timestamp in
+  let*! head_info = Evm_context.head_info () in
+  let* () =
+    when_ (not state.sunset) @@ fun () ->
+    match head_info.pending_sequencer_upgrade with
+    | Some Evm_events.Sequencer_upgrade.{timestamp = upgrade_timestamp; _}
+      when Time.Protocol.(
+             add timestamp state.sequencer_sunset_sec >= upgrade_timestamp
+             && timestamp < upgrade_timestamp) ->
+        (* We stop producing blocks ahead of the upgrade *)
+        let*! () = Block_producer_events.sunset () in
+        state.sunset <- true ;
+        Tx_container.lock_transactions ()
+    | _ -> return_unit
+  in
+  let* is_locked = Tx_container.is_locked () in
+  if is_locked then
+    let*! () = Block_producer_events.production_locked () in
+    return `No_block
+  else
+    let is_going_to_upgrade_kernel =
+      match head_info.pending_upgrade with
+      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+          timestamp >= upgrade_timestamp
+      | None -> false
+    in
+    let signer = state.signer in
+    if is_going_to_upgrade_kernel then (
+      let* hashes =
+        produce_block_with_transactions
+          ~signer
+          ~timestamp
+          ~transactions_and_objects:[]
+          ~delayed_hashes:[]
+          head_info
       in
-      (*
-        now and timestamp serve distinct but complementary purposes:
-        - now: taken at the start of the request, used to predict the next timestamp
-          and keep it aligned with real time.
-        - timestamp: derived from the previously computed `next_block_timestamp`,
-          ensuring consistency between preconfirmation and block creation.
-      *)
-      let now = Ptime_clock.now () in
-      let timestamp =
-        choose_block_timestamp state.next_block_timestamp timestamp
-      in
-      let*! head_info = Evm_context.head_info () in
-      let* () =
-        when_ (not state.sunset) @@ fun () ->
-        match head_info.pending_sequencer_upgrade with
-        | Some Evm_events.Sequencer_upgrade.{timestamp = upgrade_timestamp; _}
-          when Time.Protocol.(
-                 add timestamp state.sequencer_sunset_sec >= upgrade_timestamp
-                 && timestamp < upgrade_timestamp) ->
-            (* We stop producing blocks ahead of the upgrade *)
-            let*! () = Block_producer_events.sunset () in
-            state.sunset <- true ;
-            Tx_container.lock_transactions ()
-        | _ -> return_unit
-      in
-      let* is_locked = Tx_container.is_locked () in
-      if is_locked then
-        let*! () = Block_producer_events.production_locked () in
-        return `No_block
-      else
-        let is_going_to_upgrade_kernel =
-          match head_info.pending_upgrade with
-          | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
-              timestamp >= upgrade_timestamp
-          | None -> false
-        in
-        let signer = state.signer in
-        if is_going_to_upgrade_kernel then (
-          let* hashes =
-            produce_block_with_transactions
-              ~signer
-              ~timestamp
-              ~transactions_and_objects:[]
-              ~delayed_hashes:[]
-              head_info
+      state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
+      (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
+      return (`Block_produced (Seq.length hashes)))
+    else
+      let* delayed_hashes, transactions_and_objects =
+        if state.preconfirmation_stream_enabled then
+          let* delayed_hashes =
+            match (state.selected_delayed_txns, state.validated_txns) with
+            | [], [] ->
+                let* delayed_hashes, _rem_size =
+                  head_info_and_delayed_transactions
+                    ~with_delayed_transactions
+                    head_info.evm_state
+                    state.maximum_number_of_chunks
+                in
+                return delayed_hashes
+            | selected_delayed_txns, _validated_txns ->
+                return
+                @@ List.map
+                     (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
+                     selected_delayed_txns
           in
-          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-          (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
-          return (`Block_produced (Seq.length hashes)))
+          return
+            ( delayed_hashes,
+              List.map
+                (fun (raw, obj) ->
+                  match obj with
+                  | Tx_queue_types.Evm obj -> (raw, Transaction_object.hash obj)
+                  | Tx_queue_types.Michelson obj ->
+                      ( raw,
+                        Tx_queue_types.Tezlink_operation.hash_of_tx_object obj
+                      ))
+                state.validated_txns )
         else
-          let* delayed_hashes, transactions_and_objects =
-            if state.preconfirmation_stream_enabled then
-              let* delayed_hashes =
-                match (state.selected_delayed_txns, state.validated_txns) with
-                | [], [] ->
-                    let* delayed_hashes, _rem_size =
-                      head_info_and_delayed_transactions
-                        ~with_delayed_transactions
-                        head_info.evm_state
-                        state.maximum_number_of_chunks
-                    in
-                    return delayed_hashes
-                | selected_delayed_txns, _validated_txns ->
-                    return
-                    @@ List.map
-                         (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
-                         selected_delayed_txns
-              in
-              return
-                ( delayed_hashes,
-                  List.map
-                    (fun (raw, obj) ->
-                      match obj with
-                      | Tx_queue_types.Evm obj ->
-                          (raw, Transaction_object.hash obj)
-                      | Tx_queue_types.Michelson obj ->
-                          ( raw,
-                            Tx_queue_types.Tezlink_operation.hash_of_tx_object
-                              obj ))
-                    state.validated_txns )
-            else
-              let* delayed_hashes, remaining_cumulative_size =
-                head_info_and_delayed_transactions
-                  ~with_delayed_transactions
-                  head_info.evm_state
-                  state.maximum_number_of_chunks
-              in
-              let* transactions_and_objects =
-                pop_valid_tx
-                  ~tx_container
-                  head_info
-                  ~maximum_cumulative_size:remaining_cumulative_size
-              in
-              return (delayed_hashes, transactions_and_objects)
+          let* delayed_hashes, remaining_cumulative_size =
+            head_info_and_delayed_transactions
+              ~with_delayed_transactions
+              head_info.evm_state
+              state.maximum_number_of_chunks
           in
-          let* result =
-            produce_block_if_needed
-              ~signer
-              ~timestamp
-              ~force
-              ~transactions_and_objects
-              ~delayed_hashes
+          let* transactions_and_objects =
+            pop_valid_tx
               ~tx_container
-              ~clear_pending_queue_after:
-                (not state.preconfirmation_stream_enabled)
               head_info
+              ~maximum_cumulative_size:remaining_cumulative_size
           in
-          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-          let* () = clear_preconfirmation_data ~state in
-          return result
+          return (delayed_hashes, transactions_and_objects)
+      in
+      let* result =
+        produce_block_if_needed
+          ~signer
+          ~timestamp
+          ~force
+          ~transactions_and_objects
+          ~delayed_hashes
+          ~tx_container
+          ~clear_pending_queue_after:(not state.preconfirmation_stream_enabled)
+          head_info
+      in
+      state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
+      let* () = clear_preconfirmation_data ~state in
+      return result
 
 let notify_next_block_with_delayed ~next_block_timestamp ~delayed_hashes ~number
     ~(state : Types.state) evm_state =
