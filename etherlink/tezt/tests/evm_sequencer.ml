@@ -401,10 +401,6 @@ let test_observer_reset =
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  (* Run a proxy. *)
-  let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
-  in
   (* Run a valid sequencer. *)
   let* valid_sequencer =
     Evm_node.init
@@ -543,12 +539,7 @@ let test_observer_reset =
   let*@ _ = Rpc.produce_block valid_sequencer in
   let* () =
     let* () =
-      bake_until_sync
-        ~sc_rollup_node
-        ~proxy
-        ~sequencer:valid_sequencer
-        ~client
-        ()
+      bake_until_sync ~sc_rollup_node ~sequencer:valid_sequencer ~client ()
     in
     (* Make the published blueprint final. *)
     let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -604,7 +595,6 @@ let test_remove_sequencer =
   @@
   fun {
         sequencer;
-        proxy;
         sc_rollup_node;
         client;
         sc_rollup_address;
@@ -614,7 +604,7 @@ let test_remove_sequencer =
       }
       _protocol
     ->
-  (* Produce blocks to show that both the sequencer and proxy are not
+  (* Produce blocks to show that both the sequencer and rollup node are not
      progressing. *)
   let* _ =
     repeat 5 (fun () ->
@@ -623,11 +613,11 @@ let test_remove_sequencer =
   in
   (* Both are at genesis *)
   let*@ sequencer_head = Rpc.block_number sequencer in
-  let*@ proxy_head = Rpc.block_number proxy in
+  let*@ rollup_head = rollup_level sc_rollup_node in
   Check.((sequencer_head = 0l) int32)
     ~error_msg:"Sequencer should be at genesis" ;
-  Check.((sequencer_head = proxy_head) int32)
-    ~error_msg:"Sequencer and proxy should have the same block number" ;
+  Check.((sequencer_head = rollup_head) int32)
+    ~error_msg:"Sequencer and rollup node should have the same block number" ;
   (* Remove the sequencer via the sequencer-admin contract. *)
   let* () =
     Client.transfer
@@ -641,18 +631,18 @@ let test_remove_sequencer =
   let* exit_code = Evm_node.wait_for_shutdown_event sequencer
   and* missing_block_nb = Evm_node.wait_for_rollup_node_ahead observer
   and* () =
-    (* Produce L1 blocks to show that only the proxy is progressing *)
+    (* Produce L1 blocks to show that only the rollup node is progressing *)
     repeat 5 (fun () ->
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   Check.((exit_code = Some 100) (option int))
     ~error_msg:"Expected exit code %R, got %L" ;
-  (* Sequencer is at genesis, proxy is at [advance]. *)
+  (* Sequencer is at genesis, rollup node is at [advance]. *)
   Check.((missing_block_nb = 1) int)
     ~error_msg:"Sequencer should be missing block %L" ;
-  let*@ proxy_head = Rpc.block_number proxy in
-  Check.((proxy_head > 0l) int32) ~error_msg:"Proxy should have advanced" ;
+  let*@ rollup_head = rollup_level sc_rollup_node in
+  Check.((rollup_head > 0l) int32) ~error_msg:"Rollup node should have advanced" ;
   unit
 
 let test_patch_state =
@@ -977,7 +967,7 @@ let test_publish_blueprints =
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
     ~use_dal:ci_enabled_dal_registration
-  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  @@ fun {sequencer; client; sc_rollup_node; enable_dal; _} _protocol ->
   let* _ =
     repeat 5 (fun () ->
         let*@ _ = produce_block sequencer in
@@ -990,14 +980,8 @@ let test_publish_blueprints =
 
   (* At this point, the evm node should call the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
-
-  (* We have unfortunately noticed that the test can be flaky. Sometimes,
-     the following RPC is done before the proxy being initialised, even though
-     we wait for it. The source of flakiness is unknown but happens very rarely,
-     we put a small sleep to make the least flaky possible. *)
-  let* () = Lwt_unix.sleep 2. in
-  check_head_consistency ~left:sequencer ~right:proxy ()
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
+  check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
 
 (** Same as {!test_publish_blueprints} with signatory. *)
 let test_publish_blueprints_signatory =
@@ -1008,7 +992,7 @@ let test_publish_blueprints_signatory =
     ~title:"Sequencer publishes the blueprints to L1 with signatory"
     ~use_dal:ci_enabled_dal_registration
     ~signatory:true
-  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  @@ fun {sequencer; client; sc_rollup_node; enable_dal; _} _protocol ->
   let* _ =
     repeat 5 (fun () ->
         let*@ _ = produce_block sequencer in
@@ -1016,9 +1000,9 @@ let test_publish_blueprints_signatory =
   in
   let timeout = if enable_dal then 50. else 5. in
   let* () = Evm_node.wait_for_blueprint_injected ~timeout sequencer 5 in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Lwt_unix.sleep 2. in
-  check_head_consistency ~left:sequencer ~right:proxy ()
+  check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
 
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
@@ -1029,11 +1013,8 @@ let test_sequencer_too_ahead =
     ~tags:["evm"; "max_blueprint_ahead"]
     ~title:"Sequencer locks production if it's too ahead"
     ~use_dal:ci_enabled_dal_registration
-  @@
-  fun {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; _}
-      _protocol
-    ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  @@ fun {sequencer; sc_rollup_node; client; sc_rollup_address; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () =
     repeat (max_blueprints_ahead + 1) (fun () ->
@@ -1055,9 +1036,10 @@ let test_sequencer_too_ahead =
   Check.((block_number = 6l) int32)
     ~error_msg:"The sequencer should have been locked" ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address []
-  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
-  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  and* () =
+    Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* _ =
     repeat 2 (fun () ->
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -1098,7 +1080,7 @@ let test_resilient_to_rollup_node_disconnect =
     ~title:"Sequencer is resilient to rollup node disconnection"
     ~use_dal:ci_enabled_dal_registration
   @@
-  fun {sequencer; proxy; sc_rollup_node; sc_rollup_address; client; observer; _}
+  fun {sequencer; sc_rollup_node; sc_rollup_address; client; observer; _}
       _protocol
     ->
   (* Produce blueprints *)
@@ -1112,18 +1094,18 @@ let test_resilient_to_rollup_node_disconnect =
   in
 
   (* Produce some L1 blocks so that the rollup node publishes the blueprints. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.(
-    (rollup_node_head.number = Int32.(of_int first_batch_blueprints_count))
-      int32)
+  let*@ rollup_node_head = rollup_level sc_rollup_node in
+  Check.((rollup_node_head = Int32.(of_int first_batch_blueprints_count)) int32)
     ~error_msg:
       "The rollup node should have received the first round of lost blueprints \
        (rollup node level: %L, expected level %R)" ;
 
   (* Check sequencer and rollup consistency *)
-  let* () = check_head_consistency ~left:sequencer ~right:proxy () in
+  let* () =
+    check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+  in
 
   let* () =
     (* bake 2 block so evm_node sees it as finalized in
@@ -1157,8 +1139,9 @@ let test_resilient_to_rollup_node_disconnect =
   (* restart the rollup node to reestablish the connection *)
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address []
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
-  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired observer
-  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
+  and* () =
+    Evm_node.wait_for_rollup_node_follower_connection_acquired observer
+  in
 
   (* Produce enough blocks in advance to ensure the sequencer node will catch
      up at the end. *)
@@ -1191,10 +1174,8 @@ let test_resilient_to_rollup_node_disconnect =
 
         unit)
       ~result_f:(fun () ->
-        let*@ rollup_node_head =
-          Rpc.get_block_by_number ~block:"latest" proxy
-        in
-        if rollup_node_head.number = expected_level then return (Some ())
+        let*@ rollup_node_head = rollup_level sc_rollup_node in
+        if rollup_node_head = expected_level then return (Some ())
         else return None)
       ()
   in
@@ -1207,17 +1188,16 @@ let test_resilient_to_rollup_node_disconnect =
       ~sc_rollup_node
       ~client
       ~sequencer
-      ~proxy
       ()
   in
 
   (* Check the consistency again *)
-  check_head_consistency
+  check_rollup_head_consistency
+    ~evm_node:sequencer
+    ~sc_rollup_node
     ~error_msg:
-      "The head should be the same after the outage. Sequencer: {%L}, proxy: \
-       {%R}"
-    ~left:sequencer
-    ~right:proxy
+      "The head should be the same after the outage. Sequencer: {%L}, rollup \
+       node: {%R}"
     ()
 
 let test_can_fetch_blueprint =
@@ -1402,7 +1382,6 @@ let test_delayed_transfer_is_included =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         observer;
         _;
       }
@@ -1440,7 +1419,7 @@ let test_delayed_transfer_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint () in
@@ -1462,15 +1441,7 @@ let test_largest_delayed_transfer_is_included =
     ~title:"Largest possible delayed transaction is included"
     ~time_between_blocks:Nothing
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let _endpoint = Evm_node.endpoint sequencer in
@@ -1532,7 +1503,7 @@ let test_largest_delayed_transfer_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   unit
 
@@ -1545,15 +1516,7 @@ let test_delayed_deposit_is_included =
     ~title:"Delayed deposit is included"
     ~use_dal:ci_enabled_dal_registration
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let endpoint = Evm_node.endpoint sequencer in
@@ -1590,7 +1553,7 @@ let test_delayed_deposit_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
@@ -1670,15 +1633,7 @@ let test_delayed_fa_deposit_is_included =
     ~additional_uses:[Constant.octez_codec]
     ~time_between_blocks:Nothing
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* let endpoint = Evm_node.endpoint sequencer in *)
@@ -1702,7 +1657,7 @@ let test_delayed_fa_deposit_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
@@ -1746,15 +1701,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
     ~additional_uses:[Constant.octez_codec]
     ~time_between_blocks:Nothing
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* let endpoint = Evm_node.endpoint sequencer in *)
@@ -1774,7 +1721,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
 
@@ -1814,7 +1761,6 @@ let test_delayed_transaction_peeked =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         kernel;
         _;
       }
@@ -1869,7 +1815,7 @@ let test_delayed_transaction_peeked =
   (* Produce a block. The sequencer will include the deposit, but won't upgrade.
      The rollup node will upgrade as soon as it receives the block. *)
   let*@ _ = produce_block sequencer in
-  bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
+  bake_until_sync ~sc_rollup_node ~client ~sequencer ()
 
 let test_invalid_delayed_transaction =
   register_all
@@ -1881,15 +1827,7 @@ let test_invalid_delayed_transaction =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* Produces an invalid transaction by setting an invalid nonce. *)
@@ -1923,7 +1861,7 @@ let test_invalid_delayed_transaction =
         unit)
   in
   let*@ _ = produce_block sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* There is no receipt for the transaction because it's invalid. *)
   let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash:hash sequencer in
@@ -2015,15 +1953,7 @@ let test_fa_withdrawal_is_included =
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   (* 1. Deposit some tickets *)
@@ -2048,7 +1978,7 @@ let test_fa_withdrawal_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
 
   (* Check that deposit is successful *)
@@ -2091,7 +2021,7 @@ let test_fa_withdrawal_is_included =
       ()
   in
 
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
 
   (* Check that tickets are gone *)
   let* ticket_balance_after_withdraw =
@@ -2124,7 +2054,7 @@ let test_fa_withdrawal_is_included =
       ~withdrawal_level
       ~commitment_period:5
       ~challenge_window:5
-      ~evm_node:proxy
+      ~evm_node:sequencer
       ~sc_rollup_node
       ~sc_rollup_address
       ~client
@@ -2174,7 +2104,6 @@ let test_fa_reentrant_deposit_reverts =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         evm_version;
         _;
       }
@@ -2220,7 +2149,7 @@ let test_fa_reentrant_deposit_reverts =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   let* () =
     Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
@@ -2276,7 +2205,6 @@ let test_delayed_deposit_from_init_rollup_node =
         sc_rollup_address;
         sc_rollup_node;
         sequencer;
-        proxy;
         l2_chains;
         enable_multichain;
         _;
@@ -2287,7 +2215,7 @@ let test_delayed_deposit_from_init_rollup_node =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver ~endpoint:(Evm_node.endpoint sequencer) ()
   in
-  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~proxy ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   (* We don't care about this sequencer. *)
   let* () = Evm_node.terminate sequencer in
   (* Send the deposit to delayed inbox, no sequencer will be listening to the
@@ -2341,7 +2269,7 @@ let test_delayed_deposit_from_init_rollup_node =
     unit
   and* _hash = Evm_node.wait_for_block_producer_tx_injected new_sequencer in
   let* () =
-    bake_until_sync ~sc_rollup_node ~proxy ~sequencer:new_sequencer ~client ()
+    bake_until_sync ~sc_rollup_node ~sequencer:new_sequencer ~client ()
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
@@ -2377,7 +2305,6 @@ let test_init_from_rollup_node_data_dir =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         client;
         l2_chains;
         enable_multichain;
@@ -2391,7 +2318,7 @@ let test_init_from_rollup_node_data_dir =
         let*@ _ = produce_block sequencer in
         unit)
   in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.terminate observer in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
@@ -2424,14 +2351,16 @@ let test_init_from_rollup_node_data_dir =
   let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
   let* () = Evm_node.run evm_node' in
 
-  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
-
-  let*@ _ = produce_block evm_node' in
   let* () =
-    bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:evm_node' ()
   in
 
-  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+  let*@ _ = produce_block evm_node' in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' () in
+
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:evm_node' ()
+  in
 
   unit
 
@@ -2449,7 +2378,6 @@ let test_init_from_rollup_node_with_delayed_inbox =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         client;
         l1_contracts;
         sc_rollup_address;
@@ -2461,7 +2389,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
     ->
   (* The sequencer is needed to produce an initial block for the init from
      rollup node to work. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer in
   let* () = Evm_node.terminate observer in
   (* Sends a deposit to the delayed inbox. *)
@@ -2538,7 +2466,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
   (* Finally produce a block to clear the delayed inbox. *)
   let*@ len = produce_block sequencer in
   Check.((len = 1) int) ~error_msg:"Expected one transaction in the block" ;
-  let* _ = bake_until_sync ~proxy ~sc_rollup_node ~client ~sequencer () in
+  let* _ = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = check_head_consistency ~left:sequencer ~right:observer () in
   unit
 
@@ -2738,15 +2666,7 @@ let test_get_balance_block_param =
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
   @@
-  fun {
-        sequencer;
-        sc_rollup_node;
-        proxy;
-        client;
-        enable_multichain;
-        l2_chains;
-        _;
-      }
+  fun {sequencer; sc_rollup_node; client; enable_multichain; l2_chains; _}
       _protocol
     ->
   (* Transfer funds to a random address. *)
@@ -2772,7 +2692,7 @@ let test_get_balance_block_param =
   (* Now we will create another observer initialized from the rollup node, in
      order to test the block parameter "earliest". "Earliest" on the current
      sequencer will be block [0] which is not really robust to test. *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* _ =
     repeat 2 (fun _ ->
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -2858,7 +2778,6 @@ let test_get_block_by_number_block_param =
         sequencer;
         observer;
         sc_rollup_node;
-        proxy;
         client;
         enable_multichain;
         l2_chains;
@@ -2871,7 +2790,7 @@ let test_get_block_by_number_block_param =
     repeat Int32.(to_int observer_offset) @@ fun () ->
     next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* _ =
     repeat 2 (fun _ ->
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -3229,7 +3148,6 @@ let test_self_upgrade_kernel =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         observer;
         kernel;
         _;
@@ -3256,16 +3174,16 @@ let test_self_upgrade_kernel =
         unit)
   in
 
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ()
   and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer in
 
   let* () =
-    check_head_consistency
-      ~left:sequencer
-      ~right:proxy
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer
       ~error_msg:
-        "The head should be the same before the upgrade: sequencer is %%L \
-         while proxy is %%R"
+        "The rollup head should be the same before the upgrade: sequencer is \
+         %%L while rollup node is %%R"
       ()
   in
 
@@ -3277,15 +3195,15 @@ let test_self_upgrade_kernel =
         unit)
   and* _ = Evm_node.wait_for_successful_upgrade sequencer
   and* _ = Evm_node.wait_for_successful_upgrade observer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* () =
-    check_head_consistency
-      ~left:sequencer
-      ~right:proxy
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer
       ~error_msg:
-        "The head should be the same after the upgrade: sequencer is %%L while \
-         proxy is %%R"
+        "The rollup head should be the same after the upgrade: sequencer is \
+         %%L while rollup node is %%R"
       ()
   in
 
@@ -3392,7 +3310,6 @@ let test_upgrade_kernel_auto_sync =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         observer;
         _;
       }
@@ -3432,15 +3349,15 @@ let test_upgrade_kernel_auto_sync =
         let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
         unit)
   in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* () =
-    check_head_consistency
-      ~left:sequencer
-      ~right:proxy
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer
       ~error_msg:
-        "The head should be the same before the upgrade: sequencer is %%L \
-         while proxy is %%R"
+        "The rollup head should be the same before the upgrade: sequencer is \
+         %%L while rollup node is %%R"
       ()
   in
 
@@ -3452,15 +3369,15 @@ let test_upgrade_kernel_auto_sync =
     unit
   and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
 
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* () =
-    check_head_consistency
-      ~left:sequencer
-      ~right:proxy
+    check_rollup_head_consistency
+      ~sc_rollup_node
+      ~evm_node:sequencer
       ~error_msg:
-        "The head should be the same after the upgrade: sequencer is %%L while \
-         proxy is %%R"
+        "The rollup head should be the same after the upgrade: sequencer is \
+         %%L while rollup node is %%R"
       ()
   in
 
@@ -3509,15 +3426,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
   @@
   fun from
       to_
-      {
-        sc_rollup_node;
-        l1_contracts;
-        sc_rollup_address;
-        client;
-        sequencer;
-        proxy;
-        _;
-      }
+      {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _}
       _protocol
     ->
   let* () =
@@ -3575,7 +3484,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   (* Produce a block where the upgrade would happen *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:10Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Ensure the kernel is upgraded *)
   let* () =
@@ -3590,7 +3499,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 
   (* Produce a block where deposit would be handled *)
   let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:20Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Deposit must be applied by now *)
   let* receiver_balance_next =
@@ -3623,20 +3532,10 @@ let test_clean_bps =
     ~use_dal:Register_without_feature
     ~kernels:[Latest]
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        proxy;
-        sequencer;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocols
     ->
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~sequencer ~client () in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -3757,13 +3656,12 @@ let test_delayed_inbox_flushing_event =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
     ->
   let* () = Evm_node.terminate observer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
@@ -3799,10 +3697,12 @@ let test_delayed_inbox_flushing_event =
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup node
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   unit
 
@@ -3828,7 +3728,6 @@ let test_flushed_blueprint_reorg =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
@@ -3840,7 +3739,7 @@ let test_flushed_blueprint_reorg =
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let craft_raw_transfer account =
     Cast.craft_tx
@@ -3907,10 +3806,12 @@ let test_flushed_blueprint_reorg =
   (* A new block will make the {!flushed_delayed_inbox_levle} final. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup node
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -3965,7 +3866,6 @@ let test_multiple_flushed_blueprints =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
@@ -3977,7 +3877,7 @@ let test_multiple_flushed_blueprints =
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Add 2 transactions to the delayed inbox. *)
   let* tx1 =
@@ -4022,7 +3922,7 @@ let test_multiple_flushed_blueprints =
       tx2
   in
 
-  let*@ proxy_head_before_flush = Rpc.block_number proxy in
+  let*@ rollup_head_before_flush = rollup_level sc_rollup_node in
 
   (* Both delayed transaction added *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
@@ -4044,7 +3944,7 @@ let test_multiple_flushed_blueprints =
   in
 
   (* Make the {!flushed_delayed_inbox_level} final and ait until the
-     event is completely processed. Head of sequencer and proxy should
+     event is completely processed. Head of sequencer and rollup node should
      be in sync. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
@@ -4052,18 +3952,20 @@ let test_multiple_flushed_blueprints =
   and* _ = wait_for_second_flush
   and* _ = wait_for_processed_l1_level in
 
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
-  let*@ proxy_head_after_flush = Rpc.block_number proxy in
+  let*@ rollup_head_after_flush = rollup_level sc_rollup_node in
   Check.(
-    (Int32.to_int proxy_head_before_flush + 2
-    = Int32.to_int proxy_head_after_flush)
+    (Int32.to_int rollup_head_before_flush + 2
+    = Int32.to_int rollup_head_after_flush)
       int)
     ~error_msg:
       (sf
-         "Expected 2 flushed blueprints, proxy level before flush is %ld, \
+         "Expected 2 flushed blueprints, rollup level before flush is %ld, \
           after is %%R"
-         proxy_head_before_flush) ;
+         rollup_head_before_flush) ;
 
   (* Sequencer resumes block production. *)
   let* () =
@@ -4102,7 +4004,6 @@ let test_observer_reorg_on_blueprint_stream =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
@@ -4117,7 +4018,7 @@ let test_observer_reorg_on_blueprint_stream =
      It will then reset itself (again) and start accepting the new blueprints
      from the sequencer.
   *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
@@ -4175,13 +4076,15 @@ let test_observer_reorg_on_blueprint_stream =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup
      should be in sync. *)
   let* _ = wait_for_flush
   and* _ = wait_for_processed_l1_level
   and* () = wait_for_observer_reset in
 
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Sequencer resumes block production. *)
   let* () =
@@ -4216,7 +4119,6 @@ let test_observer_reorg_on_blueprint_catchup =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
@@ -4230,7 +4132,7 @@ let test_observer_reorg_on_blueprint_catchup =
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
@@ -4293,11 +4195,13 @@ let test_observer_reorg_on_blueprint_catchup =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup
      should be in sync. *)
   let* _ = wait_for_flush and* _ = wait_for_processed_l1_level in
 
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Sequencer resumes block production. *)
   let* () =
@@ -4346,12 +4250,11 @@ let test_flushed_blueprint_reorg_late =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
     ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* raw_transfer =
     Cast.craft_tx
@@ -4411,13 +4314,15 @@ let test_flushed_blueprint_reorg_late =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
-    (* Wait until the event is completely processed. Head of sequencer and proxy
+    (* Wait until the event is completely processed. Head of sequencer and rollup
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
   and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer in
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -4481,13 +4386,11 @@ let test_flushed_blueprint_reorg_done_late =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
     ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
-
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* raw_transfer =
     Cast.craft_tx
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -4551,16 +4454,18 @@ let test_flushed_blueprint_reorg_done_late =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
-    (* Wait until the event is completely processed. Head of sequencer and proxy
+    (* Wait until the event is completely processed. Head of sequencer and rollup node
        should be in sync. *)
     Evm_node.wait_for_processed_l1_level
       ~level:flushed_delayed_inbox_level
       sequencer
   and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup node
      should be in sync. *)
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -4619,7 +4524,6 @@ let test_upgrade_injected_before_flush_level =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         kernel;
         _;
       }
@@ -4641,10 +4545,9 @@ let test_upgrade_injected_before_flush_level =
      before the flushed level.
 
      To ensure everything is OK after the flush we trigger the update and check
-     that both the sequencer and observer are consistent with the rollup node
-     (as seen by the proxy).
+     that both the sequencer and observer are consistent with the rollup node.
   *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   (* Set a pending upgrade before the flush level. *)
   let* _root_hash =
     upgrade
@@ -4662,7 +4565,7 @@ let test_upgrade_injected_before_flush_level =
   (* Produces 2 valid blocks and wait until they are synchronized. *)
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Send a delayed transaction. *)
   let* _hash =
@@ -4713,9 +4616,11 @@ let test_upgrade_injected_before_flush_level =
   Check.((lvl_seq = lvl_obs) int)
     ~error_msg:"Level of upgrade should be the same" ;
 
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
-  let* () = check_head_consistency ~left:observer ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
   unit
 
 let test_upgrade_activated_after_flush_level =
@@ -4754,7 +4659,6 @@ let test_upgrade_activated_after_flush_level =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         kernel;
         _;
       }
@@ -4789,7 +4693,7 @@ let test_upgrade_activated_after_flush_level =
      The upgrade event must be retrieved from the invalid branch before
      resetting to level 2 and applying level 3'.
   *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   (* Set a pending upgrade at the flush level. *)
   let* _root_hash =
     upgrade
@@ -4805,7 +4709,7 @@ let test_upgrade_activated_after_flush_level =
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Shutdown the rollup, restart it without Batcher mode, we will be able
      to create the invalid branch without publishing it. *)
@@ -4853,7 +4757,9 @@ let test_upgrade_activated_after_flush_level =
 
   let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
   and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   let* _ =
     repeat 2 (fun () ->
@@ -4908,7 +4814,6 @@ let test_upgrade_injected_after_flush_level =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         kernel;
         _;
       }
@@ -4944,7 +4849,7 @@ let test_upgrade_injected_after_flush_level =
   (* Produces 2 valid blocks and wait until they are synchronized. *)
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Shutdown the rollup, restart it without Batcher mode, we will be able
      to create the invalid branch without publishing it. *)
@@ -5061,13 +4966,12 @@ let test_flushed_blueprint_reorg_upgrade =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         kernel;
         _;
       }
       _protocol
     ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* raw_transfer =
     Cast.craft_tx
@@ -5138,7 +5042,7 @@ let test_flushed_blueprint_reorg_upgrade =
   and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
 
-  (* Wait until the event is completely processed. Head of sequencer and proxy
+  (* Wait until the event is completely processed. Head of sequencer and rollup
      should be in sync. *)
   let* _ =
     Evm_node.wait_for_processed_l1_level
@@ -5149,7 +5053,9 @@ let test_flushed_blueprint_reorg_upgrade =
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
   and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~sc_rollup_node ~evm_node:sequencer ()
+  in
 
   (* Speculative head has been removed as the sequencer was forced to
      reorganize the blocks because of the flushed blueprint. *)
@@ -5177,7 +5083,7 @@ let test_flushed_blueprint_reorg_upgrade =
   Check.((rh_seq = rh_obs) string) ~error_msg:"Root hash should be the same" ;
   Check.((lvl_seq = lvl_obs) int)
     ~error_msg:"Level of upgrade should be the same" ;
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = check_head_consistency ~left:observer ~right:sequencer () in
   unit
 
@@ -5277,7 +5183,7 @@ let test_forced_blueprint_takes_pred_timestamp =
   (* The head timestamp will be high enough that we don't use the L1 timestamp
      for the forced blueprint and just take the same timestamp. *)
   let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:04:00Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   (* Make a delayed transaction and force it by creating L1 blocks. *)
   let* raw_transfer =
     Cast.craft_tx
@@ -5338,7 +5244,7 @@ let test_forced_blueprint_takes_l1_timestamp =
       _protocol
     ->
   let*@ (_ : int) = produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   (* Make a delayed transaction and force it by creating L1 blocks. *)
   let* raw_transfer =
     Cast.craft_tx
@@ -5475,7 +5381,6 @@ let test_force_kernel_upgrade_too_early =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         l2_chains;
         enable_multichain;
         _;
@@ -5483,7 +5388,7 @@ let test_force_kernel_upgrade_too_early =
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?l2_chains:(if enable_multichain then Some l2_chains else None)
@@ -5549,7 +5454,6 @@ let test_force_kernel_upgrade =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         l2_chains;
         enable_multichain;
         _;
@@ -5557,7 +5461,7 @@ let test_force_kernel_upgrade =
       _protocol
     ->
   (* Wait for the sequencer to publish its genesis block. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?l2_chains:(if enable_multichain then Some l2_chains else None)
@@ -5643,7 +5547,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   @@ fun {client; sequencer; proxy; sc_rollup_node; _} _protocol ->
   let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
   (* Bake a couple more levels for the blueprint to be final *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let raw_tx, _ = read_tx_from_file () |> List.hd in
   let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
   (* Bake enough levels to make sure the transaction would be processed
@@ -5659,56 +5563,6 @@ let test_external_transaction_to_delayed_inbox_fails =
   assert (Option.is_none response) ;
   let*@ response = Rpc.get_transaction_receipt ~tx_hash sequencer in
   assert (Option.is_none response) ;
-  unit
-
-let test_proxy_node_can_forward_to_evm_endpoint =
-  register_all
-    ~__FILE__
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~time_between_blocks:Nothing
-    ~eth_bootstrap_accounts:Eth_account.lots_of_address
-    ~tags:["proxy"; "evm_node_endpoint"]
-    ~title:"Proxy node can forward transactions to another EVM node"
-  @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
-  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-  (* We restart the proxy node with a companion EVM node (the sequencer, in
-     this case). It is expected that, in this configuration, it will forward
-     its transactions to the sequencer, which means said transactions will be
-     included in blocks. *)
-  let* () = Evm_node.terminate proxy in
-  let* () =
-    Evm_node.run
-      ~extra_arguments:["--evm-node-endpoint"; Evm_node.endpoint sequencer]
-      proxy
-  in
-  let raw_tx, _ = read_tx_from_file () |> List.hd in
-
-  (* Before sending the transaction, we need to wait until the proxy
-     is synced with the sequencer. *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-
-  (* We send a transaction through the proxy. *)
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
-
-  (* We bake a few blocks using the sequencer. *)
-  let* () =
-    repeat 2 @@ fun () ->
-    let*@ _ = produce_block sequencer in
-    unit
-  in
-
-  (* We verify the transaction sent to the proxy is known to the sequencer. *)
-  let*@ response_seq = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  assert (Option.is_some response_seq) ;
-
-  (* We bake enough L1 blocks so that the proxy node becomes aware of all
-     blocks created by the sequencer. *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-
-  (* And now we check that the proxy is also aware that the transaction has
-     been included in a block. *)
-  let*@ response_proxy = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  assert (Option.is_some response_proxy) ;
   unit
 
 let test_delayed_inbox_flushing =
@@ -5888,7 +5742,7 @@ let test_timestamp_from_the_future =
     ~tags:["evm"; "sequencer"; "block"; "timestamp"]
     ~title:"Timestamp from the future are refused"
     ~use_dal:ci_enabled_dal_registration
-  @@ fun {sequencer; proxy; sc_rollup_node; client; enable_dal; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; enable_dal; _} _protocol ->
   (* In this test the time between blocks is 1 second. *)
 
   (* Producing a block 4:50 minutes after the L1 timestamp will be accepted. We
@@ -5901,7 +5755,7 @@ let test_timestamp_from_the_future =
   (* The sequencer will accept it anyway, but we need to check that the rollup
      node accepts it. *)
   let*@ (_ : int) = produce_block ~timestamp:accepted_timestamp sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* Producing a block 5:30 minutes after the L1 timestamp will be accepted by
      the sequencer and not the rollup node. *)
@@ -5919,11 +5773,11 @@ let test_timestamp_from_the_future =
         unit)
   in
 
-  let*@ proxy_head = Rpc.block_number proxy in
+  let*@ rollup_head = rollup_level sc_rollup_node in
   let*@ sequencer_head = Rpc.block_number sequencer in
 
-  Check.((sequencer_head = Int32.succ proxy_head) int32)
-    ~error_msg:"The proxy was supposed to refuse the block" ;
+  Check.((sequencer_head = Int32.succ rollup_head) int32)
+    ~error_msg:"The rollup was supposed to refuse the block" ;
 
   let kernel_log =
     let path = Sc_rollup_node.data_dir sc_rollup_node // "kernel.log" in
@@ -6049,7 +5903,6 @@ let test_sequencer_upgrade =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         observer;
         _;
       }
@@ -6071,15 +5924,15 @@ let test_sequencer_upgrade =
   in
 
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
-  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
 
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
+    check_rollup_head_consistency
+      ~evm_node:sequencer
+      ~sc_rollup_node
       ~error_msg:
-        "The head should be the same before the upgrade: sequencer is %R while \
-         proxy is %L"
+        "The head should be the same before the upgrade: observer is %R while \
+         rollup node is %L"
       ()
   in
 
@@ -6135,22 +5988,22 @@ let test_sequencer_upgrade =
     upgrade_info_observer_no_rollup_node
   in
 
-  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
 
   Log.info
     "The upgrade is not yet triggered, head should be equivalent with the \
      block just produced" ;
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
+    check_rollup_head_consistency
+      ~evm_node:sequencer
+      ~sc_rollup_node
       ~error_msg:
-        "The head should be the same after the upgrade: sequencer is %%L while \
-         proxy is %%R"
+        "The head should be the same before the upgrade: observer is %R while \
+         rollup node is %L"
       ()
   in
 
-  let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let*@ previous_rollup_head = rollup_level sc_rollup_node in
 
   Log.info "Baking until the sequencer upgrade is triggered in the l1" ;
   let has_sequencer_changed () =
@@ -6204,21 +6057,23 @@ let test_sequencer_upgrade =
   (* Check that the evm-node sequencer refuses the blocks as they do
      not respect the sequencer's signature. *)
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:sequencer
+    check_rollup_head_consistency
+      ~evm_node:sequencer
+      ~sc_rollup_node
       ~error_msg:
         "The head should be the same after the sequencer tried to produce \
-         blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
+         blocks, they are are disregarded: sequencer is %%L while rollup node \
+         is %%R"
       ()
   in
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:observer
+    check_rollup_head_consistency
+      ~evm_node:observer
+      ~sc_rollup_node
       ~error_msg:
         "The head should be the same after the sequencer tried to produce \
-         blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
+         blocks, they are are disregarded: observer is %%L while rollup node \
+         is %%R"
       ()
   in
 
@@ -6231,10 +6086,10 @@ let test_sequencer_upgrade =
         let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((previous_proxy_head.hash = proxy_head.hash) string)
+  let*@ rollup_head = rollup_level sc_rollup_node in
+  Check.((previous_rollup_head = rollup_head) int32)
     ~error_msg:
-      "The proxy should not have progressed because no block have been \
+      "The rollup should not have progressed because no block have been \
        produced by the current sequencer." ;
 
   Log.info
@@ -6273,20 +6128,20 @@ let test_sequencer_upgrade =
   let*@ _ = produce_block ~timestamp:activation_timestamp new_sequencer in
   Log.info "Baking to check the block is accepted by the rollup node." ;
   let* () =
-    bake_until_sync ~sequencer:new_sequencer ~proxy ~sc_rollup_node ~client ()
+    bake_until_sync ~sequencer:new_sequencer ~sc_rollup_node ~client ()
   in
   let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:new_sequencer
+    check_rollup_head_consistency
+      ~evm_node:new_sequencer
+      ~sc_rollup_node
       ~error_msg:
         "The head should be the same after blocks produced by the new \
-         sequencer: new_sequencer is %R while proxy is %L"
+         sequencer: new_sequencer is %L while rollup node is %R"
       ()
   in
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  let current_head_number = proxy_head.number in
-  Check.((Int32.add previous_proxy_head.number 1l = current_head_number) int32)
+  let*@ rollup_head = rollup_level sc_rollup_node in
+  let current_head_number = rollup_head in
+  Check.((Int32.add previous_rollup_head 1l = current_head_number) int32)
     ~error_msg:
       "The block number should have incremented (previous: %L, current: %R)" ;
 
@@ -6308,7 +6163,7 @@ let test_sequencer_upgrade =
     let* () = Evm_node.run observer_sequencer in
     return observer_sequencer
   in
-  let current_head_number = Int32.to_int proxy_head.number in
+  let current_head_number = Int32.to_int rollup_head in
   let* () =
     Evm_node.wait_for_blueprint_applied observer_sequencer current_head_number
   in
@@ -6404,14 +6259,13 @@ let test_duplicate_sequencer_upgrade =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         observer;
         _;
       }
       _protocol
     ->
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
-  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
 
   Log.info "Sending two sequencer upgrades to the L1 contract" ;
 
@@ -6498,7 +6352,7 @@ let test_duplicate_sequencer_upgrade =
   let*@ _ = produce_block ~timestamp:activation_timestamp new_sequencer in
   Log.info "Baking to check the block is accepted by the rollup node." ;
   let* () =
-    bake_until_sync ~sequencer:new_sequencer ~proxy ~sc_rollup_node ~client ()
+    bake_until_sync ~sequencer:new_sequencer ~sc_rollup_node ~client ()
   in
 
   Log.info
@@ -6532,7 +6386,6 @@ let test_sequencer_diverge =
         client;
         sequencer;
         observer;
-        proxy;
         enable_dal;
         enable_multichain;
         l2_chains;
@@ -6547,7 +6400,7 @@ let test_sequencer_diverge =
         in
         unit)
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () =
     (* 2 to make sure it has been finalized *)
     repeat 2 (fun () ->
@@ -6653,13 +6506,13 @@ let test_sequencer_can_catch_up_on_event =
          is not sent, and the rollup node does not apply the blueprint
          corresponding to last_produced_block. *)
     ~use_dal:Register_without_feature
-  @@ fun {sc_rollup_node; client; sequencer; proxy; observer; _} _protocol ->
+  @@ fun {sc_rollup_node; client; sequencer; observer; _} _protocol ->
   let* () =
     repeat 2 (fun () ->
         let* _ = produce_block sequencer in
         unit)
   in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let* _ = produce_block sequencer in
   let*@ last_produced_block = Rpc.block_number sequencer in
   let* () =
@@ -6696,7 +6549,15 @@ let test_sequencer_can_catch_up_on_event =
     let* () = Evm_node.run sequencer in
     Evm_node.run observer
   in
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency
+      ~evm_node:sequencer
+      ~sc_rollup_node
+      ~error_msg:
+        "The head should be the same after catchup: sequencer is %L while \
+         rollup node is %R"
+      ()
+  in
   unit
 
 let test_sequencer_dont_read_level_twice =
@@ -6707,15 +6568,7 @@ let test_sequencer_dont_read_level_twice =
     ~tags:["evm"; "sequencer"; "event"; Tag.slow]
     ~title:"Evm node don't read the same level twice"
   @@
-  fun {
-        sc_rollup_node;
-        client;
-        sequencer;
-        proxy;
-        l1_contracts;
-        sc_rollup_address;
-        _;
-      }
+  fun {sc_rollup_node; client; sequencer; l1_contracts; sc_rollup_address; _}
       _protocol
     ->
   (* We deposit some Tez to the rollup *)
@@ -6765,7 +6618,7 @@ let test_sequencer_dont_read_level_twice =
 
   (* If the logic of the sequencer is correct (i.e., it does not process the
      deposit twice), then it is possible for the rollup node to apply them. *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   unit
 
@@ -6831,7 +6684,7 @@ let test_outbox_size_limit_resilience ~slow =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
@@ -6903,11 +6756,11 @@ let test_outbox_size_limit_resilience ~slow =
   let* _ = produce_block sequencer in
 
   (* At this point the outbox queue must contain 150 messages *)
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* 100 messages flushed at this point *)
   let* _ = produce_block sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   (* +50 messages flushed at this point *)
   if slow then (
@@ -7206,7 +7059,7 @@ let test_reset =
     ~tags:["evm"; "sequencer"; "reset"]
     ~title:"try to reset sequencer and observer state using the command."
   @@
-  fun {proxy; observer; sequencer; sc_rollup_node; client; sc_rollup_address; _}
+  fun {observer; sequencer; sc_rollup_node; client; sc_rollup_address; _}
       _protocol
     ->
   let reset_level = 5 in
@@ -7216,7 +7069,7 @@ let test_reset =
     repeat reset_level (fun () ->
         next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
   in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   Log.info
     "Stopping the rollup node, then produce %d more blocks "
     (reset_level + after_reset_level) ;
@@ -7281,7 +7134,7 @@ let test_reset =
     repeat after_reset_level (fun () ->
         next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
   in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   (* Check sequencer is at the expected level *)
   let*@ sequencer_level = Rpc.block_number sequencer in
   Check.(
@@ -7314,14 +7167,13 @@ let test_preimages_endpoint =
         client;
         sequencer;
         observer;
-        proxy;
         l2_chains;
         enable_multichain;
         _;
       }
       _protocol
     ->
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer in
   (* Prepares the sequencer without [preimages-dir], to force the use of
      preimages endpoint. *)
@@ -7487,14 +7339,13 @@ let test_preimages_endpoint_retry =
         sc_rollup_address;
         client;
         sequencer;
-        proxy;
         l2_chains;
         enable_multichain;
         _;
       }
       _protocol
     ->
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer in
   let finalizeL1 () =
     repeat 2 (fun () ->
@@ -7617,7 +7468,7 @@ let test_replay_rpc =
     ~tags:["evm"; "rpc"; "replay"]
     ~title:"Sequencer can replay a block"
     ~time_between_blocks:Nothing
-  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  @@ fun {sc_rollup_node; sequencer; client; _} _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* transaction_hash =
@@ -7637,7 +7488,7 @@ let test_replay_rpc =
     repeat 2 (fun () ->
         next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
   in
-  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let blockNumber =
     match blockNumber with
     | Some blockNumber -> blockNumber
@@ -8781,15 +8632,7 @@ let test_trace_transaction_calltracer_deposit =
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "deposit"]
     ~title:"debug_traceTransaction with calltracer can trace deposits"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let endpoint = Evm_node.endpoint sequencer in
@@ -8832,7 +8675,7 @@ let test_trace_transaction_calltracer_deposit =
     | Full _ | Empty ->
         failwith "Block should contain at least one simple transaction"
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
@@ -9451,7 +9294,7 @@ let test_deposit_and_fast_withdraw =
   let* _ = produce_block () in
   (* We make sure the L2 block is posted on the L1 and processed by the rollup
      node *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Check that the receiver's balance in the rollup matches the deposited amount. *)
   let check_balance ~receiver ~endpoint expected_balance =
@@ -9603,7 +9446,7 @@ let test_deposit_and_fa_fast_withdraw =
   (* Define the Tezos address that will receive the fast withdrawal on L1. *)
   let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
 
-  (* Switch ticket tester contract to proxy mode *)
+  (* Switch ticket tester contract to rollup node *)
   let* () =
     Client.transfer
       ~entrypoint:"set"
@@ -9652,7 +9495,7 @@ let test_deposit_and_fa_fast_withdraw =
   let*@ _ = produce_block () in
   (* We make sure the L2 block is posted on the L1 and processed by the rollup
      node *)
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Check that the receiver's balance in the rollup matches the deposited amount. *)
   let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
@@ -9751,10 +9594,7 @@ let test_trace_call =
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
-  @@
-  fun {sc_rollup_node; sequencer; client; proxy = _; evm_version; _}
-      _protocol
-    ->
+  @@ fun {sc_rollup_node; sequencer; client; evm_version; _} _protocol ->
   (* Start a RPC node as well, since we will want to check it returns the
      same result as the sequencer *)
   let* rpc_node = run_new_rpc_endpoint sequencer in
@@ -9902,7 +9742,7 @@ let test_observer_finalized_view =
       (* The logic tested here is orthogonal with the DAL, and the test itself is written with constants
          for the case DAL is not enabled. *)
       Register_without_feature
-  @@ fun {sc_rollup_node; observer; client; sequencer; proxy; _} _protocol ->
+  @@ fun {sc_rollup_node; observer; client; sequencer; _} _protocol ->
   let* () = Evm_node.terminate observer in
   let* () =
     Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
@@ -9911,7 +9751,7 @@ let test_observer_finalized_view =
   let* _ = produce_block sequencer in
   let* _ = produce_block sequencer in
 
-  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let target_finalized = 2l in
 
@@ -10046,9 +9886,7 @@ let test_finalized_view =
     unit
   and* () = p in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~sequencer ~client () in
   (* Check the heads of the various nodes *)
   let*@ sequencer_head = Rpc.block_number sequencer in
   let*@ proxy_head = Rpc.block_number proxy in
@@ -10119,15 +9957,15 @@ let test_finalized_view_forward_txn =
       "--finalized-view forwards transactions to the sequencer without waiting"
     ~da_fee:Wei.zero
       (* This test depends on the number of blocks produced until the
-         rollup node synchronizes with the sequencer and proxy. When
+         rollup node synchronizes with the sequencer. When
          DAL is activated, bake_until_sync would need to produce more
          blocks than usual. Consequently, this would finalize the
-         blocks posted on-chain. The finalized proxy does have a head,
+         blocks posted on-chain. The finalized rollup does have a head,
          and the RPC does not fail, which is not the expected result
          when running this test without DAL activation. *)
     ~use_dal:Register_without_feature
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
-  (* Start a proxy node with --finalized-view enabled *)
+  (* Start a observer node with --finalized-view enabled *)
   let* finalized_observer =
     run_new_observer_node
       ~finalized_view:true
@@ -10143,15 +9981,7 @@ let test_finalized_view_forward_txn =
     unit
   in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
-  let* () =
-    bake_until_sync
-      ~__LOC__
-      ~sc_rollup_node
-      ~proxy:finalized_observer
-      ~sequencer
-      ~client
-      ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~sequencer ~client () in
 
   (* Craft a given number of consecutive transactions. We will prove they are
      injected in blocks without the need to create new L1 blocks. *)
@@ -10199,7 +10029,7 @@ let test_finalized_block_param =
     ~title:
       "The finalized block parameter is correctly interpreted by the EVM node"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
+  @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   let* rpc = run_new_rpc_endpoint sequencer in
   (* Produce a few EVM blocks *)
   let* () =
@@ -10207,16 +10037,16 @@ let test_finalized_block_param =
     let* _ = produce_block sequencer in
     unit
   in
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
   (* Check that the L2 blocks where indeed posted onchain. *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((sequencer_head.number = 4l) int32)
     ~error_msg:"Sequencer head should be %R, but is %L instead" ;
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+  in
   (* While the blocks were posted onchain, they are not final wrt. the
-     consensus algorithm, so the finalized proxy does not have a head yet.
+     consensus algorithm, so the finalized rollup does not have a head yet.
 
      We produce both two more L2 blocks and two L1 blocks; the latter will
      allow to finalized the first four blocks posted earlier. *)
@@ -10227,9 +10057,7 @@ let test_finalized_block_param =
     unit
   in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
-  let* () =
-    bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ~proxy ()
-  in
+  let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer () in
   (* We can check the consistency of the various nodes. *)
   let*@ sequencer_new_head =
     Rpc.get_block_by_number ~block:"latest" sequencer
@@ -10243,7 +10071,9 @@ let test_finalized_block_param =
   Check.((sequencer_finalized_head.number = 4l) int32)
     ~error_msg:"Sequencer finalized head should be %R, but is %L instead" ;
 
-  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  let* () =
+    check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+  in
   let* () =
     check_block_consistency ~block:`Finalized ~left:rpc ~right:sequencer ()
   in
@@ -11637,11 +11467,11 @@ let test_node_correctly_uses_batcher_heap =
     ~title:"EVM node uses batcher heap ordering when injecting blueprints."
     ~time_between_blocks:Nothing
   @@
-  fun {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; node; _}
+  fun {sequencer; sc_rollup_node; client; sc_rollup_address; node; _}
       _protocol
     ->
   let*@ _ = produce_block sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
   let* l1_level = Node.get_level node in
   let wait_for_level_processed =
     Lwt.join
@@ -11743,14 +11573,13 @@ let test_node_correctly_uses_batcher_heap =
     Sc_rollup_node.wait_for_level sc_rollup_node l1_level_blueprints_processed
   in
 
-  let*@ rollup_level = Rpc.block_number proxy in
-  (* Check that the proxy is at least about the expected catchup. *)
+  let*@ rollup_level = rollup_level sc_rollup_node in
+  (* Check that the rollup is at least about the expected catchup. *)
   Check.(
     (Int32.to_int rollup_level >= before_level + max_blueprints_catchup)
       ~__LOC__
       int
-      ~error_msg:"Check proxy head failed. Found %L, expected >= %R") ;
-
+      ~error_msg:"Check rollup head failed. Found %L, expected >= %R") ;
   let l1_level_blueprints_processed_finalized =
     l1_level_blueprints_processed + 2
   in
@@ -11797,8 +11626,8 @@ let test_trace_empty_block =
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
     ~title:"debug_traceBlockByNumber succeeds on empty block"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  @@ fun {client; sc_rollup_node; sequencer; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let*@ trace_result = Rpc.trace_block ~block:Rpc.Latest sequencer in
   Check.(
     (trace_result = [])
@@ -11813,8 +11642,8 @@ let test_trace_block_struct_logger =
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  @@ fun {client; sc_rollup_node; sequencer; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* trace_result =
     Rpc.trace_block ~tracer:"structLogger" ~block:Rpc.Latest sequencer
   in
@@ -11835,8 +11664,8 @@ let test_trace_block =
     ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; evm_version; _} _protocol ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  @@ fun {client; sc_rollup_node; sequencer; evm_version; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
@@ -11919,8 +11748,8 @@ let test_trace_block_txs_same_caller =
       "debug_traceBlockByNumber succeeds on block with transactions using same \
        caller"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; evm_version; _} _protocol ->
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  @@ fun {client; sc_rollup_node; sequencer; evm_version; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let* call_types = Solidity_contracts.call_types evm_version in
@@ -12423,7 +12252,6 @@ let test_tx_queue_clear =
         sc_rollup_node;
         sequencer;
         observer;
-        proxy;
         _;
       }
       _protocol
@@ -12434,7 +12262,7 @@ let test_tx_queue_clear =
   in
 
   let* () = Evm_node.wait_for_blueprint_applied observer 0 in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
 
   let* raw_tx =
     Cast.craft_tx
@@ -13447,7 +13275,7 @@ let test_durable_storage_consistency =
 
   (* Rpc.state_value calls a private RPC so we can only test the EVM
      nodes for which a private RPC server exists and
-     [Evm_node.endpoint ~private_:true] succeeds so neither proxy nor
+     [Evm_node.endpoint ~private_:true] succeeds not the
      RPC EVM nodes. *)
   let evm_nodes_with_private_servers = [sequencer; observer] in
 
@@ -13820,7 +13648,7 @@ let test_sequencer_key_change =
     ~sequencer:sequencer_owner
     ~additional_sequencer_keys:[new_sequencer_owner]
     ~genesis_timestamp
-  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
+  @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let new_key = new_sequencer_owner.public_key in
   let* tx =
@@ -13837,7 +13665,7 @@ let test_sequencer_key_change =
   Check.((status = true) bool ~error_msg:"Transaction failed") ;
   Check.((List.length logs = 1) int ~error_msg:"Expected 1 log") ;
   let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
-  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
   let*@! value = Rpc.state_value sequencer Durable_storage_path.sequencer in
   let expected_key = Hex.of_string new_key |> Hex.show in
@@ -13846,7 +13674,7 @@ let test_sequencer_key_change =
       string
       ~error_msg:"Expected sequencer key to be %R, got %L") ;
   let* () = Evm_node.wait_for_blueprint_injected sequencer 3 in
-  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~client () in
   let* current_sequencer_in_rollup_hex =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
@@ -14597,7 +14425,6 @@ let () =
   test_describe_config () ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
-  test_proxy_node_can_forward_to_evm_endpoint protocols ;
   test_batch_eth_send_raw_transaction_sync_rpc () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;

@@ -150,6 +150,23 @@ val check_block_consistency :
 val check_head_consistency :
   left:Evm_node.t -> right:Evm_node.t -> ?error_msg:string -> unit -> unit Lwt.t
 
+type network = Etherlink | Tezlink
+
+(** [rollup_level sc_rollup_node] returns the current level of the
+    rollup node, or [None] if it has not processed any level yet. *)
+val rollup_level :
+  ?network:network -> Sc_rollup_node.t -> (int32, Rpc.error) result Lwt.t
+
+(** [check_rollup_head_consistency ~evm_node ~sc_rollup_node ?error_msg ()]
+    checks that the latest block of [evm_node] and the block at the level
+    of the rollup node are equal. Fails if they are not with [error_msg] *)
+val check_rollup_head_consistency :
+  evm_node:Evm_node.t ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  ?error_msg:string ->
+  unit ->
+  unit Lwt.t
+
 (** [sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     ~sequencer_admin_contract ~client ~upgrade_to
     ~activation_timestamp] prepares the sequencer upgrade payload and
@@ -179,15 +196,15 @@ val bake_until :
   unit ->
   'b Lwt.t
 
-(** [bake_until_sync ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy ~sequencer
+(** [bake_until_sync ?timeout_in_blocks ?timeout ~sc_rollup_node ~sequencer
     ~client] bakes blocks until the rollup node is synced with
     evm_node. Uses {!bake_until} *)
 val bake_until_sync :
   ?__LOC__:string ->
   ?timeout_in_blocks:int ->
   ?timeout:float ->
+  ?network:network ->
   sc_rollup_node:Sc_rollup_node.t ->
-  proxy:Evm_node.t ->
   sequencer:Evm_node.t ->
   client:Client.t ->
   unit ->

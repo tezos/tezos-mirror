@@ -2613,11 +2613,13 @@ let test_node_catchup_on_multichain =
     ~title:"EVM node catchup on multichain"
     ~time_between_blocks:Nothing
   @@
-  fun {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; node; _}
+  fun {sequencer; sc_rollup_node; client; sc_rollup_address; node; _}
       _protocol
     ->
   let*@ _ = produce_block sequencer in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () =
+    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
+  in
   let* l1_level = Node.get_level node in
   let wait_for_level_processed =
     Lwt.join
@@ -2719,13 +2721,13 @@ let test_node_catchup_on_multichain =
     Sc_rollup_node.wait_for_level sc_rollup_node l1_level_blueprints_processed
   in
 
-  let*@ rollup_level = Rpc.generic_block_number proxy in
-  (* Check that the proxy is at least about the expected catchup. *)
+  let*@ rollup_level = rollup_level ~network:Tezlink sc_rollup_node in
+  (* Check that the rollup is at least about the expected catchup. *)
   Check.(
     (Int32.to_int rollup_level >= before_level + max_blueprints_catchup)
       ~__LOC__
       int
-      ~error_msg:"Check proxy head failed. Found %L, expected >= %R") ;
+      ~error_msg:"Check rollup head failed. Found %L, expected >= %R") ;
 
   let l1_level_blueprints_processed_finalized =
     l1_level_blueprints_processed + 2
@@ -2772,15 +2774,7 @@ let test_delayed_deposit_is_included =
     ~tags:["sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Tezlink Delayed deposit is included"
   @@
-  fun {
-        client;
-        l1_contracts;
-        sc_rollup_address;
-        sc_rollup_node;
-        sequencer;
-        proxy;
-        _;
-      }
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
       _protocol
     ->
   let endpoint =
@@ -2828,7 +2822,9 @@ let test_delayed_deposit_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () =
+    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
+  in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
