@@ -198,23 +198,73 @@ module Params = struct
         in
         Lwt.return_ok time_between_blocks)
 
+  let parse_delay s =
+    let open Lwt_result_syntax in
+    let len = String.length s in
+    if len < 3 || s.[0] <> '+' then
+      tzfail
+      @@ error_of_fmt
+           "Invalid format, the delay must be formatted as `+<n><T>`, where T \
+            is a time unit `h`,`m`,`s`."
+    else
+      let number_str = String.sub s 1 (len - 2) in
+      let*? n =
+        match Int64.of_string_opt number_str with
+        | None -> Error [error_of_fmt "Invalid delay integer %S" number_str]
+        | Some n -> Ok n
+      in
+      let unit = s.[len - 1] in
+      let*? multiplier =
+        match unit with
+        | 'h' -> Ok 3600L
+        | 'm' -> Ok 60L
+        | 's' -> Ok 1L
+        | '0' .. '9' ->
+            Error [error_of_fmt "Delay must have a time unit (s, m, or h)"]
+        | _ -> Error [error_of_fmt "%c is an invalid time unit" unit]
+      in
+      return @@ Int64.mul n multiplier
+
   let timestamp =
     let open Lwt_result_syntax in
-    Tezos_clic.parameter (fun _ timestamp ->
-        let timestamp = String.trim timestamp in
-        match Time.Protocol.of_notation timestamp with
-        | Some t -> return t
-        | None -> (
-            match
-              Int64.of_string_opt timestamp
-              |> Option.map Time.Protocol.of_seconds
-            with
-            | Some t -> return t
+    Tezos_clic.parameter @@ fun _ timestamp_s ->
+    let timestamp_s = String.trim timestamp_s in
+    Client_aliases.parse_alternatives
+      [
+        ( "delay",
+          fun s ->
+            let* delay_s =
+              trace
+                (error_of_fmt
+                   "Delay must be formatted as `+<n><T>`, where `n` is an \
+                    integer and `T` a time unit `h`,`m`,`s`")
+              @@ parse_delay s
+            in
+            let now_timestamp = Time.System.to_protocol @@ Time.System.now () in
+            let timestamp = Time.Protocol.add now_timestamp delay_s in
+            return timestamp );
+        ( "rfc3399",
+          fun s ->
+            match Time.Protocol.of_notation s with
+            | Some timestamp -> return timestamp
             | None ->
-                failwith
-                  "Timestamp must be either in RFC3399 format  (e.g., \
-                   [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
-                   the {!Time.Protocol.epoch}."))
+                tzfail
+                @@ error_of_fmt
+                     "Timestamp must be in RFC3399 format (e.g. \
+                      [\"1970-01-01T00:00:00Z\"])" );
+        ( "second",
+          fun s ->
+            match
+              Int64.of_string_opt s |> Option.map Time.Protocol.of_seconds
+            with
+            | Some timestamp -> return timestamp
+            | None ->
+                tzfail
+                @@ error_of_fmt
+                     "Timestamp must be in number of seconds since the \
+                      {!Time.Protocol.epoch}" );
+      ]
+      timestamp_s
 
   let eth_address =
     Tezos_clic.parameter (fun _ address ->
@@ -565,6 +615,15 @@ let json_arg =
     ~long:"json"
     ~doc:"Enables the display of json schemas."
     ()
+
+let rollup_address_param =
+  Tezos_clic.arg
+    ~long:"rollup"
+    ~placeholder:"sr1..."
+    ~doc:
+      "A rollup address or alias used to create the string that must be passed \
+       to an admin contract"
+    Params.string
 
 let rollup_address_arg =
   let open Lwt_result_syntax in
@@ -1760,13 +1819,16 @@ let chunker_command =
       in
       print_chunks rollup_address data)
 
+let wallet_command_args =
+  Tezos_clic.args2 (Client_config.password_filename_arg ()) wallet_dir_arg
+
 let make_upgrade_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~group:Groups.kernel
     ~desc:"Create bytes payload for the upgrade entrypoint."
-    no_options
+    (merge_options wallet_command_args (args1 rollup_address_param))
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
     @@ param
          ~name:"preimage_hash"
@@ -1776,16 +1838,42 @@ let make_upgrade_command =
     @@ param
          ~name:"activation_timestamp"
          ~desc:
-           "After activation timestamp, the kernel will upgrade to this value."
+           "After activation timestamp, the kernel will upgrade to this value.\n\
+            Must follow one of the following format:\n\
+            - An RFC3399 timestamp: \"1970-01-01T00:00:00Z\",\n\
+            - A number of second since the {!Time.Protocol.epoch},\n\
+            - A delay from now: `+<n><T>` where <n> is an integer and <T> a \
+            unit `h`,`m`, or `s`."
          Params.timestamp
     @@ stop)
-    (fun () root_hash timestamp () ->
+    (fun ((password_filename, wallet_dir), rollup_addr_opt)
+         root_hash
+         timestamp
+         ()
+       ->
+      Format.printf
+        "Activation timestamp: %a\n%!"
+        Time.Protocol.pp_hum
+        timestamp ;
       let payload =
         Evm_node_lib_dev_encoding.Evm_events.Upgrade.(
           to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
-      Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
-      return_unit)
+      match rollup_addr_opt with
+      | Some rollup_id ->
+          let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+          let* rollup_addr =
+            Smart_rollup_alias.Address.find wallet_ctxt rollup_id
+          in
+          Format.printf
+            "'Pair \"%a\" %s'\n%!"
+            Tezos_crypto.Hashed.Smart_rollup_address.pp
+            rollup_addr
+            Hex.(of_bytes payload |> show) ;
+          return_unit
+      | None ->
+          Printf.printf "%s\n%!" Hex.(of_bytes payload |> show) ;
+          return_unit)
 
 let make_sequencer_upgrade_command =
   let open Tezos_clic in
@@ -1793,7 +1881,7 @@ let make_sequencer_upgrade_command =
   command
     ~group:Groups.kernel
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint."
-    (args3 config_path_arg data_dir_arg wallet_dir_arg)
+    (merge_options wallet_command_args (args2 config_path_arg data_dir_arg))
     (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
     @@ prefixes ["with"; "pool"; "address"]
     @@ Tezos_clic.param
@@ -1807,7 +1895,7 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value."
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (config_file, data_dir, wallet_dir)
+    (fun ((password_filename, wallet_dir), (config_file, data_dir))
          pool_address
          activation_timestamp
          sequencer_str
@@ -1817,7 +1905,7 @@ let make_sequencer_upgrade_command =
         Configuration.config_filename ~data_dir ?config_file ()
       in
       let* config = Cli.create_or_read_config ~data_dir config_file in
-      let wallet_ctxt = register_wallet ~wallet_dir () in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* signer =
         Evm_node_lib_dev.Signer.of_string config wallet_ctxt sequencer_str
       in

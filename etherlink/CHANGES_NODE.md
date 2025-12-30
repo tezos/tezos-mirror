@@ -12,6 +12,10 @@
 
 ### Command-line interface changes
 
+- Update the command that creates an upgrade payload with a delay, it
+  can also takes a smart rollup alias or address as a argument.
+  (!20302)
+
 ### Execution changes
 
 ### Storage changes

@@ -1580,6 +1580,9 @@ let upgrade_payload ~root_hash ~activation_timestamp =
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   let* payload = Process.check_and_read_stdout process in
+  let payload =
+    String.split_on_char '\n' (String.trim payload) |> List.rev |> List.hd
+  in
   return (String.trim payload)
 
 let transform_dump ~dump_json ~dump_rlp =
