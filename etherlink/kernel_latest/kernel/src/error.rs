@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
@@ -134,6 +134,8 @@ pub enum Error {
     TcError(String),
     #[error("BigInt conversion error: {0}")]
     TryFromBigIntError(TryFromBigIntError<BigUint>),
+    #[error("Unexpected error from native bridge: {0}")]
+    BridgeError(String),
 }
 
 impl From<revm_etherlink::Error> for Error {
