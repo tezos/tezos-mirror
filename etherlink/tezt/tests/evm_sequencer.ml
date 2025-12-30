@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2024-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -1880,7 +1880,10 @@ let test_invalid_delayed_transaction =
 let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
     ~ticket_owner ~routing_info ~amount ~ticketer ~content () =
   let* () =
-    Eth_cli.add_abi ~label:"fa_withdrawal" ~abi:(fa_withdrawal_abi_path ()) ()
+    Eth_cli.add_abi
+      ~label:"fa_withdrawal"
+      ~abi:(predep_fa_bridge_abi_path ())
+      ()
   in
   send_transaction_to_sequencer
     ?timestamp
@@ -1889,7 +1892,7 @@ let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
        ~source_private_key:sender.Eth_account.private_key
        ~endpoint
        ~abi_label:"fa_withdrawal"
-       ~address:Solidity_contracts.Precompile.fa_withdrawal
+       ~address:Solidity_contracts.Precompile.fa_bridge
        ~method_call:
          (sf
             {|withdraw("%s", "0x%s", %d, "0x%s", "0x%s")|}
@@ -1912,7 +1915,7 @@ let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
   let* () =
     Eth_cli.add_abi
       ~label:"fa_fast_withdraw"
-      ~abi:(fast_withdrawal_abi_path ())
+      ~abi:(predep_fa_bridge_abi_path ())
       ()
   in
   let call_fast_withdraw () =
@@ -1923,7 +1926,7 @@ let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
          ~source_private_key:sender.Eth_account.private_key
          ~endpoint
          ~abi_label:"fa_fast_withdraw"
-         ~address:Solidity_contracts.Precompile.fa_withdrawal
+         ~address:Solidity_contracts.Precompile.fa_bridge
          ~method_call:
            (sf
               {|fa_fast_withdraw("%s", "0x%s", %d, "0x%s", "0x%s", "%s", "%s")|}
@@ -2125,7 +2128,7 @@ let test_fa_reentrant_deposit_reverts =
          ~args:
            (sf
               {|["%s", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|}
-              Solidity_contracts.Precompile.withdrawal)
+              Solidity_contracts.Precompile.xtz_bridge)
          ~source_private_key:sender.private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi:reentrancy.label
@@ -2158,14 +2161,14 @@ let test_fa_reentrant_deposit_reverts =
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   let* () =
-    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+    Eth_cli.add_abi ~label:"claim" ~abi:(predep_fa_bridge_abi_path ()) ()
   in
   let claim =
     Eth_cli.contract_send
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
       ~endpoint:(Evm_node.endpoint sequencer)
       ~abi_label:"claim"
-      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~address:Solidity_contracts.Precompile.fa_bridge
       ~method_call:(sf {|claim(%d)|} 0)
   in
   let produce_block () = Rpc.produce_block sequencer in
@@ -8933,7 +8936,7 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
   let* () =
     Eth_cli.add_abi
       ~label:"fast_withdraw_base58"
-      ~abi:(fast_withdrawal_abi_path ())
+      ~abi:(predep_xtz_bridge_abi_path ())
       ()
   in
   (* Call the withdrawal precompiled contract. *)
@@ -8943,7 +8946,7 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"fast_withdraw_base58"
-      ~address:Solidity_contracts.Precompile.withdrawal
+      ~address:Solidity_contracts.Precompile.xtz_bridge
         (* NB: the third parameter is unused for now, could be used later for
            maximum fees to pay, whitelist of service providers etc. *)
       ~method_call:
@@ -12916,7 +12919,7 @@ let test_withdrawal_events =
 
   (* Make a regular withdrawal *)
   let* () =
-    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
+    Eth_cli.add_abi ~label:"withdraw" ~abi:(predep_xtz_bridge_abi_path ()) ()
   in
   let* _ =
     send_transaction_to_sequencer
@@ -12925,7 +12928,7 @@ let test_withdrawal_events =
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi_label:"withdraw"
-         ~address:Solidity_contracts.Precompile.withdrawal
+         ~address:Solidity_contracts.Precompile.xtz_bridge
          ~method_call:
            (sf {|withdraw_base58("%s")|} Constant.bootstrap5.public_key_hash)
          ~value:Wei.one_eth
@@ -12943,7 +12946,7 @@ let test_withdrawal_events =
   let* () =
     Eth_cli.add_abi
       ~label:"fast_withdraw_base58"
-      ~abi:(fast_withdrawal_abi_path ())
+      ~abi:(predep_xtz_bridge_abi_path ())
       ()
   in
   let* _ =
@@ -12953,7 +12956,7 @@ let test_withdrawal_events =
          ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi_label:"fast_withdraw_base58"
-         ~address:Solidity_contracts.Precompile.withdrawal
+         ~address:Solidity_contracts.Precompile.xtz_bridge
          ~method_call:
            (sf
               {|fast_withdraw_base58("%s","%s","%s")|}
@@ -13364,7 +13367,7 @@ let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
   let* nonce = get_deposit_nonce_from_latest_block sequencer in
 
   let* () =
-    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+    Eth_cli.add_abi ~label:"claim" ~abi:(predep_fa_bridge_abi_path ()) ()
   in
 
   let claim =
@@ -13372,7 +13375,7 @@ let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
       ~endpoint:(Evm_node.endpoint sequencer)
       ~abi_label:"claim"
-      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~address:Solidity_contracts.Precompile.fa_bridge
       ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
       ~value:Wei.zero
   in
@@ -13442,7 +13445,7 @@ let test_fa_deposit_can_be_claimed_and_withdrawn =
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
       ~endpoint:(Evm_node.endpoint sequencer)
       ~abi_label:"claim"
-      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~address:Solidity_contracts.Precompile.fa_bridge
       ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
       ~value:Wei.zero
       ()
@@ -13454,7 +13457,7 @@ let test_fa_deposit_can_be_claimed_and_withdrawn =
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
       ~endpoint:(Evm_node.endpoint sequencer)
       ~abi_label:"claim"
-      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~address:Solidity_contracts.Precompile.fa_bridge
       ~method_call:(sf {|claim(42)|})
       ~value:Wei.zero
       ()

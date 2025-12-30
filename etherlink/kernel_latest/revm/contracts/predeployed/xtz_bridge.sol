@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,7 +9,7 @@ import "./constants.sol";
 import "./interfaces.sol";
 import "./reentrancy_safe.sol";
 
-contract XTZWithdrawal is ReentrancySafe {
+contract XTZBridge is ReentrancySafe {
     bool private locked;
 
     event Withdrawal(

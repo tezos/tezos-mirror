@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -462,9 +462,9 @@ let nested_delegatecalls_D =
     ~contract:"D"
 
 module Precompile = struct
-  let withdrawal = "0xff00000000000000000000000000000000000001"
+  let xtz_bridge = "0xff00000000000000000000000000000000000001"
 
-  let fa_withdrawal = "0xff00000000000000000000000000000000000002"
+  let fa_bridge = "0xff00000000000000000000000000000000000002"
 
   let sequencer_key_change = "0xff00000000000000000000000000000000000006"
 end

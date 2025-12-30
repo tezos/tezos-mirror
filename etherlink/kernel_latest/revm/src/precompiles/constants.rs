@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,12 +10,12 @@ pub struct PredeployedContract {
     pub code_hash: FixedBytes<32>,
 }
 
-pub(crate) const WITHDRAWAL_SOL_CONTRACT: PredeployedContract = PredeployedContract {
-    code: include_bytes!("../../contracts/predeployed/withdrawal.bin"),
+pub(crate) const XTZ_BRIDGE_SOL_CONTRACT: PredeployedContract = PredeployedContract {
+    code: include_bytes!("../../contracts/predeployed/xtz_bridge.bin"),
     code_hash: FixedBytes::new([
-        0x4a, 0xf6, 0x89, 0x51, 0x1e, 0xd7, 0xfc, 0x42, 0x02, 0xe5, 0x26, 0xcb, 0x25,
-        0x6c, 0x1f, 0x91, 0xd3, 0xb4, 0x26, 0xdd, 0xd8, 0x17, 0x26, 0x04, 0xe4, 0x12,
-        0xdb, 0x32, 0x6d, 0x74, 0x8e, 0xc8,
+        0x97, 0x1a, 0xac, 0x34, 0x34, 0xd8, 0xf0, 0xb0, 0xc1, 0x37, 0xec, 0x24, 0xf0,
+        0x94, 0xe3, 0x87, 0x32, 0x9a, 0xb8, 0xa3, 0x5a, 0xfb, 0xf2, 0xa6, 0x05, 0xb7,
+        0x19, 0xbf, 0xfb, 0x77, 0x1a, 0xb6,
     ]),
 };
 
@@ -42,7 +42,7 @@ pub const ALWAYS_REVERT_SOL_CONTRACT: &str = "0x6080604052348015600e575f5ffd5b50
 
 pub const SYSTEM_SOL_ADDR: Address = Address::ZERO;
 
-pub const WITHDRAWAL_SOL_ADDR: Address = Address(FixedBytes::new([
+pub const XTZ_BRIDGE_SOL_ADDR: Address = Address(FixedBytes::new([
     0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 ]));
@@ -92,7 +92,7 @@ pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
 ]));
 
 pub(crate) const CUSTOMS: [Address; 7] = [
-    WITHDRAWAL_SOL_ADDR,
+    XTZ_BRIDGE_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
     TABLE_PRECOMPILE_ADDRESS,
@@ -149,7 +149,7 @@ pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 mod test {
     use super::{
         PredeployedContract, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_CONTRACT,
+        XTZ_BRIDGE_SOL_CONTRACT,
     };
 
     use crate::helpers::storage::bytes_hash;
@@ -171,8 +171,8 @@ mod test {
     }
 
     #[test]
-    fn check_withdrawal_sol_code_hash() {
-        check_code_hash_validity(&WITHDRAWAL_SOL_CONTRACT)
+    fn check_xtz_bridge_sol_code_hash() {
+        check_code_hash_validity(&XTZ_BRIDGE_SOL_CONTRACT)
     }
 
     #[test]
