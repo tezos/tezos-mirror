@@ -95,7 +95,7 @@ export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry
 ## Image names
 ##
 
-# By default, points to the versions in GCP_REGISTRY. Thus by default,
+# By default, points to the versions in GCP_CI_REGISTRY. Thus by default,
 # local image builds use images produced either locally, or on the
 # CI's protected refs. CI image builds pushes to and pulls from protected
 # (resp. unprotected) images on protected (resp. unprotected) refs.
