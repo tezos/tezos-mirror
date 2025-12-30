@@ -179,7 +179,7 @@ let jobs =
             ( "VERSION",
               Images.Base_images.(
                 Format.asprintf "%a" version_pp rust_toolchain_version) );
-            ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+            ("IMAGE_NAME", "${GCP_CI_REGISTRY}/tezos/tezos/debian-rust");
           ]
         ["scripts/ci/docker-merge-base-images.sh"]
     in

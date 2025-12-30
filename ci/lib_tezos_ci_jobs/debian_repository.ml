@@ -105,7 +105,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   let variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
-         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+         "${GCP_CI_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
        )
        (* this second variable is for a read only registry and we want it to be
           tezos/tezos *)

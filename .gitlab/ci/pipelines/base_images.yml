@@ -257,7 +257,7 @@ oc.base-images.rust.merge:
     DOCKER_VERSION: 24.0.7
     RELEASE: trixie
     VERSION: "1.0"
-    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
+    IMAGE_NAME: ${GCP_CI_REGISTRY}/tezos/tezos/debian-rust
 
 oc.base-images.debian-homebrew:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

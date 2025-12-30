@@ -9,7 +9,7 @@ Usage: $0 [image_base [image_tag]] [docker build args...]
 Creates the 'client-libs-dependencies' image from
 image/client-libs-dependencies/Dockerfile.  The built image is tagged
 with image_base:image_tag. If omitted, they default to
-'${GCP_REGISTRY}/tezos/tezos/client-libs-dependencies' respectively
+'${GCP_CI_REGISTRY}/tezos/tezos/client-libs-dependencies' respectively
 'latest'.  Remaining arguments, if any, are passed on to 'docker
 build'.
 EOT
@@ -30,7 +30,7 @@ if [ $# -gt 0 ]; then
   image_base="$1"
   shift
 else
-  image_base="${GCP_REGISTRY}/tezos/tezos/client-lib-dependencies"
+  image_base="${GCP_CI_REGISTRY}/tezos/tezos/client-lib-dependencies"
 fi
 if [ $# -gt 0 ]; then
   image_tag="$1"
