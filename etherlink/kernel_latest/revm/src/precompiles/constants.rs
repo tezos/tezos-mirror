@@ -13,9 +13,9 @@ pub struct PredeployedContract {
 pub(crate) const XTZ_BRIDGE_SOL_CONTRACT: PredeployedContract = PredeployedContract {
     code: include_bytes!("../../contracts/predeployed/xtz_bridge.bin"),
     code_hash: FixedBytes::new([
-        0x97, 0x1a, 0xac, 0x34, 0x34, 0xd8, 0xf0, 0xb0, 0xc1, 0x37, 0xec, 0x24, 0xf0,
-        0x94, 0xe3, 0x87, 0x32, 0x9a, 0xb8, 0xa3, 0x5a, 0xfb, 0xf2, 0xa6, 0x05, 0xb7,
-        0x19, 0xbf, 0xfb, 0x77, 0x1a, 0xb6,
+        0x9e, 0xdc, 0xd4, 0x33, 0xbd, 0x87, 0x5a, 0x54, 0x0e, 0xd1, 0x58, 0xec, 0x5c,
+        0xe4, 0xc9, 0xb3, 0xb0, 0xac, 0xb8, 0x3c, 0xb1, 0x52, 0xb1, 0x84, 0xd5, 0x93,
+        0xa9, 0x0d, 0xeb, 0x77, 0x5f, 0xbe,
     ]),
 };
 
@@ -131,6 +131,17 @@ pub(crate) const RUNTIME_GATEWAY_TRANSFER_BASE_COST: u64 = 1_000;
 pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;
 
 pub const FA_DEPOSIT_QUEUE_GAS_LIMIT: u64 = 0;
+
+// Rationale regarding the cost:
+// The execution cost is not meant to price the deposit operation economically.
+// Deposits are intended to be free for users.
+// This fixed cost exists solely to account for the EVM gas consumed by the
+// `handle_xtz_deposit` entrypoint and to deliberately limit any remaining gas,
+// preventing its use for unintended or malicious execution paths.
+// For this reason, the value is kept "small" but non-zero.
+// The exact max gas consuption is 164_261, which we round up as this does not
+// introduce any security concerns.
+pub const XTZ_DEPOSIT_EXECUTION_COST: u64 = 175_000;
 
 /// Overapproximation of the amount of ticks for parsing FA deposit.
 /// Also includes hashing costs.
