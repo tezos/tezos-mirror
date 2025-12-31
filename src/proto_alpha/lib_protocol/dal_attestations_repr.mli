@@ -119,3 +119,44 @@ val occupied_size_in_bits : t -> int
 (** [expected_max_size_in_bits ~number_of_slots ~number_of_lags] returns the
     maximum size (in bits) of a [t] value. *)
 val expected_max_size_in_bits : number_of_slots:int -> number_of_lags:int -> int
+
+(** Slot availability represents the protocol's attestation result for a block.
+
+    This wraps {!t} but is kept as a separate module to allow for potential
+    interface differences between attestations in operations and attestation
+    results in block metadata. *)
+module Slot_availability : sig
+  (** The slot availability type. Currently identical to {!t}. *)
+  type t
+
+  (** [empty] is the empty slot availability. *)
+  val empty : t
+
+  (** [encoding] is the data encoding for slot availability (bitset). *)
+  val encoding : t Data_encoding.t
+
+  (** [is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index]
+      returns [true] if the attestation at [lag_index] commits that the slot at
+      [slot_index] is available. [lag_index] must satisfy [0 <= lag_index <
+      number_of_lags], and [slot_index] must satisfy [0 <= slot_index <
+      number_of_slots]. *)
+  val is_attested :
+    t ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    Dal_slot_index_repr.t ->
+    bool
+
+  (** [commit t ~number_of_slots ~number_of_lags ~lag_index slot_index] commits
+      into the attestation at [lag_index] that the slot [slot_index] is
+      available. [lag_index] must satisfy [0 <= lag_index < number_of_lags],
+      and [slot_index] must satisfy [0 <= slot_index < number_of_slots]. *)
+  val commit :
+    t ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    Dal_slot_index_repr.t ->
+    t
+end

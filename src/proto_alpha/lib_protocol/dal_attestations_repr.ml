@@ -119,3 +119,17 @@ let expected_max_size_in_bits ~number_of_slots ~number_of_lags =
   (* [number_of_lags] for the prefix and [number_of_lags * number_of_slots] for
      the data section. *)
   number_of_lags * (1 + number_of_slots)
+
+(** Slot availability represents the protocol's attestation result for a block.
+    It is an alias to the main attestation type. *)
+module Slot_availability = struct
+  type nonrec t = t
+
+  let empty = empty
+
+  let encoding = encoding
+
+  let is_attested = is_attested
+
+  let commit = commit
+end
