@@ -120,6 +120,9 @@ val occupied_size_in_bits : t -> int
     maximum size (in bits) of a [t] value. *)
 val expected_max_size_in_bits : number_of_slots:int -> number_of_lags:int -> int
 
+(** Type alias for use in submodules. *)
+type attestation = t
+
 (** Slot availability represents the protocol's attestation result for a block.
 
     This wraps {!t} but is kept as a separate module to allow for potential
@@ -162,5 +165,10 @@ module Slot_availability : sig
 
   (** [number_of_attested_slots t ~number_of_lags] returns the number of
       attested slots in the given attestations. *)
-   val number_of_attested_slots : t -> number_of_lags:int -> int
+  val number_of_attested_slots : t -> number_of_lags:int -> int
+
+  (** [intersection sa attestations ~number_of_slots ~attestation_lags] returns
+      the slots attested in both [sa] and [attestations]. *)
+  val intersection :
+    t -> attestation -> number_of_slots:int -> attestation_lags:int list -> t
 end

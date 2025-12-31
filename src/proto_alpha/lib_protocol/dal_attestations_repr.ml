@@ -149,4 +149,90 @@ module Slot_availability = struct
   let commit = commit
 
   let number_of_attested_slots = number_of_attested_slots
+
+  let intersection sa attestations ~number_of_slots ~attestation_lags =
+    (* Compute intersection of two attestation bitsets.
+
+       Strategy: AND the prefix bits to find common lags, then for each
+       common lag, AND the data sections. Only include lags with non-empty
+       intersection in the result.
+
+       We maintain running counts of non-empty lags for both inputs to compute
+       data offsets incrementally, achieving O(number_of_lags) complexity. *)
+    let number_of_lags = List.length attestation_lags in
+    let prefix_mask =
+      match Bitset.fill ~length:number_of_lags with
+      | Ok mask -> mask
+      | Error _ -> assert false
+    in
+    let common_prefix =
+      Bitset.inter (Bitset.inter sa attestations) prefix_mask
+    in
+
+    (* Extract [number_of_slots] bits at [offset], normalized to position 0 *)
+    let extract_data_section bitset ~offset =
+      let z = Bitset.to_z bitset in
+      let mask =
+        Z.(shift_left (pred (shift_left one number_of_slots)) offset)
+      in
+      let normalized_z = Z.shift_right (Z.logand z mask) offset in
+      match Bitset.from_z normalized_z with
+      | Ok bs -> bs
+      | Error _ ->
+          (* unreachable; the previous operations don't make the parameter negative *)
+          assert false
+    in
+
+    (* Single pass through lags, tracking running counts for offset computation *)
+    let rec build_result lag_index ~sa_count ~att_count result result_offset =
+      if Compare.Int.(lag_index >= number_of_lags) then result
+      else
+        let sa_is_set = bitset_mem sa lag_index in
+        let att_is_set = bitset_mem attestations lag_index in
+
+        if not (bitset_mem common_prefix lag_index) then
+          (* Lag not in both - update counts for whichever is set *)
+          build_result
+            (lag_index + 1)
+            ~sa_count:(if sa_is_set then sa_count + 1 else sa_count)
+            ~att_count:(if att_is_set then att_count + 1 else att_count)
+            result
+            result_offset
+        else
+          (* Lag is in both - compute offsets from running counts *)
+          let sa_offset = number_of_lags + (sa_count * number_of_slots) in
+          let att_offset = number_of_lags + (att_count * number_of_slots) in
+          let sa_data = extract_data_section sa ~offset:sa_offset in
+          let att_data = extract_data_section attestations ~offset:att_offset in
+          let common_data = Bitset.inter sa_data att_data in
+
+          if Bitset.is_empty common_data then
+            build_result
+              (lag_index + 1)
+              ~sa_count:(sa_count + 1)
+              ~att_count:(att_count + 1)
+              result
+              result_offset
+          else
+            let result = bitset_add result lag_index in
+            let result_z =
+              Z.logor
+                (Bitset.to_z result)
+                (Z.shift_left (Bitset.to_z common_data) result_offset)
+            in
+            let result =
+              match Bitset.from_z result_z with
+              | Ok r -> r
+              | Error _ ->
+                  (* unreachable; the previous operations don't make the parameter negative *)
+                  assert false
+            in
+            build_result
+              (lag_index + 1)
+              ~sa_count:(sa_count + 1)
+              ~att_count:(att_count + 1)
+              result
+              (result_offset + number_of_slots)
+    in
+    build_result 0 ~sa_count:0 ~att_count:0 empty number_of_lags
 end
