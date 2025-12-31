@@ -159,4 +159,8 @@ module Slot_availability : sig
     lag_index:int ->
     Dal_slot_index_repr.t ->
     t
+
+  (** [number_of_attested_slots t ~number_of_lags] returns the number of
+      attested slots in the given attestations. *)
+   val number_of_attested_slots : t -> number_of_lags:int -> int
 end

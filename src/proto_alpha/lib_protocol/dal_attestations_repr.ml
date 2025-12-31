@@ -120,6 +120,21 @@ let expected_max_size_in_bits ~number_of_slots ~number_of_lags =
      the data section. *)
   number_of_lags * (1 + number_of_slots)
 
+let number_of_attested_slots t ~number_of_lags =
+  (* Count all 1 bits and subtract the prefix bits (which are 1 for non-empty lags) *)
+  let total_bits = Bitset.cardinal t in
+  (* Count prefix 1s: how many of the first number_of_lags bits are set *)
+  let prefix_ones =
+    Misc.(0 --> number_of_lags)
+    |> List.filter (fun i ->
+           match Bitset.mem t i with Ok b -> b | Error _ -> assert false)
+    |> List.length
+  in
+  total_bits - prefix_ones
+
+(** Type alias for use in submodules. *)
+type attestation = t
+
 (** Slot availability represents the protocol's attestation result for a block.
     It is an alias to the main attestation type. *)
 module Slot_availability = struct
@@ -132,4 +147,6 @@ module Slot_availability = struct
   let is_attested = is_attested
 
   let commit = commit
+
+  let number_of_attested_slots = number_of_attested_slots
 end
