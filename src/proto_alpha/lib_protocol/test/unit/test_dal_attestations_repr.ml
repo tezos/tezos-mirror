@@ -572,14 +572,20 @@ let test_intersection_basic () =
     let all_slots = Misc.(0 --> (number_of_slots - 1)) in
     List.iter_es
       (fun slot ->
+        let is_set = is_attested_result slot in
         let should_be_set =
           List.exists (fun s -> Compare.Int.(s = slot)) expected_slots
         in
         assert_equal_bool
           ~loc:__LOC__
-          (Printf.sprintf "Lag %d, slot %d should not be set" lag_index slot)
+          (Printf.sprintf
+             "Lag %d, slot %d: got %b, expected %b"
+             lag_index
+             slot
+             is_set
+             should_be_set)
           should_be_set
-          (is_attested_result slot))
+          is_set)
       all_slots
   in
 
