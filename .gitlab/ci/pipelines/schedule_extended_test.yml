@@ -798,7 +798,6 @@ oc.compile_sources_doc:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
