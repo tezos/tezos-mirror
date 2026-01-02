@@ -191,7 +191,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       return_unit)
     ~on_next_block_info:(fun timestamp number ->
       Broadcast.notify_next_block_info timestamp number ;
-      let*! () = Events.next_block_timestamp timestamp in
+      let*! () = Events.next_block_info timestamp number in
       return_unit)
     ~on_inclusion:(fun tx hash ->
       Broadcast.notify_inclusion tx hash ;

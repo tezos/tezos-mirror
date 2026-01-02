@@ -118,7 +118,7 @@ let test_observer_receives_preconfirmations () =
     7. Hashes are the same
   *)
   let add = Evm_node.wait_for_tx_queue_add_transaction sandbox in
-  let next_ts = Evm_node.wait_for_next_block_timestamp observer in
+  let next_ts = Evm_node.wait_for_next_block_info observer in
   let preconf = Evm_node.wait_for_inclusion observer in
   let p =
     Eth_cli.transaction_send
@@ -148,8 +148,8 @@ let test_observer_ignores_preconfirmations () =
   @@ fun {sandbox; observer; _} ->
   let* () = setup_experimental_feature sandbox observer ~patch_observer:false in
   let add = Evm_node.wait_for_tx_queue_add_transaction sandbox in
-  let next_ts_sandbox = Evm_node.wait_for_next_block_timestamp sandbox in
-  let next_ts_observer = Evm_node.wait_for_next_block_timestamp observer in
+  let next_ts_sandbox = Evm_node.wait_for_next_block_info sandbox in
+  let next_ts_observer = Evm_node.wait_for_next_block_info observer in
   let _ =
     Eth_cli.transaction_send
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
