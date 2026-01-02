@@ -214,11 +214,6 @@ fn store_copy(
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
     trace!("store_copy(from: {}, to: {})", from.as_str(), to.as_str());
 
-    if to.as_str() == "/kernel/boot.wasm" {
-        // If we change the kernel, we need to reload the runtime accordingly.
-        runtime_env.mut_host().request_kernel_reload();
-    }
-
     let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
     match bindings::store_copy(&tree, from, to) {
@@ -244,11 +239,6 @@ fn store_move(
     let from = read_from_memory(&memory_view, from_ptr, from_len)?;
     let to = read_from_memory(&memory_view, to_ptr, to_len)?;
     trace!("store_move(from: {}, to: {})", from.as_str(), to.as_str());
-
-    if to.as_str() == "/kernel/boot.wasm" {
-        // If we change the kernel, we need to reload the runtime accordingly.
-        runtime_env.mut_host().request_kernel_reload();
-    }
 
     let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();

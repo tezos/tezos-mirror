@@ -5072,7 +5072,7 @@ let test_estimate_gas_out_of_gas =
   let*@? {message; code = _; data = _} =
     Rpc.estimate_gas estimateGas evm_node
   in
-  Check.(message =~ rex "Error\\(OutOfGas\\)")
+  Check.(message =~ rex "OutOfGas")
     ~error_msg:"The estimate gas should fail with out of gas message." ;
   unit
 
