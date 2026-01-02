@@ -149,6 +149,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
       ~allowed_consensus:None
+      ~delegate_to_shard_count:None (* TODO: updated in the next commit *)
   in
   return ctxt
 
@@ -188,6 +189,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       ~allowed_attestations:None
       ~allowed_preattestations:None
       ~allowed_consensus:(Some minimal_slots)
+      ~delegate_to_shard_count:None
   in
   return ctxt
 

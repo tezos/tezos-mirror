@@ -370,6 +370,8 @@ module type CONSENSUS = sig
 
   type 'value level_map
 
+  type 'value raw_level_map
+
   type slot_set
 
   type slot
@@ -395,6 +397,9 @@ module type CONSENSUS = sig
       (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
+  val delegate_to_shard_count :
+    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
       due to a previous slashing. *)
@@ -415,6 +420,8 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
+    delegate_to_shard_count:
+      int Signature.Public_key_hash.Map.t raw_level_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -475,6 +482,7 @@ module Consensus :
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type 'a level_map := 'a Level_repr.Map.t
+     and type 'a raw_level_map := 'a Raw_level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type attesting_power := Attesting_power_repr.t

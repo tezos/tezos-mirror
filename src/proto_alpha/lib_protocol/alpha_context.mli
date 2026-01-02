@@ -5668,6 +5668,7 @@ module Consensus : sig
        and type slot := Slot.t
        and type 'a slot_map := 'a Slot.Map.t
        and type 'a level_map := 'a Level.Map.t
+       and type 'a raw_level_map := 'a Raw_level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
        and type attesting_power := Attesting_power.t

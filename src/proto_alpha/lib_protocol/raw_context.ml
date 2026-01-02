@@ -123,6 +123,11 @@ module Raw_consensus = struct
     allowed_consensus : consensus_power Slot_repr.Map.t Level_repr.Map.t option;
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
+    delegate_to_shard_count :
+      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t option;
+        (** Holds the number of assigned shards of delegates
+            with at least one assigned shard for all relevant future
+            levels. This is [None] only in mempool mode. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -156,6 +161,7 @@ module Raw_consensus = struct
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
+      delegate_to_shard_count = Some Raw_level_repr.Map.empty;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
@@ -242,8 +248,14 @@ module Raw_consensus = struct
     | None -> {t with preattestations_quorum_round = Some round}
 
   let set_allowed_operations ~allowed_attestations ~allowed_preattestations
-      ~allowed_consensus t =
-    {t with allowed_attestations; allowed_preattestations; allowed_consensus}
+      ~allowed_consensus ~delegate_to_shard_count t =
+    {
+      t with
+      allowed_attestations;
+      allowed_preattestations;
+      allowed_consensus;
+      delegate_to_shard_count;
+    }
 
   let locked_round_evidence t = t.locked_round_evidence
 
@@ -2043,6 +2055,8 @@ module type CONSENSUS = sig
 
   type 'value level_map
 
+  type 'value raw_level_map
+
   type slot_set
 
   type slot
@@ -2059,6 +2073,9 @@ module type CONSENSUS = sig
 
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
+  val delegate_to_shard_count :
+    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
@@ -2070,6 +2087,8 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
+    delegate_to_shard_count:
+      int Signature.Public_key_hash.Map.t raw_level_map option ->
     t
 
   val record_attestation :
@@ -2101,6 +2120,7 @@ module Consensus :
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type 'a level_map := 'a Level_repr.Map.t
+     and type 'a raw_level_map := 'a Raw_level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type attesting_power := Attesting_power_repr.t
@@ -2121,6 +2141,9 @@ module Consensus :
 
   let[@inline] allowed_consensus ctxt = ctxt.back.consensus.allowed_consensus
 
+  let[@inline] delegate_to_shard_count ctxt =
+    ctxt.back.consensus.delegate_to_shard_count
+
   let[@inline] forbidden_delegates ctxt =
     ctxt.back.consensus.forbidden_delegates
 
@@ -2137,13 +2160,14 @@ module Consensus :
     Raw_consensus.locked_round_evidence ctxt.back.consensus
 
   let[@inline] initialize_consensus_operation ctxt ~allowed_attestations
-      ~allowed_preattestations ~allowed_consensus =
+      ~allowed_preattestations ~allowed_consensus ~delegate_to_shard_count =
     update_consensus_with
       ctxt
       (Raw_consensus.set_allowed_operations
          ~allowed_attestations
          ~allowed_preattestations
-         ~allowed_consensus)
+         ~allowed_consensus
+         ~delegate_to_shard_count)
 
   let[@inline] record_preattestation ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult
