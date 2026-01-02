@@ -437,6 +437,12 @@ let eip7702 =
     ~label:"eip7702contract"
     ~contract:"EIP7702Contract"
 
+let eip7702_fallback =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/eip7702_fallback.sol")
+    ~label:"eip7702fallbackcontract"
+    ~contract:"EIP7702FallbackContract"
+
 let nested_delegatecalls_A =
   compile_contract
     ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
