@@ -768,7 +768,6 @@ oc.compile_sources_doc_deps:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
   parallel:
     matrix:
@@ -791,14 +790,22 @@ oc.compile_sources_doc:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
   parallel:
     matrix:
     - IMAGE:

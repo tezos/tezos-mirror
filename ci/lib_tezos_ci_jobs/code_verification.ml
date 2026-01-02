@@ -349,10 +349,6 @@ let jobs pipeline_type =
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
           ~stage:Stages.test
-            (* This job uses a CARGO_HOME different from
-               {!Common.cargo_home}. That CARGO_HOME used is outside the
-               CI_PROJECT_DIR, and is thus uncachable. *)
-          ~variables:[("CARGO_HOME", "/home/opam/.cargo")]
           [sf "./docs/introduction/compile-sources-setup.sh"]
         |> enable_networked_cargo
       in
@@ -376,7 +372,7 @@ let jobs pipeline_type =
                CI_PROJECT_DIR, and is thus uncachable. *)
           ~variables:[("CARGO_HOME", "/home/opam/.cargo")]
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
-        |> enable_networked_cargo
+        |> enable_networked_cargo |> enable_sccache
       in
 
       [(* Test installing through opam *) job_install_opam_noble]
