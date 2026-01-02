@@ -165,7 +165,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
       config.opentelemetry.config
   in
-  let*? {evm_node_endpoint; rollup_node_tracking} =
+  let*? {evm_node_endpoint; rollup_node_tracking; _} =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =

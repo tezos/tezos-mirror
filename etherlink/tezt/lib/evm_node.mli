@@ -193,7 +193,12 @@ val initial_kernel : t -> string option
     passed via [extra_arguments].
     [wait] defaults to true, if it is set to false, the evm node is ran but we
     do not wait for it to be ready. *)
-val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
+val run :
+  ?wait:bool ->
+  ?end_test_on_failure:bool ->
+  ?extra_arguments:string list ->
+  t ->
+  unit Lwt.t
 
 (** [wait_for_event ?timeout evm_node ~event f] waits for event [event] until
     [timeout] on node [evm_node].
@@ -367,6 +372,7 @@ val init :
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
+  ?end_test_on_failure:bool ->
   ?data_dir:string ->
   ?config_file:string ->
   ?rpc_addr:string ->

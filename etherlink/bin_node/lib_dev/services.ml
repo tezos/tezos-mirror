@@ -1654,17 +1654,19 @@ let dispatch_private_request (type f) ~websocket
     | Method (Produce_block.Method, module_) ->
         let f input =
           let open Lwt_result_syntax in
-          let timestamp, with_delayed_transactions =
+          let force, with_delayed_transactions =
             match input with
-            | Some {timestamp; with_delayed_transactions} ->
-                (timestamp, with_delayed_transactions)
-            | None -> (None, true)
+            | Some {timestamp = Some timestamp; with_delayed_transactions} ->
+                ( Block_producer.With_timestamp timestamp,
+                  with_delayed_transactions )
+            | Some {timestamp = None; with_delayed_transactions} ->
+                (True, with_delayed_transactions)
+            | None -> (True, true)
           in
-          let timestamp = Option.value timestamp ~default:(Misc.now ()) in
           let* has_produced_block =
             Block_producer.Internal_for_tests.produce_block
               ~with_delayed_transactions
-              ~force:(With_timestamp timestamp)
+              ~force
           in
           match has_produced_block with
           | `Block_produced nb_transactions ->

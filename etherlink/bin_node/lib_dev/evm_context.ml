@@ -1179,7 +1179,7 @@ module State = struct
       This function expects its connection to the store [conn] to be wrapped in
       a SQL transaction. *)
   let rec apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
-      delayed_transactions sequencer_block_hash =
+      delayed_transactions sequencer_block_hash fail_on_divergence =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction conn ;
 
@@ -1255,14 +1255,25 @@ module State = struct
             let*! evm_state = Pvm.State.get ctxt.session.context in
             ctxt.session.evm_state <- evm_state ;
             ctxt.session.future_block_info <- None ;
-            apply_blueprint_store_unsafe
-              ctxt
-              conn
-              timestamp
-              chunks
-              payload
-              delayed_transactions
-              None
+            if fail_on_divergence then
+              tzfail
+                (Node_error.Diverged
+                   {
+                     level = next;
+                     expected_block_hash = sequencer_block_hash;
+                     found_block_hash = Some block_hash;
+                     must_exit = true;
+                   })
+            else
+              apply_blueprint_store_unsafe
+                ctxt
+                conn
+                timestamp
+                chunks
+                payload
+                delayed_transactions
+                None
+                fail_on_divergence
         (* When observer, future info is present but no sequencer hash was received:
             Should not happen but if it does we re-apply the full blueprint
             as we have no way of checking the assemble validity *)
@@ -1279,6 +1290,7 @@ module State = struct
               payload
               delayed_transactions
               None
+              fail_on_divergence
         (* Any other case is standard procedure *)
         | _ ->
             ctxt.session.future_block_info <- None ;
@@ -1415,9 +1427,9 @@ module State = struct
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
-  let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
-      timestamp chunks payload delayed_transactions :
-      'a L2_types.block tzresult Lwt.t =
+  let rec apply_blueprint ?(events = []) ?expected_block_hash
+      ?(fail_on_divergence = false) ctxt conn timestamp chunks payload
+      delayed_transactions : 'a L2_types.block tzresult Lwt.t =
     let open Lwt_result_syntax in
     let+ current_block, _execution_gas =
       Misc.with_timing_f_e (fun (block, execution_gas) ->
@@ -1439,6 +1451,7 @@ module State = struct
           payload
           delayed_transactions
           expected_block_hash
+          fail_on_divergence
       in
       let kernel_upgrade =
         match ctxt.session.pending_upgrade with
@@ -2382,6 +2395,11 @@ module Handlers = struct
           State.apply_blueprint
             ?events
             ?expected_block_hash
+            ?fail_on_divergence:
+              (Option.map
+                 (fun (config : Configuration.observer) ->
+                   config.fail_on_divergence)
+                 ctxt.configuration.observer)
             ctxt
             conn
             timestamp

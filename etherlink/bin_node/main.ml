@@ -556,6 +556,12 @@ let keep_everything_arg =
     ~doc:"Do not filter out files outside of the `/evm` directory."
     ()
 
+let fail_on_divergence_arg =
+  Tezos_clic.switch
+    ~long:"fail-on-divergence"
+    ~doc:"Instant confirmation observer hard fails on block hash divergence"
+    ()
+
 let verbose_arg =
   Tezos_clic.switch
     ~short:'v'
@@ -2228,7 +2234,7 @@ let init_config_command =
        then adds the configuration for the observer mode."
     (merge_options
        common_config_args
-       (args19
+       (args20
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -2243,6 +2249,7 @@ let init_config_command =
           catchup_cooldown_arg
           evm_node_endpoint_arg
           history_arg
+          fail_on_divergence_arg
           (* others option *)
           dont_track_rollup_node_arg
           wallet_dir_arg
@@ -2296,6 +2303,7 @@ let init_config_command =
              catchup_cooldown,
              evm_node_endpoint,
              history_mode,
+             fail_on_divergence,
              dont_track_rollup_node,
              wallet_dir,
              force,
@@ -2362,6 +2370,7 @@ let init_config_command =
           ?network
           ?history_mode
           ?sunset_sec:sequencer_sunset_sec
+          ~fail_on_divergence
           config_file
       in
       let*! () = init_logs ~daily_logs:false config in

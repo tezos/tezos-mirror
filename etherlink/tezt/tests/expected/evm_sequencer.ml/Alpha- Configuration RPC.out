@@ -109,7 +109,8 @@
   },
   "observer": {
     "evm_node_endpoint": "hidden",
-    "rollup_node_tracking": true
+    "rollup_node_tracking": true,
+    "fail_on_divergence": true
   },
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
@@ -124,7 +125,7 @@
     "spawn_rpc": null,
     "l2_chains": null,
     "periodic_snapshot_path": null,
-    "preconfirmation_stream_enabled": false
+    "preconfirmation_stream_enabled": true
   },
   "proxy": {
     "evm_node_endpoint": "hidden",

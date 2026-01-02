@@ -83,7 +83,10 @@
       "rollup_node_tracking"?:
         boolean
         /* Enable or disable monitoring a companion rollup node to verify the correctness of
-           the speculative history coming from the upstream EVM node. */ },
+           the speculative history coming from the upstream EVM node. */,
+      "fail_on_divergence"?:
+        boolean
+        /* Enable or disable hard failure on assemble block divergence */ },
   "tx_pool_timeout_limit"?:
     $int64
     /* Transaction timeout limit inside the transaction pool. DEPRECATED: You should use
