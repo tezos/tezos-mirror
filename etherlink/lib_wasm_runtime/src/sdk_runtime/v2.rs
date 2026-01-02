@@ -210,11 +210,6 @@ impl Runtime for Host {
             .map_err(self.check_path_exists_v2(from_path))?;
         self.set_tree(new_tree);
 
-        if to_path.as_bytes() == b"/kernel/boot.wasm" {
-            // If we change the kernel, we need to reload the runtime accordingly.
-            self.request_kernel_reload();
-        }
-
         Ok(())
     }
 
@@ -228,11 +223,6 @@ impl Runtime for Host {
             .map_err(from_binding_error)
             .map_err(self.check_path_exists_v2(from_path))?;
         self.set_tree(new_tree);
-
-        if to_path.as_bytes() == b"/kernel/boot.wasm" {
-            // If we change the kernel, we need to reload the runtime accordingly.
-            self.request_kernel_reload();
-        }
 
         Ok(())
     }

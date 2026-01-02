@@ -50,7 +50,7 @@ pub trait Runtime {
 
             end_span()?;
 
-            if self.host().needs_kernel_reload() {
+            if self.host().needs_kernel_reload()? {
                 return Ok(RunStatus::PendingKernelUpgrade(
                     self.host().tree().clone(),
                     self.host().inputs_buffer().clone(),
@@ -331,6 +331,7 @@ pub fn load_runtime(
     native_execution: bool,
 ) -> Result<Box<dyn Runtime>, Error> {
     let root_hash = bindings::store_get_hash(&host.tree(), KERNEL)?;
+    host.root_hash = Some(root_hash.clone());
     match NativeKernel::of_root_hash(&root_hash) {
         Some(kernel) if native_execution => {
             host.version = kernel.runtime_version();

@@ -17,9 +17,9 @@ use std::{
 
 use crate::{
     bindings,
-    constants::REBOOT_FLAG,
+    constants::{self, REBOOT_FLAG},
     reveal,
-    types::{EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
+    types::{ContextHash, EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
     write_debug::write_debug,
 };
 
@@ -70,7 +70,7 @@ pub struct Host {
     inputs_buffer: InputsBuffer,
     tree: Rc<RefCell<EvmTree>>,
     rollup_address: SmartRollupAddress,
-    needs_kernel_reload: bool,
+    pub root_hash: Option<ContextHash>,
     pub preimages_dir: OCamlString,
     pub preimages_endpoint: Option<OCamlString>,
     pub version: RuntimeVersion,
@@ -90,7 +90,7 @@ impl Host {
             inputs_buffer,
             tree: Rc::new(RefCell::new(tree.clone())),
             rollup_address,
-            needs_kernel_reload: false,
+            root_hash: None,
             preimages_dir,
             preimages_endpoint,
             version: RuntimeVersion::V0,
@@ -109,13 +109,14 @@ impl Host {
         self.preimages_endpoint.as_ref().map(|s| s.as_str())
     }
 
-    pub fn request_kernel_reload(&mut self) {
-        trace!("kernel reload requested");
-        self.needs_kernel_reload = true;
-    }
-
-    pub fn needs_kernel_reload(&self) -> bool {
-        self.needs_kernel_reload
+    pub fn needs_kernel_reload(&self) -> Result<bool, Error> {
+        match &self.root_hash {
+            Some(ref previous_hash) => {
+                let root_hash = bindings::store_get_hash(&self.tree(), constants::KERNEL)?;
+                Ok(!root_hash.eq(previous_hash))
+            }
+            _ => Ok(true),
+        }
     }
 
     pub fn rollup_address(&self) -> &SmartRollupAddress {
