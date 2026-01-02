@@ -772,8 +772,8 @@ oc.compile_sources_doc_deps:
   parallel:
     matrix:
     - IMAGE:
-      - debian:bookworm
-      - ubuntu:noble
+      - debian:trixie-master-07a4c8c9
+      - ubuntu:noble-master-07a4c8c9
 
 oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
@@ -809,7 +809,7 @@ oc.compile_sources_doc:
   parallel:
     matrix:
     - IMAGE:
-      - build-debian-bookworm:master
+      - build-debian-trixie:master
       - build-ubuntu-noble:master
 
 check_riscv_kernels:

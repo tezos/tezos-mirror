@@ -336,16 +336,25 @@ let jobs pipeline_type =
           ["./docs/introduction/install-opam.sh"]
         |> enable_networked_cargo
       in
-      let job_compile_sources_build ~__POS__ ~name ~matrix ?retry () =
+      let job_compile_sources_build_deps () =
         job
           ~__POS__
-          ~name
+          ~name:"oc.compile_sources_doc_deps"
           ~cpu:Very_high
           ~image:
             (Image.mk_external
                ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
-          ~parallel:(Matrix matrix)
-          ?retry
+          ~parallel:
+            (Matrix
+               [
+                 [
+                   ( "IMAGE",
+                     [
+                       "debian:trixie-" ^ Images.Base_images.debian_version;
+                       "ubuntu:noble-" ^ Images.Base_images.debian_version;
+                     ] );
+                 ];
+               ])
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
           ~stage:Stages.test
@@ -382,11 +391,7 @@ let jobs pipeline_type =
          in master are still valid for the latest-release branch *)
       | Schedule_extended_test ->
           [
-            job_compile_sources_build
-              ~__POS__
-              ~name:"oc.compile_sources_doc_deps"
-              ~matrix:[[("IMAGE", ["debian:bookworm"; "ubuntu:noble"])]]
-              ();
+            job_compile_sources_build_deps ();
             job_compile_sources
               ~__POS__
               ~name:"oc.compile_sources_doc"
@@ -397,8 +402,7 @@ let jobs pipeline_type =
                   [
                     ( "IMAGE",
                       [
-                        "build-debian-bookworm:master";
-                        "build-ubuntu-noble:master";
+                        "build-debian-trixie:master"; "build-ubuntu-noble:master";
                       ] );
                   ];
                 ]
@@ -415,7 +419,7 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_master"
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
-              ~matrix:[[("IMAGE", ["build-debian-bookworm:master"])]]
+              ~matrix:[[("IMAGE", ["build-debian-trixie:master"])]]
               ();
           ]
     in

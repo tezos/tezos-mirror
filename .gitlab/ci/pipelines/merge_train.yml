@@ -1066,7 +1066,7 @@ oc.compile_sources_doc_master:
   parallel:
     matrix:
     - IMAGE:
-      - build-debian-bookworm:master
+      - build-debian-trixie:master
 
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

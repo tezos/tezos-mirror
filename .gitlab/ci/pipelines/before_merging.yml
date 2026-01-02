@@ -1079,7 +1079,7 @@ oc.compile_sources_doc_master:
   parallel:
     matrix:
     - IMAGE:
-      - build-debian-bookworm:master
+      - build-debian-trixie:master
 
 trigger:homebrew:
   stage: manual
