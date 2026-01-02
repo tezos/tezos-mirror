@@ -1220,12 +1220,13 @@ importing_snapshot:
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 inclusion:
-  description: received inclusion confirmation for the transaction {txn_hash}
-  level: notice
+  description: {op} inclusion confirmation for the transaction {txn_hash}
+  level: debug
   section: evm_node.dev
   json format:
     { /* inclusion version 0 */
-      "inclusion.v0": $unistring }
+      "inclusion.v0": { "op": $unistring,
+                        "txn_hash": $unistring } }
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
@@ -1426,13 +1427,16 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
-next_block_timestamp:
-  description: received timestamp of the next block {timestamp}
-  level: notice
+next_block_info:
+  description: {op} info for the next block: level = {level}, timestamp = {timestamp}
+  level: debug
   section: evm_node.dev
   json format:
-    { /* next_block_timestamp version 0 */
-      "next_block_timestamp.v0": $timestamp.protocol }
+    { /* next_block_info version 0 */
+      "next_block_info.v0":
+        { "op": $unistring,
+          "level": $unistring,
+          "timestamp": $timestamp.protocol } }
     $timestamp.protocol:
       /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring

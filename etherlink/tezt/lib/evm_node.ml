@@ -718,13 +718,13 @@ let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
       if json |-> "level" |> as_int = expected_level then Some () else None
   | None -> Some ()
 
-let wait_for_next_block_timestamp ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"next_block_timestamp.v0"
-  @@ fun json -> Some (JSON.as_string json)
+let wait_for_next_block_info ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"next_block_info.v0" @@ fun json ->
+  Some JSON.(json |-> "timestamp" |> as_string)
 
 let wait_for_inclusion ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
-  let found_hash = JSON.as_string json in
+  let found_hash = JSON.(json |-> "txn_hash" |> as_string) in
   match hash with
   | Some expected_hash ->
       if String.equal expected_hash found_hash then Some found_hash else None
