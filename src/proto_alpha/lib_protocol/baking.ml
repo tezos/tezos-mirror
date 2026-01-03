@@ -334,3 +334,28 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
       stake_info_list
   in
   return (ctxt, slots_map)
+
+let delegate_to_shard_count ctxt level =
+  let open Lwt_result_syntax in
+  let*? slots =
+    Slot.Range.create ~min:0 ~count:(Constants.dal_number_of_shards ctxt)
+  in
+  let* ctxt, map =
+    Slot.Range.fold_es
+      (fun (ctxt, map) shard_index ->
+        let*? round = Round.of_slot shard_index in
+        let* ctxt, _, consensus_pk =
+          Stake_distribution.baking_rights_owner ctxt level ~round
+        in
+        let map =
+          Signature.Public_key_hash.Map.update
+            consensus_pk.delegate
+            (function
+              | None -> Some 1 | Some num_shards -> Some (num_shards + 1))
+            map
+        in
+        return (ctxt, map))
+      (ctxt, Signature.Public_key_hash.Map.empty)
+      slots
+  in
+  return (ctxt, map)
