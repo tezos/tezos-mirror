@@ -1381,7 +1381,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             dynamic_lag_enable = false;
             number_of_slots = 160;
             attestation_lag = 5;
-            attestation_lags = [5];
+            attestation_lags = [1; 2; 3; 4; 5];
             attestation_threshold;
             cryptobox_parameters =
               {
