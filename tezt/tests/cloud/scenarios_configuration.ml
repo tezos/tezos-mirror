@@ -21,8 +21,7 @@ module DAL = struct
     producers : int option;
     producers_delay : int option;
     producer_machine_type : string option;
-    observer_slot_indices : int list;
-    observers_multi_slot_indices : int list list;
+    observers_slot_indices : int list list;
     observer_machine_type : string list;
     archivers_slot_indices : int list list;
     observer_pkhs : string list;
@@ -83,8 +82,7 @@ module DAL = struct
              producers;
              producers_delay;
              producer_machine_type;
-             observer_slot_indices;
-             observers_multi_slot_indices;
+             observers_slot_indices;
              observer_machine_type;
              archivers_slot_indices;
              observer_pkhs;
@@ -135,8 +133,7 @@ module DAL = struct
                   producers,
                   producers_delay,
                   producer_machine_type,
-                  observer_slot_indices,
-                  observers_multi_slot_indices,
+                  observers_slot_indices,
                   observer_machine_type,
                   archivers_slot_indices,
                   observer_pkhs ),
@@ -182,8 +179,7 @@ module DAL = struct
                      producers,
                      producers_delay,
                      producer_machine_type,
-                     observer_slot_indices,
-                     observers_multi_slot_indices,
+                     observers_slot_indices,
                      observer_machine_type,
                      archivers_slot_indices,
                      observer_pkhs ),
@@ -231,8 +227,7 @@ module DAL = struct
           producers;
           producers_delay;
           producer_machine_type;
-          observer_slot_indices;
-          observers_multi_slot_indices;
+          observers_slot_indices;
           observer_machine_type;
           archivers_slot_indices;
           observer_pkhs;
@@ -283,13 +278,12 @@ module DAL = struct
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
                (merge_objs
-                  (obj9
+                  (obj8
                      (dft "dal_producers_slot_indices" (list int31) [])
                      (opt "producers" int31)
                      (opt "producers_delay" int31)
                      (opt "producer_machine_type" string)
-                     (dft "observer_slot_indices" (list int31) [])
-                     (dft "observers_multi_slot_indices" (list (list int31)) [])
+                     (dft "observers_slot_indices" (list (list int31)) [])
                      (dft "observer_machine_type" (list string) [])
                      (dft "archivers_slot_indices" (list (list int31)) [])
                      (dft "observer_pkhs" (list string) []))
