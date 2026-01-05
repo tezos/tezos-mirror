@@ -217,7 +217,7 @@ To remove the Octez packages you can simply run the following command.
                 octez-dal-node octez-smart-rollup-node
 
 To upgrade packages, use ``dnf update``.
-If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+If running Octez as services, see also how to :ref:`restart them <services_upgrade>`.
 
 
 .. _getting_static_binaries:
@@ -336,7 +336,7 @@ Docker compose files
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 A working example of a simple Docker compose file is available at :src:`scripts/docker/bake.yml`.
-The compose file is able to launch services for an Octez node, a baker, and an accuser.
+The compose file is able to launch services for an Octez node, a DAL node, a baker, and an accuser.
 
 First, you have to make some choices:
 
@@ -348,16 +348,17 @@ For instance, to configure and run the node on the active protocol on Shadownet 
 
     wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
     export LIQUIDITY_BAKING_VOTE=pass
-    docker compose -f bake.yml run --rm -it octez-node octez-node config init \
+    docker compose -f bake.yml run --rm -it node octez-node config init \
        --network https://teztnets.com/shadownet --history-mode rolling \
        --data-dir /var/run/tezos/node/data \
        --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
     wget -O $HOME/rolling https://snapshots.tzinit.org/shadownet/rolling
     docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
-      octez-node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
-    docker compose -f bake.yml up octez-node
+      node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
+    docker compose -f bake.yml up node
 
-(Note in the command above that ``octez-node`` is the name of both the container and executable.)
+Note in the commands above that ``node`` is the name of the service running the ``octez-node`` executable.
+You may ignore possible warnings about environment variable ``BAKER_ADDRESS``, that we will set later on for the DAL node.
 
 .. note::
 
@@ -367,22 +368,22 @@ For instance, to configure and run the node on the active protocol on Shadownet 
 
         docker compose -f bake.yml run --rm \
           --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
-          octez-node
+          node
 
 You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
 
-    docker compose -f bake.yml exec octez-node octez-client bootstrapped
+    docker compose -f bake.yml exec node octez-client bootstrapped
 
 You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
 
-    docker compose -f bake.yml stop octez-node
-    docker compose -f bake.yml run octez-node octez-upgrade-storage
-    docker compose -f bake.yml up octez-node
+    docker compose -f bake.yml stop node
+    docker compose -f bake.yml run --rm node octez-node upgrade storage --data-dir /var/run/tezos/node/data
+    docker compose -f bake.yml up node
 
 To run the baker, you must configure a baking key (if you have one you may skip this step.
 While the node is running, do (in another window if needed)::
 
-    docker compose -f bake.yml exec octez-node sh
+    docker compose -f bake.yml exec node sh
 
 and in the shell do::
 
