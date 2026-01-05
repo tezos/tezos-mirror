@@ -1649,8 +1649,7 @@ let dispatch_private_request (type f) ~websocket
           let* has_produced_block =
             Block_producer.Internal_for_tests.produce_block
               ~with_delayed_transactions
-              ~force:true
-              ~timestamp:(Some timestamp)
+              ~force:(With_timestamp timestamp)
           in
           match has_produced_block with
           | `Block_produced nb_transactions ->
