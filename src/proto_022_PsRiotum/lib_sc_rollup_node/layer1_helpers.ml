@@ -166,7 +166,13 @@ let constants_of_parametric
           max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
-        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
+        {
+          feature_enable;
+          attestation_lag;
+          number_of_slots;
+          attestation_lags = [];
+          cryptobox_parameters;
+        };
     }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901

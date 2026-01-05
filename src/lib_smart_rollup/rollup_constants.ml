@@ -28,6 +28,7 @@
 type dal_constants = {
   feature_enable : bool;
   attestation_lag : int;
+  attestation_lags : int list;
   number_of_slots : int;
   cryptobox_parameters : Tezos_crypto_dal.Cryptobox.parameters;
 }
@@ -109,6 +110,7 @@ let encoding =
              {
                feature_enable;
                attestation_lag;
+               attestation_lags;
                number_of_slots;
                cryptobox_parameters;
              };
@@ -121,8 +123,11 @@ let encoding =
           reveal_activation_level,
           max_number_of_stored_cemented_commitments,
           max_active_outbox_levels ),
-        (feature_enable, attestation_lag, number_of_slots, cryptobox_parameters)
-      ))
+        ( feature_enable,
+          attestation_lag,
+          attestation_lags,
+          number_of_slots,
+          cryptobox_parameters ) ))
     (fun ( minimal_block_delay,
            delay_increment_per_round,
            ( challenge_window_in_blocks,
@@ -132,6 +137,7 @@ let encoding =
              max_active_outbox_levels ),
            ( feature_enable,
              attestation_lag,
+             attestation_lags,
              number_of_slots,
              cryptobox_parameters ) )
        ->
@@ -150,6 +156,7 @@ let encoding =
           {
             feature_enable;
             attestation_lag;
+            attestation_lags;
             number_of_slots;
             cryptobox_parameters;
           };
@@ -167,9 +174,10 @@ let encoding =
              (req "max_active_outbox_levels" int31)))
        (req
           "dal"
-          (obj4
+          (obj5
              (req "feature_enable" bool)
              (req "attestation_lag" int31)
+             (dft "attestation_lags" (list int31) [])
              (req "number_of_slots" int31)
              (req
                 "cryptobox_parameters"
