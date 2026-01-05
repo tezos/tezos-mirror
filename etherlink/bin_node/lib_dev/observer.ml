@@ -355,6 +355,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         Drift_monitor.run
           ~evm_node_endpoint
           ~timeout:config.rpc_timeout
+          ~chain_family
           Evm_context.next_blueprint_number) ;
     Misc.background_task ~name:"tx_queue_beacon" (fun () ->
         Tx_container.tx_queue_beacon
