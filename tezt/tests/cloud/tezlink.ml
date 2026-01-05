@@ -146,14 +146,14 @@ let make_proxy agent ~path ~dns_domain public_port activate_ssl =
           activate_ssl;
         }
 
-type sequencer_endpoint =
+type service_endpoint =
   | Internal of proxy_info
   | External of string (* the address of the end-point *)
 
 (* The internal end-point if the sequencer node is local to the scenario.
    Otherwise, i.e. when the scenario relies on an external end-point, return the
    latter. *)
-let sequencer_internal_endpoint = function
+let service_internal_endpoint = function
   | Internal proxy_info ->
       proxy_internal_endpoint proxy_info |> Client.string_of_endpoint
   | External endpoint -> endpoint
@@ -161,7 +161,7 @@ let sequencer_internal_endpoint = function
 (* The exposed end-point if the sequencer node is local to the scenario.
    Otherwise, i.e. when the scenario relies on an external end-point, return the
    latter. *)
-let sequencer_external_endpoint ~runner = function
+let service_external_endpoint ~runner = function
   | Internal proxy_info ->
       proxy_external_endpoint ~runner proxy_info |> Client.string_of_endpoint
   | External endpoint -> endpoint
@@ -291,9 +291,7 @@ let git_clone agent ?branch repo_url directory =
 let init_tzkt ~tzkt_proxy ~agent ~sequencer_endpoint ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
-  let tezlink_sandbox_endpoint =
-    sequencer_internal_endpoint sequencer_endpoint
-  in
+  let tezlink_sandbox_endpoint = service_internal_endpoint sequencer_endpoint in
   let tzkt_api_port = proxy_internal_port tzkt_proxy in
   (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
@@ -464,9 +462,7 @@ let create_env_file ~agent destination env =
 
 let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
-  let tezlink_sandbox_endpoint =
-    sequencer_internal_endpoint sequencer_endpoint
-  in
+  let tezlink_sandbox_endpoint = service_internal_endpoint sequencer_endpoint in
   let faucet_api_port = proxy_internal_port faucet_api_proxy in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -543,14 +539,14 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
     ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
-    ~faucet_pkh ~tzkt_proxy ~faucet_frontend_proxy =
+    ~faucet_pkh ~tzkt_api_proxy ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
-    sequencer_external_endpoint ~runner sequencer_endpoint
+    service_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
-  let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
+  let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
      not yet support using sandbox.tzkt.io as explorer. *)
@@ -696,10 +692,12 @@ index 1d28850f..39a15d9b 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~sequencer_endpoint ~tzkt_proxy ~umami_proxy =
+let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~umami_proxy =
   let runner = Agent.runner agent in
-  let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
-  let rpc_url = sequencer_external_endpoint ~runner sequencer_endpoint in
+  let external_tzkt_api_endpoint =
+    proxy_external_endpoint ~runner tzkt_api_proxy
+  in
+  let rpc_url = service_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
   (* Create a local patch file with its contents. *)
@@ -818,12 +816,12 @@ let rec loop n =
   loop n
 
 type faucet_proxys = {
-  tzkt_proxy : proxy_info;
+  tzkt_api_proxy : proxy_info;
   faucet_api_proxy : proxy_info;
   faucet_frontend_proxy : proxy_info;
 }
 
-type umami_proxys = {tzkt_proxy : proxy_info; umami_proxy : proxy_info}
+type umami_proxys = {tzkt_api_proxy : proxy_info; umami_proxy : proxy_info}
 
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
@@ -835,7 +833,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   in
   add_service cloud ~name ~url:(url endpoint)
 
-let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
+let add_services cloud runner ~sequencer_endpoint ~tzkt_api_proxy_opt
     ~faucet_proxys_opt ~umami_proxys_opt ~bridge_proxy_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
@@ -857,7 +855,7 @@ let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
         add_service cloud ~name:name_endpoint ~url:sequencer_endpoint
   in
   let* () =
-    match tzkt_proxy_opt with
+    match tzkt_api_proxy_opt with
     | None -> unit
     | Some tzkt_proxy ->
         let* () = add_proxy_service "TzKT API" tzkt_proxy in
@@ -906,6 +904,10 @@ type dns_domains = {
 let nginx_config_of_proxy_opt agent = function
   | None -> Lwt.return_nil
   | Some proxy -> nginx_reverse_proxy_config ~agent ~proxy
+
+let nginx_config_of_service_endpoint agent = function
+  | Internal proxy -> nginx_reverse_proxy_config ~agent ~proxy
+  | External _ -> Lwt.return_nil
 
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
@@ -968,7 +970,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             Internal sequencer_proxy
         | Some endpoint -> External endpoint
       in
-      let* tzkt_proxy_opt =
+      let* tzkt_api_proxy_opt =
         if Cli.tzkt then
           let tzkt_proxy =
             make_proxy
@@ -983,8 +985,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         else none
       in
       let* faucet_proxys_opt =
-        match (tzkt_proxy_opt, Cli.faucet) with
-        | Some tzkt_proxy, true ->
+        match (tzkt_api_proxy_opt, Cli.faucet) with
+        | Some tzkt_api_proxy, true ->
             let faucet_api_proxy =
               make_proxy
                 tezlink_sequencer_agent
@@ -1003,7 +1005,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 None
                 activate_ssl
             in
-            some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy}
+            some {tzkt_api_proxy; faucet_api_proxy; faucet_frontend_proxy}
         | None, true ->
             Test.fail
               "The faucet service relies on TzKT, but the latter is \
@@ -1011,8 +1013,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | (None | Some _), false -> none
       in
       let* umami_proxys_opt =
-        match tzkt_proxy_opt with
-        | Some tzkt_proxy when Cli.umami ->
+        match tzkt_api_proxy_opt with
+        | Some tzkt_api_proxy when Cli.umami ->
             let umami_proxy =
               make_proxy
                 tezlink_sequencer_agent
@@ -1022,7 +1024,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 None
                 activate_ssl
             in
-            some {tzkt_proxy; umami_proxy}
+            some {tzkt_api_proxy; umami_proxy}
         | None when Cli.umami ->
             Test.fail
               "Umami relies on TzKT, but the latter is deactivated (see the \
@@ -1054,7 +1056,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           cloud
           runner
           ~sequencer_endpoint
-          ~tzkt_proxy_opt
+          ~tzkt_api_proxy_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
           ~bridge_proxy_opt
@@ -1072,7 +1074,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tezlink_sequencer_agent
         | External _ -> unit
       and* () =
-        match tzkt_proxy_opt with
+        match tzkt_api_proxy_opt with
         | None -> unit
         | Some tzkt_proxy ->
             let () = toplog "Starting TzKT" in
@@ -1084,11 +1086,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       and* () =
         match umami_proxys_opt with
         | None -> unit
-        | Some {tzkt_proxy; umami_proxy} ->
+        | Some {tzkt_api_proxy; umami_proxy} ->
             init_umami
               tezlink_sequencer_agent
               ~sequencer_endpoint
-              ~tzkt_proxy
+              ~tzkt_api_proxy
               ~umami_proxy
       and* () =
         match faucet_proxys_opt with
@@ -1097,7 +1099,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               "The private key for the faucet is set but the faucet option \
                itself is disabled."
         | None -> unit
-        | Some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy} ->
+        | Some {tzkt_api_proxy; faucet_api_proxy; faucet_frontend_proxy} ->
             let () = toplog "Starting faucet" in
             let faucet_account = Constant.bootstrap1 in
             let faucet_pkh = faucet_account.public_key_hash in
@@ -1122,7 +1124,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_api_proxy
                 ~sequencer_endpoint
                 ~faucet_pkh
-                ~tzkt_proxy
+                ~tzkt_api_proxy
                 ~faucet_frontend_proxy
             in
             unit
@@ -1154,15 +1156,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* () =
         let* rpc_nginx_config =
-          match sequencer_endpoint with
-          | Internal sequencer_proxy ->
-              nginx_reverse_proxy_config
-                ~agent:tezlink_sequencer_agent
-                ~proxy:sequencer_proxy
-          | External _ -> Lwt.return_nil
+          nginx_config_of_service_endpoint
+            tezlink_sequencer_agent
+            sequencer_endpoint
         in
         let* tzkt_nginx_config =
-          nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_proxy_opt
+          nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_api_proxy_opt
         in
         let* faucet_api_nginx_config =
           let faucet_api_proxy =
