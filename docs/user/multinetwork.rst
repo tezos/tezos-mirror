@@ -105,6 +105,7 @@ Note that this also works for builtin networks, albeit a bit longer.
 There are also the following *predefined network aliases*:
 
 - ``currentnet``: designates the test network running the same protocol as mainnet
+- ``proposednet``: designates the test network running the protocol under voting, when there is one (note that in all the voting periods but the first one, there is at most one protocol under voting)
 
 For instance, for running on the current protocol's testnet, you may use ``--network https://teztnets.com/currentnet``.
 
