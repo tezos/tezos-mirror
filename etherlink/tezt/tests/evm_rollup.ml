@@ -933,9 +933,6 @@ let test_rpc_getBlockReceipts =
 
 let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "get_block_by_hash"]
     ~title:"getBlockBy returns base fee per gas and previous random number"
     ~minimum_base_fee_per_gas:(Wei.to_wei_z @@ Z.of_int 100)
@@ -2503,9 +2500,6 @@ let test_deposit_and_withdraw =
 let test_withdraw_amount =
   let admin = Constant.bootstrap5 in
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "withdraw"; "wei"; "mutez"]
     ~title:"Minimum amount to withdraw"
     ~admin
@@ -5706,9 +5700,6 @@ let test_unsupported_rpc =
 
 let test_rpc_feeHistory =
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "fee_history"]
     ~title:"RPC methods eth_feeHistory"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5759,9 +5750,6 @@ let test_rpc_feeHistory =
 
 let test_rpc_feeHistory_past =
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "fee_history"; "past"]
     ~title:"RPC methods eth_feeHistory in the past"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5792,9 +5780,6 @@ let test_rpc_feeHistory_past =
 
 let test_rpc_feeHistory_future =
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "fee_history"; "future"]
     ~title:"RPC methods eth_feeHistory in the future"
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5811,9 +5796,6 @@ let test_rpc_feeHistory_future =
 
 let test_rpc_feeHistory_long =
   register_sequencer
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade *)
-    ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "fee_history"; "block_count"]
     ~title:"RPC methods eth_feeHistory with high blockCount"
   @@ fun ~protocol:_ ~evm_setup ->
