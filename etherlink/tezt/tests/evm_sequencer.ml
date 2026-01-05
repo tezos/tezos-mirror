@@ -1868,6 +1868,16 @@ let test_invalid_delayed_transaction =
   Check.is_true
     (receipt_opt = None)
     ~error_msg:"The transaction should not have a receipt" ;
+  let* () =
+    bake_until
+      ~bake:(fun () ->
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+      ~result_f:(fun () ->
+        let* size = Delayed_inbox.size (Sc_rollup_node sc_rollup_node) in
+        if size = 0 then return (Some ()) else return None)
+      ()
+  in
   (* The transaction has been cleared from the delayed inbox. *)
   Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
