@@ -65,8 +65,8 @@ COPY --chown=tezos:nogroup sdk/rust evm_kernel/sdk/rust
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 COPY --chown=tezos:nogroup contrib evm_kernel/contrib
 RUN make -C evm_kernel -f etherlink.mk build-deps \
-  && make -C evm_kernel -f etherlink.mk EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
-  && make -C evm_kernel -f etherlink.mk evm_benchmark_kernel.wasm
+  && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
+  && make -C evm_kernel -f etherlink.mk EVM_KERNEL_SKIP_BYTECODE=yes evm_benchmark_kernel.wasm
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
