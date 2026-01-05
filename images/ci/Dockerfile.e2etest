@@ -11,7 +11,7 @@
 # - Running end-to-end tests (mostly Tezt) in the tezos/tezos CI.
 
 # hadolint ignore=DL3006
-FROM monitoring AS cast-binary
+FROM monitoring AS foundry-binaries
 
 # Satisfies DL4006: Ensure any failure in a pipe fails the build
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
@@ -86,8 +86,8 @@ COPY --from=build \
     /home/tezos/.opam/ocaml-base-compiler.${OCAML_VERSION}/bin/bisect-ppx-report \
     /bin/
 
-COPY --from=cast-binary /bin/cast /bin/
-COPY --from=cast-binary /bin/forge /bin/
+COPY --from=foundry-binaries /bin/cast /bin/
+COPY --from=foundry-binaries /bin/forge /bin/
 
 # TODO: https://gitlab.com/tezos/tezos/-/issues/5026
 # We could install npm via nvm if we tackle this issue.
