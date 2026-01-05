@@ -1372,7 +1372,7 @@ let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains
-    ?(preconfirmation_stream_enabled = false) () =
+    ?preconfirmation_stream_enabled () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1406,10 +1406,10 @@ let patch_config_with_experimental_feature
                     ("chain_family", `String l2_chain_family);
                   ])
               l2_chains))
-  |> conditional_json_put
+  |> optional_json_put
        preconfirmation_stream_enabled
        ~name:"preconfirmation_stream_enabled"
-       (`Bool true)
+       (fun bool -> `Bool bool)
 
 let patch_config_websockets_if_enabled ?max_message_length
     ?(monitor_heartbeat = true) ?rate_limit =

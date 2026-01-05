@@ -120,7 +120,7 @@
     "spawn_rpc": null,
     "l2_chains": null,
     "periodic_snapshot_path": null,
-    "preconfirmation_stream_enabled": false
+    "preconfirmation_stream_enabled": true
   },
   "proxy": {
     "ignore_block_param": false
