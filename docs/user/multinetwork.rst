@@ -35,8 +35,13 @@ with different :ref:`constants <protocol_constants>` to speed up the chain.
 
 .. _faucet:
 
-Each test network listed there also indicates a **faucet** delivering test tokens. Enter the public key hash of any test
-account on the corresponding website to receive test tokens.
+Each test network listed there indicates:
+
+- a URL defining the network parameters
+
+- a **faucet** delivering test tokens. Enter the public key hash of any test account on the corresponding website to receive test tokens
+
+- a server providing :doc:`snapshots` that allows one to start a node quickly on the test network.
 
 The faucet interface is meant for interactive use.
 If you are looking for a scriptable alternative, check the programmatic `faucet frontend <https://github.com/tacoinfra/tezos-faucet>`__ which includes the ``get-tez`` tool.
@@ -105,9 +110,14 @@ Note that this also works for builtin networks, albeit a bit longer.
 There are also the following *predefined network aliases*:
 
 - ``currentnet``: designates the test network running the same protocol as mainnet
+
 - ``proposednet``: designates the test network running the protocol under voting, when there is one (note that in all the voting periods but the first one, there is at most one protocol under voting)
 
-For instance, for running on the current protocol's testnet, you may use ``--network https://teztnets.com/currentnet``.
+For instance, for running on the current protocol's testnet, you may:
+
+- use option ``octez-node --network https://teztnets.com/currentnet`` to connect to it
+- get tokens from its faucet at ``https://faucet.currentnet.teztnets.com/``
+- download snapshots from ``https://snapshots.tzinit.org/currentnet/rolling``
 
 Custom Networks
 ---------------
