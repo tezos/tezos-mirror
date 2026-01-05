@@ -99,6 +99,9 @@ let of_receipt_and_object
     object_fields;
   }
 
+(* WARNING: the SQLite extension in ../sqlite_receipt_bloom depends on the
+   database storing receipts with this encoding to work. If it is ever changed,
+   the SQLite extension will also need to be adapted. *)
 let receipt_fields_encoding =
   let open Data_encoding in
   conv
