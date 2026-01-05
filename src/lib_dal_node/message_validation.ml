@@ -387,8 +387,6 @@ let round_robin_seq n seq =
   in
   loop [] (Stdlib.List.init n (fun _ -> [])) seq
 
-exception Bee_task_worker_error of string
-
 let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     =
   if Node_context.is_bootstrap_node ctxt then
@@ -540,21 +538,7 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
         sub_batches
     in
     (* Ensure that all tasks are successful. *)
-    let () =
-      List.iter
-        (function
-          | Ok () -> ()
-          | Error (Tezos_bees.Task_worker.Closed (Some err)) ->
-              raise
-                (Bee_task_worker_error
-                   (Format.asprintf "%a" Error_monad.pp_print_trace err))
-          | Error (Tezos_bees.Task_worker.Closed None)
-          | Error (Tezos_bees.Task_worker.Request_error _) ->
-              raise (Bee_task_worker_error "Unknown task_worker error")
-          | Error (Tezos_bees.Task_worker.Any exn) ->
-              raise (Bee_task_worker_error (Printexc.to_string exn)))
-        results
-    in
+    let _ : unit list = Tezos_bees.Task_worker.bind_and_raise_all results in
     let duration = Unix.gettimeofday () -. s in
     update_batches_stats
       proto_parameters.number_of_slots
