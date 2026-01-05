@@ -1227,6 +1227,8 @@ module type Tezlink = sig
   val faucet_private_key : string option
 
   val umami : bool
+
+  val external_tzkt : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1406,6 +1408,15 @@ module Tezlink () : Tezlink = struct
       ~unset_long:"no-umami"
       ~description:"Run an Umami v2 instance (requires --tzkt)"
       false
+
+  let external_tzkt =
+    Clap.optional_string
+      ~section
+      ~long:"external-tzkt"
+      ~description:
+        "Point to a specific TzKT explorer in the faucet and Umami when \
+         browsing injected operations"
+      ()
 end
 
 module type Etherlink = sig

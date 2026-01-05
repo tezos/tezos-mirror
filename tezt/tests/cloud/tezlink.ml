@@ -539,14 +539,24 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
     ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
-    ~faucet_pkh ~tzkt_api_proxy ~faucet_frontend_proxy =
+    ~faucet_pkh ~tzkt_api_proxy ~tzkt_url ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
     service_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
-  let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
+  let viewer =
+    let in_tzkt_sandbox api_url =
+      sf "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s" api_url
+    in
+    match tzkt_url with
+    | Some tzkt_url -> Filename.concat tzkt_url "<hash>"
+    | None ->
+        let tzkt_api = proxy_external_endpoint ~runner tzkt_api_proxy in
+        let api_url = Client.url_encoded_string_of_endpoint tzkt_api in
+        in_tzkt_sandbox api_url
+  in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
      not yet support using sandbox.tzkt.io as explorer. *)
@@ -576,14 +586,14 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
       "name": "Custom",
       "rpcUrl": %S,
       "faucetAddress": %S,
-      "viewer": "http://sandbox.tzkt.io/<hash>?tzkt_api_url=%s"
+      "viewer": "%s"
     }
 }
 |}
       (Client.string_of_endpoint faucet_api)
       tezlink_sandbox_endpoint
       faucet_pkh
-      (Client.url_encoded_string_of_endpoint tzkt_api)
+      viewer
   in
   let* () =
     run_cmd
@@ -633,7 +643,7 @@ module Umami_process = struct
       ]
 end
 
-let umami_patch ~rpc_url ~tzkt_api_url =
+let umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url ~faucet_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
      for now. *)
@@ -680,8 +690,8 @@ index 1d28850f..39a15d9b 100644
 +  name: "custom",
 +  rpcUrl: "%s",
 +  tzktApiUrl: "%s",
-+  tzktExplorerUrl: "",
-+  buyTezUrl: "",
++  tzktExplorerUrl: "%s",
++  buyTezUrl: "%s",
 +};
 +
  export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
@@ -691,15 +701,30 @@ index 1d28850f..39a15d9b 100644
     |}
     rpc_url
     tzkt_api_url
+    tzkt_url
+    faucet_url
 
-let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~umami_proxy =
+let init_umami agent ~sequencer_endpoint ~tzkt_api_proxy ~tzkt_url ~umami_proxy
+    ~faucet_proxy_opt =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint =
     proxy_external_endpoint ~runner tzkt_api_proxy
   in
   let rpc_url = service_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
-  let patch = umami_patch ~rpc_url ~tzkt_api_url in
+  (* Umami can directly reference an explorer, and will concatenate the operation
+     hash of a transaction. This means that it does not work with the sandbox
+     scheme where the suffix is the TzKT API parameter. In this case, we don't
+     point to an explorer and simply leave the value empty (`""`). *)
+  let tzkt_url = Option.value ~default:"" tzkt_url in
+  let faucet_url =
+    Option.map
+      (fun proxy ->
+        proxy_external_endpoint ~runner proxy |> Client.string_of_endpoint)
+      faucet_proxy_opt
+    |> Option.value ~default:""
+  in
+  let patch = umami_patch ~rpc_url ~tzkt_api_url ~tzkt_url ~faucet_url in
   (* Create a local patch file with its contents. *)
   let patch_filename = Temp.file "umami.patch" in
   let out_chan = Stdlib.open_out patch_filename in
@@ -1091,7 +1116,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tezlink_sequencer_agent
               ~sequencer_endpoint
               ~tzkt_api_proxy
+              ~tzkt_url:Cli.external_tzkt
               ~umami_proxy
+              ~faucet_proxy_opt:
+                (Option.map
+                   (fun proxys -> proxys.faucet_frontend_proxy)
+                   faucet_proxys_opt)
       and* () =
         match faucet_proxys_opt with
         | None when Cli.faucet_private_key <> None ->
@@ -1125,6 +1155,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~sequencer_endpoint
                 ~faucet_pkh
                 ~tzkt_api_proxy
+                ~tzkt_url:Cli.external_tzkt
                 ~faucet_frontend_proxy
             in
             unit
