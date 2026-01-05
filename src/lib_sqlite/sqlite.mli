@@ -42,6 +42,7 @@ val init :
   path:string ->
   perm:perm ->
   ?max_conn_reuse_count:int ->
+  ?register:(Sqlite3.db -> unit) ->
   (conn -> unit tzresult Lwt.t) ->
   t tzresult Lwt.t
 
