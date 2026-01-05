@@ -262,7 +262,9 @@ module Bridge_frontend_process = struct
       ?runner
       daemon
       ()
-      ["-c"; sf "cd %s && npm run dev -- --port %d" path port]
+      [
+        "-c"; sf "cd %s && npx vite preview --host 127.0.0.1 --port %d" path port;
+      ]
 end
 
 let polling_period = function
@@ -445,7 +447,7 @@ let create_config_file ~agent destination format =
     format
 
 let create_env_file ~agent destination env =
-  let temp_file = Temp.file "config" in
+  let temp_file = Temp.file @@ Format.sprintf "config_%s" destination in
   let ch = open_out temp_file in
   let config_filtered =
     List.filter_map
@@ -515,7 +517,7 @@ let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
   let* () =
     git_clone
       agent
-      "https://github.com/Arnaud-Bihan/tezlink_deposit.git"
+      "https://github.com/luciano-fs/tezlink_deposit.git"
       bridge_dir
   in
   let* () =
@@ -640,7 +642,8 @@ let umami_patch ~rpc_url ~tzkt_api_url =
      different paths (block, contract, etc.), so it doesn't plug well into Umami
      for now. *)
   sf
-    {|diff --git a/packages/state/src/slices/networks.ts b/packages/state/src/slices/networks.ts
+    {|
+diff --git a/packages/state/src/slices/networks.ts b/packages/state/src/slices/networks.ts
 index 3453eabc..1967b769 100644
 --- a/packages/state/src/slices/networks.ts
 +++ b/packages/state/src/slices/networks.ts
@@ -661,13 +664,22 @@ index 3453eabc..1967b769 100644
  
  export const networksSlice = createSlice({
 diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
-index 1d28850f..fbd54ed7 100644
+index 1d28850f..39a15d9b 100644
 --- a/packages/tezos/src/Network.ts
 +++ b/packages/tezos/src/Network.ts
-@@ -16,6 +16,14 @@ export const GHOSTNET: Network = {
+@@ -16,6 +16,23 @@ export const GHOSTNET: Network = {
    buyTezUrl: "https://faucet.ghostnet.teztnets.com/",
  };
  
++export const TEZOS_SHADOWNET: Network = {
++  name: "shadownet",
++  rpcUrl: "https://shadownet.tezos.ecadinfra.com",
++  tzktApiUrl: "https://api.shadownet.tzkt.io",
++  tzktExplorerUrl: "https://shadownet.tzkt.io",
++  buyTezUrl: "https://faucet.shadownet.teztnets.com/",
++};
++
++
 +export const TEZLINK: Network = {
 +  name: "custom",
 +  rpcUrl: "%s",
@@ -679,8 +691,8 @@ index 1d28850f..fbd54ed7 100644
  export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
  
 -export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET];
-+export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET, TEZLINK];
-|}
++export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET, TEZOS_SHADOWNET, TEZLINK];
+    |}
     rpc_url
     tzkt_api_url
 
