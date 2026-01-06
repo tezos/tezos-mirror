@@ -363,28 +363,32 @@ let verify_commitment cryptobox expected slot =
   if Cryptobox.Commitment.equal expected obtained then return_unit
   else fail (`Other [Invalid_commitment {expected; obtained}])
 
+(*
 let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
+   *)
+let try_fetch_slot_from_backup ctxt cryptobox ~slot_size slot_id
     expected_commitment_hash backup_uri =
   let open Lwt_result_syntax in
-  let fetch_and_sanitize_slot_content () =
-    (* /!\ Warning: We are fetching the slot content as stored by another DAL
-       node on disk into its store/slot_store/ directory. Currently the
-       home-made KVS we use appends extra bytes at the beginning of each
-       "file" to chech if values are present. We should takes them into
-       account to:
-       - compute the expected size of the data
-       - fetch the exact slot content, without encoding artifacts when written
-         to disk. *)
-    let* slot_opt =
+  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
+  let fetch_and_sanitize_data () =
+    let* data_opt =
       fetch_slot_from_backup_uri
         ~slot_size
         ~published_level
         ~slot_index
         backup_uri
     in
-    match slot_opt with
+    match data_opt with
     | None -> return_none
     | Some (`Slot slot_bytes) ->
+        (* /!\ Warning: We are fetching the slot content as stored by another DAL
+         node on disk into its store/slot_store/ directory. Currently the
+         home-made KVS we use appends extra bytes at the beginning of each
+         "file" to chech if values are present. We should takes them into
+         account to:
+         - compute the expected size of the data
+         - fetch the exact slot content, without encoding artifacts when written
+           to disk. *)
         let expected_size =
           slot_size + Key_value_store.file_prefix_bitset_size
         in
@@ -405,11 +409,30 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
                slot_bytes
                Key_value_store.file_prefix_bitset_size
                slot_size
-    | Some (`Shards _shards_bytes) -> Stdlib.failwith "TODO in next commit"
+    | Some (`Shards shard_bytes) -> (
+        (* We got the raw shards KVS file. We could reuse the KVS to decode the
+           bytes into a list of shards. *)
+        let*! shards_opt =
+          read_minimal_shards_for_reconstruction
+            ~from_bytes:shard_bytes
+            cryptobox
+            (Node_context.get_store ctxt)
+            slot_id
+        in
+        match shards_opt with
+        | None -> return_none
+        | Some shards ->
+            let*! res_shard_store =
+              Node_context.may_reconstruct
+                ~reconstruct:(fun _slot_index ->
+                  get_slot_content_from_shards cryptobox shards)
+                slot_id
+                ctxt
+            in
+            Result.to_option res_shard_store |> return)
   in
-  let* slot_opt =
-    fetch_and_sanitize_slot_content () |> Errors.other_lwt_result
-  in
+  (* We either directly fetched a slot, or we rebuilt it from fetched shards. *)
+  let* slot_opt = fetch_and_sanitize_data () |> Errors.other_lwt_result in
   match (slot_opt, expected_commitment_hash) with
   | None, _ -> return_none
   | Some slot, None ->
@@ -586,7 +609,6 @@ let get_commitment_from_slot_id ctxt slot_id =
 let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
   let config : Configuration_file.t = Node_context.get_config ctxt in
-  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
   match config.slots_backup_uris with
   | [] ->
       (* Fail if no backup URI is configured. *)
@@ -603,14 +625,12 @@ let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
       in
       let* slot_opt =
         List.find_map_es
-          (fun uri ->
-            try_fetch_slot_from_backup
-              cryptobox
-              ~slot_size
-              ~published_level
-              ~slot_index
-              expected_commitment_hash
-              uri)
+          (try_fetch_slot_from_backup
+             ctxt
+             cryptobox
+             ~slot_size
+             slot_id
+             expected_commitment_hash)
           backup_uris
       in
       match slot_opt with
