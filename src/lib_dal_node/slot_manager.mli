@@ -65,6 +65,10 @@ val polynomial_from_shards :
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
+  | Invalid_commitment of {
+      expected : Cryptobox.commitment;
+      obtained : Cryptobox.commitment;
+    }
   | No_prover_SRS
 
 (** [Cryptobox.polynomial_from_slot] but using the [Errors] module.
@@ -101,6 +105,33 @@ val get_slot_content :
   Node_context.t ->
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
+
+(** [verify_commitment cryptobox commitment slot] checks that [slot] is
+    consistent with [commitment].
+
+    The function:
+    - derives the slot polynomial from the raw [slot] bytes using [cryptobox],
+    - recomputes the commitment from that polynomial,
+    - compares the recomputed commitment with [commitment].
+
+    It returns:
+    - [Ok ()] if the recomputed commitment is equal to [commitment].
+    - [Error e] otherwise.
+
+    Errors could be
+    - [Invalid_commitment] if the recomputed commitment differs from [commitment].
+    - Any error raised while:
+      * decoding/validating the slot payload,
+      * computing the polynomial,
+      * recomputing and/or verifying the commitment.
+*)
+val verify_commitment :
+  Cryptobox.t -> Cryptobox.commitment -> slot -> (unit, [> Errors.other]) result
+
+(** [get_commitment_from_slot_id node_ctxt slot_id] retrieves the commitment
+    associated with the given [slot_id] from the node's store. *)
+val get_commitment_from_slot_id :
+  Node_context.t -> Types.slot_id -> Cryptobox.commitment tzresult Lwt.t
 
 (** [try_get_slot_header_from_indexed_skip_list plugin node_ctxt ~attested_level
     slot_id] retrieves the slot header associated with [slot_id], based on the
