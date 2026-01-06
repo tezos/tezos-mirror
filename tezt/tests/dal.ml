@@ -2360,9 +2360,20 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
       client
       dal_node
   in
-  let to_test =
+  let tests_ok =
+    (* Levels that must be present in both original store and snapshot *)
     List.filter
       (fun (level, _index) -> level < start + expected_exported_levels)
+      published
+  in
+  let tests_error =
+    (* Levels that must be present in original store but not in snapshot *)
+    (* [stop - 2] is used because [publish_and_bake ~to_level:stop] means
+       that blocks up to level [stop - 2] are sure to be finalized and
+       therefore present in the source DAL node's store. *)
+    List.filter
+      (fun (level, _index) ->
+        level >= start + expected_exported_levels && level < stop - 2)
       published
   in
   let file = Temp.file "export" in
@@ -2431,9 +2442,39 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
                slot_level
                slot_index) ;
         unit)
-      to_test
+      tests_ok
   in
-  Log.info "Snapshot export test passed: file created at %s" file ;
+  let unexpected_success = Failure "Should not succeed" in
+  let* () =
+    Lwt_list.iter_s
+      (fun (slot_level, slot_index) ->
+        (* Check that the source node has data *)
+        let* _ =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+        in
+        (* Check that the node bootstrapped from snapshot does not have data *)
+        let* () =
+          Lwt.catch
+            (fun () ->
+              let* _ =
+                Dal_RPC.(
+                  call fresh_dal_node
+                  @@ get_level_slot_content ~slot_level ~slot_index)
+              in
+              Lwt.fail unexpected_success)
+            (fun e ->
+              if e = unexpected_success then
+                Test.fail
+                  "After snapshot import: expected failure for \
+                   /levels/%d/slot/%d/content"
+                  slot_level
+                  slot_index
+              else Lwt.return_unit)
+        in
+        unit)
+      tests_error
+  in
   unit
 
 let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
