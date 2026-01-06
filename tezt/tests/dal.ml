@@ -2399,6 +2399,25 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
                slot_index
                (pp_status status_fresh)
                (pp_status status_orig)) ;
+        let* content_orig =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        let* content_fresh =
+          Dal_RPC.(
+            call fresh_dal_node
+            @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        Check.(content_fresh = content_orig)
+          ~__LOC__
+          Check.string
+          ~error_msg:
+            (Format.sprintf
+               "Snapshot import mismatch for slot (level=%d,index=%d)"
+               slot_level
+               slot_index) ;
         unit)
       to_test
   in
