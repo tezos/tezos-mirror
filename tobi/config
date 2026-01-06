@@ -70,7 +70,7 @@ octez-dal-node: src/bin_dal_node
 octez-distributed-internal: src/lib_distributed_internal/src
 octez-distributed-lwt-internal: src/lib_distributed_internal/lwt
 octez-evm-node: etherlink/bin_node
-octez-evm-node-libs: etherlink/bin_node/config, etherlink/bin_node/installers, etherlink/bin_node/lib_dev, etherlink/bin_node/lib_dev/encodings, etherlink/bin_node/lib_dev/tezlink, etherlink/bin_node/migrations, etherlink/lib_wasm_runtime, etherlink/lib_wasm_runtime/ocaml-api, etherlink/lib_wasm_runtime_callbacks, websocket/core, websocket/lwt
+octez-evm-node-libs: etherlink/bin_node/config, etherlink/bin_node/installers, etherlink/bin_node/lib_dev, etherlink/bin_node/lib_dev/encodings, etherlink/bin_node/lib_dev/sqlite_receipt_bloom, etherlink/bin_node/lib_dev/tezlink, etherlink/bin_node/migrations, etherlink/lib_wasm_runtime, etherlink/lib_wasm_runtime/ocaml-api, etherlink/lib_wasm_runtime_callbacks, websocket/core, websocket/lwt
 octez-evm-node-tests: etherlink/bin_node/test
 octez-evm-wasm-runtime-tests: etherlink/lib_wasm_runtime_callbacks/test
 octez-igd-next: src/rust_deps/rust_igd_next/ocaml-api

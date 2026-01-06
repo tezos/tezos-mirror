@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name sqlite_receipt_bloom)
+ (public_name octez-evm-node-libs.sqlite_receipt_bloom)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  sqlite3)
+ (foreign_stubs
+  (language c)
+  (flags (-Wall -Wextra :standard))
+  (names receipt_bloom receipt_bloom_stub)))

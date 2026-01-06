@@ -298,6 +298,11 @@ let seqes = external_lib "seqes" V.(at_least "0.2")
 
 let sexplib = external_lib "sexplib" V.True
 
+(* WARNING: SQLite extension in etherlink/bin_node/lib_dev/sqlite_receipt_bloom
+   re-export some types of the ocaml sqlite3 interface which is not guaranteed
+   to be stable. Verify compatibility before updating sqlite3 dependency. *)
+let sqlite3 = external_lib "sqlite3" V.(exactly "5.3.1")
+
 let stdint = external_lib "stdint" V.True
 
 let str = external_lib "str" ~opam:"" V.True
