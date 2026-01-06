@@ -655,6 +655,8 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
       state.maximum_number_of_chunks
   in
   let*! head_info = Evm_context.head_info () in
+  Octez_telemetry.Trace.add_attrs (fun () ->
+      [Telemetry.Attributes.Block.number head_info.next_blueprint_number]) ;
   let* current_size, opt_delayed_hashes =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then

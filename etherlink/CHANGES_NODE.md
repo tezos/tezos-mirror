@@ -10,6 +10,9 @@
 
 ### Metrics changes
 
+- Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
+  instant preconfirmations. (!20369)
+
 ### Command-line interface changes
 
 - Update the command that creates an upgrade payload with a delay, it

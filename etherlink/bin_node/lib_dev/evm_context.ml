@@ -891,15 +891,21 @@ module State = struct
 
   let next_block_info ctxt (timestamp : Time.Protocol.t)
       (number : Ethereum_types.quantity) =
-    if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then
+    if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then (
+      Octez_telemetry.Trace.add_attrs (fun () ->
+          [Telemetry.Attributes.Block.number number]) ;
       ctxt.session.future_block_state <-
-        Some {evm_state = ctxt.session.evm_state; timestamp; next_tx_index = 0l}
+        Some {evm_state = ctxt.session.evm_state; timestamp; next_tx_index = 0l})
     else ctxt.session.future_block_state <- None
 
   let execute_single_transaction ctxt (tx : Broadcast.transaction) hash =
     let open Lwt_result_syntax in
     Octez_telemetry.Trace.add_attrs (fun () ->
-        Telemetry.Attributes.[Transaction.hash hash]) ;
+        Telemetry.Attributes.
+          [
+            Transaction.hash hash;
+            Block.number ctxt.session.next_blueprint_number;
+          ]) ;
     match ctxt.session.future_block_state with
     | Some {evm_state; timestamp; next_tx_index} ->
         let* tx =
