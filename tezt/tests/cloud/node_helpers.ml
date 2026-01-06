@@ -55,12 +55,16 @@ let isolated_args ~private_mode peers =
       @ if private_mode then [Private_mode] else [])
       peers)
 
-let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
-    =
+let may_add_migration_offset_to_config node snapshot
+    ~(migration_offset : Protocol_migration.offset option) ~network =
   let* level = get_snapshot_info_level node snapshot in
   match migration_offset with
   | None -> Lwt.return_unit
-  | Some migration_offset ->
+  | Some (Cycle_offset _) ->
+      (* Migration_offset with Cycle should have been replaced by the proper level
+       at the beginning of the experiment *)
+      assert false
+  | Some (Level_offset migration_offset) ->
       let* network_config =
         match network with
         | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config

@@ -458,7 +458,11 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
   in
   let* dal_node =
@@ -544,7 +548,11 @@ let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
   in
   let* () =
@@ -599,7 +607,11 @@ let init_stresstest_i i (configuration : Scenarios_configuration.LAYER1.t) ~pkh
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
       ~tps
   in
@@ -617,7 +629,11 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       resources
   in
   let* dal_node =
@@ -1115,7 +1131,7 @@ let snapshot_timestamp ~snapshot ~(network : Network.t) =
   let* snapshot = local_snapshot ~snapshot ~network in
   Snapshot_helpers.get_snapshot_info_timestamp node snapshot
 
-let number_of_bakers ~snapshot ~(network : Network.t) =
+let init_tmp_node snapshot network =
   let* snapshot = local_snapshot ~snapshot ~network in
   let node =
     let name = "tmp-node" in
@@ -1138,13 +1154,68 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   in
   let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
   let* () = Node.wait_for_ready node in
+  return node
+
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* node = init_tmp_node snapshot network in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* n =
-    RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
-    |> RPC_core.call_json (Node.as_rpc_endpoint node)
-    |> Lwt.map (fun {RPC_core.body; _} -> JSON.(body |> as_list |> List.length))
+    Lwt.map
+      List.length
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegates
+           ~query_string:[("active", "true")]
+           ())
   in
   let* () = Node.terminate node in
+  let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
   Lwt.return n
+
+let get_migration_level_offsets (migration : Protocol_migration.t) ~snapshot
+    ~(network : Network.t) () =
+  let* node = init_tmp_node snapshot network in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* current_level =
+    Lwt.map
+      (fun (current_level : RPC.level) -> current_level.level)
+      (Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ())
+  in
+  let* last_cycle_level =
+    Lwt.map
+      (fun (levels : RPC.cycle_levels) -> levels.last)
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_helper_levels_in_current_cycle ())
+  in
+  let* blocks_per_cycle =
+    Lwt.map
+      (fun constants -> JSON.(constants |-> "blocks_per_cycle" |> as_int))
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_context_constants_parametric ())
+  in
+  let* migration =
+    let migration_level_offset =
+      match migration.migration_offset with
+      | Level_offset l -> l
+      | Cycle_offset c ->
+          last_cycle_level - current_level + (c * blocks_per_cycle)
+    in
+    let termination_level_offset =
+      match migration.migration_offset with
+      | Level_offset l -> l
+      | Cycle_offset c -> c * blocks_per_cycle
+    in
+    return
+      ( Protocol_migration.
+          {
+            migration_offset = Level_offset migration_level_offset;
+            termination_offset = Level_offset termination_level_offset;
+          },
+        current_level + migration_level_offset,
+        current_level + migration_level_offset + termination_level_offset )
+  in
+  let* () = Node.terminate node in
+  let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
+  Lwt.return migration
 
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : Scenarios_configuration.LAYER1.t =
@@ -1156,7 +1227,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
       without_dal = Cli.without_dal;
       dal_node_producers = Cli.dal_producers_slot_indices;
       maintenance_delay = Cli.maintenance_delay;
-      migration_offset = Cli.migration_offset;
+      migration = Cli.migration;
       ppx_profiling_verbosity = Cli.ppx_profiling_verbosity;
       ppx_profiling_backends = Cli.ppx_profiling_backends;
       signing_delay = Cli.signing_delay;
@@ -1279,6 +1350,22 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
+  let* configuration, _migration_level, termination_level =
+    match configuration.migration with
+    | None -> return (configuration, None, None)
+    | Some migration ->
+        let* migration, migration_level, termination_level =
+          get_migration_level_offsets
+            migration
+            ~snapshot:configuration.snapshot
+            ~network:configuration.network
+            ()
+        in
+        return
+          ( {configuration with migration = Some migration},
+            Some migration_level,
+            Some termination_level )
+  in
   toplog "Prepare artifacts directory and export the full configuration" ;
   Artifact_helpers.prepare_artifacts
     ~scenario_config:
@@ -1343,17 +1430,24 @@ let register (module Cli : Scenarios_cli.Layer1) =
         Lwt.return_unit)
       t.producers
   in
+  let should_terminate level =
+    match termination_level with
+    | None -> false
+    | Some termination_level -> level >= termination_level
+  in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
     (let rec loop with_producers level =
        let level = succ level in
        toplog "Loop at level %d" level ;
-       let* () =
-         if with_producers then
-           let* _ = Node.wait_for_level t.bootstrap.node level in
-           Lwt.return_unit
-         else produce_slot t level
-       in
-       loop with_producers level
+       if should_terminate level then Lwt.return_unit
+       else
+         let* () =
+           if with_producers then
+             let* _ = Node.wait_for_level t.bootstrap.node level in
+             Lwt.return_unit
+           else produce_slot t level
+         in
+         loop with_producers level
      in
      loop (List.compare_length_with t.producers 0 = 0))

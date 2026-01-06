@@ -888,12 +888,17 @@ let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "validators"]
     Fun.id
 
+type cycle_levels = {first : int; last : int}
+
 let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     ?(block = "head") () =
   make
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-    Fun.id
+  @@ fun json ->
+  let first = JSON.(json |-> "first" |> as_int) in
+  let last = JSON.(json |-> "last" |> as_int) in
+  {first; last}
 
 let get_chain_block_helper_total_baking_power ?(chain = "main")
     ?(block = "head") () =

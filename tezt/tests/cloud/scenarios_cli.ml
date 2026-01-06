@@ -834,7 +834,7 @@ module type Layer1 = sig
 
   val maintenance_delay : int
 
-  val migration_offset : int option
+  val migration : Protocol_migration.t option
 
   val signing_delay : (float * float) option
 
@@ -1009,20 +1009,25 @@ module Layer1 () = struct
            default_maintenance_delay)
       (Option.value ~default:default_maintenance_delay from_config)
 
-  let migration_offset =
+  let migration =
     let from_cli =
-      Clap.optional_int
+      Clap.optional
         ~section
-        ~long:"migration-offset"
+        ~long:"protocol-migration"
         ~description:
-          "After how many levels we will perform a UAU to upgrade to the next \
-           protocol."
+          "With Cycle_offset 0, a migration to the next protocol will be set \
+           and done at the end of the current cycle. With Cycle_offset \
+           <target>, the migration will be done at the end of the target \
+           cycle. With Level_offset <n>, the migration will be done after the \
+           level n."
+        ~placeholder:"Cycle_offset 0|Cycle_offset <n>|Level_offset <n>"
+        Protocol_migration.typ
         ()
     in
     let from_config =
       Option.fold
         ~none:None
-        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.migration_offset)
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.migration)
         config
     in
     Option.fold ~none:from_config ~some:Option.some from_cli

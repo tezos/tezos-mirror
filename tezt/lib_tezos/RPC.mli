@@ -804,13 +804,15 @@ val get_chain_block_helper_validators :
   unit ->
   JSON.t t
 
+type cycle_levels = {first : int; last : int}
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/levels_in_current_cycle]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_levels_in_current_cycle :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> cycle_levels t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/total_baking_power]
 

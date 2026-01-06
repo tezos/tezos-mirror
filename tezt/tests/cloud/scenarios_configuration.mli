@@ -101,8 +101,10 @@ module LAYER1 : sig
       Use 0 for disabling delay and have all the bakers to merge their
       store at the beginning of cycles.
 
-    - [migration_offset]: offset that dictates after how many levels a protocol
-      upgrade will be performed via a UAU.
+      - [migration]: is the parameters for protocol migration. The level offset
+      (can be expressed in cycle) that dictates after how many levels a protocol
+      upgrade will be performed via a UAU. And the number of level or cycle that
+      should be baked after the migration until the experiment stops
 
     - [stresstest]: See the description of [stresstest_conf]
 
@@ -117,7 +119,7 @@ module LAYER1 : sig
     without_dal : bool;
     dal_node_producers : int list option;
     maintenance_delay : int;
-    migration_offset : int option;
+    migration : Protocol_migration.t option;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     signing_delay : (float * float) option;
