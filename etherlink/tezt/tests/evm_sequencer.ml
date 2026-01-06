@@ -9891,17 +9891,7 @@ let test_finalized_view =
          and the RPC does not fail, which is not the expected result
          when running this test without DAL activation. *)
     ~use_dal:Register_without_feature
-  @@ fun {sc_rollup_node; client; sequencer; proxy; _} _protocol ->
-  (* Start a proxy node with --finalized-view enabled *)
-  let* finalized_proxy =
-    Evm_node.init
-      ~patch_config:
-        JSON.(
-          fun json ->
-            put ("finalized_view", annotate ~origin:"" (`Bool true)) json)
-      ~mode:Proxy
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
+  @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   let* finalized_observer =
     run_new_observer_node
       ~finalized_view:true
@@ -9919,17 +9909,9 @@ let test_finalized_view =
   let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~sequencer ~client () in
   (* Check the heads of the various nodes *)
   let*@ sequencer_head = Rpc.block_number sequencer in
-  let*@ proxy_head = Rpc.block_number proxy in
 
   Check.((sequencer_head = 4l) int32)
     ~error_msg:"Sequencer head should be %R, but is %L instead" ;
-  Check.((proxy_head = sequencer_head) int32)
-    ~error_msg:
-      "Regular proxy head should be equal to sequencer head (%R), but is %L \
-       instead" ;
-  (* While the blocks were posted onchain, they are not final wrt. the
-     consensus algorithm, so the finalized proxy does not have a head yet. *)
-  let*@? _ = Rpc.block_number finalized_proxy in
 
   (* By default the stateful node assume the block 0 is finalized *)
   let*@ finalized_block = Rpc.block_number finalized_observer in
@@ -9949,12 +9931,7 @@ let test_finalized_view =
     let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
-  let*@ finalized_proxy_block = Rpc.block_number finalized_proxy in
   let*@ finalized_observer_block = Rpc.block_number finalized_observer in
-  Check.((finalized_proxy_block = sequencer_head) int32)
-    ~error_msg:
-      "Finalized proxy head should be equal to sequencer head (%R), but is %L \
-       instead" ;
   Check.((finalized_observer_block = sequencer_head) int32)
     ~error_msg:
       "Finalized observer head should be equal to sequencer head (%R), but is \
@@ -10564,14 +10541,13 @@ let test_configuration_service =
         Constant.WASM.evm_kernel;
       ])
   @@ fun protocol ->
-  let* {sequencer; proxy; observer; _} =
+  let* {sequencer; observer; _} =
     Setup.setup_sequencer
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
       protocol
   in
-  let* proxy_config = Rpc.configuration proxy in
   let* sequencer_config = Rpc.configuration sequencer in
   let* observer_config = Rpc.configuration observer in
 
@@ -10589,7 +10565,6 @@ let test_configuration_service =
       json
   in
 
-  Regression.capture (JSON.encode (remove_public_rpc_port proxy_config)) ;
   Regression.capture (JSON.encode (remove_public_rpc_port @@ sequencer_config)) ;
   Regression.capture (JSON.encode (remove_public_rpc_port @@ observer_config)) ;
 
