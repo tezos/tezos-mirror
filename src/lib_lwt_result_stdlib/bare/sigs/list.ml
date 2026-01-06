@@ -177,6 +177,14 @@ module type S = sig
       calling [map] and [find] separately. *)
   val find_map : ('a -> 'b option) -> 'a list -> 'b option
 
+  (** [find_mapi f xs] applies [f] to each of the elements of [xs] and their
+      index (starting from 0) until it returns [Some _] at which point it is
+      returned. If no such element is found then it returns [None].
+
+      E.g., [find_mapi (fun i x -> if i >= 2 then Some x else None) ['a'; 'b';
+      'c'; 'd']] is [Some 'c']. *)
+  val find_mapi : (int -> 'a -> 'b option) -> 'a list -> 'b option
+
   (** [mem ~equal a l] is [true] iff there is an element [e] of [l] such that
       [equal a e]. *)
   val mem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
@@ -543,6 +551,21 @@ module type S = sig
   (** [find_map_es] is an Lwt-Result-aware variant of {!find_map}. *)
   val find_map_es :
     ('a -> ('b option, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b option, 'trace) result Lwt.t
+
+  (** [find_mapi_e] is a Result-aware variant of {!find_mapi}. *)
+  val find_mapi_e :
+    (int -> 'a -> ('b option, 'trace) result) ->
+    'a list ->
+    ('b option, 'trace) result
+
+  (** [find_mapi_s] is an Lwt-aware variant of {!find_mapi}. *)
+  val find_mapi_s : (int -> 'a -> 'b option Lwt.t) -> 'a list -> 'b option Lwt.t
+
+  (** [find_mapi_es] is an Lwt-Result-aware variant of {!find_mapi}. *)
+  val find_mapi_es :
+    (int -> 'a -> ('b option, 'trace) result Lwt.t) ->
     'a list ->
     ('b option, 'trace) result Lwt.t
 

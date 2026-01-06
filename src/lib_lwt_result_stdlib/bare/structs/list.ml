@@ -431,6 +431,50 @@ let find_map_es f =
       | Some _ -> return found
       | None -> (find_map_es [@ocaml.tailcall]) f xs)
 
+let find_mapi_e f xs =
+  let open Result_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs -> (
+        let* found = f i x in
+        match found with
+        | Some _ -> return found
+        | None -> (aux [@ocaml.tailcall]) (i + 1) xs)
+  in
+  aux 0 xs
+
+let find_mapi_s f xs =
+  let open Lwt_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs -> (
+        let* found = f i x in
+        match found with
+        | Some _ -> return found
+        | None -> (aux [@ocaml.tailcall]) (i + 1) xs)
+  in
+  match xs with
+  | [] -> return_none
+  | x :: rest -> (
+      let* found = lwt_apply2 f 0 x in
+      match found with Some _ -> return found | None -> aux 1 rest)
+
+let find_mapi_es f xs =
+  let open Lwt_result_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs -> (
+        let* found = f i x in
+        match found with
+        | Some _ -> return found
+        | None -> (aux [@ocaml.tailcall]) (i + 1) xs)
+  in
+  match xs with
+  | [] -> return_none
+  | x :: rest -> (
+      let* found = lwt_apply2 f 0 x in
+      match found with Some _ -> return found | None -> aux 1 rest)
+
 let rev_filter f xs =
   fold_left (fun rev_xs x -> if f x then x :: rev_xs else rev_xs) [] xs
 
