@@ -1065,7 +1065,9 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
     in
     return_unit
   in
-  Sqlite.init ?max_conn_reuse_count ~path ~perm migration
+  Sqlite.init ?max_conn_reuse_count 
+    ~register:Sqlite_receipt_bloom.register
+    ~path ~perm migration
 
 module Context_hashes = struct
   let store store number hash =

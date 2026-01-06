@@ -217,7 +217,7 @@ let evm_node_migrations =
           ];
         ]
 
-let _evm_node_sqlite_receipt_bloom =
+let evm_node_sqlite_receipt_bloom =
   octez_evm_node_lib
     "sqlite_receipt_bloom"
     ~path:"etherlink/bin_node/lib_dev/sqlite_receipt_bloom"
@@ -370,6 +370,7 @@ let evm_node_lib_dev =
         octez_telemetry;
         lwt_domain;
         octez_layer2_shell;
+        evm_node_sqlite_receipt_bloom;
       ]
 
 let floodgate_lib =
