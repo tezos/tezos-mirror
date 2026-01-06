@@ -16,12 +16,7 @@ int sqlite3_receipt_bloom_init(sqlite3 *db);
 
 CAMLprim value caml_sqlite3_register_receipt_bloom(value v_db)
 {
-    db_wrap *dbw = Sqlite3_val(v_db);
-
-    if (!dbw || !dbw->db)
-        caml_failwith("receipt_bloom: NULL sqlite3 db");
-
-    sqlite3 *db = dbw->db;                    /* extract raw sqlite3* */
+    sqlite3 *db = ocaml_sqlite3_db(v_db);
 
     if (sqlite3_receipt_bloom_init(db) != SQLITE_OK)
         caml_failwith("receipt_bloom: init failed");

@@ -18,24 +18,23 @@
  * implementation, without requiring the full original header.
  */
 
-typedef struct user_function {
-  value v_fun;
-  struct user_function *next;
-} user_function;
+/*
+ * NOTE:
+ * Verified against sqlite3-ocaml 5.3.1.
+ * struct db_wrap has sqlite3* as its first field.
+ */
 
-typedef struct user_collation {
-  value v_fun;
-  struct user_collation *next;
-} user_collation;
-
-typedef struct db_wrap {
+/* Prefix view of db_wrap: MUST match the first field */
+typedef struct {
   sqlite3 *db;
-  int rc;
-  _Atomic(int) ref_count;
-  user_function *user_functions;
-  user_collation *user_collations;
-} db_wrap;
+} db_wrap_prefix;
 
-#define Sqlite3_val(x) (*((db_wrap **)Data_custom_val(x)))
+/* Extract sqlite3* from an OCaml Sqlite3.db */
+static inline sqlite3 *ocaml_sqlite3_db(value v)
+{
+    /* db_wrap is stored as a pointer in the custom block */
+    void *p = *((void **)Data_custom_val(v));
+    return ((db_wrap_prefix *)p)->db;
+}
 
 #endif /* SQLITE3_OCAML_STUBS_H */
