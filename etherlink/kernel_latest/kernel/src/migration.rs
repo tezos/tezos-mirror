@@ -31,6 +31,7 @@ use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
+use tezos_ethereum::block::EthBlock;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::{evm_node_flag, Runtime};
 use tezos_smart_rollup::storage::path::RefPath;
@@ -83,9 +84,6 @@ mod legacy {
     // functions. The legacy semantics of these functions is needed in
     // some migration step to access the storage using the fields
     // which were present at the time.
-
-    use crate::chains::ChainFamily;
-
     use super::*;
     use primitive_types::{H160, H256};
     use revm::state::AccountInfo;
@@ -93,6 +91,7 @@ mod legacy {
         helpers::legacy::{alloy_to_u256, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
     };
+    use tezos_ethereum::block::EthBlock;
     use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_storage::storage::Storage;
     use tezos_storage::read_h256_be;
@@ -290,15 +289,13 @@ mod legacy {
         read_h256_be(host, &current_hash(root)?)
     }
 
-    pub fn read_current(
+    pub fn read_current_etherlink_block(
         host: &mut impl Runtime,
-        root: &impl Path,
-        chain_family: &ChainFamily,
-    ) -> anyhow::Result<L2Block> {
-        let hash = read_current_hash(host, root)?;
-        let block_path = path(root, hash)?;
+    ) -> anyhow::Result<EthBlock> {
+        let hash = read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
+        let block_path = path(&ETHERLINK_SAFE_STORAGE_ROOT_PATH, hash)?;
         let bytes = &host.store_read_all(&block_path)?;
-        let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
+        let block_from_bytes = EthBlock::from_bytes(bytes)?;
         Ok(block_from_bytes)
     }
 }
@@ -478,11 +475,7 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V27 => {
             // Initialize the next_blueprint_info field
-            match legacy::read_current(
-                host,
-                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-                &crate::chains::ChainFamily::Evm,
-            ) {
+            match legacy::read_current_etherlink_block(host) {
                 Ok(block) => {
                     store_current_block_header(host, &block.into())?;
                     Ok(MigrationStatus::Done)
@@ -628,7 +621,7 @@ fn migrate_to<Host: Runtime>(
                     &hash_path,
                 )?)?;
                 let block_from_bytes =
-                    L2Block::try_from_bytes(&crate::chains::ChainFamily::Evm, &block)?;
+                    L2Block::Etherlink(Box::new(EthBlock::from_bytes(&block)?));
                 allow_path_not_found(host.store_delete(&concat(
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                     &RefPath::assert_from(b"/blocks"),

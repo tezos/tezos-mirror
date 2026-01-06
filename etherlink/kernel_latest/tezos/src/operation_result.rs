@@ -13,30 +13,26 @@ use mir::gas;
 use mir::gas::interpret_cost::SigCostError;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
-use nom::error::ParseError;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc as tezos_enc;
-use tezos_data_encoding::nom as tezos_nom;
-use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::types::Zarith;
 use tezos_enc::BinWriter;
-use tezos_nom::NomReader;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Debug, PartialEq, Eq, BinWriter)]
 pub struct CounterError {
     pub expected: Narith,
     pub found: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, BinWriter)]
 pub enum ValidityError {
     #[error("Counter in the past: {0:?}.")]
     CounterInThePast(CounterError),
@@ -99,7 +95,7 @@ impl From<SigCostError> for ValidityError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, BinWriter)]
 pub enum RevealError {
     #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
@@ -113,7 +109,7 @@ pub enum RevealError {
     FailedToWriteManager,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter)]
 #[error("{contract:?} cannot spend {amount:?} as its balance is {balance:?}")]
 pub struct BalanceTooLow {
     pub contract: Contract,
@@ -121,7 +117,7 @@ pub struct BalanceTooLow {
     pub amount: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq, BinWriter)]
 pub enum TransferError {
     #[error(transparent)]
     BalanceTooLow(BalanceTooLow),
@@ -174,7 +170,7 @@ pub enum TransferError {
     DepositError(String),
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum OriginationError {
     #[error("Failed to fetch source account")]
     FailedToFetchSourceAccount,
@@ -214,7 +210,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -298,19 +294,8 @@ impl BinWriter for ApplyOperationError {
     }
 }
 
-// As we're encoding the OperationError with a single String, the NomReader function is broken.
-// This is not an issue as we never deserialize OperationError outside of tests.
-impl NomReader<'_> for OperationError {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        Err(nom::Err::Error(DecodeError::from_error_kind(
-            input,
-            nom::error::ErrorKind::Fail,
-        )))
-    }
-}
-
 pub trait OperationKind {
-    type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
+    type Success: PartialEq + Debug + BinWriter;
 }
 
 impl OperationKind for TransferContent {
@@ -325,7 +310,7 @@ impl OperationKind for OriginationContent {
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
@@ -344,7 +329,7 @@ impl From<TransferTarget> for TransferSuccess {
     }
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct RevealSuccess {
     pub consumed_milligas: Narith,
 }
@@ -356,12 +341,6 @@ pub struct Empty;
 impl BinWriter for Empty {
     fn bin_write(&self, _: &mut Vec<u8>) -> tezos_enc::BinResult {
         Ok(())
-    }
-}
-
-impl NomReader<'_> for Empty {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        Ok((input, Self))
     }
 }
 
@@ -397,21 +376,8 @@ impl BinWriter for Originated {
     }
 }
 
-impl NomReader<'_> for Originated {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        let (input, contract) = Contract::nom_read(input)?;
-        match contract {
-            Contract::Originated(kt1h) => Ok((input, Originated { contract: kt1h })),
-            Contract::Implicit(_) => Err(nom::Err::Error(DecodeError::from_error_kind(
-                input,
-                nom::error::ErrorKind::Fail,
-            ))),
-        }
-    }
-}
-
 // Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct OriginationSuccess {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -423,7 +389,7 @@ pub struct OriginationSuccess {
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct TransferSuccess {
     #[encoding(option, bytes)]
     pub storage: Option<Vec<u8>>,
@@ -459,7 +425,7 @@ impl Default for TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -481,7 +447,7 @@ impl From<ApplyOperationError> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -489,7 +455,7 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(BacktrackedResult<M>),
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct BacktrackedResult<M: OperationKind> {
     pub errors: Option<()>,
     pub result: M::Success,
@@ -513,7 +479,7 @@ impl<M: OperationKind> ContentResult<M> {
 
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 #[encoding(tags = "u8")]
 pub enum Balance {
     #[encoding(tag = 0)]
@@ -527,14 +493,14 @@ pub enum Balance {
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub enum UpdateOrigin {
     BlockApplication,
 }
 
 /// Depending of the sign of [changes], the balance is credited or debited
 /// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct BalanceUpdate {
     pub balance: Balance,
     pub changes: i64,
@@ -544,7 +510,7 @@ pub struct BalanceUpdate {
 // Inspired from `Manager_operation_result` case in 'kind contents_result type
 // from `src/proto_alpha/lib_protocol/apply_results.ml` file.
 // Still need to implement internal_results
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -553,7 +519,7 @@ pub struct OperationResult<M: OperationKind> {
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct InternalContentWithMetadata<M: OperationKind> {
     pub sender: Contract,
     pub nonce: u16,
@@ -561,7 +527,7 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
     pub result: ContentResult<M>,
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
@@ -713,12 +679,12 @@ fn produce_skipped_result<M: OperationKind>(
     }
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub enum OperationDataAndMetadata {
     OperationWithMetadata(OperationBatchWithMetadata),
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, BinWriter)]
 pub struct OperationBatchWithMetadata {
     #[encoding(dynamic, list)]
     pub operations: Vec<OperationWithMetadata>,
@@ -729,35 +695,6 @@ pub struct OperationBatchWithMetadata {
 pub struct OperationWithMetadata {
     pub content: ManagerOperationContent,
     pub receipt: OperationResultSum,
-}
-
-impl NomReader<'_> for OperationWithMetadata {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        let (input, content) = ManagerOperationContent::nom_read(input)?;
-        let (input, receipt) = match content {
-            ManagerOperationContent::Transaction(_) => {
-                let (input, receipt) =
-                    OperationResult::<TransferContent>::nom_read(input)?;
-                (input, OperationResultSum::Transfer(receipt))
-            }
-            ManagerOperationContent::Reveal(_) => {
-                let (input, receipt) = OperationResult::<RevealContent>::nom_read(input)?;
-                (input, OperationResultSum::Reveal(receipt))
-            }
-            ManagerOperationContent::Origination(_) => {
-                let (input, receipt) =
-                    OperationResult::<OriginationContent>::nom_read(input)?;
-                (input, OperationResultSum::Origination(receipt))
-            }
-            _ => {
-                return Err(nom::Err::Error(tezos_nom::error::DecodeError::invalid_tag(
-                    input,
-                    format!("{content:?}"),
-                )))
-            }
-        };
-        Ok((input, Self { content, receipt }))
-    }
 }
 
 impl BinWriter for OperationWithMetadata {
@@ -907,28 +844,6 @@ mod tests {
                    "sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"
                ).unwrap(),
            })
-    }
-
-    #[test]
-    fn test_operation_with_metadata_rlp_roundtrip() {
-        let operation_and_receipt = dummy_test_result_operation();
-        let mut output = vec![];
-        operation_and_receipt
-            .bin_write(&mut output)
-            .expect("Operation with metadata should be encodable");
-        let outputcpy = output.clone();
-        let (remaining, read_result) = OperationDataAndMetadata::nom_read(&outputcpy)
-            .expect("Operation with metadata should be decodable");
-
-        assert_eq!(
-            read_result, operation_and_receipt,
-            "Roundtrip failed on {:?}",
-            read_result
-        );
-        assert!(
-            remaining.is_empty(),
-            "There should be no remaining bytes after decoding"
-        );
     }
 
     #[test]
