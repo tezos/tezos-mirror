@@ -1118,6 +1118,13 @@ let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
       let slot_content =
         Format.asprintf "content at level %d index %d" level index
       in
+      let* predecessor = Node.wait_for_level node (pred level) in
+      if predecessor >= level then
+        Test.fail
+          "Tried to publish a slot header at level %d but the predecessor \
+           level is %d"
+          level
+          predecessor ;
       let* () = publish source ~index slot_content in
       let* _commitment, _proof =
         let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
@@ -2330,12 +2337,17 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
 
 let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
     dal_node =
-  let* start = Node.get_level node in
+  let* start = Lwt.map succ (Node.get_level node) in
   let expected_exported_levels = 5 in
   let stop =
+    (* We add +2 because, DAL node deals with finalized blocks, which are
+       described by the DAL node's block_handler as:
+       > A slot header is considered finalized when it is in
+       > a block with at least two other blocks on top of it, as guaranteed by
+       > Tenderbake. *)
     start + expected_exported_levels
     + parameters.Dal_common.Parameters.attestation_lag
-    + Tezos_dal_node_lib.Constants.validation_slack + 1
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
   in
   let* published =
     publish_and_bake
@@ -2350,7 +2362,7 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
   in
   let to_test =
     List.filter
-      (fun (level, _index) -> level <= start + expected_exported_levels)
+      (fun (level, _index) -> level < start + expected_exported_levels)
       published
   in
   let file = Temp.file "export" in
@@ -2399,6 +2411,25 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
                slot_index
                (pp_status status_fresh)
                (pp_status status_orig)) ;
+        let* content_orig =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        let* content_fresh =
+          Dal_RPC.(
+            call fresh_dal_node
+            @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        Check.(content_fresh = content_orig)
+          ~__LOC__
+          Check.string
+          ~error_msg:
+            (Format.sprintf
+               "Snapshot import mismatch for slot (level=%d,index=%d)"
+               slot_level
+               slot_index) ;
         unit)
       to_test
   in
