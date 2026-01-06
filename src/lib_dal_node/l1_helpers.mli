@@ -46,3 +46,8 @@ val wait_for_block_with_plugin :
 (** [fetch_l1_chain_id cctxt] fetches the chain id from the connected L1
     node. *)
 val fetch_l1_chain_id : Rpc_context.t -> Chain_id.t tzresult Lwt.t
+
+(** [fetch_l1_known_protocols cctxt] fetches the known protocol infos from the
+    connected L1 node. *)
+val fetch_l1_known_protocols :
+  Rpc_context.t -> Chain_services.protocol_info list tzresult Lwt.t
