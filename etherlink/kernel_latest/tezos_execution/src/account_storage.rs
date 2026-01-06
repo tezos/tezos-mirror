@@ -244,9 +244,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
 
     fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, tezos_storage::error::Error> {
         let code_path = context::code::code_path(self)?;
-        let code_size_path = context::code::code_size_path(self)?;
-        let Narith(code_size) = read_nom_value(host, &code_size_path)?;
-        let code = host.store_read(&code_path, 0, code_size.try_into()?)?;
+        let code = host.store_read_all(&code_path)?;
         Ok(code)
     }
 
@@ -276,9 +274,7 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
         let storage_path = context::code::storage_path(self)?;
-        let storage_size_path = context::code::storage_size_path(self)?;
-        let Narith(storage_size) = read_nom_value(host, &storage_size_path)?;
-        let storage = host.store_read(&storage_path, 0, storage_size.try_into()?)?;
+        let storage = host.store_read_all(&storage_path)?;
         Ok(storage)
     }
 
@@ -367,6 +363,7 @@ mod test {
     /// obtained by `octez-client show address bootstrap1` in mockup mode
     const BOOTSTRAP1_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
     const BOOTSTRAP1_PK: &str = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
+    const KT1: &str = "KT1QbKzQAyJtzprfvUJZv8VGqwQNch2o89di";
 
     /// obtained by `octez-codec encode alpha.contract from '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'`
     const BOOTSTRAP1_CONTRACT: RefPath =
@@ -653,5 +650,32 @@ mod test {
             .expect("Read balance should have succeeded");
 
         assert_eq!(test_balance, read_balance);
+    }
+
+    #[test]
+    fn test_set_read_large_code() {
+        let mut host = MockKernelHost::default();
+
+        // Initialize path for Tezlink context at /tezlink/context
+        let context = context::TezlinkContext::init_context();
+
+        // Create an originated account for KT1
+        let contract = Contract::from_b58check(KT1).unwrap();
+        let account = context
+            .originated_from_contract(&contract)
+            .expect("Account creation should have succeeded");
+
+        let code = vec![1u8; 10_000];
+
+        // Set the code of the KT1
+        account
+            .set_code(&mut host, &code)
+            .expect("Setting code of the KT1 should succeed");
+
+        let read_code = account
+            .code(&host)
+            .expect("Read the code of the KT1 should succeed");
+
+        assert_eq!(code, read_code, "Set/Read code have inconsistent behavior");
     }
 }
