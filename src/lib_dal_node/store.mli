@@ -33,6 +33,12 @@ module Shards_disk : sig
     root_dir:string ->
     Types.slot_id ->
     (int, Cryptobox.share) Key_value_store.layout
+
+  (** [add_file_layout] adds a new file layout that will be used starting at the
+      given level. This aims to be called when a new protocol is activated,
+      introducing a new layout related to DAL protocol parameters changes. *)
+  val add_file_layout :
+    int32 -> Cryptobox.parameters -> (unit, [> `Fail of string]) result
 end
 
 module Shards : sig
@@ -109,6 +115,11 @@ module Slots : sig
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
   val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
+
+  (** [add_file_layout] adds a new file layout that will be used starting at the
+      given level. This aims to be called when a new protocol is activated,
+      introducing a new layout related to DAL protocol parameters changes. *)
+  val add_file_layout : int32 -> Cryptobox.parameters -> unit
 end
 
 module Slot_id_cache : sig

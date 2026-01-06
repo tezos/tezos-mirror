@@ -80,37 +80,6 @@ let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
       Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
-let init_cryptobox config proto_parameters profile =
-  let open Lwt_result_syntax in
-  let prover_srs = Profile_manager.is_prover_profile profile in
-  let* () =
-    if prover_srs then
-      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      Cryptobox.init_prover_dal
-        ~find_srs_files
-        ~fetch_trusted_setup:config.Configuration_file.fetch_trusted_setup
-        ()
-    else return_unit
-  in
-  match Cryptobox.make proto_parameters.Types.cryptobox_parameters with
-  | Ok cryptobox ->
-      if prover_srs then
-        match Cryptobox.precompute_shards_proofs cryptobox with
-        | Ok precomputation -> return (cryptobox, Some precomputation)
-        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
-          ->
-            fail
-              [
-                Errors.Cryptobox_initialisation_failed
-                  (Printf.sprintf
-                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
-                      smaller than expected (= %d)"
-                     given
-                     expected);
-              ]
-      else return (cryptobox, None)
-  | Error (`Fail msg) -> fail [Errors.Cryptobox_initialisation_failed msg]
-
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
 let get_identity ctxt = ctxt.identity
@@ -181,6 +150,19 @@ let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
               params
               ~level:block_level
               ctxt.proto_cryptoboxes
+          in
+          Store.Slots.add_file_layout
+            (Int32.add block_level 1l)
+            params.cryptobox_parameters ;
+          let* () =
+            match
+              Store.Shards_disk.add_file_layout
+                (Int32.add block_level 1l)
+                params.cryptobox_parameters
+            with
+            | Ok () -> return_unit
+            | Error (`Fail msg) ->
+                tzfail (Proto_cryptoboxes.Cannot_register_shard_layout {msg})
           in
           ctxt.proto_cryptoboxes <- new_cryptoboxes ;
           return_unit)

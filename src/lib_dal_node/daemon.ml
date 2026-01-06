@@ -540,14 +540,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       ~number_of_slots:proto_parameters.number_of_slots
   in
   let identity = p2p_config.P2p.identity in
-
-  let* proto_cryptoboxes =
-    Proto_cryptoboxes.init
-      config
-      proto_parameters
-      profile_ctxt
-      ~level:head_level
-  in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -676,6 +668,16 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       proto_parameters
       ~head_level
       ~first_seen_level
+  in
+  let* proto_cryptoboxes =
+    Proto_cryptoboxes.init
+      ~cctxt
+      ~header
+      ~config
+      ~current_head_proto_parameters:proto_parameters
+      ~first_seen_level:(Option.value first_seen_level ~default:head_level)
+      profile_ctxt
+      proto_plugins
   in
   let*? cryptobox, _ =
     Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level

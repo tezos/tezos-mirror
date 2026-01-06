@@ -174,25 +174,54 @@ module Shards_disk = struct
            parameters. It must always be > 0. *)
   }
 
-  let file_layout ~root_dir (slot_id : Types.slot_id) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  module ShardsLayouts = Map.Make (struct
+    type t = Int32.t
 
-       Make Key-Value store layout resilient to crypto parameters change.  Also,
-       putting a value not far from the real number of shards allows saving disk
-       storage. *)
-    let number_of_shards = 4096 in
-    let slot_id_string =
-      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    let compare = compare
+  end)
+
+  let shards_layouts = ref ShardsLayouts.empty
+
+  exception NoShardLayout of int32
+
+  let get_shard_layout ~(slot_id : Types.slot_id) =
+    let e =
+      ShardsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !shards_layouts
     in
-    let filepath = Filename.concat root_dir slot_id_string in
-    Key_value_store.layout
-      ~encoded_value_size:(Value_size_hooks.share_size ())
-      ~encoding:Cryptobox.share_encoding
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:Fun.id
-      ~number_of_keys_per_file:number_of_shards
-      ()
+    match e with
+    | Some (_, v) -> v
+    | None -> raise (NoShardLayout slot_id.slot_level)
+
+  let make_file_layout cryptobox =
+    let share_size = Cryptobox.encoded_share_size cryptobox in
+    let params = Cryptobox.parameters cryptobox in
+    let number_of_shards = params.number_of_shards in
+    fun ~root_dir (slot_id : Types.slot_id) ->
+      let slot_id_string =
+        Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+      in
+      let filepath = Filename.concat root_dir slot_id_string in
+      Key_value_store.layout
+        ~encoded_value_size:share_size
+        ~encoding:Cryptobox.share_encoding
+        ~filepath
+        ~eq:Stdlib.( = )
+        ~index_of:Fun.id
+        ~number_of_keys_per_file:number_of_shards
+        ()
+
+  let add_file_layout level cryptobox_parameters =
+    let open Result_syntax in
+    let* cryptobox = Cryptobox.make cryptobox_parameters in
+    let layout = make_file_layout cryptobox in
+    shards_layouts := ShardsLayouts.add level layout !shards_layouts ;
+    return_unit
+
+  let file_layout ~root_dir slot_id =
+    let layout = get_shard_layout ~slot_id in
+    layout ~root_dir slot_id
 
   let with_metrics store f =
     let open Lwt_result_syntax in
@@ -498,10 +527,28 @@ end
 module Slots = struct
   type t = (Types.slot_id * int, unit, bytes) KVS.t
 
-  let file_layout ~root_dir ((slot_id : Types.slot_id), slot_size) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  module SlotsLayouts = Map.Make (struct
+    type t = Int32.t
 
-       Make Key-Value store layout resilient to crypto parameters change. *)
+    let compare = compare
+  end)
+
+  let slots_layouts = ref SlotsLayouts.empty
+
+  exception NoSlotLayout of int32
+
+  let get_slot_layout ~(slot_id : Types.slot_id) =
+    let e =
+      SlotsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !slots_layouts
+    in
+    match e with
+    | Some (_, v) -> v
+    | None -> raise (NoSlotLayout slot_id.slot_level)
+
+  let make_file_layout {Cryptobox.slot_size; _} =
+   fun ~root_dir (slot_id : Types.slot_id) ->
     let number_of_slots = 1 in
     let slot_id_string =
       Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
@@ -515,6 +562,14 @@ module Slots = struct
       ~index_of:(fun () -> 0)
       ~number_of_keys_per_file:number_of_slots
       ()
+
+  let add_file_layout level cryptobox =
+    let layout = make_file_layout cryptobox in
+    slots_layouts := SlotsLayouts.add level layout !slots_layouts
+
+  let file_layout ~root_dir (slot_id, _slot_size) =
+    let layout = get_slot_layout ~slot_id in
+    layout ~root_dir slot_id
 
   let init node_store_dir slot_store_dir =
     let root_dir = Filename.concat node_store_dir slot_store_dir in

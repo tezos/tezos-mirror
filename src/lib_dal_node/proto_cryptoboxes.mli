@@ -9,16 +9,20 @@ type cryptobox_with_precomputation
 
 type t
 
-type error += No_cryptobox
+type error += No_cryptobox | Cannot_register_shard_layout of {msg : string}
 
-(** [init_cryptoboxes config param profile ~level] returns the new
-    proto_cryptoboxes state in which the cryptobox for the given ~level has been
-    initialized. *)
+(** [init_~cctxt ~header ~config ~current_head_proto_parameters
+    ~first_seen_level profile plugins] returns the new proto_cryptoboxes state
+    in which the cryptoboxes for each protocol known by the associated L1 node
+    are initialized. *)
 val init :
-  Configuration_file.t ->
-  Types.proto_parameters ->
+  cctxt:Rpc_context.t ->
+  header:Block_header.t ->
+  config:Configuration_file.t ->
+  current_head_proto_parameters:Types.proto_parameters ->
+  first_seen_level:int32 ->
   Profile_manager.t ->
-  level:int32 ->
+  Proto_plugins.t ->
   t tzresult Lwt.t
 
 (** [add param ~level t] adds a new proto_cryptobox which becomes registered at

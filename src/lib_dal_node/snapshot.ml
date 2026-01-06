@@ -226,15 +226,29 @@ module Merge = struct
     let config = Configuration_file.{config with endpoint} in
     let cctxt = Rpc_context.make config.Configuration_file.endpoint in
     let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
+    let head_level = header.Block_header.shell.level in
     let*? (module Plugin : Dal_plugin.T), proto_parameters =
       Proto_plugins.get_plugin_and_parameters_for_level
         proto_plugins
-        ~level:header.Block_header.shell.level
+        ~level:head_level
     in
     let profile_ctxt = Profile_manager.empty in
+    let* first_seen_level =
+      read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
+    in
     (* Initialize crypto as needed by file layouts. *)
-    let* cryptobox, _ =
-      Node_context.init_cryptobox config proto_parameters profile_ctxt
+    let* proto_cryptoboxes =
+      Proto_cryptoboxes.init
+        ~cctxt
+        ~header
+        ~config
+        ~current_head_proto_parameters:proto_parameters
+        ~first_seen_level
+        profile_ctxt
+        proto_plugins
+    in
+    let*? cryptobox, _ =
+      Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
     in
     let slots =
       Option.value
@@ -245,9 +259,6 @@ module Merge = struct
     Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
-    in
-    let* first_seen_level =
-      read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
     in
     let* last_processed_level =
       read_from_store ~root_dir:src_root_dir (module Store.Last_processed_level)

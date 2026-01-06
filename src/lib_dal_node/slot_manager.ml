@@ -653,47 +653,51 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let store = Node_context.get_store ctxt in
-  let*? cryptobox, _ =
-    Errors.other_result
-    @@ Node_context.get_cryptobox_and_precomputations
-         ~level:slot_id.Types.Slot_id.slot_level
-         ctxt
+  let res =
+    Node_context.get_cryptobox_and_precomputations
+      ~level:slot_id.Types.Slot_id.slot_level
+      ctxt
   in
-  let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-  let*! res_slot_store =
-    Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
-  in
-  match res_slot_store with
-  | Ok slot -> return slot
-  | Error _ -> (
-      let*! res_shard_store =
-        if reconstruct_if_missing then
-          (* The slot could not be obtained from the slot store, attempt a
-             reconstruction. *)
-          let*! shards_opt =
-            read_minimal_shards_for_reconstruction cryptobox store slot_id
-          in
-          match shards_opt with
-          | None -> Lwt.return_none
-          | Some shards ->
-              let*! res_shard_store =
-                Node_context.may_reconstruct
-                  ~reconstruct:(fun _slot_id ->
-                    get_slot_content_from_shards cryptobox shards)
-                  slot_id
-                  ctxt
-              in
-              Lwt.return_some res_shard_store
-        else Lwt.return_none
+  match res with
+  | Error _ ->
+      (* No cryptobox associated to this slot_id. *)
+      fail Errors.not_found
+  | Ok (cryptobox, _) -> (
+      let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+      let*! res_slot_store =
+        Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
       in
-      match res_shard_store with
-      | Some (Ok slot) ->
-          let* () =
-            Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id
+      match res_slot_store with
+      | Ok slot -> return slot
+      | Error _ -> (
+          let* res_shard_store =
+            if reconstruct_if_missing then
+              (* The slot could not be obtained from the slot store, attempt a
+             reconstruction. *)
+              let*! shards_opt =
+                read_minimal_shards_for_reconstruction cryptobox store slot_id
+              in
+              match shards_opt with
+              | None -> return_none
+              | Some shards ->
+                  let*! res_shard_store =
+                    Node_context.may_reconstruct
+                      ~reconstruct:(fun _slot_id ->
+                        get_slot_content_from_shards cryptobox shards)
+                      slot_id
+                      ctxt
+                  in
+                  return_some res_shard_store
+            else return_none
           in
-          return slot
-      | Some (Error _) | None ->
-          fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id)
+          match res_shard_store with
+          | Some (Ok slot) ->
+              let* () =
+                Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id
+              in
+              return slot
+          | Some (Error _) | None ->
+              fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id))
 
 (* Main functions *)
 

@@ -96,8 +96,9 @@ let produce_commitment_and_proof =
                 commitment) ->
         return (commitment, commitment_proof)
     | _ ->
+        let l1_level = Node_context.get_l1_current_head_level ctxt in
         let*? cryptobox, shards_proofs_precomputation =
-          Node_context.get_cryptobox_and_precomputations ctxt
+          Node_context.get_cryptobox_and_precomputations ~level:l1_level ctxt
           |> Errors.other_result
         in
         let profile = Node_context.get_profile_ctxt ctxt in
@@ -107,7 +108,7 @@ let produce_commitment_and_proof =
           else return_unit
         in
         let*? proto_parameters =
-          (Node_context.get_proto_parameters ctxt ~level:`Head
+          (Node_context.get_proto_parameters ctxt ~level:(`Level l1_level)
           |> Errors.other_result)
           [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
