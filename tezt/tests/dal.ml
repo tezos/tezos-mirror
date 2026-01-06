@@ -2337,12 +2337,17 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
 
 let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
     dal_node =
-  let* start = Node.get_level node in
+  let* start = Lwt.map succ (Node.get_level node) in
   let expected_exported_levels = 5 in
   let stop =
+    (* We add +2 because, DAL node deals with finalized blocks, which are
+       described by the DAL node's block_handler as:
+       > A slot header is considered finalized when it is in
+       > a block with at least two other blocks on top of it, as guaranteed by
+       > Tenderbake. *)
     start + expected_exported_levels
     + parameters.Dal_common.Parameters.attestation_lag
-    + Tezos_dal_node_lib.Constants.validation_slack + 1
+    + Tezos_dal_node_lib.Constants.validation_slack + 2
   in
   let* published =
     publish_and_bake
@@ -2357,7 +2362,7 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
   in
   let to_test =
     List.filter
-      (fun (level, _index) -> level <= start + expected_exported_levels)
+      (fun (level, _index) -> level < start + expected_exported_levels)
       published
   in
   let file = Temp.file "export" in
