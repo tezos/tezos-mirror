@@ -1229,6 +1229,8 @@ module type Tezlink = sig
   val umami : bool
 
   val external_tzkt : string option
+
+  val external_tzkt_api : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1416,6 +1418,14 @@ module Tezlink () : Tezlink = struct
       ~description:
         "Point to a specific TzKT explorer in the faucet and Umami when \
          browsing injected operations"
+      ()
+
+  let external_tzkt_api =
+    Clap.optional_string
+      ~section
+      ~long:"external-tzkt-api"
+      ~description:
+        "Don't run TzKT and instead have services point to an external API"
       ()
 end
 
