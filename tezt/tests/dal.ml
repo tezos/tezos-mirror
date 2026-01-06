@@ -1118,6 +1118,13 @@ let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
       let slot_content =
         Format.asprintf "content at level %d index %d" level index
       in
+      let* predecessor = Node.wait_for_level node (pred level) in
+      if predecessor >= level then
+        Test.fail
+          "Tried to publish a slot header at level %d but the predecessor \
+           level is %d"
+          level
+          predecessor ;
       let* () = publish source ~index slot_content in
       let* _commitment, _proof =
         let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
