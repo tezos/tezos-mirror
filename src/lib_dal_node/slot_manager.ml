@@ -670,7 +670,11 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
         else Lwt.return_none
       in
       match res_shard_store with
-      | Some (Ok slot) -> return slot
+      | Some (Ok slot) ->
+          let* () =
+            Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id
+          in
+          return slot
       | Some (Error _) | None ->
           fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id)
 
