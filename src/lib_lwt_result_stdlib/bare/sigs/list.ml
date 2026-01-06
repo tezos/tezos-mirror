@@ -243,7 +243,7 @@ module type S = sig
   (** [append xs ys] is a list containing the elements of [xs] and the elements
       of [ys], in this order.
 
-      [concat ['x'; 'y'] ['a'; 'b']] is [['x'; 'y'; 'a'; 'b']] *)
+      [append ['x'; 'y'] ['a'; 'b']] is [['x'; 'y'; 'a'; 'b']] *)
   val append : 'a list -> 'a list -> 'a list
 
   (** [rev_append xs ys] is [append (rev xs) ys] but more efficient. In other
