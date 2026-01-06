@@ -160,6 +160,13 @@ module type S = sig
       {!Stdlib.List}. *)
   val find_opt : ('a -> bool) -> 'a list -> 'a option
 
+  (** [find_index f xs] returns [Some i], where [i] is the index of the first
+      element of the list [xs] that satisfies [f x], if there is such an
+      element. It returns [None] if there is no such element.
+
+      E.g., [find_index (fun x -> x >= 10) [1; 5; 10; 15]] is [Some 2]. *)
+  val find_index : ('a -> bool) -> 'a list -> int option
+
   (** [find_map f xs] applies [f] to each of the elements of [xs] until it
       returns [Some _] at which point it is returned. If no such elements are
       found then it returns [None].
@@ -512,6 +519,19 @@ module type S = sig
     ('a -> (bool, 'trace) result Lwt.t) ->
     'a list ->
     ('a option, 'trace) result Lwt.t
+
+  (** [find_index_e] is a Result-aware variant of {!find_index}. *)
+  val find_index_e :
+    ('a -> (bool, 'trace) result) -> 'a list -> (int option, 'trace) result
+
+  (** [find_index_s] is an Lwt-aware variant of {!find_index}. *)
+  val find_index_s : ('a -> bool Lwt.t) -> 'a list -> int option Lwt.t
+
+  (** [find_index_es] is an Lwt-Result-aware variant of {!find_index}. *)
+  val find_index_es :
+    ('a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    (int option, 'trace) result Lwt.t
 
   (** [find_map_e] is a Result-aware variant of {!find_map}. *)
   val find_map_e :

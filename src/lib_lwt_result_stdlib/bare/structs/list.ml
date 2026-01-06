@@ -343,6 +343,44 @@ let find_es f =
       let* found = Lwt.apply f x in
       if found then return_some x else (find_es [@ocaml.tailcall]) f xs
 
+let find_index_e f xs =
+  let open Result_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs ->
+        let* found = f x in
+        if found then return_some i else (aux [@ocaml.tailcall]) (i + 1) xs
+  in
+  aux 0 xs
+
+let find_index_s f xs =
+  let open Lwt_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs ->
+        let* found = f x in
+        if found then return_some i else (aux [@ocaml.tailcall]) (i + 1) xs
+  in
+  match xs with
+  | [] -> return_none
+  | x :: rest ->
+      let* found = Lwt.apply f x in
+      if found then return_some 0 else aux 1 rest
+
+let find_index_es f xs =
+  let open Lwt_result_syntax in
+  let rec aux i = function
+    | [] -> return_none
+    | x :: xs ->
+        let* found = f x in
+        if found then return_some i else (aux [@ocaml.tailcall]) (i + 1) xs
+  in
+  match xs with
+  | [] -> return_none
+  | x :: rest ->
+      let* found = Lwt.apply f x in
+      if found then return_some 0 else aux 1 rest
+
 let rec find_map_e f =
   let open Result_syntax in
   function
