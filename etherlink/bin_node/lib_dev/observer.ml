@@ -153,7 +153,7 @@ let install_finalizer_observer ~rollup_node_tracking
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
 let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
-    ~init_from_snapshot () =
+    ~init_from_snapshot ~sandbox () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* telemetry_cleanup =
@@ -227,6 +227,21 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~tx_container
       ()
   in
+
+  let* () =
+    when_ sandbox @@ fun () ->
+    let*! {next_blueprint_number; _} = Evm_context.head_info () in
+    let* pk =
+      Batch.call
+        ~timeout:config.rpc_timeout
+        ~keep_alive:config.keep_alive
+        (module Rpc_encodings.Sequencer)
+        ~evm_node_endpoint
+        (Block_parameter (Number next_blueprint_number))
+    in
+    Evm_context.patch_sequencer_key pk
+  in
+
   (* One domain for the Lwt scheduler, one domain for Evm_context, one domain
      for spawning processes, one for the Irmin GC and the rest of the RPCs. *)
   let pool = Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 4)) in
@@ -287,7 +302,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
 
   let* () =
-    if rollup_node_tracking then
+    if rollup_node_tracking && not sandbox then
       let* () =
         Evm_events_follower.start
           {

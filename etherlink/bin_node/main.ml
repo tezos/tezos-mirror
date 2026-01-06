@@ -416,6 +416,15 @@ let private_rpc_port_arg =
     ~doc:"The EVM node private server rpc port."
     Params.int
 
+let sandbox_arg =
+  Tezos_clic.switch
+    ~doc:
+      "Enable sandbox mode\n\
+       At startup, the observer node will fetch the public key used by its \
+       remote EVM endpoint and patch its local state accordingly."
+    ~long:"sandbox"
+    ()
+
 let ws_arg =
   Tezos_clic.arg_or_switch
     ~long:"ws"
@@ -1595,7 +1604,8 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ?evm_node_endpoint ?tx_queue_max_lifespan ?tx_queue_max_size
     ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size ?log_filter_max_nb_logs
     ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel ~no_sync
-    ~init_from_snapshot ?history_mode ~finalized_view ?network config_file =
+    ~init_from_snapshot ?history_mode ~finalized_view ?network ~sandbox
+    config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1644,6 +1654,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
     ~init_from_snapshot
     ?kernel_path:kernel
     ~config
+    ~sandbox
     ()
 
 let make_dev_messages ~kind ~smart_rollup_address data =
@@ -3204,7 +3215,7 @@ let tezlink_sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args11
+  Tezos_clic.args12
     private_rpc_port_arg
     evm_node_endpoint_arg
     preimages_arg
@@ -3219,6 +3230,7 @@ let observer_run_args =
        ~why:
          "If set, additional sanity checks are performed on the node’s startup."
        ())
+    sandbox_arg
 
 let observer_command =
   let open Tezos_clic in
@@ -3261,7 +3273,8 @@ let observer_command =
              no_sync,
              init_from_snapshot,
              history_mode,
-             network ) )
+             network,
+             sandbox ) )
          ()
        ->
       let open Lwt_result_syntax in
@@ -3304,6 +3317,7 @@ let observer_command =
         ?history_mode
         ~finalized_view
         ?network
+        ~sandbox
         config_file)
 
 let export_snapshot

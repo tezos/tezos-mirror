@@ -1515,6 +1515,20 @@ let dispatch_request (type f) ~websocket
               rpc_ok kernel_root_hash
             in
             build ~f module_ parameters
+        | Rpc_encodings.Sequencer.Method ->
+            let f block_param =
+              let block =
+                Option.value
+                  ~default:(Block_parameter.Block_parameter Latest)
+                  block_param
+              in
+              let* state = Backend_rpc.Reader.get_state ~block () in
+              let* pk =
+                Durable_storage.sequencer (Backend_rpc.Reader.read state)
+              in
+              rpc_ok pk
+            in
+            build ~f module_ parameters
         | Eth_max_priority_fee_per_gas.Method ->
             let f (_ : unit option) = rpc_ok Qty.zero in
             build ~f module_ parameters

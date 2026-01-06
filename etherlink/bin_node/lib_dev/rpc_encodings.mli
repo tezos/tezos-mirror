@@ -133,6 +133,11 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Sequencer :
+  METHOD
+    with type input = Ethereum_types.Block_parameter.extended
+     and type output = Signature.Public_key.t
+
 module Kernel_version : METHOD with type input = unit and type output = string
 
 module Kernel_root_hash :
