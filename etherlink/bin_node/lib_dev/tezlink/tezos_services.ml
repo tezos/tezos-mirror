@@ -105,11 +105,7 @@ module Imported_protocol = struct
       seed_nonce_hash = None;
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '\000';
-      per_block_votes =
-        {
-          liquidity_baking_vote = Per_block_vote_pass;
-          adaptive_issuance_vote = Per_block_vote_pass;
-        };
+      per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
     }
 
   let signature : Alpha_context.signature =
@@ -316,13 +312,11 @@ module Current_block_services = struct
           Imported_protocol.Alpha_context.Per_block_votes
           .Liquidity_baking_toggle_EMA
           .zero;
-        adaptive_issuance_vote_ema =
-          Imported_protocol.Alpha_context.Per_block_votes
-          .Adaptive_issuance_launch_EMA
-          .zero;
-        adaptive_issuance_launch_cycle = None;
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
+        abaab_activation_level = None;
+        attestations = None;
+        preattestations = None;
       }
 
   let transfer_receipt account balance : operation_receipt =
@@ -353,6 +347,7 @@ module Current_block_services = struct
              storage_size = Z.zero;
              paid_storage_size_diff = Z.zero;
              allocated_destination_contract = false;
+             address_registry_diff = [];
            })
     in
     let internal_operation_results = [] in
@@ -518,8 +513,8 @@ module Adaptive_issuance_services = struct
     {
       cycle = i;
       baking_reward_fixed_portion = Tez.one;
-      baking_reward_bonus_per_slot = Tez.one;
-      attesting_reward_per_slot = Tez.one;
+      baking_reward_bonus_per_block = Tez.one;
+      attesting_reward_per_block = Tez.one;
       dal_attesting_reward_per_shard = Tez.one;
       seed_nonce_revelation_tip = Tez.one;
       vdf_revelation_tip = Tez.one;

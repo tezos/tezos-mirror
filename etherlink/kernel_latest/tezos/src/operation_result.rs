@@ -404,6 +404,8 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+    #[encoding(dynamic, list)]
+    pub address_registry_diff: Vec<Empty>,
 }
 
 impl Default for TransferSuccess {
@@ -418,6 +420,7 @@ impl Default for TransferSuccess {
             paid_storage_size_diff: 0.into(),
             allocated_destination_contract: false,
             lazy_storage_diff: None,
+            address_registry_diff: vec![],
         }
     }
 }
@@ -714,6 +717,7 @@ mod tests {
     use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
     use crate::operation::{
         ManagerOperation, OriginationContent, Parameters, TransferContent,
+        TARGET_TEZOS_PROTOCOL,
     };
     use pretty_assertions::assert_eq;
 
@@ -783,7 +787,7 @@ mod tests {
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
-                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_milligas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
+                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_milligas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false, address_registry_diff: vec![] }
                             ))
 
                         , internal_operation_results: vec![] })
@@ -852,8 +856,11 @@ mod tests {
         dummy_test_result_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "tez_transfer");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "tez_transfer",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -864,8 +871,11 @@ mod tests {
         simple_origination_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "origination");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "origination",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -876,8 +886,11 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.data_and_metadata", "failed");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.data_and_metadata",
+            "failed",
+        );
 
         assert_eq!(output, operation_and_receipt_bytes);
     }
@@ -927,13 +940,17 @@ mod tests {
                 storage_size: 0.into(),
                 paid_storage_size_diff: 0.into(),
                 allocated_destination_contract: false,
+                address_registry_diff: vec![],
             })),
         });
         let output = operation
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
-        let operation_and_receipt_bytes =
-            fetch_generated_data("S023", "operation.internal_and_metadata", "applied");
+        let operation_and_receipt_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.internal_and_metadata",
+            "applied",
+        );
         assert_eq!(output, operation_and_receipt_bytes);
     }
 
@@ -984,6 +1001,7 @@ mod tests {
                     storage_size: 0.into(),
                     paid_storage_size_diff: 0.into(),
                     allocated_destination_contract: false,
+                    address_registry_diff: vec![],
                 }),
             }),
         });
@@ -991,7 +1009,7 @@ mod tests {
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
         let operation_and_receipt_bytes = fetch_generated_data(
-            "S023",
+            TARGET_TEZOS_PROTOCOL,
             "operation.internal_and_metadata",
             "backtracked",
         );

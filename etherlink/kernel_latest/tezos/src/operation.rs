@@ -33,6 +33,9 @@ use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup::types::PublicKeyHash;
 use thiserror::Error;
 
+#[cfg(test)]
+pub const TARGET_TEZOS_PROTOCOL: &str = "T024";
+
 /**
 
 There is a distance between the binary format of manager operations
@@ -382,7 +385,8 @@ mod tests {
             signature,
         };
 
-        let operation_bytes = fetch_generated_data("S023", "operation", "reveal");
+        let operation_bytes =
+            fetch_generated_data(TARGET_TEZOS_PROTOCOL, "operation", "reveal");
 
         let operation = Operation::nom_read_exact(&operation_bytes)
             .expect("Decoding operation should have succeeded");
@@ -424,7 +428,7 @@ mod tests {
         };
 
         let operation_bytes = fetch_generated_data(
-            "S023",
+            TARGET_TEZOS_PROTOCOL,
             "operation",
             "operation-transaction-to-implicit",
         );
@@ -444,8 +448,11 @@ mod tests {
 
     #[test]
     fn tezos_compatibility_for_smart_contract_address() {
-        let address_bytes =
-            fetch_generated_data("S023", "contract", "contract-originated");
+        let address_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "contract",
+            "contract-originated",
+        );
 
         let expected_address =
             Contract::from_b58check("KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat").unwrap();
@@ -506,7 +513,7 @@ mod tests {
         };
 
         let operation_bytes = fetch_generated_data(
-            "S023",
+            TARGET_TEZOS_PROTOCOL,
             "operation",
             "operation-transaction-to-originated",
         );
@@ -586,7 +593,7 @@ mod tests {
         };
 
         let operation_bytes = fetch_generated_data(
-            "S023",
+            TARGET_TEZOS_PROTOCOL,
             "operation",
             "operation-batch-reveal-transaction",
         );
@@ -645,8 +652,11 @@ ManagerOperationContent::Origination(ManagerOperation {
             signature,
         };
 
-        let operation_bytes =
-            fetch_generated_data("S023", "operation", "operation-origination");
+        let operation_bytes = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation",
+            "operation-origination",
+        );
 
         let (bytes, decoded_operation) = Operation::nom_read(&operation_bytes).unwrap();
         assert_eq!(expected_operation, decoded_operation);
