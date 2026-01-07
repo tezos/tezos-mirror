@@ -59,9 +59,9 @@ let default_constants =
             {
               feature_enable;
               attestation_lag;
+              attestation_lags;
               number_of_slots;
               cryptobox_parameters;
-              attestation_lags;
               _;
             };
           _;
