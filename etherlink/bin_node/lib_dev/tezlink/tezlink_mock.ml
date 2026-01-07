@@ -76,7 +76,11 @@ let contents : Alpha_context.Block_header.contents =
       Bytes.make
         Imported_protocol.Constants_repr.proof_of_work_nonce_size
         '\000';
-    per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
+    per_block_votes =
+      {
+        liquidity_baking_vote = Per_block_vote_pass;
+        adaptive_issuance_vote = Per_block_vote_pass;
+      };
   }
 
 (* When indexing Tezlink, Tzkt requires Liquidity baking contracts. *)

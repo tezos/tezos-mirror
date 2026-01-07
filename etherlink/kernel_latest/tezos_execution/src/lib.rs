@@ -125,7 +125,6 @@ fn transfer_tez<Host: Runtime>(
         storage_size: 0_u64.into(),
         paid_storage_size_diff: 0_u64.into(),
         allocated_destination_contract: false,
-        address_registry_diff: vec![],
     })
 }
 
@@ -1927,7 +1926,6 @@ mod tests {
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
-                        address_registry_diff: vec![],
                     },
                 )),
                 internal_operation_results: vec![],
@@ -2020,7 +2018,6 @@ mod tests {
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
-                        address_registry_diff: vec![],
                     },
                 )),
                 internal_operation_results: vec![],
@@ -2129,7 +2126,6 @@ mod tests {
                             storage_size: 0_u64.into(),
                             paid_storage_size_diff: 0_u64.into(),
                             allocated_destination_contract: false,
-                            address_registry_diff: vec![],
                         }
                     )),
                     internal_operation_results: vec![InternalOperationSum::Transfer(
@@ -2170,7 +2166,6 @@ mod tests {
                                     storage_size: 0_u64.into(),
                                     paid_storage_size_diff: 0_u64.into(),
                                     allocated_destination_contract: false,
-                                    address_registry_diff: vec![],
                                 }
                             )),
                         }
@@ -2278,7 +2273,6 @@ mod tests {
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
-                        address_registry_diff: vec![],
                     },
                 )),
                 internal_operation_results: vec![],
@@ -2645,7 +2639,6 @@ mod tests {
                             storage_size: 0_u64.into(),
                             paid_storage_size_diff: 0_u64.into(),
                             allocated_destination_contract: false,
-                            address_registry_diff: vec![],
                         },
                     )),
                     internal_operation_results: vec![],
@@ -2691,7 +2684,6 @@ mod tests {
                             storage_size: 0_u64.into(),
                             paid_storage_size_diff: 0_u64.into(),
                             allocated_destination_contract: false,
-                            address_registry_diff: vec![],
                         },
                     )),
                     internal_operation_results: vec![],
