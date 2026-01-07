@@ -4726,6 +4726,8 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
        C.11 - Try future level (expected 404)
        C.12 - Try out-of-bounds slot index (expected 404)
        C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
+
+    The same test can be triggered by requesting shards instead of slots.
 *)
 let dal_slots_retrievability =
   (* Helper to run the RPC that fetches a slot from a given DAL node *)
@@ -4775,7 +4777,14 @@ let dal_slots_retrievability =
   in
 
   (* Main test body *)
-  fun _protocol dal_parameters _cryptobox l1_node client original_dal_node ->
+  fun _protocol
+      dal_parameters
+      ~(store_kind : [`Slots | `Shards])
+      _cryptobox
+      l1_node
+      client
+      original_dal_node
+    ->
     (* A. NODE SETUP *)
     let* () = Dal_node.terminate original_dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
@@ -4785,19 +4794,25 @@ let dal_slots_retrievability =
     let mk_dal_pub ~idx ~name =
       make_dal_node ~operator_profiles:[idx] ~name l1_node
     in
-    let slots_store_path dal_node =
-      Format.sprintf "/%s/store/slot_store" @@ Dal_node.data_dir dal_node
+    let store_path dal_node =
+      Format.sprintf
+        "/%s/store/%s_store"
+        (Dal_node.data_dir dal_node)
+        (match store_kind with `Slots -> "slot" | `Shards -> "shard")
     in
-    let slots_store_uri dal_node =
-      Format.sprintf "file://%s" @@ slots_store_path dal_node
+    let store_uri dal_node =
+      let fragment =
+        match store_kind with `Slots -> "#slots" | `Shards -> "#shards"
+      in
+      Format.sprintf "file://%s%s" (store_path dal_node) fragment
     in
 
     let* dal_pub1 = mk_dal_pub ~idx:1 ~name:"dal_pub1" in
     let* dal_pub2 = mk_dal_pub ~idx:2 ~name:"dal_pub2" in
     let* dal_pub3 = mk_dal_pub ~idx:3 ~name:"dal_pub3" in
-    let archive1 = slots_store_uri dal_pub1 in
-    let archive2 = slots_store_uri dal_pub2 in
-    let archive3 = slots_store_uri dal_pub3 in
+    let archive1 = store_uri dal_pub1 in
+    let archive2 = store_uri dal_pub2 in
+    let archive3 = store_uri dal_pub3 in
 
     (* Launch four fetchers with different backup configurations *)
     let* valid_dal_fetcher_1_2 =
@@ -4907,23 +4922,27 @@ let dal_slots_retrievability =
       |> fetch_404_expected ~__LOC__
     in
 
-    let slot_path dal ~slot_index =
-      Format.sprintf
-        "%s/%d_%d_%d"
-        (slots_store_path dal)
-        published_level
-        slot_index
-        slot_size
+    let data_path dal ~slot_index =
+      match store_kind with
+      | `Slots ->
+          Format.sprintf
+            "%s/%d_%d_%d"
+            (store_path dal)
+            published_level
+            slot_index
+            slot_size
+      | `Shards ->
+          Format.sprintf "%s/%d_%d" (store_path dal) published_level slot_index
     in
     (* C.6 Tamper slot1 content: expect 404 + event *)
     let* () =
-      Log.info "C.6: Tamper slot1 content" ;
+      Log.info "C.6: Tamper data content" ;
       let () =
         Sys.command
           (Format.sprintf
              "cp %s %s"
-             (slot_path dal_pub2 ~slot_index:2)
-             (slot_path dal_pub1 ~slot_index:1))
+             (data_path dal_pub2 ~slot_index:2)
+             (data_path dal_pub1 ~slot_index:1))
         |> fun exit_code -> assert (exit_code = 0)
       in
       let expected_event =
@@ -4937,17 +4956,24 @@ let dal_slots_retrievability =
 
     (* C.7 Tamper slot2 size: expect 404 + event *)
     let* () =
-      Log.info "C.7: Tamper slot2 size" ;
-      let () =
-        Sys.command ("echo bad > " ^ slot_path dal_pub2 ~slot_index:2) |> ignore
-      in
-      let expected_event =
-        wait_for_event_promise
-          valid_dal_fetcher_1_2
-          "slot_from_backup_has_unexpected_size"
-      in
-      get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:2
-      |> fetch_404_expected ~__LOC__ ~expected_event
+      if store_kind = `Shards then
+        let () =
+          Log.info "C.7: Tamper slot2 size disabled for shard archives"
+        in
+        unit
+      else
+        let () = Log.info "C.7: Tamper slot2 size" in
+        let () =
+          Sys.command ("echo bad > " ^ data_path dal_pub2 ~slot_index:2)
+          |> ignore
+        in
+        let expected_event =
+          wait_for_event_promise
+            valid_dal_fetcher_1_2
+            "slot_from_backup_has_unexpected_size"
+        in
+        get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:2
+        |> fetch_404_expected ~__LOC__ ~expected_event
     in
 
     (* C.8 Invalid URI (untrusted): expect 500 *)
@@ -11907,7 +11933,17 @@ let register ~protocols =
     ~number_of_slots:8
     ~attestation_threshold:0
     "fetching slots from backup sources"
-    dal_slots_retrievability
+    (dal_slots_retrievability ~store_kind:`Slots)
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
+    ~operator_profiles:[0]
+    ~l1_history_mode:(Custom Node.Archive)
+    ~history_mode:Full
+    ~number_of_slots:8
+    ~attestation_threshold:0
+    "fetching shards from backup sources"
+    (dal_slots_retrievability ~store_kind:`Shards)
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["traps"]

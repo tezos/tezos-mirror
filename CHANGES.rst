@@ -80,6 +80,8 @@ Data Availability Layer (DAL)
 
 DAL node
 ~~~~~~~~
+- Option ``--slots-backup-uri`` now supports shard archives in addition to slot
+  archives. Use URI fragments #shards or #slots (default if omitted). (MR :gl:`!19293`)
 
 Miscellaneous
 -------------

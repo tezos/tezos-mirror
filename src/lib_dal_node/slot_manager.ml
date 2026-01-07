@@ -207,49 +207,107 @@ let polynomial_from_shards cryptobox shards =
       | `Invalid_shard_length msg ) ->
       Error (Errors.other [Merging_failed msg])
 
-let get_slot_content_from_shards cryptobox store slot_id =
-  let open Lwt_result_syntax in
-  let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
+let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
+  let open Lwt_syntax in
+  let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
-  let minimal_number_of_shards = number_of_shards / redundancy_factor in
-  let rec loop acc shard_id remaining =
-    if remaining <= 0 then return acc
-    else if shard_id >= number_of_shards then
-      let provided = minimal_number_of_shards - remaining in
-      fail
-        (Errors.other
-           [Missing_shards {provided; required = minimal_number_of_shards}])
-    else
-      let*! res = Store.Shards.read (Store.shards store) slot_id shard_id in
-      match res with
-      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-      | Error _ -> loop acc (shard_id + 1) remaining
+  let needed = number_of_shards / redundancy_factor in
+  let* rev_shards, count_elts =
+    Store.Shards.read_all
+      ?from_bytes
+      (Store.shards store)
+      slot_id
+      ~number_of_shards
+    |> Seq_s.fold_left
+         (fun (acc, count_elts) elt ->
+           match elt with
+           | _, index, Ok share ->
+               (Cryptobox.{index; share} :: acc, count_elts + 1)
+           | _ -> (acc, count_elts))
+         ([], 0)
   in
-  let* shards = loop Seq.empty 0 minimal_number_of_shards in
+  if needed > count_elts then return_none
+  else List.take_n needed rev_shards |> List.to_seq |> return_some
+
+let get_slot_content_from_shards cryptobox shards =
+  let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-  (* Store the slot so that next calls don't require a reconstruction. *)
-  let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
-  let*! () =
-    Event.emit_reconstructed_slot
-      ~size:(Bytes.length slot)
-      ~shards:(Seq.length shards)
-  in
   return slot
 
+let http_request_path_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let kind, filename =
+    match store_kind with
+    | `Shards_archive ->
+        ("shards", Format.sprintf "%ld_%d" published_level slot_index)
+    | `Slots_archive ->
+        ( "slots",
+          Format.sprintf "%ld_%d_%d" published_level slot_index slot_size )
+  in
+  Uri.with_path
+    backup_uri
+    String.(concat "/" ["v0"; kind; "by_published_level"; filename])
+
+let local_filename_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let uri = Uri.path_and_query backup_uri in
+  match store_kind with
+  | `Shards_archive -> Format.sprintf "%s/%ld_%d" uri published_level slot_index
+  | `Slots_archive ->
+      Format.sprintf "%s/%ld_%d_%d" uri published_level slot_index slot_size
+
+(* The function below fetches a slot payload (or its shards) from a local file
+   or over HTTP(S), depending on the URI scheme, with the choice between slots
+   and shards driven by the URI fragment:
+
+    - No fragment or ["#slots"]  -> consider the source as a *slots* archive
+    - ["#shards"]                -> consider the source as a *shards* archive
+    - Any other fragment         -> [Failure "Invalid backup_uri fragment ..."]
+
+    The fragment is only a DAL-side indication to extend the
+    [--slots-backup-uri] option and associated code to handle shards without
+    breaking compatibility. It is stripped from [backup_uri]
+    before computing the local path or issuing the HTTP request.
+
+   URL/path shapes look as follows:
+
+   - Local (file://): the fragment affects the *filename*, not the directory.
+     * #slots  -> <base>/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/<published_level>_<slot_index>
+
+   - Remote (http[s]://): the fragment selects a server-side subtree.
+     * #slots  -> <base>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/v0/shards/by_published_level/<published_level>_<slot_index>
+*)
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
     backup_uri =
   let open Lwt_result_syntax in
+  (* Extract the fragment of the URI. We expect nothing, #slots or #shards. *)
+  let fragment_kind = Uri.fragment backup_uri in
+  let archive_kind =
+    match fragment_kind with
+    | None -> `Slots_archive (* default *)
+    | Some "slots" -> `Slots_archive
+    | Some "shards" -> `Shards_archive
+    | Some s ->
+        Stdlib.failwith
+          (Format.sprintf
+             "Invalid backup_uri fragment %S. Expecting 'slots' or 'shards'."
+             s)
+  in
+  (* Drop the fragment part from the URI *)
+  let backup_uri = Uri.with_fragment backup_uri None in
   match Uri.scheme backup_uri with
   | Some "file" ->
       let slot_filename =
-        Format.sprintf
-          "%s/%ld_%d_%d"
-          (Uri.path_and_query backup_uri)
+        local_filename_from_kind
+          backup_uri
           published_level
           slot_index
           slot_size
+          archive_kind
       in
       if Sys.file_exists slot_filename then
         let*! content =
@@ -258,30 +316,30 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
               let*! res =
                 Lwt_io.with_file ~mode:Lwt_io.Input slot_filename Lwt_io.read
               in
-              Lwt.return_some (Bytes.of_string res))
+              let res = Bytes.of_string res in
+              Lwt.return_some
+                (if archive_kind = `Shards_archive then `Shards res
+                 else `Slot res))
             (fun _ -> Lwt.return_none)
         in
         return content
       else return_none
   | Some ("http" | "https") -> (
       let url =
-        Uri.with_path
+        http_request_path_from_kind
           backup_uri
-          String.(
-            concat
-              "/"
-              [
-                "v0";
-                "slots";
-                "by_published_level";
-                Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
-              ])
+          published_level
+          slot_index
+          slot_size
+          archive_kind
       in
       let*! resp, body = Cohttp_lwt_unix.Client.get url in
       match resp.status with
       | `OK ->
           let*! body_str = Cohttp_lwt.Body.to_string body in
-          return_some (Bytes.of_string body_str)
+          let res = Bytes.of_string body_str in
+          return_some
+            (if archive_kind = `Shards_archive then `Shards res else `Slot res)
       | #Cohttp.Code.status_code as status ->
           (* Consume the body of the request in case of failure to avoid leaking stream!
              See https://github.com/mirage/ocaml-cohttp/issues/730 *)
@@ -305,28 +363,32 @@ let verify_commitment cryptobox expected slot =
   if Cryptobox.Commitment.equal expected obtained then return_unit
   else fail (`Other [Invalid_commitment {expected; obtained}])
 
+(*
 let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
+   *)
+let try_fetch_slot_from_backup ctxt cryptobox ~slot_size slot_id
     expected_commitment_hash backup_uri =
   let open Lwt_result_syntax in
-  let fetch_and_sanitize_slot_content () =
-    (* /!\ Warning: We are fetching the slot content as stored by another DAL
-       node on disk into its store/slot_store/ directory. Currently the
-       home-made KVS we use appends extra bytes at the beginning of each
-       "file" to chech if values are present. We should takes them into
-       account to:
-       - compute the expected size of the data
-       - fetch the exact slot content, without encoding artifacts when written
-         to disk. *)
-    let* slot_opt =
+  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
+  let fetch_and_sanitize_data () =
+    let* data_opt =
       fetch_slot_from_backup_uri
         ~slot_size
         ~published_level
         ~slot_index
         backup_uri
     in
-    match slot_opt with
+    match data_opt with
     | None -> return_none
-    | Some slot_bytes ->
+    | Some (`Slot slot_bytes) ->
+        (* /!\ Warning: We are fetching the slot content as stored by another DAL
+         node on disk into its store/slot_store/ directory. Currently the
+         home-made KVS we use appends extra bytes at the beginning of each
+         "file" to chech if values are present. We should takes them into
+         account to:
+         - compute the expected size of the data
+         - fetch the exact slot content, without encoding artifacts when written
+           to disk. *)
         let expected_size =
           slot_size + Key_value_store.file_prefix_bitset_size
         in
@@ -347,10 +409,30 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
                slot_bytes
                Key_value_store.file_prefix_bitset_size
                slot_size
+    | Some (`Shards shard_bytes) -> (
+        (* We got the raw shards KVS file. We could reuse the KVS to decode the
+           bytes into a list of shards. *)
+        let*! shards_opt =
+          read_minimal_shards_for_reconstruction
+            ~from_bytes:shard_bytes
+            cryptobox
+            (Node_context.get_store ctxt)
+            slot_id
+        in
+        match shards_opt with
+        | None -> return_none
+        | Some shards ->
+            let*! res_shard_store =
+              Node_context.may_reconstruct
+                ~reconstruct:(fun _slot_index ->
+                  get_slot_content_from_shards cryptobox shards)
+                slot_id
+                ctxt
+            in
+            Result.to_option res_shard_store |> return)
   in
-  let* slot_opt =
-    fetch_and_sanitize_slot_content () |> Errors.other_lwt_result
-  in
+  (* We either directly fetched a slot, or we rebuilt it from fetched shards. *)
+  let* slot_opt = fetch_and_sanitize_data () |> Errors.other_lwt_result in
   match (slot_opt, expected_commitment_hash) with
   | None, _ -> return_none
   | Some slot, None ->
@@ -527,7 +609,6 @@ let get_commitment_from_slot_id ctxt slot_id =
 let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
   let open Lwt_result_syntax in
   let config : Configuration_file.t = Node_context.get_config ctxt in
-  let Types.Slot_id.{slot_index; slot_level = published_level} = slot_id in
   match config.slots_backup_uris with
   | [] ->
       (* Fail if no backup URI is configured. *)
@@ -544,14 +625,12 @@ let fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id =
       in
       let* slot_opt =
         List.find_map_es
-          (fun uri ->
-            try_fetch_slot_from_backup
-              cryptobox
-              ~slot_size
-              ~published_level
-              ~slot_index
-              expected_commitment_hash
-              uri)
+          (try_fetch_slot_from_backup
+             ctxt
+             cryptobox
+             ~slot_size
+             slot_id
+             expected_commitment_hash)
           backup_uris
       in
       match slot_opt with
@@ -574,17 +653,28 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
         if reconstruct_if_missing then
           (* The slot could not be obtained from the slot store, attempt a
              reconstruction. *)
-          let*! res_shard_store =
-            Node_context.may_reconstruct
-              ~reconstruct:(get_slot_content_from_shards cryptobox store)
-              slot_id
-              ctxt
+          let*! shards_opt =
+            read_minimal_shards_for_reconstruction cryptobox store slot_id
           in
-          Lwt.return_some res_shard_store
+          match shards_opt with
+          | None -> Lwt.return_none
+          | Some shards ->
+              let*! res_shard_store =
+                Node_context.may_reconstruct
+                  ~reconstruct:(fun _slot_id ->
+                    get_slot_content_from_shards cryptobox shards)
+                  slot_id
+                  ctxt
+              in
+              Lwt.return_some res_shard_store
         else Lwt.return_none
       in
       match res_shard_store with
-      | Some (Ok slot) -> return slot
+      | Some (Ok slot) ->
+          let* () =
+            Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id
+          in
+          return slot
       | Some (Error _) | None ->
           fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id)
 
