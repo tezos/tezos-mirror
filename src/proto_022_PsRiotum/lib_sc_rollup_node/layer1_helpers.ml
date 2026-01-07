@@ -171,6 +171,7 @@ let constants_of_parametric
           attestation_lag;
           number_of_slots;
           attestation_lags = [];
+          dynamic_lag_enable = false;
           cryptobox_parameters;
         };
     }
