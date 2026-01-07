@@ -57,7 +57,7 @@ esac
 docker buildx create --driver docker-container --use --name tezos || echo "Warning: Docker builder instance already exists"
 
 echo "Building images to GCP registries ..."
-echo "IMAGE=$IMAGE_PATH:$RELEASE"
+echo "IMAGE=$IMAGE_PATH"
 echo "gcp=${gcp}"
 echo "gcp_generic=${gcp_generic}"
 echo "PLATFORM=$PLATFORM"
@@ -78,7 +78,7 @@ docker buildx build --push \
   --cache-to="type=registry,ref=${gcp_generic}-cache" \
   --secret "id=npm_token,src=/tmp/npm_token.txt" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
-  --build-arg IMAGE="$IMAGE_PATH:$RELEASE" \
+  --build-arg IMAGE="$IMAGE_PATH" \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --build-arg NPM_REGISTRY_DOMAIN="${NPM_REGISTRY_DOMAIN:-}" \
   --build-arg NPM_REGISTRY="${NPM_REGISTRY:-}" \
