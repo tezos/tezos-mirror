@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- Optimize `eth_getLogs` with up to 10x latency improvement when filtering on
+  addresses or topics by implementing bloom filter checks in SQLite
+  directly. (!20366)
+
 ### Metrics changes
 
 - Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
