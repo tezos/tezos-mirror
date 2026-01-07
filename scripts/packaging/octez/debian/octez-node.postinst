@@ -37,16 +37,15 @@ configure)
         chown tezos "$TEZOS_HOME"
       fi
     fi
-
-    # setup log directory
-    if [ ! -d /var/log/tezos ]; then
-      mkdir -p /var/log/tezos
-      chown tezos /var/log/tezos
-    fi
   else
     echo "Upgrading octez-node from version $2 ( postinst )"
   fi
 
+  # setup log directory (on fresh install AND upgrade)
+  if [ ! -d /var/log/tezos ]; then
+    mkdir -p /var/log/tezos
+    chown tezos /var/log/tezos
+  fi
   ;;
 *)
   : noop
