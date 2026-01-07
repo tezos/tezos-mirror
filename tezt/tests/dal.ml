@@ -2335,8 +2335,8 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
        %L, got = %R)" ;
   unit
 
-let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
-    dal_node =
+let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
+    parameters cryptobox node client dal_node =
   let* start = Lwt.map succ (Node.get_level node) in
   let expected_exported_levels = 5 in
   let stop =
@@ -2360,10 +2360,25 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
       client
       dal_node
   in
+
+  let upper_bound_exported = start + expected_exported_levels in
+  let index_ok =
+    let is_exported =
+      match slots_exported with
+      | None -> fun _ -> true
+      | Some l -> fun x -> List.mem x l
+    in
+    let is_imported =
+      match slots_imported with
+      | None -> fun _ -> true
+      | Some l -> fun x -> List.mem x l
+    in
+    fun i -> is_exported i && is_imported i
+  in
   let tests_ok =
     (* Levels that must be present in both original store and snapshot *)
     List.filter
-      (fun (level, _index) -> level < start + expected_exported_levels)
+      (fun (level, index) -> index_ok index && level < upper_bound_exported)
       published
   in
   let tests_error =
@@ -2372,14 +2387,23 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
        that blocks up to level [stop - 2] are sure to be finalized and
        therefore present in the source DAL node's store. *)
     List.filter
-      (fun (level, _index) ->
-        level >= start + expected_exported_levels && level < stop - 2)
+      (fun (level, index) ->
+        (level >= upper_bound_exported && level < stop - 2)
+        || (level < upper_bound_exported && not (index_ok index)))
       published
   in
-  let file = Temp.file "export" in
+  let min_published_level = Int32.of_int start in
+  let max_published_level = Int32.of_int stop in
+  let file = Temp.file ("snapshot-" ^ name) in
   (* Export with default levels (uses first_seen_level and last_processed_level) *)
   let* () =
-    Dal_node.snapshot_export ~endpoint:(Node.as_rpc_endpoint node) dal_node file
+    Dal_node.snapshot_export
+      ~min_published_level
+      ~max_published_level
+      ?slots:slots_exported
+      ~endpoint:(Node.as_rpc_endpoint node)
+      dal_node
+      file
   in
   (* Verify the snapshot file was created *)
   let* file_exists = Lwt_unix.file_exists file in
@@ -2393,6 +2417,9 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
   let* () =
     Dal_node.snapshot_import
       ~no_check:true (* Snapshot data validation is not implemented yet *)
+      ~min_published_level
+      ~max_published_level
+      ?slots:slots_imported
       ~endpoint:(Node.as_rpc_endpoint node)
       fresh_dal_node
       file
@@ -2400,6 +2427,9 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
   let* () = Dal_node.run fresh_dal_node in
   (* Compare slot statuses between the original node and the fresh one built from snapshot. *)
   let* () =
+    Log.info
+      "Checking that the DAL node bootstrapped from snapshot has the expected \
+       slot data..." ;
     Lwt_list.iter_s
       (fun (slot_level, slot_index) ->
         let* status_orig =
@@ -2446,6 +2476,9 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
   in
   let unexpected_success = Failure "Should not succeed" in
   let* () =
+    Log.info
+      "Checking that the DAL node bootstrapped from snapshot lacks the \
+       expected slot data..." ;
     Lwt_list.iter_s
       (fun (slot_level, slot_index) ->
         (* Check that the source node has data *)
@@ -2475,6 +2508,25 @@ let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
         unit)
       tests_error
   in
+  unit
+
+let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
+    dal_node =
+  let test ?slots_exported ?slots_imported name =
+    test_dal_node_snapshot_aux
+      ~name
+      ~operators
+      ?slots_exported
+      ?slots_imported
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
+  let* () = test "empty" in
+  let* () = test ~slots_exported:[List.hd operators] "filter-exported" in
+  let* () = test ~slots_imported:[List.hd operators] "filter-imported" in
   unit
 
 let test_dal_node_import_l1_snapshot _protocol parameters _cryptobox node client
@@ -11625,11 +11677,11 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["snapshot"]
-    ~operator_profiles:[0]
+    ~operator_profiles:[0; 3]
     ~l1_history_mode:(Custom Node.Archive)
     ~history_mode:Full
     "dal node snapshot export/import"
-    (test_dal_node_snapshot ~operators:[0])
+    (test_dal_node_snapshot ~operators:[0; 3])
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)

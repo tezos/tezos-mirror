@@ -21,6 +21,7 @@ val export :
   endpoint:Uri.t option ->
   min_published_level:int32 option ->
   max_published_level:int32 option ->
+  slots:int list option ->
   string ->
   unit tzresult Lwt.t
 
@@ -37,5 +38,6 @@ val import :
   endpoint:Uri.t option ->
   min_published_level:int32 option ->
   max_published_level:int32 option ->
+  slots:int list option ->
   string ->
   unit tzresult Lwt.t
