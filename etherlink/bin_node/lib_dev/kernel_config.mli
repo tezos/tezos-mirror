@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type evm_version = Shanghai | Cancun
+type evm_version = Shanghai | Cancun | Prague | Osaka
 
 (** [make ~boostrap_balance ?bootstrap_accounts ... ~output ()]
     generates a configuration file located at [output], where

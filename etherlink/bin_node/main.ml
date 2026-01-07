@@ -2466,12 +2466,14 @@ let set_account_code =
 let evm_version_arg =
   let long = "evm-version" in
   let doc = Format.sprintf "Value for evm_version in the installer config." in
-  Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai"
+  Tezos_clic.arg ~long ~doc ~placeholder:"cancun|shanghai|prague|osaka"
   @@ Tezos_clic.parameter (fun _ evm_version ->
          let open Lwt_result_syntax in
          match evm_version with
          | "shanghai" -> return Evm_node_lib_dev.Kernel_config.Shanghai
          | "cancun" -> return Evm_node_lib_dev.Kernel_config.Cancun
+         | "prague" -> return Evm_node_lib_dev.Kernel_config.Prague
+         | "osaka" -> return Evm_node_lib_dev.Kernel_config.Osaka
          | _ -> failwith "Parsing error for evm-version")
 
 let make_l2_kernel_config_command =

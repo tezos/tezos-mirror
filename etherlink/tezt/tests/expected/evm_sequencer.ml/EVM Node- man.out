@@ -860,7 +860,7 @@ Kernel commands:
       [--enable-fa-bridge] [--enable-revm] [--dal-slots <0,1,4,6,...>] [--enable-dal]
       [--enable-multichain] [--l2-chain-id <1>] [--max-delayed-inbox-blueprint-length <1000>]
       [--enable-fast-withdrawal] [--enable-fast-fa-withdrawal]
-      [--evm-version <cancun|shanghai>] [--set-code <0x...,0x....>]
+      [--evm-version <cancun|shanghai|prague|osaka>] [--set-code <0x...,0x....>]
       [-r --with-runtime <RUNTIME>] [--tez-bootstrap-balance <3800000>]
       [--tez-bootstrap-account <edp...>]
     Create a configuration for the kernel installer.
@@ -908,7 +908,8 @@ Kernel commands:
     --enable-fast-withdrawal: Enable flag enable_fast_withdrawal in the installer config.
     --enable-fast-fa-withdrawal: Enable flag enable_fast_fa_withdrawal in the installer
       config.
-    --evm-version <cancun|shanghai>: Value for evm_version in the installer config.
+    --evm-version <cancun|shanghai|prague|osaka>: Value for evm_version in the installer
+      config.
     --set-code <0x...,0x....>: Add code to an account in the installer config.
     -r --with-runtime <RUNTIME>: Enable a Tezos X experimental runtime alongside the default
       Ethereum runtime of Etherlink
