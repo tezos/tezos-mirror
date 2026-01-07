@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezlink_protocol = Protocol.T024
+let tezlink_protocol = Protocol.S023
 
 (* How to add a new contract to this list to serve as bootstrap contracts in
    Tezlink integration tests.
