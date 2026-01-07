@@ -33,16 +33,17 @@ module Parameters : sig
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
+    attestation_lags : int list;
     attestation_threshold : int;
   }
 
   val parameter_file : Protocol.t -> string Lwt.t
 
-  val from_protocol_parameters : JSON.t -> t
+  val from_protocol_parameters : Protocol.t -> JSON.t -> t
 
-  val from_client : ?block:string -> Client.t -> t Lwt.t
+  val from_client : Protocol.t -> ?block:string -> Client.t -> t Lwt.t
 
-  val from_endpoint : Endpoint.t -> t Lwt.t
+  val from_endpoint : Protocol.t -> Endpoint.t -> t Lwt.t
 
   (* This function computes the period (in cycles) during which the node stores
      data about attested slots assuming the node supports refutations and it has

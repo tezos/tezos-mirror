@@ -462,7 +462,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
   let dal_parameters =
-    Dal.Parameters.from_protocol_parameters proto_parameters
+    Dal.Parameters.from_protocol_parameters protocol proto_parameters
   in
   let config : Cryptobox.Config.t =
     {activated = true; bootstrap_peers = dal_bootstrap_peers}
@@ -4298,7 +4298,7 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     let base = Either.right (migrate_to, None) in
     let* proto_parameters = generate_protocol_parameters base migrate_to [] in
     let new_dal_parameters =
-      Dal.Parameters.from_protocol_parameters proto_parameters
+      Dal.Parameters.from_protocol_parameters migrate_to proto_parameters
     in
     let old_lag = dal_parameters.attestation_lag in
     let new_lag = new_dal_parameters.attestation_lag in
@@ -4749,7 +4749,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       generate_protocol_parameters base migrate_to []
     in
     let new_dal_parameters =
-      Dal.Parameters.from_protocol_parameters new_proto_parameters
+      Dal.Parameters.from_protocol_parameters migrate_to new_proto_parameters
     in
     let new_lag = new_dal_parameters.attestation_lag in
     Log.info "Initializing the cryptobox" ;

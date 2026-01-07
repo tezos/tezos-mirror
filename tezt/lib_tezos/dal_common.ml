@@ -34,6 +34,7 @@ module Parameters = struct
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
+    attestation_lags : int list;
     attestation_threshold : int;
   }
 
@@ -41,7 +42,7 @@ module Parameters = struct
     let args = [(["dal_parametric"; "feature_enable"], `Bool true)] in
     Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
 
-  let from_protocol_parameters json =
+  let from_protocol_parameters protocol json =
     let json = JSON.(json |-> "dal_parametric") in
     let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
     let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
@@ -49,6 +50,11 @@ module Parameters = struct
     let page_size = JSON.(json |-> "page_size" |> as_int) in
     let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
     let attestation_lag = JSON.(json |-> "attestation_lag" |> as_int) in
+    let attestation_lags =
+      if Protocol.number protocol >= 025 then
+        JSON.(json |-> "attestation_lags" |> as_list |> List.map as_int)
+      else [attestation_lag]
+    in
     let attestation_threshold =
       JSON.(json |-> "attestation_threshold" |> as_int)
     in
@@ -65,21 +71,22 @@ module Parameters = struct
           {number_of_shards; redundancy_factor; slot_size; page_size};
       number_of_slots;
       attestation_lag;
+      attestation_lags;
       attestation_threshold;
     }
 
-  let from_client ?block client =
+  let from_client protocol ?block client =
     let* json =
       Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_context_constants ?block ()
     in
-    from_protocol_parameters json |> return
+    from_protocol_parameters protocol json |> return
 
-  let from_endpoint endpoint =
+  let from_endpoint protocol endpoint =
     let* json =
       RPC_core.call endpoint @@ RPC.get_chain_block_context_constants ()
     in
-    from_protocol_parameters json |> return
+    from_protocol_parameters protocol json |> return
 
   let full_storage_period_with_refutation_in_cycles ~proto_parameters =
     let blocks_per_cycle =
@@ -187,7 +194,6 @@ module Attestations = struct
 
   let rec decode protocol str =
     if Protocol.number protocol < 025 then (
-      (* the same code as for [Attestations.decode] *)
       let attestation = Z.of_string str in
       let length = Z.numbits attestation in
       let array = Array.make length false in

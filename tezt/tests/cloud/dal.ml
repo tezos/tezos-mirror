@@ -1100,7 +1100,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     JSON.(constants |-> "minimal_block_delay" |> as_int)
   in
   let* parameters =
-    Dal_common.Parameters.from_endpoint some_node_rpc_endpoint
+    Dal_common.Parameters.from_endpoint
+      configuration.protocol
+      some_node_rpc_endpoint
   in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
