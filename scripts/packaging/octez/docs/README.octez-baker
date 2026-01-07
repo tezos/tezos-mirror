@@ -10,8 +10,11 @@ baker using
 $ sudo systemctl start octez-baker
 ```
 
-All services are enabled but not started by default. It's up to the user
-to configure them.
+All services are disabled and not started by default. To enable and start:
+
+```
+$ sudo systemctl enable --now octez-baker
+```
 
 ## Usage with a remote signer
 
@@ -46,3 +49,8 @@ $ sudo su tezos -c "octez-client sign bytes 0x03 for alice"
 # Register your baking account
 $ sudo su tezos -c "octez-client register key alice as delegate"
 ```
+
+## Full Documentation
+
+For complete setup instructions, see:
+https://tezos.gitlab.io/introduction/services.html

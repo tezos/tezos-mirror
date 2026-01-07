@@ -189,7 +189,7 @@ Now that everything is in place, we can start the Octez baker.
 
 This service will automatically start all accusers and bakers for all protocols
 shipped with the package.
-It will also start the DAL node alongside the baker, which is the recommended setting for all bakers.
+If ``--dal-node`` is configured in ``/etc/default/octez-baker``, the DAL node will also be started alongside the baker, which is the recommended setting for all bakers.
 The DAL node is run in a default configuration, that is, in controller mode without any profile; you may edit file ``/etc/default/octez-dal-node`` or use commands such as ``sudo su tezos -c "octez-dal-node config ..."`` to set up another configuration, refer to page :doc:`../shell/dal_node`.
 
 The logs of the baker are available in ``/var/log/tezos/baker*.log``.
