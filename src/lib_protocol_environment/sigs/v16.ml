@@ -6601,9 +6601,9 @@ val find : ('a -> bool) -> 'a list -> 'a option
     {!Stdlib.List}. *)
 val find_opt : ('a -> bool) -> 'a list -> 'a option
 
-(** [find_index predicate xs] is the index of the first element [x] of the
-    list [xs] such that [predicate x] is [true] or [None] if the list [xs]
-    has no such element.
+(** [find_index f xs] returns [Some i], where [i] is the index of the first
+    element of the list [xs] that satisfies [f x], if there is such an
+    element. It returns [None] if there is no such element.
 
     E.g., [find_index (fun x -> x >= 10) [1; 5; 10; 15]] is [Some 2]. *)
 val find_index : ('a -> bool) -> 'a list -> int option
