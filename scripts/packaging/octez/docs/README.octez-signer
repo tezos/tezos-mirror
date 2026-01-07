@@ -51,3 +51,8 @@ https://faucet.ghostnet.teztnets.com/
 
 We recommend to associate the signer to a ledger and to take all relevant
 precautions to secure the private keys.
+
+## Full Documentation
+
+For complete setup instructions, see:
+https://tezos.gitlab.io/introduction/services.html
