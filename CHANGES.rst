@@ -85,6 +85,8 @@ Smart Rollup node
 
 - Remove protocol plugin for Nairobi (17). This still allows to replay Etherlink
   mainnet from genesis but not Etherlink testnet. (MR :gl:`!20301`)
+- Fix the status of traces for our workers’ handlers remaining unset. (MR
+  :gl:`!20379`)
 
 Smart Rollup WASM Debugger
 --------------------------

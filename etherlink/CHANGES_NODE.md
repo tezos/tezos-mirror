@@ -12,6 +12,7 @@
 
 - Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
   instant preconfirmations. (!20369)
+- Fix the status of traces for our workers’ handlers remaining unset. (!20379)
 
 ### Command-line interface changes
 
