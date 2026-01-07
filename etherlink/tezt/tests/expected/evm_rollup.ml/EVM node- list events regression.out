@@ -732,10 +732,10 @@ evm_context_request_failed:
                      "transaction":
                        { /* Evm */
                          "kind": "evm",
-                         "transaction": $unistring }
+                         "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ }
                        || { /* Michelson */
                             "kind": "michelson",
-                            "transaction": $unistring } }
+                            "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ } }
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
@@ -2686,10 +2686,10 @@ evm_context_request_failed:
                      "transaction":
                        { /* Evm */
                          "kind": "evm",
-                         "transaction": $unistring }
+                         "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ }
                        || { /* Michelson */
                             "kind": "michelson",
-                            "transaction": $unistring } }
+                            "transaction": /^([a-zA-Z0-9][a-zA-Z0-9])*$/ } }
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
