@@ -1596,6 +1596,7 @@ type baker_test_env = {
   cctxt : Protocol_client_context.full;
   delegates : Baking_state_types.Key.t list;
   global_state : Baking_state.global_state;
+  automaton_state : Baking_state.automaton_state;
   genesis_block_info : Baking_state_types.block_info;
 }
 
@@ -1693,10 +1694,14 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
       ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
+  let name = Uri.to_string cctxt#base in
+  let automaton_state =
+    Baking_state.
+      {name; cctxt; validation_mode = Local context_index; operation_worker}
+  in
   let global_state =
     Baking_state.
       {
-        cctxt;
         chain_id;
         config =
           {
@@ -1706,7 +1711,6 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
           };
         constants;
         round_durations;
-        operation_worker;
         dal_attestable_slots_worker;
         forge_worker_hooks =
           {
@@ -1714,7 +1718,6 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
             get_forge_event_stream = (fun () -> Lwt_stream.of_list []);
             cancel_all_pending_tasks = (fun () -> ());
           };
-        validation_mode = Local context_index;
         delegates;
         cache;
         dal_node_rpc_ctxt = None;
@@ -1747,7 +1750,7 @@ let create_baker_test_env ?(config = default_config) ~num_delegates () =
               grandparent = shell.predecessor;
             }
   in
-  return {cctxt; delegates; global_state; genesis_block_info}
+  return {cctxt; delegates; global_state; automaton_state; genesis_block_info}
 
 (** Create a batch_content for consensus vote testing. *)
 let create_batch_content ~(block_info : Baking_state_types.block_info) :
