@@ -16,6 +16,7 @@ purge)
   rm -Rf /var/tezos/.tezos-client/logs
   rm -f /var/log/tezos/accuser*.log
   rm -f /var/log/tezos/baker*.log
+  db_purge || true
   echo "Octez baker purged"
   ;;
 upgrade | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
