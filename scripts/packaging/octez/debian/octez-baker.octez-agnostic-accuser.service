@@ -1,0 +1,26 @@
+[Unit]
+Description=Octez accuser service
+Documentation=https://octez.tezos.com/docs/
+After=network.target
+PartOf=octez-baker.service
+
+[Service]
+EnvironmentFile=-/etc/default/octez-baker
+EnvironmentFile=-/etc/default/octez-accuser
+User=tezos
+WorkingDirectory=~
+KillMode=control-group
+Restart=on-failure
+RestartSec=10s
+Slice=octez.slice
+
+ExecStart=/bin/sh -c "/usr/bin/octez-accuser run $RUNTIME_OPTS"
+
+ExecStartPre=+touch /var/log/tezos/accuser.log
+ExecStartPre=+chown tezos:tezos /var/log/tezos/accuser.log
+
+StandardOutput=append:/var/log/tezos/accuser.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target

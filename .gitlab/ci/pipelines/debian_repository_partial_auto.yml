@@ -273,7 +273,6 @@ oc.install_bin_debian_bookworm_systemd_test:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -306,7 +305,6 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -315,6 +313,38 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
+    images/packages/debian-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    PREFIX: ""
+    DISTRIBUTION: debian
+    RELEASE: bookworm
+
+oc.upgrade_bin_debian_bookworm-systemd_no_restart:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publishing_tests
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests_debian
+  - apt_repo_debian
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test-no-restart.sh
     images/packages/debian-systemd-tests.Dockerfile
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:

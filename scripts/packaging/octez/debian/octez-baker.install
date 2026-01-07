@@ -2,3 +2,4 @@ binaries/octez-baker-P* /usr/bin/
 binaries/octez-baker /usr/bin/
 binaries/octez-accuser-P* /usr/bin/
 binaries/octez-accuser /usr/bin/
+scripts/systemd-octez-bakers.sh /usr/share/octez-baker/

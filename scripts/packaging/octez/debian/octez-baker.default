@@ -1,0 +1,17 @@
+
+# Data Directory
+# we use the datadir defined in /etc/default/octez-node
+
+# Liquidity baking toggle vote (on/pass/off)
+LQVOTE="pass"
+
+# Baker key - leave empty to bake for all available keys
+# BAKER_KEY=""
+
+# Use agnostic baker instead of protocol-specific baker (true/false)
+# AGNOSTIC_BAKER="false"
+
+# Other runtime options
+# To enable DAL node alongside the baker, add --dal-node to RUNTIME_OPTS:
+# RUNTIME_OPTS="--dal-node http://127.0.0.1:10732"
+RUNTIME_OPTS=""

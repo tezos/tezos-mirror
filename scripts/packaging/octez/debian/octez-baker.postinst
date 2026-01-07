@@ -1,0 +1,36 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+echoerr() { echo "$@" 1>&2; }
+
+db_version 2.0
+
+case "${1}" in
+configure)
+  # if $2 is empty, then we're doing a fresh install.
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
+    echoerr "Fresh installation (or reconfigure) of the Octez baker"
+
+    mkdir -p /var/tezos/.tezos-client
+    chown tezos:tezos /var/tezos/.tezos-client
+  else
+    echoerr "Upgrading octez-baker from version $2 ( postinst )"
+  fi
+
+  # Reload systemd if unit files changed during upgrade
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+  fi
+  ;;
+*)
+  : nop
+  ;;
+esac
+
+#DEBHELPER#

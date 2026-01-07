@@ -66,6 +66,20 @@ Codec
 Docker Images
 -------------
 
+Packaging
+---------
+
+- **Breaking change**: Debian/Ubuntu packages now install services as disabled
+  by default. Users must explicitly enable services with
+  ``systemctl enable octez-node`` (and similar for other services) before
+  starting them. This prevents accidental service starts during package
+  installation or upgrades. (MR :gl:`!19996`)
+
+- **Breaking change**: Services (octez-node, octez-baker, octez-dal-node) are
+  now gracefully stopped during package upgrade and NOT automatically restarted.
+  Users must manually restart services after upgrade with
+  ``systemctl start octez-node`` (and similar). (MR :gl:`!19996`)
+
 Smart Rollup node
 -----------------
 

@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+# Load debconf library
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+case "${1}" in
+purge)
+  # Purge debconf data for the package in any case
+  # shellcheck disable=SC2119
+  db_purge || true
+  ;;
+upgrade | remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+*)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 1
+  ;;
+esac
+
+#DEBHELPER#

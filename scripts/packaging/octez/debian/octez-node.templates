@@ -1,0 +1,7 @@
+Template: octez-node/purge_warning
+Type: boolean
+Default: false
+Description: Remove all node data
+ This operation will remove all node data, including the configuration and
+ associated files. If you choose not to proceed, the node data will remain
+ intact, and only the packages will be removed.

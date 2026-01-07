@@ -1,2 +1,27 @@
 #!/bin/sh
-exit 0
+
+set -e
+
+# Load debconf library
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+case "${1}" in
+remove) ;;
+purge)
+  rm -f /var/tezos/.tezos-client/*_highwatermarks
+  rm -f /var/tezos/.tezos-client/*_stateful_nonces
+  rm -Rf /var/tezos/.tezos-client/logs
+  rm -f /var/log/tezos/accuser*.log
+  rm -f /var/log/tezos/baker*.log
+  db_purge || true
+  echo "Octez baker purged"
+  ;;
+upgrade | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+*)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 1
+  ;;
+esac
+
+#DEBHELPER#

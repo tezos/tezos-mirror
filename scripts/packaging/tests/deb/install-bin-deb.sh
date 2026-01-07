@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -eu
-set -x
 
 REPO="https://storage.googleapis.com/${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}/$CI_COMMIT_REF_NAME"
 DISTRO=$1
@@ -29,6 +28,8 @@ apt-get install -y \
   octez-dal-node \
   octez-baker \
   octez-smart-rollup-node
+
+systemctl list-unit-files --type=service | grep "octez"
 
 octez-node --version
 octez-client --version

@@ -1,0 +1,56 @@
+# Octez Baker
+
+The octez baker should be configured to run along side a remote signer.
+
+This package provides systemd services for both the baker and the accuser
+and for the active and next protocol. For example, you can start the
+baker using
+
+```
+$ sudo systemctl start octez-baker
+```
+
+All services are disabled and not started by default. To enable and start:
+
+```
+$ sudo systemctl enable --now octez-baker
+```
+
+## Usage with a remote signer
+
+The remote signer can be located either on the same machine, or better
+on a separate machine and connected to a ledger.
+
+This package does not make any assumption on how the final user will
+configure its baker. We provide as an example some steps a user should
+take to configure its baker service to communicate with a remote signer.
+
+We assume, for the sake of brevity, that the signer is configured to
+answer on a local http connection running on localhost and will use
+authentication.
+
+For example, assuming the octez-signer is already setup:
+```
+$ octez-signer show address alice
+Hash: tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs
+Public Key: edpkvGAz71r8SZomcvF7LGajXT3AnhYX9CrmK3JWgA2xk8rf8CudY8
+
+# Tell the baker about this signer
+$ sudo su tezos -c "octez-client -R tcp://localhost:7732 config update"
+
+# add the remote key to the baker
+$ sudo su tezos -c "octez-client -R tcp://localhost:7732 import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+
+# Check that everything is ok
+# you should see the the operation in the logs of the signer
+# journalctl --user-unit octez-signer
+$ sudo su tezos -c "octez-client sign bytes 0x03 for alice"
+
+# Register your baking account
+$ sudo su tezos -c "octez-client register key alice as delegate"
+```
+
+## Full Documentation
+
+For complete setup instructions, see:
+https://tezos.gitlab.io/introduction/services.html
