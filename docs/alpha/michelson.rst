@@ -543,6 +543,8 @@ reject any contract using it.
    used to authenticate layer-2 operations to transfer tickets from
    this account.
 
+:doc:`../protocols/012_ithaca` deprecated the use of the ``SUB`` instruction on ``mutez``  arguments, and introduced instruction ``SUB_MUTEZ`` for dealing with that case.
+
 Macros
 ------
 
