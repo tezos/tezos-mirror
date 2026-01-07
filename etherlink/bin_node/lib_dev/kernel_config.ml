@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type evm_version = Shanghai | Cancun
+type evm_version = Shanghai | Cancun | Prague | Osaka
 
 let make_path = function [] -> "" | l -> "/" ^ String.concat "/" l ^ "/"
 
@@ -374,7 +374,12 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
       (fun evm_version ->
         ( "evm_version",
           padded_32_le_int_bytes
-          @@ match evm_version with Shanghai -> Z.zero | Cancun -> Z.one ))
+          @@
+          match evm_version with
+          | Shanghai -> Z.zero
+          | Cancun -> Z.one
+          | Prague -> Z.of_int 2
+          | Osaka -> Z.of_int 3 ))
       evm_version
   in
   let with_runtimes =
