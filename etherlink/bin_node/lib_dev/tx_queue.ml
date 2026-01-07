@@ -992,6 +992,14 @@ struct
       else
         return (Error "Transaction limit was reached. Transaction is rejected.")
 
+    let injection_confirmation state txn_hash status =
+      match Inflight_transactions.find_opt txn_hash state.waiting_injection with
+      | Some {queue_callback; _} ->
+          state.waiting_injection <-
+            Inflight_transactions.remove txn_hash state.waiting_injection ;
+          queue_callback status
+      | None -> Lwt.return_unit
+
     let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
@@ -1113,15 +1121,8 @@ struct
             ignore ;
 
           return_unit
-      | Injection_confirmation {txn_hash; status} -> (
-          match
-            Inflight_transactions.find_opt txn_hash state.waiting_injection
-          with
-          | Some {queue_callback; _} ->
-              state.waiting_injection <-
-                Inflight_transactions.remove txn_hash state.waiting_injection ;
-              Lwt_result.ok (queue_callback status)
-          | None -> return_unit)
+      | Injection_confirmation {txn_hash; status} ->
+          Lwt_result.ok (injection_confirmation state txn_hash status)
       | Size_info ->
           protect @@ fun () ->
           return
@@ -1213,13 +1214,14 @@ struct
           let*! () =
             Seq.S.iter
               (fun hash ->
+                (* Maybe we are receiving the transaction from the stream
+                   before the RPC actually returned something. We need to check
+                   to be sure. *)
+                let*! () = injection_confirmation state hash `Accepted in
                 let callback = Pending_transactions.pop state.pending hash in
                 match callback with
                 | Some {pending_callback; _} -> pending_callback `Confirmed
-                | None ->
-                    (* delayed transactions hashes are part of confirmed
-                       txs *)
-                    Lwt.return_unit)
+                | None -> Lwt.return_unit)
               confirmed_txs
           in
           if clear_pending_queue_after then (
