@@ -10,4 +10,9 @@ db_version 2.0
 # work directory to store temporary files associated to this package
 mkdir -p /var/run/octez-dal-node
 
+# Reload systemd if unit files changed during upgrade
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload || true
+fi
+
 #DEBHELPER#
