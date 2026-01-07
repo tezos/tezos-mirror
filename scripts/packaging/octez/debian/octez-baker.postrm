@@ -9,8 +9,6 @@ set -e
 case "${1}" in
 remove) ;;
 purge)
-  # Purge debconf data for the package in any case
-  # shellcheck disable=SC2119
   rm -f /var/tezos/.tezos-client/*_highwatermarks
   rm -f /var/tezos/.tezos-client/*_stateful_nonces
   rm -Rf /var/tezos/.tezos-client/logs

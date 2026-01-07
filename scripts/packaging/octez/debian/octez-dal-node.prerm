@@ -1,2 +1,11 @@
 #!/bin/sh
-exit 0
+
+set -e
+
+# Gracefully stop the DAL node before upgrade/remove
+if systemctl is-active --quiet octez-dal-node.service; then
+  echo "Stopping octez-dal-node"
+  systemctl stop octez-dal-node.service
+fi
+
+#DEBHELPER#

@@ -1,2 +1,11 @@
 #!/bin/sh
-exit 0
+
+set -e
+
+# Gracefully stop the baker before upgrade/remove
+if systemctl is-active --quiet octez-baker.service; then
+  echo "Stopping octez-baker"
+  systemctl stop octez-baker.service
+fi
+
+#DEBHELPER#
