@@ -91,6 +91,8 @@ type ('a, 'ctx) arg =
       doc : string;
       label : label;
       placeholder : string;
+      env : string option;
+      env_separator : char;
       kind : ('p, 'ctx) parameter;
     }
       -> ('p list option, 'ctx) arg
@@ -227,7 +229,19 @@ let rec print_options_detailed : type ctx a.
         placeholder
         print_desc
         doc
-  | MultipleArg {label; placeholder; doc; _} ->
+  | MultipleArg {label; placeholder; doc; env; env_separator; _} ->
+      let doc =
+        match env with
+        | None -> doc
+        | Some env ->
+            Format.sprintf
+              "%s\n\
+               If set, defaults to the values listed in the environment \
+               variable `$%s`, separated by '%c'."
+              doc
+              env
+              env_separator
+      in
       Format.fprintf
         ppf
         "@[<hov 2>@{<opt>%a <%s>@}: %a@]"
@@ -900,8 +914,10 @@ let constant c = Constant c
 let arg ~doc ?short ~long ~placeholder ?env kind =
   Arg {doc; label = {long; short}; placeholder; env; kind}
 
-let multiple_arg ~doc ?short ~long ~placeholder kind =
-  MultipleArg {doc; label = {long; short}; placeholder; kind}
+let multiple_arg ~doc ?short ~long ~placeholder ?env ?(env_separator = ',') kind
+    =
+  MultipleArg
+    {doc; label = {long; short}; env; env_separator; placeholder; kind}
 
 let default_arg ~doc ?short ~long ~placeholder ~default ?pp_default ?env kind =
   DefArg
@@ -1152,6 +1168,16 @@ let with_env ~default ?env k =
   | Some env -> (
       match Sys.getenv_opt env with Some s -> k env s | None -> return default)
 
+let with_env_multiple ~default ?env ~env_separator k =
+  let open Lwt_result_syntax in
+  match env with
+  | None -> return default
+  | Some env -> (
+      match Sys.getenv_opt env with
+      | Some s ->
+          k env (List.map String.trim (String.split_on_char env_separator s))
+      | None -> return default)
+
 (* Argument parsing *)
 let rec parse_arg : type a ctx.
     ?command:_ command ->
@@ -1180,9 +1206,20 @@ let rec parse_arg : type a ctx.
       | Some [Occ_empty] ->
           invalid_arg (Format.sprintf "'%s' must contain a value." long)
       | Some (_ :: _) -> tzfail (Multiple_occurrences ("--" ^ long, command)))
-  | MultipleArg {label = {long; short = _}; kind = {converter; _}; _} -> (
+  | MultipleArg
+      {label = {long; short = _}; kind = {converter; _}; env; env_separator; _}
+    -> (
       match StringMap.find_opt long args_dict with
-      | None | Some [] -> return_none
+      | None | Some [] ->
+          with_env_multiple ~default:None ?env ~env_separator @@ fun env s ->
+          let+ x =
+            List.map_es
+              (fun x ->
+                trace_eval (fun () -> Bad_env_argument (env, command))
+                @@ converter ctx x)
+              s
+          in
+          Some x
       | Some l ->
           let+ x =
             List.map_es

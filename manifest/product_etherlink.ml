@@ -446,6 +446,7 @@ let floodgate_lib =
         evm_node_lib_dev_encoding |> open_;
         evm_node_config |> open_;
         octez_workers;
+        octez_telemetry;
       ]
 
 let _octez_evm_node_tests =
@@ -747,7 +748,9 @@ let _floodgate_bin =
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         evm_node_config |> open_;
+        octez_stdlib_unix |> open_;
         floodgate_lib |> open_;
+        octez_version;
       ]
 
 let _outbox_monitor =
