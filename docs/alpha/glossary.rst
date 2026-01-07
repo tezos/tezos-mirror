@@ -38,7 +38,7 @@ _`Economic protocol`
     forking of the blockchain. This is because the procedure for an upgrade is also defined within the economic protocol, which can thus update itself.
 
 _`Fitness` (a.k.a. score, weight)
-    For each block, the consensus algotrithm can compute a score called fitness which determines the quality of the chain leading to that block.
+    For each block, the consensus algorithm can compute a score called fitness which determines the quality of the chain leading to that block.
     The shell changes the head of the chain to the valid block that has the highest fitness.
 
 _`Height`
@@ -62,7 +62,7 @@ _`Metadata`
     consists of many pieces of information such as the operation receipts,
     rewards updates, voting period, etc.
 
-    A block's metadata is the collections of operations metadata for all the operations included in the block (if the validation was successful).
+    A block's metadata is the collection of operations metadata for all the operations included in the block (if the validation was successful).
 
     For a detailed metadata content check the :doc:`./rpc` under
     the prefix ``../<block_id>/metadata``.
@@ -71,7 +71,7 @@ _`Node`
     A peer in a Tezos P2P network.
     The term "node" can refer to a few different kinds of nodes, including Tezos Layer 1 nodes, `DAL node`_\ s, and `Smart Rollup`_ nodes.
     The context should help to disambiguate between these, but in most cases, the term "node" refers to a Layer 1 node.
-    Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
+    Layer 1 nodes maintain a local state and propagate block_\ s and operation_\ s.
 
 _`Operation`
     An operation transforms the context_; this is what makes the state of the chain
@@ -106,7 +106,7 @@ Protocol terms
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
     to abuse the network in another similar way), another delegate_ can make an
-    accusation, by providing evidence of the offense. The delegate_ injecting the accusation in a newly baked block is called the accuser.\
+    accusation by providing evidence of the offense. The delegate_ injecting the accusation in a newly baked block is called the accuser.\
 
     The accuser is awarded some funds from the security deposit of the accused.
 
@@ -224,7 +224,7 @@ _`Delegation`
     An operation_ in which an account_ designates a
     delegate_. The delegating account's balance increases the delegate_'s `baking power`_ and consequently
     its `baking rights`_ and `attesting rights`_; it also increases its `voting power`_. However, the delegate_ does not control the funds of
-    the delegating account_, e.g., it can not spend them.
+    the delegating account_, e.g., it cannot spend them.
 
 .. _def_double_signing_alpha:
 
@@ -269,7 +269,7 @@ _`Implicit account`
 
 _`Layer 1`
     The primary blockchain i.e. the Tezos chain. Within any blockchain ecosystem, Layer 1 (L1) refers to the main chain to
-    which side chains, rollups, or other protocols connect and settle to. The Layer 1 chain is deemed to be most
+    which side chains, rollups, or other protocols connect and settle to. The Layer 1 chain is deemed to be the most
     secure, since it has the most value (or stake) tied to it, and be most decentralized and censorship resistant.
     However, transaction space is limited leading to low throughput and possibly high transaction costs.
     See `Layer 2`_.
