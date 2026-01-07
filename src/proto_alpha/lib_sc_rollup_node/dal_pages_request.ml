@@ -37,7 +37,7 @@ module Slot_id = Tezos_dal_node_services.Types.Slot_id
 type Environment.Error_monad.error +=
   | No_dal_node_provided
   | Dal_invalid_page_for_slot of Dal.Page.t
-  | Dal_attestation_status_not_final of {
+  | Dal_attestation_status_not_found of {
       published_level : int32;
       slot_index : int;
     }
@@ -59,18 +59,14 @@ let () =
   let open Environment.Error_monad in
   register_error_kind
     `Temporary
-    ~id:"dal_pages_request.attestation_status_not_final"
-    ~title:"DAL attestation status is not final"
+    ~id:"dal_pages_request.attestation_status_not_found"
+    ~title:"DAL attestation status is not found"
     ~description:
-      "The DAL attestation status for the requested slot is not final yet. We \
-       cannot decide whether it is legitimate for the rollup node to import \
-       it."
+      "The DAL attestation status for the requested slot is not found."
     ~pp:(fun ppf (published_level, slot_index) ->
       Format.fprintf
         ppf
-        "DAL attestation status not final for slot %d published at level %ld. \
-         We cannot decide yet if it is legitimate for the rollup node to \
-         import it."
+        "DAL attestation status not found for slot %d published at level %ld."
         slot_index
         published_level)
     Data_encoding.(
@@ -78,11 +74,11 @@ let () =
         (req "published_level" Data_encoding.int32)
         (req "slot_index" Data_encoding.uint8))
     (function
-      | Dal_attestation_status_not_final {published_level; slot_index} ->
+      | Dal_attestation_status_not_found {published_level; slot_index} ->
           Some (published_level, slot_index)
       | _ -> None)
     (fun (published_level, slot_index) ->
-      Dal_attestation_status_not_final {published_level; slot_index})
+      Dal_attestation_status_not_found {published_level; slot_index})
 
 let () =
   let open Environment.Error_monad in
@@ -144,20 +140,6 @@ module Event = struct
       ("published_level", Data_encoding.int32)
       ~pp4:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
-
-  let final_slot_header_attestation_status_failure =
-    declare_4
-      ~section
-      ~name:"final_slot_header_attestation_status_failure"
-      ~msg:
-        "Failed to get a final status for slot at index {slot_index} published \
-         at level {published_level}. Reason: {reason}, {allowed_retries_count} \
-         retries left."
-      ~level:Warning
-      ("published_level", Data_encoding.int32)
-      ("slot_index", Data_encoding.int31)
-      ("allowed_retries_count", Data_encoding.int31)
-      ("reason", Data_encoding.string)
 end
 
 module Slot_id_cache =
@@ -183,49 +165,138 @@ let download_confirmed_slot_pages =
         Slot_id_cache.replace cache slot_id res ;
         res
 
-(* Adaptive DAL is not supported anymore *)
-let get_slot_header_attestation_info =
+let slot_statuses_cache :
+    ([`Attested of int | `Unattested | `Unpublished] * int32 * Block_hash.t)
+    Slot_id_cache.t =
+  let number_of_slots = 32 in
+  let max_number_of_dynamic_lags = 5 in
+  let tb_finality = 2 in
+  Slot_id_cache.create
+  @@ (number_of_slots * max_number_of_dynamic_lags * tb_finality)
+
+module SI = Set.Make (Int)
+
+(* This function returns the (final) attestation status of [slot_id] (published
+   level, index) as seen from L1 at the inbox level identified by
+   [inbox_level_block_hash].
+
+   We deliberately do not rely on DAL nodes here: DAL nodes typically update their
+   context only after blocks finalization, while rollups advance optimistically
+   and may need this information earlier. Instead, we read the DAL skip-list
+   cells from L1 ([Dal.skip_list_cells_of_level] at `Hash
+   (inbox_level_block_hash, 0)), and derive the slot status from those cells.
+
+   The function maintains a small in-memory cache keyed by
+   (inbox_level_block_hash, slot_id) to avoid refetching/decoding the same
+   skip-list data multiple times within a run. The use of the inbox_level's
+   block hash protects from the use of wrong/reverted statuses in case of L1
+   reorg.
+
+   Note 1: this limitation only affects fetching header/attestation
+   metadata. Fetching the *slot contents* can still rely on a DAL node when the
+   data is already stored, even if the corresponding header attestation status
+   is not (yet) available in the DAL node context.
+
+   Note 2: Adaptive DAL is not supported. We check attestation status as
+   declared by the L1 protocol. *)
+let get_slot_header_attestation_info (Node_context.{cctxt; _} as node_ctxt)
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants) slot_id
+    =
   let open Lwt_result_syntax in
-  (* The size was chosen arbitrarily, but it should be sufficient for Etherlink,
-     given that slots statuses are pulled and processed in some order and only
-     once. In general a kernel may request data it previously processed during
-     normal operation (i.e., not for refutation games). This size can then be
-     adapted as needed. *)
-  let cache = Slot_id_cache.create 16 in
-  fun dal_cctxt ~published_level ~index ~dal_slot_status_max_fetch_attempts ->
-    let published_level = Raw_level.to_int32 published_level in
-    let index = Dal.Slot_index.to_int index in
-    let slot_id = Slot_id.{slot_level = published_level; slot_index = index} in
-    let may_retry n f res ~reason =
-      let*! () =
-        Event.(emit final_slot_header_attestation_status_failure)
-          (published_level, index, n, reason)
+  let find_opt () =
+    match Slot_id_cache.find_opt slot_statuses_cache slot_id with
+    | Some (status, indexed_block_level, indexed_block_hash) ->
+        let* current_block_hash =
+          Node_context.hash_of_level node_ctxt indexed_block_level
+        in
+        if Block_hash.equal indexed_block_hash current_block_hash then
+          return_some status
+        else
+          (* There was a reorg, we should re-fetch statuses from L1 *)
+          return_none
+    | None -> return_none
+  in
+  let* immediate_res = find_opt () in
+  match immediate_res with
+  | Some res -> return res
+  | None -> (
+      let init_cache_for_potential_attestation_lag ~lag =
+        let potential_attested_level =
+          Int32.(add slot_id.slot_level (of_int lag))
+        in
+        let* potential_attested_level_hash =
+          Node_context.hash_of_level node_ctxt potential_attested_level
+        in
+        let* cells =
+          let cctxt = new Protocol_client_context.wrap_full cctxt in
+          Plugin.RPC.Dal.skip_list_cells_of_level
+            cctxt
+            (cctxt#chain, `Hash (potential_attested_level_hash, 0))
+            ()
+        in
+        List.iter
+          (fun (_hash, cell) ->
+            let content = Dal.Slots_history.content cell in
+            let Dal.Slots_history.{header_id = {published_level; index}; _} =
+              Dal.Slots_history.content_id content
+            in
+            let published_level = Raw_level.to_int32 published_level in
+            let index = Dal.Slot_index.to_int index in
+            let slot_id =
+              Slot_id.{slot_level = published_level; slot_index = index}
+            in
+            let final_status =
+              match content with
+              | Unpublished _ -> `Unpublished
+              | Published {is_proto_attested = false; _} -> `Unattested
+              | Published {attestation_lag; _} ->
+                  `Attested
+                    (Dal.Slots_history.attestation_lag_value attestation_lag)
+            in
+            Slot_id_cache.replace
+              slot_statuses_cache
+              slot_id
+              ( final_status,
+                potential_attested_level,
+                potential_attested_level_hash ))
+          cells ;
+        return_unit
       in
-      if n <= 0 then Lwt.return res else f (n - 1)
-    in
-    let rec aux allowed_retries_count =
-      match Slot_id_cache.find_opt cache slot_id with
+      let attestation_lags =
+        (* init with dynamic lags, if enabled *)
+        (if dal_constants.dynamic_lag_enable then
+           SI.of_list dal_constants.attestation_lags
+         else SI.empty)
+        |>
+        (* Add current lag if not already present *)
+        SI.add dal_constants.attestation_lag
+        |>
+        (* Add legacy lag if not already present *)
+        SI.add Dal.Slots_history.legacy_attestation_lag
+      in
+      let* res =
+        List.fold_left_es
+          (fun res lag ->
+            if Option.is_some res then return res
+            else
+              let* () = init_cache_for_potential_attestation_lag ~lag in
+              find_opt ())
+          None
+          (SI.elements attestation_lags)
+      in
+      match res with
       | Some status -> return status
-      | None -> (
-          let*! res = Dal_node_client.get_slot_status dal_cctxt slot_id in
-          match res with
-          | Ok ((`Attested _ | `Unattested | `Unpublished) as final_status) ->
-              Slot_id_cache.replace cache slot_id final_status ;
-              Lwt.return res
-          | Ok `Waiting_attestation ->
-              may_retry
-                allowed_retries_count
-                aux
-                res
-                ~reason:"waiting for attestation"
-          | Error err ->
-              may_retry
-                allowed_retries_count
-                aux
-                res
-                ~reason:(Format.asprintf "%a" Error_monad.pp_print_trace err))
-    in
-    aux dal_slot_status_max_fetch_attempts
+      | None ->
+          let open Environment.Error_monad.Lwt_result_syntax in
+          let*! res =
+            tzfail
+            @@ Dal_attestation_status_not_found
+                 {
+                   published_level = slot_id.slot_level;
+                   slot_index = slot_id.slot_index;
+                 }
+          in
+          Environment.wrap_tzresult res |> Lwt.return)
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -295,18 +366,6 @@ let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
        ~inbox_level
        slot_id
        ~dal_attested_slots_validity_lag
-
-let attestation_status_not_final published_level slot_index =
-  let open Environment.Error_monad.Lwt_result_syntax in
-  let*! res =
-    tzfail
-    @@ Dal_attestation_status_not_final
-         {
-           published_level = Raw_level.to_int32 published_level;
-           slot_index = Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index;
-         }
-  in
-  Environment.wrap_tzresult res |> Lwt.return
 
 let get_dal_node cctxt_opt =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -401,16 +460,12 @@ let page_content_int
   else
     let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
     let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
-    let dal_slot_status_max_fetch_attempts =
-      node_ctxt.config.dal_slot_status_max_fetch_attempts
-    in
+    let published_level = Raw_level.to_int32 published_level in
+    let index = Dal.Slot_index.to_int index in
+    let slot_id = Slot_id.{slot_level = published_level; slot_index = index} in
 
     let* status =
-      get_slot_header_attestation_info
-        dal_cctxt
-        ~published_level
-        ~index
-        ~dal_slot_status_max_fetch_attempts
+      get_slot_header_attestation_info node_ctxt dal_constants slot_id
     in
     match status with
     | `Attested attestation_lag ->
@@ -430,7 +485,6 @@ let page_content_int
         then return_none
         else get_page dal_cctxt ~inbox_level page_id
     | `Unattested | `Unpublished -> return_none
-    | `Waiting_attestation -> attestation_status_not_final published_level index
 
 let with_errors_logging ~inbox_level slot_id f =
   let open Lwt_syntax in

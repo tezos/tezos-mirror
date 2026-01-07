@@ -59,6 +59,8 @@ let default_constants =
             {
               feature_enable;
               attestation_lag;
+              attestation_lags;
+              dynamic_lag_enable;
               number_of_slots;
               cryptobox_parameters;
               _;
@@ -84,7 +86,14 @@ let default_constants =
           max_active_outbox_levels = Int32.to_int max_active_outbox_levels;
         };
       dal =
-        {feature_enable; attestation_lag; number_of_slots; cryptobox_parameters};
+        {
+          feature_enable;
+          attestation_lag;
+          attestation_lags;
+          dynamic_lag_enable;
+          number_of_slots;
+          cryptobox_parameters;
+        };
     }
 
 let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =

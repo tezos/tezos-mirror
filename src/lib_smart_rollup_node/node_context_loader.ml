@@ -472,6 +472,8 @@ module Internal_for_tests = struct
                 {
                   feature_enable = false;
                   attestation_lag = 0;
+                  attestation_lags = [];
+                  dynamic_lag_enable = false;
                   number_of_slots = 0;
                   cryptobox_parameters =
                     {
