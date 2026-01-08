@@ -25,6 +25,7 @@ depends: [
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }
   "re" { >= "1.10.0" }
+  "sqlite3" { = "5.3.1" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
   "octez-protocol-023-PtSeouLo-libs"

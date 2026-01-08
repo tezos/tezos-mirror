@@ -55,20 +55,27 @@ module Pool = struct
 
   let dispose {conn = (module Db : Caqti_lwt.CONNECTION); _} = Db.disconnect ()
 
-  let connect uri =
+  let connect ?register uri =
     let open Lwt_syntax in
     let* res = Caqti_lwt_unix.connect uri in
     match res with
-    | Ok conn -> return {conn; use_count = 0}
+    | Ok conn ->
+        let (module Conn) = conn in
+        (match (register, Conn.driver_connection) with
+        | None, _ -> ()
+        | Some register, Some (Caqti_driver_sqlite3.Driver_connection db) ->
+            register db
+        | _ -> assert false) ;
+        return {conn; use_count = 0}
     | Error e -> Lwt.fail (Connection_error e)
 
-  let create ?max_use_count size uri =
+  let create ?max_use_count ?register size uri =
     Lwt_pool.create
       size
       ~validate:(validate ~max_use_count)
       ~check
       ~dispose
-      (fun () -> connect uri)
+      (fun () -> connect ?register uri)
 end
 
 type sqlite_journal_mode = Wal | Other
@@ -367,7 +374,7 @@ let vacuum ~conn ~output_db_file =
 let vacuum_self ~conn =
   with_connection conn @@ fun conn -> Db.exec conn Q.vacuum_self ()
 
-let init ~path ~perm ?max_conn_reuse_count migration_code =
+let init ~path ~perm ?max_conn_reuse_count ?register migration_code =
   let open Lwt_result_syntax in
   let uri = uri path perm in
   let pool_size =
@@ -398,7 +405,9 @@ let init ~path ~perm ?max_conn_reuse_count migration_code =
           | None -> () )
     else (no_trace, no_add_attrs)
   in
-  let db_pool = Pool.create pool_size ?max_use_count:max_conn_reuse_count uri in
+  let db_pool =
+    Pool.create pool_size ?max_use_count:max_conn_reuse_count ?register uri
+  in
   let store = {db_pool; trace; add_attrs} in
   use store @@ fun conn ->
   let* () = set_wal_journal_mode conn in

@@ -43,7 +43,8 @@
   opentelemetry-lwt
   octez-libs.octez-telemetry
   octez-lwt-domain
-  octez-l2-libs.layer2_shell)
+  octez-l2-libs.layer2_shell
+  octez-evm-node-libs.sqlite_receipt_bloom)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

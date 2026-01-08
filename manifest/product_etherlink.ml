@@ -217,6 +217,20 @@ let evm_node_migrations =
           ];
         ]
 
+let evm_node_sqlite_receipt_bloom =
+  octez_evm_node_lib
+    "sqlite_receipt_bloom"
+    ~path:"etherlink/bin_node/lib_dev/sqlite_receipt_bloom"
+    ~synopsis:"SQLite static extension for receipt bloom filtering"
+    ~deps:[sqlite3]
+    ~foreign_stubs:
+      {
+        language = C;
+        flags = [S "-Wall"; S "-Wextra"; S ":standard"];
+        include_dirs = [];
+        names = ["receipt_bloom"; "receipt_bloom_stub"];
+      }
+
 let evm_node_lib_dev_encoding =
   octez_evm_node_lib
     "evm_node_lib_dev_encoding"
@@ -356,6 +370,7 @@ let evm_node_lib_dev =
         octez_telemetry;
         lwt_domain;
         octez_layer2_shell;
+        evm_node_sqlite_receipt_bloom;
       ]
 
 let floodgate_lib =

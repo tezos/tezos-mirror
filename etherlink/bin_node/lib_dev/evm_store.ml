@@ -744,6 +744,10 @@ DO UPDATE SET value = excluded.value
   module Transactions = struct
     let table = "transactions" (* For opentelemetry *)
 
+    (* WARNING: the SQLite extension in [sqlite_receipt_bloom/] depends on the
+       database storing receipts with [Transaction_info.receipt_fields_encoding]
+       to work. If it is ever changed, the SQLite extension will also need to be
+       adapted. *)
     let receipt_fields =
       custom
         ~encode:(fun payload ->
@@ -817,7 +821,7 @@ DO UPDATE SET value = excluded.value
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
 
     let select_receipts_from_block_range =
-      (t2 level level
+      (t3 level level (option octets)
       ->* t6
             block_hash
             quantity
@@ -828,7 +832,9 @@ DO UPDATE SET value = excluded.value
         ~name:__FUNCTION__
         ~table
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
-              WHERE ? <= block_number AND block_number < ?
+              WHERE $1 <= block_number AND block_number < $2
+              AND ($3 IS NULL OR
+                   receipt_contains_bloom_filter(receipt_fields, $3))
               ORDER BY block_number DESC, index_ DESC|eos}
 
     let select_object =
@@ -1065,7 +1071,12 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
     in
     return_unit
   in
-  Sqlite.init ?max_conn_reuse_count ~path ~perm migration
+  Sqlite.init
+    ?max_conn_reuse_count
+    ~register:Sqlite_receipt_bloom.register
+    ~path
+    ~perm
+    migration
 
 module Context_hashes = struct
   let store store number hash =
@@ -1558,7 +1569,7 @@ module Transactions = struct
       level
       []
 
-  let receipts_of_block_range store (Ethereum_types.Qty level) len =
+  let receipts_of_block_range ?mask store (Ethereum_types.Qty level) len =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
     let+ res =
@@ -1601,7 +1612,9 @@ module Transactions = struct
               contractAddress = contract_address;
             }
           :: acc)
-        (Qty level, Qty Z.(level + of_int len))
+        ( Qty level,
+          Qty Z.(level + of_int len),
+          Option.map Bytes.unsafe_to_string mask )
         []
     in
     res

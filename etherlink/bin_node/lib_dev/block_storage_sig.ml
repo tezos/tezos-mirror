@@ -40,7 +40,7 @@ module type S = sig
   (** [block_range_receipts n len] returns the receipts of [len] blocks,
       starting from level [n]. *)
   val block_range_receipts :
-    Z.t -> int -> Transaction_receipt.t list tzresult Lwt.t
+    ?mask:Ethbloom.t -> Z.t -> int -> Transaction_receipt.t list tzresult Lwt.t
 
   (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
   val transaction_receipt :

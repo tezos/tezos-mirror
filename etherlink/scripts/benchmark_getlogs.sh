@@ -2,6 +2,11 @@
 
 # A script to benchmark the performance of the eth_getLogs RPC
 
+if ! command -v jq > /dev/null 2>&1; then
+  echo "jq is not installed. Please install it to run this script."
+  exit 1
+fi
+
 # Configuration
 NODE_URL=${NODE_URL:-"http://localhost:8545"}
 OUTPUT_DIR=${OUTPUT_DIR:-"getlogs_benchmark_results_$(date +%Y%m%d_%H%M%S)"}
@@ -44,7 +49,7 @@ set -euo pipefail
 mkdir -p "$OUTPUT_DIR"
 
 # Initialize CSV file
-echo "range_size,response_time_ms,status" > "$CSV_FILE"
+echo "range_size,response_time_ms,status,num_logs" > "$CSV_FILE"
 
 echo "Generating requests (max $MAX_REQUESTS)..."
 declare -a requests_to_run
@@ -89,7 +94,7 @@ echo "Executing requests in parallel (max $max_parallelism)..."
 
 # Function to execute a single curl request and measure time
 execute_request() {
-  local from_block to_block range_size payload start_time http_code end_time duration_ms
+  local from_block to_block range_size payload start_time http_code end_time duration_ms num_logs response_file
   from_block=$1
   to_block=$2
   range_size=$3
@@ -99,24 +104,30 @@ execute_request() {
     to_block=$end_block
   fi
 
-  payload='{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x'$(printf '%x' "$from_block")'","toBlock":"0x'$(printf '%x' "$to_block")'"}],"id":1}'
+  # Comment topic (Transfer) to get all logs
+  payload='{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock":"0x'$(printf '%x' "$from_block")'","toBlock":"0x'$(printf '%x' "$to_block")'", "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]}],"id":1}'
+
+  response_file=$(mktemp)
 
   start_time=$(date +%s%N)
-  http_code=$(curl -s -o /tmp/response.json -w "%{response_code}" -X POST -H "Content-Type: application/json" --data "$payload" "$NODE_URL")
+  http_code=$(curl -s -o "$response_file" -w "%{response_code}" -X POST -H "Content-Type: application/json" --data "$payload" "$NODE_URL")
   end_time=$(date +%s%N)
 
   duration_ms=$(((end_time - start_time) / 1000000)) # Convert nanoseconds to milliseconds
 
   if [[ "$http_code" -ne 200 ]]; then
-    echo "$range_size,$duration_ms,HTTP_ERROR" >> "$CSV_FILE" # HTTP error
+    echo "$range_size,$duration_ms,HTTP_ERROR,0" >> "$CSV_FILE" # HTTP error
   else
     # Check for JSON-RPC error in the response body
-    if grep -q '"error":' /tmp/response.json; then
-      echo "$range_size,$duration_ms,JSON_RPC_ERROR" >> "$CSV_FILE" # JSON-RPC error
+    if grep -q '"error":' "$response_file"; then
+      cat "$response_file"
+      echo "$range_size,$duration_ms,JSON_RPC_ERROR,0" >> "$CSV_FILE" # JSON-RPC error
     else
-      echo "$range_size,$duration_ms,OK" >> "$CSV_FILE"
+      num_logs=$(jq '.result | length' "$response_file")
+      echo "$range_size,$duration_ms,OK,$num_logs" >> "$CSV_FILE"
     fi
   fi
+  rm -f "$response_file"
 }
 
 export -f execute_request
@@ -132,15 +143,26 @@ echo "All requests completed. Results saved to $CSV_FILE"
 # Calculate and print failure statistics
 TOTAL_REQUESTS=$(wc -l < "$CSV_FILE")
 TOTAL_REQUESTS=$((TOTAL_REQUESTS - 1)) # Subtract header row
-FAILED_REQUESTS=$(grep -c ',ERROR' "$CSV_FILE" || true)
+SUCCESSFUL_REQUESTS_FILE="$OUTPUT_DIR/successful_requests.csv"
+grep ",OK," "$CSV_FILE" > "$SUCCESSFUL_REQUESTS_FILE"
+SUCCESSFUL_REQUESTS=$(wc -l < "$SUCCESSFUL_REQUESTS_FILE")
+FAILED_REQUESTS=$((TOTAL_REQUESTS - SUCCESSFUL_REQUESTS))
+
+# Sum total logs from successful requests
+TOTAL_LOGS=0
+if [ -s "$SUCCESSFUL_REQUESTS_FILE" ]; then
+  TOTAL_LOGS=$(awk -F, '{s+=$4} END {print s}' "$SUCCESSFUL_REQUESTS_FILE")
+fi
 
 echo ""
 echo "--- Benchmark Summary ---"
 if ((TOTAL_REQUESTS > 0)); then
   FAILURE_PERCENTAGE=$(awk "BEGIN { printf \"%.2f\", ($FAILED_REQUESTS / $TOTAL_REQUESTS) * 100 }")
   echo "Total requests: $TOTAL_REQUESTS"
+  echo "Successful requests: $SUCCESSFUL_REQUESTS"
   echo "Failed requests: $FAILED_REQUESTS"
   echo "Failure percentage: $FAILURE_PERCENTAGE%"
+  echo "Total logs returned: $TOTAL_LOGS"
 else
   echo "No requests were executed."
 fi
@@ -154,7 +176,7 @@ echo "range_size,median_response_time_ms" > "$MEDIANS_FILE"
 
 for size in "${request_sizes[@]}"; do
   # Filter successful requests for the current size, get response times, sort them
-  times=$(grep "^$size," "$CSV_FILE" | grep ",OK$" | cut -d, -f2 | sort -n)
+  times=$(grep "^$size," "$CSV_FILE" | grep ",OK" | cut -d, -f2 | sort -n)
 
   # If no successful requests for this size, skip
   if [ -z "$times" ]; then

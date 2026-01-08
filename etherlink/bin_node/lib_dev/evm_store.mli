@@ -245,10 +245,12 @@ module Transactions : sig
   val receipts_of_block_number :
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
 
-  (** [receipts_of_block_range conn block_number len] returns all the receipts
-      found in [len] blocks, starting from level [block_number]. The function does
-      not check if these blocks exist. *)
+  (** [receipts_of_block_range ?mask conn block_number len] returns all the
+      receipts found in [len] blocks, starting from level [block_number]. The
+      function does not check if these blocks exist. [mask] can be provided to
+      filter only receipts which include this bloom filter. *)
   val receipts_of_block_range :
+    ?mask:Ethbloom.t ->
     conn ->
     Ethereum_types.quantity ->
     int ->
