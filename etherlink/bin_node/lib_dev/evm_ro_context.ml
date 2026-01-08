@@ -476,8 +476,8 @@ type replay_result =
     }
   | Replay_failure
 
-let replay ctxt ?(log_file = "replay") ?profile
-    ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
+let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
+    (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
   let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
   let* evm_state = get_evm_state ctxt hash in
@@ -493,7 +493,11 @@ let replay ctxt ?(log_file = "replay") ?profile
       conn
       (Qty number)
   in
-  let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
+  let log_file =
+    Option.map
+      (fun name -> Printf.sprintf "%s_%s" name (Z.to_string number))
+      log_file
+  in
   let*! () = Evm_state.preload_kernel ~pool:ctxt.execution_pool evm_state in
   let process_time = ref (Ptime.Span.of_int_s 0) in
   let* apply_result =
@@ -509,7 +513,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     let chunks = Sequencer_blueprint.unsafe_drop_signatures chunks in
     Evm_state.apply_unsigned_chunks
       ~pool:ctxt.execution_pool
-      ~log_file
+      ?log_file
       ?profile
       ~data_dir:ctxt.data_dir
       ~chain_family:EVM
