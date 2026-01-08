@@ -100,13 +100,23 @@ fn make_object(
     index: u32,
     fee_updates: &FeeUpdates,
 ) -> Result<TransactionObject, anyhow::Error> {
-    let (gas_used, gas_price) = match &transaction.content {
+    let (gas, gas_price) = match &transaction.content {
         TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
-        TransactionContent::Deposit(_)
-        | TransactionContent::FaDeposit(_)
-        | TransactionContent::TezosDelayed(_) => {
+        TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
+            // The gas and gas_price fields of the operation object
+            // represent the gas limit and max fee per gas of the
+            // input transaction; since deposits and FA deposits are
+            // crafted ex nihilo, we don't have a gas limit nor a max
+            // fee per gas in these cases. For lack of a better
+            // alternative, we put the used gas and the actual gas
+            // price instead.
+            (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
+        }
+        TransactionContent::TezosDelayed(_) => {
+            // Gas and gas price are not yet part of the Michelson
+            // runtime cost model.
             (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
         }
     };
@@ -120,7 +130,7 @@ fn make_object(
     Ok(TransactionObject {
         block_number,
         from,
-        gas_used,
+        gas,
         gas_price,
         hash,
         input: transaction.data(),
