@@ -53,4 +53,7 @@ module Internal_for_tests : sig
     with_delayed_transactions:bool ->
     force:force ->
     [`Block_produced of int | `No_block] tzresult Lwt.t
+
+  val propose_next_block_timestamp :
+    next_block_timestamp:Time.System.t -> unit tzresult Lwt.t
 end

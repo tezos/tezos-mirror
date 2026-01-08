@@ -1677,6 +1677,19 @@ let dispatch_private_request (type f) ~websocket
                    (Format.sprintf "Block production failed"))
         in
         build ~f module_ parameters
+    | Method (Propose_next_block_timestamp.Method, _module_)
+      when block_production <> `Single_node ->
+        unsupported ()
+    | Method (Propose_next_block_timestamp.Method, module_) ->
+        let f timestamp =
+          let open Lwt_result_syntax in
+          let* () =
+            Block_producer.Internal_for_tests.propose_next_block_timestamp
+              ~next_block_timestamp:timestamp
+          in
+          rpc_ok ()
+        in
+        build_with_input ~f module_ parameters
     | Method (Wait_transaction_confirmation.Method, module_) ->
         let open Lwt_result_syntax in
         let f hash =
