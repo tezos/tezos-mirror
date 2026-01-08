@@ -10,6 +10,8 @@ type t = Mainnet | Tezlink_shadownet | Latest
 
 let etherlink_all = [Mainnet; Latest]
 
+let tezlink_all = [Tezlink_shadownet; Latest]
+
 let to_uses_and_tags = function
   | Mainnet -> ("mainnet", Constant.WASM.mainnet_kernel)
   | Tezlink_shadownet ->

@@ -19,13 +19,23 @@ open Test_helpers
 open Setup
 open Delayed_inbox
 
+let check_kernel_version ~evm_node ~equal expected =
+  let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
+  if equal then
+    Check.((kernel_version = expected) string)
+      ~error_msg:"Expected kernelVersion to be %R, got %L"
+  else
+    Check.((kernel_version <> expected) string)
+      ~error_msg:"Expected kernelVersion to be different than %R" ;
+  return kernel_version
+
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
-    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
-    ?max_blueprints_catchup ?max_blueprints_lag ?catchup_cooldown scenario
-    protocols =
+    ?genesis_timestamp ?(time_between_blocks = Evm_node.Nothing)
+    ?additional_uses ?max_blueprints_catchup ?max_blueprints_lag
+    ?catchup_cooldown ?(kernels = [Kernel.Latest]) scenario protocols =
   register_all
     ~__FILE__
-    ~kernels:[Kernel.Latest]
+    ~kernels
     ~title
     ~tags:("tezlink" :: tags)
     ~l2_setups:
@@ -39,6 +49,7 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
       ]
     ~use_multichain:Register_with_feature
     ~rpc_server:Evm_node.Resto
+    ?genesis_timestamp
     ~time_between_blocks
     ?max_blueprints_catchup
     ?max_blueprints_lag
@@ -46,6 +57,26 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ?additional_uses
     scenario
     protocols
+
+let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
+    ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.tezlink_all)
+    ?(upgrade_to = Kernel.upgrade_to) ?(additional_uses = []) scenario protocols
+    =
+  List.iter
+    (fun from ->
+      let from_tag, _ = Kernel.to_uses_and_tags from in
+      let to_ = upgrade_to from in
+      let to_tag, to_use = Kernel.to_uses_and_tags to_ in
+      register_tezlink_test
+        ~kernels:[from]
+        ~genesis_timestamp
+        ~time_between_blocks
+        ~tags:("upgrade_scenario" :: to_tag :: tags)
+        ~title:Format.(sprintf "%s (%s -> %s)" title from_tag to_tag)
+        ~additional_uses:(to_use :: additional_uses)
+        (scenario from to_)
+        protocols)
+    kernels
 
 let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
     ?bootstrap_contracts ?(time_between_blocks = Evm_node.Nothing) scenario =
@@ -2944,6 +2975,101 @@ let test_big_map_transfer =
   in
   unit
 
+(** This tests the situation where the kernel has an upgrade and the
+    sequencer upgrade by following the event of the kernel. *)
+let test_tezlink_upgrade_kernel_auto_sync =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_tezlink_upgrade_test
+    ~genesis_timestamp
+    ~time_between_blocks:Nothing
+    ~tags:["sequencer"; "upgrade"; "auto"; "sync"]
+    ~title:
+      "Tezlink rollup-node kernel upgrade is applied to the sequencer state."
+  @@
+  fun from
+      to_
+      {
+        sc_rollup_node;
+        l1_contracts;
+        sc_rollup_address;
+        client;
+        sequencer;
+        observer;
+        _;
+      }
+      _protocol
+    ->
+  let* () =
+    match Kernel.commit_of from with
+    | Some from_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:true from_commit
+        in
+        unit
+    | None -> unit
+  in
+
+  (* Kill the observer to demonstrate the sequencer propagates the upgrade on
+     replay. *)
+  let* () = Evm_node.terminate observer in
+
+  (* Sends the upgrade to L1, but not to the sequencer. *)
+  let _, to_use = Kernel.to_uses_and_tags to_ in
+  let* _root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:to_use
+      ~activation_timestamp
+  in
+
+  (* Per the activation timestamp, the state will remain synchronised until
+     the kernel is upgraded. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
+        unit)
+  in
+  let* () =
+    bake_until_sync ~network:Tezlink ~sc_rollup_node ~client ~sequencer ()
+  in
+
+  (* Produce a block after activation timestamp, both the rollup node
+     and the sequencer will upgrade to latest kernel. *)
+  let* _ =
+    let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer in
+    unit
+  and* _upgrade = Evm_node.wait_for_successful_upgrade sequencer in
+
+  let* () =
+    bake_until_sync ~network:Tezlink ~sc_rollup_node ~client ~sequencer ()
+  in
+
+  let* () =
+    match Kernel.commit_of to_ with
+    | Some to_commit ->
+        let* _ =
+          check_kernel_version ~evm_node:sequencer ~equal:true to_commit
+        in
+        unit
+    | None -> unit
+  in
+
+  (* Start the observer again and wait for a successful upgrade *)
+  let* () = Evm_node.run observer in
+  let* _upgrade = Evm_node.wait_for_successful_upgrade observer in
+
+  let* () = Evm_node.wait_for_blueprint_applied observer 3 in
+
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2992,4 +3118,5 @@ let () =
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
-  test_big_map_transfer [Alpha]
+  test_big_map_transfer [Alpha] ;
+  test_tezlink_upgrade_kernel_auto_sync [Alpha]
