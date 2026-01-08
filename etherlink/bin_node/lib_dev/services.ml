@@ -339,7 +339,8 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         let stream =
           Lwt_stream.filter_map
             (function
-              | Broadcast.Included_transaction {tx; hash = _} -> (
+              | Octez_telemetry.Traceparent.
+                  {data = Broadcast.Included_transaction {tx; hash = _}; _} -> (
                   match tx with
                   | Common (Broadcast.Evm raw) -> (
                       let res = Transaction_object.decode raw in

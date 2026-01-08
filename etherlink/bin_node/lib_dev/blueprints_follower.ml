@@ -305,115 +305,126 @@ and stream_loop ~multichain ~sbl_callbacks_activated ~instant_confirmations
       ]
   in
   match candidate with
-  | Ok (Some (Finalized_levels {l1_level; start_l2_level; end_l2_level})) ->
-      let* () =
-        Octez_telemetry.Trace.with_tzresult ~service_name "on_finalized_levels"
-        @@ fun _scope ->
-        params.on_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
-      in
-      (stream_loop [@tailcall])
-        ~multichain
-        ~sbl_callbacks_activated
-        ~instant_confirmations
-        (Qty next_blueprint_number)
-        params
-        monitor
-  | Ok (Some (Blueprint blueprint)) -> (
-      let* r =
-        Octez_telemetry.Trace.with_tzresult
-          ~attrs:[Telemetry.Attributes.Block.number blueprint.blueprint.number]
-          ~service_name
-          "on_new_blueprint"
-        @@ fun _scope ->
-        params.on_new_blueprint (Qty next_blueprint_number) blueprint
-      in
-      match r with
-      | `Continue is_sub_block_activated ->
-          (stream_loop [@tailcall])
-            ~multichain
-            ~sbl_callbacks_activated:is_sub_block_activated
-            ~instant_confirmations
-            (Qty (Z.succ next_blueprint_number))
-            params
-            monitor
-      | `Restart_from level ->
-          Evm_services.close_monitor monitor ;
-          (catchup [@tailcall])
-            ~multichain
-            ~sbl_callbacks_activated
-            ~instant_confirmations
-            ~next_blueprint_number:level
-            ~first_connection:
-              (* The connection was not interrupted, but we decided to restart
+  | Ok (Some data) ->
+      Octez_telemetry.Traceparent.propagate
+        ~service_name
+        "handler"
+        data
+        (fun _scope -> function
+        | Finalized_levels {l1_level; start_l2_level; end_l2_level} ->
+            let* () =
+              Octez_telemetry.Trace.with_tzresult
+                ~service_name
+                "on_finalized_levels"
+              @@ fun _scope ->
+              params.on_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
+            in
+            (stream_loop [@tailcall])
+              ~multichain
+              ~sbl_callbacks_activated
+              ~instant_confirmations
+              (Qty next_blueprint_number)
+              params
+              monitor
+        | Blueprint blueprint -> (
+            let* r =
+              Octez_telemetry.Trace.with_tzresult
+                ~attrs:
+                  [Telemetry.Attributes.Block.number blueprint.blueprint.number]
+                ~service_name
+                "on_new_blueprint"
+              @@ fun _scope ->
+              params.on_new_blueprint (Qty next_blueprint_number) blueprint
+            in
+            match r with
+            | `Continue is_sub_block_activated ->
+                (stream_loop [@tailcall])
+                  ~multichain
+                  ~sbl_callbacks_activated:is_sub_block_activated
+                  ~instant_confirmations
+                  (Qty (Z.succ next_blueprint_number))
+                  params
+                  monitor
+            | `Restart_from level ->
+                Evm_services.close_monitor monitor ;
+                (catchup [@tailcall])
+                  ~multichain
+                  ~sbl_callbacks_activated
+                  ~instant_confirmations
+                  ~next_blueprint_number:level
+                  ~first_connection:
+                    (* The connection was not interrupted, but we decided to restart
                  following blueprints from a different level. As a consequence,
                  no need to wait. *)
-              true
-            params)
-  | Ok (Some (Next_block_info {timestamp; number})) ->
-      let* () =
-        if sbl_callbacks_activated.sbl_callbacks_activated then
-          Octez_telemetry.Trace.with_tzresult
-            ~attrs:[Telemetry.Attributes.Block.number number]
-            ~service_name
-            "on_next_block_info"
-          @@ fun _scope -> params.on_next_block_info timestamp number
-        else
-          let*! () = Events.ignored_preconfirmations () in
-          return_unit
-      in
-      (stream_loop [@tailcall])
-        ~multichain
-        ~sbl_callbacks_activated
-        ~instant_confirmations
-        (Qty next_blueprint_number)
-        params
-        monitor
-  | Ok (Some (Included_transaction {tx; hash})) ->
-      let* () =
-        if sbl_callbacks_activated.sbl_callbacks_activated then
-          Octez_telemetry.Trace.with_tzresult
-            ~attrs:
-              [
-                Telemetry.Attributes.Transaction.hash hash;
-                Telemetry.Attributes.Block.number (Qty next_blueprint_number);
-              ]
-            ~service_name
-            "on_inclusion"
-          @@ fun _scope -> params.on_inclusion tx hash
-        else
-          let*! () = Events.ignored_preconfirmations () in
-          return_unit
-      in
-      (stream_loop [@tailcall])
-        ~multichain
-        ~sbl_callbacks_activated
-        ~instant_confirmations
-        (Qty next_blueprint_number)
-        params
-        monitor
-  | Ok (Some (Dropped_transaction {hash; reason})) ->
-      let* () =
-        if sbl_callbacks_activated.sbl_callbacks_activated then
-          Octez_telemetry.Trace.with_tzresult
-            ~attrs:
-              [
-                Telemetry.Attributes.Transaction.hash hash;
-                Telemetry.Attributes.Block.number (Qty next_blueprint_number);
-              ]
-            ~service_name
-            "on_dropped"
-          @@ fun _scope -> params.on_dropped hash reason
-        else
-          let*! () = Events.ignored_preconfirmations () in
-          return_unit
-      in
-      (stream_loop [@tailcall])
-        ~multichain
-        ~sbl_callbacks_activated
-        ~instant_confirmations
-        (Qty next_blueprint_number)
-        params
-        monitor
+                    true
+                  params)
+        | Next_block_info {timestamp; number} ->
+            let* () =
+              if sbl_callbacks_activated.sbl_callbacks_activated then
+                Octez_telemetry.Trace.with_tzresult
+                  ~attrs:[Telemetry.Attributes.Block.number number]
+                  ~service_name
+                  "on_next_block_info"
+                @@ fun _scope -> params.on_next_block_info timestamp number
+              else
+                let*! () = Events.ignored_preconfirmations () in
+                return_unit
+            in
+            (stream_loop [@tailcall])
+              ~multichain
+              ~sbl_callbacks_activated
+              ~instant_confirmations
+              (Qty next_blueprint_number)
+              params
+              monitor
+        | Included_transaction {tx; hash} ->
+            let* () =
+              if sbl_callbacks_activated.sbl_callbacks_activated then
+                Octez_telemetry.Trace.with_tzresult
+                  ~attrs:
+                    [
+                      Telemetry.Attributes.Transaction.hash hash;
+                      Telemetry.Attributes.Block.number
+                        (Qty next_blueprint_number);
+                    ]
+                  ~service_name
+                  "on_inclusion"
+                @@ fun _scope -> params.on_inclusion tx hash
+              else
+                let*! () = Events.ignored_preconfirmations () in
+                return_unit
+            in
+            (stream_loop [@tailcall])
+              ~multichain
+              ~sbl_callbacks_activated
+              ~instant_confirmations
+              (Qty next_blueprint_number)
+              params
+              monitor
+        | Dropped_transaction {hash; reason} ->
+            let* () =
+              if sbl_callbacks_activated.sbl_callbacks_activated then
+                Octez_telemetry.Trace.with_tzresult
+                  ~attrs:
+                    [
+                      Telemetry.Attributes.Transaction.hash hash;
+                      Telemetry.Attributes.Block.number
+                        (Qty next_blueprint_number);
+                    ]
+                  ~service_name
+                  "on_dropped"
+                @@ fun _scope -> params.on_dropped hash reason
+              else
+                let*! () = Events.ignored_preconfirmations () in
+                return_unit
+            in
+            (stream_loop [@tailcall])
+              ~multichain
+              ~sbl_callbacks_activated
+              ~instant_confirmations
+              (Qty next_blueprint_number)
+              params
+              monitor)
   | Ok None | Error [Timeout] ->
       Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
