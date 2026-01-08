@@ -90,7 +90,7 @@ mod tests {
             Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff,
             Update,
         },
-        operation::TARGET_TEZOS_PROTOCOL,
+        protocol::TARGET_TEZOS_PROTOCOL,
     };
     use mir::ast::BinWriter;
     use primitive_types::H256;
