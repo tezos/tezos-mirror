@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -28,6 +28,7 @@ type kernel =
   | Ebisu
   | Farfadet
   | FarfadetR1
+  | FarfadetR2
 
 val kernel_from_string : string -> kernel option
 
