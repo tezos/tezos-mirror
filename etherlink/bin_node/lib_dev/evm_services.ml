@@ -100,17 +100,25 @@ let blueprint_watcher_service =
 let message_watcher_service =
   let level_query =
     Query.(
-      query (fun from_level instant_confirmations ->
-          (from_level, instant_confirmations))
-      |+ field "from_level" Arg.uint63 0L fst
-      |+ field "instant_confirmations" Arg.bool false snd
+      query (fun from_level instant_confirmations otel ->
+          object
+            method from_level = from_level
+
+            method instant_confirmations = instant_confirmations
+
+            method otel = otel
+          end)
+      |+ field "from_level" Arg.uint63 0L (fun q -> q#from_level)
+      |+ field "instant_confirmations" Arg.bool false (fun q ->
+             q#instant_confirmations)
+      |+ field "otel" Arg.bool false (fun q -> q#otel)
       |> seal)
   in
 
   Service.get_service
     ~description:"Watch for new messages"
     ~query:level_query
-    ~output:Broadcast.message_encoding
+    ~output:Broadcast.encoding
     Path.(evm_services_root / "messages")
 
 let create_blueprint_stream get_next_blueprint_number find_blueprint from_level
@@ -159,7 +167,10 @@ let create_broadcast_service get_next_blueprint_number find_blueprint from_level
     find_blueprint
     from_level
     Broadcast.create_broadcast_stream
-    (fun b -> Lwt_syntax.return_some @@ Broadcast.Blueprint b)
+    (fun b ->
+      Lwt_syntax.return_some
+      @@ Octez_telemetry.Traceparent.
+           {data = Broadcast.Blueprint b; origin = None})
 
 let register_get_smart_rollup_address_service smart_rollup_address dir =
   Evm_directory.register0 dir get_smart_rollup_address_service (fun () () ->
@@ -215,26 +226,45 @@ let register_blueprint_watcher_service find_blueprint get_next_blueprint_number
         find_blueprint
         level)
 
+let instant_confirmation ~enable stream =
+  if not enable then
+    Lwt_stream.filter
+      Broadcast.(
+        function
+        | Octez_telemetry.Traceparent.
+            {
+              data =
+                ( Next_block_info _ | Included_transaction _
+                | Dropped_transaction _ );
+              _;
+            } ->
+            false
+        | {data = Blueprint _ | Finalized_levels _; _} -> true)
+      stream
+  else stream
+
+let otel_instrumentation ~enable stream =
+  if not enable then
+    Lwt_stream.map
+      Octez_telemetry.Traceparent.(fun data -> {data with origin = None})
+      stream
+  else stream
+
 let register_broadcast_service find_blueprint get_next_blueprint_number dir =
   let open Lwt_syntax in
-  Evm_directory.streamed_register0
-    dir
-    message_watcher_service
-    (fun (level, instant_confirmations) () ->
-      let* stream, stopper =
-        create_broadcast_service get_next_blueprint_number find_blueprint level
+  Evm_directory.streamed_register0 dir message_watcher_service (fun q () ->
+      let+ stream, stopper =
+        create_broadcast_service
+          get_next_blueprint_number
+          find_blueprint
+          q#from_level
       in
-      if instant_confirmations then return (stream, stopper)
-      else
-        return
-          ( Lwt_stream.filter
-              (function
-                | Broadcast.Next_block_info _ | Included_transaction _
-                | Dropped_transaction _ ->
-                    false
-                | Blueprint _ | Finalized_levels _ -> true)
-              stream,
-            stopper ))
+      let stream =
+        stream
+        |> instant_confirmation ~enable:q#instant_confirmations
+        |> otel_instrumentation ~enable:q#otel
+      in
+      (stream, stopper))
 
 let register get_next_blueprint_number find_blueprint_legacy find_blueprint
     smart_rollup_address time_between_blocks dir =
@@ -367,13 +397,22 @@ let monitor_messages ~evm_node_endpoint ~timeout ~instant_confirmations
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
   let level = Z.to_int64 level in
+  let params =
+    object
+      method from_level = level
+
+      method instant_confirmations = instant_confirmations
+
+      method otel = Octez_telemetry.Opentelemetry_setup.is_enabled ()
+    end
+  in
   let* closefn =
     Rollup_services.with_timeout
       timeout
       evm_node_endpoint
       message_watcher_service
       ()
-      (level, instant_confirmations)
+      params
     @@ fun () ->
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.octet_stream]
@@ -382,7 +421,7 @@ let monitor_messages ~evm_node_endpoint ~timeout ~instant_confirmations
       ~on_chunk
       ~on_close
       ()
-      (level, instant_confirmations)
+      params
       ()
   in
   return {stream; closefn}

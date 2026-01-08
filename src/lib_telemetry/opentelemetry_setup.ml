@@ -92,3 +92,5 @@ let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
             Backend.cleanup ~on_done () ;
             clean_up_done))
   else no_clean_up
+
+let is_enabled () = Option.is_some (Opentelemetry.Collector.get_backend ())

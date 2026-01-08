@@ -35,12 +35,15 @@ type message =
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
   | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
 
-val message_encoding : message Data_encoding.t
+val encoding : message Octez_telemetry.Traceparent.instrumented Data_encoding.t
 
 (** [create_broadcast_stream ()] returns a new stream that can be used to be
     notified of all messages, including a new blueprint being successfully
     applied on top of the local state. *)
-val create_broadcast_stream : unit -> message Lwt_stream.t * Lwt_watcher.stopper
+val create_broadcast_stream :
+  unit ->
+  message Octez_telemetry.Traceparent.instrumented Lwt_stream.t
+  * Lwt_watcher.stopper
 
 (** [notify_blueprint blueprint] advertizes [blueprint] to both the blueprint
     stream and the broadcast stream. *)
