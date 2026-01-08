@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 24.0~rc2 (60afd4da)"
+    "version": "Octez 24.0 (5a3ca147)"
   },
   "paths": {
     "/ban_operation": {
@@ -205,7 +205,7 @@
                       "protocol": {
                         "type": "string",
                         "enum": [
-                          "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                          "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                         ]
                       },
                       "branch": {
@@ -214,7 +214,7 @@
                       "contents": {
                         "type": "array",
                         "items": {
-                          "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                          "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                         }
                       },
                       "signature": {
@@ -357,7 +357,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -383,7 +383,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                             ]
                           },
                           "branch": {
@@ -392,7 +392,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -423,7 +423,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                             ]
                           },
                           "branch": {
@@ -432,7 +432,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -463,7 +463,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                             ]
                           },
                           "branch": {
@@ -472,7 +472,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -503,7 +503,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                             ]
                           },
                           "branch": {
@@ -512,7 +512,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -543,7 +543,7 @@
                           "protocol": {
                             "type": "string",
                             "enum": [
-                              "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
                             ]
                           },
                           "branch": {
@@ -552,7 +552,7 @@
                           "contents": {
                             "type": "array",
                             "items": {
-                              "$ref": "#/components/schemas/023-PtSeouLo.operation.alpha.contents"
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
                             }
                           },
                           "signature": {
@@ -719,32 +719,7 @@
   },
   "components": {
     "schemas": {
-      "023-PtSeouLo.adaptive_issuance_vote": {
-        "oneOf": [
-          {
-            "title": "per_block_vote_on",
-            "type": "string",
-            "enum": [
-              "on"
-            ]
-          },
-          {
-            "title": "per_block_vote_off",
-            "type": "string",
-            "enum": [
-              "off"
-            ]
-          },
-          {
-            "title": "per_block_vote_pass",
-            "type": "string",
-            "enum": [
-              "pass"
-            ]
-          }
-        ]
-      },
-      "023-PtSeouLo.block_header.alpha.full_header": {
+      "024-PtTALLiN.block_header.alpha.full_header": {
         "title": "Shell header",
         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
         "type": "object",
@@ -795,10 +770,7 @@
             "$ref": "#/components/schemas/cycle_nonce"
           },
           "liquidity_baking_toggle_vote": {
-            "$ref": "#/components/schemas/023-PtSeouLo.liquidity_baking_vote"
-          },
-          "adaptive_issuance_vote": {
-            "$ref": "#/components/schemas/023-PtSeouLo.adaptive_issuance_vote"
+            "$ref": "#/components/schemas/024-PtTALLiN.liquidity_baking_vote"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V2"
@@ -817,11 +789,10 @@
           "payload_round",
           "proof_of_work_nonce",
           "liquidity_baking_toggle_vote",
-          "adaptive_issuance_vote",
           "signature"
         ]
       },
-      "023-PtSeouLo.contract_id": {
+      "024-PtTALLiN.contract_id": {
         "title": "A contract handle",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
         "oneOf": [
@@ -830,7 +801,7 @@
           }
         ]
       },
-      "023-PtSeouLo.contract_id.originated": {
+      "024-PtTALLiN.contract_id.originated": {
         "title": "A contract handle -- originated account",
         "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
         "oneOf": [
@@ -839,7 +810,7 @@
           }
         ]
       },
-      "023-PtSeouLo.entrypoint": {
+      "024-PtTALLiN.entrypoint": {
         "title": "entrypoint",
         "description": "Named entrypoint to a Michelson smart contract",
         "oneOf": [
@@ -923,7 +894,7 @@
           }
         ]
       },
-      "023-PtSeouLo.inlined.consensus_operation": {
+      "024-PtTALLiN.inlined.consensus_operation": {
         "description": "An operation's shell header.",
         "type": "object",
         "properties": {
@@ -931,7 +902,7 @@
             "$ref": "#/components/schemas/block_hash"
           },
           "operations": {
-            "$ref": "#/components/schemas/023-PtSeouLo.inlined.consensus_operation.contents"
+            "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation.contents"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature.V2"
@@ -942,7 +913,7 @@
           "operations"
         ]
       },
-      "023-PtSeouLo.inlined.consensus_operation.contents": {
+      "024-PtTALLiN.inlined.consensus_operation.contents": {
         "oneOf": [
           {
             "title": "Preattestation",
@@ -1168,7 +1139,7 @@
           }
         ]
       },
-      "023-PtSeouLo.liquidity_baking_vote": {
+      "024-PtTALLiN.liquidity_baking_vote": {
         "oneOf": [
           {
             "title": "per_block_vote_on",
@@ -1193,7 +1164,7 @@
           }
         ]
       },
-      "023-PtSeouLo.michelson.v1.primitives": {
+      "024-PtTALLiN.michelson.v1.primitives": {
         "type": "string",
         "enum": [
           "SHA256",
@@ -1203,50 +1174,52 @@
           "False",
           "CAST",
           "ISNAT",
-          "address",
+          "unit",
           "PACK",
           "EMIT",
-          "mutez",
-          "bls12_381_g1",
+          "string",
+          "chain_id",
           "Pair",
+          "constant",
           "IF_CONS",
-          "bool",
-          "bytes",
+          "INDEX_ADDRESS",
+          "signature",
           "storage",
           "OR",
+          "chest",
           "view",
           "UNPACK",
           "ADD",
           "DIP",
-          "map",
+          "lambda",
           "MEM",
           "BYTES",
           "SENDER",
           "ADDRESS",
           "CDR",
           "SAPLING_EMPTY_STATE",
-          "or",
+          "nat",
           "LOOP",
-          "contract",
-          "unit",
+          "GET_ADDRESS_INDEX",
+          "mutez",
           "SHA512",
           "CREATE_ACCOUNT",
           "BLAKE2B",
           "READ_TICKET",
           "LE",
-          "chain_id",
+          "sapling_transaction_deprecated",
+          "bytes",
           "timestamp",
-          "operation",
-          "set",
+          "or",
           "CHAIN_ID",
-          "chest",
+          "ticket",
           "SELF_ADDRESS",
           "SOURCE",
           "IMPLICIT_ACCOUNT",
-          "key",
+          "contract",
           "AMOUNT",
           "CHECK_SIGNATURE",
-          "sapling_transaction_deprecated",
+          "tx_rollup_l2_address",
           "LSR",
           "EQ",
           "Elt",
@@ -1259,16 +1232,16 @@
           "SWAP",
           "Some",
           "parameter",
-          "pair",
-          "bls12_381_g2",
+          "option",
+          "never",
           "VIEW",
           "None",
           "SLICE",
-          "int",
+          "bool",
           "ABS",
-          "lambda",
+          "key",
           "DUG",
-          "list",
+          "key_hash",
           "CAR",
           "GET",
           "HASH_KEY",
@@ -1278,7 +1251,7 @@
           "TOTAL_VOTING_POWER",
           "Lambda_rec",
           "SIZE",
-          "nat",
+          "map",
           "STEPS_TO_QUOTA",
           "IF_NONE",
           "UNPAIR",
@@ -1291,39 +1264,39 @@
           "PAIR",
           "SPLIT_TICKET",
           "RIGHT",
-          "key_hash",
+          "int",
           "AND",
           "NEG",
-          "option",
+          "big_map",
           "BALANCE",
           "SET_DELEGATE",
           "NEVER",
           "MIN_BLOCK_TIME",
           "INT",
-          "chest_key",
+          "bls12_381_fr",
           "ITER",
           "True",
           "Right",
           "Ticket",
           "GT",
           "DIG",
-          "tx_rollup_l2_address",
+          "operation",
           "SUB",
           "EDIV",
           "MAP",
           "IF_LEFT",
-          "big_map",
+          "list",
           "VOTING_POWER",
           "LAMBDA_REC",
           "Left",
-          "ticket",
+          "bls12_381_g2",
           "TICKET_DEPRECATED",
-          "bls12_381_fr",
-          "never",
+          "bls12_381_g1",
+          "sapling_state",
           "DUP",
           "LEFT",
-          "constant",
-          "signature",
+          "chest_key",
+          "pair",
           "SHA3",
           "LAMBDA",
           "NOT",
@@ -1331,8 +1304,8 @@
           "NOW",
           "NAT",
           "GE",
-          "string",
-          "sapling_transaction",
+          "set",
+          "address",
           "NEQ",
           "IF",
           "FAILWITH",
@@ -1344,7 +1317,7 @@
           "DROP",
           "EMPTY_BIG_MAP",
           "UNIT",
-          "sapling_state",
+          "sapling_transaction",
           "TICKET",
           "EMPTY_MAP",
           "APPLY",
@@ -1357,10 +1330,10 @@
           "code"
         ]
       },
-      "023-PtSeouLo.mutez": {
+      "024-PtTALLiN.mutez": {
         "$ref": "#/components/schemas/positive_bignum"
       },
-      "023-PtSeouLo.operation.alpha.contents": {
+      "024-PtTALLiN.operation.alpha.contents": {
         "oneOf": [
           {
             "title": "Attestation",
@@ -1600,10 +1573,10 @@
                 "maximum": 65535
               },
               "op1": {
-                "$ref": "#/components/schemas/023-PtSeouLo.inlined.consensus_operation"
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
               },
               "op2": {
-                "$ref": "#/components/schemas/023-PtSeouLo.inlined.consensus_operation"
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
               }
             },
             "required": [
@@ -1681,10 +1654,10 @@
                 ]
               },
               "bh1": {
-                "$ref": "#/components/schemas/023-PtSeouLo.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/024-PtTALLiN.block_header.alpha.full_header"
               },
               "bh2": {
-                "$ref": "#/components/schemas/023-PtSeouLo.block_header.alpha.full_header"
+                "$ref": "#/components/schemas/024-PtTALLiN.block_header.alpha.full_header"
               }
             },
             "required": [
@@ -1704,7 +1677,7 @@
                 ]
               },
               "attestation": {
-                "$ref": "#/components/schemas/023-PtSeouLo.inlined.consensus_operation"
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
               },
               "consensus_slot": {
                 "type": "integer",
@@ -1864,7 +1837,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1906,7 +1879,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1918,16 +1891,16 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "amount": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "destination": {
-                "$ref": "#/components/schemas/023-PtSeouLo.contract_id"
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
               },
               "parameters": {
                 "type": "object",
                 "properties": {
                   "entrypoint": {
-                    "$ref": "#/components/schemas/023-PtSeouLo.entrypoint"
+                    "$ref": "#/components/schemas/024-PtTALLiN.entrypoint"
                   },
                   "value": {}
                 },
@@ -1962,7 +1935,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -1974,13 +1947,13 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "balance": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "delegate": {
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "script": {
-                "$ref": "#/components/schemas/023-PtSeouLo.scripted.contracts"
+                "$ref": "#/components/schemas/024-PtTALLiN.scripted.contracts"
               }
             },
             "required": [
@@ -2008,7 +1981,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2046,7 +2019,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2058,7 +2031,7 @@
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "limit": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               }
             },
             "required": [
@@ -2084,7 +2057,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2099,7 +2072,7 @@
                 "$ref": "#/components/schemas/bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/023-PtSeouLo.contract_id.originated"
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id.originated"
               }
             },
             "required": [
@@ -2127,7 +2100,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2169,7 +2142,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2258,7 +2231,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2295,7 +2268,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2309,13 +2282,13 @@
               "ticket_contents": {},
               "ticket_ty": {},
               "ticket_ticketer": {
-                "$ref": "#/components/schemas/023-PtSeouLo.contract_id"
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
               },
               "ticket_amount": {
                 "$ref": "#/components/schemas/positive_bignum"
               },
               "destination": {
-                "$ref": "#/components/schemas/023-PtSeouLo.contract_id"
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
               },
               "entrypoint": {
                 "$ref": "#/components/schemas/unistring"
@@ -2350,7 +2323,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2408,7 +2381,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2465,7 +2438,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2508,7 +2481,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2547,7 +2520,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2612,7 +2585,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2903,7 +2876,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -2958,7 +2931,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3006,7 +2979,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3049,7 +3022,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3151,7 +3124,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3224,13 +3197,13 @@
                             "type": "object",
                             "properties": {
                               "contents": {
-                                "$ref": "#/components/schemas/micheline.023-PtSeouLo.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
                               },
                               "ty": {
-                                "$ref": "#/components/schemas/micheline.023-PtSeouLo.michelson_v1.expression"
+                                "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
                               },
                               "ticketer": {
-                                "$ref": "#/components/schemas/023-PtSeouLo.contract_id"
+                                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
                               }
                             },
                             "required": [
@@ -3271,7 +3244,7 @@
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               },
               "fee": {
-                "$ref": "#/components/schemas/023-PtSeouLo.mutez"
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
               },
               "counter": {
                 "$ref": "#/components/schemas/positive_bignum"
@@ -3399,7 +3372,7 @@
           }
         ]
       },
-      "023-PtSeouLo.scripted.contracts": {
+      "024-PtTALLiN.scripted.contracts": {
         "type": "object",
         "properties": {
           "code": {},
@@ -3539,7 +3512,7 @@
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
       },
-      "micheline.023-PtSeouLo.michelson_v1.expression": {
+      "micheline.024-PtTALLiN.michelson_v1.expression": {
         "oneOf": [
           {
             "title": "Int",
@@ -3582,7 +3555,7 @@
             "title": "Sequence",
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/micheline.023-PtSeouLo.michelson_v1.expression"
+              "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
             }
           },
           {
@@ -3591,12 +3564,12 @@
             "type": "object",
             "properties": {
               "prim": {
-                "$ref": "#/components/schemas/023-PtSeouLo.michelson.v1.primitives"
+                "$ref": "#/components/schemas/024-PtTALLiN.michelson.v1.primitives"
               },
               "args": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/micheline.023-PtSeouLo.michelson_v1.expression"
+                  "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
                 }
               },
               "annots": {
