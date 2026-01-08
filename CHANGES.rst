@@ -42,6 +42,13 @@ General
 Node
 ----
 
+- For protocol Seoul and later, The
+  ``helpers/scripts/normalize_stack`` and
+  ``helpers/scripts/normalize_data`` Michelson RPCs now accept
+  ill-typed inputs. To test if some Michelson value is well-typed or
+  not, the ``helpers/scripts/typecheck_data`` Michelson RPC can still
+  be used. (MR :gl:`!20297`)
+
 Client
 ------
 
