@@ -1,15 +1,13 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Representation for typed Michelson `operation` values.
 
 use std::rc::Rc;
 
-use super::{Address, ContractScript, FieldAnnotation, KeyHash, Micheline, Or, Type, TypedValue};
+use super::{Address, ContractScript, FieldAnnotation, Micheline, Or, Type, TypedValue};
+use tezos_crypto_rs::{hash::ContractKt1Hash, public_key_hash::PublicKeyHash};
 
 /// Representation of token transfer operation, created by `TRANSFER_TOKENS`
 /// instruction.
@@ -25,7 +23,7 @@ pub struct TransferTokens<'a> {
 
 /// Representation of set delegate operation, created by `SET_DELEGATE` instruction.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SetDelegate(pub Option<KeyHash>);
+pub struct SetDelegate(pub Option<PublicKeyHash>);
 
 /// Representation of emit operation, created by `EMIT` instruction.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -52,7 +50,7 @@ pub struct Emit<'a> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CreateContract<'a> {
     /// Contract's optional delegate.
-    pub delegate: Option<KeyHash>,
+    pub delegate: Option<PublicKeyHash>,
     /// Contract's inital balance.
     pub amount: i64,
     /// Contract's initial storage.
@@ -63,6 +61,8 @@ pub struct CreateContract<'a> {
     /// encoding must survive round-trip via `PACK`/`UNPACK`, so raw code has to
     /// be stored.
     pub micheline_code: &'a Micheline<'a>,
+    /// The address at which the contract must be originated.
+    pub address: ContractKt1Hash,
 }
 
 /// Enum corresponding to values of the `operation` Michelson type.

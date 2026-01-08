@@ -37,8 +37,8 @@ let op_id_arg =
 let injector_op_query : op_query Tezos_rpc.Query.t =
   let open Tezos_rpc.Query in
   query (function
-      | Some op_id -> {op_id}
-      | None -> Stdlib.failwith "Missing id query parameter")
+    | Some op_id -> {op_id}
+    | None -> Stdlib.failwith "Missing id query parameter")
   |+ opt_field "id" op_id_arg (fun t -> Some t.op_id)
   |> seal
 

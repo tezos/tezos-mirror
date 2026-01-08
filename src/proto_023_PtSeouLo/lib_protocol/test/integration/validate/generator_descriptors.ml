@@ -355,9 +355,9 @@ let dbl_attestation_prelude state =
   match heads with
   | None -> return ([], state)
   | Some (b1, b2) ->
-      let* delegate1, delegate2 = pick_two_attesters (B b1) in
-      let* op1 = Op.raw_preattestation ~delegate:delegate1 b1 in
-      let* op2 = Op.raw_preattestation ~delegate:delegate1 b2 in
+      let* attesting_slot = Op.get_attesting_slot ~attested_block:b1 in
+      let* op1 = Op.raw_preattestation ~attesting_slot b1 in
+      let* op2 = Op.raw_preattestation ~attesting_slot b2 in
       let op1, op2 =
         let comp =
           Operation_hash.compare (Operation.hash op1) (Operation.hash op2)
@@ -368,8 +368,13 @@ let dbl_attestation_prelude state =
       let slashable_preattestations =
         (op1, op2) :: state.dbl_attestation.slashable_preattestations
       in
-      let* op3 = Op.raw_attestation ~delegate:delegate2 b1 in
-      let* op4 = Op.raw_attestation ~delegate:delegate2 b2 in
+      let* attesting_slot' =
+        Op.get_different_attesting_slot
+          ~consensus_pkh_to_avoid:attesting_slot.consensus_pkh
+          ~attested_block:b1
+      in
+      let* op3 = Op.raw_attestation ~attesting_slot:attesting_slot' b1 in
+      let* op4 = Op.raw_attestation ~attesting_slot:attesting_slot' b2 in
       let op3, op4 =
         let comp =
           Operation_hash.compare (Operation.hash op3) (Operation.hash op4)
@@ -604,17 +609,18 @@ let preattestation_descriptor =
     candidates_generator =
       (fun state ->
         let open Lwt_result_syntax in
-        let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
-          let delegate = Option.value ~default:delegate ck_opt in
-          match slots_opt with
-          | None -> return_none
-          | Some slots -> (
-              match slots with
-              | [] -> return_none
-              | _ :: _ ->
-                  let* op = Op.preattestation ~delegate state.block in
-                  return_some op)
+        let gen (manager_pkh, _ck_opt) =
+          let* attesters = Context.get_attesters (B state.block) in
+          if
+            List.exists
+              (fun {Context.delegate; _} ->
+                Signature.Public_key_hash.equal delegate manager_pkh)
+              attesters
+          then
+            (* The manager key has attesting rights on this block *)
+            let* op = Op.preattestation ~manager_pkh state.block in
+            return_some op
+          else return_none
         in
         List.filter_map_es gen state.delegates);
   }
@@ -630,17 +636,18 @@ let attestation_descriptor =
     candidates_generator =
       (fun state ->
         let open Lwt_result_syntax in
-        let gen (delegate, ck_opt) =
-          let* slots_opt = Context.get_attester_slot (B state.block) delegate in
-          let delegate = Option.value ~default:delegate ck_opt in
-          match slots_opt with
-          | None -> return_none
-          | Some slots -> (
-              match slots with
-              | [] -> return_none
-              | _ :: _ ->
-                  let* op = Op.attestation ~delegate state.block in
-                  return_some op)
+        let gen (manager_pkh, _ck_opt) =
+          let* attesters = Context.get_attesters (B state.block) in
+          if
+            List.exists
+              (fun {Context.delegate; _} ->
+                Signature.Public_key_hash.equal delegate manager_pkh)
+              attesters
+          then
+            (* The manager key has attesting rights on this block *)
+            let* op = Op.attestation ~manager_pkh state.block in
+            return_some op
+          else return_none
         in
         List.filter_map_es gen state.delegates);
   }
@@ -655,25 +662,8 @@ let attestations_aggregate_descriptor =
     opt_prelude = None;
     candidates_generator =
       (fun state ->
-        let open Lwt_result_syntax in
-        let* attestations =
-          List.filter_map_es
-            (fun (delegate, consensus_key_opt) ->
-              let* slots_opt =
-                Context.get_attester_slot (B state.block) delegate
-              in
-              let delegate = Option.value ~default:delegate consensus_key_opt in
-              let* signer = Account.find delegate in
-              match (slots_opt, signer.sk) with
-              | Some (_ :: _), Bls _ ->
-                  let* op = Op.raw_attestation ~delegate state.block in
-                  return (Some op)
-              | _, _ -> return_none)
-            state.delegates
-        in
-        match Op.aggregate attestations with
-        | Some op -> return [op]
-        | None -> return_nil);
+        let* op = Op.attestations_aggregate state.block in
+        return [op]);
   }
 
 let preattestations_aggregate_descriptor =
@@ -686,25 +676,8 @@ let preattestations_aggregate_descriptor =
     opt_prelude = None;
     candidates_generator =
       (fun state ->
-        let open Lwt_result_syntax in
-        let* preattestations =
-          List.filter_map_es
-            (fun (delegate, consensus_key_opt) ->
-              let* slots_opt =
-                Context.get_attester_slot (B state.block) delegate
-              in
-              let delegate = Option.value ~default:delegate consensus_key_opt in
-              let* signer = Account.find delegate in
-              match (slots_opt, signer.sk) with
-              | Some (_ :: _), Bls _ ->
-                  let* op = Op.raw_preattestation ~delegate state.block in
-                  return (Some op)
-              | _, _ -> return_none)
-            state.delegates
-        in
-        match Op.aggregate_preattestations preattestations with
-        | Some op -> return [op]
-        | None -> return_nil);
+        let* op = Op.preattestations_aggregate state.block in
+        return [op]);
   }
 
 module Manager = Manager_operation_helpers

@@ -52,8 +52,10 @@ let frames_rate_limiter : frames_rate_limiter =
   {kind = "frames"; limit = None; table = Ip_table.create 31}
 
 module Types = struct
+  type unsubscriber = unit -> bool tzresult Lwt.t
+
   type subscriptions_table =
-    (Ethereum_types.Subscription.id, unit -> unit) Stdlib.Hashtbl.t
+    (Ethereum_types.Subscription.id, unsubscriber) Stdlib.Hashtbl.t
 
   type close_info = {reason : string; status : Websocket_encodings.close_status}
 
@@ -249,7 +251,7 @@ let handle_subscription
         (Lwt_stream.wrap_exn stream)
     in
     let* () = Event.(emit unsubscribe) (conn_descr, id, "Stream terminated") in
-    stopper () ;
+    let* (_ : bool tzresult) = stopper () in
     Stdlib.Hashtbl.remove subscriptions id ;
     return_unit
   in
@@ -262,7 +264,11 @@ let handle_subscription
           id,
           "Asynchronous exception in stream processing: "
           ^ Printexc.to_string exn ) ;
-      stopper () ;
+      Lwt.dont_wait
+        (fun () ->
+          let* (_ : bool tzresult) = stopper () in
+          return_unit)
+        ignore ;
       Stdlib.Hashtbl.remove subscriptions id ;
       ())
 
@@ -533,8 +539,7 @@ let monitor_websocket worker =
 module Handlers = struct
   type self = worker
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun worker request ->
@@ -648,7 +653,14 @@ module Handlers = struct
         push_frame None
       with _ -> (* Websocket already closed *) ()
     in
-    Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
+    Stdlib.Hashtbl.iter
+      (fun _id stopper ->
+        Lwt.dont_wait
+          (fun () ->
+            let* (_ : bool tzresult) = stopper () in
+            return_unit)
+          ignore)
+      subscriptions ;
     Stdlib.Hashtbl.clear subscriptions ;
     cleanup_rate_limiters_on_close w ;
     return_unit

@@ -9,11 +9,15 @@ module type S = sig
 
   module Etherlink_block_storage : Block_storage_sig.S
 
+  module Tezos : Tezlink_backend_sig.S
+
   module Tezlink : Tezlink_backend_sig.S
 
   module Etherlink : Etherlink_backend_sig.S
 
   module Tracer_etherlink : Tracer_sig.S
+
+  module SimulatorBackend : Simulator.SimulationBackend
 
   val block_param_to_block_number :
     chain_family:_ L2_types.chain_family ->
@@ -77,6 +81,10 @@ module type S = sig
 
   val l2_levels_of_l1_level :
     int32 -> Evm_store.L1_l2_finalized_levels.t option tzresult Lwt.t
+
+  (** [list_runtimes ()] returns the list of runtimes activated in the kernel,
+      according to the feature flags set in durable storage. *)
+  val list_runtimes : unit -> Tezosx.runtime list tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -115,7 +123,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Etherlink = struct
     include Etherlink_durable_storage.Make (Backend.Reader)
     include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
-    include Simulator.Make (Backend.SimulatorBackend)
+    include Simulator.MakeEtherlink (Backend.SimulatorBackend)
 
     let replay number =
       let open Lwt_result_syntax in
@@ -131,11 +139,13 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     Tracer_sig.Make (Executor) (Etherlink_block_storage) (Backend.Tracer)
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
+  module SimulatorBackend = Backend.SimulatorBackend
+  module Tezos = Tezos_backend.Make (Backend.SimulatorBackend)
 
   module Tezlink =
     Tezlink_services_impl.Make
       (struct
-        include Backend.Reader
+        include Backend.SimulatorBackend
 
         let block_param_to_block_number =
           Backend.block_param_to_block_number ~chain_family:L2_types.Michelson
@@ -177,8 +187,13 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     | _ -> tzfail Node_error.Unexpected_multichain
 end
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+(** Represents the different ways transactions can be injected into the system *)
+type endpoint =
+  | Rpc of Uri.t
+    (* Send transactions through standard RPC calls to the node at uri *)
+  | Websocket of Websocket_client.t
+    (* Use an active websocket client to push transactions in real time *)
+  | Block_producer (* Inject transactions directly into the block producer. *)
 
 (** [Tx_container] is the signature of the module that deals with
     storing and forwarding transactions. the module type is used by
@@ -186,8 +201,6 @@ type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
     transactions. *)
 module type Tx_container = sig
   type address
-
-  type legacy_transaction_object
 
   type transaction_object
 
@@ -202,8 +215,9 @@ module type Tx_container = sig
       available based on the pending transaction of the tx_container.
       [next_nonce] is the next expected nonce found in the backend. *)
   val add :
+    ?wait_confirmation:bool ->
     next_nonce:Ethereum_types.quantity ->
-    legacy_transaction_object ->
+    transaction_object ->
     raw_tx:Ethereum_types.hex ->
     (Ethereum_types.hash, string) result tzresult Lwt.t
 
@@ -213,7 +227,7 @@ module type Tx_container = sig
 
   (** [content ()] returns all the transactions found in tx
       container. *)
-  val content : unit -> Ethereum_types.txpool tzresult Lwt.t
+  val content : unit -> Transaction_object.txqueue_content tzresult Lwt.t
 
   (** [shutdown ()] stops the tx container, waiting for the ongoing request
     to be processed. *)
@@ -257,6 +271,15 @@ module type Tx_container = sig
     confirmed_txs:Ethereum_types.hash Seq.t ->
     unit tzresult Lwt.t
 
+  (** The Tx_queue has a table of pending transactions. There are two
+      ways for transactions to be removed from this table; either they
+      are confirmed because they have been seen in a block or they are
+      dropped.
+
+      [dropped_transaction ~dropped_tx] drops [dropped_tx] hash. *)
+  val dropped_transaction :
+    dropped_tx:Ethereum_types.hash -> reason:string -> unit tzresult Lwt.t
+
   (** The Tx_pool pops transactions until the sum of the sizes of the
       popped transactions reaches maximum_cumulative_size; it ignores
       the [validate_tx] and [initial_validation_state] arguments, The
@@ -268,10 +291,13 @@ module type Tx_container = sig
     validate_tx:
       ('a ->
       string ->
-      legacy_transaction_object ->
-      [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
+      transaction_object ->
+      [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
-    (string * legacy_transaction_object) list tzresult Lwt.t
+    (string * transaction_object) list tzresult Lwt.t
+
+  (** [size_info] returns the size of the tx container. *)
+  val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
 end
 
 (** ['f tx_container] is a GADT parametrized by the same type argument
@@ -283,13 +309,11 @@ type 'f tx_container =
   | Evm_tx_container :
       (module Tx_container
          with type address = Ethereum_types.address
-          and type legacy_transaction_object =
-            Ethereum_types.legacy_transaction_object
           and type transaction_object = Transaction_object.t)
       -> L2_types.evm_chain_family tx_container
   | Michelson_tx_container :
       (module Tx_container
-         with type legacy_transaction_object = Tezos_types.Operation.t)
+         with type transaction_object = Tezos_types.Operation.t)
       -> L2_types.michelson_chain_family tx_container
 
 (** Some functions of the Tx_container module, such as [add], have

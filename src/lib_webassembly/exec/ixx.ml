@@ -440,7 +440,7 @@ struct
      * matches the number of bits of Rep, the shift will be incorrect.
      *   -1 (Int32) << 32 = -1
      * Then the logor will be also wrong. So we check and bail out early.
-     * *)
+     *)
     if not needs_extend then i
     else
       let sign_bit = Rep.logand (Rep.of_int (1 lsl (Rep.bitwidth - 1))) i in

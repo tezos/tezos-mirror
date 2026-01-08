@@ -35,7 +35,9 @@ Version 12.4 fixed a memory leak in the accuser and the baker.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v12.4

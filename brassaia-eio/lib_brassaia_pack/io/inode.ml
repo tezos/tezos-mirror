@@ -21,15 +21,17 @@ include Inode_intf
 
 module Make_persistent
     (H : Brassaia.Hash.S)
-    (Node : Brassaia.Node.Generic_key.S
-              with type hash = H.t
-               and type contents_key = H.t Pack_key.t
-               and type node_key = H.t Pack_key.t)
+    (Node :
+      Brassaia.Node.Generic_key.S
+        with type hash = H.t
+         and type contents_key = H.t Pack_key.t
+         and type node_key = H.t Pack_key.t)
     (Inter : Internal with type hash = H.t and type key = H.t Pack_key.t)
-    (Pack : Pack_store.S
-              with type hash = H.t
-               and type key = H.t Pack_key.t
-               and type value = Inter.Raw.t) =
+    (Pack :
+      Pack_store.S
+        with type hash = H.t
+         and type key = H.t Pack_key.t
+         and type value = Inter.Raw.t) =
 struct
   module Raw = Inter.Raw
   module Pack = Pack

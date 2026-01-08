@@ -32,8 +32,24 @@ cd ..
 echo "Add package: octez-deps"
 mkdir -p opam-repository/packages/octez-deps/octez-deps.dev
 cp octez-deps.opam.locked opam-repository/packages/octez-deps/octez-deps.dev/opam
-mkdir -p opam-repository/packages/stdcompat/stdcompat.19
-cp stdcompat.opam.locked opam-repository/packages/stdcompat/stdcompat.19/opam
+
+echo "Add package: release-tools-deps"
+mkdir -p opam-repository/packages/release-tools-deps/release-tools-deps.dev
+cp release-tools-deps.opam.locked opam-repository/packages/release-tools-deps/release-tools-deps.dev/opam
+
+echo "Add packages: dream-httpaf, dream"
+mkdir -p 'opam-repository/packages/dream-httpaf/dream-httpaf.1.0.0~alpha4-octez'
+cp dream-httpaf.opam.locked 'opam-repository/packages/dream-httpaf/dream-httpaf.1.0.0~alpha4-octez/opam'
+mkdir -p 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez'
+cp dream.opam.locked 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez/opam'
+
+echo "Add package: cohttp"
+mkdir -p 'opam-repository/packages/cohttp/cohttp.5.3.1~octez'
+cp cohttp.opam.locked 'opam-repository/packages/cohttp/cohttp.5.3.1~octez/opam'
+mkdir -p 'opam-repository/packages/cohttp-lwt/cohttp-lwt.5.3.1~octez'
+cp cohttp-lwt.opam.locked 'opam-repository/packages/cohttp-lwt/cohttp-lwt.5.3.1~octez/opam'
+mkdir -p 'opam-repository/packages/cohttp-lwt-unix/cohttp-lwt-unix.5.3.1~octez'
+cp cohttp-lwt-unix.opam.locked 'opam-repository/packages/cohttp-lwt-unix/cohttp-lwt-unix.5.3.1~octez/opam'
 
 echo "Add package: dummy-tezos"
 # This package adds some constraints to the solution found by the opam solver.
@@ -88,11 +104,11 @@ esac
 
 cd opam-repository
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  "octez-deps,ocaml,ocaml-base-compiler,odoc,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
+  "octez-deps,release-tools-deps,ocaml,ocaml-base-compiler,odoc,ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg" \
   --environment "os=linux,arch=$arch,os-family=alpine"
 
 # Clean up: remove packages that we do not actually want to install.
-rm -rf packages/"$dummy_pkg" packages/octez-deps
+rm -rf packages/"$dummy_pkg" packages/octez-deps packages/release-tools-deps
 
 # Retry mechanism for [opam admin add-hashes]
 # The [opam admin add-hashes] command often hangs when fetching hashes from erratique.ch.

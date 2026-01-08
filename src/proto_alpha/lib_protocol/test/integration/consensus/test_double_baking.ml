@@ -193,8 +193,8 @@ let test_valid_double_baking_followed_by_double_attesting () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_final =
     Block.bake ~policy:(By_account baker2) ~operation blk_with_db_evidence
@@ -271,8 +271,8 @@ let test_valid_double_attesting_followed_by_double_baking () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_with_de_evidence =
     Block.bake ~policy:(By_account baker2) ~operation blk_a
@@ -356,17 +356,12 @@ let test_payload_producer_gets_evidence_rewards () =
     Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   in
   let* attesters = Context.get_attesters (B b_with_evidence) in
-  let* preattesters =
-    List.map_es
-      (function
-        | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-      attesters
-  in
   let* preattestations =
     List.map_ep
-      (fun (attester, _slots) ->
-        Op.preattestation ~delegate:attester b_with_evidence)
-      preattesters
+      (function
+        | {Plugin.RPC.Validators.delegate; _} ->
+            Op.preattestation ~manager_pkh:delegate b_with_evidence)
+      attesters
   in
   let* b' =
     Block.bake
@@ -480,8 +475,8 @@ let test_same_blocks () =
   double_baking (B ba) ba.header ba.header |> fun operation ->
   let*! res = Block.bake ~operation ba in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+    | _ -> false)
 
 (** Check that an double baking operation that is invalid due to
    incorrect ordering of the block headers fails. *)
@@ -493,8 +488,8 @@ let test_incorrect_order () =
   |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+    | _ -> false)
 
 (** Check that a double baking operation exposing two blocks with
     different levels fails. *)
@@ -506,8 +501,8 @@ let test_different_levels () =
   double_baking (B blk_a) blk_a.header blk_b_2.header |> fun operation ->
   let*! res = Block.bake ~operation blk_a in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+    | _ -> false)
 
 (** Check that a double baking operation exposing two yet-to-be-baked
     blocks fails. *)
@@ -519,10 +514,10 @@ let test_too_early_double_baking_evidence () =
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Too_early_denunciation
-          {kind = Misbehaviour.Double_baking; _} ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Too_early_denunciation
+        {kind = Misbehaviour.Double_baking; _} ->
+        true
+    | _ -> false)
 
 (** Check that after [max_slashing_period * blocks_per_cycle + 1] blocks -- corresponding to 2 cycles
    --, it is not possible to create a double baking operation anymore. *)
@@ -536,10 +531,10 @@ let test_too_late_double_baking_evidence () =
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Outdated_denunciation
-          {kind = Misbehaviour.Double_baking; _} ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Outdated_denunciation
+        {kind = Misbehaviour.Double_baking; _} ->
+        true
+    | _ -> false)
 
 (** Check that before [blocks_per_cycle] blocks
    -- corresponding to 2 cycles --, it is still possible to create a
@@ -570,8 +565,8 @@ let test_different_delegates () =
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   let*! e = Block.bake ~operation blk_a in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+    | _ -> false)
 
 (** This test is supposed to mimic that a block cannot be baked by one baker and
     signed by another. The way it tries to show this is by using a
@@ -619,17 +614,17 @@ let test_double_evidence () =
   let*! e = Block.bake ~operations:[evidence; evidence] blk in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_denunciation
-            {kind = Misbehaviour.Double_baking; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Conflicting_denunciation
+          {kind = Misbehaviour.Double_baking; _} ->
+          true
+      | _ -> false)
   in
   let* blk = Block.bake ~operation:evidence blk in
   double_baking (B blk) blk_b.header blk_a.header |> fun evidence ->
   let*! e = Block.bake ~operation:evidence blk in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Validate_errors.Anonymous.Already_denounced _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Already_denounced _ -> true
+    | _ -> false)
 
 let tests =
   [

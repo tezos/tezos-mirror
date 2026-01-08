@@ -112,7 +112,7 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
+module Make (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
@@ -1200,8 +1200,14 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
             let inbox_level = Raw_level_repr.to_int32 inbox_level in
             (* the [published_level]'s pages to request is [inbox_level -
                attestation_lag - 1]. *)
+            (* Before importing a slot, we wait 2 blocks for finality + 1 block
+               for DAL node processing, + 1 block because PVM arith requests DAL
+               slots at start of level internal message. *)
+            let import_extra_delay = 4l in
             let lvl =
-              Int32.sub (Int32.sub inbox_level dal_params.attestation_lag) 1l
+              Int32.sub
+                (Int32.sub inbox_level dal_params.attestation_lag)
+                import_extra_delay
             in
             match Raw_level_repr.of_int32 lvl with
             | Error _ ->
@@ -1581,6 +1587,11 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
 
   let step_transition ~is_reveal_enabled input_given state =
     let open Lwt_syntax in
+    (* Get the current level to include it in the proof. It is needed as the
+       tick's merkle proof is also used to retrieve the level at which the tick
+       was executed. If the proof production gets the current level, then proof
+       verification can get it as well. *)
+    let* _current_level = get_current_level state in
     let* request = is_input_state ~is_reveal_enabled state in
     let error msg = state_of (internal_error msg) state in
 
@@ -1624,6 +1635,18 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
     return (state, request)
 
   type error += Arith_proof_verification_failed
+
+  let get_proof_state_level proof =
+    let open Lwt_result_syntax in
+    let proof = Context.cast_read_only proof in
+    let*! result =
+      Context.verify_proof proof (fun state ->
+          let*! current_level_opt = get_current_level state in
+          Lwt.return (state, current_level_opt))
+    in
+    match result with
+    | None -> tzfail Arith_proof_verification_failed
+    | Some (_state, current_level_opt) -> return current_level_opt
 
   let verify_proof ~is_reveal_enabled input_given proof =
     let open Lwt_result_syntax in
@@ -1783,6 +1806,8 @@ module Protocol_implementation = Make (struct
   let proof_before proof = kinded_hash_to_state_hash proof.Context.Proof.before
 
   let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
+
+  let cast_read_only proof = Context.Proof.{proof with after = proof.before}
 
   let proof_encoding = Context.Proof_encoding.V2.Tree2.tree_proof_encoding
 end)

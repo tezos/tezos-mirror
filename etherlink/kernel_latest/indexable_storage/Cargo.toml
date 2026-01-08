@@ -11,6 +11,7 @@ license = "MIT"
 [dependencies]
 thiserror.workspace = true
 rlp.workspace = true
+num-bigint.workspace = true
 tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true

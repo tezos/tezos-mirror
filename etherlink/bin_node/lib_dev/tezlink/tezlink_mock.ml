@@ -34,11 +34,17 @@ let fitness =
    being replaced by actual data. *)
 let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
 
-(* We are introducing a mock bootstrap account, which will be useful for plugging
-   Tzkt on Tezlink. For now, we are using this bootstrap account as the proposer/baker,
-   but this should change. If we decide to introduce real Tezlink bootstrap account,
-   the baker/proposer should be the address zero or the address of the sequencer). *)
-let bootstrap_account =
+(* We are introducing a mock baker account at a fixed address to answer TzKT requests
+   about baking rights. This account has all baking rights for all cycles. For now, it
+   is at a fixed address; in the future, it could be replaced by the address of the
+   sequencer so that it can collect the DA-fee part of operation fees. *)
+let baker_initial_balance = 200000000000L
+
+let baker_initial_deposit = Alpha_context.Tez.of_mutez_exn baker_initial_balance
+
+let faucet_public_key_hash = Signature.Public_key_hash.zero
+
+let baker_account =
   let public_key_internal =
     let pk_opt =
       Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
@@ -57,7 +63,7 @@ let bootstrap_account =
       public_key,
       (* This amount was arbitrarly chosen according to bootstrap account
          in L1 sandbox *)
-      Alpha_context.Tez.of_mutez_exn 200000000000L,
+      baker_initial_deposit,
       None,
       None )
 
@@ -76,93 +82,6 @@ let contents : Alpha_context.Block_header.contents =
         adaptive_issuance_vote = Per_block_vote_pass;
       };
   }
-
-let signature : Imported_protocol.Alpha_context.signature =
-  Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
-
-let protocol_data : Alpha_context.Block_header.protocol_data =
-  {contents; signature}
-
-module Operation_metadata = struct
-  open Imported_protocol.Apply_results
-  open Alpha_context
-
-  type error += Unsupported_operation_kind of string
-
-  let () =
-    register_error_kind
-      `Permanent
-      ~id:"evm_node.dev.tezlink.unsupported_operation_kind"
-      ~title:"Unsupported operation kind"
-      ~description:"In a RPC call, an operation of unsupported kind was given."
-      ~pp:(fun ppf s -> Format.fprintf ppf "Unsupported operation kind: %s" s)
-      Data_encoding.(obj1 (req "message" string))
-      (function
-        | Unsupported_operation_kind message -> Some message | _ -> None)
-      (fun message -> Unsupported_operation_kind message)
-
-  let consumed_gas = Gas.Arith.zero
-
-  let manager_op_result (type kind) (contents : kind manager_operation) :
-      kind successful_manager_operation_result tzresult =
-    let open Result_syntax in
-    match contents with
-    | Reveal _ -> return (Reveal_result {consumed_gas})
-    | Transaction _ ->
-        return
-          (Transaction_result
-             (Transaction_to_contract_result
-                {
-                  storage = None;
-                  lazy_storage_diff = None;
-                  balance_updates = [];
-                  ticket_receipt = [];
-                  originated_contracts = [];
-                  consumed_gas;
-                  storage_size = Z.zero;
-                  paid_storage_size_diff = Z.zero;
-                  allocated_destination_contract = true;
-                }))
-    | _ ->
-        tzfail
-          (Unsupported_operation_kind
-             "only supported kinds are 'reveal' and 'transaction'")
-
-  let contents_result (type kind) (contents : kind contents) :
-      kind contents_result tzresult =
-    let open Result_syntax in
-    match contents with
-    | Manager_operation {operation; _} ->
-        let* result = manager_op_result operation in
-        return
-          (Manager_operation_result
-             {
-               balance_updates = [];
-               internal_operation_results = [];
-               operation_result = Applied result;
-             })
-    | _ ->
-        tzfail
-          (Unsupported_operation_kind "only manager operations are supported")
-
-  let rec contents_list_result :
-      type kind. kind contents_list -> kind contents_result_list tzresult =
-   fun contents ->
-    let open Result_syntax in
-    match contents with
-    | Single contents ->
-        let* result = contents_result contents in
-        return (Single_result result)
-    | Cons (contents, contents_list) ->
-        let* result = contents_result contents in
-        let* result_list = contents_list_result contents_list in
-        return (Cons_result (result, result_list))
-
-  let operation_metadata (Operation_data op) =
-    let open Result_syntax in
-    let* contents = contents_list_result op.contents in
-    return (Operation_metadata {contents})
-end
 
 (* When indexing Tezlink, Tzkt requires Liquidity baking contracts. *)
 module Liquidity_baking = struct
@@ -285,7 +204,7 @@ module Storage_repr = struct
     let stake ~consensus_pk =
       let lots =
         Option.value ~default:Imported_protocol.Tez_repr.one
-        @@ Imported_protocol.Tez_repr.of_mutez 200000000000L
+        @@ Imported_protocol.Tez_repr.of_mutez baker_initial_balance
       in
       let selected_stake =
         Imported_protocol.Stake_repr.make
@@ -327,7 +246,8 @@ module Storage_repr = struct
                (),
                (),
                selected_stake_distribution,
-               () ) -> {delegate_sampler_state; selected_stake_distribution})
+               () )
+           -> {delegate_sampler_state; selected_stake_distribution})
         (obj9
            (req "already_denounced" empty)
            (req "dal_already_denounced" empty)
@@ -386,23 +306,6 @@ module Voting_period = struct
       ~dst:Alpha_context.Voting_period.encoding
 end
 
-let balance_udpdate_bootstrap ~amount ~bootstrap =
-  let open Alpha_context.Receipt in
-  let migration =
-    item
-      Bootstrap
-      (Debited (Alpha_context.Tez.of_mutez_exn amount))
-      Protocol_migration
-  in
-  let baker = frozen_baker bootstrap in
-  let deposit =
-    item
-      (Deposits baker)
-      (Credited (Alpha_context.Tez.of_mutez_exn amount))
-      Protocol_migration
-  in
-  [migration; deposit]
-
 let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
   let open Alpha_context.Receipt in
   let debited_rewards =
@@ -413,3 +316,95 @@ let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
     item (Deposits baker) (Credited amount) Block_application
   in
   [debited_rewards; credited_rewards]
+
+let storage_cycle () =
+  let public_key =
+    match baker_account.public_key with
+    | None -> (* Unreachable *) assert false
+    | Some public_key -> public_key
+  in
+  let consensus_pk =
+    Imported_protocol.Raw_context.
+      {
+        delegate = baker_account.public_key_hash;
+        consensus_pk = public_key;
+        consensus_pkh = baker_account.public_key_hash;
+        companion_pk = None;
+        companion_pkh = None;
+      }
+  in
+  let delegate_sampler_state =
+    Storage_repr.Cycle.create_sample_state
+      ~consensus_pks:[(consensus_pk, baker_initial_balance)]
+  in
+  let selected_stake_distribution = Storage_repr.Cycle.stake ~consensus_pk in
+  Lwt_result.return
+    Storage_repr.Cycle.{delegate_sampler_state; selected_stake_distribution}
+
+(* This is a way to obtain a context built on genesis with the minimum of
+   block. This is not to be used if the context is actually relevant, but just
+   as a dummy value for specific cases, for Quick and Dirty wins. *)
+let init_dummy_context () =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_syntax in
+  let* b, _cs = Context.init1 () in
+  let* v = Incremental.begin_construction b in
+  let ctxt = Incremental.alpha_ctxt v in
+  let ctxt = Alpha_context.Gas.set_unlimited ctxt in
+  return ctxt
+
+(* This an implementation taken straight from the plugin, which assumes the
+   context is actually irrelevant. A better solution would be to go through
+   rust bindings to the mir implementation, but this a quick win. *)
+let list_entrypoints code normalize_types =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let open Imported_protocol in
+  let* ctxt = init_dummy_context () in
+  let expr = Script.lazy_expr code in
+  (* The following is taken verbatim from the implementation of the contract
+     services in the plugin:
+         src/proto_023_PtSeouLo/lib_plugin/contract_services.ml
+  *)
+  let legacy = true in
+  let open Script_ir_translator in
+  let*?@ expr, _ =
+    Script.force_decode_in_context
+      ~consume_deserialization_gas:When_needed
+      ctxt
+      expr
+  in
+  let*@ {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+  Lwt.return
+  @@ Imported_env.wrap_tzresult (* we wrap the Error_monad result*)
+       (let open Result_syntax in
+        let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+          Script_ir_translator.parse_parameter_ty_and_entrypoints
+            ctxt
+            ~legacy
+            arg_type
+        in
+        let unreachable_entrypoint, map =
+          list_entrypoints_uncarbonated arg_type entrypoints
+        in
+        let* entrypoint_types, _ctxt =
+          Entrypoint.Map.fold_e
+            (fun entry
+                 (Script_typed_ir.Ex_ty ty, original_type_expr)
+                 (acc, ctxt)
+               ->
+              let* ty_expr, ctxt =
+                let open Tezos_micheline in
+                if normalize_types then
+                  let* ty_node, ctxt =
+                    Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                  in
+                  return (Micheline.strip_locations ty_node, ctxt)
+                else return (Micheline.strip_locations original_type_expr, ctxt)
+              in
+              return ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+            map
+            ([], ctxt)
+        in
+        return_some (unreachable_entrypoint, entrypoint_types))

@@ -13,18 +13,18 @@
 ## This script is also sourced in the Makefile, as such it should be compatible
 ## with both make and sh syntaxes
 
-export ocaml_version=5.2.1
+export ocaml_version=5.3.0
 # Used for sanity check in Makefile.
 export opam_version_major=2
 # The recommended rust version should equal the version set in the
 # root rust-toolchain file, such that:
 # rust-toolchain == recommended_rust_version
-export recommended_rust_version=1.86.0
+export recommended_rust_version=1.88.0
 export recommended_node_version=18.18.2
 
 ## opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export opam_repository_tag=a28eb8a148feb4fbc6466fa0791668993513dbde
+export opam_repository_tag=8a528d6bb48e4be260fb670a1754df39a1192147
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
@@ -47,16 +47,18 @@ export dal_srs_g2_sha=97d76e266e657cc3c859c3359c717136f55cfe4c0256ea418f907406cb
 export alpine_version='3.20'
 
 # Installed via apk rust
-export rust_version='1.86.0'
+export rust_version='1.88.0'
 
 # Installed via apk cargo
-export cargo_version='1.86.0'
+export cargo_version='1.88.0'
 
-# Installed via apk opam
+# Installed via install_opam_static.sh
+# beware of updating opam to 2.4.0.
+# See https://gitlab.com/tezos/tezos/-/merge_requests/18809
 export opam_version='2.3.0'
 
 # Installed via apk python3-dev
-export python_version='3.12.11'
+export python_version='3.12.12'
 
 # Installed via apk
 export poetry_version='1.8.3'

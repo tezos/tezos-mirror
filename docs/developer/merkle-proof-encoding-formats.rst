@@ -5,8 +5,8 @@ A Merkle proof is a datum which demonstrates that a `Merkle tree <https://en.wik
 Typically a Merkle root and a subtree of a Merkle tree are used as a Merkle proof.
 Verification is done by computing the Merkle root and checking it is the same as the given hash.
 In Octez, Merkle proofs are used for Optimistic Rollups (see :doc:`../active/smart_rollups`) in the event
-an invalid hash is submitted from a layer 2 node to layer 1.
-An honest layer 2 node can then present a Merkle proof to demonstrate that the previously submitted hash is in fact fraudulent.
+an invalid hash is submitted from a Layer 2 node to Layer 1.
+An honest Layer 2 node can then present a Merkle proof to demonstrate that the previously submitted hash is in fact fraudulent.
 
 This document shows the encoding format of the Merkle proof implemented in :src:`src/lib_context/merkle_proof_encoding/merkle_proof_encoding.ml`.
 There are 2 versions of encodings (defined as V1 and V2), each generating 2 types of

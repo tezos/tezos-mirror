@@ -13,10 +13,14 @@ use crate::models::{
 use crate::{write_host, write_out, DiffMap, ReportMap, ReportValue};
 
 use crate::models::TxPartIndices;
-use evm_execution::account_storage::EthereumAccount;
 
 use bytes::Bytes;
-use primitive_types::{H160, H256, U256};
+use primitive_types::H256;
+use revm::primitives::Address;
+use revm::{primitives::U256, state::AccountInfo};
+use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
+use revm_etherlink::storage::code::CodeStorage;
+use revm_etherlink::storage::world_state_handler::StorageAccount;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -87,29 +91,22 @@ fn check_if_network_match(filler_network: &str, spec_name: &SpecName) -> bool {
 
 fn check_should_not_exist(
     host: &mut EvalHost,
-    account: &EthereumAccount,
+    account: &StorageAccount,
     invalid_state: &mut bool,
     shouldnotexist: &Option<String>,
     hex_address: &str,
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
-        let balance_is_zero = if let Ok(balance) = account.balance(host) {
-            balance == U256::zero()
-        } else {
-            false
-        };
+        let AccountInfo {
+            balance,
+            code,
+            nonce,
+            ..
+        } = account.info(host).unwrap();
 
-        let no_code = if let Ok(code_size) = account.code_size(host) {
-            code_size == U256::zero()
-        } else {
-            false
-        };
-
-        let nonce_is_zero = if let Ok(nonce) = account.nonce(host) {
-            nonce == 0
-        } else {
-            false
-        };
+        let balance_is_zero = balance == U256::ZERO;
+        let no_code = code.is_none() || code.unwrap().is_empty();
+        let nonce_is_zero = nonce == 0;
 
         if balance_is_zero && no_code && nonce_is_zero {
             write_host!(host, "Account {} rightfully does not exist.", hex_address);
@@ -122,17 +119,17 @@ fn check_should_not_exist(
 
 fn check_balance(
     host: &mut EvalHost,
-    account: &EthereumAccount,
+    account: &StorageAccount,
     invalid_state: &mut bool,
-    balance: &Option<U256>,
+    balance: &Option<primitive_types::U256>,
     hex_address: &str,
 ) {
     if let Some(balance) = balance {
-        match account.balance(host) {
-            Ok(current_balance) => {
-                if current_balance != *balance {
+        match account.info(host) {
+            Ok(current_info) => {
+                if current_info.balance != u256_to_alloy(balance) {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_balance);
+                    write_host!( host, "Account {}: balance don't match current one, {} was expected, but got {}.", hex_address, balance, current_info.balance);
                 } else {
                     write_host!(host, "Account {}: balance matched.", hex_address);
                 }
@@ -147,17 +144,18 @@ fn check_balance(
 
 fn check_code(
     host: &mut EvalHost,
-    account: &EthereumAccount,
+    account: &StorageAccount,
     invalid_state: &mut bool,
     code: &Option<Bytes>,
     hex_address: &str,
 ) {
     if let Some(code) = &code {
+        let info = account.info(host).unwrap(); // Ensure the account exists.
         let mut code = code.to_vec();
         trim_trailing_zeros(&mut code);
-        match account.code(host) {
-            Ok(current_code) => {
-                let mut current_code = current_code;
+        match CodeStorage::new(&info.code_hash).unwrap().get_code(host) {
+            Ok(Some(current_code)) => {
+                let mut current_code = current_code.original_byte_slice().to_vec();
                 trim_trailing_zeros(&mut current_code);
                 if current_code != code {
                     *invalid_state = true;
@@ -166,7 +164,7 @@ fn check_code(
                     write_host!(host, "Account {}: code matched.", hex_address);
                 }
             }
-            Err(_) => {
+            Ok(None) | Err(_) => {
                 *invalid_state = true;
                 write_host!(host, "Account {} should have a code.", hex_address);
             }
@@ -176,17 +174,17 @@ fn check_code(
 
 fn check_nonce(
     host: &mut EvalHost,
-    account: &EthereumAccount,
+    account: &StorageAccount,
     invalid_state: &mut bool,
     nonce: &Option<u64>,
     hex_address: &str,
 ) {
     if let Some(nonce) = nonce {
-        match account.nonce(host) {
-            Ok(current_nonce) => {
-                if current_nonce != *nonce {
+        match account.info(host) {
+            Ok(current_info) => {
+                if current_info.nonce != *nonce {
                     *invalid_state = true;
-                    write_host!( host, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce);
+                    write_host!( host, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_info.nonce);
                 } else {
                     write_host!(host, "Account {}: nonce matched.", hex_address);
                 }
@@ -201,7 +199,7 @@ fn check_nonce(
 
 fn check_storage(
     host: &mut EvalHost,
-    account: &EthereumAccount,
+    account: &StorageAccount,
     invalid_state: &mut bool,
     storage: &Option<HashMap<H256, H256>>,
     hex_address: &str,
@@ -215,10 +213,13 @@ fn check_storage(
             );
         }
         for (index, value) in storage.iter() {
-            match account.get_storage(host, index) {
+            match account.get_storage(host, &U256::from_be_bytes(h256_to_alloy(index).0))
+            {
                 Ok(current_storage_value) => {
                     let storage_value = value;
-                    if current_storage_value != *storage_value {
+                    if current_storage_value
+                        != U256::from_be_bytes(h256_to_alloy(storage_value).0)
+                    {
                         *invalid_state = true;
                         write_host!( host, "Account {}: storage don't match current one for index {}, {} was expected, but got {}.", hex_address, index, storage_value, current_storage_value);
                     } else {
@@ -250,8 +251,9 @@ fn check_durable_storage(
         } else {
             "0x".to_owned() + account
         };
-        let address = H160::from_str(&hex_address).expect("Expect valid hex digit(s).");
-        let account = EthereumAccount::from_address(&address).unwrap();
+        let address =
+            Address::from_str(&hex_address).expect("Expect valid hex digit(s).");
+        let account = StorageAccount::from_address(&address).unwrap();
         let mut invalid_state = false;
 
         // Enable checks when fields are available in the source filler file.

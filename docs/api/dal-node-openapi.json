@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 22.1 (9758b259)"
+    "version": "Octez 23.2 (13afca5d)"
   },
   "paths": {
     "/health": {
@@ -729,7 +729,26 @@
     },
     "/p2p/gossipsub/mesh": {
       "get": {
-        "description": "Get the mesh of the peer. Concretely, the RPC returns a list of topics, where each topic is associated to the remote peers with which the current node shares a full connection (on that topic).",
+        "description": "Get the mesh of the peer. Concretely, the RPC returns a list of topics, where each topic is associated to the remote peers with which the current node shares a full connection (on that topic). Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2048,7 +2067,7 @@
                 "schema": {
                   "oneOf": [
                     {
-                      "title": "Boostrap node",
+                      "title": "Bootstrap node",
                       "type": "object",
                       "properties": {
                         "kind": {
@@ -2073,125 +2092,36 @@
                           ]
                         },
                         "controller_profiles": {
-                          "oneOf": [
-                            {
-                              "title": "profile_encoding",
-                              "type": "object",
-                              "properties": {
-                                "operators": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
-                                  }
-                                },
-                                "observers": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "integer",
-                                    "minimum": -1073741824,
-                                    "maximum": 1073741823
-                                  }
-                                },
-                                "attesters": {
-                                  "type": "array",
-                                  "items": {
-                                    "$ref": "#/components/schemas/Signature.Public_key_hash"
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              "title": "legacy_profile_encoding",
+                          "type": "object",
+                          "properties": {
+                            "operators": {
                               "type": "array",
                               "items": {
-                                "oneOf": [
-                                  {
-                                    "title": "Attester with pkh",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "attester"
-                                        ]
-                                      },
-                                      "public_key_hash": {
-                                        "$ref": "#/components/schemas/Signature.Public_key_hash"
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "public_key_hash"
-                                    ]
-                                  },
-                                  {
-                                    "title": "Slot producer",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "producer"
-                                        ]
-                                      },
-                                      "slot_index": {
-                                        "type": "integer",
-                                        "minimum": -1073741824,
-                                        "maximum": 1073741823
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "slot_index"
-                                    ]
-                                  },
-                                  {
-                                    "title": "observer",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                          "observer"
-                                        ]
-                                      },
-                                      "slot_index": {
-                                        "type": "integer",
-                                        "minimum": -1073741824,
-                                        "maximum": 1073741823
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "slot_index"
-                                    ]
-                                  }
-                                ]
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "observers": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "attesters": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Signature.Public_key_hash"
                               }
                             }
-                          ]
+                          }
                         }
                       },
                       "required": [
                         "kind",
                         "controller_profiles"
-                      ]
-                    },
-                    {
-                      "title": "Random_observer",
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "random_observer"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "kind"
                       ]
                     }
                   ]
@@ -2217,105 +2147,31 @@
           "content": {
             "application/json": {
               "schema": {
-                "oneOf": [
-                  {
-                    "title": "profile_encoding",
-                    "type": "object",
-                    "properties": {
-                      "operators": {
-                        "type": "array",
-                        "items": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "observers": {
-                        "type": "array",
-                        "items": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
-                        }
-                      },
-                      "attesters": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Signature.Public_key_hash"
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "title": "legacy_profile_encoding",
+                "type": "object",
+                "properties": {
+                  "operators": {
                     "type": "array",
                     "items": {
-                      "oneOf": [
-                        {
-                          "title": "Attester with pkh",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "attester"
-                              ]
-                            },
-                            "public_key_hash": {
-                              "$ref": "#/components/schemas/Signature.Public_key_hash"
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "public_key_hash"
-                          ]
-                        },
-                        {
-                          "title": "Slot producer",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "producer"
-                              ]
-                            },
-                            "slot_index": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "slot_index"
-                          ]
-                        },
-                        {
-                          "title": "observer",
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": [
-                                "observer"
-                              ]
-                            },
-                            "slot_index": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
-                            }
-                          },
-                          "required": [
-                            "kind",
-                            "slot_index"
-                          ]
-                        }
-                      ]
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "observers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "attesters": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Signature.Public_key_hash"
                     }
                   }
-                ]
+                }
               }
             }
           }
@@ -2590,6 +2446,9 @@
                       "type": "integer",
                       "minimum": -2147483648,
                       "maximum": 2147483647
+                    },
+                    "minimal_block_delay": {
+                      "$ref": "#/components/schemas/int64"
                     }
                   },
                   "required": [
@@ -2603,7 +2462,8 @@
                     "sc_rollup_challenge_window_in_blocks",
                     "commitment_period_in_blocks",
                     "dal_attested_slots_validity_lag",
-                    "blocks_per_cycle"
+                    "blocks_per_cycle",
+                    "minimal_block_delay"
                   ]
                 }
               }

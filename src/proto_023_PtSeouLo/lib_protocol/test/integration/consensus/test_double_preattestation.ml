@@ -57,21 +57,12 @@ end = struct
 
   (** Helper function for illformed denunciations construction *)
 
-  let pick_attesters ctxt =
-    let open Lwt_result_syntax in
-    let module V = Plugin.RPC.Validators in
-    let* validators_list = Context.get_attesters ctxt in
-    match validators_list with
-    | a :: b :: _ ->
-        return ((a.V.delegate, a.V.slots), (b.V.delegate, b.V.slots))
-    | _ -> assert false
-
   let invalid_denunciation loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Invalid_denunciation
-            Misbehaviour.Double_preattesting ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_preattesting ->
+          true
+      | _ -> false)
 
   let malformed_double_preattestation_denunciation
       ?(include_attestation = false) ?(block_round = 0)
@@ -102,17 +93,17 @@ end = struct
 
   let already_denounced loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Already_denounced
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Already_denounced
+          {kind = Misbehaviour.Double_preattesting; _} ->
+          true
+      | _ -> false)
 
   let outdated_denunciation loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Outdated_denunciation
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Outdated_denunciation
+          {kind = Misbehaviour.Double_preattesting; _} ->
+          true
+      | _ -> false)
 
   let unexpected_failure loc res =
     (* no error is expected *)
@@ -209,11 +200,7 @@ end = struct
   let generic_double_preattestation_denunciation ~nb_blocks_before_double
       ~nb_blocks_before_denunciation ~test_expected_ok
       ?(test_expected_ko = fun _loc _res -> Lwt_result_syntax.return_unit)
-      ?(pick_attesters =
-        let open Lwt_result_syntax in
-        fun ctxt ->
-          let* a, _b = pick_attesters ctxt in
-          return (a, a)) ~loc () =
+      ?(different_attesters = false) ~loc () =
     let open Lwt_result_syntax in
     let* genesis, contracts =
       Context.init_n
@@ -232,10 +219,19 @@ end = struct
     let* trans = Op.transaction (B genesis) addr addr Tez.one_mutez in
     let* head_A = bake ~policy:(By_round 0) blk in
     let* head_B = bake ~policy:(By_round 0) blk ~operations:[trans] in
-    let* (d1, _slots1), (d2, _slots2) = pick_attesters (B head_A) in
-    (* default: d1 = d2 *)
-    let* op1 = Op.raw_preattestation ~delegate:d1 head_A in
-    let* op2 = Op.raw_preattestation ~delegate:d2 head_B in
+    (* By default, [different_attesters] is false so [d1 = d2]. *)
+    let* d1, d2 =
+      if different_attesters then
+        let* attester1, attester2 =
+          Context.get_first_different_attesters (B head_A)
+        in
+        return (attester1.delegate, attester2.delegate)
+      else
+        let* attester = Context.get_attester (B head_A) in
+        return (attester.delegate, attester.delegate)
+    in
+    let* op1 = Op.raw_preattestation ~manager_pkh:d1 head_A in
+    let* op2 = Op.raw_preattestation ~manager_pkh:d2 head_B in
     let op1, op2 = order_preattestations ~correct_order:true op1 op2 in
     (* bake `nb_blocks_before_denunciation` before double preattestation denunciation *)
     let* blk = bake_n nb_blocks_before_denunciation blk in
@@ -302,7 +298,7 @@ end = struct
       ~nb_blocks_before_denunciation:2
       ~test_expected_ok:unexpected_success
       ~test_expected_ko:invalid_denunciation
-      ~pick_attesters (* pick different attesters *)
+      ~different_attesters:true
       ~loc:__LOC__
       ()
 
@@ -361,9 +357,9 @@ end = struct
     let* blk_1, blk_2 = block_fork genesis in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in
-    let* delegate, _ = Context.get_attester (B blk_a) in
-    let* preattestation_a = Op.raw_preattestation ~delegate blk_a in
-    let* preattestation_b = Op.raw_preattestation ~delegate blk_b in
+    let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+    let* preattestation_a = Op.raw_preattestation ~manager_pkh:delegate blk_a in
+    let* preattestation_b = Op.raw_preattestation ~manager_pkh:delegate blk_b in
     let operation =
       double_preattestation (B genesis) preattestation_a preattestation_b
     in
@@ -383,10 +379,10 @@ end = struct
     in
     let* () =
       Assert.proto_error ~loc:__LOC__ e (function
-          | Validate_errors.Anonymous.Conflicting_denunciation
-              {kind = Misbehaviour.Double_preattesting; _} ->
-              true
-          | _ -> false)
+        | Validate_errors.Anonymous.Conflicting_denunciation
+            {kind = Misbehaviour.Double_preattesting; _} ->
+            true
+        | _ -> false)
     in
     let* blk_with_evidence1 =
       Block.bake ~policy:(By_account baker) ~operation blk_a
@@ -406,29 +402,35 @@ end = struct
     in
     let* block = Block.bake genesis in
     let* attesters = Context.get_attesters (B block) in
-    let delegate, slot1, slot2 =
+    let consensus_pkh, slot1, slot2 =
       (* Find an attester with more than 1 slot. *)
       WithExceptions.Option.get
         ~loc:__LOC__
         (List.find_map
            (fun (attester : RPC.Validators.t) ->
              match attester.slots with
-             | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+             | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
              | _ -> None)
            attesters)
     in
-    let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 block in
-    let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 block in
+    let attesting_slot1 = {Op.slot = slot1; consensus_pkh} in
+    let attesting_slot2 = {Op.slot = slot2; consensus_pkh} in
+    let* preattestation1 =
+      Op.raw_preattestation ~attesting_slot:attesting_slot1 block
+    in
+    let* preattestation2 =
+      Op.raw_preattestation ~attesting_slot:attesting_slot2 block
+    in
     let double_preattestation_evidence =
       double_preattestation (B block) preattestation1 preattestation2
     in
     let*! res = Block.bake ~operation:double_preattestation_evidence block in
     let* () =
       Assert.proto_error ~loc:__LOC__ res (function
-          | Validate_errors.Anonymous.Invalid_denunciation
-              Misbehaviour.Double_preattesting ->
-              true
-          | _ -> false)
+        | Validate_errors.Anonymous.Invalid_denunciation
+            Misbehaviour.Double_preattesting ->
+            true
+        | _ -> false)
     in
     return_unit
 
@@ -450,29 +452,16 @@ end = struct
     let* blk_1, blk_2 = block_fork b in
     let* blk_a = Block.bake blk_1 in
     let* blk_b = Block.bake blk_2 in
-    let* attesters = Context.get_attesters (B blk_a) in
-    let attester, slot =
-      WithExceptions.Option.get
-        ~loc:__LOC__
-        (Test_aggregate.find_attester_with_bls_key attesters)
+    let* attesting_slot =
+      Op.get_attesting_slot_with_bls_key ~attested_block:blk_a
     in
-    let* op1 =
-      Op.raw_preattestation
-        ~delegate:attester.RPC.Validators.delegate
-        ~slot
-        blk_a
-    in
-    let* op2_standalone =
-      Op.raw_preattestation
-        ~delegate:attester.RPC.Validators.delegate
-        ~slot
+    let* op1 = Op.raw_preattestation ~attesting_slot blk_a in
+    let* op2 =
+      Op.raw_preattestations_aggregate
+        ~committee:[attesting_slot; attesting_slot]
         blk_b
     in
-    let op2 =
-      WithExceptions.Option.get
-        ~loc:__LOC__
-        (Op.raw_aggregate_preattestations [op2_standalone; op2_standalone])
-    in
+    let slot = attesting_slot.slot in
     let op =
       let contents =
         if Operation_hash.(Operation.hash op1 < Operation.hash op2) then

@@ -12,8 +12,11 @@ Available services:
       node. 
   + levels/<int32>/slots/<int>/
     - GET /levels/<int32>/slots/<int>/commitment
-        Return the accepted commitment associated to the given slot index and
-        published at the given level. 
+        Return the commitment associated to the given slot index and
+        published at the given level, if any. The commitment is fetched from
+        the skip-list storage. Note that the commitment is not present in the
+        storage immediately after publication, but only when its attestation
+        status is known and final. 
     - GET /levels/<int32>/slots/<int>/content
         Retrieve the content of the slot whose id is given. 
     - GET /levels/<int32>/slots/<int>/pages
@@ -23,7 +26,10 @@ Available services:
     - GET /levels/<int32>/slots/<int>/shards/<int>/content
         Fetch shard as bytes 
     - GET /levels/<int32>/slots/<int>/status
-        Return the status for the given slot. 
+        Return the status for the given slot. For operator nodes only. 
+  - GET /monitor/synchronized
+      Returns the stream of synchronization statuses of the DAL node with the
+      L1 node. 
   + p2p/
     - POST /p2p/connect
         Connect to a new peer. 
@@ -99,15 +105,23 @@ Available services:
       Update the list of profiles tracked by the DAL node. Note that it does
       not take the bootstrap profile as it is incompatible with other
       profiles. 
-  - GET /profiles/<pkh>/attested_levels/<int32>/assigned_shard_indices
-      Return the shard indexes assigned to the given public key hash at the
-      given level. 
-  - GET /profiles/<pkh>/attested_levels/<int32>/attestable_slots
-      Return the currently attestable slots at the given attested level by
-      the given public key hash. A slot is attestable at level [l] if it is
-      published at level [l - attestation_lag] and *all* the shards assigned
-      at level [l] to the given public key hash are available in the DAL
-      node's store. 
+  + profiles/<pkh>/
+    - GET /profiles/<pkh>/attested_levels/<int32>/assigned_shard_indices
+        Return the shard indexes assigned to the given public key hash at the
+        given level. 
+    - GET /profiles/<pkh>/attested_levels/<int32>/attestable_slots
+        Return the currently attestable slots at the given attested level by
+        the given public key hash. A slot is attestable at level [l] if it is
+        published at level [l - attestation_lag] and *all* the shards
+        assigned at level [l] to the given public key hash are available in
+        the DAL node's store. 
+    - GET /profiles/<pkh>/monitor/attestable_slots
+        Stream attestable slot ids for a given public key hash [pkh]. A slot
+        is attestable for attested level L if it was published at (L -
+        attestation_lag) and *all* shards assigned at level L to [pkh] are
+        available in the DAL node's store. If some shards of the slot are
+        detected as traps for the baker, the slot should not be attested, so
+        the id is not sent via the stream. 
   - GET /protocol_parameters
       Returns the protocol parameters as known by the DAL node. An optional
       'level' argument can specify for which level to retrieve them. 
@@ -122,7 +136,13 @@ Available services:
       the sent data is smaller than the size of a DAL slot, it is padded with
       the character provided as padding query parameter (defaults to \000).
       If the slot_index query parameter is provided, the DAL node checks that
-      its profile allows to publish data on the given slot index. 
+      its profile allows to publish data on the given slot index. However,
+      slot_index is optional and has NO SEMANTIC EFFECT on the produced
+      commitment. It exists solely to help reverse proxies route POST /slots
+      requests to a DAL node subscribed to the corresponding topics. 
+  - GET /synchronized
+      Returns the current synchronization status of the DAL node with the L1
+      node. 
   - GET /version
       version 
 

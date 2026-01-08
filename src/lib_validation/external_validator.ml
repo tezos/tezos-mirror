@@ -95,7 +95,7 @@ module Processing = struct
     let sandbox_parameters =
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
     in
-    let*! context_index =
+    let* context_index =
       Context_ops.init
         ~kind:`Disk
         ~patch_context:(fun ctxt ->
@@ -129,8 +129,7 @@ module Processing = struct
         profiler_headless;
       }
 
-  let handle_request :
-      type a.
+  let handle_request : type a.
       External_validation.parameters ->
       state ->
       a External_validation.request ->
@@ -159,9 +158,9 @@ module Processing = struct
       in
       Lwt.return
         (`Continue
-          ( res,
-            {context_index; cache; cached_result; headless; profiler_headless}
-          ))
+           ( res,
+             {context_index; cache; cached_result; headless; profiler_headless}
+           ))
     in
     function
     | Commit_genesis {chain_id} ->
@@ -249,9 +248,9 @@ module Processing = struct
                   } )
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue
           block_application_result
@@ -326,9 +325,9 @@ module Processing = struct
           | Error _ as err -> Lwt.return (err, None)
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue res cache cachable_result (Some (report, profiler_report))
     | External_validation.Validate
@@ -379,9 +378,9 @@ module Processing = struct
                 operations)
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue
           block_validate_result

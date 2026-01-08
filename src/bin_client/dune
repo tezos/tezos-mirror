@@ -139,12 +139,18 @@
   (select void_for_linking-octez-protocol-021-PsQuebec-libs-plugin from
    (octez-protocol-021-PsQuebec-libs.plugin -> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin.empty)
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin.empty))
-  octez-protocol-022-PsRiotum-libs.client.commands-registration
-  octez-protocol-022-PsRiotum-libs.baking-commands.registration
-  octez-protocol-022-PsRiotum-libs.plugin
+  (select void_for_linking-octez-protocol-022-PsRiotum-libs-client-commands-registration from
+   (octez-protocol-022-PsRiotum-libs.client.commands-registration -> void_for_linking-octez-protocol-022-PsRiotum-libs-client-commands-registration.empty)
+   (-> void_for_linking-octez-protocol-022-PsRiotum-libs-client-commands-registration.empty))
+  (select void_for_linking-octez-protocol-022-PsRiotum-libs-plugin from
+   (octez-protocol-022-PsRiotum-libs.plugin -> void_for_linking-octez-protocol-022-PsRiotum-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-022-PsRiotum-libs-plugin.empty))
   octez-protocol-023-PtSeouLo-libs.client.commands-registration
   octez-protocol-023-PtSeouLo-libs.baking-commands.registration
   octez-protocol-023-PtSeouLo-libs.plugin
+  octez-protocol-024-PtTALLiN-libs.client.commands-registration
+  octez-protocol-024-PtTALLiN-libs.baking-commands.registration
+  octez-protocol-024-PtTALLiN-libs.plugin
   (select void_for_linking-octez-protocol-alpha-libs-client-commands-registration from
    (octez-protocol-alpha-libs.client.commands-registration -> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty))
@@ -212,6 +218,8 @@
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-client-commands-registration.empty "")
+   (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-baking-commands-registration.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin.empty ""))))

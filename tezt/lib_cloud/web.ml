@@ -39,16 +39,15 @@ let string_docker_command agent =
       let ssh_id = runner.Runner.ssh_id in
       String.concat
         " "
-        [
-          "ssh";
-          Format.asprintf "root@%s" (fst point);
-          "-p";
-          string_of_int (snd point);
-          "-o";
-          "StrictHostKeyChecking=no";
-          "-i";
-          ssh_id |> Option.get;
-        ]
+        ([
+           "ssh";
+           Format.asprintf "root@%s" (fst point);
+           "-p";
+           string_of_int (snd point);
+           "-i";
+           ssh_id |> Option.get;
+         ]
+        @ runner.options)
 
 let string_vm_command agent =
   match Agent.cmd_wrapper agent with
@@ -78,28 +77,41 @@ let agent_jingo_template agent =
   let open Jingoo.Jg_types in
   let Agent.Configuration.
         {
-          vm = {machine_type; docker_image; max_run_duration; binaries_path; os};
+          vm =
+            {
+              machine_type;
+              disk_type;
+              disk_size_gb;
+              docker_image;
+              dockerbuild_args = _;
+              max_run_duration;
+              binaries_path;
+              os;
+            };
           name;
         } =
     Agent.configuration agent
   in
   Tobj
-    [
-      ("name", Tstr name);
-      ("machine_type", Tstr machine_type);
-      ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
-      ( "max_run_duration",
-        Tstr
-          (Option.fold
-             ~none:"no limit"
-             ~some:(fun time -> string_of_int time ^ "s")
-             max_run_duration) );
-      ("binaries_path", Tstr binaries_path);
-      ("os", Tstr (Os.to_string os));
-      ("vm_command", Tstr (string_vm_command agent));
-      ("docker_command", Tstr (string_docker_command agent));
-      ("monitored_binaries", Tlist (monitored_binaries agent));
-    ]
+    ([
+       ("name", Tstr name);
+       ("machine_type", Tstr machine_type);
+       ("docker_image", Tstr (Format.asprintf "%a" pp_docker_image docker_image));
+       ( "max_run_duration",
+         Tstr
+           (Option.fold
+              ~none:"no limit"
+              ~some:(fun time -> string_of_int time ^ "s")
+              max_run_duration) );
+       ("binaries_path", Tstr binaries_path);
+       ("os", Tstr (Os.to_string os));
+       ("vm_command", Tstr (string_vm_command agent));
+       ("docker_command", Tstr (string_docker_command agent));
+       ("monitored_binaries", Tlist (monitored_binaries agent));
+     ]
+    @ (match disk_type with None -> [] | Some d -> [("disk_type", Tstr d)])
+    @
+    match disk_size_gb with None -> [] | Some s -> [("disk_size_gb", Tint s)])
 
 let monitoring_jingo_template agents agent =
   let open Jingoo.Jg_types in

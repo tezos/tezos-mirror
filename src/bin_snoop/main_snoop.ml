@@ -394,7 +394,8 @@ and infer_for_measurements ?local_model_name measurements
 
         List.fold_left
           (fun (overrides_map, scores_list, report)
-               (local_model_name, problem, solution) ->
+               (local_model_name, problem, solution)
+             ->
             let overrides_map =
               List.fold_left
                 (fun map (variable, solution) ->

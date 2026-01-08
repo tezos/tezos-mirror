@@ -168,7 +168,9 @@ let register_signer (module C : M) (cctxt : Client_context.io_wallet)
   let logger =
     (* overriding the logger we might already have with the one from
        module C *)
-    match C.logger with Some logger -> logger | None -> rpc_config.logger
+    match C.logger with
+    | Some logger -> logger
+    | None -> rpc_config.logger
   in
   let other_registrations, signing_version =
     match parsed_config_file with
@@ -458,6 +460,69 @@ let init_logging (module C : M) ?(parsed_args : Client_config.cli_args option)
       | None -> init ~config ()
       | Some config -> init ~config ())
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["client"]
+
+  let rand_seed_is_set =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"rand_seed_is_set"
+      ~msg:
+        (Format.sprintf
+           "%s is set, using fixed random seed ({seed})"
+           Client_config.client_fixed_random_seed_env_var)
+      ~pp1:Format.pp_print_int
+      ("seed", Data_encoding.int31)
+
+  let rand_seed_is_not_an_int =
+    declare_1
+      ~section
+      ~level:Error
+      ~name:"rand_seed_is_not_an_int"
+      ~msg:
+        (Format.sprintf
+           "%s is set to a non-integer value ({seed}), using self init random \
+            seed instead"
+           Client_config.client_fixed_random_seed_env_var)
+      ~pp1:Format.pp_print_string
+      ("seed", Data_encoding.string)
+
+  let rand_seed_not_allowed =
+    declare_0
+      ~section
+      ~level:Error
+      ~name:"rand_seed_not_allowed"
+      ~msg:
+        (Format.sprintf
+           "%s is set, but fixed random seed is not allowed in the current \
+            configuration"
+           Client_config.client_fixed_random_seed_env_var)
+      ()
+end
+
+type error += Rand_seed_not_allowed
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"client.randSeedNotAllowed"
+    ~title:"Random seed not allowed"
+    ~description:
+      "The environment variable for fixed random seed is set, but fixed random \
+       seed is not allowed in the current configuration."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The environment variable %s is set, but fixed random seed is not \
+         allowed in the current configuration."
+        Client_config.client_fixed_random_seed_env_var)
+    Data_encoding.unit
+    (function Rand_seed_not_allowed -> Some () | _ -> None)
+    (fun () -> Rand_seed_not_allowed)
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let open Lwt_result_syntax in
@@ -476,7 +541,6 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
     | _ :: args -> move_autocomplete_token_upfront [] args
     | [] -> ([], None)
   in
-  Random.self_init () ;
   ignore
     Tezos_clic.(
       setup_formatter
@@ -530,7 +594,7 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
                 ~base_dir
                 ()
           in
-          let rpc_config =
+          let* rpc_config =
             let rpc_config : RPC_client_unix.config =
               match parsed_config_file with
               | None -> RPC_client_unix.default_config
@@ -547,22 +611,57 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
             in
             match parsed_args with
             | Some parsed_args ->
+                (* check if fixed random seed is allowed and stop the program if
+                  not while the variable is set *)
+                let* _ =
+                  match
+                    Sys.getenv_opt
+                      Client_config.client_fixed_random_seed_env_var
+                  with
+                  | Some _ ->
+                      if not parsed_args.Client_config.allow_fixed_random_seed
+                      then
+                        let*! () = Events.(emit rand_seed_not_allowed) () in
+                        tzfail Rand_seed_not_allowed
+                      else return_unit
+                  | _ -> return_unit
+                in
+                (* Initialize RNG only after checking the gate. *)
+                let* () =
+                  match
+                    Sys.getenv_opt
+                      Client_config.client_fixed_random_seed_env_var
+                  with
+                  | None -> return @@ Random.self_init ()
+                  | Some seed_str -> (
+                      match int_of_string_opt seed_str with
+                      | Some seed ->
+                          let*! () = Events.(emit rand_seed_is_set) seed in
+                          return @@ Random.init seed
+                      | None ->
+                          let*! () =
+                            Events.(emit rand_seed_is_not_an_int) seed_str
+                          in
+                          return @@ Random.self_init ())
+                in
                 if parsed_args.Client_config.print_timings then
                   let gettimeofday = Unix.gettimeofday in
-                  {
-                    rpc_config with
-                    logger =
-                      RPC_client_unix.timings_logger
-                        ~gettimeofday
-                        Format.err_formatter;
-                  }
+                  return
+                    {
+                      rpc_config with
+                      logger =
+                        RPC_client_unix.timings_logger
+                          ~gettimeofday
+                          Format.err_formatter;
+                    }
                 else if parsed_args.Client_config.log_requests then
-                  {
-                    rpc_config with
-                    logger = RPC_client_unix.full_logger Format.err_formatter;
-                  }
-                else rpc_config
-            | None -> rpc_config
+                  return
+                    {
+                      rpc_config with
+                      logger = RPC_client_unix.full_logger Format.err_formatter;
+                    }
+                else return rpc_config
+            | None -> return rpc_config
           in
           let* client_config =
             setup_client_config

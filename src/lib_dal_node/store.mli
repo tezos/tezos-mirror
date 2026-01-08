@@ -40,6 +40,7 @@ module Shards : sig
 
   (** Same as [read_values] but for all possible shards of the given slot id. *)
   val read_all :
+    ?from_bytes:bytes ->
     t ->
     Types.slot_id ->
     number_of_shards:int ->
@@ -87,35 +88,19 @@ module Slot_id_cache : sig
   val find_opt : t -> Types.slot_id -> commitment option
 end
 
-module Statuses : sig
-  (** A store keeping the attestation status of slot ids. *)
+module Statuses_cache : sig
+  (** A cache keeping the attestation status of slot ids. *)
 
   type t
 
-  (** [update_selected_slot_headers_statuses ~block_level
-      ~attestation_lag ~number_of_slots attested is_attested store]
-      updates the status of all accepted slots at level [block_level -
-      attestation_lag] to either `Attested ([attested] returns [true])
-      or `Unattested (when [attested] returns [false]). *)
-  val update_selected_slot_headers_statuses :
-    block_level:int32 ->
-    attestation_lag:int ->
-    number_of_slots:int ->
-    (int -> bool) ->
-    t ->
-    unit tzresult Lwt.t
+  (** [update_slot_header_status store slot_id status] updates the status of the
+      [slot_id] to [status]. *)
+  val update_slot_header_status :
+    t -> Types.slot_id -> Types.header_status -> unit
 
-  (** [get_slot_status ~slot_id store] returns the status associated
-      to the given accepted [slot_id], or [None] if no status is
-      associated to the [slot_id]. *)
-  val get_slot_status :
-    slot_id:Types.slot_id ->
-    t ->
-    (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
-
-  (** [remove_level_status ~level store] removes the status of all the
-      slot ids published at the given level. *)
-  val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
+  (** [get_slot_status cache ~slot_id] returns the status associated
+      to the given [slot_id], if any. *)
+  val get_slot_status : t -> Types.slot_id -> Types.header_status option
 end
 
 module Commitment_indexed_cache : sig
@@ -152,6 +137,8 @@ module Traps : sig
   val find : t -> level:Types.level -> Types.trap list
 end
 
+module Chain_id : Single_value_store.S with type value = Chain_id.t
+
 module Last_processed_level : Single_value_store.S with type value = int32
 
 module First_seen_level : Single_value_store.S with type value = int32
@@ -164,8 +151,9 @@ end
 (** The DAL node store. *)
 type t
 
-(** [cache t] returns the cache associated with the store [t]. *)
-val cache :
+(** [not_yet_published_cache t] returns the cache for not-yet-published data
+    associated with the store [t]. *)
+val not_yet_published_cache :
   t -> (slot * share array * shard_proof array) Commitment_indexed_cache.t
 
 (** [first_seen_level t] returns the first seen level store associated
@@ -177,6 +165,9 @@ val first_seen_level : t -> First_seen_level.t
     maximum number of levels is given by {!Constants.slot_id_cache_size}.
     No more than [number_of_slots] commitments can be stored per level. *)
 val finalized_commitments : t -> Slot_id_cache.t
+
+(** [chain_id t] returns the chain_id store associated with the store [t]. *)
+val chain_id : t -> Chain_id.t
 
 (** [last_processed_level t] returns the last processed level store
     associated with the store [t]. *)
@@ -190,9 +181,9 @@ val shards : t -> Shards.t
     with the store [t]. *)
 val skip_list_cells : t -> Dal_store_sqlite3.Skip_list_cells.t
 
-(** [slot_header_statuses t] returns the statuses store  associated with the store
+(** [statuses_cache t] returns the statuses cache associated with the store
     [t]. *)
-val slot_header_statuses : t -> Statuses.t
+val statuses_cache : t -> Statuses_cache.t
 
 (** [slots t] returns the slots store associated with the store
     [t]. *)
@@ -203,8 +194,8 @@ val slots : t -> Slots.t
 val traps : t -> Traps.t
 
 (** [cache_entry store commitment entry] adds or replace an entry to
-    the cache with key [commitment]. *)
-val cache_entry :
+    the not-yet-published cache with key [commitment]. *)
+val cache_not_yet_published_entry :
   t ->
   commitment ->
   Cryptobox.slot ->
@@ -235,7 +226,7 @@ val add_slot_headers :
   block_level:int32 ->
   Dal_plugin.slot_header list ->
   t ->
-  unit tzresult Lwt.t
+  unit Lwt.t
 
 (** [Skip_list_cells] manages the storage of [Skip_list_cell.t] *)
 module Skip_list_cells : sig
@@ -249,32 +240,49 @@ module Skip_list_cells : sig
     Skip_list_hash.t ->
     Skip_list_cell.t option tzresult Lwt.t
 
-  (** [find_by_slot_id_opt ?conn store ~attested_level ~slot_index] returns the
-      cell associated to ([attested_level], [slot_index]) in the [store], if
-      any. *)
+  (** [find_by_slot_id_opt ?conn store slot_id] returns the cell and the
+      attestation lag associated to ([slot_id.slot_level], [slot_id.slot_index])
+      in the [store], if any. *)
   val find_by_slot_id_opt :
     ?conn:Sqlite.conn ->
     t ->
-    attested_level:int32 ->
-    slot_index:Types.slot_index ->
-    Dal_proto_types.Skip_list_cell.t option tzresult Lwt.t
+    Types.slot_id ->
+    (Dal_proto_types.Skip_list_cell.t * int) option tzresult Lwt.t
 
-  (** [insert ?conn store ~attested_level values] inserts the given list of [values]
-      associated to the given [attested_level] in the [store]. Any existing value
-      is overridden. *)
+  (** See {!Dal_store_sqlite3.Skip_list_cells.find_by_level}. *)
+  val find_by_level :
+    ?conn:Sqlite.conn ->
+    t ->
+    published_level:int32 ->
+    (Dal_proto_types.Skip_list_cell.t
+    * Dal_proto_types.Skip_list_hash.t
+    * Types.slot_index)
+    list
+    tzresult
+    Lwt.t
+
+  (** [insert ?conn store ~published_level ~attestation_lag values extract]
+      inserts the given list of [values] associated to the given
+      [published_level] in the [store], using [extract] for extracting needed
+      data from [values]. Any existing value is overridden. *)
   val insert :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
     attested_level:int32 ->
-    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
+    'a list ->
+    ('a ->
+    Skip_list_hash.t
+    * Skip_list_cell.t
+    * Types.slot_index
+    * Types.attestation_lag) ->
     unit tzresult Lwt.t
 
-  (** [remove ?conn store ~attested_level] removes any data related to [attested_level]
+  (** [remove ?conn store ~published_level] removes any data related to [published_level]
       from the [store]. *)
   val remove :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
-    attested_level:int32 ->
+    published_level:int32 ->
     unit tzresult Lwt.t
 
   (** [schemas data_dir] returns the list of SQL statements allowing

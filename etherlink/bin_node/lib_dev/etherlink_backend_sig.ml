@@ -35,7 +35,7 @@ module type S = sig
   val inject_transactions :
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
-    transactions:(string * Ethereum_types.legacy_transaction_object) list ->
+    transactions:(string * Transaction_object.t) list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)
@@ -63,7 +63,8 @@ module type S = sig
     returns the gas used to execute the call. *)
   val estimate_gas :
     Ethereum_types.call ->
-    Ethereum_types.Block_parameter.t ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.state_override ->
     Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [storage_at address pos block_param] returns the value at index

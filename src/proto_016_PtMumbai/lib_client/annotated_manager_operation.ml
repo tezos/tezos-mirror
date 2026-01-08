@@ -113,9 +113,8 @@ let manager_from_annotated operation =
   >|? fun counter ->
   Manager_operation {source; fee; counter; gas_limit; storage_limit; operation}
 
-let rec manager_list_from_annotated :
-    type kind. kind annotated_list -> kind Kind.manager contents_list tzresult =
-  function
+let rec manager_list_from_annotated : type kind.
+    kind annotated_list -> kind Kind.manager contents_list tzresult = function
   | Single_manager operation ->
       manager_from_annotated operation >|? fun op -> Single op
   | Cons_manager (operation, rest) ->

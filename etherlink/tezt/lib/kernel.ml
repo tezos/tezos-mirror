@@ -27,7 +27,19 @@ let of_tag_use u =
 
 let supports_dal = function Mainnet -> false | Latest -> true
 
-let supports_revm = function Mainnet -> false | Latest -> true
+let supports_revm = function
+  | kernel when kernel = Constant.WASM.evm_kernel -> true
+  | _ -> false
+
+let of_tag tag =
+  let contain_exp ~exp =
+    let re = Str.regexp_string exp in
+    try
+      ignore (Str.search_forward re tag 0) ;
+      true
+    with Not_found -> false
+  in
+  if contain_exp ~exp:"mainnet" then Mainnet else Latest
 
 (* Select the appropriate EVM version for the specified kernel.
 
@@ -35,8 +47,6 @@ let supports_revm = function Mainnet -> false | Latest -> true
    supporting configurable (overridable) EVM versions. *)
 let select_evm_version ?evm_version kernel =
   match (evm_version, kernel) with
-  | Some Evm_version.Shanghai, _ -> Evm_version.Shanghai
-  | None, Mainnet -> Evm_version.Cancun
-  | None, Latest -> Cancun
+  | _, Mainnet -> Evm_version.Prague
+  | None, Latest -> Evm_version.Osaka
   | Some v, Latest -> v
-  | _ -> Test.fail "Invalid combination of kernel and evm_version"

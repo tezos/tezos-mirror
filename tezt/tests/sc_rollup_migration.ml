@@ -946,12 +946,12 @@ let test_l2_migration_scenario_event ?parameters_ty
   scenario migrate_from rollup_node sc_rollup tezos_node tezos_client
 
 let test_refutation_migration_scenario ?(flaky = false) ?commitment_period
-    ?challenge_window ~variant ~mode ~kind scenario ~migrate_from ~migrate_to
-    ~migration_on_event =
+    ?challenge_window ~variant ~mode ~kind ?boot_sector ?(extra_tags = [])
+    scenario ~migrate_from ~migrate_to ~migration_on_event =
   let tags =
     (if flaky then [Tag.flaky] else [])
     @ ["refutation"]
-    @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
+    @ if mode = Sc_rollup_node.Accuser then ["accuser"] else [] @ extra_tags
   in
 
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
@@ -964,6 +964,7 @@ let test_refutation_migration_scenario ?(flaky = false) ?commitment_period
     ~rollup_node_name:"honest"
     ~tags
     ~variant
+    ?boot_sector
     ~description:"refutation games over migrations"
     ~migrate_from
     ~migrate_to
@@ -1026,6 +1027,52 @@ let test_refutation_migration ~migrate_from ~migrate_to =
         ])
     tests
 
+let test_refutation_migration_dal_parameters ~migrate_from ~migrate_to =
+  if Protocol.(number migrate_to >= 25) then
+    let from_params = Protocol.parameter_file migrate_from |> JSON.parse_file in
+    let to_params = Protocol.parameter_file migrate_to |> JSON.parse_file in
+    let reveal_dal_params params =
+      let number_of_slots =
+        JSON.(params |-> "dal_parametric" |-> "number_of_slots" |> as_int)
+      in
+      let attestation_lag =
+        JSON.(params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+      in
+      let slot_size =
+        JSON.(params |-> "dal_parametric" |-> "slot_size" |> as_int)
+      in
+      let page_size =
+        JSON.(params |-> "dal_parametric" |-> "page_size" |> as_int)
+      in
+      (number_of_slots, attestation_lag, slot_size, page_size)
+    in
+    let from_dal_params = reveal_dal_params from_params in
+    let to_dal_params = reveal_dal_params to_params in
+    if from_dal_params <> to_dal_params then
+      let p1, p2, p3, p4 = to_dal_params in
+      let loser_mode = sf "reveal_dal_parameters %d %d %d %d" p1 p2 p3 p4 in
+      (* We play a refutation game where the malicious rollup node plays the DAL
+          parameters of protocol P for commitments in protocol P-1. The refutation
+          game is played in protocol P, therefore, if the refutation game cannot
+          handle older parameters, malicious rollup node will not lose. *)
+      let kernel = Constant.WASM.echo_dal_reveal_parameters in
+      test_refutation_migration_scenario
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:10
+        ~commitment_period:5
+        ~variant:"reveal_dal_parameters"
+        ~boot_sector:(read_kernel ~base:"" ~suffix:"" @@ Uses.path kernel)
+        ~extra_tags:[Uses.tag kernel]
+        (refutation_scenario_parameters
+           ~loser_modes:[loser_mode]
+           (inputs_for 10)
+           ~final_level:50
+           ~priority:`Priority_honest)
+        ~migrate_from
+        ~migrate_to
+        ~migration_on_event:(commitment_computed_event ~inbox_level:5)
+
 let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_inbox ~kind ~migrate_from ~migrate_to ;
   test_migration_ticket_inbox ~kind ~migrate_from ~migrate_to ;
@@ -1040,7 +1087,8 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
 let register_migration_only_wasm ~migrate_from ~migrate_to =
-  test_refutation_migration ~migrate_from ~migrate_to
+  test_refutation_migration ~migrate_from ~migrate_to ;
+  test_refutation_migration_dal_parameters ~migrate_from ~migrate_to
 
 let register ~migrate_from ~migrate_to =
   register_migration ~kind:"arith" ~migrate_from ~migrate_to ;

@@ -69,11 +69,6 @@ val missing_blueprints :
     blueprints from level [min] to [max] because the rollup node is lagging. *)
 val catching_up : Z.t -> Z.t -> unit Lwt.t
 
-(** [blueprint_proposal level duration] advertizes the sequencer has crafted a
-    blueprint for [level] in [duration] time. *)
-val blueprint_proposal :
-  Ethereum_types.quantity -> Time.System.Span.t -> unit Lwt.t
-
 (** [blueprint_production level duration] advertizes the sequencer has fully
     produced a blueprint for [level] in [duration] time. *)
 val blueprint_production :

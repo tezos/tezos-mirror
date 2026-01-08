@@ -12,7 +12,8 @@
   octez-libs.crypto-dal
   octez-libs.base
   octez-libs.base.unix
-  octez-libs.cohttp-lwt-unix)
+  cohttp-lwt-unix
+  yaml)
  (flags
   (:standard)
   -open Tezt_wrapper

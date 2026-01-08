@@ -109,14 +109,12 @@ let respond_error ?status ?code ?headers media err =
     media
     (encode media Rpc_encodings.JSONRPC.error_encoding err)
 
-let get_params :
-    type params.
+let get_params : type params.
     Dream.request -> (unit, params) Path.t -> (params, string) result =
  fun request p ->
   let open Result_syntax in
-  let rec extract :
-      type param. (unit, param) Resto.Internal.path -> (param, string) result =
-    function
+  let rec extract : type param.
+      (unit, param) Resto.Internal.path -> (param, string) result = function
     | Root -> return_unit
     | Static (path, _s) -> extract path
     | Dynamic (path, arg) ->
@@ -156,8 +154,7 @@ let dream_path (path : _ Path.t) : string =
 let bad_request media msg =
   respond ~status:`Bad_Request media (encode media Data_encoding.string msg)
 
-let make_gen_route :
-    type params query input.
+let make_gen_route : type params query input.
     (_, _, params, query, input, _) Service.t ->
     (Dream.request ->
     params:params ->
@@ -309,15 +306,15 @@ let make_jsonrpc_websocket_route path
               send_error output_media websocket (Rpc_errors.internal_error msg))
         (Lwt_stream.wrap_exn stream)
     in
-    stopper () ;
     Stdlib.Hashtbl.remove subscriptions id ;
+    let* (_ : bool tzresult) = stopper () in
     return_unit
   in
   let async_write_stream subscription =
     Lwt.dont_wait
       (fun () -> write_stream subscription)
       (fun exn ->
-        subscription.stopper () ;
+        let (_ : bool tzresult Lwt.t) = subscription.stopper () in
         Stdlib.Hashtbl.remove subscriptions subscription.id ;
         Dream.error @@ fun log ->
         log
@@ -337,7 +334,11 @@ let make_jsonrpc_websocket_route path
            subscriptions)"
           (Dream.client request)
           (Stdlib.Hashtbl.length subscriptions) ;
-        Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
+        Stdlib.Hashtbl.iter
+          (fun _id stopper ->
+            let (_ : bool tzresult Lwt.t) = stopper () in
+            ())
+          subscriptions ;
         Stdlib.Hashtbl.clear subscriptions ;
         Dream.close_websocket websocket
     | Some message ->

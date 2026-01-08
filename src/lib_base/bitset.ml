@@ -11,7 +11,10 @@ type t = Z.t
 
 let encoding = Data_encoding.z
 
-type error += Invalid_position of int | Invalid_input of string
+type error +=
+  | Invalid_position of int
+  | Invalid_range of {pos : int; length : int}
+  | Invalid_input of string
 
 let () =
   let open Data_encoding in
@@ -23,6 +26,15 @@ let () =
     (obj1 (req "position" int31))
     (function Invalid_position i -> Some i | _ -> None)
     (fun i -> Invalid_position i) ;
+  register_error_kind
+    `Permanent
+    ~id:"bitfield_invalid_range"
+    ~title:"Invalid bitfield’s position range"
+    ~description:
+      "Bitfields do not accept non-positive length nor negative positions"
+    (obj2 (req "position" int31) (req "length" int31))
+    (function Invalid_range {pos; length} -> Some (pos, length) | _ -> None)
+    (fun (pos, length) -> Invalid_range {pos; length}) ;
   register_error_kind
     `Permanent
     ~id:"bitfield_invalid_input"
@@ -50,10 +62,29 @@ let add field pos =
   let* () = error_when Compare.Int.(pos < 0) (Invalid_position pos) in
   return @@ Z.logor field Z.(shift_left one pos)
 
+let add_many field pos length =
+  let open Result_syntax in
+  let* () =
+    error_when
+      Compare.Int.(pos < 0 || length <= 0)
+      (Invalid_range {pos; length})
+  in
+  return @@ Z.(logor field (shift_left (pred (shift_left one length)) pos))
+
 let remove field pos =
   let open Result_syntax in
   let* () = error_when Compare.Int.(pos < 0) (Invalid_position pos) in
   return @@ Z.logand field Z.(lognot (shift_left one pos))
+
+let remove_many field pos length =
+  let open Result_syntax in
+  let* () =
+    error_when
+      Compare.Int.(pos < 0 || length <= 0)
+      (Invalid_range {pos; length})
+  in
+  return
+  @@ Z.(logand field (lognot (shift_left (pred (shift_left one length)) pos)))
 
 let shift_right field ~offset =
   let open Result_syntax in

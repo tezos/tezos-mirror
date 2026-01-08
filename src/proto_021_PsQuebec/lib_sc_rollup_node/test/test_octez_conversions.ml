@@ -185,10 +185,11 @@ let gen_inbox =
     return (Sc_rollup.Inbox.finalize_inbox_level_no_history inbox witness)
   in
   return
-  @@ (witness_and_inbox |> function
-      | Ok v -> Sc_rollup_proto_types.Inbox.to_octez v
-      | Error e ->
-          Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
+  @@ ( witness_and_inbox |> function
+       | Ok v -> Sc_rollup_proto_types.Inbox.to_octez v
+       | Error e ->
+           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e)
+     )
 
 let number_of_slots = 256
 
@@ -227,8 +228,8 @@ let gen_slot_headers =
   let+ l = list_size size gen_slot_header in
   List.sort
     (fun (h1 : Octez_smart_rollup.Dal.Slot_header.t)
-         (h2 : Octez_smart_rollup.Dal.Slot_header.t) ->
-      compare_slot_header_id h1.id h2.id)
+         (h2 : Octez_smart_rollup.Dal.Slot_header.t)
+       -> compare_slot_header_id h1.id h2.id)
     l
   |> fun l ->
   match l with

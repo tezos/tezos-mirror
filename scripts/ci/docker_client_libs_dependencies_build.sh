@@ -78,6 +78,7 @@ if [ "$skip_registry_cache_check" = "true" ]; then
 fi
 echo "Build ${image_name}"
 
+# shellcheck disable=SC2046
 ./images/create_client_libs_dependencies_image.sh \
   "${image_base}" \
   "${image_tag}" \
@@ -89,7 +90,8 @@ echo "Build ${image_name}"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  -t "${image_base}:${docker_image_ref_tag}"
+  -t "${image_base}:${docker_image_ref_tag}" \
+  $(if [ "$skip_registry_cache_check" = "true" ]; then echo "--no-cache"; fi)
 
 ./images/client-libs-dependencies/check_versions.sh "${image_base}" "${image_tag}"
 

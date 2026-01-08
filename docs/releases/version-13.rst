@@ -13,7 +13,9 @@ your vote for the liquidity baking toggle, see :ref:`the changelog <changes_13_0
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v13.0

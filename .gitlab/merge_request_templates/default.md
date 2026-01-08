@@ -1,5 +1,5 @@
 <!--
-Thanks you for taking the time to contributing to the Tezos project!
+Thank you for taking the time to contributing to the Tezos project!
 
 Make sure to read our Contributing guide (https://tezos.gitlab.io/developer/contributing.html) and the Merge process description (https://tezos.gitlab.io/developer/merge_team.html). -->
 

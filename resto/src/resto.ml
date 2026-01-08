@@ -183,9 +183,8 @@ module Internal = struct
     | Dynamic (path, arg) -> Dynamic (subst1 path, arg)
     | DynamicTail (path, arg) -> DynamicTail (subst1 path, arg)
 
-  let rec subst3 :
-      type a b c d e. (a, ((a * c) * d) * e) path -> (b, ((b * c) * d) * e) path
-      = function
+  let rec subst3 : type a b c d e.
+      (a, ((a * c) * d) * e) path -> (b, ((b * c) * d) * e) path = function
     | Root -> assert false (* impossible *)
     | Static (path, name) -> Static (subst3 path, name)
     | Dynamic (path, arg) -> Dynamic (subst2 path, arg)
@@ -414,8 +413,7 @@ module Query = struct
 
   let query : 'b -> ('a, 'b, 'b) open_query = fun c fs -> (c, fs)
 
-  let app :
-      type a b c d.
+  let app : type a b c d.
       (a, b, c -> d) open_query -> (a, c) query_field -> (a, b, d) open_query =
    fun r f fs ->
     let c, fs = r (F1 (f, fs)) in
@@ -435,8 +433,8 @@ module Query = struct
   let fold_fields (type fs) ~f ~init fs =
     let rec loop : type f. _ -> (fs, f) query_fields -> _ =
      fun acc -> function
-      | F0 -> acc
-      | F1 (field, fs) -> loop (f acc (Field field)) fs
+       | F0 -> acc
+       | F1 (field, fs) -> loop (f acc (Field field)) fs
     in
     loop init fs
 
@@ -697,15 +695,14 @@ module MakeService (Encoding : ENCODING) = struct
     let to_service x = x
 
     type (_, _) eq =
-      | Eq
-          : ( ('query, 'input, 'output, 'error) types,
-              ('query, 'input, 'output, 'error) types )
-            eq
+      | Eq :
+          ( ('query, 'input, 'output, 'error) types,
+            ('query, 'input, 'output, 'error) types )
+          eq
 
     exception Not_equal
 
-    let eq :
-        type query1 input1 output1 error1 query2 input2 output2 error2.
+    let eq : type query1 input1 output1 error1 query2 input2 output2 error2.
         (query1, input1, output1, error1) types ->
         (query2, input2, output2, error2) types ->
         ( (query1, input1, output1, error1) types,
@@ -764,16 +761,16 @@ module MakeService (Encoding : ENCODING) = struct
       =
    fun {path; _} -> path
 
-  let input_encoding :
-      type pr p i q o e. (_, pr, p, q, i, o, e) service -> i input =
+  let input_encoding : type pr p i q o e.
+      (_, pr, p, q, i, o, e) service -> i input =
    fun {types; _} -> types.input
 
-  let output_encoding :
-      type pr p i q o e. (_, pr, p, q, i, o, e) service -> o Encoding.t =
+  let output_encoding : type pr p i q o e.
+      (_, pr, p, q, i, o, e) service -> o Encoding.t =
    fun {types; _} -> types.output
 
-  let error_encoding :
-      type pr p i q o e. (_, pr, p, q, i, o, e) service -> e Encoding.t =
+  let error_encoding : type pr p i q o e.
+      (_, pr, p, q, i, o, e) service -> e Encoding.t =
    fun {types; _} -> types.error
 
   type ('prefix, 'params, 'error) description_service =
@@ -801,8 +798,8 @@ module MakeService (Encoding : ENCODING) = struct
 
   let forge_request_args : type pr p. (pr, p) path -> p -> string list =
    fun path args ->
-    let rec forge_request_args :
-        type k. (pr, k) path -> k -> string list -> string list =
+    let rec forge_request_args : type k.
+        (pr, k) path -> k -> string list -> string list =
      fun path args acc ->
       match (path, args) with
       | Root, _ -> acc
@@ -842,8 +839,7 @@ module MakeService (Encoding : ENCODING) = struct
     in
     loop fields
 
-  let forge_partial_request :
-      type pr p i q o e.
+  let forge_partial_request : type pr p i q o e.
       (_, pr, p, q, i, o, e) service -> ?base:Uri.t -> p -> q -> i request =
    fun s ?base:(uri = Uri.empty) args query ->
     let path = String.concat "/" (forge_request_args s.path args) in

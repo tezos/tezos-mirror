@@ -48,4 +48,5 @@ module type Sigs = sig
   module type S = S
 
   module Unix : S
+  module Domain : S
 end

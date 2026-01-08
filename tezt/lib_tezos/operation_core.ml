@@ -376,17 +376,17 @@ let make_run_operation_input ?chain_id t client =
   let signature = Tezos_crypto.Signature.zero in
   return
     (`O
-      [
-        ( "operation",
-          `O
-            [
-              ("branch", `String t.branch);
-              ("contents", t.contents);
-              ( "signature",
-                `String (Tezos_crypto.Signature.to_b58check signature) );
-            ] );
-        ("chain_id", `String chain_id);
-      ])
+       [
+         ( "operation",
+           `O
+             [
+               ("branch", `String t.branch);
+               ("contents", t.contents);
+               ( "signature",
+                 `String (Tezos_crypto.Signature.to_b58check signature) );
+             ] );
+         ("chain_id", `String chain_id);
+       ])
 
 let make_preapply_operation_input ~protocol ~signature t =
   let protocol = Protocol.hash protocol in
@@ -507,36 +507,79 @@ module Consensus = struct
     in
     inject ?request ?force ?error ~protocol op client
 
-  let get_slots ~level client =
+  let get_rounds ~level ~protocol client =
     let* rpc_json =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_helper_validators ~level ()
     in
     let open JSON in
+    let list =
+      if Protocol.number protocol >= 024 then
+        match as_list rpc_json with
+        | [] | _ :: _ :: _ -> assert false
+        | [rpc_json] -> as_list (rpc_json |-> "delegates")
+      else as_list rpc_json
+    in
+    let rounds_name =
+      if Protocol.number protocol >= 024 then "rounds" else "slots"
+    in
     return
     @@ List.map
          (fun json ->
            let delegate = json |-> "delegate" |> as_string in
-           let slots = json |-> "slots" |> as_list |> List.map as_int in
+           let slots = json |-> rounds_name |> as_list |> List.map as_int in
            (delegate, slots))
-         (as_list rpc_json)
+         list
 
-  let get_slots_by_consensus_key ~level client =
-    let* rpc_json =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+  let get_attestation_slot_opt ~level ~protocol ?(delegate : Account.key option)
+      ?(consensus_key : Account.key option) client =
+    let () =
+      match (delegate, consensus_key) with
+      | Some _, Some _ ->
+          Test.fail
+            "get_attestation_slot: Cannot call function with both delegate and \
+             consensus key arguments"
+      | None, None ->
+          Test.fail
+            "get_attestation_slot: Must call function with either delegate or \
+             consensus key argument"
+      | Some _, None | None, Some _ -> ()
     in
-    let open JSON in
-    return
-    @@ List.map
-         (fun json ->
-           let consensus_key = json |-> "consensus_key" |> as_string in
-           let slots = json |-> "slots" |> as_list |> List.map as_int in
-           (consensus_key, slots))
-         (as_list rpc_json)
+    let get_pkh (x : Account.key) = x.public_key_hash in
+    let delegate = Option.map get_pkh delegate in
+    let consensus_key = Option.map get_pkh consensus_key in
+    let* rpc_json =
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_helper_validators
+           ~level
+           ?delegate
+           ?consensus_key
+           ()
+    in
+    try
+      if Protocol.number protocol >= 024 then
+        return
+        @@ Some
+             JSON.(
+               rpc_json |=> 0 |-> "delegates" |=> 0 |-> "attestation_slot"
+               |> as_int)
+      else return @@ Some JSON.(rpc_json |=> 0 |-> "slots" |=> 0 |> as_int)
+    with _ -> return None
 
-  let first_slot ~slots (delegate : Account.key) =
-    match List.assoc_opt delegate.public_key_hash slots with
-    | Some slots -> List.hd slots
-    | None -> Test.fail "No slots found for %s" delegate.public_key_hash
+  let get_attestation_slot ~level ~protocol ?(delegate : Account.key option)
+      ?(consensus_key : Account.key option) client =
+    let* r_opt =
+      get_attestation_slot_opt ~level ~protocol ?delegate ?consensus_key client
+    in
+    match r_opt with
+    | Some r -> return r
+    | None ->
+        let pkh =
+          let open Option in
+          if is_some delegate then (get delegate).public_key_hash
+          else (get consensus_key).public_key_hash
+        in
+        Test.fail "No slots found for %s" pkh
 
   let get_block_payload_hash ?block client =
     let* block_header =
@@ -682,7 +725,7 @@ module Anonymous = struct
              ("kind", Ezjsonm.string "dal_entrapment_evidence");
              ("attestation", attestation);
            ]
-          @ (if Protocol.(number protocol > number R022) then
+          @ (if Protocol.(number protocol > 22) then
                [("consensus_slot", json_of_int consensus_slot)]
              else [])
           @ [
@@ -720,7 +763,7 @@ module Anonymous = struct
     "vh3cjL2UL3p73CHhSLpAcLvB9obU9jSrRsu1Y9tg85os3i3akAig"
 
   let make_double_consensus_evidence_with_distinct_bph ~kind ~misbehaviour_level
-      ~misbehaviour_round ~culprit client =
+      ~misbehaviour_round ~culprit ~protocol client =
     let* slots =
       Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_helper_validators
@@ -729,8 +772,14 @@ module Anonymous = struct
            ()
     in
     let slot =
-      JSON.(
-        slots |> as_list |> List.hd |-> "slots" |> as_list |> List.hd |> as_int)
+      if Protocol.number protocol >= 024 then
+        JSON.(
+          slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+          |-> "slots" |> as_list |> List.hd |> as_int)
+      else
+        JSON.(
+          slots |> as_list |> List.hd |-> "slots" |> as_list |> List.hd
+          |> as_int)
     in
     let mk_consensus_op block_payload_hash =
       let consensus =
@@ -1184,3 +1233,10 @@ let outdated_dal_denunciation =
 
 let injection_error_unknown_branch =
   rex {|Operation ([\w\d]+) is branched on either:|}
+
+let dal_entrapment_wrong_commitment =
+  rex {|DAL shard proof error: Invalid shard \(for commitment = ([\w\d]+)\).|}
+
+let dal_entrapment_of_not_published_commitment =
+  rex
+    {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}

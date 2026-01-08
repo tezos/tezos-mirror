@@ -76,7 +76,7 @@ let find_sampling_level ctxt cycle =
   else if Compare.Int32.(current_raw < sampling_level) then
     return `Cycle_too_far_in_future
   else
-    let* first_level = First_level_of_protocol.get ctxt in
+    let* first_level = Protocol_activation_level.get ctxt in
     let first_level = Raw_level.to_int32 first_level in
     if Compare.Int32.(first_level <= sampling_level) then
       return (`Retry_at_level sampling_level)
@@ -224,7 +224,9 @@ let delegator_contribution ctxt ~delegate_pkh delegator =
     | Some {finalizable; unfinalizable} ->
         let* finalizable_sum =
           List.fold_left_e
-            (fun acc (request_delegate, _cycle, (amount : Alpha_context.Tez.t)) ->
+            (fun acc
+                 (request_delegate, _cycle, (amount : Alpha_context.Tez.t))
+               ->
               if Signature.Public_key_hash.(request_delegate <> delegate_pkh)
               then Alpha_context.Tez.(acc +? amount)
               else return acc)

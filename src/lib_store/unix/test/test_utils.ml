@@ -329,25 +329,9 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
         if with_gc then (
           register_gc store ;
           register_split store) ;
-        protect
-          ~on_error:(fun err ->
-            let*! () = Store.close_store store in
-            Lwt.return (Error err))
-          (fun () ->
-            Lwt.finalize
-              (fun () -> k (store_dir, data_dir) store)
-              (fun () ->
-                let*! () =
-                  Lwt.catch
-                    (fun () -> Store.close_store store)
-                    (fun _ ->
-                      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3305
-
-                         Avoid to re-raise Pack_error: "Double_close"
-                         when closing the Context multiple times.*)
-                      Lwt.return_unit)
-                in
-                Lwt.return_unit)))
+        Lwt.finalize
+          (fun () -> k (store_dir, data_dir) store)
+          (fun () -> Store.close_store store))
   in
   match r with
   | Error err ->

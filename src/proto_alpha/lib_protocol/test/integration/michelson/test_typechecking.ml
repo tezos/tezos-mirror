@@ -74,7 +74,7 @@ let test_unparse_view () =
   let* v = Incremental.begin_construction b in
   let ctx = Incremental.alpha_ctxt v in
   let*@ unparsed_script, _ctx =
-    Script_ir_translator.parse_and_unparse_script_unaccounted
+    Script_ir_translator.parse_and_unparse_michelson_script_unaccounted
       ctx
       ~legacy:true
       ~allow_forged_tickets_in_storage:false
@@ -539,8 +539,7 @@ let test_parse_comb_data () =
     let diff = {map = Big_map_overlay.empty; size = 0} in
     Big_map {id = Some big_map_id; diff; key_type = nat_ty; value_type = nat_ty}
   in
-  let ty_equal :
-      type a ac1 ac2.
+  let ty_equal : type a ac1 ac2.
       (a, ac1) Script_typed_ir.ty -> (a, ac2) Script_typed_ir.ty -> bool =
    fun ty1 ty2 ->
     match Script_typed_ir.(is_comparable ty1, is_comparable ty2) with
@@ -992,6 +991,10 @@ let tests =
       "forbidden CREATE_CONTRACT in view"
       `Quick
       (test_forbidden_op_in_view "CREATE_CONTRACT");
+    Tztest.tztest
+      "forbidden INDEX_ADDRESS in view"
+      `Quick
+      (test_forbidden_op_in_view "INDEX_ADDRESS");
     Tztest.tztest
       "parse contract data for rollup"
       `Quick

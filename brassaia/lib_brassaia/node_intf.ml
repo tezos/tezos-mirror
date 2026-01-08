@@ -129,10 +129,10 @@ module type Core = sig
       purpose (so [Tree.hash] and [Tree.equal] are not in the Lwt monad as
       well). *)
 
-  type effect := expected_depth:int -> node_key -> t option
+  type read_effect := expected_depth:int -> node_key -> t option
   (** The type for read effects. *)
 
-  val with_handler : (effect -> effect) -> t -> t
+  val with_handler : (read_effect -> read_effect) -> t -> t
   (** [with_handler f] replace the current effect handler [h] by [f h]. [f h]
       will be called for all the recursive read effects that are required by
       recursive operations on nodes. .*)
@@ -348,11 +348,12 @@ module type Sigs = sig
         (C : Contents.Store)
         (S : Indexable.S)
         (H : Hash.S with type t = S.hash)
-        (V : S
-               with type t = S.value
-                and type hash = H.t
-                and type contents_key = C.key
-                and type node_key = S.key) :
+        (V :
+          S
+            with type t = S.value
+             and type hash = H.t
+             and type contents_key = C.key
+             and type node_key = S.key) :
       Store
         with type 'a t = 'a C.t * 'a S.t
          and type key = S.key

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids] creates a DAL
+(** [create ~signer ~smart_rollup_address ~slot_ids] creates a DAL
     slot import signal for a given list [slot_ids] of slot_indices and their
     corresponding published leveles.  Returns an external message input to put
     in the inbox.

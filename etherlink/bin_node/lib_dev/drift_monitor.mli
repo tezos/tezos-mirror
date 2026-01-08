@@ -12,6 +12,7 @@
     It sets {!last_observed_drift} accordingly. *)
 val run :
   evm_node_endpoint:Uri.t ->
+  timeout:float ->
   (unit -> Ethereum_types.quantity Lwt.t) ->
   'a tzresult Lwt.t
 

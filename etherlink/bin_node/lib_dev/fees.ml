@@ -60,8 +60,8 @@ let gas_used_for_da_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
     let size_slot = Z.of_int 32 in
     let access_list_size =
       List.fold_left
-        (fun acc (_, slots) ->
-          let nb_slots = Z.of_int (List.length slots) in
+        (fun acc ({address = _; storage_keys} : Transaction_object.access) ->
+          let nb_slots = Z.of_int (List.length storage_keys) in
           let slots_cost = Z.mul size_slot nb_slots in
           Z.add (Z.add acc slots_cost) size_address)
         Z.zero

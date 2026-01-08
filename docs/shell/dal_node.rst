@@ -24,7 +24,7 @@ Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe
 
 Bootstrap nodes are DAL network entry points that are used for network discovery.
 A bootstrap node remains connected to a large number of peers and is subscribed to all topics.
-When a DAL node starts, it gets the URLs of the bootstrap nodes from its layer 1 node and uses these bootstrap nodes to connect to peers.
+When a DAL node starts, it gets the URLs of the bootstrap nodes from its Layer 1 node and uses these bootstrap nodes to connect to peers.
 When a DAL node does not have the necessary connections to the P2P network, bootstrap nodes provide connection points with the relevant topics.
 
 Modes
@@ -129,6 +129,16 @@ By default, the DAL node runs in controller mode without any profile.
 When a baker starts with the ``--dal-node`` argument, it checks the DAL node's configuration.
 If the DAL node is not in bootstrap mode and not already set up with the ``attester`` profile, the baker configures the DAL node to use the attester profile associated with the keys that it is using.
 
+Routing
+~~~~~~~
+
+DAL nodes must be able to initiate connections outside their local network and accept connections from outside their local network.
+By default, the DAL node accepts P2P connections on port 11732, but you can change the address and port that the node listens on by setting the ``--net-addr`` argument.
+In simple setups with a single DAL node, routing configuration is usually not necessary.
+However, if you are using a load balancer or running multiple DAL nodes, you may need to configure port forwarding on your router and the ports and addresses that the DAL nodes use.
+
+For more information, see :doc:`Routing <../user/routing>`.
+
 Storage
 ^^^^^^^
 
@@ -161,6 +171,7 @@ For instance, one can post slots, ask the node to compute and store shards, to u
 
 The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
 The RPC server is started by default, even if this option is not given.
+Look at  :ref:`openapi description<dal-node-openapi>` for the list of available RPC.
 
 
 Operational aspects

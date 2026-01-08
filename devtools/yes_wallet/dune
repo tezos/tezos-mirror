@@ -10,8 +10,8 @@
   ezjsonm
   octez-node-config
   octez-shell-libs.store
-  tezos-protocol-022-PsRiotum.protocol
   tezos-protocol-023-PtSeouLo.protocol
+  tezos-protocol-024-PtTALLiN.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags

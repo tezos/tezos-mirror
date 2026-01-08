@@ -110,8 +110,7 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
    fun w Loop -> accept (Worker.state w)
 

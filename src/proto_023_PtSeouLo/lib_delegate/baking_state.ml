@@ -32,25 +32,6 @@ module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : packed_operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : packed_operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
 }
@@ -81,7 +62,8 @@ let block_info_encoding =
            quorum;
            payload;
            grandparent;
-         } ->
+         }
+       ->
       ( hash,
         shell,
         payload_hash,
@@ -99,7 +81,8 @@ let block_info_encoding =
            prequorum,
            quorum,
            payload,
-           grandparent ) ->
+           grandparent )
+       ->
       {
         hash;
         shell;
@@ -123,12 +106,6 @@ let block_info_encoding =
        (req "grandparent" Block_hash.encoding))
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
-
-type delegate_slot = {
-  delegate : Delegate.t;
-  first_slot : Slot.t;
-  attesting_power : int;
-}
 
 module Delegate_slots = struct
   (* Note that we also use the delegate slots as proposal slots. *)
@@ -172,13 +149,6 @@ module Delegate_slots = struct
 end
 
 type delegate_slots = Delegate_slots.t
-
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
-
-type proposal = {block : block_info; predecessor : block_info}
 
 let proposal_encoding =
   let open Data_encoding in
@@ -313,22 +283,8 @@ type block_to_bake = {
 type consensus_vote_kind = Attestation | Preattestation
 
 let consensus_vote_kind_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"preattestation"
-        unit
-        (function Preattestation -> Some () | _ -> None)
-        (fun () -> Preattestation);
-      case
-        (Tag 1)
-        ~title:"attestation"
-        unit
-        (function Attestation -> Some () | _ -> None)
-        (fun () -> Attestation);
-    ]
+  Data_encoding.string_enum
+    [("preattestation", Preattestation); ("attestation", Attestation)]
 
 let pp_consensus_vote_kind fmt = function
   | Attestation -> Format.fprintf fmt "attestation"
@@ -594,40 +550,22 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
-let vote_kind_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"Preattestation"
-        unit
-        (function Preattestation -> Some () | _ -> None)
-        (fun () -> Preattestation);
-      case
-        (Tag 1)
-        ~title:"Attestation"
-        unit
-        (function Attestation -> Some () | _ -> None)
-        (fun () -> Attestation);
-    ]
+let dal_content_encoding =
+  Data_encoding.conv
+    (fun {attestation} -> attestation)
+    (fun attestation -> {attestation})
+    Dal.Attestation.encoding
 
 let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
-  let dal_content_encoding : dal_content encoding =
-    conv
-      (fun {attestation} -> attestation)
-      (fun attestation -> {attestation})
-      Dal.Attestation.encoding
-  in
   conv
     (fun {vote_kind; vote_consensus_content; delegate; dal_content} ->
       (vote_kind, vote_consensus_content, delegate, dal_content))
     (fun (vote_kind, vote_consensus_content, delegate, dal_content) ->
       {vote_kind; vote_consensus_content; delegate; dal_content})
     (obj4
-       (req "vote_kind" vote_kind_encoding)
-       (req "vote_consensus_content" consensus_content_encoding)
+       (req "operation_kind" consensus_vote_kind_encoding)
+       (req "consensus_content" consensus_content_encoding)
        (req "delegate" Delegate.encoding_for_logging__cannot_decode)
        (opt "dal_content" dal_content_encoding))
 
@@ -664,7 +602,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              operations;
              manager_operations_infos;
              baking_votes;
-           } ->
+           }
+         ->
         ( signed_block_header,
           round,
           delegate,
@@ -676,7 +615,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              delegate,
              operations,
              manager_operations_infos,
-             baking_votes ) ->
+             baking_votes )
+         ->
         {
           signed_block_header;
           round;
@@ -1003,13 +943,8 @@ let delegate_slots attesting_rights delegates =
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    (Plugin.RPC.Validators.get
-       cctxt
-       (chain, block)
-       ~levels:[level]
-     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+    Node_rpc.get_validators cctxt ~chain ~block ~levels:[level] ()
   in
   let*! delegate_slots =
     (delegate_slots
@@ -1322,6 +1257,101 @@ let pp_timeout_kind fmt = function
         "time to prepare next level block at round %a"
         Round.pp
         at_round
+
+let pp_dal_content fmt {attestation} =
+  Z.pp_print fmt (Environment.Bitset.to_z (attestation :> Environment.Bitset.t))
+
+let pp_kind_and_dal fmt {vote_kind; dal_content; _} =
+  match (vote_kind, dal_content) with
+  | Preattestation, _ -> Format.fprintf fmt "preattestation"
+  | Attestation, None -> Format.fprintf fmt "attestation (without DAL content)"
+  | Attestation, Some dal_attestation ->
+      Format.fprintf
+        fmt
+        "attestation (with DAL bitset %a)"
+        pp_dal_content
+        dal_attestation
+
+let pp_unsigned_consensus_vote fmt
+    ({
+       vote_kind;
+       vote_consensus_content = {level; round; _};
+       delegate;
+       dal_content;
+     } as t) =
+  let companion_key_is_relevant =
+    match (vote_kind, dal_content) with
+    | Attestation, Some _ -> Key.is_bls delegate.consensus_key
+    | Attestation, None | Preattestation, _ -> false
+  in
+  Format.fprintf
+    fmt
+    "%a@ for level %a, round %a@ for delegate@ %a"
+    pp_kind_and_dal
+    t
+    Protocol.Alpha_context.Raw_level.pp
+    level
+    Protocol.Alpha_context.Round.pp
+    round
+    (if companion_key_is_relevant then Delegate.pp
+     else Delegate.pp_without_companion_key)
+    delegate
+
+let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
+  pp_unsigned_consensus_vote fmt unsigned_consensus_vote
+
+let pp_forge_event fmt = function
+  | Block_ready {signed_block_header; round; delegate; _} ->
+      Format.fprintf
+        fmt
+        "block ready@ at level %ld, round %a@ for@ delegate@ %a "
+        signed_block_header.shell.level
+        Round.pp
+        round
+        Delegate.pp_without_companion_key
+        delegate
+  | Preattestation_ready signed_op | Attestation_ready signed_op ->
+      Format.fprintf
+        fmt
+        "operation ready:@ %a"
+        pp_signed_consensus_vote
+        signed_op
+
+let pp_event fmt = function
+  | New_valid_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new valid proposal received: %a"
+        pp_block_info
+        proposal.block
+  | New_head_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new head proposal received: %a"
+        pp_block_info
+        proposal.block
+  | Prequorum_reached (candidate, preattestations) ->
+      Format.fprintf
+        fmt
+        "prequorum reached with %d preattestations for %a at round %a"
+        (List.length preattestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | Quorum_reached (candidate, attestations) ->
+      Format.fprintf
+        fmt
+        "quorum reached with %d attestations for %a at round %a"
+        (List.length attestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | New_forge_event forge_event ->
+      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
+  | Timeout kind ->
+      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
 
 let pp_short_event fmt =
   let open Format in

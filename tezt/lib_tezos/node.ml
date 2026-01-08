@@ -249,8 +249,9 @@ let pid node =
 
 let path node = node.path
 
-let spawn_command node =
+let spawn_command ?env node =
   Process.spawn
+    ?env
     ?runner:node.persistent_state.runner
     ~name:node.name
     ~color:node.color
@@ -446,19 +447,52 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
-  let rionet_network_config : JSON.u =
+  (* Copied from Octez_node_config.Config_file *)
+  let shadownet_network_config : JSON.u =
     `O
       [
         ( "genesis",
           mk_genesis
-            ~timestamp:"2025-02-19T12:45:00Z"
-            ~block:"BLsnvEitopA3xXTH7sVyAXiaL7s4MjPDmRhgmek3gxjHi9gRFGZ"
+            ~timestamp:"2025-08-07T20:00:00Z"
+            ~block:"BMJTFWBgqGUzsvW4JLS1XuCYnpH18pBsLb5UvPCv2eiNC5vUeps"
             ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
         ( "genesis_parameters",
           mk_genesis_parameters
             ~genesis_pubkey:
               "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
-        ("chain_name", `String "TEZOS_RIONET_2025-02-19T12:45:00Z");
+        ("chain_name", `String "TEZOS_SHADOWNET_2025-08-07T20:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  let seoulnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2025-07-11T08:00:00Z"
+            ~block:"BLQGRyv3v92oE9iM4BGWwWpy6NxcDFPb7NLsNeuRVr3TYidU7MC"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
+        ("chain_name", `String "TEZOS_SEOULNET_2025-07-11T08:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  let tallinnnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2025-11-18T21:00:00Z"
+            ~block:"BMQuJ7YgLaLUiyiSWmGma5LwkEFBAmksDFmocyEUe59yVav7wfC"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
+        ("chain_name", `String "TEZOS_TALLINNNET_2025-11-18T21:00:00Z");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
@@ -531,13 +565,14 @@ module Config_file = struct
       JSON.annotate
         ~origin:"dal_initialisation"
         (`O
-          [
-            ("activated", `Bool dal_config.activated);
-            ( "bootstrap_peers",
-              `A
-                (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)
-            );
-          ])
+           [
+             ("activated", `Bool dal_config.activated);
+             ( "bootstrap_peers",
+               `A
+                 (List.map
+                    (fun peer -> `String peer)
+                    dal_config.bootstrap_peers) );
+           ])
     in
     let network =
       JSON.unannotate JSON.(old_config |-> "network")
@@ -579,10 +614,20 @@ module Config_file = struct
       ?user_activated_upgrades
       ("set_ghostnet_sandbox_network", ghostnet_sandbox_network_config)
 
-  let set_rionet_network ?user_activated_upgrades () =
+  let set_seoulnet_network ?user_activated_upgrades () =
     set_network
       ?user_activated_upgrades
-      ("set_rionet_network", rionet_network_config)
+      ("set_seoulnet_network", seoulnet_network_config)
+
+  let set_tallinnnet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_tallinnnet_network", tallinnnet_network_config)
+
+  let set_shadownet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_shadownet_network", shadownet_network_config)
 end
 
 type snapshot_history_mode = Rolling_history | Full_history
@@ -614,9 +659,10 @@ let spawn_snapshot_info ?(json = false) node file =
 let snapshot_info ?json node file =
   spawn_snapshot_info ?json node file |> Process.check_and_read_stdout
 
-let spawn_snapshot_import ?(force = false) ?(no_check = false)
+let spawn_snapshot_import ?env ?(force = false) ?(no_check = false)
     ?(reconstruct = false) node file =
   spawn_command
+    ?env
     node
     (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
     @ (if reconstruct then ["--reconstruct"] else [])
@@ -624,8 +670,9 @@ let spawn_snapshot_import ?(force = false) ?(no_check = false)
     @ (if force then ["--force"] else [])
     @ [file])
 
-let snapshot_import ?force ?no_check ?reconstruct node file =
-  spawn_snapshot_import ?force ?no_check ?reconstruct node file |> Process.check
+let snapshot_import ?env ?force ?no_check ?reconstruct node file =
+  spawn_snapshot_import ?env ?force ?no_check ?reconstruct node file
+  |> Process.check
 
 let spawn_reconstruct node =
   spawn_command
@@ -1156,10 +1203,10 @@ let send_raw_data node ~data =
       if len = 0 then Lwt.return_unit
       else
         Lwt.bind (Lwt_unix.write_string descr buf pos len) (function
-            | 0 ->
-                Lwt.fail End_of_file
-                (* other endpoint cleanly closed its connection *)
-            | nb_written -> inner (pos + nb_written) (len - nb_written))
+          | 0 ->
+              Lwt.fail End_of_file
+              (* other endpoint cleanly closed its connection *)
+          | nb_written -> inner (pos + nb_written) (len - nb_written))
     in
     inner pos len
   in

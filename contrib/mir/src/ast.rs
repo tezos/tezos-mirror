@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! AST definitions for raw ([Micheline]) and typed representations of
 //! Michelson.
@@ -14,12 +11,9 @@ pub mod byte_repr_trait;
 mod comparable;
 pub mod micheline;
 pub mod michelson_address;
-pub mod michelson_key;
-pub mod michelson_key_hash;
 pub mod michelson_lambda;
 pub mod michelson_list;
 pub mod michelson_operation;
-pub mod michelson_signature;
 pub mod or;
 pub mod overloads;
 
@@ -30,9 +24,11 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
+use tezos_crypto_rs::public_key::PublicKey;
 /// Reexported from [tezos_crypto_rs::hash]. Typechecked values of the Michelson
 /// type `chain_id`.
-pub use tezos_crypto_rs::hash::ChainId;
+pub use tezos_crypto_rs::{hash::ChainId, public_key_hash::PublicKeyHash};
+pub use tezos_data_encoding::enc::BinWriter;
 use typed_arena::Arena;
 
 use crate::lexer::Prim;
@@ -45,23 +41,21 @@ pub use big_map::BigMap;
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
 pub use michelson_address::*;
-pub use michelson_key::Key;
-pub use michelson_key_hash::KeyHash;
 pub use michelson_lambda::{Closure, Lambda};
 pub use michelson_list::MichelsonList;
 pub use michelson_operation::{
     CreateContract, Emit, Operation, OperationInfo, SetDelegate, TransferTokens,
 };
-pub use michelson_signature::Signature;
 pub use or::Or;
-
-use self::entrypoint::Direction;
+pub use tezos_crypto_rs::signature::Signature;
 
 /// Representation for values of the Michelson `ticket` type.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ticket<'a> {
     /// Ticketer, the address of the contract that issued the ticket.
     pub ticketer: AddressHash,
+    /// Type of the payload.
+    pub content_type: Type,
     /// Ticket payload.
     pub content: TypedValue<'a>,
     /// Ticket amount.
@@ -215,7 +209,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             }
         }
 
-        impl<'a> ExactSizeIterator for LinearizePairIter<'a> {}
+        impl ExactSizeIterator for LinearizePairIter<'_> {}
 
         match self {
             Nat => Micheline::prim0(Prim::nat),
@@ -332,10 +326,10 @@ pub enum TypedValue<'a> {
     ChainId(ChainId),
     Contract(Address),
     Bytes(Vec<u8>),
-    Key(Key),
+    Key(PublicKey),
     Signature(Signature),
     Lambda(Closure<'a>),
-    KeyHash(KeyHash),
+    KeyHash(PublicKeyHash),
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
     Timestamp(BigInt),
@@ -359,8 +353,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         };
         match self {
             TV::Int(i) => V::Int(i),
-            TV::Nat(u) => V::Int(u.try_into().unwrap()),
-            TV::Mutez(u) => V::Int(u.try_into().unwrap()),
+            TV::Nat(u) => V::Int(u.into()),
+            TV::Mutez(u) => V::Int(u.into()),
             TV::Bool(true) => V::prim0(Prim::True),
             TV::Bool(false) => V::prim0(Prim::False),
             TV::String(s) => V::String(s),
@@ -376,21 +370,28 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 m.into_iter()
                     .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
             )),
-            TV::BigMap(m) => {
-                let id_part = m.id.map(|i| V::Int(i.0));
-                let overlay_empty = m.overlay.is_empty();
-                let map_part = V::Seq(V::alloc_iter(
+            TV::BigMap(m) => match m.content {
+                big_map::BigMapContent::InMemory(m) => V::Seq(V::alloc_iter(
                     arena,
-                    m.overlay.into_iter().map(|(key, val)| {
-                        V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
-                    }),
-                ));
-                match id_part {
-                    Some(id_part) if overlay_empty => id_part,
-                    Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
-                    None => map_part,
+                    m.into_iter()
+                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+                )),
+                big_map::BigMapContent::FromId(m) => {
+                    let id_part = V::Int(m.id.value.into());
+                    let overlay_empty = m.overlay.is_empty();
+                    let map_part = V::Seq(V::alloc_iter(
+                        arena,
+                        m.overlay.into_iter().map(|(key, val)| {
+                            V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
+                        }),
+                    ));
+                    if overlay_empty {
+                        id_part
+                    } else {
+                        V::prim2(arena, Prim::Pair, id_part, map_part)
+                    }
                 }
-            }
+            },
             TV::Option(x) => option_into_micheline(x.map(|v| *v)),
             TV::Or(or) => match *or {
                 Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
@@ -399,10 +400,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Address(x) => V::Bytes(x.to_bytes_vec()),
             TV::ChainId(x) => V::Bytes(x.into()),
             TV::Bytes(x) => V::Bytes(x),
-            TV::Key(k) => V::Bytes(k.to_bytes_vec()),
-            TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Key(k) => V::Bytes(k.to_bytes().unwrap()),
+            TV::Signature(s) => V::Bytes(s.into()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
-            TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+            TV::KeyHash(s) => V::Bytes(s.to_bytes().unwrap()),
             TV::Timestamp(s) => V::Int(s),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
@@ -627,7 +628,7 @@ pub enum Instruction<'a> {
     Right,
     Lambda(Lambda<'a>),
     Exec,
-    Ticket,
+    Ticket(Type),
     HashKey,
     Apply {
         arg_ty: Type,
@@ -649,6 +650,7 @@ pub enum Instruction<'a> {
     Source,
     Now,
     ImplicitAccount,
+    IsImplicitAccount,
     TotalVotingPower,
     VotingPower,
     /// Here entrypoint is not an optional value because explicit default entrypoints are forbidden
@@ -663,6 +665,21 @@ pub enum Instruction<'a> {
     },
     CreateContract(Rc<ContractScript<'a>>, &'a Micheline<'a>),
     Map(overloads::Map, Vec<Self>),
+    IView {
+        name: String,
+        return_type: Type,
+    },
+}
+
+/// An untyped view, as it appears in a script
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct View<'a> {
+    /// Input type of the view
+    pub input_type: Type,
+    /// Output type of the view
+    pub output_type: Type,
+    /// Code of the view
+    pub code: Micheline<'a>,
 }
 
 /// A full typechecked contract script.
@@ -676,9 +693,25 @@ pub struct ContractScript<'a> {
     pub code: Instruction<'a>,
     /// Script entrypoints.
     pub annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    /// Views. Corresponds to the script's `view` fields.
+    pub views: HashMap<String, View<'a>>,
 }
 
+/// Enum representing each layer to achieve a given entrypoint
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Direction {
+    /// Left
+    Left,
+    /// Right
+    Right,
+}
+
+/// A structure mapping from entrypoints to their types. This is simply an alias
+/// for a [HashMap].
+pub type Entrypoints = HashMap<Entrypoint, Type>;
+
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_strategies {
     use proptest::prelude::*;
 
@@ -746,11 +779,16 @@ pub mod test_strategies {
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(Type::new_ticket),
-                (inner.clone(), inner)
+                (inner.clone(), inner.clone())
                     .prop_filter("Key must be comparable", |(k, _)| k
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(|(k, v)| Type::new_map(k, v)),
+                (inner.clone(), inner)
+                    .prop_filter("Key must be comparable", |(k, _)| k
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(|(k, v)| Type::new_big_map(k, v)),
             ]
         })
     }
@@ -794,13 +832,15 @@ pub mod test_strategies {
                     .boxed()
             }
             T::Ticket(t) => {
-                (typed_value_by_type(t), (1u64..100u64))
-                    .prop_map(|(content, amount)| V::new_ticket(Ticket {
-                        ticketer: AddressHash::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
-                        content,
-                        amount: amount.into(),
-                    }
-                    ))
+                (Just(t.as_ref().clone()), typed_value_by_type(t), (1u64..100u64))
+                    .prop_map(|(content_type, content, amount)|
+                              V::new_ticket(Ticket {
+                                  ticketer: AddressHash::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
+                                  content_type,
+                                  content,
+                                  amount: amount.into(),
+                              }
+                              ))
                     .boxed()
             }
             T::Option(t) => prop_oneof![
@@ -831,6 +871,25 @@ pub mod test_strategies {
                 )
                 .prop_map(V::Map)
                 .boxed()
+            }
+            // We don't generate all the allowed syntaxes for big maps
+            // but only id-free ones because these are the only ones
+            // which can be typechecked in any context.
+            T::BigMap(m) => {
+                let (key_ty, val_ty) = m.as_ref();
+                (Just(key_ty.clone()), Just(val_ty.clone()), prop::collection::btree_map(
+                    typed_value_by_type(key_ty),
+                    typed_value_by_type(val_ty),
+                    0..=3,
+                ))
+                    .prop_map(|(key_type, value_type, map)|
+                              {
+                                  let content = big_map::BigMapContent::InMemory(map);
+                                  V::BigMap(BigMap {
+                                      content,
+                                      key_type,
+                                      value_type,
+                                  })}).boxed()
             }
             T::Address => prop_oneof![
                 Just(V::Address(
@@ -864,28 +923,28 @@ pub mod test_strategies {
             .boxed(),
             T::Key => prop_oneof![
                 Just(V::Key(
-                    Key::from_base58_check("edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu").unwrap()
+                    PublicKey::from_b58check("edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+                    PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
+                    PublicKey::from_b58check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
+                    PublicKey::from_b58check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+                    PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB").unwrap()
+                    PublicKey::from_b58check("p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk").unwrap()
+                    PublicKey::from_b58check("p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G").unwrap()
+                    PublicKey::from_b58check("BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G").unwrap()
                 )),
             ]
                 .boxed(),
@@ -893,7 +952,7 @@ pub mod test_strategies {
                 Just(V::Signature( Signature::from_base58_check("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F").unwrap())).boxed(),
             T::KeyHash =>
                 Just(V::KeyHash(
-                    KeyHash::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
+                    PublicKeyHash::from_b58check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
                 )).boxed(),
             #[cfg(feature = "bls")]
             T::Bls12381Fr =>
@@ -906,7 +965,6 @@ pub mod test_strategies {
                 Just(V::Bls12381G2(Box::new(bls::g2::G2::zero()))).boxed(),
             T::Contract(_) => panic!("Cannot generate typed value for contract"),
             T::Operation => panic!("Cannot generate typed value for operation"),
-            T::BigMap(_) => panic!("Cannot generate typed value for big_map"),
             T::Lambda(_) => panic!("Cannot generate typed value for lambda"),
             T::Never =>  panic!("Cannot generate typed value for never"),
             // NOTE: if you append clauses here, you likely need to update other generators too
@@ -930,5 +988,15 @@ mod test_untypers {
             let typed_ = typecheck_value(&untyped, &mut ctx, &typed.ty);
             assert_eq!(typed_, Ok(typed.val))
         }
+    }
+
+    // We used to have a bug in which a panic was raised in the
+    // following case, this test is there to avoid a regression.
+    #[test]
+    fn test_big_map_without_id() {
+        let arena = Arena::new();
+        let mut m = BigMap::empty(Type::Nat, Type::Unit);
+        m.update(TypedValue::Nat(0u32.into()), None);
+        TypedValue::BigMap(m).into_micheline_optimized_legacy(&arena);
     }
 }

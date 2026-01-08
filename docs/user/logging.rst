@@ -67,7 +67,7 @@ and for making the API consistent; most Unix-ish systems nowadays have
 used with ``file-descriptor-path`` (with some precautions).
 
 The path of the URI is used by ``file-descriptor-path`` to choose the
-path to write to and ignored for the other two.
+path to write to and ignored for the other three.
 
 The query of the URI is used to further configure the sink instance.
 
@@ -224,14 +224,17 @@ By default, the Octez binaries generate **user logs** as follows:
 The node and the baker additionally generate by default more detailed
 **internal logs** as follows:
 
-- A file-descriptor-sink is activated to store logs from last seven days with an
+- A file-descriptor-path sink is activated to store logs from last seven days with an
   ``Info`` level. For the node, the path is ``<node-data-dir>/daily-logs/``. For
   other tools, see the corresponding sections in this page.
 
-JSON Configuration Format
--------------------------
+Configuration blob
+------------------
 
-A configuration JSON blob, is an object with one field ``"active_sinks"``
+Configuration blobs are used in various places: node configuration file,
+logging-configuration RPC, etc.
+
+A configuration blob is a JSON object with one field ``"active_sinks"``
 which contains a list of URIs:
 
 .. code:: javascript
@@ -240,11 +243,40 @@ which contains a list of URIs:
      "active_sinks": [ <list-of-sink-URIs> ]
    }
 
-The URIs are discriminated among the sink implementations above using
-their schemes and activated.
+The URIs, which are sink implementations taking any of the forms above, are
+configured according to their schemes and queries, and activated.
 
-It is used in various places: node configuration file,
-logging-configuration RPC, etc.
+In the following example two sinks are defined.
+
+.. code:: javascript
+
+   "active_sinks": [
+     "file-descriptor-stdout://?format=pp&level-at-least=notice&advertise-levels=true",
+     "file-descriptor-path://<path_to_log>/daily.log?daily-logs=7&format=one-per-line&level-at-least=info&create-dirs=true&chmod=0o640"
+   ]
+
+
+- The first one defines a sink on stdout that will print the logs at level at
+  least ``notice`` using the ``pp`` format and with advertise levels:
+
+.. code::
+
+   <005> 2025-10-10T12:33:27.197-00:00 [agnostic-agent.period_status] new block (BLfoQ7p5cV5nyyiSPFenQxmQfvqi8oqZbqvmG1rL3qwcnYD1F5U) on proposal period (remaining period duration 199)
+   <005> 2025-10-10T12:33:27.198-00:00 [023-PtSeouLo.delegate.denunciation.accuser_processed_block] block BLfoQ7p5cV5nyyiSPFenQxmQfvqi8oqZbqvmG1rL3qwcnYD1F5U registered
+
+- The second one defines rotated logs. Daily logs will be written in the
+  ``<path_to_log>/`` directory with a rotation every 7 days. Here, the format
+  will be ``one-per-line`` and level at least ``info`` giving more informative
+  logs.
+
+.. code::
+
+   {"fd-sink-item.v0":{"hostname":"host","time_stamp":1759939740.311383,"section":["agnostic-agent"],"event":{"period_status.v0":{"block":"BLkzCnfm6XYth9rZ4axJBAjpc5dnt23b9aZsrHchxAeDVbVMzj6","period":"proposal","remaining":100859}}}}
+   {"fd-sink-item.v0":{"hostname":"host","time_stamp":1759939748.555863,"section":["agnostic-agent"],"event":{"period_status.v0":{"block":"BMDApJyvZiZKkpgeTfupLGPwxrsYoU2hwaLcdn5H4g4fxRb3zmh","period":"proposal","remaining":100858}}}}
+
+This configuration blob should be included in ``"internal-events"`` of node config file and in
+``"internal_events"`` for client, accuser, baker config file.
+
 
 Environment Variables
 ---------------------
@@ -340,7 +372,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and baker configuration
 ------------------------------
 
-Both ``octez-client`` and ``octez-{baker,accuser}-*`` can be configured either
+Both ``octez-client`` and ``octez-{baker,accuser}`` can be configured either
 using environment variables or using ``internal-events`` in the client configuration
 file, with the file-descriptor sinks described above.
 
@@ -349,8 +381,8 @@ all the interactions with the node (but it does *not* use the logging
 framework).
 
 By default, the baker also generates internal logs, which are stored at
-``<client-base-dir>/logs/octez-baker-<protocol-name>/*``. Hence, running two bakers
-(for two different accounts) using the same protocol with the same base
+``<client-base-dir>/logs/octez-baker/*``. Hence, running two bakers
+(for two different accounts) with the same base
 directory is not recommended.
 
 Processing Structured Events

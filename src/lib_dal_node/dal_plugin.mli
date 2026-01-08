@@ -33,6 +33,8 @@ type operation_application_result =
 
 type slot_index = int
 
+type attestation_lag = int
+
 (** Information extracted from DAL slots headers operations included in L1
     blocks. Each slot header is made of an L1 level for which it is published,
     the slot's index and commitment. *)
@@ -52,6 +54,10 @@ module type T = sig
   type attestation_operation
 
   type tb_slot
+
+  (** [tb_slot_to_int tb_slot] returns the integer representation of a
+      [tb_slot]. *)
+  val tb_slot_to_int : tb_slot -> int
 
   (** [block_info ?chain ?block ~operations_metadata ctxt] returns the
       information of the [block] in [ctxt] for the given [chain]. Operations'
@@ -76,29 +82,25 @@ module type T = sig
     Tezos_rpc__RPC_context.generic ->
     slot_header list tzresult Lwt.t
 
-  (** For a given block, returns for each included attestation, as a
-      list, its Tenderbake slot, its attester if available in the
-      operation receipt, its [attestation] operation and, if it
-      exists, its [dal_attestation] to be passed to the [is_attested]
-      function. *)
+  (** For a given block, returns for each included attestation, as a list, its
+      Tenderbake slot, its [attestation] operation and, if it exists, its
+      [dal_attestation] to be passed to the [is_attested] function. *)
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot
-    * Signature.public_key_hash option
-    * attestation_operation
-    * dal_attestation option)
-    list
-    tzresult
+    (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
-  (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
-      map that associates to the public key hash [pkh] of the member of
-      the committee its assigned shard indexes. *)
-  val get_committee :
+  (** [get_committees ctxt ~level] retrieves the DAL and Tenderbake attestation
+      committees at [level] from L1 as a map that associates to the public key
+      hash [pkh] of the member of the committee its assigned shard indexes and
+      attestation slot. Retrieving the attestation slot is particularly useful
+      to associate attestations to their senders without relying on a delegate
+      pkh.*)
+  val get_committees :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
+    (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   (** [dal_attestation block_info] returns the metadata of the given
       [block_info] as an abstract value of type [dal_attestation] to be passed
@@ -134,6 +136,20 @@ module type T = sig
     tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
+  (** This function constructs and injects the L1 publication operation.
+      It is meant to be used in a test context, as it requires the explicit
+      provision of the secret key, which is not desirable in production. *)
+  val publish :
+    Tezos_rpc.Context.generic ->
+    block_level:int32 ->
+    source:Signature.Public_key_hash.t ->
+    slot_index:slot_index ->
+    commitment:Tezos_crypto_dal.Cryptobox.commitment ->
+    commitment_proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
+    src_sk:Signature.Secret_key.t ->
+    unit ->
+    Operation_hash.t tzresult Lwt.t
+
   val is_delegate :
     Tezos_rpc.Context.generic ->
     pkh:Signature.Public_key_hash.t ->
@@ -156,6 +172,17 @@ module type T = sig
 
     val cell_hash : cell -> hash
 
+    (** [back_pointer cell ~index:i] returns [Ok (Some hash)] if [hash] is the
+        [i]-th back pointer of [cell]. Returns [Ok None] if the cell contains
+        fewer than [i + 1] back pointers.
+
+        [back_pointer cell ~index:0] returns the {!hash} of the previous cell,
+        if any.
+
+        The function returns [Error ()] for older protocols that don't expose
+        the needed function to access cells' back pointers. *)
+    val back_pointer : cell -> index:int -> (hash option, unit) result
+
     (* Returns the DAL skip list cells produced at the given attested level.
        Each cell is associated with its hash and slot index. There are
        [number_of_slots] cells per level. *)
@@ -165,11 +192,20 @@ module type T = sig
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
-      (hash * cell * slot_index) list tzresult Lwt.t
+      (hash * cell * slot_index * attestation_lag) list tzresult Lwt.t
 
     (** Extracts and returns the slot header of the given cell if it was
         published to L1. *)
     val slot_header_of_cell : cell -> slot_header option
+
+    (** Returns [Some (`Attested | `Unattested | `Unpublished)] when the protocol
+       attestation status of the given cell is attested, unattested, or
+       unpublished.
+
+       The function returns [None] for older protocols that do not expose
+       the necessary information to access the status. *)
+    val proto_attestation_status :
+      cell -> [`Attested of attestation_lag | `Unattested | `Unpublished] option
   end
 
   module RPC : sig

@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -32,6 +32,12 @@ module World_state = struct
   let root = "/world_state"
 
   let make s = EVM.make (root ^ s)
+end
+
+module Single_tx = struct
+  let single_tx_path = World_state.make "/single_tx"
+
+  let input_tx = single_tx_path ^ "/input_tx"
 end
 
 let etherlink_root = World_state.make ""
@@ -72,6 +78,8 @@ let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 module Accounts = struct
   let accounts_path = World_state.make "/eth_accounts"
 
+  let info_path = "/info"
+
   let balance_path = "/balance"
 
   let nonce_path = "/nonce"
@@ -83,6 +91,8 @@ module Accounts = struct
   let storage_path = "/storage"
 
   let account (Address (Hex s)) = accounts_path ^ "/" ^ s
+
+  let info address = account address ^ info_path
 
   let balance address = account address ^ balance_path
 
@@ -128,12 +138,6 @@ module Accounts = struct
     let* address_path = account_e address in
     return (address_path ^ path)
 
-  let balance_e address = concat_e address balance_path
-
-  let nonce_e address = concat_e address nonce_path
-
-  let code_e address = concat_e address code_path
-
   let storage_e address index =
     if String.length index = 64 then
       concat_e address (storage_path ^ "/" ^ index)
@@ -152,18 +156,42 @@ module Code = struct
   let code code_hash = code_storage code_hash ^ code
 end
 
+module Blueprint = struct
+  let current_generation = EVM.make "/blueprints/generation"
+
+  let blueprint blueprint_number =
+    EVM.make "/blueprints/" ^ Z.to_string blueprint_number
+
+  let chunk ~blueprint_number ~chunk_index =
+    blueprint blueprint_number ^ "/" ^ string_of_int chunk_index
+
+  let nb_chunks ~blueprint_number = blueprint blueprint_number ^ "/nb_chunks"
+
+  let generation ~blueprint_number = blueprint blueprint_number ^ "/generation"
+end
+
 module Block = struct
   type number = Current | Nth of Z.t
 
-  let blocks ~root = root ^ "/blocks"
+  let by_hash ~root (Block_hash (Hex hash)) = root ^ "/blocks" ^ "/" ^ hash
 
-  let number = "/number"
+  let current_block_parent ~root = root ^ "/blocks/current"
 
-  let by_hash ~root (Block_hash (Hex hash)) = blocks ~root ^ "/" ^ hash
+  let current_block ~root = current_block_parent ~root ^ "/block"
 
-  let current_number ~root = blocks ~root ^ "/current" ^ number
+  let current_number ~root = current_block_parent ~root ^ "/number"
 
-  let current_hash ~root = blocks ~root ^ "/current/hash"
+  let current_hash ~root = current_block_parent ~root ^ "/hash"
+
+  let current_receipts ~root =
+    current_block_parent ~root ^ "/transactions_receipts"
+
+  let current_transactions_objects ~root =
+    current_block_parent ~root ^ "/transactions_objects"
+end
+
+module BlockHeader = struct
+  let current = "/evm/current_block_header"
 end
 
 module Indexes = struct

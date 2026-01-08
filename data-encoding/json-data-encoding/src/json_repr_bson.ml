@@ -420,5 +420,34 @@ let bytes_to_bson ?(laziness = true) ?(cache = true) ?(conforming = false) ~copy
   let buffer = if copy then Bytes.copy buffer else buffer in
   Repr.from_bytes ~laziness ~cache ~conforming buffer
 
+(* BSON documents are prefixed by their length so we can use this information to
+   parse multiple concatenated BSON objects. See
+   https://bsonspec.org/spec.html. *)
+let bytes_to_bson_list ?(laziness = true) ?(cache = true) ?(conforming = false)
+    ~copy buffer =
+  let buffer = if copy then Bytes.copy buffer else buffer in
+  let total_len = Bytes.length buffer in
+  let rec loop acc offset =
+    if offset = total_len then (List.rev acc, None)
+    else if offset + 4 > total_len then
+      (* Not enough data for document size (4 bytes) *)
+      (List.rev acc, Some offset)
+    else
+      let doc_len = Int32.to_int (Repr.LEB.get_int32 buffer offset) in
+      if doc_len < 5 then
+        Format.ksprintf
+          (fun msg -> raise (Bson_decoding_error (msg, buffer, offset)))
+          "Invalid document size: %d"
+          doc_len
+      else if offset + doc_len > total_len then
+        (* Incomplete BSON object *)
+        (List.rev acc, Some offset)
+      else
+        let bson_bytes = Bytes.sub buffer offset doc_len in
+        let bson = Repr.from_bytes ~laziness ~cache ~conforming bson_bytes in
+        loop (bson :: acc) (offset + doc_len)
+  in
+  loop [] 0
+
 module Json_encoding = Json_encoding.Make (Repr)
 module Json_query = Json_query.Make (Repr)

@@ -34,3 +34,7 @@ test-bindings: bindings
 	@$(MAKE_PYTHON) test
 	@$(MAKE_KOTLIN) test
 	@$(MAKE_SWIFT) test
+
+.PHONY: publish
+publish:
+	@$(MAKE_PYTHON) publish

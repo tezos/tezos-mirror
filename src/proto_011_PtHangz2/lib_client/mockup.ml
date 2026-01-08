@@ -129,7 +129,8 @@ module Protocol_constants_overrides = struct
                    liquidity_baking_subsidy,
                    liquidity_baking_sunset_level,
                    liquidity_baking_escape_ema_threshold ),
-                 (chain_id, timestamp) ) ) ) ->
+                 (chain_id, timestamp) ) ) )
+         ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -714,7 +715,8 @@ module Protocol_parameters = struct
       (fun ( initial_timestamp,
              bootstrap_accounts,
              bootstrap_contracts,
-             constants ) ->
+             constants )
+         ->
         {initial_timestamp; bootstrap_accounts; bootstrap_contracts; constants})
       (obj4
          (req "initial_timestamp" Time.Protocol.encoding)

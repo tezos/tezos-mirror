@@ -42,13 +42,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         return
           (List.map
              (fun Plugin.RPC.Attestation_rights.
-                    {delegate; first_slot; attestation_power; _} ->
+                    {delegate; first_slot; attesting_power; _}
+                ->
                Consensus_ops.
                  {
                    address =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    first_slot = slot_to_int first_slot;
-                   power = attestation_power;
+                   power = attesting_power;
                  })
              answer.Plugin.RPC.Attestation_rights.delegates_rights)
     | [] -> return_nil
@@ -67,10 +68,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
            contents =
              Single
                (Attestation
-                 {
-                   consensus_content = {slot; level; round; block_payload_hash};
-                   _;
-                 });
+                  {
+                    consensus_content = {slot; level; round; block_payload_hash};
+                    _;
+                  });
            signature = _;
          };
      shell = _;
@@ -208,7 +209,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             Protocol.Alpha_context.Round.to_int32 round
         | Single
             (Attestations_aggregate
-              {consensus_content = {round; _}; committee = _}) ->
+               {consensus_content = {round; _}; committee = _}) ->
             Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
@@ -220,7 +221,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             Protocol.Alpha_context.Round.to_int32 round
         | Single
             (Preattestations_aggregate
-              {consensus_content = {round; _}; committee = _}) ->
+               {consensus_content = {round; _}; committee = _}) ->
             Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
@@ -240,7 +241,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 kind;
               };
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
-            power;
+            power =
+              Protocol.Alpha_context.Attesting_power.get_slots_from_result power;
           }
         :: acc)
       acc
@@ -259,12 +261,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         match receipt with
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Preattestation_result
-                      {delegate; consensus_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Preattestation_result
+                        {delegate; consensus_power; _});
+               }) ->
             return
             @@ Consensus_ops.
                  {
@@ -276,17 +278,20 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      };
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
-                   power = consensus_power;
+                   power =
+                     Protocol.Alpha_context.Attesting_power
+                     .get_slots_from_result
+                       consensus_power;
                  }
                :: acc
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Attestation_result
-                      {delegate; consensus_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Attestation_result
+                        {delegate; consensus_power; _});
+               }) ->
             return
             @@ Consensus_ops.
                  {
@@ -298,21 +303,24 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                      };
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
-                   power = consensus_power;
+                   power =
+                     Protocol.Alpha_context.Attesting_power
+                     .get_slots_from_result
+                       consensus_power;
                  }
                :: acc
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Attestations_aggregate_result
-                      {
-                        committee;
-                        total_consensus_power = _;
-                        balance_updates = _;
-                      });
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Attestations_aggregate_result
+                        {
+                          committee;
+                          total_consensus_power = _;
+                          balance_updates = _;
+                        });
+               }) ->
             return
             @@ consensus_ops_from_aggregate
                  acc
@@ -322,16 +330,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                  Consensus_ops.Attestation
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Preattestations_aggregate_result
-                      {
-                        committee;
-                        total_consensus_power = _;
-                        balance_updates = _;
-                      });
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Preattestations_aggregate_result
+                        {
+                          committee;
+                          total_consensus_power = _;
+                          balance_updates = _;
+                        });
+               }) ->
             return
             @@ consensus_ops_from_aggregate
                  acc

@@ -48,11 +48,11 @@ val new_finalized_head :
   launch_time:float ->
   (unit, tztrace) result Lwt.t
 
-(** [store_skip_list_cells ctxt cctxt proto_parameters ~attested_level plugin]
+(** [fetch_and_store_skip_list_cells ctxt cctxt proto_parameters ~attested_level plugin]
     extracts and stores the skip list cells from [block_info] at [block_level],
     using the encoding from the corresponding [plugin]. It is used to support
     DAL refutation. *)
-val store_skip_list_cells :
+val fetch_and_store_skip_list_cells :
   Node_context.t ->
   Rpc_context.t ->
   Tezos_dal_node_services.Types.proto_parameters ->
@@ -67,4 +67,4 @@ val remove_old_level_stored_data :
   Tezos_dal_node_services.Types.proto_parameters ->
   Node_context.t ->
   int32 ->
-  unit Lwt.t
+  (unit, tztrace) result Lwt.t

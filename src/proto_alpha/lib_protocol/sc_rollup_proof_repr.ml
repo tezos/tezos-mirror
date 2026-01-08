@@ -289,10 +289,20 @@ module Dal_helpers = struct
          ~published_level
          ~dal_attested_slots_validity_lag
 
-  let verify ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
-      dal_snapshot proof ~dal_attested_slots_validity_lag =
+  let verify ~metadata ~dal_activation_level ~dal_number_of_slots
+      ~commit_inbox_level dal_parameters page_id dal_snapshot proof
+      ~dal_attested_slots_validity_lag =
     let open Result_syntax in
+    let* input_opt, attestation_lag =
+      Dal_slot_repr.History.verify_proof
+        dal_parameters
+        page_id
+        dal_snapshot
+        proof
+    in
+    let dal_attestation_lag =
+      Dal_slot_repr.History.attestation_lag_value attestation_lag
+    in
     if
       page_id_is_valid
         dal_parameters
@@ -303,23 +313,27 @@ module Dal_helpers = struct
         ~dal_number_of_slots
         page_id
         ~dal_attested_slots_validity_lag
-    then
-      let* input =
-        Dal_slot_repr.History.verify_proof
-          dal_parameters
-          page_id
-          dal_snapshot
-          proof
-      in
-      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
+    then return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
     else return_none
 
-  let produce ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters
-      ~attestation_threshold_percent ~restricted_commitments_publishers page_id
-      ~page_info ~get_history confirmed_slots_history
-      ~dal_attested_slots_validity_lag =
+  let produce ~metadata ~dal_activation_level ~dal_number_of_slots
+      ~commit_inbox_level dal_parameters ~attestation_threshold_percent
+      ~restricted_commitments_publishers page_id ~page_info ~get_history
+      confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
+    let* proof, content_opt, attestation_lag =
+      Dal_slot_repr.History.produce_proof
+        dal_parameters
+        ~attestation_threshold_percent
+        ~restricted_commitments_publishers
+        page_id
+        ~page_info
+        ~get_history
+        confirmed_slots_history
+    in
+    let dal_attestation_lag =
+      Dal_slot_repr.History.attestation_lag_value attestation_lag
+    in
     if
       page_id_is_valid
         dal_parameters
@@ -331,16 +345,6 @@ module Dal_helpers = struct
         page_id
         ~dal_attested_slots_validity_lag
     then
-      let* proof, content_opt =
-        Dal_slot_repr.History.produce_proof
-          dal_parameters
-          ~attestation_threshold_percent
-          ~restricted_commitments_publishers
-          page_id
-          ~page_info
-          ~get_history
-          confirmed_slots_history
-      in
       return
         ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
           Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
@@ -379,9 +383,9 @@ end
 
 let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
-    snapshot commit_inbox_level dal_snapshot dal_parameters
-    ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~is_reveal_enabled ~dal_attested_slots_validity_lag (proof : proof t) =
+    snapshot commit_inbox_level dal_snapshot ~find_dal_parameters
+    ~dal_activation_level ~is_reveal_enabled ~dal_attested_slots_validity_lag
+    (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -407,34 +411,49 @@ let valid (type state proof output)
         return_some (Sc_rollup_PVM_sig.Reveal (Raw_data data))
     | Some (Reveal_proof Metadata_proof) ->
         return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
-    | Some (Reveal_proof (Dal_page_proof {proof; page_id})) ->
+    | Some (Reveal_proof (Dal_page_proof {proof = dal_page_proof; page_id})) ->
+        let* disputed_level = P.get_proof_state_level proof.pvm_step in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters
+            ((* The rationale for [Option.value
+                ~default:metatadata.origination_level] is the first input a
+                Smart Rollup will consume is the [Start_of_level] of
+                origination_level + 1. As the level of a PVM is given by the
+                inputs, if it's none, that means the PVM has never consumed an
+                input and therefore is on the origination level. *)
+             Option.value
+               ~default:metadata.origination_level
+               disputed_level)
+        in
         Dal_helpers.verify
-          ~dal_number_of_slots
+          ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
-          dal_parameters
-          ~dal_attestation_lag
+          dal_parameters.cryptobox_parameters
           ~commit_inbox_level
           page_id
           dal_snapshot
-          proof
+          dal_page_proof
         |> Lwt.return
     | Some (Reveal_proof Dal_parameters_proof) ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6562
-           Support revealing historical DAL parameters.
-
-           Currently, we do not support revealing DAL parameters for the past.
-           We ignore the given [published_level] and use the DAL parameters. *)
+        let* disputed_level = P.get_proof_state_level proof.pvm_step in
+        let* dal_parameters =
+          find_dal_parameters
+            (Option.value ~default:metadata.origination_level disputed_level)
+        in
         return_some
           (Sc_rollup_PVM_sig.Reveal
              (Dal_parameters
                 Sc_rollup_dal_parameters_repr.
                   {
-                    number_of_slots = Int64.of_int dal_number_of_slots;
-                    attestation_lag = Int64.of_int dal_attestation_lag;
-                    slot_size = Int64.of_int dal_parameters.slot_size;
-                    page_size = Int64.of_int dal_parameters.page_size;
+                    number_of_slots = Int64.of_int dal_parameters.number_of_slots;
+                    attestation_lag =
+                      Int64.of_int dal_parameters.attestation_lag;
+                    slot_size =
+                      Int64.of_int dal_parameters.cryptobox_parameters.slot_size;
+                    page_size =
+                      Int64.of_int dal_parameters.cryptobox_parameters.page_size;
                   }))
   in
   let input =
@@ -480,11 +499,11 @@ let valid (type state proof output)
     | ( Some (Reveal_proof (Dal_page_proof {page_id = proof_page_id; proof})),
         Needs_reveal
           (Request_adal_page
-            {
-              page_id;
-              attestation_threshold_percent;
-              restricted_commitments_publishers;
-            }) ) ->
+             {
+               page_id;
+               attestation_threshold_percent;
+               restricted_commitments_publishers;
+             }) ) ->
         Dal_helpers.validate_dal_input_request
           proof
           ~proof_page_id
@@ -545,7 +564,8 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
+let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
+    ~is_reveal_enabled =
   let open Lwt_result_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
@@ -611,7 +631,6 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~dal_attestation_lag
           ~commit_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
@@ -622,11 +641,11 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           confirmed_slots_history
     | Needs_reveal
         (Request_adal_page
-          {
-            page_id;
-            attestation_threshold_percent;
-            restricted_commitments_publishers;
-          }) ->
+           {
+             page_id;
+             attestation_threshold_percent;
+             restricted_commitments_publishers;
+           }) ->
         let open Dal_with_history in
         let attestation_threshold_percent =
           Some attestation_threshold_percent
@@ -636,7 +655,6 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~dal_attestation_lag
           ~commit_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
@@ -646,20 +664,29 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~dal_attested_slots_validity_lag
           confirmed_slots_history
     | Needs_reveal Reveal_dal_parameters ->
-        let open Dal_with_history in
+        let*! level = P.get_current_level P.state in
+        let level = Option.value ~default:metadata.origination_level level in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters level
+        in
         return
           ( Some (Reveal_proof Dal_parameters_proof),
             Some
-              Sc_rollup_PVM_sig.(
-                Reveal
-                  (Dal_parameters
-                     Sc_rollup_dal_parameters_repr.
-                       {
-                         number_of_slots = Int64.of_int dal_number_of_slots;
-                         attestation_lag = Int64.of_int dal_attestation_lag;
-                         slot_size = Int64.of_int dal_parameters.slot_size;
-                         page_size = Int64.of_int dal_parameters.page_size;
-                       })) )
+              (Sc_rollup_PVM_sig.Reveal
+                 (Dal_parameters
+                    Sc_rollup_dal_parameters_repr.
+                      {
+                        number_of_slots =
+                          Int64.of_int dal_parameters.number_of_slots;
+                        attestation_lag =
+                          Int64.of_int dal_parameters.attestation_lag;
+                        slot_size =
+                          Int64.of_int
+                            dal_parameters.cryptobox_parameters.slot_size;
+                        page_size =
+                          Int64.of_int
+                            dal_parameters.cryptobox_parameters.page_size;
+                      })) )
   in
   let input_given =
     Option.bind

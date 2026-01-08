@@ -37,6 +37,12 @@ type batching_configuration = Disabled | Enabled of {time_interval : int}
 
 type experimental_features = unit
 
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Signature.Secret_key.t;
+}
+
 let history_mode_encoding =
   let open Data_encoding in
   union
@@ -87,6 +93,18 @@ let batching_configuration_encoding =
         (fun time_interval -> Enabled {time_interval});
     ]
 
+let publish_slots_regularly_encoding =
+  let open Data_encoding in
+  conv
+    (fun {frequency; slot_index; secret_key} ->
+      (frequency, slot_index, secret_key))
+    (fun (frequency, slot_index, secret_key) ->
+      {frequency; slot_index; secret_key})
+    (obj3
+       (req "frequency" uint16)
+       (req "slot_index" uint16)
+       (req "secret_key" Signature.Secret_key.encoding))
+
 type t = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
@@ -109,6 +127,7 @@ type t = {
   ignore_l1_config_peers : bool;
   disable_amplification : bool;
   batching_configuration : batching_configuration;
+  publish_slots_regularly : publish_slots_regularly option;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -187,6 +206,7 @@ let default =
     ignore_l1_config_peers = false;
     disable_amplification = false;
     batching_configuration = default_batching_configuration;
+    publish_slots_regularly = None;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -231,7 +251,9 @@ let encoding : t Data_encoding.t =
            ignore_l1_config_peers;
            disable_amplification;
            batching_configuration;
-         } ->
+           publish_slots_regularly;
+         }
+       ->
       ( ( ( data_dir,
             rpc_addr,
             listen_addr,
@@ -252,7 +274,7 @@ let encoding : t Data_encoding.t =
             verbose,
             ignore_l1_config_peers,
             disable_amplification ) ),
-        batching_configuration ))
+        (batching_configuration, publish_slots_regularly) ))
     (fun ( ( ( data_dir,
                rpc_addr,
                listen_addr,
@@ -273,7 +295,8 @@ let encoding : t Data_encoding.t =
                verbose,
                ignore_l1_config_peers,
                disable_amplification ) ),
-           batching_configuration ) ->
+           (batching_configuration, publish_slots_regularly) )
+       ->
       {
         data_dir;
         rpc_addr;
@@ -296,6 +319,7 @@ let encoding : t Data_encoding.t =
         ignore_l1_config_peers;
         disable_amplification;
         batching_configuration;
+        publish_slots_regularly;
       })
     (merge_objs
        (merge_objs
@@ -401,12 +425,18 @@ let encoding : t Data_encoding.t =
                 ~description:"Disable amplification"
                 bool
                 default.disable_amplification)))
-       (obj1
+       (obj2
           (dft
              "batching_configuration"
              ~description:"Set the batching delay for shard verification"
              batching_configuration_encoding
-             default.batching_configuration)))
+             default.batching_configuration)
+          (opt
+             "publish_slots_regularly"
+             ~description:
+               "Set the frequency, the slot and the secret key used for \
+                automatic production"
+             publish_slots_regularly_encoding)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

@@ -24,11 +24,7 @@ open Setup
 open Rpc.Syntax
 
 let register_test =
-  register_test_for_kernels
-    ~__FILE__
-    ~enable_dal:true
-    ~enable_multichain:false
-    ~enable_revm:false
+  register_test_for_kernels ~__FILE__ ~enable_dal:true ~enable_multichain:false
 
 let count_event ?(get_count_from_event = fun _event -> 1) sequencer event
     counter =
@@ -52,8 +48,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
     ~dal_slots:(Some [dal_slot])
   (* We want this test in the CI so we put no extra tags when DAL
      is active to avoid having the [ci_disabled] or [slow] tag. *)
-  @@
-  fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
   let number_of_blueprints = 5 in
 
   let number_of_blueprints_sent_to_inbox = ref 0 in
@@ -103,7 +98,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
        finalized in `rollup_node_follower` *)
     if enable_dal then
       repeat 2 (fun () ->
-          let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
           unit)
     else unit
   in

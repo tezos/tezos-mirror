@@ -1,10 +1,7 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/* Copyright (c) [2022-2023] TriliTech <contact@trili.tech>                   */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+// SPDX-FileCopyrightText: [2022-2023] TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
 
 /// Prefix denoting an encoded number.
 pub const NUMBER_TAG: u8 = 0x00;

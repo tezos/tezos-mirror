@@ -30,6 +30,8 @@ COPY --chown=tezos:tezos .gitconfig /home/tezos/
 
 # Rust installer script
 COPY --chown=tezos:tezos install-rust.sh /tmp/
+COPY --chown=tezos:tezos scripts/install_opam_static.sh /tmp/
+COPY --chown=tezos:tezos scripts/install_sccache_static.sh /tmp/
 
 # setup kisscache
 COPY --chown=tezos:tezos scripts/kiss-fetch.sh scripts/kiss-logs.sh /tmp/
@@ -71,35 +73,43 @@ RUN apk update \
     zlib-static \
     libusb-dev \
     hidapi-dev \
-    sccache \
     shfmt \
     upx \
     protobuf \
     protobuf-dev \
     sqlite-static \
-    sqlite-dev \
- # Opam from Edge is Opam 2.2
- && apk add --no-cache \
-    opam --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+    sqlite-dev
 
 # Install Cargo and Rust (more information in the shell script)
 RUN ./install-rust.sh \
     && rm -rf /tmp/install-rust.sh
+
+ARG OPAM_VERSION
+ENV OPAM_VERSION=$OPAM_VERSION
+# Install opam
+RUN ./install_opam_static.sh \
+    && rm -f /tmp/install_opam_static.sh
+
+RUN ./install_sccache_static.sh \
+    && rm -f /tmp/install_sccache_static.sh
 
 USER tezos
 WORKDIR /home/tezos
 
 # Create an opam-repository directory that is a clone of the public opam repository
 # filtered to only keep packages which we actually need.
-COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked ./
-
-COPY --chown=tezos:tezos stdcompat.opam.locked ./
+COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked release-tools-deps.opam.locked dream-httpaf.opam.locked dream.opam.locked cohttp.opam.locked cohttp-lwt.opam.locked cohttp-lwt-unix.opam.locked ./
 
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \
   && rm create_opam_repo.sh \
   && rm octez-deps.opam.locked \
-  && rm stdcompat.opam.locked \
+  && rm release-tools-deps.opam.locked \
+  && rm dream-httpaf.opam.locked \
+  && rm dream.opam.locked \
+  && rm cohttp.opam.locked \
+  && rm cohttp-lwt.opam.locked \
+  && rm cohttp-lwt-unix.opam.locked \
   && rm version.sh
 
 # Needed by 'opam admin cache' below
@@ -114,9 +124,12 @@ RUN opam init --disable-sandboxing --no-setup --yes \
  && opam clean
 
 # Add opam cache
+# [depext=false] prevents opam to search for system dependencies.
+# All build and runtime dependencies needed by opam
 RUN opam admin cache \
  && opam update \
- && opam clean
+ && opam clean \
+ && opam option depext=false
 
 USER root
 RUN /tmp/kiss-logs.sh /tmp/kiss.log \

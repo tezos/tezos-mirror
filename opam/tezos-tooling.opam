@@ -11,12 +11,12 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "bisect_ppx" { >= "2.7.0" }
-  "ocamlformat" { = "0.26.2" }
+  "ocamlformat" { = "0.27.0" }
   "num"
   "re" { >= "1.10.0" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

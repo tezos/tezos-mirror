@@ -7,6 +7,9 @@
 
 include module type of Tezt.Cli
 
+(** The name and encoding of the scenario specific options if mentionned in the config file. *)
+val scenario_specific : (string * Data_encoding.Json.t) option
+
 (** When [localhost] is [true], the cloud scenario should be run locally. This
     can be used to test a scenario before deploying it. *)
 val localhost : bool
@@ -90,6 +93,14 @@ val website : bool
     *)
 val machine_type : string
 
+(** Enable to specify a disk type for GCP machines. The string must be a machine
+    description compliant with GCP (ex: "pdd-ssd" or "hyperdisk-balanced").
+*)
+val disk_type : string option
+
+(** Enable to specify the size of disks for GCP machines, in GB. *)
+val disk_size_gb : int option
+
 (** Specify the dockerfile alias to use. If not specified, the image
     name will be given by the value of the variable `TEZT_CLOUD`. *)
 val dockerfile_alias : string option
@@ -144,11 +155,43 @@ val binaries_path : string
     Use 0 to disable log-rotation *)
 val log_rotation : int
 
+(* Daily log path retrieval if set. *)
+val retrieve_daily_logs : bool
+
+(* Ppx profiling traces retrieval if set. *)
+val retrieve_ppx_profiling_traces : bool
+
+(** Boundaries used for setting a random network latency on docker containers. *)
+val tc_delay : (float * float) option
+
+(** Boundaries used for setting a random network jitter on docker containers. *)
+val tc_jitter : (float * float) option
+
+(* Artifact path retrieval if set. *)
+val artifacts_dir : string option
+
+(* Retrieves teztale artifacts if the artifact-dir is set. *)
+val teztale_artifacts : bool
+
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
+
+(** The ssh private key to use for the initial deployment *)
+val ssh_private_key : string option
 
 (** Slack channel id to send notifications on *)
 val slack_channel_id : string option
 
 (** Slack authentication token to allow publication *)
 val slack_bot_token : string option
+
+module Types : sig
+  val dir_typ : name:string -> cli_parameter:string -> string option Clap.typ
+end
+
+(** [to_json_config ~scenario_name ?scenario_config ()] generates the full
+    configuration file encoded in JSON, each option being retrieved from the CLI
+    or default parameters. If [scenario_config] is not given, it encodes the
+    one from the CLI. *)
+val to_json_config :
+  ?scenario_config:string * Data_encoding.Json.t -> unit -> Data_encoding.Json.t

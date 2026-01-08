@@ -17,12 +17,12 @@ depends: [
   "octez-shell-libs" {with-test}
   "octez-alcotezt" {with-test}
   "eio" {with-test}
-  "eio_main" {with-test}
+  "eio_posix" {with-test}
   "fpath" {with-test}
   "vector" {with-test}
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

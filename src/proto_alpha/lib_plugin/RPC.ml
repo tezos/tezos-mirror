@@ -510,8 +510,7 @@ module Scripts = struct
       let open Lwt_result_syntax in
       (* We drop the gas limit as this function is only used for debugging/errors. *)
       let ctxt = Gas.set_unlimited ctxt in
-      let rec unparse_stack :
-          type a s.
+      let rec unparse_stack : type a s.
           (a, s) Script_typed_ir.stack_ty * (a * s) ->
           Script.expr list Environment.Error_monad.tzresult Lwt.t = function
         | Bot_t, (EmptyCell, EmptyCell) -> return_nil
@@ -628,8 +627,7 @@ module Scripts = struct
       let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
       Int (loc, z)
 
-    let rec unparse_ty :
-        type a ac loc.
+    let rec unparse_ty : type a ac loc.
         loc:loc -> (a, ac) ty -> (loc, Script.prim) Micheline.node =
      fun ~loc ty ->
       let return (name, args, annot) = Prim (loc, name, args, annot) in
@@ -740,8 +738,7 @@ module Scripts = struct
             let+ Ex_stack (sty, y, st), ctxt = parse_stack ctxt ~legacy l in
             (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
 
-    let rec unparse_stack :
-        type a s.
+    let rec unparse_stack : type a s.
         context ->
         Script_ir_unparser.unparsing_mode ->
         (a, s) Script_typed_ir.stack_ty ->
@@ -764,8 +761,7 @@ module Scripts = struct
             ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
   end
 
-  let rec pp_instr_name :
-      type a b c d.
+  let rec pp_instr_name : type a b c d.
       Format.formatter -> (a, b, c, d) Script_typed_ir.kinstr -> unit =
     let open Script_typed_ir in
     let open Format in
@@ -879,6 +875,8 @@ module Scripts = struct
       | ITransfer_tokens _ -> pp_print_string fmt "TRANSFER_TOKENS"
       | IImplicit_account _ -> pp_print_string fmt "IMPLICIT_ACCOUNT"
       | IIs_implicit_account _ -> pp_print_string fmt "IS_IMPLICIT_ACCOUNT"
+      | IIndex_address _ -> pp_print_string fmt "INDEX_ADDRESS"
+      | IGet_address_index _ -> pp_print_string fmt "GET_ADDRESS_INDEX"
       | ICreate_contract _ -> pp_print_string fmt "CREATE_CONTRACT"
       | ISet_delegate _ -> pp_print_string fmt "SET_DELEGATE"
       | INow _ -> pp_print_string fmt "NOW"
@@ -993,9 +991,6 @@ module Scripts = struct
           migration_balance_updates = [];
           liquidity_baking_toggle_ema =
             Per_block_votes.Liquidity_baking_toggle_EMA.zero;
-          adaptive_issuance_vote_ema =
-            Per_block_votes.Adaptive_issuance_launch_EMA.zero;
-          adaptive_issuance_launch_cycle = None;
           implicit_operations_results = [];
         }
     in
@@ -1299,6 +1294,7 @@ module Scripts = struct
                  lazy_storage_diff;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ ) =
           Script_interpreter.execute
@@ -1306,7 +1302,7 @@ module Scripts = struct
             unparsing_mode
             step_constants
             ~cached_script:None
-            ~script:{storage; code}
+            ~script:(Script.Script {storage; code})
             ~entrypoint
             ~parameter
             ~internal:true
@@ -1370,13 +1366,14 @@ module Scripts = struct
                    lazy_storage_diff;
                    ticket_diffs = _;
                    ticket_receipt = _;
+                   address_registry_diff = _;
                  },
                  _ctxt ),
                trace ) =
           Interp.execute
             ctxt
             step_constants
-            ~script:{storage; code}
+            ~script:(Script.Script {storage; code})
             ~entrypoint
             ~parameter
         in
@@ -1415,6 +1412,15 @@ module Scripts = struct
                  View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
+        (* The native case will be handled in a later MR (!19583). *)
+        let script =
+          match script with
+          | Script.Script s -> s
+          | Native _ ->
+              Stdlib.failwith
+                "Tzip4 views are not implemented yet for native contracts"
+        in
+        (* let*? script = Environment.Error_monad.Result_syntax wrap_tzresult script in *)
         let*? decoded_script = Script_repr.(force_decode script.code) in
         let* view_ty = script_entrypoint_type ctxt decoded_script entrypoint in
         let*? ty = View_helpers.extract_view_output_type entrypoint view_ty in
@@ -1458,13 +1464,14 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
             ctxt
             unparsing_mode
             step_constants
-            ~script
+            ~script:(Script.Script script)
             ~cached_script:None
             ~entrypoint
             ~parameter
@@ -1503,6 +1510,14 @@ module Scripts = struct
             ~some:Result_syntax.return
             ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
             script_opt
+        in
+        (* The native case will be handled in a later MR (!19583). *)
+        let script =
+          match script with
+          | Script.Script s -> s
+          | Script.Native _ ->
+              Stdlib.failwith
+                "Views are not implemented yet for native contracts"
         in
         let*? decoded_script = Script_repr.(force_decode script.code) in
         let contract = Contract.Originated contract_hash in
@@ -1556,13 +1571,14 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
             ctxt
             unparsing_mode
             step_constants
-            ~script:viewer_script
+            ~script:(Script viewer_script)
             ~cached_script:None
             ~entrypoint:Entrypoint.default
             ~parameter
@@ -1596,7 +1612,14 @@ module Scripts = struct
         let code = Script.lazy_expr expr in
         let* ( Ex_code
                  (Code
-                   {code; arg_type; storage_type; views; entrypoints; code_size}),
+                    {
+                      implementation;
+                      arg_type;
+                      storage_type;
+                      views;
+                      entrypoints;
+                      code_size;
+                    }),
                ctxt ) =
           Script_ir_translator.parse_code ~elab_conf ctxt ~code
         in
@@ -1613,7 +1636,7 @@ module Scripts = struct
           Script_ir_translator.Ex_script
             (Script
                {
-                 code;
+                 implementation;
                  arg_type;
                  storage_type;
                  views;
@@ -2110,7 +2133,7 @@ module Contract = struct
              (req "unparsing_mode" unparsing_mode_encoding)
              (dft "normalize_types" bool false))
         ~query:RPC_query.empty
-        ~output:(option Script.encoding)
+        ~output:(option Script.michelson_with_storage_encoding)
         RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
 
     let get_used_storage_space =
@@ -2190,11 +2213,12 @@ module Contract = struct
         get_contract contract @@ fun contract ->
         let* ctxt, script = Contract.get_script ctxt contract in
         match script with
-        | None -> return_none
-        | Some script ->
+        | None | Some (Script.Native _) -> return_none
+        | Some (Script.Script script) ->
             let ctxt = Gas.set_unlimited ctxt in
             let+ script, _ctxt =
-              Script_ir_translator.parse_and_unparse_script_unaccounted
+              Script_ir_translator
+              .parse_and_unparse_michelson_script_unaccounted
                 ctxt
                 ~legacy:true
                 ~allow_forged_tickets_in_storage:true
@@ -2405,7 +2429,7 @@ module Protocol = struct
 
   let register_first_level () =
     Registration.register0 ~chunked:false S.first_level (fun context () () ->
-        Alpha_context.First_level_of_protocol.get context)
+        Alpha_context.Protocol_activation_level.get context)
 
   let register () = register_first_level ()
 
@@ -3066,6 +3090,13 @@ module Dal = struct
         ~output:(Data_encoding.list shards_assignment_encoding)
         RPC_path.(path / "shards")
 
+    let past_parameters =
+      RPC_service.get_service
+        ~description:"Get the DAL parameters to use for a given level"
+        ~output:Constants.Parametric.dal_encoding
+        ~query:RPC_query.empty
+        RPC_path.(path / "past_parameters" /: Raw_level.rpc_arg)
+
     let published_slot_headers =
       let output = Data_encoding.(list Dal.Slot.Header.encoding) in
       RPC_service.get_service
@@ -3134,6 +3165,13 @@ module Dal = struct
       []
     |> return
 
+  let register_past_parameters () =
+    Registration.register1 ~chunked:false S.past_parameters
+    @@ fun ctxt level () () -> Dal.Past_parameters.parameters ctxt level
+
+  let past_parameters ctxt block level =
+    RPC_context.make_call1 S.past_parameters ctxt block level () ()
+
   let dal_published_slot_headers ctxt block ?level () =
     RPC_context.make_call0 S.published_slot_headers ctxt block level ()
 
@@ -3162,6 +3200,7 @@ module Dal = struct
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
+    register_past_parameters () ;
     register_published_slot_headers () ;
     register_skip_list_cells_of_level ()
 end
@@ -3210,10 +3249,7 @@ module Forge = struct
                dft
                  "per_block_votes"
                  per_block_votes_encoding
-                 {
-                   liquidity_baking_vote = Per_block_vote_pass;
-                   adaptive_issuance_vote = Per_block_vote_pass;
-                 }))
+                 {liquidity_baking_vote = Per_block_vote_pass}))
         ~output:(obj1 (req "protocol_data" (bytes Hex)))
         RPC_path.(path / "protocol_data")
 
@@ -3422,24 +3458,6 @@ module Forge = struct
 
   let empty_proof_of_work_nonce =
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'
-
-  let protocol_data ctxt block ?(payload_hash = Block_payload_hash.zero)
-      ?(payload_round = Round.zero) ?seed_nonce_hash
-      ?(proof_of_work_nonce = empty_proof_of_work_nonce)
-      ~liquidity_baking_toggle_vote ~adaptive_issuance_vote () =
-    RPC_context.make_call0
-      S.protocol_data
-      ctxt
-      block
-      ()
-      ( payload_hash,
-        payload_round,
-        seed_nonce_hash,
-        proof_of_work_nonce,
-        {
-          liquidity_baking_vote = liquidity_baking_toggle_vote;
-          adaptive_issuance_vote;
-        } )
 end
 
 module Parse = struct
@@ -3797,7 +3815,7 @@ module Attestation_rights = struct
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
-    attestation_power : int;
+    attesting_power : int;
   }
 
   type t = {
@@ -3809,14 +3827,14 @@ module Attestation_rights = struct
   let delegate_rights_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; first_slot; attestation_power} ->
-        (delegate, first_slot, attestation_power, consensus_key))
-      (fun (delegate, first_slot, attestation_power, consensus_key) ->
-        {delegate; first_slot; attestation_power; consensus_key})
+      (fun {delegate; consensus_key; first_slot; attesting_power} ->
+        (delegate, first_slot, attesting_power, consensus_key))
+      (fun (delegate, first_slot, attesting_power, consensus_key) ->
+        {delegate; first_slot; attesting_power; consensus_key})
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req "attestation_power" uint16)
+         (req "attesting_power" uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
   let encoding =
@@ -3878,9 +3896,11 @@ module Attestation_rights = struct
         attestation_path
   end
 
-  let attestation_rights_at_level ctxt level =
+  let attestation_rights_at_level ctxt attested_level =
     let open Lwt_result_syntax in
-    let* ctxt, rights = Baking.attesting_rights_by_first_slot ctxt level in
+    let* ctxt, rights =
+      Baking.attesting_rights_by_first_slot ctxt ~attested_level
+    in
     let* current_round = Round.get ctxt in
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
@@ -3891,29 +3911,46 @@ module Attestation_rights = struct
         ~current_level
         ~current_round
         ~current_timestamp
-        ~level
+        ~level:attested_level
         ~round:Round.zero
     in
     let rights =
       Slot.Map.fold
         (fun first_slot
-             ( {
-                 Consensus_key.delegate;
-                 consensus_pk = _;
-                 consensus_pkh = consensus_key;
-                 companion_pk = _;
-                 companion_pkh = _;
-               },
-               attestation_power,
-               _dal_power )
-             acc ->
-          {delegate; consensus_key; first_slot; attestation_power} :: acc)
+             ({
+                consensus_key =
+                  {
+                    Consensus_key.delegate;
+                    consensus_pk = _;
+                    consensus_pkh = consensus_key;
+                    companion_pk = _;
+                    companion_pkh = _;
+                  };
+                attesting_power;
+                dal_power = _;
+              } :
+               Consensus_key.power)
+             acc
+           ->
+          {
+            delegate;
+            consensus_key;
+            first_slot;
+            (* TODO ABAAB (this RPC is only used for tests) *)
+            attesting_power = Attesting_power.get_slots attesting_power;
+          }
+          :: acc)
         rights
         []
     in
     (* returns the ctxt with an updated cache of slot holders *)
     return
-      (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
+      ( ctxt,
+        {
+          level = attested_level.level;
+          delegates_rights = rights;
+          estimated_time;
+        } )
 
   let get_attestation_rights ctxt (q : S.attestation_rights_query) =
     let open Lwt_result_syntax in
@@ -3962,27 +3999,99 @@ module Attestation_rights = struct
 end
 
 module Validators = struct
-  type t = {
-    level : Raw_level.t;
+  type delegate = {
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
-    slots : Slot.t list;
+    rounds : Round.t list;
+    attesting_power : int64;
+    attestation_slot : Slot.t;
   }
+
+  type t = {
+    level : Raw_level.t;
+    consensus_threshold : int64;
+    consensus_committee : int64;
+    abaab_activation_flag : bool;
+    delegates : delegate list;
+  }
+
+  let delegate_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             delegate;
+             consensus_key;
+             companion_key;
+             rounds;
+             attesting_power;
+             attestation_slot;
+           }
+         ->
+        ( delegate,
+          rounds,
+          consensus_key,
+          companion_key,
+          attesting_power,
+          attestation_slot ))
+      (fun ( delegate,
+             rounds,
+             consensus_key,
+             companion_key,
+             attesting_power,
+             attestation_slot )
+         ->
+        {
+          delegate;
+          consensus_key;
+          companion_key;
+          rounds;
+          attesting_power;
+          attestation_slot;
+        })
+      (obj6
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (req "rounds" (list Round.encoding))
+         (req "consensus_key" Signature.Public_key_hash.encoding)
+         (opt "companion_key" Bls.Public_key_hash.encoding)
+         (req "attesting_power" int64)
+         (req "attestation_slot" Slot.encoding))
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; consensus_key; companion_key; slots} ->
-        (level, delegate, slots, consensus_key, companion_key))
-      (fun (level, delegate, slots, consensus_key, companion_key) ->
-        {level; delegate; consensus_key; companion_key; slots})
+      (fun {
+             level;
+             consensus_threshold;
+             consensus_committee;
+             abaab_activation_flag;
+             delegates;
+           }
+         ->
+        ( level,
+          consensus_threshold,
+          consensus_committee,
+          abaab_activation_flag,
+          delegates ))
+      (fun ( level,
+             consensus_threshold,
+             consensus_committee,
+             abaab_activation_flag,
+             delegates )
+         ->
+        {
+          level;
+          consensus_threshold;
+          consensus_committee;
+          abaab_activation_flag;
+          delegates;
+        })
       (obj5
          (req "level" Raw_level.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (req "slots" (list Slot.encoding))
-         (req "consensus_key" Signature.Public_key_hash.encoding)
-         (opt "companion_key" Bls.Public_key_hash.encoding))
+         (req "consensus_threshold" int64)
+         (req "consensus_committee" int64)
+         (req "all_bakers_attest_activated" bool)
+         (req "delegates" (list delegate_encoding)))
 
   module S = struct
     open Data_encoding
@@ -4024,22 +4133,40 @@ module Validators = struct
         path
   end
 
-  let add_attestation_slots_at_level (ctxt, acc) level =
+  let attestation_slots_at_level ctxt attested_level =
     let open Lwt_result_syntax in
-    let+ ctxt, rights = Baking.attesting_rights ctxt level in
+    let* ctxt, rights = Baking.attesting_rights ctxt ~attested_level in
     let aggregate_attestation = Constants.aggregate_attestation ctxt in
-    ( ctxt,
-      Signature.Public_key_hash.Map.fold
-        (fun _pkh {Baking.delegate; consensus_key; companion_key; slots} acc ->
-          let companion_key =
-            match consensus_key with
-            | Bls _ when aggregate_attestation -> companion_key
-            | _ -> None
-          in
-          {level = level.level; delegate; consensus_key; companion_key; slots}
-          :: acc)
-        rights
-        acc )
+    return
+      ( ctxt,
+        Signature.Public_key_hash.Map.fold
+          (fun _pkh
+               {
+                 Baking.delegate;
+                 consensus_key;
+                 companion_key;
+                 rounds;
+                 attesting_power;
+                 attestation_slot;
+               }
+               acc
+             ->
+            let companion_key =
+              match consensus_key with
+              | Bls _ when aggregate_attestation -> companion_key
+              | _ -> None
+            in
+            {
+              delegate;
+              consensus_key;
+              companion_key;
+              rounds;
+              attesting_power;
+              attestation_slot;
+            }
+            :: acc)
+          rights
+          [] )
 
   let register () =
     let open Lwt_result_syntax in
@@ -4049,9 +4176,40 @@ module Validators = struct
         in
         let+ _ctxt, rights =
           List.fold_left_es
-            add_attestation_slots_at_level
+            (fun (ctxt, acc) attested_level ->
+              let abaab_activation_flag =
+                Attesting_power.check_all_bakers_attest_at_level
+                  ctxt
+                  ~attested_level
+              in
+              let* ctxt, consensus_threshold =
+                Attesting_power.consensus_threshold ctxt ~attested_level
+              in
+              let* ctxt, consensus_committee =
+                Attesting_power.consensus_committee ctxt ~attested_level
+              in
+              let* ctxt, delegates =
+                attestation_slots_at_level ctxt attested_level
+              in
+              return
+                ( ctxt,
+                  ( {
+                      level = attested_level.level;
+                      consensus_threshold;
+                      consensus_committee;
+                      abaab_activation_flag;
+                      delegates = [];
+                    },
+                    delegates )
+                  :: acc ))
             (ctxt, [])
             (List.rev levels)
+        in
+        let filter_with f list =
+          List.map
+            (fun (level_info, delegates) ->
+              (level_info, List.filter f delegates))
+            list
         in
         let rights =
           match q.delegates with
@@ -4062,7 +4220,7 @@ module Validators = struct
                   (Signature.Public_key_hash.equal p.delegate)
                   delegates
               in
-              List.filter is_requested rights
+              filter_with is_requested rights
         in
         let rights =
           match q.consensus_keys with
@@ -4073,7 +4231,12 @@ module Validators = struct
                   (Signature.Public_key_hash.equal p.consensus_key)
                   delegates
               in
-              List.filter is_requested rights
+              filter_with is_requested rights
+        in
+        let rights =
+          List.map
+            (fun (level_info, delegates) -> {level_info with delegates})
+            rights
         in
         rights)
 
@@ -4149,6 +4312,39 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Data_encoding.int64
       RPC_path.(path / "total_baking_power")
+
+  let baking_power_distribution_for_current_cycle =
+    RPC_service.get_service
+      ~description:
+        "Returns the total baking power and the list of active delegates with \
+         their respective baking power, used to determine consensus rights for \
+         the current cycle. Note that these baking powers correspond to the \
+         staked and delegated balances that were held by bakers at the end of \
+         (current_cycle - CONSENSUS_RIGHTS_DELAY - 1)."
+      ~query:RPC_query.empty
+      ~output:
+        Data_encoding.(tup2 int64 (list (tup2 Consensus_key.encoding int64)))
+      RPC_path.(path / "baking_power_distribution_for_current_cycle")
+
+  let cycle_query : Cycle.t option RPC_query.t =
+    let open RPC_query in
+    query Fun.id |+ opt_field "cycle" Cycle.rpc_arg Fun.id |> seal
+
+  let tz4_baker_number_ratio =
+    RPC_service.get_service
+      ~description:"Returns the ratio of active bakers using a tz4."
+      ~query:cycle_query
+      ~output:Data_encoding.(string Plain)
+      RPC_path.(path / "tz4_baker_number_ratio")
+
+  let abaab_activation_level =
+    RPC_service.get_service
+      ~description:
+        "Returns the activation level of All Bakers Attest. If the level is \
+         not set, returns `null`."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(option Level_repr.encoding)
+      RPC_path.(path / "all_bakers_attest_activation_level")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4170,6 +4366,7 @@ let register () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
   Contract_services.register () ;
   Delegate_services.register () ;
+  Destination_services.register () ;
   Scripts.register () ;
   Forge.register () ;
   Parse.register () ;
@@ -4210,7 +4407,47 @@ let register () =
   Registration.register0 ~chunked:false S.total_baking_power (fun ctxt () () ->
       Stake_distribution.For_RPC.total_baking_power
         ctxt
-        (Level.current ctxt).cycle)
+        (Level.current ctxt).cycle) ;
+  Registration.register0
+    ~chunked:false
+    S.baking_power_distribution_for_current_cycle
+    (fun ctxt () () ->
+      let* (_ctxt : t), total_stake, stake_info_list =
+        Stake_distribution.stake_info ctxt (Level.current ctxt)
+      in
+      let stake_info_list =
+        List.map (fun (x, y) -> (Consensus_key.pkh x, y)) stake_info_list
+      in
+      return (total_stake, stake_info_list)) ;
+  Registration.register0
+    ~chunked:false
+    S.tz4_baker_number_ratio
+    (fun ctxt q () ->
+      let cycle = Option.value ~default:(Level.current ctxt).cycle q in
+      let* _, _total_stake, stake_info_list =
+        Stake_distribution.stake_info_for_cycle ctxt cycle
+      in
+      let tz4_bakers =
+        List.fold_left
+          (fun acc (x, _) ->
+            match x.Consensus_key.consensus_pk with
+            | Bls _ -> acc + 1
+            | _ -> acc)
+          0
+          stake_info_list
+      in
+      let num = Z.(mul (of_int tz4_bakers) (of_int 100)) in
+      let den = Z.of_int (List.length stake_info_list) in
+      let whole_part, rest = Z.(div_rem num den) in
+      let decimals = Z.(div (mul rest (of_int 100)) den) in
+      return
+      @@ Format.asprintf "%d.%02d%%" (Z.to_int whole_part) (Z.to_int decimals)) ;
+  Registration.register0
+    ~chunked:false
+    S.abaab_activation_level
+    (fun ctxt () () ->
+      Storage.All_bakers_attest_activation.find
+        (Alpha_context.Internal_for_tests.to_raw ctxt))
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
@@ -4220,6 +4457,17 @@ let levels_in_current_cycle ctxt ?(offset = 0l) block =
 
 let consecutive_round_zero ctxt block =
   RPC_context.make_call0 S.consecutive_round_zero ctxt block () ()
+
+let baking_power_distribution_for_current_cycle ctxt block =
+  RPC_context.make_call0
+    S.baking_power_distribution_for_current_cycle
+    ctxt
+    block
+    ()
+    ()
+
+let tz4_baker_number_ratio ctxt ?cycle block =
+  RPC_context.make_call0 S.tz4_baker_number_ratio ctxt block cycle ()
 
 let rpc_services =
   register () ;

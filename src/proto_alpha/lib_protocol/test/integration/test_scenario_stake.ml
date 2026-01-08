@@ -290,7 +290,8 @@ let scenario_forbidden_operations =
         else return input)
   in
   init_staker_delegate_or_external
-  --> (* Staking everything works for self delegates, but not for delegated accounts *)
+  -->
+  (* Staking everything works for self delegates, but not for delegated accounts *)
   assert_failure
     ~expected_error:(fun (_, state) errs ->
       if State.(is_self_delegate "staker" state) then
@@ -392,7 +393,8 @@ let change_delegate_to_self =
         (stake "staker" Half
         --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> (Tag "finalize"
-       --> (* Explicitly finalize, so that we can check that the balances
+       -->
+       (* Explicitly finalize, so that we can check that the balances
               are identical to the beginning. This proves that changing
               delegates has indeed unstaked all staked funds. *)
        finalize "staker"
@@ -449,13 +451,16 @@ let change_delegate =
         (stake "staker" Half
         --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> (Tag "finalize"
-       --> (* Explicitly finalize, so that we can check that the balances
+       -->
+       (* Explicitly finalize, so that we can check that the balances
               are identical to the beginning. This proves that changing
               delegates has indeed unstaked all staked funds. *)
        finalize "staker"
        --> check_snapshot_balances "init"
        --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
-       --> (* Staking again is also possible. *) stake "staker" Half
+       -->
+       (* Staking again is also possible. *)
+       stake "staker" Half
        --> check_snapshot_balances "after_stake"
       |+ Tag "don't finalize" --> stake "staker" Half)
   --> (Tag "finally, unstake" --> unstake "staker" Half
@@ -922,7 +927,8 @@ let test_pseudotokens_roundings =
          (* Difference = +1 *)
          --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
   --> (assert_success ~loc:__LOC__
-      @@ (* All but one *)
+      @@
+      (* All but one *)
       unstake "staker" (Amount (Tez.of_mutez 10_000_057_187L))
       (* 10_000_057_187 * 20_000_000_001 / 20_000_114_375 = 10_000_000_000 pseudotokens removed *)
       --> check_staker_issued_pseudotokens ~loc:__LOC__ (-10_000_000_000L)
@@ -935,7 +941,8 @@ let test_pseudotokens_roundings =
       (* Difference = 1 *)
       --> check_other_staker_staked_tokens_increase ~loc:__LOC__ 1L)
   --> (assert_success ~loc:__LOC__
-      @@ (* All *)
+      @@
+      (* All *)
       unstake "staker" (Amount (Tez.of_mutez 10_000_057_188L))
       (* Should unconditionally remove all pseudotokens *)
       --> check_staker_issued_pseudotokens ~loc:__LOC__ (-10_000_000_001L)

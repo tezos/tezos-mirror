@@ -41,6 +41,8 @@ type block = t
 
 type full_metadata = block_header_metadata * operation_receipt list
 
+type block_with_metadata = block * full_metadata
+
 (** Not the same as [Context.get_alpha_ctxt] as it does not construct a new block *)
 val get_alpha_ctxt : t -> context tzresult Lwt.t
 
@@ -59,6 +61,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 (**
    The default baking functions below is to use (blocks) [Application] mode.
@@ -77,6 +80,8 @@ val get_next_baker :
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
 
+val get_payload_round : block -> Round.t
+
 (** Returns the consensus key that was used to bake the block. *)
 val block_producer : block -> Consensus_key.pk tzresult Lwt.t
 
@@ -85,7 +90,6 @@ module Forge : sig
     ?proof_of_work_threshold:Int64.t ->
     ?seed_nonce_hash:Nonce_hash.t ->
     ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     payload_hash:Block_payload_hash.t ->
     payload_round:Round.t ->
     Block_header.shell_header ->
@@ -104,7 +108,6 @@ module Forge : sig
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
     ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-    ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
     t ->
     header tzresult Lwt.t
 
@@ -157,10 +160,15 @@ val genesis :
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?allow_tz4_delegate_enable:bool ->
   ?aggregate_attestation:bool ->
+  ?native_contracts_enable:bool ->
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
-val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
+val genesis_with_parameters :
+  ?prepare_context:
+    (Raw_context.t -> Raw_context.t Environment.Error_monad.tzresult Lwt.t) ->
+  Parameters.t ->
+  block tzresult Lwt.t
 
 (** [alpha_context <opts> accounts] : instantiates an alpha_context with the
     given constants [<opts>] and initializes [accounts] with their
@@ -230,7 +238,6 @@ val bake :
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   ?check_size:bool ->
   t ->
   t tzresult Lwt.t
@@ -247,16 +254,14 @@ val bake_with_metadata :
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   t ->
-  (t * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
+  block_with_metadata tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
 val bake_n :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   block tzresult Lwt.t
@@ -266,7 +271,6 @@ val bake_until_level :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   Raw_level.t ->
   t ->
   block tzresult Lwt.t
@@ -277,7 +281,6 @@ val bake_n_with_all_balance_updates :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
@@ -301,7 +304,6 @@ val bake_n_with_liquidity_baking_toggle_ema :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   int ->
   t ->
   (block * Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.t) tzresult
@@ -318,14 +320,12 @@ val bake_n_with_metadata :
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   int ->
   block ->
-  (block * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
+  block_with_metadata tzresult Lwt.t
 
 val get_balance_updates_from_metadata :
-  block_header_metadata * operation_receipt list ->
-  Alpha_context.Receipt.balance_updates
+  full_metadata -> Alpha_context.Receipt.balance_updates
 
 (** Bake blocks while a predicate over the block holds. The returned
     block is the last one for which the predicate holds; in case the
@@ -338,7 +338,6 @@ val bake_while :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> bool) ->
   block ->
@@ -354,7 +353,6 @@ val bake_while_with_metadata :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   ?invariant:(block -> unit tzresult Lwt.t) ->
   (block -> block_header_metadata -> bool) ->
   block ->
@@ -444,6 +442,7 @@ val prepare_initial_context_params :
   ?consensus_rights_delay:int ->
   ?allow_tz4_delegate_enable:bool ->
   ?aggregate_attestation:bool ->
+  ?native_contracts_enable:bool ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

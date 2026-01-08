@@ -1336,8 +1336,7 @@ module Make (Parameters : PARAMETERS) = struct
   module Handlers = struct
     type self = worker
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =
@@ -1484,7 +1483,8 @@ module Make (Parameters : PARAMETERS) = struct
   let next_protocol_of_block =
     let proto_levels_cache = Int_cache.create 7 in
     fun (cctxt : Client_context.full)
-        (block_hash, (block_header : Block_header.t)) ->
+        (block_hash, (block_header : Block_header.t))
+      ->
       let open Lwt_result_syntax in
       let proto_level = block_header.shell.proto_level in
       Int_cache.bind_or_put

@@ -10,7 +10,14 @@ let toplog (fmt : ('a, Format.formatter, unit, unit) format4) : 'a =
 
 let init_teztale cloud agent =
   let () = toplog "Initialize Teztale server" in
-  let* teztale = Tezos.Teztale.run_server cloud agent in
+  let* teztale =
+    Tezos.Teztale.run_server
+      ?artifact_dir:
+        (if Tezt_cloud_cli.teztale_artifacts then Tezt_cloud_cli.artifacts_dir
+         else None)
+      cloud
+      agent
+  in
   let* () = Tezos.Teztale.wait_server teztale in
   let () = toplog "Teztale server is ready" in
   let* () =
@@ -51,6 +58,7 @@ let add_prometheus_source ?dal_node ?sc_rollup_node ?evm_node ?node cloud agent
     Option.map
       (fun evm_node ->
         target
+          (* Note: Evm node uses the same port for rpc and for metrics *)
           (Tezos.Evm_node.rpc_port evm_node)
           (Tezt_etherlink.Evm_node.name evm_node))
       evm_node
@@ -72,3 +80,13 @@ let init_explorus cloud node =
     cloud
     ~name:"Explorus"
     ~url:(sf "http://explorus.io?network=%s" (Node.rpc_endpoint node))
+
+(* Some DAL nodes (those in operator mode) refuse to start unless they are
+   connected to an Octez node keeping enough history to play refutation
+   games. *)
+let refutation_game_minimal_rolling_history_mode =
+  Node.(History_mode (Rolling (Some 79)))
+
+let default_page_size = 3967
+
+let default_slot_size = 32 * default_page_size

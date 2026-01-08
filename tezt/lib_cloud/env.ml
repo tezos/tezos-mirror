@@ -10,7 +10,9 @@ let tezt_cloud =
   | Some tezt_cloud -> tezt_cloud
   | None -> (
       (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
-      match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
+      match Sys.getenv_opt "TEZT_CLOUD" with
+      | None -> ""
+      | Some value -> value)
 
 let mode =
   match (Cli.proxy, Cli.localhost, Cli.ssh_host) with
@@ -33,7 +35,9 @@ let mode =
       `Ssh_host (user, host, port)
 
 let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
-  home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
+  match Cli.ssh_private_key with
+  | None -> home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
+  | Some key -> key
 
 let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
@@ -107,6 +111,16 @@ let process_monitoring = Cli.process_monitoring
 
 let log_rotation = Cli.log_rotation
 
+let retrieve_daily_logs = Cli.retrieve_daily_logs
+
+let tc_delay = Cli.tc_delay
+
+let tc_jitter = Cli.tc_jitter
+
+let artifacts_dir = Cli.artifacts_dir
+
+let teztale_artifacts = Cli.teztale_artifacts
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
@@ -116,19 +130,37 @@ let init () =
      This allows logrotate to use a better strategy than copytruncate
      https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html
   *)
-  (if log_rotation <> 0 then
-     match Tezt_core.Cli.Logs.file with
-     | None -> ()
-     | Some logfile ->
-         Log.report "Installing signal handler for SIGHUP" ;
-         let signal_hup_handler signal =
-           if signal = Sys.sighup then (
-             (* TODO: Not sure if set_file is async-signal-safe.
-                Maybe implement a better solution if it causes issues *)
-             Tezt_core.Log.set_file logfile ;
-             Log.report "Logfile was reopened")
-         in
-         Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
+  (match Tezt_core.Cli.Logs.file with
+  | None -> ()
+  | Some logfile ->
+      let sighup_flag = ref false in
+      (* loop every second to check if sighup_flag was set *)
+      let logfile_reopen =
+        let rec loop () =
+          let* () =
+            if !sighup_flag then (
+              sighup_flag := false ;
+              Log.report "Reopening logfile : %s" logfile ;
+              Tezt_core.Log.set_file logfile ;
+              Lwt.return_unit)
+            else Lwt_unix.sleep 1.
+          in
+          loop ()
+        in
+        Log.report "Starting reopen logfile background handler" ;
+        loop ()
+      in
+      (* signal handler that now just defer Log.set_file *)
+      let signal_hup_handler signal =
+        if signal = Sys.sighup then sighup_flag := true
+      in
+      let _ =
+        Lwt_main.Exit_hooks.add_first (fun () ->
+            let () = Lwt.cancel logfile_reopen in
+            Lwt.return_unit)
+      in
+      Log.report "Installing signal handler for reopening logfile" ;
+      Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
   | `Local_orchestrator_local_agents | `Ssh_host _ -> Lwt.return_unit
   | `Remote_orchestrator_local_agents ->
@@ -261,10 +293,16 @@ let notifier =
         "A Slack bot token has been provided but no Slack channel id. No \
          reports or alerts will be sent." ;
       Notifier_null
-  | None, Some _ ->
-      Log.warn
-        "A Slack channel ID has been provided but no Slack bot token. No \
-         reports or alerts will be sent." ;
-      Notifier_null
+  | None, Some slack_channel_id -> (
+      match Sys.getenv_opt "TEZTCLOUD_SLACK_BOT_TOKEN" with
+      | None ->
+          Log.warn
+            "A Slack channel ID has been provided but no --slack-bot-token is \
+             specified or TEZTCLOUD_SLACK_BOT_TOKEN environment variable is \
+             defined. No reports or alerts will be sent." ;
+          Notifier_null
+      | Some slack_bot_token ->
+          Notifier_slack
+            {name = "default-slack"; slack_channel_id; slack_bot_token})
   | Some slack_bot_token, Some slack_channel_id ->
       Notifier_slack {name = "default-slack"; slack_channel_id; slack_bot_token}

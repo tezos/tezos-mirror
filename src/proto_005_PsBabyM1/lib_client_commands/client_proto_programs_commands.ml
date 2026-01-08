@@ -230,7 +230,8 @@ let commands () =
            program
            storage
            input
-           cctxt ->
+           cctxt
+         ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
         Lwt.return @@ Micheline_parser.no_parsing_error program
@@ -276,7 +277,10 @@ let commands () =
          no_print_source_flag
          custom_gas_flag)
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
+      (fun (show_types, emacs_mode, no_print_source, original_gas)
+           program
+           cctxt
+         ->
         match program with
         | program, [] ->
             resolve_max_gas cctxt cctxt#block original_gas
@@ -462,7 +466,8 @@ let commands () =
            bytes
            (_, (key_locator, _))
            signature
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         Client_keys_v0.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->
@@ -614,27 +619,28 @@ let commands () =
            expr_string
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         (match from_format with
         | `Michelson ->
             let program = Michelson_v1_parser.parse_toplevel expr_string in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
-            (typecheck_program
-               cctxt
-               ~chain:cctxt#chain
-               ~block:cctxt#block
-               program
-             >>= function
-             | Error _ as res ->
-                 print_typecheck_result
-                   ~emacs:false
-                   ~show_types:true
-                   ~print_source_on_error:true
-                   program
-                   res
-                   cctxt
-             | Ok _ -> return_unit)
+            ( typecheck_program
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                program
+            >>= function
+              | Error _ as res ->
+                  print_typecheck_result
+                    ~emacs:false
+                    ~show_types:true
+                    ~print_source_on_error:true
+                    program
+                    res
+                    cctxt
+              | Ok _ -> return_unit )
             >>=? fun () -> return program.expanded
         | `JSON -> (
             match Data_encoding.Json.from_string expr_string with
@@ -686,7 +692,8 @@ let commands () =
            data_string
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let micheline_of_expr expr =
           Micheline_printer.printable
             Michelson_v1_primitives.string_of_prim

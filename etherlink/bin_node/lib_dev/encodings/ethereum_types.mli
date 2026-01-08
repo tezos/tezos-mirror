@@ -75,6 +75,18 @@ val block_hash_of_bytes : bytes -> block_hash
 
 val block_hash_of_string : string -> block_hash
 
+(** Type for values than are already encoded, for performance purposes. *)
+type 'a pre_encoded = private {
+  encoding : 'a Data_encoding.t;
+  json : Data_encoding.json;
+}
+
+val pre_encode : 'a Data_encoding.t -> 'a -> 'a pre_encoded
+
+val decode_pre : 'a pre_encoded -> 'a
+
+val pre_encoded_encoding : 'a Data_encoding.t -> 'a pre_encoded Data_encoding.t
+
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@unboxed]
 
@@ -121,6 +133,8 @@ val pp_hash : Format.formatter -> hash -> unit
 val transaction_hash_size : int
 
 val decode_hash : bytes -> hash
+
+val encode_hash : hash -> bytes
 
 (** [hash_of_string s] takes a string [s] representing a hash in
     hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps
@@ -302,6 +316,8 @@ module Address : sig
   val to_string : t -> string
 
   val of_string : string -> t
+
+  val to_eip55_string : t -> string
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
@@ -323,6 +339,8 @@ val transaction_log_body_from_rlp :
   Rlp.item -> address * hash list * hex * quantity
 
 val decode_hex : bytes -> hex
+
+val encode_hex : hex -> bytes
 
 module From_rlp : sig
   val decode_address : Rlp.item -> address tzresult
@@ -380,6 +398,8 @@ module Subscription : sig
     | Logs of logs
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
+    | NewPreconfirmedReceipts
     | Etherlink of etherlink_extension
 
   val kind_encoding : kind Data_encoding.t
@@ -408,14 +428,17 @@ module Subscription : sig
 
   type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
 
-  type 'transaction_object output =
+  type ('transaction_object, 'receipt) output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | NewIncludedTransactions of 'transaction_object
+    | NewPreconfirmedReceipts of 'receipt
     | Etherlink of etherlink_extension_output
 
   val output_encoding :
     'transaction_object Data_encoding.t ->
-    'transaction_object output Data_encoding.t
+    'receipt Data_encoding.t ->
+    ('transaction_object, 'receipt) output Data_encoding.t
 end

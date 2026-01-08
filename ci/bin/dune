@@ -6,12 +6,15 @@
  (libraries
   gitlab_ci
   tezos_ci
-  grafazos
-  teztale
-  rollup_node
-  yaml
-  unix
-  tezt.core)
+  tezos_ci_jobs
+  grafazos_ci
+  teztale_ci
+  rollup_node_ci
+  sdk_bindings_ci
+  etherlink_ci
+  documentation_ci
+  client_libs_ci)
  (flags
   (:standard)
-  -open Gitlab_ci.Base))
+  -open Gitlab_ci.Base
+  -open Tezos_ci_jobs))

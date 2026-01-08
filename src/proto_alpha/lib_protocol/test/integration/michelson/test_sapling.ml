@@ -49,7 +49,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let module H = Tezos_sapling.Core.Client.Hash in
     let cm = H.uncommitted ~height:0 in
@@ -93,7 +93,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -127,7 +127,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -186,7 +186,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -231,7 +231,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id_one_by_one =
       Lazy_storage_diff.fresh
@@ -313,7 +313,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -335,7 +335,7 @@ module Raw_context_tests = struct
               ~predecessor_timestamp:b.header.shell.timestamp
               ~timestamp:b.header.shell.timestamp
               (Raw_context.recover ctx)
-              ~adaptive_issuance_enable:false
+              ~all_bakers_attest_first_level:None
           in
           (ctx, Int32.succ cnt))
         (ctx, 0l)
@@ -387,7 +387,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -926,7 +926,8 @@ module Interpreter_tests = struct
             (function
               | Environment.Ecoproto_error
                   (Tezos_protocol_alpha.Protocol.Script_tc_errors
-                   .Unexpected_forged_value _) ->
+                   .Unexpected_forged_value
+                     _) ->
                   true
               | _ -> false)
             errs) ;
@@ -1056,7 +1057,7 @@ module Interpreter_tests = struct
           ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
           ~allow_forged_tickets_in_storage:true
           ~allow_forged_lazy_storage_id_in_storage:true
-          script
+          (Script script)
       in
       let*?@ id, _ctx_2 =
         Script_ir_translator.get_single_sapling_state
@@ -1075,7 +1076,7 @@ module Interpreter_tests = struct
           ~level:block.header.shell.level
           ~predecessor_timestamp:block.header.shell.timestamp
           ~timestamp:block.header.shell.timestamp
-          ~adaptive_issuance_enable:false
+          ~all_bakers_attest_first_level:None
       in
       let*@ result = Sapling_storage.Roots.mem raw_ctx id root in
       return result

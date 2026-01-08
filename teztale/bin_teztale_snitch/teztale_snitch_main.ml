@@ -90,7 +90,8 @@ let filter_source source data =
     (fun {
            level;
            data = {missing_blocks; delegate_operations; blocks; cycle_info};
-         } ->
+         }
+       ->
       let missing_blocks =
         missing_blocks
         |> List.filter_map @@ fun b ->

@@ -313,8 +313,8 @@ module Atom = struct
 end
 
 (** Main recursive reading function, in continuation passing style. *)
-let rec read_rec :
-    type ret. ret Encoding.t -> ?name:string -> slicer_state -> ret =
+let rec read_rec : type ret.
+    ret Encoding.t -> ?name:string -> slicer_state -> ret =
  fun e ?name state ->
   let ( !! ) x =
     match name with None -> x | Some name -> Format.sprintf "%S (%s)" name x
@@ -484,8 +484,7 @@ let rec read_rec :
   | Mu {fix; name; _} -> read_rec (fix e) ~name:!!name state
   | Delayed f -> read_rec (f ()) ?name state
 
-and read_variable_pair :
-    type left right.
+and read_variable_pair : type left right.
     left Encoding.t ->
     right Encoding.t ->
     ?name:string ->
@@ -510,8 +509,7 @@ and read_variable_pair :
   | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
   | `Variable, (`Variable | `Dynamic) -> assert false
 
-and read_variable_list :
-    type a.
+and read_variable_list : type a.
     read_error ->
     int ->
     a Encoding.t ->
@@ -529,8 +527,8 @@ and read_variable_list :
   in
   loop max_length [] 0
 
-and read_fixed_list :
-    type a. int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
+and read_fixed_list : type a.
+    int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
  fun exact_length e ?name state ->
   let name = Option.map (fun name -> name ^ " element") name in
   let rec loop exact_length acc =
@@ -542,8 +540,8 @@ and read_fixed_list :
   in
   loop exact_length []
 
-and read_fixed_array :
-    type a. int -> a Encoding.t -> ?name:string -> slicer_state -> a array =
+and read_fixed_array : type a.
+    int -> a Encoding.t -> ?name:string -> slicer_state -> a array =
  fun exact_length e ?name state ->
   assert (exact_length >= 0) ;
   if exact_length = 0 then [||]

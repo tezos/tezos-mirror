@@ -284,23 +284,64 @@ module DNS = struct
     in
     return zone
 
-  let add_subdomain ~zone ~name ~value =
+  let apply_update ~zone ~name ~log transaction =
     let* name = get_fqdn ~zone ~name in
     match name with
     | None ->
         Log.report "No domain found for zone: '%s'" zone ;
         Lwt.return_unit
     | Some name ->
-        Log.report "Adding subdomain '%s'" name ;
-        Transaction.(try_update ~zone @@ add ~zone ~name ~value) ()
+        Log.report "%s" (log name) ;
+        Transaction.(try_update ~zone @@ transaction ~name) ()
+
+  let add_subdomain ~zone ~name ~value =
+    apply_update
+      ~zone
+      ~name
+      ~log:(Format.sprintf "Adding subdomain '%s'")
+      (fun ~name () -> Transaction.add ~zone ~name ~value ())
 
   let remove_subdomain ~zone ~name ~value =
-    let* name = get_fqdn ~zone ~name in
-    match name with
+    apply_update
+      ~zone
+      ~name
+      ~log:(Format.sprintf "Removing subdomain '%s'")
+      (fun ~name () -> Transaction.remove ~zone ~name ~value ())
+
+  let set_subdomain ~agent_ip ~domain =
+    let* res = find_zone_for_subdomain domain in
+    match res with
     | None ->
-        Log.report "No domain found for zone: '%s'" zone ;
+        let () =
+          Log.report
+            ~color:Log.Color.FG.yellow
+            "The domain '%s' is not a subdomain of an authorized GCP zone. \
+             Skipping."
+            domain
+        in
         Lwt.return_unit
-    | Some name ->
-        Log.report "Removing subdomain '%s'" name ;
-        Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
+    | Some (zone, _) ->
+        let transaction ~name () =
+          let* ip = get_value ~zone ~domain in
+          let* () =
+            match ip with
+            | None -> Lwt.return_unit
+            | Some ip -> Transaction.remove ~zone ~name ~value:ip ()
+          in
+          Transaction.add ~zone ~name ~value:agent_ip ()
+        in
+        let* () =
+          apply_update
+            ~zone
+            ~name:domain
+            ~log:(Format.sprintf "Updating subdomain '%s'")
+            transaction
+        in
+        let () =
+          Log.report
+            ~color:Log.Color.FG.green
+            "DNS registered successfully: '%s'"
+            domain
+        in
+        Lwt.return_unit
 end

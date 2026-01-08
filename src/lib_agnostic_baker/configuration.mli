@@ -32,7 +32,8 @@ val baker_args :
     * bool
     * bool
     * Q.t option
-    * Q.t option,
+    * Q.t option
+    * bool,
     Tezos_client_base.Client_context.full )
   Tezos_clic.options
 
@@ -67,6 +68,7 @@ type t = {
   state_recorder : bool;
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
+  allow_signing_delay : bool;
 }
 
 val create_config :
@@ -86,11 +88,11 @@ val create_config :
   * bool
   * bool
   * Q.t option
-  * Q.t option ->
+  * Q.t option
+  * bool ->
   t
 
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Per_block_votes.per_block_vote;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote;
 }

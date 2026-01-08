@@ -46,6 +46,13 @@ let configuration_service =
     ~output:Data_encoding.Json.encoding
     Path.(root / "configuration")
 
+let mode_service =
+  Service.get_service
+    ~description:"Expose the operating mode of the EVM node"
+    ~query:Query.empty
+    ~output:Data_encoding.string
+    Path.(root / "mode")
+
 type health_check_query = {drift_threshold : Z.t}
 
 let health_check_service =
@@ -61,9 +68,7 @@ let health_check_service =
     ~output:Data_encoding.empty
     Path.(root / "health_check")
 
-type error += Node_is_bootstrapping
-
-type error += Node_is_lagging
+type error += Node_is_bootstrapping | Node_is_lagging | Stalled_database
 
 let () =
   register_error_kind
@@ -84,7 +89,17 @@ let () =
        servers can be outdated"
     Data_encoding.empty
     (function Node_is_lagging -> Some () | _ -> None)
-    (fun () -> Node_is_lagging)
+    (fun () -> Node_is_lagging) ;
+  register_error_kind
+    `Temporary
+    ~id:"stalled_database"
+    ~title:"Database of the node is not responsive"
+    ~description:
+      "The database connections used by the node are stalled, the node needs \
+       to be restarted."
+    Data_encoding.empty
+    (function Stalled_database -> Some () | _ -> None)
+    (fun () -> Stalled_database)
 
 let client_version =
   Format.sprintf
@@ -101,9 +116,9 @@ let configuration_handler config =
   (* Hide some parts of the configuration. *)
   let hidden = "hidden" in
   let kernel_execution =
-    Configuration.{config.kernel_execution with preimages = hidden}
+    Configuration.{config.kernel_execution with preimages = Some hidden}
   in
-  let sequencer = {config.sequencer with sequencer = None} in
+  let sequencer = {config.sequencer with sequencer = []} in
   let observer =
     Option.map
       (fun (observer : observer) ->
@@ -120,6 +135,7 @@ let configuration_handler config =
   let config =
     {
       config with
+      data_dir = hidden;
       rollup_node_endpoint = Uri.of_string hidden;
       kernel_execution;
       sequencer;
@@ -131,30 +147,62 @@ let configuration_handler config =
 
   Data_encoding.Json.construct
     ~include_default_fields:`Always
-    (Configuration.encoding hidden)
+    (Configuration.encoding ())
     config
 
-let health_check_handler ?delegate_to query =
-  match delegate_to with
-  | None ->
+let health_check_handler config mode db_liveness_check query =
+  match mode with
+  | Mode.Sequencer _ | Observer _ | Proxy _ ->
       let open Lwt_result_syntax in
-      let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping in
-      let* () =
+      let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
+      and* () =
         fail_when
           Z.Compare.(
             Drift_monitor.last_observed_drift () > query.drift_threshold)
           Node_is_lagging
+      and* () =
+        let* has_timeout =
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep 2. in
+               return true);
+              (let* _ = db_liveness_check () in
+               return false);
+            ]
+        in
+        fail_when has_timeout Stalled_database
       in
       return_unit
-  | Some evm_node_endpoint ->
+  | Rpc {evm_node_endpoint; _} ->
       Rollup_services.call_service
         ~keep_alive:false
         ~base:evm_node_endpoint
+        ~timeout:config.Configuration.rpc_timeout
         ~media_types:[Media_type.json]
         health_check_service
         ()
         query
         ()
+
+let evm_mode_handler config evm_mode =
+  let open Lwt_result_syntax in
+  match evm_mode with
+  | Mode.Sequencer _ -> return "sequencer"
+  | Observer _ -> return "observer"
+  | Proxy _ -> return "proxy"
+  | Rpc {evm_node_endpoint; _} ->
+      let+ evm_node_mode =
+        Rollup_services.call_service
+          ~keep_alive:false
+          ~base:evm_node_endpoint
+          ~timeout:config.Configuration.rpc_timeout
+          ~media_types:[Media_type.json]
+          mode_service
+          ()
+          ()
+          ()
+      in
+      Format.sprintf "rpc (%s)" evm_node_mode
 
 let version dir =
   Evm_directory.register0 dir version_service (fun () () ->
@@ -164,9 +212,13 @@ let configuration config dir =
   Evm_directory.register0 dir configuration_service (fun () () ->
       configuration_handler config |> Lwt.return_ok)
 
-let health_check ?delegate_to dir =
+let evm_mode config evm_mode dir =
+  Evm_directory.register0 dir mode_service (fun () () ->
+      evm_mode_handler config evm_mode)
+
+let health_check config mode db_liveness_check dir =
   Evm_directory.register0 dir health_check_service (fun query () ->
-      health_check_handler ?delegate_to query)
+      health_check_handler config mode db_liveness_check query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -208,8 +260,13 @@ let block_transaction_count block =
 
 type sub_stream = {
   kind : Ethereum_types.Subscription.kind;
-  stream : Transaction_object.t Ethereum_types.Subscription.output Lwt_stream.t;
-  stopper : unit -> unit;
+  stream :
+    ( Transaction_object.t,
+      Transaction_receipt.t )
+    Ethereum_types.Subscription.output
+    tzresult
+    Lwt_stream.t;
+  stopper : unit -> bool tzresult Lwt.t;
 }
 
 let subscriptions :
@@ -244,30 +301,23 @@ let generate_id () =
   Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
   encode_id id
 
-let logs_of_filter logs =
-  match logs with
-  | Ethereum_types.Filter.Log logs ->
-      Some (Ethereum_types.Subscription.Logs logs)
-  | Ethereum_types.Filter.Block_filter _
-  | Ethereum_types.Filter.Pending_transaction_filter _ ->
-      None
-
 let filter_from ~address ~topics =
   Ethereum_types.Filter.
     {from_block = None; to_block = None; address; topics; block_hash = None}
 
 let filter_logs ~bloom_filter ~receipt =
-  let logs = Filter_helpers.filter_receipt bloom_filter receipt in
-  let logs = Option.value ~default:[] logs in
-  List.filter_map logs_of_filter logs
+  Filter_helpers.filter_receipt bloom_filter receipt
 
 let produce_logs_stream ~bloom_filter stream =
-  Lwt_stream.map_list (fun receipt -> filter_logs ~bloom_filter ~receipt) stream
+  Lwt_stream.map_list
+    (fun receipt ->
+      filter_logs ~bloom_filter ~receipt
+      |> List.map (fun l -> Ethereum_types.Subscription.Logs l))
+    stream
 
-let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
+let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
     (module Backend_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
-  let id = make_id ~id:(generate_id ()) in
   let* stream, stopper =
     match kind with
     | NewHeads -> return @@ Lwt_watcher.create_stream Evm_context.head_watcher
@@ -283,6 +333,41 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+    | NewIncludedTransactions ->
+        let stream, stopper = Broadcast.create_broadcast_stream () in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Broadcast.Included_transaction {tx; hash = _} -> (
+                  match tx with
+                  | Common (Broadcast.Evm raw) -> (
+                      let res = Transaction_object.decode raw in
+                      match res with
+                      | Ok txn ->
+                          Some
+                            (Ethereum_types.Subscription.NewIncludedTransactions
+                               txn)
+                      | Error _ -> None)
+                  | Common (Broadcast.Michelson _raw) ->
+                      (* TODO: L2-586 include tezlink transaction in preconfirmation stream *)
+                      None
+                  | _ -> None)
+              | _ -> None)
+            stream
+        in
+        return (stream, stopper)
+    | NewPreconfirmedReceipts ->
+        let stream, stopper = Broadcast.create_transaction_result_stream () in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Broadcast.{hash = _; result = Ok receipt} ->
+                  Some
+                    (Ethereum_types.Subscription.NewPreconfirmedReceipts receipt)
+              | _ -> None)
+            stream
+        in
+        return (stream, stopper)
     | Etherlink (L1_L2_levels from_l1_level) ->
         let* () =
           unless (Evm_events_follower.available ()) @@ fun () ->
@@ -298,7 +383,8 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
                        {
                          Evm_store.L1_l2_finalized_levels.start_l2_level;
                          end_l2_level;
-                       } ) ->
+                       } )
+                   ->
                   {
                     Ethereum_types.Subscription.l1_level;
                     start_l2_level;
@@ -318,34 +404,220 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
         in
         return (stream, stopper)
   in
+  return
+    ( Lwt_stream.map Result.ok stream,
+      fun () ->
+        Lwt_watcher.shutdown stopper ;
+        return true )
+
+type 'a proxied_subscription = {
+  watcher : 'a Lwt_watcher.input;
+  unsubscribe : unit -> bool tzresult Lwt.t;
+  mutable subscribers : int;
+}
+
+module WsClientTable = Hashtbl.Make (struct
+  type t = Websocket_client.t * Ethereum_types.Subscription.kind
+
+  let equal (ws1, k1) (ws2, k2) =
+    Websocket_client.client_id ws1 = Websocket_client.client_id ws2 && k1 = k2
+
+  let hash (ws, k) = Hashtbl.hash (Websocket_client.client_id ws, k)
+end)
+
+let proxied_subscriptions = WsClientTable.create 4
+
+let create_proxied_subscription ws_client ~timeout kind =
+  let open Lwt_result_syntax in
+  let timeout = Websocket_client.{timeout; on_timeout = `Retry_forever} in
+  let watcher = Lwt_watcher.create_input () in
+  let upstream_unsubscribe = ref (fun () -> return_false) in
+  let unsubscribe () =
+    WsClientTable.remove proxied_subscriptions (ws_client, kind) ;
+    !upstream_unsubscribe ()
+  in
+  let proxied = {watcher; unsubscribe; subscribers = 0} in
+  WsClientTable.replace proxied_subscriptions (ws_client, kind) proxied ;
+  let upstream_subscribe () =
+    let rec resubscribe () =
+      let open Lwt_syntax in
+      if proxied.subscribers <= 0 then
+        (* no more subscribers *)
+        return_unit
+      else
+        (* Resubscribing after small delay *)
+        let* () = Lwt_unix.sleep 1. in
+        let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+        upstream_subscribe_loop sub
+    and upstream_subscribe_loop =
+      let open Lwt_syntax in
+      function
+      | Error e ->
+          (* Notify error and attempt resubscription *)
+          Lwt_watcher.notify watcher (Error e) ;
+          resubscribe ()
+      | Ok Websocket_client.{stream; unsubscribe} ->
+          (* Subscription success, register new unsubscribe *)
+          (* TODO: maybe add missing elements in the stream while
+             disconnected. *)
+          upstream_unsubscribe := unsubscribe ;
+          Lwt.dont_wait
+            (fun () ->
+              let* () = Lwt_stream.iter (Lwt_watcher.notify watcher) stream in
+              (* Upstream subscription stream stopped, resubscribe if there are
+                  any subscribers left. *)
+              resubscribe ())
+            ignore ;
+          return_unit
+    in
+    let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+    let*! () = upstream_subscribe_loop (Ok sub) in
+    return_unit
+  in
+  let* () = upstream_subscribe () in
+  return proxied
+
+let get_proxied_subscription ws_client ~timeout
+    (kind : Ethereum_types.Subscription.kind) =
+  let open Lwt_result_syntax in
+  let kind =
+    match kind with
+    | NewHeads -> (NewHeads : Ethereum_types.Subscription.kind)
+    | Logs _ ->
+        (* Subscribe to all logs *)
+        Logs {address = None; topics = None}
+    | NewPendingTransactions -> NewPendingTransactions
+    | NewIncludedTransactions -> NewIncludedTransactions
+    | NewPreconfirmedReceipts -> NewPreconfirmedReceipts
+    | Syncing -> Syncing
+    | Etherlink (L1_L2_levels _) ->
+        (* Don't fetch historic levels through websocket *)
+        Etherlink (L1_L2_levels None)
+  in
+  match WsClientTable.find proxied_subscriptions (ws_client, kind) with
+  | Some proxied -> return proxied
+  | None -> create_proxied_subscription ws_client ~timeout kind
+
+(* In RPC mode, the EVM node acts as a proxy to the server for
+   `eth_subscribe`. There is at most one subscription active per kind on the
+   server. *)
+let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
+    (ws_client : Websocket_client.t)
+    (module Backend_rpc : Services_backend_sig.S) =
+  let open Lwt_result_syntax in
+  let* proxied = get_proxied_subscription ws_client ~timeout kind in
+  let* stream, stopper =
+    match kind with
+    | NewHeads | NewPendingTransactions | Syncing | NewIncludedTransactions
+    | NewPreconfirmedReceipts ->
+        return @@ Lwt_watcher.create_stream proxied.watcher
+    | Logs {address; topics} ->
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let filter = filter_from ~address ~topics in
+        let* bloom_filter = Filter_helpers.validate_bloom_filter filter in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Ok (Ethereum_types.Subscription.Logs log) ->
+                  Filter_helpers.filter_one_log bloom_filter log
+                  |> Option.map (fun l ->
+                         Ok (Ethereum_types.Subscription.Logs l))
+              | Ok _ -> None
+              | Error e -> Some (Error e))
+            stream
+        in
+        return (stream, stopper)
+    | Etherlink (L1_L2_levels from_l1_level) ->
+        let* extra =
+          match from_l1_level with
+          | None -> return_nil
+          | Some from_l1_level ->
+              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              List.rev_map
+                (fun ( l1_level,
+                       {
+                         Evm_store.L1_l2_finalized_levels.start_l2_level;
+                         end_l2_level;
+                       } )
+                   ->
+                  Ok
+                    (Ethereum_types.Subscription.Etherlink
+                       (L1_l2_levels {l1_level; start_l2_level; end_l2_level})))
+                l1_l2
+              |> List.rev
+        in
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let stream = Lwt_stream.append (Lwt_stream.of_list extra) stream in
+        return (stream, stopper)
+  in
+  let unsubscribed = ref false in
+  let unsubscribe () =
+    if !unsubscribed then return_false
+    else (
+      unsubscribed := true ;
+      Lwt_watcher.shutdown stopper ;
+      proxied.subscribers <- proxied.subscribers - 1 ;
+      if proxied.subscribers <= 0 then proxied.unsubscribe () else return_true)
+  in
+  proxied.subscribers <- proxied.subscribers + 1 ;
+  return (stream, unsubscribe)
+
+let eth_subscribe (config : Configuration.t) (mode : 'f Mode.t) ~kind backend =
+  let open Lwt_result_syntax in
+  let id = make_id ~id:(generate_id ()) in
+  let* stream, stopper =
+    match mode with
+    | Rpc {websocket = Some ws_client; _} ->
+        eth_subscribe_rpc_mode
+          ~timeout:config.rpc_timeout
+          ~kind
+          ws_client
+          backend
+    | Rpc {websocket = None; _} ->
+        failwith
+          "Cannot call eth_subscribe on RPC node whose endpoint does not \
+           support websockets."
+    | _ -> eth_subscribe_direct ~kind backend
+  in
   let stopper () =
     Stdlib.Hashtbl.remove subscriptions id ;
-    Lwt_watcher.shutdown stopper
+    stopper ()
   in
   Stdlib.Hashtbl.add subscriptions id {kind; stream; stopper} ;
   return (id, (stream, stopper))
 
 let eth_unsubscribe ~id =
   match Stdlib.Hashtbl.find_opt subscriptions id with
-  | Some {stopper; _} ->
-      stopper () ;
-      true
-  | None -> false
+  | Some {stopper; _} -> stopper ()
+  | None -> Lwt_result_syntax.return_false
 
-let decode :
-    type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
- fun (module M) v -> Data_encoding.Json.destruct M.input_encoding v
+let decode : type a.
+    (module METHOD with type input = a) -> Data_encoding.json -> a =
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.decode"
+  @@ fun _ -> Data_encoding.Json.destruct M.input_encoding v
 
-let encode :
-    type a. (module METHOD with type output = a) -> a -> Data_encoding.json =
- fun (module M) v -> Data_encoding.Json.construct M.output_encoding v
+let encode : type a.
+    (module METHOD with type output = a) -> a -> Data_encoding.json =
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.encode"
+  @@ fun _ -> Data_encoding.Json.construct M.output_encoding v
 
-let build :
-    type input output.
+let direct_rpc_value v = JSONRPC.Direct v
+
+let lazy_rpc_value v = JSONRPC.Lazy v
+
+let build : type input output.
     (module METHOD with type input = input and type output = output) ->
     f:(input option -> (output, Rpc_errors.t) Result.t tzresult Lwt.t) ->
     Data_encoding.json option ->
-    JSONRPC.value Lwt.t =
+    JSONRPC.return_value Lwt.t =
  fun (module Method) ~f parameters ->
   let open Lwt_syntax in
   Lwt.catch
@@ -354,10 +626,11 @@ let build :
       let+ v = f decoded in
       match v with
       | Error err ->
-          Error
-            (Rpc_errors.internal_error
-            @@ Format.asprintf "%a" pp_print_trace err)
-      | Ok value -> Result.map (encode (module Method)) value)
+          direct_rpc_value
+            (Error
+               (Rpc_errors.internal_error
+               @@ Format.asprintf "%a" pp_print_trace err))
+      | Ok value -> direct_rpc_value (Result.map (encode (module Method)) value))
     (fun exn ->
       Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
       @@ Printexc.to_string exn)
@@ -373,6 +646,50 @@ let expect_input input f =
 
 let build_with_input method_ ~f parameters =
   build method_ ~f:(fun input -> expect_input input f) parameters
+
+let build_with_lazy_output : type input output.
+    (module METHOD with type input = input and type output = output) ->
+    f:
+      (input option ->
+      (output, Rpc_errors.t) Result.t tzresult Lwt.t tzresult Lwt.t) ->
+    Data_encoding.json option ->
+    JSONRPC.return_value Lwt.t =
+ fun (module Method) ~f parameters ->
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () ->
+      let decoded = Option.map (decode (module Method)) parameters in
+      let+ v = f decoded in
+      match v with
+      | Error err ->
+          direct_rpc_value
+            (Error
+               (Rpc_errors.internal_error
+               @@ Format.asprintf "%a" pp_print_trace err))
+      | Ok promise ->
+          let encode = function
+            | Ok v -> Result.map (encode (module Method)) v
+            | Error err ->
+                Error
+                  (Rpc_errors.internal_error
+                  @@ Format.asprintf "%a" pp_print_trace err)
+          in
+          lazy_rpc_value (Lwt.map encode promise))
+    (fun exn ->
+      Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
+      @@ Printexc.to_string exn)
+
+let build_with_input_and_lazy_output method_ ~f parameters =
+  let missing_parameter () =
+    Lwt_result.return (Lwt.return (Ok (Error Rpc_errors.invalid_input)))
+  in
+  let expect_input input f =
+    match input with None -> missing_parameter () | Some v -> f v
+  in
+  build_with_lazy_output
+    method_
+    ~f:(fun input -> expect_input input f)
+    parameters
 
 let get_fee_history block_count block_parameter config
     (module Backend_rpc : Services_backend_sig.S) =
@@ -481,13 +798,87 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (type f) ~is_sequencer ~websocket
+let inject_rpc_call (config : Configuration.t) request method_
+    Mode.{evm_node_endpoint; _} =
+  let open Lwt_result_syntax in
+  let* res =
+    Injector.call_singleton_request
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~base:evm_node_endpoint
+      method_
+      request
+  in
+  match res with
+  | Ok output -> rpc_ok output
+  | Error reason -> rpc_error (Rpc_errors.internal_error reason)
+
+let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful_evm
+    ~on_stateful_michelson =
+  match mode with
+  | Mode.Rpc rpc -> on_rpc rpc
+  | Proxy (Evm_tx_container tx_container)
+  | Sequencer (Evm_tx_container tx_container)
+  | Observer (Evm_tx_container tx_container) ->
+      on_stateful_evm tx_container
+  | Proxy (Michelson_tx_container tx_container)
+  | Sequencer (Michelson_tx_container tx_container)
+  | Observer (Michelson_tx_container tx_container) ->
+      on_stateful_michelson tx_container
+
+let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
+    ~wait_confirmation =
+  let open Lwt_result_syntax in
+  let f raw_tx =
+    let txn = Ethereum_types.hex_to_bytes raw_tx in
+    let* is_valid = Prevalidator.prevalidate_raw_transaction txn in
+    match is_valid with
+    | Error err ->
+        let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_tx in
+        rpc_error (Rpc_errors.transaction_rejected err None)
+    | Ok {next_nonce; transaction_object} ->
+        Octez_telemetry.Trace.(
+          add_attrs (fun () ->
+              Telemetry.Attributes.
+                [Transaction.hash @@ Transaction_object.hash transaction_object])) ;
+        process_based_on_mode
+          mode
+          ~on_rpc:(fun {evm_node_private_endpoint; _} ->
+            let* res =
+              Injector.inject_transaction
+                ~wait_confirmation
+                ~keep_alive:config.keep_alive
+                ~timeout:config.rpc_timeout
+                ~base:evm_node_private_endpoint
+                ~tx_object:transaction_object
+                ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+            in
+            match res with
+            | Ok output -> rpc_ok output
+            | Error reason -> rpc_error (Rpc_errors.internal_error reason))
+          ~on_stateful_evm:(fun (module Tx_container) ->
+            let* tx_hash =
+              Tx_container.add
+                ~next_nonce
+                transaction_object
+                ~raw_tx
+                ~wait_confirmation
+            in
+            match tx_hash with
+            | Ok tx_hash -> rpc_ok tx_hash
+            | Error reason ->
+                rpc_error (Rpc_errors.transaction_rejected reason None))
+          ~on_stateful_michelson:(fun _ ->
+            failwith "Unsupported JSONRPC method in Tezlink: sendRawTransaction")
+  in
+  f
+
+let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
-    (config : Configuration.t)
-    (tx_container : f Services_backend_sig.tx_container)
+    (rpc : Configuration.rpc) (config : Configuration.t) (mode : f Mode.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
-    ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+    ({method_; parameters; id} as request : JSONRPC.request) :
+    JSONRPC.return_response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
   Telemetry.Jsonrpc.trace_dispatch_with
@@ -496,7 +887,7 @@ let dispatch_request (type f) ~is_sequencer ~websocket
     method_
     id
   @@ fun _scope ->
-  let*! value =
+  let*! return_value =
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
     with
@@ -652,20 +1043,22 @@ let dispatch_request (type f) ~is_sequencer ~websocket
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-                  let* (module Tx_container) =
-                    match tx_container with
-                    | Evm_tx_container m -> return m
-                    | Michelson_tx_container _ ->
-                        failwith
-                          "Unsupported JSONRPC method in Tezlink: \
-                           getTransactionCount"
-                  in
-                  let* next_nonce =
-                    Backend_rpc.Etherlink.nonce address block_param
-                  in
-                  let next_nonce = Option.value ~default:Qty.zero next_nonce in
-                  let* nonce = Tx_container.nonce ~next_nonce address in
-                  rpc_ok nonce
+                  process_based_on_mode
+                    mode
+                    ~on_rpc:(inject_rpc_call config request module_)
+                    ~on_stateful_michelson:(fun _ ->
+                      failwith
+                        "Unsupported JSONRPC method in Tezlink: \
+                         getTransactionCount")
+                    ~on_stateful_evm:(fun (module Tx_container) ->
+                      let* next_nonce =
+                        Backend_rpc.Etherlink.nonce address block_param
+                      in
+                      let next_nonce =
+                        Option.value ~default:Qty.zero next_nonce
+                      in
+                      let* nonce = Tx_container.nonce ~next_nonce address in
+                      rpc_ok nonce)
               | _ ->
                   let* nonce =
                     Backend_rpc.Etherlink.nonce address block_param
@@ -768,24 +1161,23 @@ let dispatch_request (type f) ~is_sequencer ~websocket
               Octez_telemetry.Trace.(
                 add_attrs (fun () ->
                     Telemetry.Attributes.[Transaction.hash tx_hash])) ;
-
-              let* (module Tx_container) =
-                match tx_container with
-                | Evm_tx_container m -> return m
-                | Michelson_tx_container _ ->
-                    failwith
-                      "Unsupported JSONRPC method in Tezlink: \
-                       getTransactionByHash"
-              in
-              let* transaction_object = Tx_container.find tx_hash in
-              let* transaction_object =
-                match transaction_object with
-                | Some transaction_object -> return_some transaction_object
-                | None ->
-                    Backend_rpc.Etherlink_block_storage.transaction_object
-                      tx_hash
-              in
-              rpc_ok transaction_object
+              process_based_on_mode
+                mode
+                ~on_rpc:(inject_rpc_call config request module_)
+                ~on_stateful_michelson:(fun _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Tezlink: \
+                     GetTransactionByHash")
+                ~on_stateful_evm:(fun (module Tx_container) ->
+                  let* transaction_object = Tx_container.find tx_hash in
+                  match transaction_object with
+                  | Some transaction_object -> rpc_ok (Some transaction_object)
+                  | None ->
+                      let* transaction_object =
+                        Backend_rpc.Etherlink_block_storage.transaction_object
+                          tx_hash
+                      in
+                      rpc_ok transaction_object)
             in
             build_with_input ~f module_ parameters
         | Get_transaction_by_block_hash_and_index.Method ->
@@ -841,48 +1233,122 @@ let dispatch_request (type f) ~is_sequencer ~websocket
                     transactions"
                    None
             else
-              let max_number_of_chunks =
-                if is_sequencer then Some config.sequencer.max_number_of_chunks
-                else None
-              in
               let f raw_tx =
-                let txn = Ethereum_types.hex_to_bytes raw_tx in
-                let* is_valid =
-                  Validate.is_tx_valid
-                    ?max_number_of_chunks
-                    (module Backend_rpc)
-                    ~mode:validation
-                    txn
-                in
-                match is_valid with
-                | Error err ->
-                    let*! () =
-                      Tx_pool_events.invalid_transaction ~transaction:raw_tx
-                    in
-                    rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok (next_nonce, transaction_object) -> (
-                    Octez_telemetry.Trace.(
-                      add_attrs (fun () ->
-                          Telemetry.Attributes.
-                            [Transaction.hash transaction_object.hash])) ;
-
-                    let* (module Tx_container) =
-                      match tx_container with
-                      | Evm_tx_container m -> return m
-                      | Michelson_tx_container _ ->
-                          failwith
-                            "Unsupported JSONRPC method in Tezlink: \
-                             sendRawTransaction"
-                    in
-                    let* tx_hash =
-                      Tx_container.add ~next_nonce transaction_object ~raw_tx
-                    in
-                    match tx_hash with
-                    | Ok tx_hash -> rpc_ok tx_hash
-                    | Error reason ->
-                        rpc_error (Rpc_errors.transaction_rejected reason None))
+                send_raw_transaction config mode ~wait_confirmation:false raw_tx
               in
               build_with_input ~f module_ parameters
+        | Send_raw_transaction_sync.Method ->
+            let wait_or_timeout timeout f =
+              match timeout with
+              | 0L -> f ()
+              | timeout ->
+                  let timeout = Int64.to_float timeout in
+                  (*milliseconds to seconds*)
+                  let timeout = timeout /. 1000. in
+                  Lwt.catch
+                    (fun () -> Lwt_unix.with_timeout timeout f)
+                    (function
+                      | Lwt_unix.Timeout ->
+                          rpc_error
+                            (Rpc_errors.transaction_rejected
+                               (Format.sprintf
+                                  "The transaction was added to the mempool \
+                                   but wasn't processed in %d seconds"
+                                  (int_of_float timeout))
+                               None)
+                      | exn -> Lwt.fail exn)
+            in
+            let tx_hash_to_receipt f tx_hash =
+              match tx_hash with
+              | Error reason -> rpc_error reason
+              | Ok tx_hash -> (
+                  let* receipt = f tx_hash in
+                  match receipt with
+                  | Some (Ok receipt) -> rpc_ok receipt
+                  | Some (Error reason) ->
+                      rpc_error
+                        (Rpc_errors.transaction_rejected reason (Some tx_hash))
+                  | None ->
+                      rpc_error
+                        (Rpc_errors.transaction_rejected
+                           "Transaction not found"
+                           (Some tx_hash)))
+            in
+            let f (raw_tx, timeout, block_parameter) =
+              match block_parameter with
+              (* Wait for the receipt in the stream *)
+              | Ethereum_types.Block_parameter.Pending -> (
+                  match mode with
+                  | Rpc {evm_node_endpoint; _} -> (
+                      (* For the RPC mode forward the call *)
+                      let* res =
+                        Injector.call_singleton_request
+                          ~keep_alive:config.keep_alive
+                          ~timeout:config.rpc_timeout
+                          ~base:evm_node_endpoint
+                          module_
+                          request
+                      in
+                      match res with
+                      | Ok output -> rpc_ok output
+                      | Error reason ->
+                          rpc_error
+                            (Rpc_errors.transaction_rejected reason None))
+                  | _ ->
+                      wait_or_timeout timeout @@ fun () ->
+                      let transaction_result_stream, stopper =
+                        Broadcast.create_transaction_result_stream ()
+                      in
+                      let* hash =
+                        send_raw_transaction
+                          config
+                          mode
+                          raw_tx
+                          ~wait_confirmation:false
+                      in
+                      let receipt_from_stream hash =
+                        let*! receipt =
+                          Lwt_stream.find
+                            (fun (r : Broadcast.transaction_result) ->
+                              r.hash = hash)
+                            transaction_result_stream
+                        in
+                        return
+                          (Option.map
+                             (fun Broadcast.{result; _} -> result)
+                             receipt)
+                      in
+                      let+ receipt =
+                        tx_hash_to_receipt receipt_from_stream hash
+                      in
+                      Lwt_watcher.shutdown stopper ;
+                      receipt)
+              | Ethereum_types.Block_parameter.Latest ->
+                  (* Use normal execution infos *)
+                  wait_or_timeout timeout (fun () ->
+                      let* hash =
+                        send_raw_transaction
+                          config
+                          mode
+                          raw_tx
+                          ~wait_confirmation:true
+                      in
+                      tx_hash_to_receipt
+                        (fun tx_hash ->
+                          let* receipt =
+                            Backend_rpc.Etherlink_block_storage
+                            .transaction_receipt
+                              tx_hash
+                          in
+                          return (Option.map (fun r -> Ok r) receipt))
+                        hash)
+              | _ ->
+                  rpc_error
+                    (Rpc_errors.invalid_params
+                       "The block parameter for sendRawTransactionSync must be \
+                        'latest' or 'pending'")
+            in
+            build_with_input ~f module_ parameters
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
@@ -911,8 +1377,13 @@ let dispatch_request (type f) ~is_sequencer ~websocket
             in
             build_with_input ~f module_ parameters
         | Get_estimate_gas.Method ->
-            let f (call, block) =
-              let* result = Backend_rpc.Etherlink.estimate_gas call block in
+            let f (call, block_param, state_override) =
+              let* result =
+                Backend_rpc.Etherlink.estimate_gas
+                  call
+                  block_param
+                  state_override
+              in
               match result with
               | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
               | Ok (Ok {value = _; gas_used = None}) ->
@@ -932,15 +1403,15 @@ let dispatch_request (type f) ~is_sequencer ~websocket
             build_with_input ~f module_ parameters
         | Txpool_content.Method ->
             let f (_ : unit option) =
-              let* (module Tx_container) =
-                match tx_container with
-                | Evm_tx_container m -> return m
-                | Michelson_tx_container _ ->
-                    failwith
-                      "Unsupported JSONRPC method in Tezlink: txpoolContent"
-              in
-              let* txpool_content = Tx_container.content () in
-              rpc_ok txpool_content
+              process_based_on_mode
+                mode
+                ~on_rpc:(inject_rpc_call config request module_)
+                ~on_stateful_michelson:(fun _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Tezlink: txpoolContent")
+                ~on_stateful_evm:(fun (module Tx_container) ->
+                  let* txpool_content = Tx_container.content () in
+                  rpc_ok txpool_content)
             in
             build ~f module_ parameters
         | Web3_clientVersion.Method ->
@@ -1055,14 +1526,14 @@ let dispatch_request (type f) ~is_sequencer ~websocket
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
-  Lwt.return JSONRPC.{value; id}
+  Lwt.return JSONRPC.{return_value; id}
 
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (config : Configuration.t)
-    (tx_container : f Services_backend_sig.tx_container)
+    (rpc : Configuration.rpc) (_config : Configuration.t) (mode : f Mode.t)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
-    ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+    ({method_; parameters; id} : JSONRPC.request) :
+    JSONRPC.return_response Lwt.t =
   let open Lwt_syntax in
   Telemetry.Jsonrpc.trace_dispatch_with
     ~websocket
@@ -1071,30 +1542,32 @@ let dispatch_private_request (type f) ~websocket
     id
   @@ fun _scope ->
   let unsupported () =
-    return
-      (Error
-         JSONRPC.
-           {
-             code = -3200;
-             message = "Method not supported";
-             data = Some (`String method_);
-           })
+    Lwt.return
+    @@ direct_rpc_value
+         (Error
+            JSONRPC.
+              {
+                code = -3200;
+                message = "Method not supported";
+                data = Some (`String method_);
+              })
   in
-  let* value =
+  let* return_value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
     with
     | Unknown ->
-        return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not found";
-                 data = Some (`String method_);
-               })
+        Lwt.return
+        @@ direct_rpc_value
+             (Error
+                JSONRPC.
+                  {
+                    code = -3200;
+                    message = "Method not found";
+                    data = Some (`String method_);
+                  })
     | Unsupported -> unsupported ()
     | Disabled ->
         Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
@@ -1128,63 +1601,52 @@ let dispatch_private_request (type f) ~websocket
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
         let f
-            ( (transaction_object : Ethereum_types.legacy_transaction_object),
-              raw_txn ) =
+            ( (transaction_object : Transaction_object.t),
+              raw_txn,
+              wait_confirmation ) =
           Octez_telemetry.Trace.(
             add_attrs (fun () ->
-                Telemetry.Attributes.[Transaction.hash transaction_object.hash])) ;
+                Telemetry.Attributes.
+                  [
+                    Transaction.hash (Transaction_object.hash transaction_object);
+                  ])) ;
 
-          let* is_valid =
-            let get_nonce () =
-              let* next_nonce =
-                Backend_rpc.Etherlink.nonce
-                  transaction_object.from
-                  (Block_parameter Latest)
-              in
-              let next_nonce =
-                match next_nonce with
-                | None -> Ethereum_types.Qty Z.zero
-                | Some next_nonce -> next_nonce
-              in
-              return @@ Ok (next_nonce, transaction_object)
+          let* next_nonce =
+            let* next_nonce =
+              Backend_rpc.Etherlink.nonce
+                (Transaction_object.sender transaction_object)
+                (Block_parameter Latest)
             in
-            (* If the tx_queue is enabled the validation is done by
-               the block producer *)
-            if Configuration.is_tx_queue_enabled config then get_nonce ()
-            else
-              (* With the legacy tx_pool we do the full validation
-                 when receiving the transaction even if it was already
-                 partially done by the attached rpc node. *)
-              let* mode = Tx_pool.mode () in
-              match mode with
-              | Sequencer ->
-                  Validate.is_tx_valid (module Backend_rpc) ~mode:Full raw_txn
-              | _ -> get_nonce ()
+            return
+            @@
+            match next_nonce with
+            | None -> Ethereum_types.Qty Z.zero
+            | Some next_nonce -> next_nonce
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in
-          match is_valid with
-          | Error err ->
-              let*! () = Tx_pool_events.invalid_transaction ~transaction in
-              rpc_error (Rpc_errors.transaction_rejected err None)
-          | Ok (next_nonce, transaction_object) -> (
-              let* tx_hash =
-                let* (module Tx_container) =
-                  match tx_container with
-                  | Evm_tx_container m -> return m
-                  | Michelson_tx_container _ ->
-                      failwith
-                        "Unsupported JSONRPC method in Tezlink: \
-                         injectTransaction"
-                in
+          let* tx_hash =
+            match mode with
+            | Observer (Evm_tx_container (module Tx_container))
+            | Sequencer (Evm_tx_container (module Tx_container)) ->
                 Tx_container.add
+                  ~wait_confirmation
                   ~next_nonce
                   transaction_object
                   ~raw_tx:transaction
-              in
-              match tx_hash with
-              | Ok tx_hash -> rpc_ok tx_hash
-              | Error reason ->
-                  rpc_error (Rpc_errors.transaction_rejected reason None))
+            | Observer (Michelson_tx_container _m)
+            | Sequencer (Michelson_tx_container _m) ->
+                failwith
+                  "Unsupported JSONRPC method in Tezlink: injectTransaction"
+            | Proxy _ ->
+                failwith
+                  "Unsupported JSONRPC method in proxy: injectTransaction"
+            | Rpc _ ->
+                failwith "Unsupported JSONRPC method in Rpc: injectTransaction"
+          in
+          match tx_hash with
+          | Ok tx_hash -> rpc_ok tx_hash
+          | Error reason ->
+              rpc_error (Rpc_errors.transaction_rejected reason None)
         in
         build_with_input ~f module_ parameters
     | Method (Inject_tezlink_operation.Method, module_) ->
@@ -1200,15 +1662,25 @@ let dispatch_private_request (type f) ~websocket
                   [Transaction.hash (Tezos_types.Operation.hash_operation op)])) ;
           let* hash =
             let* (module Tx_container) =
-              match tx_container with
-              | Evm_tx_container _ ->
+              match mode with
+              | Observer (Michelson_tx_container m)
+              | Sequencer (Michelson_tx_container m) ->
+                  return m
+              | Observer (Evm_tx_container _m) | Sequencer (Evm_tx_container _m)
+                ->
                   failwith
                     "Unsupported JSONRPC method in Etherlink: \
                      injectTezlinkOperation"
-              | Michelson_tx_container m -> return m
+              | Proxy _ ->
+                  failwith
+                    "Unsupported JSONRPC method in proxy: \
+                     injectTezlinkOperation"
+              | Rpc _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Rpc: injectTezlinkOperation"
             in
             Tx_container.add
-              ~next_nonce:(Ethereum_types.Qty op.counter)
+              ~next_nonce:(Ethereum_types.Qty op.first_counter)
               op
               ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
           in
@@ -1248,18 +1720,27 @@ let dispatch_private_request (type f) ~websocket
         build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
-  return JSONRPC.{value; id}
+  return JSONRPC.{return_value; id}
 
 let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
-    ctx dispatch_request (input : JSONRPC.request batched_request) =
+let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx ~tick
+    dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
+  let wait_for_return_output JSONRPC.{return_value; id} =
+    match return_value with
+    | JSONRPC.Direct value -> return JSONRPC.{value; id}
+    | JSONRPC.Lazy value ->
+        let* value in
+        return JSONRPC.{value; id}
+  in
   match input with
   | Singleton request ->
-      let* response = dispatch_request config tx_container ctx request in
+      let* return_value = dispatch_request ctx request in
+      let* _ = tick () in
+      let* response = wait_for_return_output return_value in
       return (Singleton response)
   | Batch requests ->
       let batch_size = List.length requests in
@@ -1267,37 +1748,49 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
       @@ fun _scope ->
       let process =
         if can_process_batch batch_size rpc.batch_limit then
-          dispatch_request config tx_container ctx
+          dispatch_request ctx
         else fun req ->
-          let value =
-            Error Rpc_errors.(invalid_request "too many requests in batch")
+          let response =
+            direct_rpc_value
+              (Error Rpc_errors.(invalid_request "too many requests in batch"))
           in
-          Lwt.return JSONRPC.{value; id = req.id}
+          return JSONRPC.{return_value = response; id = req.id}
       in
-      let* outputs = List.map_s process requests in
+      let* outputs_waiter = List.map_s process requests in
+      let* _ = tick () in
+      let* outputs = List.map_p wait_for_return_output outputs_waiter in
       return (Batch outputs)
 
 let websocket_response_of_response response = {response; subscription = None}
 
 let encode_subscription_response subscription r =
   let result =
-    Data_encoding.Json.construct
-      (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
-      r
+    match r with
+    | Ok r ->
+        Data_encoding.Json.construct
+          (Ethereum_types.Subscription.output_encoding
+             Transaction_object.encoding
+             Transaction_receipt.encoding)
+          r
+    | Error err ->
+        let msg =
+          match err with [] -> "" | e :: _ -> (find_info_of_error e).id
+        in
+        let data = Data_encoding.Json.construct trace_encoding err in
+        Rpc_errors.internal_error msg ~data
+        |> Data_encoding.Json.construct JSONRPC.error_encoding
   in
   Rpc_encodings.Subscription.{params = {result; subscription}}
 
 let empty_stream =
   let stream, push = Lwt_stream.create () in
   push None ;
-  (stream, fun () -> ())
+  (stream, fun () -> Lwt_result_syntax.return_false)
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket ~is_sequencer
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config tx_container ctx
-    (input : JSONRPC.request) =
+let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) config mode ctx (input : JSONRPC.request) =
   let open Lwt_syntax in
   match
     map_method_name
@@ -1309,24 +1802,20 @@ let dispatch_websocket ~is_sequencer
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
-        let* id_stream = eth_subscribe ~kind (fst ctx) in
-        let id, stream =
-          match id_stream with
-          | Ok id_stream -> id_stream
-          | Error err ->
-              Format.kasprintf
-                Stdlib.failwith
-                "The websocket `logs` event produced the following error: %a"
-                pp_print_trace
-                err
-        in
+        let open Lwt_result_syntax in
+        let* id, stream = eth_subscribe config mode ~kind (fst ctx) in
         (* This is an optimization to avoid having to search in the map
            of subscriptions for `stream` and `id`. *)
         sub_stream := stream ;
         sid := id ;
         rpc_ok id
       in
-      let* value = build_with_input ~f module_ input.parameters in
+      let* return_value = build_with_input ~f module_ input.parameters in
+      let* value =
+        match return_value with
+        | JSONRPC.Direct value -> return value
+        | JSONRPC.Lazy value -> value
+      in
       let response = JSONRPC.{value; id = input.id} in
       let subscription_id = !sid in
       let stream, stopper = !sub_stream in
@@ -1337,96 +1826,99 @@ let dispatch_websocket ~is_sequencer
         {response; subscription = Some {id = subscription_id; stream; stopper}}
   | Method (Unsubscribe.Method, module_) ->
       let f (id : Ethereum_types.Subscription.id) =
-        let status = eth_unsubscribe ~id in
+        let open Lwt_result_syntax in
+        let* status = eth_unsubscribe ~id in
         rpc_ok status
       in
-      let+ value = build_with_input ~f module_ input.parameters in
+      let* return_value = build_with_input ~f module_ input.parameters in
+      let+ value =
+        match return_value with
+        | JSONRPC.Direct value -> return value
+        | JSONRPC.Lazy value -> value
+      in
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
-      let+ response =
+      let* {return_value; id} =
         dispatch_request
-          ~is_sequencer
           ~websocket:true
           rpc_server_family
           rpc
-          validation
           config
-          tx_container
+          mode
           ctx
           input
+      in
+      let+ response =
+        match return_value with
+        | JSONRPC.Direct value -> return JSONRPC.{value; id}
+        | JSONRPC.Lazy value ->
+            let* value in
+            return JSONRPC.{value; id}
       in
       websocket_response_of_response response
 
 let dispatch_private_websocket
     (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
-    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
-    =
+    (rpc : Configuration.rpc) config mode ctx (input : JSONRPC.request) =
   let open Lwt_syntax in
-  let+ response =
+  let* {return_value; id} =
     dispatch_private_request
       ~websocket:true
       rpc_server_family
       ~block_production
       rpc
       config
-      tx_container
+      mode
       ctx
       input
   in
+  let+ response =
+    match return_value with
+    | JSONRPC.Direct value -> return JSONRPC.{value; id}
+    | JSONRPC.Lazy value ->
+        let* value in
+        return JSONRPC.{value; id}
+  in
   websocket_response_of_response response
 
-let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
-    ctx dir path dispatch_request =
+let generic_dispatch ~service_name (rpc : Configuration.rpc) ctx dir path ~tick
+    dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler
-        ~service_name
-        rpc
-        config
-        tx_container
-        ctx
-        dispatch_request
-        input
+      dispatch_handler ~service_name rpc ctx ~tick dispatch_request input
       |> Lwt_result.ok)
 
-let dispatch_public (type f) ~is_sequencer
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config
-    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+let dispatch_public (type f) (rpc_server_family : f Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) config (mode : f Mode.t) ctx dir ~tick =
   generic_dispatch
     ~service_name:"public_rpc"
     rpc
-    config
-    tx_container
     ctx
     dir
     Path.root
-    (dispatch_request
-       ~is_sequencer
-       ~websocket:false
-       rpc_server_family
-       rpc
-       validation)
+    ~tick
+    (dispatch_request ~websocket:false rpc_server_family rpc config mode)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config
-    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+    (rpc : Configuration.rpc) ~block_production config (mode : f Mode.t) ctx dir
+    ~tick =
   generic_dispatch
     ~service_name:"private_rpc"
     rpc
-    config
-    tx_container
     ctx
     dir
     Path.(add_suffix root "private")
+    ~tick
     (dispatch_private_request
        ~websocket:false
        rpc_server_family
+       ~block_production
        rpc
-       ~block_production)
+       config
+       mode)
 
-let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
-    path dispatch_websocket =
+let generic_websocket_dispatch (config : Configuration.t) mode ctx dir path
+    dispatch_websocket =
   match config.websockets with
   | None -> dir
   | Some {max_message_length; monitor_heartbeat; _} ->
@@ -1435,70 +1927,70 @@ let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
         ~max_message_length
         dir
         path
-        (dispatch_websocket config tx_container ctx)
+        (dispatch_websocket config mode ctx)
 
-let dispatch_websocket_public (type f) ~is_sequencer
+let dispatch_websocket_public
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config
-    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+    (rpc : Configuration.rpc) config mode ctx dir =
   generic_websocket_dispatch
     config
-    tx_container
+    mode
     ctx
     dir
     "/ws"
-    (dispatch_websocket ~is_sequencer rpc_server_family rpc validation)
+    (dispatch_websocket rpc_server_family rpc)
 
-let dispatch_websocket_private (type f)
+let dispatch_websocket_private
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config
-    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+    (rpc : Configuration.rpc) ~block_production config mode ctx dir =
   generic_websocket_dispatch
     config
-    tx_container
+    mode
     ctx
     dir
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory (type f) ~is_sequencer ~rpc_server_family
-    ?delegate_health_check_to rpc validation config
-    (tx_container : f Services_backend_sig.tx_container) backend dir =
-  dir |> version |> configuration config
-  |> health_check ?delegate_to:delegate_health_check_to
-  |> dispatch_public
-       ~is_sequencer
-       rpc_server_family
-       rpc
-       validation
-       config
-       tx_container
-       backend
-  |> dispatch_websocket_public
-       ~is_sequencer
-       rpc_server_family
-       rpc
-       validation
-       config
-       tx_container
-       backend
+let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
+    (mode : f Mode.t) rpc config backend dir ~tick =
+  let db_liveness_check () =
+    let open Lwt_result_syntax in
+    let (module Backend : Services_backend_sig.S) = fst backend in
+    match rpc_server_family with
+    | Rpc_types.Multichain_sequencer_rpc_server -> return_unit
+    | Rpc_types.Single_chain_node_rpc_server f -> (
+        match f with
+        | EVM ->
+            let* _ = Backend.Etherlink_block_storage.current_block_number () in
+            return_unit
+        | Michelson ->
+            let* _ =
+              Backend.Tezlink.current_level `Main (`Head 0l) ~offset:0l
+            in
+            return_unit)
+  in
 
-let private_directory ~rpc_server_family rpc config
-    (tx_container : _ Services_backend_sig.tx_container) backend
-    ~block_production =
+  dir |> version |> configuration config |> evm_mode config mode
+  |> health_check config mode db_liveness_check
+  |> dispatch_public rpc_server_family rpc config mode backend ~tick
+  |> dispatch_websocket_public rpc_server_family rpc config mode backend
+
+let private_directory ~rpc_server_family mode rpc config backend
+    ~block_production ~tick =
   Evm_directory.empty config.experimental_features.rpc_server
-  |> version
+  |> version |> evm_mode config mode
   |> dispatch_private
        rpc_server_family
        rpc
        config
-       tx_container
+       mode
        backend
        ~block_production
+       ~tick
   |> dispatch_websocket_private
        rpc_server_family
        rpc
        config
-       tx_container
+       mode
        backend
        ~block_production

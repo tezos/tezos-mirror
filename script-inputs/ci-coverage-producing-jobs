@@ -1,7 +1,9 @@
-tezt-flaky
-tezt-time-sensitive
-tezt
 oc.unit:proto-x86_64
 oc.unit:other-x86_64
-oc.unit:etherlink-x86_64
 oc.unit:non-proto-x86_64
+tezt
+tezt-time-sensitive
+tezt-flaky
+etherlink.tezt
+etherlink.tezt-flaky
+etherlink.unit_tests

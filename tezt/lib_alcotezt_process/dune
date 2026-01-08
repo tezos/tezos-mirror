@@ -1,0 +1,18 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name alcotezt_process)
+ (public_name octez-libs.alcotezt-process)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.error-monad
+  lwt.unix
+  lwt_eio)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad))

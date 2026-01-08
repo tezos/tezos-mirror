@@ -39,6 +39,12 @@ pub const SBI_TEZOS_BLAKE2B_HASH256: u64 = 0x07;
 /// Function ID for `sbi tezos reveal`
 pub const SBI_TEZOS_REVEAL: u64 = 0x09;
 
+/// Function ID for `sbi_tezos_secp256k1_verify`
+pub const SBI_TEZOS_SECP256K1_VERIFY: u64 = 0x0a;
+
+/// Function ID for `sbi_tezos_keccak_hash256`
+pub const SBI_TEZOS_KECCAK256_HASH: u64 = 0x0b;
+
 /// Maximum size of Reveal Request
 pub const REVEAL_REQUEST_MAX_SIZE: usize = 4096;
 

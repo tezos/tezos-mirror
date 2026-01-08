@@ -113,7 +113,10 @@ module Pages_cache =
   Aches_lwt.Lache.Make (Aches.Rache.Transfer (Aches.Rache.LRU) (Slot_id))
 
 let get_slot_pages =
-  let pages_cache = Pages_cache.create 16 (* 130MB *) in
+  let pages_cache =
+    Pages_cache.create 16
+    (* 130MB *)
+  in
   fun dal_cctxt commitment ->
     Pages_cache.bind_or_put
       pages_cache
@@ -121,21 +124,13 @@ let get_slot_pages =
       (Dal_node_client.get_slot_pages dal_cctxt)
       Lwt.return
 
-let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
-    ~published_level ~index =
-  let open Lwt_result_syntax in
-  let* published_in_block_hash =
-    Node_context.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
-  in
-  let* header =
-    Node_context.get_slot_header node_ctxt ~published_in_block_hash index
-  in
+let download_confirmed_slot_pages {Node_context.dal_cctxt; _} ~published_level
+    ~index =
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
   (* DAL must be configured for this point to be reached *)
-  let slot_id : Slot_id.t =
-    {slot_level = header.id.published_level; slot_index = header.id.index}
-  in
-  get_slot_pages dal_cctxt slot_id
+  get_slot_pages
+    dal_cctxt
+    {slot_level = Raw_level.to_int32 published_level; slot_index = index}
 
 let storage_invariant_broken published_level index =
   failwith

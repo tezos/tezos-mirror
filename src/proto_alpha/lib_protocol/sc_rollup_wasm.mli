@@ -69,7 +69,7 @@ module V2_0_0 : sig
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
   module Make
       (Lib_scoru_Wasm : Make_wasm)
-      (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
+      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree

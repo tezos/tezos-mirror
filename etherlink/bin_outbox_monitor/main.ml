@@ -124,7 +124,8 @@ let run_command =
     (prefixes ["run"] @@ stop)
     (fun {data_dir; verbosity}
          (evm_node_endpoint, rollup_node_endpoint, l1_node_endpoint)
-         _ ->
+         _
+       ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbosity ~data_dir in
       let* db = Db.init ~data_dir Read_write in

@@ -303,7 +303,8 @@ struct
         if
           (* the generation has changed *)
           h.generation > Int63.succ old_generation
-          || (* the last sync was done between clear(log) and clear(log_async) *)
+          ||
+          (* the last sync was done between clear(log) and clear(log_async) *)
           (h.generation = Int63.succ old_generation && h.offset = Int63.zero)
         then (
           (* close the file .*)
@@ -324,9 +325,9 @@ struct
                 "[%s] log_async IO header monotonicity violated during sync:@,\
                 \  offset: %a -> %a@,\
                 \  generation: %a -> %a@,\
-                 Reloading the log to compensate." (Filename.basename t.root)
-                Int63.pp old_offset Int63.pp h.offset Int63.pp old_generation
-                Int63.pp h.generation);
+                 Reloading the log to compensate."
+                (Filename.basename t.root) Int63.pp old_offset Int63.pp h.offset
+                Int63.pp old_generation Int63.pp h.generation);
           Log_file.reload log)
 
   (** Syncs the [index] of the instance by checking on-disk changes. *)

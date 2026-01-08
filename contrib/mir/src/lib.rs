@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 #![warn(clippy::redundant_clone)]
 #![warn(missing_docs)]
 #![deny(clippy::disallowed_methods)]
@@ -77,7 +74,7 @@
 //!
 //! ```
 //! use mir::ast::*;
-//! use mir::context::Ctx;
+//! use mir::context::{Ctx, TypecheckingCtx};
 //! use mir::parser::Parser;
 //! use typed_arena::Arena;
 //! let script = r#"
@@ -99,7 +96,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true, true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -111,7 +108,7 @@
 //! // from `parser` for simplicity, you may also opt to create a new one to
 //! // potentially save a bit of memory (depends on the workload).
 //! let (operations_iter, new_storage) = contract_typechecked
-//!     .interpret(&mut ctx, &parser.arena, parameter, None, storage)
+//!     .interpret(&mut ctx, &parser.arena, parameter, &Entrypoint::default(), &storage)
 //!     .unwrap();
 //! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
 //! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
@@ -152,9 +149,8 @@ mod tests {
     use typed_arena::Arena;
 
     use crate::ast::annotations::FieldAnnotation;
-    use crate::ast::micheline::test_helpers::*;
     use crate::ast::*;
-    use crate::context::Ctx;
+    use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
 
     use crate::interpreter;
@@ -164,6 +160,7 @@ mod tests {
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
     use std::rc::Rc;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
         let initial_milligas = ctx.gas.milligas();
@@ -177,7 +174,7 @@ mod tests {
     fn interpret_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(10)];
         let temp = Arena::new();
@@ -192,7 +189,7 @@ mod tests {
         let ast = parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
         let temp = Arena::new();
         let mut ctx = Ctx::default();
-        let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
+        let ast = ast.typecheck_instruction(ctx.gas(), None, &[]).unwrap();
         let mut istack = stk![];
         assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
@@ -202,7 +199,7 @@ mod tests {
     fn interpret_test_gas_consumption() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
@@ -217,7 +214,7 @@ mod tests {
     fn interpret_test_gas_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
@@ -233,7 +230,7 @@ mod tests {
     fn interpret_test_macro_if_some() {
         let ast = parse(MACRO_IF_SOME_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[app!(option[app!(nat)])])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("option nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         let temp = Arena::new();
@@ -253,7 +250,7 @@ mod tests {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
         assert!(
-            typechecker::typecheck_instruction(&ast, &mut Ctx::default(), None, &mut stack).is_ok()
+            typechecker::typecheck_instruction(&ast, &mut Gas::default(), None, &mut stack).is_ok()
         );
         assert_eq!(stack, tc_stk![Type::Int])
     }
@@ -264,7 +261,9 @@ mod tests {
         let mut ctx = Ctx::default();
         let start_milligas = ctx.gas.milligas();
         report_gas(&mut ctx, |ctx| {
-            assert!(ast.typecheck_instruction(ctx, None, &[app!(nat)]).is_ok());
+            assert!(ast
+                .typecheck_instruction(ctx.gas(), None, &[parse("nat").unwrap()])
+                .is_ok());
         });
         assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
     }
@@ -272,10 +271,8 @@ mod tests {
     #[test]
     fn typecheck_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
-        let ctx = &mut Ctx::default();
-        ctx.gas = Gas::new(1000);
         assert_eq!(
-            ast.typecheck_instruction(ctx, None, &[app!(nat)]),
+            ast.typecheck_instruction(&mut Gas::new(1000), None, &[parse("nat").unwrap()]),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -285,7 +282,7 @@ mod tests {
         use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         assert_eq!(
-            ast.typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
+            ast.typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
             Err(TcError::NoMatchingOverload {
                 instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
@@ -336,14 +333,13 @@ mod tests {
 
     #[test]
     fn parser_test_expect_fail() {
-        use crate::ast::micheline::test_helpers::app;
         assert_eq!(
             parse(FIBONACCI_MALFORMED_SRC)
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[app!(nat)]),
+                .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
             Err(typechecker::TcError::UnexpectedMicheline(format!(
                 "{:?}",
-                app!(DUP[4, app!(GT)])
+                parse("DUP 4 GT").unwrap()
             )))
         );
     }
@@ -366,14 +362,16 @@ mod tests {
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck_script(ctx)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 ctx,
                 &arena,
                 "foo".into(),
-                None,
-                M::seq(
+                &Entrypoint::default(),
+                &M::seq(
                     &arena,
                     [
                         M::prim2(&arena, Prim::Elt, "bar".into(), 0.into()),
@@ -404,7 +402,7 @@ mod tests {
         let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
-            typecheck_instruction(&ast, &mut ctx, None, &mut input_failing_type_stack).unwrap();
+            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack).unwrap();
         assert_eq!(
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
@@ -425,6 +423,7 @@ mod tests {
             stk![TypedValue::new_option(Some(TypedValue::new_ticket(
                 Ticket {
                     amount: 10u32.into(),
+                    content_type: Type::Int,
                     content: TypedValue::int(20),
                     ticketer: ctx.self_address
                 }
@@ -444,6 +443,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ticketer_address_hash,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
@@ -472,6 +472,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ctx.self_address,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
@@ -509,6 +510,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ctx.self_address,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
@@ -795,17 +797,20 @@ mod tests {
 
     #[test]
     fn source() {
-        let addr = Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr = PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         run_e2e_test(
             &Arena::new(),
             "SOURCE",
             stk![],
             stk![Type::Address],
             stk![],
-            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::Address(Address {
+                hash: addr.clone().into(),
+                entrypoint: Entrypoint::default()
+            })],
             {
                 let mut c = Ctx::default();
-                c.source = addr.hash;
+                c.source = addr;
                 c
             },
         );
@@ -852,7 +857,7 @@ mod tests {
 
     #[test]
     fn implicit_account() {
-        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         run_e2e_test(
             &Arena::new(),
             "IMPLICIT_ACCOUNT",
@@ -868,9 +873,9 @@ mod tests {
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
         run_e2e_test(
             &Arena::new(),
             "VOTING_POWER",
@@ -905,8 +910,8 @@ mod tests {
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         run_e2e_test(
             &Arena::new(),
             "TOTAL_VOTING_POWER",
@@ -1051,11 +1056,15 @@ mod tests {
     #[test]
     fn create_contract() {
         use tezos_crypto_rs::hash::OperationHash;
-        let mut ctx = Ctx::default();
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
+        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
                 delegate: None,
@@ -1063,11 +1072,10 @@ mod tests {
                 storage: TypedValue::Unit,
                 code: Rc::new(cs),
                 micheline_code: &cs_mich,
+                address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
             101,
         );
-        let expected_addr =
-            TypedValue::Address(Address::try_from("KT1CvVk9uuEpf5t88frj41xMzHc5M6FHqxZw").unwrap());
         run_e2e_test(
             &Arena::new(),
             r#"CREATE_CONTRACT {
@@ -1082,7 +1090,10 @@ mod tests {
                 TypedValue::Mutez(100),
                 TypedValue::new_option(None)
             ],
-            stk![expected_addr, expected_op],
+            stk![
+                TypedValue::Address(Address::try_from(expected_addr).unwrap()),
+                expected_op
+            ],
             {
                 let mut ctx = Ctx::default();
                 ctx.set_operation_counter(100);
@@ -1150,7 +1161,8 @@ mod tests {
 #[cfg(test)]
 mod multisig_tests {
     use crate::ast::*;
-    use crate::context::Ctx;
+    use crate::context::{Ctx, TypecheckingCtx};
+    use crate::gas::Gas;
     use crate::interpreter::{ContractInterpretError, InterpretError};
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
@@ -1246,7 +1258,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1263,9 +1277,9 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
-                None,
+                &Entrypoint::default(),
                 // make_initial_storage(),
-                pair(
+                &pair(
                     anti_replay_counter(),
                     pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
@@ -1319,7 +1333,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1336,8 +1352,8 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
-                None,
-                pair(
+                &Entrypoint::default(),
+                &pair(
                     anti_replay_counter(),
                     pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
@@ -1375,7 +1391,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1392,8 +1410,8 @@ mod multisig_tests {
                     // %sigs
                     seq([some(invalid_signature)]),
                 ),
-                None,
-                pair(
+                &Entrypoint::default(),
+                &pair(
                     anti_replay_counter(),
                     pair(threshold, seq([PUBLIC_KEY.into()])),
                 ),

@@ -24,6 +24,10 @@ val singleton :
 
 val to_list : t -> (module Dal_plugin.T) list
 
+(** [current_proto_level plugins] returns the [proto_level] of the most recently
+    added protocol plugin. *)
+val current_proto_level : t -> int option
+
 type error +=
   | No_plugin_for_level of {level : int32}
   | No_plugin_for_proto of {proto_hash : Protocol_hash.t}

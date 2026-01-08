@@ -1,0 +1,24 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/sha3.tz on storage None and input 0x48656c6c6f2c20776f726c6421 --level 1 --trace-stack
+storage
+  (Some 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 4.907)
+    [ (Pair 0x48656c6c6f2c20776f726c6421 None) ]
+  - location: 8 (just consumed gas: 0.010)
+    [ 0x48656c6c6f2c20776f726c6421 ]
+  - location: 9 (just consumed gas: 1.457)
+    [ 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722 ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Some 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ {}
+      (Some 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Pair {}
+            (Some 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722)) ]
+

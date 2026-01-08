@@ -10,6 +10,7 @@ if [ "${CI_COMMIT_REF_NAME}" == "master" ]; then
   sudo apk add aws-cli
   # Update S3
   # https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html
+  aws configure set s3.max_concurrent_requests 500
   aws s3 sync docs/_build/ s3://site-prod.octez.tezos.com/docs --delete --only-show-errors
   aws cloudfront create-invalidation --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" --paths "/*"
 

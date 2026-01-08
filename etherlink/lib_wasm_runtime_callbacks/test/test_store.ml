@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -71,7 +72,7 @@ let test_store_has () =
 
   let* res = run @@ fun () -> store_has tree "/test/a/b" in
   let res = expect_ok "should be able to call store_has" res in
-  Check.((res = 1) int ~error_msg:"Expected %R (directories and value), got %L") ;
+  Check.((res = 1) int ~error_msg:"Expected %R (only value), got %L") ;
 
   let* res = run @@ fun () -> store_has tree "/test" in
   let res = expect_ok "should be able to call store_has" res in

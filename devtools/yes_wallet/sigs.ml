@@ -38,6 +38,10 @@ module type PROTOCOL = sig
     val ( +? ) : t -> t -> t tzresult
 
     val to_mutez : t -> int64
+
+    val of_mutez_exn : int64 -> t
+
+    val ( >= ) : t -> t -> bool
   end
 
   module Signature : sig
@@ -93,7 +97,7 @@ module type PROTOCOL = sig
       Signature.public_key_hash ->
       Signature.public_key tzresult Lwt.t
 
-    val fold : context -> init:'a -> f:('a -> contract -> 'a Lwt.t) -> 'a Lwt.t
+    val fold : context -> init:'a -> f:(contract -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
     val balance : context -> contract -> Tez.t tzresult Lwt.t
 
@@ -139,10 +143,17 @@ module type PROTOCOL = sig
     val deactivated :
       context -> Signature.public_key_hash -> bool tzresult Lwt.t
 
-    val consensus_key :
+    val consensus_keys :
       context ->
       Signature.public_key_hash ->
-      Signature.public_key tzresult Lwt.t
+      (Signature.public_key * Signature.public_key list) tzresult Lwt.t
+
+    val companion_keys :
+      context ->
+      Signature.public_key_hash ->
+      (Bls12_381_signature.MinPk.pk option * Bls12_381_signature.MinPk.pk list)
+      tzresult
+      Lwt.t
   end
 
   val hash : Protocol_hash.t
@@ -153,6 +164,19 @@ module type PROTOCOL = sig
     predecessor_timestamp:Time.Protocol.t ->
     timestamp:Time.Protocol.t ->
     context tzresult Lwt.t
+
+  val value_of_key :
+    chain_id:Chain_id.t ->
+    predecessor_context:Tezos_protocol_environment.Context.t ->
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor_level:int32 ->
+    predecessor_fitness:bytes trace ->
+    predecessor:Block_hash.t ->
+    timestamp:Time.Protocol.t ->
+    (Tezos_protocol_environment.Context.cache_key ->
+    Tezos_protocol_environment.Context.cache_value Error_monad.tzresult Lwt.t)
+    tzresult
+    Lwt.t
 end
 
 type protocol = (module PROTOCOL)

@@ -267,7 +267,8 @@ let rpc_directory_with_validator dir validator =
       Store_types.Protocol_levels.fold
         (fun proto_level
              Store_types.Protocol_levels.{protocol; activation_block; _}
-             acc -> {protocol; proto_level; activation_block} :: acc)
+             acc
+           -> {protocol; proto_level; activation_block} :: acc)
         protocols
         []
       |> List.sort (fun p1 p2 ->
@@ -279,7 +280,8 @@ let rpc_directory_with_validator dir validator =
       try
         Store_types.Protocol_levels.iter
           (fun proto_level
-               Store_types.Protocol_levels.{protocol; activation_block; _} ->
+               Store_types.Protocol_levels.{protocol; activation_block; _}
+             ->
             if Protocol_hash.equal protocol hash then
               raise (Found {protocol; proto_level; activation_block}))
           protocols ;

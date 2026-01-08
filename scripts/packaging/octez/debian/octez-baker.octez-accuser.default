@@ -1,2 +1,2 @@
 #  Keep the daemon process alive: when the connection with the node is lost
-RUNTIME_OPTS="--keep-alive"
+RUNTIME_OPTS=""

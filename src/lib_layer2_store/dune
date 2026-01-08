@@ -16,7 +16,7 @@
   octez-libs.tezos-context.encoding
   octez-libs.context.sigs
   octez-libs.tezos-context.helpers
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   camlzip
   tar
   tar-unix)

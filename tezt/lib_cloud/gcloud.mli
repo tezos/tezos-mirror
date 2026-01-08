@@ -120,4 +120,11 @@ module DNS : sig
       semantics for removing values associated to the same key. *)
   val remove_subdomain :
     zone:string -> name:string -> value:string -> unit Lwt.t
+
+  (** [set_subdomain ~agent_ip ~domain] registers the specified domain in an
+     appropriate GCP zone.
+     This function is destructive for previous DNS entries. It does not only
+     add the new DNS, it also remove the previous ones if any.
+     *)
+  val set_subdomain : agent_ip:string -> domain:string -> unit Lwt.t
 end

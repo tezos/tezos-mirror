@@ -68,7 +68,7 @@ let validate {alive; _} =
   let open Lwt_syntax in
   (match Opentelemetry.Scope.get_ambient_scope () with
   | Some scope ->
-      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+      Opentelemetry.Scope.add_attrs scope (fun () ->
           [("octez_connpool.reuse", `Bool alive)])
   | _ -> ()) ;
   return alive
@@ -84,7 +84,7 @@ let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
       close_conn conn)
     (fun () ->
       let open Lwt_syntax in
-      Opentelemetry.Trace.with_
+      Opentelemetry_lwt.Trace.with_
         ~service_name:"Octez_connpool"
         "create_new_connection"
       @@ fun _ ->
@@ -124,7 +124,8 @@ let pre_heat t =
 
 let warm t =
   let open Lwt_syntax in
-  Opentelemetry.Trace.with_ ~service_name:"Octez_connpool" "warm" @@ fun _ ->
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Octez_connpool" "warm"
+  @@ fun _ ->
   let rec re_warm n pool =
     Lwt_pool.use pool @@ fun _conn ->
     if n > 1 then re_warm (n - 1) pool else return_unit
@@ -164,8 +165,22 @@ let redact_sensitive_header ~sensitive_headers h v =
   in
   if Cohttp.Header.mem sensitive_headers h then "[REDACTED]" else v
 
-let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
-    ?query ?userinfo ~retry_count t meth route =
+exception Timeout
+
+let with_timeout_exn ?timeout k =
+  match timeout with
+  | None -> k ()
+  | Some duration ->
+      Lwt.pick
+        [
+          k ();
+          (let open Lwt_syntax in
+           let* () = Lwt_unix.sleep duration in
+           Lwt.fail Timeout);
+        ]
+
+let call_exn ?timeout ?(headers = Cohttp.Header.init ())
+    ?(sensitive_headers = []) ?body ?query ?userinfo ~retry_count t meth route =
   let open Lwt_syntax in
   let uri = make_uri t.endpoint ?query ?userinfo route in
   Lwt_pool.use t.pool @@ fun conn ->
@@ -201,12 +216,12 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
     ]
     @ http_server_attr @ http_port_attr @ headers_attrs @ retry_attr
   in
-  Opentelemetry.Trace.with_
+  Opentelemetry_lwt.Trace.with_
     ~service_name:"Octez_connpool"
     ~kind:Span_kind_client
     Format.(sprintf "%s %s" (Cohttp.Code.string_of_method meth) route)
   @@ fun scope ->
-  Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
+  Opentelemetry.Scope.add_attrs scope make_attrs ;
   Lwt.catch
     (fun () ->
       let headers =
@@ -214,14 +229,17 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
           add_traceparent_header headers scope
         else headers
       in
-      let* resp, body = Client.call ~ctx:(Some conn) ~headers ?body meth uri in
+      let* resp, body =
+        with_timeout_exn ?timeout @@ fun () ->
+        Client.call ~ctx:(Some conn) ~headers ?body meth uri
+      in
       let* body = Cohttp_lwt.Body.to_string body in
       let* () =
         match Cohttp.Header.connection (Cohttp.Response.headers resp) with
         | None | Some `Keep_alive -> Lwt.return_unit
         | Some `Close | Some (`Unknown _) -> close_conn conn
       in
-      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+      Opentelemetry.Scope.add_attrs scope (fun () ->
           let resp_code = Cohttp.Code.code_of_status resp.status in
           if resp_code >= 400 then
             Opentelemetry.Scope.set_status
@@ -258,7 +276,8 @@ let retry max k =
   in
   retry max k
 
-let call ?headers ?sensitive_headers ?body ?query ?userinfo t meth route =
+let call ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t meth
+    route =
   (* When trying to make a call, we need to take into account the edge case
      that the scenario could have gone down and all connections are stalled (or
      it had to close some of the connections for some reasons). So we retry
@@ -267,6 +286,7 @@ let call ?headers ?sensitive_headers ?body ?query ?userinfo t meth route =
   retry (t.pool_len + 1) @@ fun retry_count ->
   Lwt_result.ok
     (call_exn
+       ?timeout
        ?headers
        ?sensitive_headers
        ?body
@@ -277,20 +297,38 @@ let call ?headers ?sensitive_headers ?body ?query ?userinfo t meth route =
        meth
        route)
 
-let get ?headers ?sensitive_headers ?query ?userinfo t route =
-  call ?headers ?sensitive_headers ?query ?userinfo t `GET route
+let get ?timeout ?headers ?sensitive_headers ?query ?userinfo t route =
+  call ?timeout ?headers ?sensitive_headers ?query ?userinfo t `GET route
 
-let post ?headers ?sensitive_headers ?body ?query ?userinfo t route =
-  call ?headers ?sensitive_headers ?body ?query ?userinfo t `POST route
+let post ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t `POST route
 
-let put ?headers ?sensitive_headers ?body ?query ?userinfo t route =
-  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PUT route
+let put ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t `PUT route
 
-let delete ?headers ?sensitive_headers ?body ?query ?userinfo t route =
-  call ?headers ?sensitive_headers ?body ?query ?userinfo t `DELETE route
+let delete ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call
+    ?timeout
+    ?headers
+    ?sensitive_headers
+    ?body
+    ?query
+    ?userinfo
+    t
+    `DELETE
+    route
 
-let patch ?headers ?sensitive_headers ?body ?query ?userinfo t route =
-  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PATCH route
+let patch ?timeout ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call
+    ?timeout
+    ?headers
+    ?sensitive_headers
+    ?body
+    ?query
+    ?userinfo
+    t
+    `PATCH
+    route
 
 let () =
   register_error_kind

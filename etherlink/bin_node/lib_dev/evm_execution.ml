@@ -9,15 +9,15 @@ module type S = sig
   val replay :
     ?log_file:string ->
     ?profile:Configuration.profile_mode ->
-    ?alter_evm_state:(Irmin_context.tree -> Irmin_context.tree tzresult Lwt.t) ->
+    ?alter_evm_state:(Pvm.State.t -> Pvm.State.t tzresult Lwt.t) ->
     Ethereum_types.quantity ->
     Evm_state.apply_result tzresult Lwt.t
 
   val execute :
-    ?alter_evm_state:(Irmin_context.tree -> Irmin_context.tree tzresult Lwt.t) ->
+    ?alter_evm_state:(Pvm.State.t -> Pvm.State.t tzresult Lwt.t) ->
     Simulation.Encodings.simulate_input ->
     Ethereum_types.Block_parameter.extended ->
-    Irmin_context.tree tzresult Lwt.t
+    Pvm.State.t tzresult Lwt.t
 end
 
 module No_execution : S = struct

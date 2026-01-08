@@ -307,10 +307,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     mutable status : worker_status;
     mutable state : worker_state;
     self : Peer.t;
-    worker_crashed : unit Lwt.t * unit Lwt.u;
+    main_loop_promise : unit Lwt.t * unit Lwt.u;
   }
-
-  exception Worker_crashed
 
   let maybe_reachable_point = C.maybe_reachable_point
 
@@ -380,7 +378,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       [GS.Route_message] output);
       - Notifying the application layer if it is interested in it.
 
-      Note that it's the responsability of the automaton modules to filter out
+      Note that it's the responsibility of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
   let handle_receive_message (received_message : GS.receive_message) :
       worker_state * [`Receive_message] GS.output -> worker_state = function
@@ -420,7 +418,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** From the worker's perspective, the outcome of joining a new topic from the
       application layer are:
       - Sending [Subscribe] messages to connected peers with that topic;
-      - Sending [Graft] messages to the newly construced topic's mesh. *)
+      - Sending [Graft] messages to the newly constructed topic's mesh. *)
   let handle_join topic = function
     | state, GS.Already_joined -> state
     | state, Joining_topic {to_graft} ->
@@ -901,18 +899,17 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~self ({gossip_state; _} as state) = function
-    | New_connection {peer; direct; trusted; bootstrap} -> (
+    | New_connection {peer; direct; trusted; bootstrap} ->
         ((GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
          |> update_gossip_state state
          |> handle_new_connection peer ~bootstrap ~trusted)
          [@profiler.span_f
            {verbosity = Notice} ["apply_event"; "P2P_input"; "New_connection"]])
-        )
-    | Disconnection {peer} -> (
+    | Disconnection {peer} ->
         ((GS.remove_peer {peer} gossip_state
          |> update_gossip_state state |> handle_disconnection peer)
          [@profiler.span_f
-           {verbosity = Notice} ["apply_event"; "P2P_input"; "Disconnection"]]))
+           {verbosity = Notice} ["apply_event"; "P2P_input"; "Disconnection"]])
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message
           ~self
@@ -952,7 +949,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         | `Valid | `Invalid ->
             let state = {state with unknown_validity_messages} in
             handle_app_message state message
-            |> (* Other messages are processed recursively *)
+            |>
+            (* Other messages are processed recursively *)
             check_unknown_messages_id
         | `Unknown -> state
         | `Outdated ->
@@ -966,14 +964,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
-    | Heartbeat -> (
+    | Heartbeat ->
         (((* TODO: https://gitlab.com/tezos/tezos/-/issues/5170
 
              Do we want to detect cases where two successive [Heartbeat] events
              would be handled (e.g. because the first one is late)? *)
           GS.heartbeat gossip_state
          |> update_gossip_state state |> handle_heartbeat)
-         [@profiler.span_f {verbosity = Notice} ["apply_event"; "Heartbeat"]]))
+         [@profiler.span_f {verbosity = Notice} ["apply_event"; "Heartbeat"]])
     | P2P_input event ->
         apply_p2p_event
           ~self
@@ -1027,7 +1025,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       that consumes pushed events in [t.events_stream], if any.
 
       When the loop is canceled, the returned monad will need an additional
-      extra event to consume in order to resolve. *)
+      extra event to consume in order to resolve.
+
+      When the loop catches an exception, it is raised to the main_loop promise
+      to help the handling of a failing gossipsub_worker. *)
   let event_loop t =
     let open Monad in
     let shutdown = ref false in
@@ -1047,9 +1048,9 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           in
           t.state <- new_state ;
           loop t
-        with (_ : exn) ->
+        with exn ->
           t.status <- Crashed ;
-          Lwt.wakeup (snd t.worker_crashed) () ;
+          Lwt.wakeup_exn (snd t.main_loop_promise) exn ;
           return ()
     in
     let promise = loop t in
@@ -1120,12 +1121,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | None -> Sequentially
             | Some time_interval -> In_batches {time_interval});
         };
-      worker_crashed = Lwt.wait ();
+      main_loop_promise = Lwt.wait ();
     }
 
   let stats t = t.state.stats
 
-  let worker_crashed t = fst t.worker_crashed
+  let main_loop_promise t = fst t.main_loop_promise
 
   let p2p_output_stream t = t.state.p2p_output_stream
 

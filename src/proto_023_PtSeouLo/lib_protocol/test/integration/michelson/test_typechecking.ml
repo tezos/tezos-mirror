@@ -539,8 +539,7 @@ let test_parse_comb_data () =
     let diff = {map = Big_map_overlay.empty; size = 0} in
     Big_map {id = Some big_map_id; diff; key_type = nat_ty; value_type = nat_ty}
   in
-  let ty_equal :
-      type a ac1 ac2.
+  let ty_equal : type a ac1 ac2.
       (a, ac1) Script_typed_ir.ty -> (a, ac2) Script_typed_ir.ty -> bool =
    fun ty1 ty2 ->
     match Script_typed_ir.(is_comparable ty1, is_comparable ty2) with

@@ -59,12 +59,12 @@ let check_file_content file_path =
     Sys.remove file_path
 
 let noop profiler =
-  record profiler Info ("noop", []) ;
+  record ~cpu:None profiler Info ("noop", []) ;
   stop profiler
 
 let sleep10ms profiler =
   let tag = "sleep10ms" in
-  record profiler Info (tag, []) ;
+  record ~cpu:None profiler Info (tag, []) ;
   Log.info "%s" tag ;
   Unix.sleepf 0.01 ;
   noop profiler ;
@@ -72,20 +72,20 @@ let sleep10ms profiler =
 
 let sleep70ms profiler =
   let tag = "sleep70" in
-  record profiler Info (tag, []) ;
+  record ~cpu:None profiler Info (tag, []) ;
   Log.info "%s" tag ;
   Unix.sleepf 0.07 ;
   stop profiler
 
 let foo profiler =
-  record profiler Info ("foo", []) ;
+  record ~cpu:None profiler Info ("foo", []) ;
   sleep10ms profiler ;
   sleep70ms profiler ;
   sleep10ms profiler ;
   stop profiler
 
 let bar profiler =
-  record profiler Info ("bar", []) ;
+  record ~cpu:None profiler Info ("bar", []) ;
   sleep70ms profiler ;
   sleep10ms profiler ;
   foo profiler ;
@@ -94,7 +94,7 @@ let bar profiler =
 
 let test70 profiler =
   Log.info "\nTEST: test 70\n" ;
-  record profiler Info ("test70", []) ;
+  record ~cpu:None profiler Info ("test70", []) ;
   bar profiler ;
   foo profiler ;
   stop profiler
@@ -108,6 +108,7 @@ let sleep_until_next_second () =
 
 let slp tag profiler =
   record_s
+    ~cpu:None
     profiler
     Info
     ("slp " ^ tag, [])
@@ -119,57 +120,60 @@ let slp tag profiler =
 
 let sequences profiler =
   let* () =
-    record_s profiler Info ("a_seq", []) (fun () -> slp "a_seq" profiler)
+    record_s ~cpu:None profiler Info ("a_seq", []) (fun () ->
+        slp "a_seq" profiler)
   in
-  record_s profiler Info ("b_seq", []) (fun () ->
+  record_s ~cpu:None profiler Info ("b_seq", []) (fun () ->
       let* () =
-        record_s profiler Info ("b_a_seq", []) (fun () ->
+        record_s ~cpu:None profiler Info ("b_a_seq", []) (fun () ->
             slp "b_a_seq" profiler)
       in
       let* () =
-        record_s profiler Info ("b_b_seq", []) (fun () ->
+        record_s ~cpu:None profiler Info ("b_b_seq", []) (fun () ->
             slp "b_b_seq" profiler)
       in
       slp "b_seq" profiler)
 
 let aggregates profiler =
   let* () =
-    aggregate_s profiler Info ("a_aggr", []) (fun () -> slp "a_aggr" profiler)
+    aggregate_s ~cpu:None profiler Info ("a_aggr", []) (fun () ->
+        slp "a_aggr" profiler)
   in
   let* () =
-    aggregate_s profiler Info ("b_aggr", []) (fun () -> slp "b_aggr" profiler)
+    aggregate_s ~cpu:None profiler Info ("b_aggr", []) (fun () ->
+        slp "b_aggr" profiler)
   in
   let* () =
-    aggregate_s profiler Info ("a_aggr", []) (fun () ->
+    aggregate_s ~cpu:None profiler Info ("a_aggr", []) (fun () ->
         let* () =
-          aggregate_s profiler Info ("a_a_aggr", []) (fun () ->
+          aggregate_s ~cpu:None profiler Info ("a_a_aggr", []) (fun () ->
               slp "a_a_aggr" profiler)
         in
         let* () =
-          aggregate_s profiler Info ("a_b_aggr", []) (fun () ->
+          aggregate_s ~cpu:None profiler Info ("a_b_aggr", []) (fun () ->
               slp "a_b_aggr" profiler)
         in
         let* () =
-          aggregate_s profiler Info ("a_c_aggr", []) (fun () ->
+          aggregate_s ~cpu:None profiler Info ("a_c_aggr", []) (fun () ->
               slp "a_c_aggr" profiler)
         in
         slp "a_aggr" profiler)
   in
-  aggregate_s profiler Info ("a_aggr", []) (fun () ->
+  aggregate_s ~cpu:None profiler Info ("a_aggr", []) (fun () ->
       let* () =
-        aggregate_s profiler Info ("a_a_aggr", []) (fun () ->
-            aggregate_s profiler Info ("a_a_a_aggr", []) (fun () ->
+        aggregate_s ~cpu:None profiler Info ("a_a_aggr", []) (fun () ->
+            aggregate_s ~cpu:None profiler Info ("a_a_a_aggr", []) (fun () ->
                 slp "a_a_a_aggr" profiler))
       in
       slp "a_aggr" profiler)
 
 let buggy_aggregates profiler =
   let t1 =
-    aggregate_s profiler Info ("bug_aggr_a", []) (fun () ->
+    aggregate_s ~cpu:None profiler Info ("bug_aggr_a", []) (fun () ->
         slp "bug_aggr_a" profiler)
   in
   let t2 =
-    aggregate_s profiler Info ("bug_aggr_b", []) (fun () ->
+    aggregate_s ~cpu:None profiler Info ("bug_aggr_b", []) (fun () ->
         let* () = slp "bug_aggr_b_a" profiler in
         slp "bug_aggr_b_b" profiler)
   in
@@ -177,10 +181,12 @@ let buggy_aggregates profiler =
 
 let spans profiler =
   let t1 =
-    span_s profiler Info (["span1"], []) (fun () -> slp "span1" profiler)
+    span_s ~cpu:None profiler Info (["span1"], []) (fun () ->
+        slp "span1" profiler)
   in
   let t2 =
     span_s
+      ~cpu:None
       profiler
       Info
       (["span2"; "inner1"], [])
@@ -190,6 +196,7 @@ let spans profiler =
   in
   let t3 =
     span_s
+      ~cpu:None
       profiler
       Info
       (["span2"; "inner2"], [])
@@ -201,32 +208,33 @@ let spans profiler =
 
 let sequences_with_mark_and_stamp profiler =
   let* () =
-    record_s profiler Info ("a_seq", []) (fun () -> slp "a_seq" profiler)
+    record_s ~cpu:None profiler Info ("a_seq", []) (fun () ->
+        slp "a_seq" profiler)
   in
-  record_s profiler Info ("b_seq", []) (fun () ->
+  record_s ~cpu:None profiler Info ("b_seq", []) (fun () ->
       let* () =
-        record_s profiler Info ("b_a_seq", []) (fun () ->
+        record_s ~cpu:None profiler Info ("b_a_seq", []) (fun () ->
             slp "b_a_seq" profiler)
       in
       let () =
         List.iter (fun _ -> mark profiler Info (["mark"], [])) (1 -- 10)
       in
-      stamp profiler Info ("stamp", []) ;
+      stamp ~cpu:None profiler Info ("stamp", []) ;
       let* () =
-        record_s profiler Info ("b_b_seq", []) (fun () ->
+        record_s ~cpu:None profiler Info ("b_b_seq", []) (fun () ->
             slp "b_b_seq" profiler)
       in
       let () =
         List.iter (fun _ -> mark profiler Info (["mark"], [])) (1 -- 10)
       in
-      stamp profiler Info ("stamp", []) ;
+      stamp ~cpu:None profiler Info ("stamp", []) ;
       slp "b_seq" profiler)
 
 let test_profiler_actions profiler =
   Log.info "\nTEST: test_profiler_actions\n" ;
   let main () =
     let* () = sleep_until_next_second () in
-    record_s profiler Info ("main", []) (fun () ->
+    record_s ~cpu:None profiler Info ("main", []) (fun () ->
         let* () = sequences profiler in
         let* () = aggregates profiler in
         let* () = buggy_aggregates profiler in

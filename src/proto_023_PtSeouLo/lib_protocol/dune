@@ -26,6 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -w -32-34
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_023_PtSeouLo
@@ -295,6 +296,7 @@
   tezos-protocol-023-PtSeouLo.protocol.raw)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Protocol Tezos_protocol_023_PtSeouLo))
 
@@ -577,7 +579,8 @@
   apply.ml apply.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34 -warn-error +a .)))
 
 (library
  (name tezos_protocol_023_PtSeouLo_lifted)
@@ -589,6 +592,7 @@
   tezos-protocol-023-PtSeouLo.protocol)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives
   -open Tezos_protocol_023_PtSeouLo)
  (modules Lifted_protocol))
@@ -607,6 +611,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Functor))
 
@@ -885,6 +890,9 @@
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -w -32-34)
  (modules Registerer))
 
 (rule

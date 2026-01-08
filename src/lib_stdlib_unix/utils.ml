@@ -115,6 +115,18 @@ let copy_dir ?(perm = 0o755) ?progress src dst =
 
 let copy_file = copy_file ~count_progress:(fun _ -> ())
 
+let hardlink_dir ?(perm = 0o755) src dst =
+  create_dir ~perm dst ;
+  fold_files
+    src
+    (fun relative_path () ->
+      let src = Filename.concat src relative_path in
+      let dst = Filename.concat dst relative_path in
+      let dst_dir = Filename.dirname dst in
+      create_dir ~perm dst_dir ;
+      Unix.link src dst)
+    ()
+
 let rec retry ?max_delay ~delay ~factor ?tries ~is_error ~emit
     ?(msg = fun _ -> "") f x =
   let open Lwt.Syntax in
@@ -165,3 +177,19 @@ let rec retry ?max_delay ~delay ~factor ?tries ~is_error ~emit
   | Error errs as err ->
       let* () = emit (Format.sprintf "%sNo attempts left." (msg errs)) in
       Lwt.return err
+
+let event_on_stalling_promise ?max_delay ?(factor = 1.2) ?(initial_delay = 2.)
+    ~event f =
+  let open Lwt.Syntax in
+  let rec timeout_warn sum ~delay =
+    let next_delay = delay *. factor in
+    let delay =
+      Option.fold ~none:next_delay ~some:(Float.min next_delay) max_delay
+    in
+    let* () = Lwt_unix.sleep delay in
+    let sum = sum +. delay in
+    let* () = event sum in
+    timeout_warn sum ~delay
+  in
+  (* [timeout_warn] will never stop but will emit an event after a delay each time *)
+  Lwt.pick [f; timeout_warn 0. ~delay:initial_delay]

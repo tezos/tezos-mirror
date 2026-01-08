@@ -17,8 +17,8 @@ export CI_COMMIT_TAG="${ci_commit_tag}"
 ## The goal of this script is to retag existing Docker images (do not rebuild them)
 target_tag="${1:-latest}"
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. "${2:-./scripts/ci/octez-release.sh}"
+# shellcheck source=./scripts/releases/octez-release.sh
+. "${2:-./scripts/releases/octez-release.sh}"
 
 if [ -z "${gitlab_release}" ]; then
   echo "Error: could not find valid tag like *-vX.Y at branch HEAD"

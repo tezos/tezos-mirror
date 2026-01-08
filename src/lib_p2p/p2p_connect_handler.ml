@@ -711,8 +711,9 @@ let accept t fd point =
   in
   if t.config.max_incoming_connections <= P2p_point.Table.length t.incoming then
     reject ~reason:Incoming_connection_too_many
-  else if (* silently ignore banned points *)
-          P2p_pool.Points.banned t.pool point
+  else if
+    (* silently ignore banned points *)
+    P2p_pool.Points.banned t.pool point
   then reject ~reason:Incoming_connection_banned
   else
     let canceler = Lwt_canceler.create () in
@@ -899,7 +900,8 @@ module Internal_for_tests = struct
              ?advertised_port:_
              _
              _
-             _ ->
+             _
+           ->
           let connection_info =
             P2p_connection.Internal_for_tests.Info.mock default_metadata
           in
@@ -914,8 +916,8 @@ module Internal_for_tests = struct
              ?binary_chunks_size:_
              ~canceler:_
              authenticated_connection
-             _encoding ->
-          P2p_socket.Internal_for_tests.mock authenticated_connection);
+             _encoding
+           -> P2p_socket.Internal_for_tests.mock authenticated_connection);
     }
 
   let dumb_config : config =

@@ -40,24 +40,7 @@ module Plugin = struct
 
   type tb_slot = Slot.t
 
-  type error += Aggregation_result_size_error
-
-  let () =
-    Protocol_client_context.register_error_kind
-      `Permanent
-      ~id:"Aggregation_result_size_error"
-      ~title:"Bad aggregagtion result size"
-      ~description:
-        "Aggregation result should have as many elements as the original \
-         aggregated attestation"
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Aggregation result should have as many elements as the original \
-           aggregated attestation")
-      Data_encoding.unit
-      (function Aggregation_result_size_error -> Some () | _ -> None)
-      (fun () -> Aggregation_result_size_error)
+  let tb_slot_to_int tb_slot = Slot.to_int tb_slot
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -152,6 +135,61 @@ module Plugin = struct
     let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
     return_unit
 
+  let publish cctxt ~block_level ~source ~slot_index ~commitment
+      ~commitment_proof ~src_sk () =
+    let open Lwt_result_syntax in
+    let chain = `Main in
+    let block = `Level block_level in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
+    let* {dal = {number_of_slots; _}; _} =
+      Plugin.Constants_services.parametric cpctxt (chain, block)
+    in
+    let*? slot_index =
+      Dal.Slot_index.of_int ~number_of_slots slot_index
+      |> Environment.wrap_tzresult
+    in
+    let* block_hash =
+      Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
+    in
+    let* counter =
+      let* pcounter =
+        Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
+      in
+      return (Manager_counter.succ pcounter)
+    in
+    let operation =
+      Dal_publish_commitment {slot_index; commitment; commitment_proof}
+    in
+    let operation =
+      (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+         - tz1: fees of 513µtz and 1333 gas consumed
+         - tz2: fees of 514µtz and 1318 gas consumed
+         - tz3: fees of 543µtz and 1607 gas consumed
+         - tz4: fees of 700µtz and 2837 gas consumed
+         We added a margin to it.
+         The storage limit value has been selected purely arbitrarily
+         (it worked with this value when I experimented, so I did not change it). *)
+      Alpha_context.(
+        Manager_operation
+          {
+            source;
+            fee = Tez.of_mutez_exn (Int64.of_int 750);
+            counter;
+            operation;
+            gas_limit = Gas.Arith.integral_of_int_exn 3000;
+            storage_limit = Z.of_int 100;
+          })
+    in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        ({branch = block_hash}, Contents_list (Single operation))
+    in
+    let bytes =
+      Signature.append ~watermark:Signature.Generic_operation src_sk bytes
+    in
+    Shell_services.Injection.operation cctxt ~chain bytes
+
   let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
@@ -203,7 +241,7 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
         cpctxt
         ~block:(`Level block_level)
-        ~metadata:`Always
+        ~metadata:`Never
         0
     in
     Lwt.return @@ Result.map List.flatten
@@ -211,7 +249,7 @@ module Plugin = struct
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
-           | Single (Attestation attestation) -> (
+           | Single (Attestation attestation) ->
                let packed_operation =
                  Op
                    {
@@ -226,26 +264,8 @@ module Plugin = struct
                      (dal_content.attestation :> dal_attestation))
                    attestation.dal_content
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result (Attestation_result result) ->
-                       let delegate =
-                         Tezos_crypto.Signature.Of_V2.public_key_hash
-                           result.delegate
-                       in
-                       Ok
-                         [
-                           ( tb_slot,
-                             Some delegate,
-                             packed_operation,
-                             dal_attestation );
-                         ]
-                   | _ ->
-                       Ok [(tb_slot, None, packed_operation, dal_attestation)])
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok [(tb_slot, None, packed_operation, dal_attestation)])
-           | Single (Attestations_aggregate {committee; _}) -> (
+               Ok [(tb_slot, packed_operation, dal_attestation)]
+           | Single (Attestations_aggregate {committee; _}) ->
                let packed_operation =
                  Op
                    {
@@ -263,36 +283,15 @@ module Plugin = struct
                          dal_content_opt ))
                    committee
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result
-                       (Attestations_aggregate_result {committee; _}) ->
-                       List.map2
-                         ~when_different_lengths:[Aggregation_result_size_error]
-                         (fun (tb_slot, dal_attestation) (consensus_key, _) ->
-                           ( tb_slot,
-                             Some consensus_key.Consensus_key.delegate,
-                             packed_operation,
-                             dal_attestation ))
-                         slots_and_dal_attestations
-                         committee
-                   | _ ->
-                       Ok
-                         (List.map
-                            (fun (tb_slot, dal_attestation) ->
-                              (tb_slot, None, packed_operation, dal_attestation))
-                            slots_and_dal_attestations))
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok
-                     (List.map
-                        (fun (tb_slot, dal_attestation) ->
-                          (tb_slot, None, packed_operation, dal_attestation))
-                        slots_and_dal_attestations))
+               Ok
+                 (List.map
+                    (fun (tb_slot, dal_attestation) ->
+                      (tb_slot, packed_operation, dal_attestation))
+                    slots_and_dal_attestations)
            | _ -> Ok [])
          consensus_ops
 
-  let get_committee ctxt ~level =
+  let get_committees ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let*? level = Raw_level.of_int32 level |> wrap in
@@ -302,7 +301,23 @@ module Plugin = struct
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
         let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
-        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+        let tb_slot =
+          (* Associating delegate public key hash to Tenderbake attestation
+               slot can be done by matching the first DAL slot index of a given
+               attester as there is a DAL protocol invariant that enforces that
+               the first DAL slot index corresponds to the TB attestation slot
+               index of a give attester. *)
+          match List.hd indexes with
+          | Some slot -> slot
+          | None ->
+              (* We assume that the set indexes associated to a delegate is
+                   never empty. *)
+              assert false
+        in
+        Tezos_crypto.Signature.Public_key_hash.Map.add
+          delegate
+          (indexes, tb_slot)
+          acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
@@ -353,6 +368,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
+    (* The feature is not available for this protocol. *)
+    let back_pointer _cell ~index:_ = Error ()
+
     (* This function returns the list of cells of the DAL skip list constructed
        at the level of the block whose info are given. For that, it calls the
        {!Plugin.RPC.Dal.skip_list_cells_of_level} RPC that directly retrieves
@@ -370,11 +388,11 @@ module Plugin = struct
         ~pred_publication_level_dal_constants:_ =
       let open Lwt_result_syntax in
       let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+      let attestation_lag =
+        dal_constants.Tezos_dal_node_services.Types.attestation_lag
+      in
       let published_level =
-        Int32.sub
-          attested_level
-          (Int32.of_int
-             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
+        Int32.sub attested_level (Int32.of_int attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -394,7 +412,7 @@ module Plugin = struct
                 Slots_history.(content cell |> content_id).index
                 |> Slot_index.to_int)
             in
-            (hash, cell, slot_index))
+            (hash, cell, slot_index, attestation_lag))
           cells
 
     let slot_header_of_cell cell =
@@ -409,6 +427,17 @@ module Plugin = struct
                 slot_index = Dal.Slot_index.to_int id.index;
                 commitment;
               }
+
+    let proto_attestation_status =
+      let legacy_attestation_lag = 8 in
+      fun cell ->
+        Option.some
+        @@
+        match Dal.Slots_history.(content cell) with
+        | Dal.Slots_history.Unpublished _ -> `Unpublished
+        | Published {is_proto_attested; _} ->
+            if is_proto_attested then `Attested legacy_attestation_lag
+            else `Unattested
   end
 
   module RPC = struct

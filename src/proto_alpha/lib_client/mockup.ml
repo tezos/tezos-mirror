@@ -189,7 +189,7 @@ module Bootstrap_contract = struct
       (obj4
          (opt "delegate" Signature.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
-         (req "script" Script.encoding)
+         (req "script" Script.michelson_with_storage_encoding)
          (opt "hash" Contract_hash.encoding))
 end
 
@@ -212,7 +212,8 @@ module Protocol_parameters = struct
       (fun ( initial_timestamp,
              bootstrap_accounts,
              bootstrap_contracts,
-             constants ) ->
+             constants )
+         ->
         {initial_timestamp; bootstrap_accounts; bootstrap_contracts; constants})
       (obj4
          (req "initial_timestamp" Time.Protocol.encoding)
@@ -554,10 +555,7 @@ let mem_init :
           proof_of_work_nonce;
           (* following Baking_configuration.per_block_votes in lib_delegate *)
           per_block_votes =
-            {
-              liquidity_baking_vote = Per_block_votes.Per_block_vote_pass;
-              adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
-            };
+            {liquidity_baking_vote = Per_block_votes.Per_block_vote_pass};
         }
       in
       let unsigned_bytes =

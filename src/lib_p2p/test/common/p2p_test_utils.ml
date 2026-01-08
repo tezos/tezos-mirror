@@ -315,8 +315,8 @@ let connect ?(proof_of_work_target = proof_of_work_target) sched addr port id =
   match r with
   | Error
       (Left
-        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
-        | `Connection_canceled | `Unexpected_error _ )) ->
+         ( `Network_unreachable | `Connection_unreachable | `Connection_refused
+         | `Connection_canceled | `Unexpected_error _ )) ->
       Lwt.fail Cant_connect
   | Error (Right e) -> Lwt_result.fail e
   | Ok fd ->

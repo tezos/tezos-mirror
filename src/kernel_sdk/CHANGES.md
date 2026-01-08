@@ -34,6 +34,9 @@
 - Change `Runtime::store_value_size` to return `PathNotFound` when the input is the path of a directory.
 - Add support for `MichelsonTimestamp` encoding and decoding.
 - Return a dummy value for `Runtime::reboot_left` on RISC-V, as RISC-V kernels do not need to reboot.
+- Add `Hash` implementation for `OwnedPath`.
+- Remove `tezos-smart-rollup-encoding::contract::Contract`. One may continue to use `tezos-smart-rollup::types::Contract`, which is exported
+  from `tezos-protocol::contract::Contract`. This is a drop-in replacement that is fully backwards compatible.
 
 ### Installer client/kernel
 

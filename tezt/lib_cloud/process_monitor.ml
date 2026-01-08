@@ -14,6 +14,7 @@ type t = {
 let executable = "prometheus-process-exporter"
 
 let init ~listening_port =
+  Log.report "Process_monitor: listening on %d" listening_port ;
   {listening_port; monitored_processes = []; checked_in_path = false}
 
 let encoding =
@@ -26,6 +27,7 @@ let encoding =
 let add_binary t ~group ~name =
   if List.mem (group, name) t.monitored_processes then false
   else (
+    Log.report "Process_monitor: enable watching %s in group %s" name group ;
     t.monitored_processes <- (group, name) :: t.monitored_processes ;
     true)
 
@@ -44,23 +46,21 @@ let reload t run_cmd =
       let () =
         match r with
         | WEXITED 0 -> t.checked_in_path <- true
-        | _ -> Log.warn "Cannot find executable: %s" executable
+        | _ -> Log.warn "Process_monitor: cannot find executable: %s" executable
       in
       Lwt.return_unit
     else Lwt.return_unit
   in
   let processes_names = List.map snd (get_binaries t) in
   let processes = String.concat "," processes_names in
-  Log.report
-    "Restarting prometheus-process-exporter; monitored processes = {%s}"
-    processes ;
+  Log.report "Process_monitor: restarting prometheus-process-exporter" ;
+  Log.report "Process_monitor: monitored processes : {%s}" processes ;
   let* _ = run_cmd ~detach:false "pkill" ["-f"; executable] |> Process.wait in
-  let* _ =
-    run_cmd
-      ~detach:true
-      executable
-      (["-web.listen-address"; Format.asprintf ":%d" t.listening_port]
-      @ ["--procnames"; processes])
-    |> Process.wait
+  let cmd, args =
+    ( executable,
+      ["-web.listen-address"; Format.asprintf ":%d" t.listening_port]
+      @ ["--procnames"; processes] )
   in
+  Log.report "Process_monitor: [exec] %s %s" cmd (String.concat " " args) ;
+  let* _ = run_cmd ~detach:true cmd args |> Process.wait in
   Lwt.return_unit

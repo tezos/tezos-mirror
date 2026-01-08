@@ -9,7 +9,8 @@
   octez-libs.base
   octez-libs.base.unix
   octez-l2-libs.irmin_context
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
+  octez-lwt-domain
   opentelemetry-lwt)
  (flags
   (:standard)

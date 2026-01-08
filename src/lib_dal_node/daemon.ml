@@ -93,11 +93,11 @@ let on_new_finalized_head ctxt cctxt crawler =
     | None -> Lwt.fail_with "L1 crawler lib shut down"
     | Some (finalized_block_hash, finalized_shell_header) ->
         ()
-        [@profiler.reset_block_section
-          {profiler_module = Profiler} finalized_block_hash] ;
+        [@profiler.overwrite
+          Profiler.reset_block_section (finalized_block_hash, [])] ;
         ()
-        [@profiler.reset_block_section
-          {profiler_module = Gossipsub_profiler} finalized_block_hash] ;
+        [@profiler.overwrite
+          Gossipsub_profiler.reset_block_section (finalized_block_hash, [])] ;
         let* () =
           (Block_handler.new_finalized_head
              ctxt
@@ -129,6 +129,12 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+module IntSet = Set.Make (struct
+  type t = int
+
+  let compare = compare
+end)
+
 let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     node_store node_ctxt amplificator ~verbose =
   let timing_table_size =
@@ -143,74 +149,220 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     let config = Node_context.get_config node_ctxt in
     config.disable_amplification
   in
-  let shards_handler shards =
+  let shards_out_handler shards =
+    (* Counting potentially emitted message is a good way to count the number of shards validated. *)
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
-        Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
+        Types.Message_id.{commitment; shard_index; level; slot_index; _}
+      ->
       let open Lwt_result_syntax in
       let slot_id : Types.slot_id = {slot_level = level; slot_index} in
-      (let* () =
-         (Seq.return {Cryptobox.share; index = shard_index}
-         |> save_and_notify slot_id |> Errors.to_tzresult)
-         [@profiler.aggregate_s
-           {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
-       in
-       let number_of_shards =
-         proto_parameters.cryptobox_parameters.number_of_shards
-       in
-       (* Introduce a new store read at each received shard. Not sure it can be
-          a problem, though *)
-       let* number_of_already_stored_shards =
-         (Store.Shards.count_values
-            node_store
-            slot_id
+      ((let* () =
+          (Seq.return {Cryptobox.share; index = shard_index}
+          |> save_and_notify slot_id |> Errors.to_tzresult)
           [@profiler.aggregate_s
-            {verbosity = Notice; profiler_module = Profiler} "count_values"])
-       in
-       let slot_metrics =
-         (Dal_metrics.update_timing_shard_received
-            (Node_context.get_cryptobox node_ctxt)
-            shards_timing_table
-            slot_id
-            ~number_of_already_stored_shards
-            ~number_of_shards
-          [@profiler.aggregate_f
-            {verbosity = Notice; profiler_module = Profiler}
-              "update_timing_shard_received"])
-       in
-       match
-         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
-       with
-       | Controller profile
-         when Controller_profiles.is_observed_slot slot_index profile -> (
-           match amplificator with
-           | None ->
-               let*! () =
-                 if not disable_amplification then
-                   Event.emit_amplificator_uninitialized ()
-                 else Lwt.return_unit
-               in
-               return_unit
-           | Some amplificator ->
-               assert (not disable_amplification) ;
-               Amplificator.try_amplification
-                 commitment
-                 slot_metrics
-                 slot_id
-                 amplificator
-               [@profiler.aggregate_s
-                 {verbosity = Notice; profiler_module = Profiler}
-                   "try_amplification"])
-       | _ -> return_unit)
+            {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
+        in
+        let* () =
+          Attestable_slots.may_notify_attestable_slot_or_trap node_ctxt ~slot_id
+        in
+        (* Introduce a new store read at each received shard. Not sure it can be
+          a problem, though *)
+        let* number_of_already_stored_shards =
+          (Store.Shards.count_values
+             node_store
+             slot_id
+           [@profiler.aggregate_s
+             {verbosity = Notice; profiler_module = Profiler} "count_values"])
+        in
+        let update_metric_and_emit_event ?min_shards_to_reconstruct_slot
+            ~number_of_expected_shards () =
+          let open Lwt_syntax in
+          let updated, slot_metrics =
+            (Dal_metrics.update_timing_shard_validated
+               shards_timing_table
+               slot_id
+               ?min_shards_to_reconstruct_slot
+               ~number_of_already_stored_shards
+               ~number_of_expected_shards
+             [@profiler.aggregate_f
+               {verbosity = Notice; profiler_module = Profiler}
+                 "update_timing_shard_validated"])
+          in
+          let* () =
+            if updated then
+              Event.emit_validation_of_shard_update
+                ~level
+                ~slot_index
+                ~slot_metrics
+            else return_unit
+          in
+          return slot_metrics
+        in
+        match
+          Profile_manager.get_profiles
+          @@ Node_context.get_profile_ctxt node_ctxt
+        with
+        | Controller profile
+          when Controller_profiles.can_publish_on_slot_index slot_index profile
+          -> (
+            (* If one is an observer or an operator for current slot, then they expect all the shards. *)
+            let total_number_of_shards =
+              proto_parameters.cryptobox_parameters.number_of_shards
+            in
+            let min_shards_to_reconstruct_slot =
+              let redundancy_factor =
+                proto_parameters.cryptobox_parameters.redundancy_factor
+              in
+              total_number_of_shards / redundancy_factor
+            in
+            let*! slot_metrics =
+              update_metric_and_emit_event
+                ~min_shards_to_reconstruct_slot
+                ~number_of_expected_shards:total_number_of_shards
+                ()
+            in
+            match amplificator with
+            | None ->
+                let*! () =
+                  if not disable_amplification then
+                    Event.emit_amplificator_uninitialized ()
+                  else Lwt.return_unit
+                in
+                return_unit
+            | Some amplificator ->
+                assert (not disable_amplification) ;
+                Amplificator.try_amplification
+                  commitment
+                  slot_metrics
+                  slot_id
+                  amplificator
+                [@profiler.aggregate_s
+                  {verbosity = Notice; profiler_module = Profiler}
+                    "try_amplification"])
+        | Controller profile when Controller_profiles.has_attester profile ->
+            (* If one is not observing the slot but is an attester, then they
+               expect a number of shards depending of the committee draw. *)
+            let attesters = Controller_profiles.attesters profile in
+            let* committee =
+              let level =
+                Int32.add
+                  level
+                  (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
+              in
+              Node_context.fetch_committees node_ctxt ~level
+            in
+            let number_of_expected_shards =
+              Signature.Public_key_hash.Set.fold
+                (fun pkh acc ->
+                  match Signature.Public_key_hash.Map.find pkh committee with
+                  | None -> acc
+                  | Some (shard_indices, _) -> acc + List.length shard_indices)
+                attesters
+                0
+            in
+            let*! _slot_metrics =
+              update_metric_and_emit_event ~number_of_expected_shards ()
+            in
+            return_unit
+        | _ -> return_unit)
       [@profiler.aggregate_s
-        {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+        {verbosity = Notice; profiler_module = Profiler} "shards_handler"])
+  in
+  let shards_in_handler still_to_receive_indices =
+   fun Types.Message_id.{level; slot_index; shard_index; _} from_peer ->
+    let open Lwt_result_syntax in
+    let*! () =
+      Event.emit_reception_of_shard_detailed
+        ~level
+        ~slot_index
+        ~shard_index
+        ~sender:from_peer
+    in
+    let slot_id : Types.slot_id = {slot_level = level; slot_index} in
+    let update_metric_and_emit_event if_no_shards_yet =
+      let still_to_receive_shards =
+        match
+          Dal_metrics.Slot_id_bounded_map.find_opt
+            still_to_receive_indices
+            slot_id
+        with
+        | None -> if_no_shards_yet ()
+        | Some l -> l
+      in
+      let last_expected_shard =
+        if IntSet.is_empty still_to_receive_shards then false
+        else
+          let new_set = IntSet.remove shard_index still_to_receive_shards in
+          Dal_metrics.Slot_id_bounded_map.replace
+            still_to_receive_indices
+            slot_id
+            new_set ;
+          IntSet.is_empty new_set
+      in
+      let updated, slot_metrics =
+        (Dal_metrics.update_timing_shard_received
+           shards_timing_table
+           slot_id
+           ~last_expected_shard
+         [@profiler.aggregate_f
+           {verbosity = Notice; profiler_module = Profiler}
+             "update_timing_shard_received"])
+      in
+      let*! () =
+        if updated then
+          Event.emit_reception_of_shard_update ~level ~slot_index ~slot_metrics
+        else Lwt.return_unit
+      in
+      return_unit
+    in
+    match[@profiler.aggregate_s
+           {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+      Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
+    with
+    | Controller profile
+      when Controller_profiles.can_publish_on_slot_index slot_index profile ->
+        (* If one is an observer or an operator for current slot, then they
+           expect all the shards. *)
+        let total_number_of_shards =
+          proto_parameters.cryptobox_parameters.number_of_shards
+        in
+        update_metric_and_emit_event (fun () ->
+            IntSet.of_list (0 -- (total_number_of_shards - 1)))
+    | Controller profile when Controller_profiles.has_attester profile ->
+        (* If one is not observing the slot but is an attester, then they expect
+           a number of shards depending of the committee draw. *)
+        let attesters = Controller_profiles.attesters profile in
+        let* committee =
+          let level =
+            Int32.add
+              level
+              (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
+          in
+          Node_context.fetch_committees node_ctxt ~level
+        in
+        update_metric_and_emit_event (fun () ->
+            Signature.Public_key_hash.Set.fold
+              (fun pkh acc ->
+                match Signature.Public_key_hash.Map.find pkh committee with
+                | None -> acc
+                | Some (shard_indices, _) ->
+                    IntSet.union acc (IntSet.of_list shard_indices))
+              attesters
+              IntSet.empty)
+    | _ -> return_unit
+  in
+  let still_to_receive_indices =
+    Dal_metrics.Slot_id_bounded_map.create
+      (proto_parameters.number_of_slots * proto_parameters.attestation_lag)
   in
   Lwt.catch
     (fun () ->
       Gossipsub.Transport_layer_hooks.activate
         gs_worker
         transport_layer
-        ~app_messages_callback:(shards_handler node_store)
+        ~app_out_callback:(shards_out_handler node_store)
+        ~app_in_callback:(shards_in_handler still_to_receive_indices)
         ~verbose)
     (fun exn ->
       let msg =
@@ -283,6 +435,30 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
+(* This back-fills the store with slot headers at levels from [from_level] to
+   [from_level - attestation_lag]. *)
+let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
+    proto_parameters ~from_level =
+  let open Lwt_result_syntax in
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  List.iter_es
+    (fun i ->
+      let block_level = Int32.(sub from_level (of_int i)) in
+      if block_level > 1l then
+        let* slot_headers =
+          Plugin.get_published_slot_headers ~block_level cctxt
+        in
+        let*! () =
+          Slot_manager.store_slot_headers
+            ~number_of_slots
+            ~block_level
+            slot_headers
+            store
+        in
+        return_unit
+      else return_unit)
+    (Stdlib.List.init proto_parameters.attestation_lag Fun.id)
+
 let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     ~configuration_override () =
   let open Lwt_result_syntax in
@@ -298,7 +474,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     in
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  let*! () = Event.emit_starting_node () in
   let* ({
           rpc_addr;
           (* These are not the cryptographic identities of peers, but the points
@@ -325,6 +500,8 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
   let* network_name = L1_helpers.infer_dal_network_name cctxt in
+  let version = Tezos_version_value.Bin_version.octez_version_string in
+  let*! () = Event.emit_starting_node ~network_name ~version in
   let* initial_peers_names =
     if ignore_l1_config_peers then return points
     else
@@ -364,7 +541,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
   let head_level = header.Block_header.shell.level in
-  let*? _plugin, proto_parameters =
+  let*? (module Plugin), proto_parameters =
     Proto_plugins.get_plugin_and_parameters_for_level
       proto_plugins
       ~level:head_level
@@ -383,6 +560,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  let identity = p2p_config.P2p.identity in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -422,7 +600,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         }
       else limits
     in
-    let identity = p2p_config.P2p.identity in
     (* Initialize the OpenTelemetry profiler only when identity is available, to
        allow discriminating the different services. *)
     ()
@@ -474,6 +651,21 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   in
   (* Initialize store *)
   let* store = Store.init config profile_ctxt proto_parameters in
+  let* current_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
+  let chain_id_store = Store.chain_id store in
+  let* stored_chain_id = Store.Chain_id.load chain_id_store in
+  let* () =
+    match stored_chain_id with
+    | None ->
+        (* If no chain was stored, then either:
+           - the DAL node never ran, hence there are no level stored,
+           - the previously running DAL node did not feature the chain id storing.
+           Hence, for retrocompatibility, we accept to load stored level if any in this case. *)
+        Store.Chain_id.save chain_id_store current_chain_id
+    | Some chain when chain = current_chain_id -> return_unit
+    | Some stored_chain_id ->
+        tzfail @@ Errors.Wrong_chain_id {current_chain_id; stored_chain_id}
+  in
   let* last_processed_level =
     let last_processed_level_store = Store.last_processed_level store in
     Store.Last_processed_level.load last_processed_level_store
@@ -519,6 +711,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let ctxt =
     Node_context.init
       config
+      ~identity
       profile_ctxt
       cryptobox
       shards_proofs_precomputation
@@ -551,7 +744,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     | Disabled -> ()
   in
   (* Even if the batch validation is activated, one has to register a per message
-     validation for the validation of message id. *)
+    validation for the validation of message id. *)
   Gossipsub.Worker.Validate_message_hook.set
     (Message_validation.gossipsub_app_messages_validation
        ctxt
@@ -605,13 +798,13 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
           ~head_level
           proto_parameters
   in
+  (* We reload the last processed level because [clean_up_store] has likely
+     modified it. *)
+  let* last_notified_level =
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.load last_processed_level_store
+  in
   let* crawler =
-    (* We reload the last processed level because [clean_up_store] has likely
-       modified it. *)
-    let* last_notified_level =
-      let last_processed_level_store = Store.last_processed_level store in
-      Store.Last_processed_level.load last_processed_level_store
-    in
     let open Constants in
     let*! crawler =
       Crawler.start
@@ -623,6 +816,16 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         cctxt
     in
     return crawler
+  in
+  let* () =
+    let from_level = Int32.pred head_level in
+    (backfill_slot_statuses
+       cctxt
+       store
+       (module Plugin)
+       proto_parameters
+       ~from_level
+     [@profiler.record_s {verbosity = Notice} "backfill_slot_statuses"])
   in
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
@@ -645,8 +848,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Register topics with gossipsub worker. *)
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
-  let version = Tezos_version_value.Bin_version.octez_version_string in
-  let*! () = Event.emit_node_is_ready ~network_name ~version in
+  let*! () = Event.emit_node_is_ready () in
   () [@profiler.overwrite may_start_profiler data_dir] ;
   let* _ =
     Lwt.pick

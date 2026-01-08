@@ -6,7 +6,7 @@
  (public_name octez-evm-node-libs.websocket_cohttp_lwt)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   octez-evm-node-libs.websocket)
  (modules websocket_cohttp_lwt))
 
@@ -16,6 +16,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   lwt_log
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   octez-evm-node-libs.websocket)
  (modules websocket_lwt_unix))

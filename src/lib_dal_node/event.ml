@@ -45,13 +45,15 @@ open struct
   let section = ["dal"]
 
   let starting_node =
-    declare_0
+    declare_2
       ~section
       ~prefix_name_with_section:true
       ~name:"starting"
-      ~msg:"starting the DAL node"
+      ~msg:
+        "starting the DAL node (network: {network}, octez version: {version})"
       ~level:Notice
-      ()
+      ("network", Distributed_db_version.Name.encoding)
+      ("version", Data_encoding.string)
 
   let waiting_l1_node_bootstrapped =
     declare_0
@@ -108,15 +110,13 @@ open struct
       ()
 
   let node_is_ready =
-    declare_2
+    declare_0
       ~section
       ~prefix_name_with_section:true
       ~name:"is_ready"
-      ~msg:
-        "the DAL node is ready (network: {network}, octez version: {version})"
+      ~msg:"the DAL node is ready"
       ~level:Notice
-      ("network", Distributed_db_version.Name.encoding)
-      ("version", Data_encoding.string)
+      ()
 
   let config_file_not_found =
     declare_1
@@ -357,31 +357,24 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
 
-  let stored_slot_shard =
+  let cached_or_stored_slot_shard ~kind =
     declare_3
       ~section
       ~prefix_name_with_section:true
-      ~name:"stored_slot_shard"
+      ~name:(Format.sprintf "%s_slot_shard" kind)
       ~msg:
-        "stored shard {shard_index} for level {published_level} and index \
-         {slot_index}"
+        (Format.sprintf
+           "%s shard {shard_index} for level {published_level} and index \
+            {slot_index}"
+           kind)
       ~level:Debug
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
 
-  let stored_slot_status =
-    declare_3
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"stored_slot_status"
-      ~msg:
-        "stored slot status for level {published_level} and index \
-         {slot_index}: {status}"
-      ~level:Debug
-      ("published_level", Data_encoding.int32)
-      ("slot_index", Data_encoding.int31)
-      ("status", Types.header_status_encoding)
+  let stored_slot_shard = cached_or_stored_slot_shard ~kind:"stored"
+
+  let cached_slot_shard = cached_or_stored_slot_shard ~kind:"cached"
 
   let removed_slot_shards =
     declare_2
@@ -403,14 +396,17 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
 
-  let removed_status =
-    declare_1
+  let slot_header_status_not_found =
+    declare_2
       ~section
       ~prefix_name_with_section:true
-      ~name:"removed_status"
-      ~msg:"removed statuses for level {level}"
-      ~level:Debug
-      ("level", Data_encoding.int32)
+      ~name:"slot_header_status_not_found"
+      ~msg:
+        "Slot header status not found for level {published_level}, slot index \
+         {slot_index}."
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
 
   let slot_header_status_storage_error =
     declare_3
@@ -477,16 +473,6 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("error", Error_monad.trace_encoding)
 
-  let removing_status_failed =
-    declare_2
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"removing_status_failed"
-      ~level:Warning
-      ~msg:"removing status file for level {level} failed: {error}"
-      ("level", Data_encoding.int32)
-      ("error", Error_monad.trace_encoding)
-
   let removing_skip_list_cells_failed =
     declare_2
       ~section
@@ -533,6 +519,69 @@ open struct
       ("level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("validation_error", Data_encoding.string)
+
+  let batch_validation_stats =
+    declare_5
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_stats"
+      ~msg:
+        "Batch {batch_id} for level {level} of {elements} shards \
+         ({percentage}) verified in {validation_duration}s"
+      ~level:Info
+      ("batch_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
+      ("elements", Data_encoding.int31)
+      ("percentage", Data_encoding.float)
+      ~pp4:(fun fmt -> Format.fprintf fmt "%.2f%%")
+      ("validation_duration", Data_encoding.float)
+      ~pp5:(fun fmt -> Format.fprintf fmt "%.4f")
+
+  let pp_print_array_i ?(pp_sep = Format.pp_print_cut) pp_v ppf v =
+    let pp_print_iter ?(pp_sep = Format.pp_print_cut) iter pp_v ppf v =
+      let is_first = ref true in
+      let pp_v v =
+        if !is_first then is_first := false else pp_sep ppf () ;
+        pp_v ppf v
+      in
+      iter pp_v v
+    in
+    pp_print_iter ~pp_sep Array.iteri pp_v ppf v
+
+  let batch_validation_distribution_stats =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_distribution_stats"
+      ~msg:
+        "Shard distribution of batch {batch_id} for level {level}: \
+         {shard_distribution}"
+      ~level:Debug
+      ("batch_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
+      ("shard_distribution", Data_encoding.(array int31))
+      ~pp3:(fun fmt ->
+        Format.fprintf
+          fmt
+          "%a@."
+          (pp_print_array_i
+             ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
+             (fun fmt i shards -> Format.fprintf fmt "(%d:%d)" i shards)))
+
+  let batch_validation_completion_stats =
+    declare_4
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_completion_stats"
+      ~msg:
+        "Shards for level {level} of {total_shard_processed} elements treated \
+         with {total_batches_processed} batches in {validation_duration}s."
+      ~level:Info
+      ("level", Data_encoding.int32)
+      ("total_shard_processed", Data_encoding.int31)
+      ("total_batches_processed", Data_encoding.int31)
+      ("validation_duration", Data_encoding.float)
+      ~pp4:(fun ppf -> Format.fprintf ppf "%.3f")
 
   let p2p_server_is_ready =
     declare_1
@@ -733,13 +782,13 @@ open struct
       ()
 
   let crypto_process_started =
-    declare_1
+    declare_0
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"crypto_process_started"
-      ~msg:"cryptographic child process started (pid: {pid})"
+      ~msg:"cryptographic child process started"
       ~level:Notice
-      ("pid", Data_encoding.int31)
+      ()
 
   let crypto_process_stopped =
     declare_0
@@ -758,6 +807,7 @@ open struct
       ~msg:"cryptographic child process terminated unexpectedly: #{error}."
       ~level:Error
       ("error", Data_encoding.string)
+      ~pp1:Format.pp_print_string
 
   let crypto_process_error =
     declare_1
@@ -1066,8 +1116,8 @@ open struct
       ~prefix_name_with_section:true
       ~name:"start_catchup"
       ~msg:
-        "catching up to level {end_level}, from last processed level \
-         {start_level} (that is, {levels_to_clean_up} levels to process)"
+        "catching up to level {end_level}, from level {start_level} (that is, \
+         {levels_to_clean_up} levels to process)"
       ~level:Notice
       ("start_level", Data_encoding.int32)
       ("end_level", Data_encoding.int32)
@@ -1169,6 +1219,91 @@ open struct
       ~level:Warning
       ("delegates", Data_encoding.list Signature.Public_key_hash.encoding)
       ~pp1:pp_pkh_list
+
+  let reception_of_shard_update =
+    declare_4
+      ~section:["dal"; "reception"]
+      ~prefix_name_with_section:true
+      ~name:"reception_of_shard_update"
+      ~msg:
+        "For level {level} and slot {slot_index} {position} shard has been \
+         received.\n\
+         {slot_metrics}"
+      ~level:Info
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("position", Data_encoding.string)
+      ("slot_metrics", Dal_metrics.slot_metrics_encoding)
+      ~pp4:Dal_metrics.pp_slot_metrics_received
+
+  let validation_of_shard_update =
+    declare_4
+      ~section:["dal"; "attestation"]
+      ~prefix_name_with_section:true
+      ~name:"validation_of_shard_update"
+      ~msg:
+        "For level {level} and slot {slot_index} {position} shard(s) have been \
+         validated.\n\
+         {slot_metrics}"
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("position", Data_encoding.string)
+      ("slot_metrics", Dal_metrics.slot_metrics_encoding)
+      ~pp4:Dal_metrics.pp_slot_metrics
+
+  let reception_of_shard_detailed =
+    declare_4
+      ~section:["dal_shards"; "reception"]
+      ~name:"reception_of_a_shard"
+      ~msg:
+        "For level {level} and slot {slot_index}, shard {shard_index} has been \
+         received from {sender}."
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("shard_index", Data_encoding.int31)
+      ("sender", Types.Peer.encoding)
+      ~pp4:Types.Peer.pp
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+  let skip_attesting_shards =
+    declare_1
+      ~section:["dal_shards"; "skip"]
+      ~name:"skip_attesting_shards"
+      ~msg:
+        "Skip attested level {level} due to change in attestation lag at \
+         migration level."
+      ~level:Warning
+      ("level", Data_encoding.int32)
+
+  let backfill_error =
+    declare_1
+      ~section
+      ~name:"backfill_error"
+      ~msg:"Backfill failed with error: {error}"
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
+
+  let publication =
+    declare_2
+      ~section
+      ~name:"publication"
+      ~msg:"Publication operation {op_hash} at level {block_level} injected"
+      ~level:Info
+      ("op_hash", Operation_hash.encoding)
+      ("block_level", Data_encoding.int32)
+
+  let publication_failed =
+    declare_2
+      ~section
+      ~name:"publication_failed"
+      ~msg:"Publication at level {block_level} failed with error: {error}"
+      ~level:Warning
+      ("block_level", Data_encoding.int32)
+      ~pp2:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 (* DAL node event emission functions *)
@@ -1208,7 +1343,8 @@ let emit_fetching_slot_from_backup_failed ~published_level ~slot_index
       Uri.to_string backup_uri,
       Cohttp.Code.string_of_status status )
 
-let emit_starting_node () = emit starting_node ()
+let emit_starting_node ~network_name ~version =
+  emit starting_node (network_name, version)
 
 let emit_waiting_l1_node_bootstrapped () = emit waiting_l1_node_bootstrapped ()
 
@@ -1222,8 +1358,7 @@ let emit_dal_node_sqlite3_store_init () = emit dal_node_sqlite3_store_init ()
 
 let emit_store_is_ready () = emit store_is_ready ()
 
-let emit_node_is_ready ~network_name ~version =
-  emit node_is_ready (network_name, version)
+let emit_node_is_ready () = emit node_is_ready ()
 
 let emit_config_file_not_found ~path = emit config_file_not_found path
 
@@ -1288,8 +1423,8 @@ let emit_stored_slot_content ~published_level ~slot_index =
 let emit_stored_slot_shard ~published_level ~slot_index ~shard_index =
   emit stored_slot_shard (published_level, slot_index, shard_index)
 
-let emit_stored_slot_status ~published_level ~slot_index ~status =
-  emit stored_slot_status (published_level, slot_index, status)
+let emit_cached_slot_shard ~published_level ~slot_index ~shard_index =
+  emit cached_slot_shard (published_level, slot_index, shard_index)
 
 let emit_removed_slot_shards ~published_level ~slot_index =
   emit removed_slot_shards (published_level, slot_index)
@@ -1297,7 +1432,8 @@ let emit_removed_slot_shards ~published_level ~slot_index =
 let emit_removed_slot ~published_level ~slot_index =
   emit removed_slot (published_level, slot_index)
 
-let emit_removed_status ~level = emit removed_status level
+let emit_slot_header_status_not_found ~published_level ~slot_index =
+  emit slot_header_status_not_found (published_level, slot_index)
 
 let emit_slot_header_status_storage_error ~published_level ~slot_index ~error =
   emit slot_header_status_storage_error (published_level, slot_index, error)
@@ -1316,9 +1452,6 @@ let emit_removing_shards_failed ~published_level ~slot_index ~error =
 let emit_removing_slot_failed ~published_level ~slot_index ~error =
   emit removing_slot_failed (published_level, slot_index, error)
 
-let emit_removing_status_failed ~level ~error =
-  emit removing_status_failed (level, error)
-
 let emit_removing_skip_list_cells_failed ~level ~error =
   emit removing_skip_list_cells_failed (level, error)
 
@@ -1329,11 +1462,26 @@ let emit_dont_wait__message_validation_error ~message_id ~validation_error =
     message_validation_error
     (message_id, validation_error)
 
-let emit_dont_wait__batch_validation_error ~level ~slot_index ~validation_error
-    =
+let emit_batch_validation_error ~level ~slot_index ~validation_error =
+  emit batch_validation_error (level, slot_index, validation_error)
+
+let emit_dont_wait__batch_validation_stats ~batch_id ~head_level
+    ~number_of_shards ~shard_percentage ~duration =
   emit__dont_wait__use_with_care
-    batch_validation_error
-    (level, slot_index, validation_error)
+    batch_validation_stats
+    (batch_id, head_level, number_of_shards, shard_percentage, duration)
+
+let emit_dont_wait__batch_validation_distribution_stats ~batch_id ~head_level
+    ~shard_distribution =
+  emit__dont_wait__use_with_care
+    batch_validation_distribution_stats
+    (batch_id, head_level, shard_distribution)
+
+let emit_dont_wait__batch_validation_completion_stats ~level
+    ~total_shard_processed ~total_batches_processed ~duration =
+  emit__dont_wait__use_with_care
+    batch_validation_completion_stats
+    (level, total_shard_processed, total_batches_processed, duration)
 
 let emit_p2p_server_is_ready ~point = emit p2p_server_is_ready point
 
@@ -1383,7 +1531,7 @@ let emit_store_upgraded ~old_version ~new_version =
 
 let emit_store_upgrade_error () = emit store_upgrade_error ()
 
-let emit_crypto_process_started ~pid = emit crypto_process_started pid
+let emit_crypto_process_started () = emit crypto_process_started ()
 
 let emit_crypto_process_stopped () = emit crypto_process_stopped ()
 
@@ -1473,11 +1621,8 @@ let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
     cannot_attest_slot_because_of_trap
     (pkh, published_level, slot_index, shard_index)
 
-let emit_dont_wait__register_trap ~delegate ~published_level ~slot_index
-    ~shard_index =
-  emit__dont_wait__use_with_care
-    register_trap
-    (delegate, published_level, slot_index, shard_index)
+let emit_register_trap ~delegate ~published_level ~slot_index ~shard_index =
+  emit register_trap (delegate, published_level, slot_index, shard_index)
 
 let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
   emit start_catchup (start_level, end_level, levels_to_clean_up)
@@ -1489,3 +1634,38 @@ let emit_end_catchup () = emit end_catchup ()
 let emit_shard_validation_is_disabled () = emit shard_validation_is_disabled ()
 
 let emit_ignoring_pkhs ~pkhs = emit ignoring_pkhs pkhs
+
+let emit_reception_of_shard_update ~level ~slot_index ~slot_metrics =
+  let position =
+    Option.fold
+      ~none:"first"
+      ~some:(fun _ -> "last")
+      slot_metrics.Dal_metrics.duration_all_shards_received
+  in
+  emit reception_of_shard_update (level, slot_index, position, slot_metrics)
+
+let emit_validation_of_shard_update ~level ~slot_index ~slot_metrics =
+  let position =
+    Option.fold
+      ~none:"first"
+      ~some:(fun _ ->
+        Option.fold
+          ~none:"enough"
+          ~some:(fun _ -> "all")
+          slot_metrics.Dal_metrics.duration_all_shards_validated)
+      slot_metrics.Dal_metrics.duration_enough_shards_validated
+  in
+  emit validation_of_shard_update (level, slot_index, position, slot_metrics)
+
+let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
+  emit reception_of_shard_detailed (level, slot_index, shard_index, sender)
+
+let emit_skip_attesting_shards ~level = emit skip_attesting_shards level
+
+let emit_backfill_error ~error = emit backfill_error error
+
+let emit_publication ~block_level ~op_hash =
+  emit publication (op_hash, block_level)
+
+let emit_publication_failed ~block_level ~error =
+  emit publication_failed (block_level, error)

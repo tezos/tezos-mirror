@@ -7,3 +7,7 @@
 
 (** The installer kernel used to originate Etherlink on Mainnet *)
 val mainnet : string
+
+(** The installer kernel used to originate Etherlink Shadownet on
+    Shadownet *)
+val shadownet : string

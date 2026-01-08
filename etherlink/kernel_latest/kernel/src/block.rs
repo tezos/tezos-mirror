@@ -29,19 +29,18 @@ use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
-use evm::Config;
-use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
-use evm_execution::precompiles::PrecompileBTreeMap;
-use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
+use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
+use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_tracing::trace_kernel;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -134,12 +133,10 @@ fn compute<Host: Runtime>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut EthBlockInProgress,
     block_constants: &BlockConstants,
-    precompiles: &PrecompileBTreeMap<Host>,
-    evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
     log!(
         host,
@@ -172,19 +169,21 @@ fn compute<Host: Runtime>(
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
-        match apply_transaction(
+        match __trace_kernel!(
             host,
-            outbox_queue,
-            block_constants,
-            precompiles,
-            &transaction,
-            block_in_progress.index,
-            evm_account_storage,
-            sequencer_pool_address,
-            tracer_input,
-            evm_configuration,
-            limits,
-        )? {
+            "apply_transaction",
+            apply_transaction(
+                host,
+                outbox_queue,
+                block_constants,
+                &transaction,
+                block_in_progress.index,
+                sequencer_pool_address,
+                tracer_input,
+                spec_id,
+                limits,
+            )?
+        ) {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
                 object_info,
@@ -245,8 +244,6 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
         header.hash,
         tick_counter.c,
         gas_price,
-        header.receipts_root,
-        header.transactions_root,
     );
 
     tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
@@ -303,7 +300,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     next_bip_number,
                     chain_header,
                     blueprint,
-                );
+                )?;
             Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),
@@ -315,7 +312,6 @@ pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: EthBlockInProgress,
-    precompiles: &PrecompileBTreeMap<Host>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -323,10 +319,8 @@ pub fn compute_bip<Host: Runtime>(
     chain_id: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> anyhow::Result<BlockComputationResult> {
-    let mut evm_account_storage =
-        init_account_storage().context("Failed to initialize EVM account storage")?;
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
         limits.minimum_base_fee_per_gas,
@@ -339,12 +333,10 @@ pub fn compute_bip<Host: Runtime>(
         outbox_queue,
         &mut block_in_progress,
         &constants,
-        precompiles,
-        &mut evm_account_storage,
         sequencer_pool_address,
         limits,
         tracer_input,
-        evm_configuration,
+        spec_id,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
@@ -449,6 +441,7 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
+#[trace_kernel("stage_two")]
 pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,
@@ -471,7 +464,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         world_state: OwnedPath::from(&chain_config.storage_root_path()),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let precompiles = chain_config.precompiles_set(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
@@ -521,7 +513,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         &mut safe_host,
         &outbox_queue,
         block_in_progress,
-        &precompiles,
         &mut tick_counter,
         sequencer_pool_address,
         config.maximum_allowed_ticks,
@@ -535,6 +526,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             included_delayed_transactions,
             block,
         }) => {
+            let timestamp = block.timestamp();
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
@@ -543,7 +535,13 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 config,
                 included_delayed_transactions,
             )?;
-            Ok(ComputationResult::RebootNeeded)
+            upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
+
+            if safe_host.is_evm_node() {
+                Ok(ComputationResult::Finished)
+            } else {
+                Ok(ComputationResult::RebootNeeded)
+            }
         }
         Ok(BlockComputationResult::RebootNeeded) => {
             // The computation will resume at next reboot, we leave the
@@ -585,36 +583,37 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_tezlink::operation::Parameter;
-
     use crate::block_storage;
+    use crate::block_storage::internal_for_tests::{
+        read_transaction_receipt, read_transaction_receipt_status,
+    };
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::chains::TezlinkContent;
+    use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, MichelsonChainConfig, TezTransactions,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezTransactions,
         TEZLINK_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
-    use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
     use crate::transaction::Transactions;
     use crate::{retrieve_block_fees, retrieve_chain_id};
-    use evm_execution::account_storage::{
-        account_path, init_account_storage, EthereumAccountStorage,
-    };
-    use evm_execution::configuration::EVMVersion;
-    use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
+    use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use sha3::{Digest, Keccak256};
     use std::str::FromStr;
-    use tezos_crypto_rs::hash::UnknownSignature;
+    use tezos_crypto_rs::hash::ChainId;
+    use tezos_crypto_rs::hash::HashTrait;
+    use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
@@ -625,14 +624,18 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_execution::account_storage::Manager;
+    use tezos_execution::account_storage::TezlinkAccount;
     use tezos_execution::account_storage::TezlinkImplicitAccount;
+    use tezos_execution::account_storage::TezlinkOriginatedAccount;
     use tezos_execution::context;
-    use tezos_smart_rollup::types::Contract;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_tezlink::operation::sign_operation;
+    use tezos_tezlink::operation::Parameter;
 
     fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
@@ -640,54 +643,101 @@ mod tests {
 
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_tezlink::block::TezBlock;
-    use tezos_tezlink::operation::BlockHash;
     use tezos_tezlink::operation::ManagerOperation;
+    use tezos_tezlink::operation::ManagerOperationContent;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
+    use tezos_tezlink::operation::OriginationContent;
     use tezos_tezlink::operation::RevealContent;
+    use tezos_tezlink::operation::Script;
     use tezos_tezlink::operation::TransferContent;
+
+    #[derive(Clone)]
+    struct Bootstrap {
+        pkh: PublicKeyHash,
+        pk: PublicKey,
+        sk: SecretKeyEd25519,
+    }
+
+    fn bootstrap1() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh",
+            )
+            .unwrap(),
+        }
+    }
+
+    fn bootstrap2() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo",
+            )
+            .unwrap(),
+        }
+    }
 
     fn make_operation(
         fee: u64,
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
-        content: OperationContent,
+        source: Bootstrap,
+        content: Vec<OperationContent>,
     ) -> Operation {
-        let branch = BlockHash::from(TezBlock::genesis_block_hash());
-        // No need a real signature for now
-        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+        let branch = TezBlock::genesis_block_hash().into();
+        let content = content
+            .into_iter()
+            .map(|c| -> ManagerOperationContent {
+                ManagerOperation {
+                    source: source.pkh.clone(),
+                    fee: fee.into(),
+                    counter: counter.into(),
+                    operation: c,
+                    gas_limit: gas_limit.into(),
+                    storage_limit: storage_limit.into(),
+                }
+                .into()
+            })
+            .collect::<Vec<ManagerOperationContent>>();
+
+        let signature = sign_operation(&source.sk, &branch, &content).unwrap();
+
         Operation {
             branch,
-            content: ManagerOperation {
-                source,
-                fee: fee.into(),
-                counter: counter.into(),
-                operation: content,
-                gas_limit: gas_limit.into(),
-                storage_limit: storage_limit.into(),
-            }
-            .into(),
+            content,
             signature,
         }
     }
-
     fn make_reveal_operation(
         fee: u64,
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
-        pk: PublicKey,
+        source: Bootstrap,
     ) -> Operation {
         make_operation(
             fee,
             counter,
             gas_limit,
             storage_limit,
-            source,
-            OperationContent::Reveal(RevealContent { pk }),
+            source.clone(),
+            vec![OperationContent::Reveal(RevealContent {
+                pk: source.pk,
+                proof: None,
+            })],
         )
     }
 
@@ -697,7 +747,7 @@ mod tests {
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
+        source: Bootstrap,
         amount: Narith,
         destination: Contract,
         parameters: Option<Parameter>,
@@ -708,11 +758,36 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer(TransferContent {
+            vec![OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
                 parameters,
-            }),
+            })],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn make_origination_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: Bootstrap,
+        balance: Narith,
+        code: Vec<u8>,
+        storage: Vec<u8>,
+    ) -> Operation {
+        make_operation(
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            source,
+            vec![OperationContent::Origination(OriginationContent {
+                balance,
+                delegate: None,
+                script: Script { code, storage },
+            })],
         )
     }
 
@@ -723,10 +798,21 @@ mod tests {
         }
     }
 
-    fn tezlink_blueprint(operations: Vec<Operation>) -> Blueprint<TezTransactions> {
+    fn tezlink_blueprint(
+        operations: Vec<Operation>,
+        timestamp: Timestamp,
+    ) -> Blueprint<TezTransactions> {
+        let operations = operations
+            .into_iter()
+            .map(|op| {
+                let tx_hash = op.hash().unwrap().0 .0;
+                let content = TezlinkContent::Tezos(op);
+                TezlinkOperation { tx_hash, content }
+            })
+            .collect();
         Blueprint {
             transactions: TezTransactions(operations),
-            timestamp: Timestamp::from(0i64),
+            timestamp,
         }
     }
 
@@ -735,55 +821,36 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
-    fn set_balance<Host: Runtime>(
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-        address: &H160,
-        balance: U256,
-    ) {
-        let mut account = evm_account_storage
-            .get_or_create(host, &account_path(address).unwrap())
-            .unwrap();
-        let current_balance = account.balance(host).unwrap();
-        if current_balance > balance {
-            account
-                .balance_remove(host, current_balance - balance)
-                .unwrap();
-        } else {
-            account
-                .balance_add(host, balance - current_balance)
-                .unwrap();
-        }
+    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
+        let mut info = account.info(host).unwrap();
+        info.balance = u256_to_alloy(&balance);
+        account.set_info(host, info).unwrap();
     }
 
-    fn get_balance<Host: Runtime>(
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-        address: &H160,
-    ) -> U256 {
-        let account = evm_account_storage
-            .get_or_create(host, &account_path(address).unwrap())
-            .unwrap();
-        account.balance(host).unwrap()
+    fn get_balance<Host: Runtime>(host: &mut Host, address: &H160) -> U256 {
+        let account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
+        let info = account.info(host).unwrap();
+        alloy_to_u256(&info.balance)
     }
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    const TEZLINK_BOOTSTRAP_1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-    const TEZLINK_BOOTSTRAP_2: &str = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
-
-    fn dummy_evm_config(evm_configuration: Config) -> EvmChainConfig {
+    fn dummy_evm_config(spec_id: SpecId) -> EvmChainConfig {
         EvmChainConfig::create_config(
             DUMMY_CHAIN_ID,
             EvmLimits::default(),
-            evm_configuration,
+            spec_id,
+            ExperimentalFeatures::default(),
         )
     }
 
     fn dummy_tez_config() -> MichelsonChainConfig {
-        MichelsonChainConfig::create_config(DUMMY_CHAIN_ID)
+        MichelsonChainConfig::create_config(
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
+        )
     }
 
     fn dummy_configuration() -> Configuration {
@@ -829,6 +896,7 @@ mod tests {
             value,
             data,
             vec![],
+            None,
             None,
         )
     }
@@ -897,6 +965,7 @@ mod tests {
             data,
             vec![],
             None,
+            None,
         );
 
         tx.sign_transaction(private_key.to_string()).unwrap()
@@ -932,10 +1001,7 @@ mod tests {
         Ok(())
     }
 
-    fn produce_block_with_several_valid_txs<Host: Runtime>(
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-    ) {
+    fn produce_block_with_several_valid_txs<Host: Runtime>(host: &mut Host) {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
 
@@ -953,17 +1019,12 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        set_balance(
-            host,
-            evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(host, &dummy_block_fees()).unwrap();
 
         produce(
             host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -982,7 +1043,7 @@ mod tests {
         ) {
             Ok(_) => (),
             Err(e) => {
-                panic!("Block reading failed: {:?}\n", e)
+                panic!("Block reading failed: {e:?}\n")
             }
         }
     }
@@ -1008,9 +1069,9 @@ mod tests {
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
+                tezlink_blueprint(vec![], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![], Timestamp::from(1i64)),
+                tezlink_blueprint(vec![], Timestamp::from(10i64)),
             ],
         );
 
@@ -1034,22 +1095,22 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
+        let bootstrap = bootstrap1();
+        let src = bootstrap.pkh.clone();
+
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeeded");
 
-        let contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("Contract creation should have succeed");
+        let contract = Contract::Implicit(src.clone());
 
         let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account interface should be correct");
 
         // Allocate bootstrap 1
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
-
-        let src = PublicKeyHash::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
-
+        account.set_balance(&mut host, &10u64.into()).unwrap();
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
@@ -1059,14 +1120,14 @@ mod tests {
             .manager(&host)
             .expect("Retrieve manager should have succeeded");
 
-        assert_eq!(Manager::NotRevealed(src.clone()), manager);
+        assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, src, pk.clone());
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal])],
+            vec![tezlink_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1091,26 +1152,26 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
+        let boostrap1 = bootstrap1();
+        let src = boostrap1.pkh.clone();
+
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeed");
 
-        let bootstrap1_contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("Contract creation should have succeed");
+        let bootstrap1_contract = Contract::Implicit(src.clone());
 
-        let mut bootstrap1 =
+        let bootstrap1 =
             TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
                 .expect("Account interface should be correct");
 
         // Allocate bootstrap 1 and give some mutez for a transfer
-        TezlinkImplicitAccount::allocate(&mut host, &context, &bootstrap1_contract)
+        bootstrap1
+            .allocate(&mut host)
             .expect("Contract initialization should have succeed");
 
         bootstrap1
             .set_balance(&mut host, &50_u64.into())
             .expect("Set balance should have succeed");
-
-        // Drop the mutable access to bootstrap1
-        let bootstrap1 = bootstrap1;
 
         let manager = bootstrap1
             .manager(&host)
@@ -1119,21 +1180,20 @@ mod tests {
         // Verify that bootstrap 1 is not revealed
         assert!(matches!(manager, Manager::NotRevealed(_)));
 
-        let src = PublicKeyHash::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
-
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .expect("Public key creation should have succeed");
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, src.clone(), pk.clone());
+        let reveal = make_reveal_operation(1, 1, 500, 0, boostrap1.clone());
 
         // Bootstrap 1 will transfer 35 mutez to bootstrap 2
 
-        let bootstrap2_contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_2)
-            .expect("Contract creation should have succeed");
+        let boostrap2 = bootstrap2();
+        let dst = boostrap2.pkh.clone();
+
+        let bootstrap2_contract = Contract::Implicit(dst.clone());
 
         let bootstrap2 =
             TezlinkImplicitAccount::from_contract(&context, &bootstrap2_contract)
@@ -1146,11 +1206,11 @@ mod tests {
 
         // Bootstrap 1 transfer 35 mutez to bootstrap 2
         let transfer = make_transaction_operation(
-            0,
+            1,
             2,
+            3000,
             0,
-            0,
-            src.clone(),
+            boostrap1,
             35_u64.into(),
             bootstrap2_contract,
             None,
@@ -1159,7 +1219,10 @@ mod tests {
         // Bootstrap 1 reveals its manager and then
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal, transfer])],
+            vec![tezlink_blueprint(
+                vec![reveal, transfer],
+                Timestamp::from(0i64),
+            )],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1185,11 +1248,130 @@ mod tests {
         // Bootstrap 1 should have sent 35 mutez to Bootstrap 2
         let bootstrap1_balance = bootstrap1.balance(&host).unwrap();
 
-        assert_eq!(bootstrap1_balance, 15_u64.into());
+        // bootstrap 1 should have pay 2 mutez in fees (for reveal and transfer)
+        assert_eq!(bootstrap1_balance, 13_u64.into());
 
         let bootstrap2_balance = bootstrap2.balance(&host).unwrap();
 
         assert_eq!(bootstrap2_balance, 35_u64.into());
+    }
+
+    #[test]
+    fn test_tezlink_level_now_chain_id_instructions() {
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_tez_config();
+        let mut config = dummy_configuration();
+
+        // A contract storing the chain id and the level and timestamp
+        // of the last call
+        let parser = mir::parser::Parser::new();
+        let code = parser
+            .parse_top_level(
+                "
+                   parameter unit;
+                   storage (pair nat timestamp chain_id);
+                   code { DROP; CHAIN_ID; NOW; LEVEL; PAIR 3; NIL operation; PAIR }
+            ",
+            )
+            .expect("Should have succeeded to parse the script")
+            .encode();
+        let storage = parser
+            .parse("Pair 0 0 0x00000000")
+            .expect("Should have succeeded to parse the storage")
+            .encode();
+
+        let boostrap1 = bootstrap1();
+        let src = boostrap1.pkh.clone();
+        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("Context creation should have succeed");
+
+        let bootstrap1_contract = Contract::Implicit(src.clone());
+        let bootstrap1 =
+            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
+                .expect("Account interface should be correct");
+        // Allocate bootstrap 1 and give some mutez for a transfer
+        bootstrap1
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeed");
+        bootstrap1
+            .set_balance(&mut host, &500_000u64.into())
+            .expect("Set balance should have succeed");
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+        bootstrap1
+            .set_manager_public_key(&mut host, &pk)
+            .expect("Set manager should have succeed");
+        let origination = make_origination_operation(
+            1,
+            1,
+            1000,
+            0,
+            boostrap1.clone(),
+            35_u64.into(),
+            code,
+            storage,
+        );
+
+        // Address generated by the origination
+        let generated_contract =
+            Contract::Originated(mir::interpreter::compute_contract_address(
+                &origination.hash().unwrap().0.to_fixed_bytes(),
+                1,
+            ));
+
+        let call = make_transaction_operation(
+            1,
+            2,
+            1000,
+            0,
+            boostrap1,
+            0.into(),
+            generated_contract.clone(),
+            None,
+        );
+
+        let timestamp_of_call = 10i64;
+        store_blueprints::<_, MichelsonChainConfig>(
+            &mut host,
+            vec![
+                tezlink_blueprint(vec![origination], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![call], Timestamp::from(timestamp_of_call)),
+            ],
+        );
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let expected_level = 1;
+        assert_eq!(
+            U256::from(expected_level),
+            read_current_number(&host).unwrap()
+        );
+        let expected_timestamp = timestamp_of_call;
+        let expected_chain_id = "0x01000000";
+        let expected_storage = format!(
+            "Pair {expected_level} (Pair {expected_timestamp} {expected_chain_id})"
+        );
+
+        assert_eq!(
+            parser.parse(&expected_storage).unwrap(),
+            mir::ast::Micheline::decode_raw(
+                &parser.arena,
+                &TezlinkOriginatedAccount::from_contract(&context, &generated_contract)
+                    .unwrap()
+                    .storage(&host)
+                    .unwrap()
+            )
+            .unwrap()
+        )
     }
 
     #[test]
@@ -1212,18 +1394,12 @@ mod tests {
         let transactions: Vec<Transaction> = vec![invalid_tx];
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
-        let mut evm_account_storage = init_account_storage().unwrap();
         let sender = dummy_eth_caller();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(30000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(30000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1257,18 +1433,12 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1300,18 +1470,12 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(5000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(5000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1340,14 +1504,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut evm_account_storage = init_account_storage().unwrap();
-
-        produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
+        produce_block_with_several_valid_txs(&mut host);
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance =
-            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -1381,19 +1542,13 @@ mod tests {
         );
 
         let sender = dummy_eth_caller();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce block for blueprint containing transaction_0
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1402,7 +1557,7 @@ mod tests {
         // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1411,8 +1566,7 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance =
-            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -1449,18 +1603,12 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees).unwrap();
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1484,11 +1632,9 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let chain_config = dummy_evm_config(SpecId::default());
 
-        let mut evm_account_storage = init_account_storage().unwrap();
-
-        produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
+        produce_block_with_several_valid_txs(&mut host);
 
         assert_current_block_reading_validity(&mut host, &chain_config);
     }
@@ -1511,18 +1657,12 @@ mod tests {
 
         let sender = dummy_eth_caller();
         let initial_sender_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            initial_sender_balance,
-        );
+        set_balance(&mut host, &sender, initial_sender_balance);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1531,9 +1671,8 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(&mut host, &mut evm_account_storage, &sender);
-        let dest_balance =
-            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+        let sender_balance = get_balance(&mut host, &sender);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
@@ -1544,62 +1683,6 @@ mod tests {
 
         assert_eq!(dest_balance, expected_dest_balance);
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
-    }
-
-    #[test]
-    fn test_blocks_are_indexed() {
-        let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
-        let blocks_index = block_storage::internal_for_tests::init_blocks_index(
-            &chain_config.storage_root_path(),
-        )
-        .unwrap();
-
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
-
-        let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let sender = dummy_eth_caller();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(
-            &mut host,
-            &chain_config,
-            &mut dummy_configuration(),
-            None,
-            None,
-        )
-        .expect("The block production failed.");
-
-        let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-
-        let current_block_hash = block_storage::read_current(
-            &mut host,
-            &chain_config.storage_root_path(),
-            &chain_config.get_chain_family(),
-        )
-        .unwrap()
-        .hash()
-        .as_bytes()
-        .to_vec();
-
-        assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
-
-        assert_eq!(
-            Ok(current_block_hash),
-            blocks_index.get_value(&host, new_number_of_blocks_indexed - 1)
-        );
     }
 
     fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
@@ -1625,17 +1708,10 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let block_constants = first_block(&mut host);
-        let precompiles = precompile_set(false);
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
 
         // tx is valid because correct nonce and account provisionned
         let valid_tx = Transaction {
@@ -1649,8 +1725,6 @@ mod tests {
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),
-            vec![0; 32],
-            vec![0; 32],
         );
         // run is almost full wrt gas consumption in the current run
         let limits = EvmLimits::default();
@@ -1663,12 +1737,10 @@ mod tests {
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
-            &precompiles,
-            &mut evm_account_storage,
             None,
             &EvmLimits::default(),
             None,
-            &EVMVersion::current_test_config(),
+            &SpecId::default(),
         )
         .expect("Should safely ask for a reboot");
 
@@ -1698,9 +1770,8 @@ mod tests {
         // the transaction should not have been processed
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(&mut host, &mut evm_account_storage, &sender);
-        let dest_balance =
-            get_balance(&mut host, &mut evm_account_storage, &dest_address);
+        let sender_balance = get_balance(&mut host, &sender);
+        let dest_balance = get_balance(&mut host, &dest_address);
         assert_eq!(sender_balance, U256::from(10000000000000000000u64));
         assert_eq!(dest_balance, U256::from(0u64))
     }
@@ -1709,16 +1780,14 @@ mod tests {
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
 
-        let mut evm_account_storage = init_account_storage().unwrap();
-
         let caller =
             address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
 
         // Get the balance before the transaction, i.e. 0.
-        let caller_account = evm_account_storage
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
-        let default_nonce = caller_account.nonce(&host).unwrap();
+        let caller_account =
+            StorageAccount::from_address(&h160_to_alloy(&caller)).unwrap();
+        let info = caller_account.info(&mut host).unwrap();
+        let default_nonce = info.nonce;
         assert_eq!(default_nonce, 0, "default nonce should be 0");
 
         let tx = dummy_eth_transaction_zero();
@@ -1726,7 +1795,7 @@ mod tests {
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
         let fees = U256::from(21000) * tx.gas_limit_with_fees();
-        set_balance(&mut host, &mut evm_account_storage, &caller, fees);
+        set_balance(&mut host, &caller, fees);
 
         // Prepare a invalid transaction, i.e. with not enough funds.
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
@@ -1743,7 +1812,7 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1755,7 +1824,8 @@ mod tests {
         );
 
         // Nonce should not have been bumped
-        let nonce = caller_account.nonce(&host).unwrap();
+        let info = caller_account.info(&mut host).unwrap();
+        let nonce = info.nonce;
         assert_eq!(nonce, default_nonce, "nonce should not have been bumped");
     }
 
@@ -1784,7 +1854,7 @@ mod tests {
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let chain_config = dummy_evm_config(SpecId::default());
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
@@ -1872,6 +1942,7 @@ mod tests {
             data,
             vec![],
             None,
+            None,
         );
         unsigned_tx
             .sign_transaction(String::from(secret_key))
@@ -1899,13 +1970,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -1913,8 +1978,12 @@ mod tests {
         // - call `loop(300)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
+        let loop_addr: H160 = {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&sender);
+            stream.append(&0u64);
+            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
+        };
         let loop_300_tx =
             create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
         let loop_300_tx2 =
@@ -1930,7 +1999,7 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
-        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let mut chain_config = dummy_evm_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -1991,13 +2060,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -2005,8 +2068,12 @@ mod tests {
         // - call `loop(300)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
+        let loop_addr: H160 = {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&sender);
+            stream.append(&0u64);
+            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
+        };
 
         let loop_300_tx =
             create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
@@ -2023,7 +2090,7 @@ mod tests {
 
         store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
 
-        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let mut chain_config = dummy_evm_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -2116,17 +2183,11 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2196,18 +2257,12 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut evm_account_storage = init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,

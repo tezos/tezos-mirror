@@ -26,10 +26,10 @@ depends: [
   "octez-lib-upnp" { = version }
   "octez-lib-upnp-args" { = version }
   "tezos-protocol-000-Ps9mPmXa" { = version }
-  "tezos-protocol-022-PsRiotum" { = version }
-  "octez-protocol-022-PsRiotum-libs" { = version }
   "tezos-protocol-023-PtSeouLo" { = version }
   "octez-protocol-023-PtSeouLo-libs" { = version }
+  "tezos-protocol-024-PtTALLiN" { = version }
+  "octez-protocol-024-PtTALLiN-libs" { = version }
 ]
 depopts: [
   "tezos-protocol-genesis"
@@ -73,6 +73,8 @@ depopts: [
   "octez-protocol-020-PsParisC-libs"
   "tezos-protocol-021-PsQuebec"
   "octez-protocol-021-PsQuebec-libs"
+  "tezos-protocol-022-PsRiotum"
+  "octez-protocol-022-PsRiotum-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -118,11 +120,13 @@ conflicts: [
   "octez-protocol-020-PsParisC-libs" { != version }
   "tezos-protocol-021-PsQuebec" { != version }
   "octez-protocol-021-PsQuebec-libs" { != version }
+  "tezos-protocol-022-PsRiotum" { != version }
+  "octez-protocol-022-PsRiotum-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

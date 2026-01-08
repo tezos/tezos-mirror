@@ -30,7 +30,7 @@ let on_main_run callback =
 
 let init_eio_loop ~env ~switch () =
   (* Having [!instance <> None] should only happen if [main_run] is
-     called within [main_run]. It will be caught up by [eio_main.main_run]
+     called within [main_run]. It will be caught up by [eio_posix.main_run]
      but we can [assert false] just in case the error is not caught
      for some reason. *)
   assert (!instance = None) ;
@@ -41,7 +41,7 @@ let main_run ?(eio = false) ~process_name promise =
   Gc_setup.set_gc_space_overhead process_name ;
   if eio then (
     let debug = Sys.getenv_opt "LWT_EIO_DEBUG" <> None in
-    Eio_main.run @@ fun env ->
+    Eio_posix.run @@ fun env ->
     Lwt_eio.with_event_loop ~debug ~clock:env#clock @@ fun () ->
     Eio.Switch.run @@ fun switch ->
     init_eio_loop ~env ~switch () ;
@@ -64,7 +64,7 @@ let main_run ?(eio = false) ~process_name promise =
   else Lwt_main.run @@ promise ()
 
 let main_run_eio promise =
-  Eio_main.run @@ fun env ->
+  Eio_posix.run @@ fun env ->
   Eio.Switch.run @@ fun switch ->
   init_eio_loop ~env ~switch () ;
   let res = promise env in

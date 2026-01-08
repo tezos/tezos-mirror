@@ -3,9 +3,333 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 22.1 (9758b259)"
+    "version": "Octez 23.2 (13afca5d)"
   },
   "paths": {
+    "/bls/aggregate_proofs": {
+      "post": {
+        "description": "Aggregate BLS proofs. Return null if the provided proofs cannot be aggregated, or if their aggregation is not a valid proof for the provided public key.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "proofs": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Bls12_381_signature"
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "proofs"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bls/aggregate_public_keys": {
+      "post": {
+        "description": "Aggregate BLS public keys after checking their BLS proofs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "public_key": {
+                      "$ref": "#/components/schemas/Bls12_381.Public_key"
+                    },
+                    "proof": {
+                      "$ref": "#/components/schemas/Bls12_381_signature"
+                    }
+                  },
+                  "required": [
+                    "public_key",
+                    "proof"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "object",
+                      "properties": {
+                        "public_key": {
+                          "$ref": "#/components/schemas/Bls12_381.Public_key"
+                        },
+                        "public_key_hash": {
+                          "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "public_key",
+                        "public_key_hash"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bls/aggregate_signatures": {
+      "post": {
+        "description": "Aggregate BLS signatures. Return null if the signatures cannot be aggregated, or if their aggregation is not a valid signature for the provided public key and message.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "message": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  },
+                  "signature_shares": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Bls12_381_signature"
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "message",
+                  "signature_shares"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bls/check_proof": {
+      "post": {
+        "description": "Check a BLS proof",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "proof": {
+                    "$ref": "#/components/schemas/Bls12_381_signature"
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "proof"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bls/threshold_signatures": {
+      "post": {
+        "description": "Threshold BLS signatures",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "message": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  },
+                  "signature_shares": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -128,
+                          "maximum": 127
+                        },
+                        "signature": {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "signature"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "message",
+                  "signature_shares"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chains/{chain_id}": {
       "patch": {
         "description": "Forcefully set the bootstrapped flag of the node",
@@ -8329,10 +8653,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Registered backend.",
+                  "description": "Registered backends.",
                   "type": "object",
                   "properties": {
-                    "registered_backend": {
+                    "registered_backends": {
                       "type": "array",
                       "items": {
                         "oneOf": [
@@ -8376,7 +8700,7 @@
                     }
                   },
                   "required": [
-                    "registered_backend",
+                    "registered_backends",
                     "backends"
                   ]
                 }
@@ -8398,7 +8722,7 @@
     },
     "/protocols": {
       "get": {
-        "description": "(no description)",
+        "description": "the list of protocols supported by the node",
         "responses": {
           "200": {
             "description": "",
@@ -8428,7 +8752,7 @@
     },
     "/protocols/{Protocol_hash}": {
       "get": {
-        "description": "(no description)",
+        "description": "the interface of a protocol grouped by its implementing modules",
         "parameters": [
           {
             "name": "Protocol_hash",
@@ -8497,7 +8821,7 @@
     },
     "/protocols/{Protocol_hash}/environment": {
       "get": {
-        "description": "(no description)",
+        "description": "the protocol environment version required by a protocol",
         "parameters": [
           {
             "name": "Protocol_hash",
@@ -11230,6 +11554,30 @@
   },
   "components": {
     "schemas": {
+      "Bls12_381.Public_key": {
+        "title": "A Bls12_381 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Bls12_381.Public_key_hash": {
+        "title": "A Bls12_381 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Bls12_381_signature": {
+        "title": "A Bls12_381 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
       "Chain_id": {
         "title": "Network identifier (Base58Check-encoded)",
         "oneOf": [

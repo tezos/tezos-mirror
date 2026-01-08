@@ -57,7 +57,7 @@ let double_consensus_already_denounced_waiter accuser oph =
 
 let get_double_consensus_denounciation_hash protocol consensus_name client =
   let double_consensus_kind =
-    if Protocol.(number protocol > number R022) then
+    if Protocol.(number protocol > 22) then
       "double_consensus_operation_evidence"
     else sf "double_%s_evidence" consensus_name
   in
@@ -104,7 +104,12 @@ let double_consensus_init
   let slots =
     List.map
       JSON.as_int
-      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+      (if Protocol.number protocol >= 024 then
+         JSON.(
+           slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+           |-> "attestation_slot")
+         :: []
+       else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info "Inject valid %s." consensus_name ;
   let waiter = Node.wait_for_request ~request:`Inject node in
@@ -388,7 +393,11 @@ let operation_too_far_in_future =
   let slots =
     List.map
       JSON.as_int
-      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+      (if Protocol.number protocol >= 024 then
+         JSON.(
+           slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+           |-> "rounds" |> as_list)
+       else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info
     "Craft and inject an attestation 3 levels in the future and wait for \
@@ -527,16 +536,24 @@ let attestation_and_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Diminish some constants to activate consensus keys faster *)
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Diminish some constants to activate consensus keys faster *)
+         (["blocks_per_cycle"], `Int 2);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @
+      (* TODO ABAAB: reactivate test with threshold active *)
+      if Protocol.(number protocol >= 024) then
+        [
+          ( ["all_bakers_attest_activation_threshold"],
+            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+        ]
+      else [])
   in
   let* node, client =
     Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -563,8 +580,9 @@ let attestation_and_aggregation_wrong_payload_hash =
   (* Attest for bootstrap1 with a dummy block_payload_hash *)
   let* _ =
     let open Operation.Consensus in
-    let* slots = get_slots_by_consensus_key ~level client in
-    let slot = first_slot ~slots ck1 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck1 client
+    in
     let* branch = get_branch ~attested_level:level client in
     let* bph_level_4 = get_block_payload_hash ~block:"4" client in
     attest_for
@@ -591,12 +609,13 @@ let attestation_and_aggregation_wrong_payload_hash =
       [(bootstrap1, (Attestation, Attestations_aggregate))]
   in
   let open Operation.Consensus in
-  let* slots = get_slots_by_consensus_key ~level client in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
   (* Attest for bootstrap1 and check that he is forbidden *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck1 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck1 client
+    in
     attest_for
       ~error:delegate_forbidden_error
       ~protocol
@@ -610,7 +629,9 @@ let attestation_and_aggregation_wrong_payload_hash =
   in
   (* Attest for bootstrap2 and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck2 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck2 client
+    in
     attest_for
       ~protocol
       ~branch
@@ -635,16 +656,24 @@ let double_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Diminish some constants to activate consensus keys faster. *)
-        (["blocks_per_cycle"], `Int 3);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Diminish some constants to activate consensus keys faster. *)
+         (["blocks_per_cycle"], `Int 3);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @
+      (* TODO ABAAB: reactivate test with threshold active *)
+      if Protocol.(number protocol >= 024) then
+        [
+          ( ["all_bakers_attest_activation_threshold"],
+            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+        ]
+      else [])
   in
   let* node1, client1 =
     Client.init_with_protocol
@@ -729,12 +758,13 @@ let double_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level client1 in
   (* Attest with the double attesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -754,7 +784,9 @@ let double_aggregation_wrong_payload_hash =
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~protocol
@@ -774,8 +806,72 @@ let double_aggregation_wrong_payload_hash =
 let accuser_processed_block accuser =
   Accuser.wait_for accuser "accuser_processed_block.v0" (fun _json -> Some ())
 
-let daemon_stop accuser =
-  Accuser.wait_for accuser "daemon_stop.v0" (fun _json -> Some ())
+let stopping_agent accuser =
+  Accuser.wait_for accuser "stopping_agent.v0" (fun json ->
+      Some JSON.(json |-> "proto" |> as_string))
+
+let accusers_migration_test ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  (* Migration level is set arbitrarily *)
+  let migration_level = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  Test.register
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "accuser works correctly under migration from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+    ~tags:
+      [team; "migration"; Protocol.tag migrate_from; Protocol.tag migrate_to]
+    ~uses:[Constant.octez_accuser]
+  @@ fun () ->
+  let* client, node =
+    Protocol_migration.user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  let* () = Client.activate_protocol ~protocol:migrate_from client in
+
+  Log.info "Initialise accuser" ;
+  let* accuser = Accuser.init ~event_level:`Debug node in
+  let accuser_processed_block = accuser_processed_block accuser in
+  let accuser_stop = stopping_agent accuser in
+
+  Log.info "Bake %d levels" (migration_level - 1) ;
+  let* () =
+    repeat (migration_level - 1) (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        accuser_processed_block)
+  in
+
+  Log.info
+    "Bake one more level to migrate from %s to %s"
+    (Protocol.tag migrate_from)
+    (Protocol.tag migrate_to) ;
+  (* The accuser for the old protocol is killed 3 levels after the migration. *)
+  let* () = repeat 3 (fun _ -> Client.bake_for_and_wait client)
+  and* () =
+    let* proto = accuser_stop in
+    Check.((proto = Protocol.hash migrate_from) string)
+      ~error_msg:"Expected to have stopped the agent of proto %R, but got %L" ;
+    unit
+  in
+
+  Log.info "After migration, old protocol accuser should have stopped" ;
+
+  Log.info "Bake a few more levels into the new protocol" ;
+  let* () =
+    repeat 5 (fun () ->
+        let* () =
+          Client.attest_for
+            ~protocol:migrate_to
+            ~force:true
+            ~key:[Constant.bootstrap1.alias]
+            client
+        in
+        let* () = Client.bake_for_and_wait client in
+        accuser_processed_block)
+  in
+  let* () = Accuser.terminate accuser in
+  unit
 
 let fetch_round ?block client =
   Client.RPC.call client @@ RPC.get_chain_block_helper_round ?block ()
@@ -799,21 +895,29 @@ let preattestation_and_aggregation_wrong_payload_hash =
     ~__FILE__
     ~title:"preattestation and aggregation wrong payload_hash"
     ~tags:[Tag.layer1; "preattestation"; "aggregation"]
-    ~supports:Protocol.(From_protocol 024)
+    ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
   let consensus_rights_delay = 1 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (* Diminish some constants to activate consensus keys faster. *)
-        (["blocks_per_cycle"], `Int 3);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (* Diminish some constants to activate consensus keys faster. *)
+         (["blocks_per_cycle"], `Int 3);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @
+      (* TODO ABAAB: reactivate test with threshold active *)
+      if Protocol.(number protocol >= 024) then
+        [
+          ( ["all_bakers_attest_activation_threshold"],
+            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+        ]
+      else [])
   in
   let* node, client =
     Client.init_with_protocol
@@ -847,14 +951,15 @@ let preattestation_and_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash ~block:"2" client in
-  let* slots = get_slots_by_consensus_key ~level client in
   Log.info
     "preattesting level %d round 1 for bootstrap1, bootstrap2 and bootstrap4"
     level ;
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client
+        in
         let* (`OpHash _) =
           preattest_for
             ~protocol
@@ -900,11 +1005,12 @@ let preattestation_and_aggregation_wrong_payload_hash =
   (* Attest with the misbehaving keys and check that they are forbidden *)
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
-  let* slots = get_slots_by_consensus_key ~level client in
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -922,7 +1028,9 @@ let preattestation_and_aggregation_wrong_payload_hash =
   in
   (* Attest with a non-misbehaving key and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck3 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck3 client
+    in
     attest_for
       ~protocol
       ~branch
@@ -940,21 +1048,29 @@ let double_preattestation_aggregation_wrong_payload_hash =
     ~__FILE__
     ~title:"double preattestation aggregation wrong payload hash"
     ~tags:[Tag.layer1; "double"; "preattestation"; "aggregation"]
-    ~supports:Protocol.(From_protocol 024)
+    ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
   let consensus_rights_delay = 1 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (* Diminish some constants to activate consensus keys faster. *)
-        (["blocks_per_cycle"], `Int 3);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (* Diminish some constants to activate consensus keys faster. *)
+         (["blocks_per_cycle"], `Int 3);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @
+      (* TODO ABAAB: reactivate test with threshold active *)
+      if Protocol.(number protocol >= 024) then
+        [
+          ( ["all_bakers_attest_activation_threshold"],
+            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+        ]
+      else [])
   in
   let* node1, client1 =
     Client.init_with_protocol
@@ -1063,12 +1179,13 @@ let double_preattestation_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level client1 in
   (* Attest with the double preattesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -1086,7 +1203,9 @@ let double_preattestation_aggregation_wrong_payload_hash =
   in
   (* Attest with a non-misbehaving key and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck3 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck3 client1
+    in
     attest_for
       ~protocol
       ~branch
@@ -1098,6 +1217,9 @@ let double_preattestation_aggregation_wrong_payload_hash =
       client1
   in
   unit
+
+let register_migration ~migrate_from ~migrate_to =
+  accusers_migration_test ~migrate_from ~migrate_to
 
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;

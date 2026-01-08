@@ -196,18 +196,11 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     | None -> Test.fail ~__LOC__ "Unexpected case: there are no delegates"
     | Some (pkh, _) -> pkh
   in
-  let* attestation = Op.raw_attestation blk ~delegate ?dal_content in
+  let* attester = Context.get_attester ~manager_pkh:delegate (B blk) in
+  let attesting_slot = Op.attesting_slot_of_attester attester in
+  let* attestation = Op.raw_attestation blk ~attesting_slot ?dal_content in
+  let consensus_slot = attesting_slot.slot in
   let attestation_level = blk.header.shell.level in
-  let* consensus_slot =
-    let+ all_slots = Context.get_attester_slot (B blk) delegate in
-    let fst_slot = Option.bind all_slots List.hd in
-    match fst_slot with
-    | None ->
-        Test.fail
-          ~__LOC__
-          "Unexpected case: delegate is not in attestation committee"
-    | Some slot -> slot
-  in
 
   let* blk =
     let blocks_to_bake =
@@ -296,7 +289,7 @@ let test_invalid_accusation_no_dal_content =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_no_dal_content
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -314,7 +307,7 @@ let test_invalid_accusation_slot_not_attested =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_attested
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -332,7 +325,7 @@ let test_invalid_accusation_slot_not_published =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_published
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -367,7 +360,7 @@ let test_invalid_accusation_shard_is_not_trap =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_shard_is_not_trap
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -385,7 +378,7 @@ let test_invalid_accusation_wrong_shard_owner =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_wrong_shard_owner
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit

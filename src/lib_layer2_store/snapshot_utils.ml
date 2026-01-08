@@ -180,11 +180,17 @@ let add_download_command () =
 
 let program_exists cmd =
   let open Lwt_syntax in
-  let+ status =
-    Lwt_process.with_process_full
-      ("which", [|"which"; "-s"; cmd|])
-      (fun pc -> pc#status)
+  let ((o, i, e) as proc) =
+    Unix.open_process_args_full
+      "which"
+      [|"which"; "-s"; cmd|]
+      (Unix.environment ())
   in
+  let pid = Unix.process_full_pid proc in
+  let+ _, status = Lwt_unix.waitpid [] pid in
+  In_channel.close o ;
+  Out_channel.close i ;
+  In_channel.close e ;
   match status with Unix.WEXITED 0 -> true | _ -> false
 
 let choose_download_command ~progress url =

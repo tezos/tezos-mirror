@@ -3,7 +3,7 @@ Running a DAL attester node
 
 To attest the data published on the :doc:`DAL<./dal_overview>`, you need an active baker and node.
 While you can run a DAL node without an active baker, when you do so, your account is not assigned DAL attestation rights and therefore your node can distribute data among other DAL nodes but cannot attest that it is available.
-Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on layer 1.
+Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on Layer 1.
 
 Therefore, we assume here you have installed Octez, see :doc:`../introduction/howtoget`.
 Make also sure that you have an instance of the ``octez-node`` binary running, as explained in :doc:`../user/setup-node`.
@@ -23,7 +23,7 @@ Running the DAL node
 
 Before anything else, make sure your machine satisfies the hardware requirements at :doc:`dal_node`.
 
-Follow these steps to run a DAL node along with a layer 1 node and a baker.
+Follow these steps to run a DAL node along with a Layer 1 node and a baker.
 
 #. **If** you plan to run the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`, install the DAL trusted setup as described in section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
@@ -42,6 +42,8 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles="$MY_ADDRESS" --data-dir my-attester-tezos-dal-node
 
+   If you are switching from running the DAL node on a different network, use an empty directory instead of re-using the directory from another network.
+
    You can specify parameters such as the RPC node in the ``config init`` command or in the ``run`` command.
    These commands have the same parameters. For information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
 
@@ -51,15 +53,13 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    If you need to explicitly connect your node to running DAL nodes, pass the ``--peers`` argument with a comma-separated list of DAL node host names and ports.
    The default P2P port is 11732, so the argument might look like this: ``--peers=host1.example.com:11732,host2.example.com:11732``.
 
-#. Recommended: Ensure that the P2P port that the DAL node runs on is accessible from outside its system.
+#. Ensure that the P2P port that the DAL node runs on is accessible from outside its local network.
 
-   By default, the DAL node accepts P2P connections on port 11732, but you can change the port and address that the node listens on by setting the ``--net-addr`` argument, as in ``--net-addr 0.0.0.0:11732``.
-   Depending on your network, you may need to adapt your firewall rules or set up network address translation (NAT) to direct external traffic to the DAL node.
-   For example, you might need to redirect external traffic on TCP port ``<external_port>`` to your node at ``<local_ip_address>:<port>`` where ``<local_ip_address>`` is the IP address of the node on your local network and ``<port>`` is the port given in the ``--net-addr`` argument.
+   DAL nodes must be able to initiate connections outside their local network and accept connections from outside their local network.
+   By default, the DAL node accepts P2P connections on port 11732, but you can change the address and port that the node listens on by setting the ``--net-addr`` argument.
+   In simple setups with a single DAL node, routing configuration is usually not necessary.
 
-   If ``<external_port>`` is different from ``<port>``, then you should set the public address of your node via its configuration or the CLI option ``--public-addr <external_ip_address>:<external_port>``.
-
-   This setup assumes that ``<external_ip_address>`` is fixed and won't change during the lifetime of the node.
+   For more information, see :doc:`Routing <../user/routing>`.
 
 #. Start the DAL node by running its ``run`` command, passing the directory that you set in the ``config init`` command if you changed the default.
    You can also pass any other parameters that you did not set in that command:
@@ -71,13 +71,13 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    Leave the DAL node process running.
 
 #. In a new terminal window, start or restart a baking daemon as usual, but tell it to connect to the DAL node by passing the ``--dal-node`` argument with the host name and RPC port of the DAL node.
-   The DAL node accepts RPC calls on port 10732 by default, so the command might look like this example, where ``<PROTO_HASH>`` is the short hash of the current protocol of the network:
+   The DAL node accepts RPC calls on port 10732 by default, so the command might look like this example:
 
    .. code-block:: shell
 
-      octez-baker-<PROTO_HASH> run with local node "$HOME/.tezos-node" bob --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
+      octez-baker run with local node "$HOME/.tezos-node" bob --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
-   The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual layer 1 baking function.
+   The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual Layer 1 baking function.
 
 #. In a new terminal window, verify that your baking daemon has attestation rights allocated for the current cycle, by running:
 

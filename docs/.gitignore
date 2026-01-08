@@ -10,6 +10,7 @@ octezdoc.txt
 /user/node-config.json
 /CHANGES-dev.rst
 /developer/metrics.csv
+/developer/rollup_metrics.csv
 
 /linkcheck
 /odoc.log

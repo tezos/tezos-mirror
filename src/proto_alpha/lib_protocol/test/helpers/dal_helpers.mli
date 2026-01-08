@@ -199,9 +199,36 @@ end) : sig
     __LOC__:string -> 'a tzresult -> 'b -> unit tzresult Lwt.t
 end
 
-(** Builds a {!Alpha_context.type-dal_content} from its integer
+(** Builds a {!Alpha_context.type-dal_content} from its {!Z.t}
     representation, that is, the sum of powers of two of the indexes
     of attested slots.
 
     Raises an exception when the given argument is negative. *)
-val dal_content_of_int : loc:string -> int -> Alpha_context.dal_content
+val dal_content_of_z : Z.t -> Alpha_context.dal_content tzresult Lwt.t
+
+(** Builds a {!Alpha_context.type-dal_content} from a list of attested
+    slots.
+
+    @param [number_of_slots] defaults to
+      {!Default_parameters.constants_test.dal.number_of_slots}.
+
+    Fails when any of the attested slots is negative or greater than
+    or equal to [number_of_slots]. *)
+val dal_content_of_int_list :
+  ?number_of_slots:int -> int list -> Alpha_context.dal_content
+
+(** A list of varied dal_content options, for tests where we want to
+    build attestations with different dal contents. *)
+val various_dal_contents : Alpha_context.dal_content option list
+
+(** Transform a list of committee members into a list of [(member,
+    dal)] where [dal] is picked successively from
+    {!various_dal_contents} (going back to the beginning of
+    {!various_dal_contents} if it is shorter than the provided
+    committee.
+
+    Depending on when this function is called, ['a] may be e.g. the
+    {!Signature.public_key_hash} of delegates or their consensus key,
+    or {!Op.attesting_slot}. *)
+val committee_with_various_dal_contents :
+  'a list -> ('a * Alpha_context.dal_content option) list

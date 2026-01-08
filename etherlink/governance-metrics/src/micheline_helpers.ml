@@ -49,8 +49,8 @@ let decode_set decode_elt = function
 let decode_map ~decode_key ~decode_elt =
   let open Result_syntax in
   decode_set (function
-      | Prim (_, "Elt", [key; value], _) ->
-          let* key = decode_key key in
-          let* value = decode_elt value in
-          Ok (key, value)
-      | _ -> error_with "DecodeMapError")
+    | Prim (_, "Elt", [key; value], _) ->
+        let* key = decode_key key in
+        let* value = decode_elt value in
+        Ok (key, value)
+    | _ -> error_with "DecodeMapError")

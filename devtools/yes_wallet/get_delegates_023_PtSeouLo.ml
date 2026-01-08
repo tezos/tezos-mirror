@@ -63,9 +63,12 @@ module Get_delegates = struct
       |> Lwt.map Environment.wrap_tzresult
 
     let fold context ~init ~f =
-      let open Lwt_syntax in
-      let* l = list context in
-      Lwt_list.fold_left_s f init l
+      Storage.Contract.fold
+        (Alpha_context.Internal_for_tests.to_raw context)
+        ~order:`Undefined
+        ~init
+        ~f:(fun (contract : Contract_repr.t) v ->
+          f (Obj.magic contract : contract) v)
 
     let balance ctxt t = get_balance ctxt t |> Lwt.map Environment.wrap_tzresult
 
@@ -127,13 +130,32 @@ module Get_delegates = struct
     let deactivated ctxt pkh =
       deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
 
-    let consensus_key ctxt pkh : Signature.public_key tzresult Lwt.t =
+    let consensus_keys ctxt pkh :
+        (Signature.public_key * Signature.public_key list) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* {consensus_pk; _} =
         Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
         |> Lwt.map Environment.wrap_tzresult
       in
-      return consensus_pk
+      let* pending_updates =
+        Alpha_context.Delegate.Consensus_key.pending_updates ctxt pkh
+        |> Lwt.map Environment.wrap_tzresult
+        |> Lwt_result.map (List.map (fun (_, _, pk) -> pk))
+      in
+      return (consensus_pk, pending_updates)
+
+    let companion_keys ctxt pkh =
+      let open Lwt_result_syntax in
+      let* {companion_pk; _} =
+        Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
+        |> Lwt.map Environment.wrap_tzresult
+      in
+      let* pending_updates =
+        Alpha_context.Delegate.Consensus_key.pending_companion_updates ctxt pkh
+        |> Lwt.map Environment.wrap_tzresult
+        |> Lwt_result.map (List.map (fun (_, _, pk) -> pk))
+      in
+      return (companion_pk, pending_updates)
   end
 
   let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
@@ -143,6 +165,27 @@ module Get_delegates = struct
       |> Lwt.map Environment.wrap_tzresult
     in
     ctxt
+
+  let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+    let open Lwt_result_syntax in
+    let r =
+      Protocol.value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      |> Lwt.map Environment.wrap_tzresult
+    in
+    Lwt_result.map
+      (fun cache_key ->
+        fun key ->
+         let*! toto = cache_key key in
+         Lwt.return @@ Environment.wrap_tzresult toto)
+      r
 end
 
 let () = Known_protocols.register (module Get_delegates)

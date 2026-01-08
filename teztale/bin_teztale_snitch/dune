@@ -11,8 +11,8 @@
   octez-libs.base
   octez-version.value
   lib_teztale_base
-  octez-libs.cohttp-lwt
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt
+  cohttp-lwt-unix
   cmdliner)
  (link_flags
   (:standard)

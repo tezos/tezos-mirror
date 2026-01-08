@@ -71,12 +71,30 @@ module IdMap : Map.S with type key = id
 
 type time = {
   wall : float;  (** Wall-clock time: total time elapsed. *)
-  cpu : float;  (** CPU time: time elapsed in the CPU. *)
+  cpu : float option;  (** CPU time: time elapsed in the CPU. *)
 }
 
 type span = Span of time
 
-val zero_time : span
+(** [compute_cpu ~cpu] returns true if CPU profiling should be enabled.
+
+    Computing CPU times is slow, if the overhead when profiling is too important,
+    consider disabling cpu profiling globally or locally on functions
+    that are called a lot.
+
+    This depends on the value of the CPU_PROFILING environment variable
+    and [cpu].
+
+    [CPU_PROFILING] value dictates what kind of value is returned:
+    - [true] means cpu profiling will be enabled everywhere
+    - [false] means cpu profiling will be disabled everywhere
+    - [default_true] means cpu profiling will be enabled except for
+      the profiling parts where [cpu:false] is explicit
+    - [default_false] means cpu profiling will be disabled except for
+      the profiling parts where [cpu:true] is explicit. *)
+val compute_cpu : cpu:bool option -> bool
+
+val zero_time : cpu:bool option -> span
 
 val ( -* ) : time -> time -> time
 
@@ -141,33 +159,33 @@ module type DRIVER = sig
   val create : config -> state
 
   (** Gives the current time in seconds. *)
-  val time : state -> time
+  val time : cpu:bool option -> state -> time
 
   (** Open a sequence in the current sequence.
       If currently aggregating (not all aggregation scopes are closed),
       this has the same semantics as {!aggregate} instead. *)
-  val record : state -> verbosity -> id -> unit
+  val record : cpu:bool option -> state -> verbosity -> id -> unit
 
   (** Open an aggregation node in the current sequence. *)
-  val aggregate : state -> verbosity -> id -> unit
+  val aggregate : cpu:bool option -> state -> verbosity -> id -> unit
 
   (** Close the most recently opened sequence or aggregation scope. *)
   val stop : state -> unit
 
   (** Record a timestamp in the most recently opened sequence. *)
-  val stamp : state -> verbosity -> id -> unit
+  val stamp : cpu:bool option -> state -> verbosity -> id -> unit
 
   (** Count this event's occurences in the most recent sequence. *)
   val mark : state -> verbosity -> ids -> unit
 
   (** Sum the time spent in this event in the most recent sequence. *)
-  val span : state -> verbosity -> span -> ids -> unit
+  val span : cpu:bool option -> state -> verbosity -> span -> ids -> unit
 
   (** Include a report in the current sequence. *)
   val inc : state -> report -> unit
 
   (** Consume the last toplevel report, if any. *)
-  val report : state -> report option
+  val report : cpu:bool option -> state -> report option
 
   (** Flush and/or close output. *)
   val close : state -> unit
@@ -187,9 +205,9 @@ type instance
     the given [params] *)
 val instance : 'a driver -> 'a -> instance
 
-val time : instance -> time
+val time : cpu:bool option -> instance -> time
 
-val report : instance -> report option
+val report : cpu:bool option -> instance -> report option
 
 val report_s : instance -> report Lwt.t
 
@@ -223,22 +241,22 @@ val plugged : profiler -> instance list
 (** Open a sequence in the current sequence.
     If currently aggregating (not all aggregation scopes are closed),
     this has the same semantics as {!aggregate} instead. *)
-val record : profiler -> verbosity -> id -> unit
+val record : cpu:bool option -> profiler -> verbosity -> id -> unit
 
 (** Open an aggregation node in the current sequence. *)
-val aggregate : profiler -> verbosity -> id -> unit
+val aggregate : cpu:bool option -> profiler -> verbosity -> id -> unit
 
 (** Close the most recently opened sequence or aggregation scope. *)
 val stop : profiler -> unit
 
 (** Record a timestamp in the most recently opened sequence. *)
-val stamp : profiler -> verbosity -> id -> unit
+val stamp : cpu:bool option -> profiler -> verbosity -> id -> unit
 
 (** Count this event's occurences in the most recent sequence. *)
 val mark : profiler -> verbosity -> ids -> unit
 
 (** Sum the time spent in this event in the most recent sequence. *)
-val span : profiler -> verbosity -> span -> ids -> unit
+val span : cpu:bool option -> profiler -> verbosity -> span -> ids -> unit
 
 (** Include a report in the current sequence. *)
 val inc : profiler -> report -> unit
@@ -249,10 +267,17 @@ val inc : profiler -> report -> unit
       f ();
       stop ();
     ]} *)
-val record_f : profiler -> verbosity -> id -> (unit -> 'a) -> 'a
+val record_f :
+  cpu:bool option -> profiler -> verbosity -> id -> (unit -> 'a) -> 'a
 
 (** Same as {!record_f} but for Lwt function *)
-val record_s : profiler -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val record_s :
+  cpu:bool option ->
+  profiler ->
+  verbosity ->
+  id ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 
 (** [aggregate_f profiler verbosity label f] will call:
     {[
@@ -260,17 +285,31 @@ val record_s : profiler -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
       f ();
       stop ();
     ]} *)
-val aggregate_f : profiler -> verbosity -> id -> (unit -> 'a) -> 'a
+val aggregate_f :
+  cpu:bool option -> profiler -> verbosity -> id -> (unit -> 'a) -> 'a
 
 (** Same as {!aggregate_f} but for Lwt functions *)
-val aggregate_s : profiler -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val aggregate_s :
+  cpu:bool option ->
+  profiler ->
+  verbosity ->
+  id ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 
 (** [span_f profiler verbosity label_list f] will compute [span] but
     specifically around [f] *)
-val span_f : profiler -> verbosity -> ids -> (unit -> 'a) -> 'a
+val span_f :
+  cpu:bool option -> profiler -> verbosity -> ids -> (unit -> 'a) -> 'a
 
 (** Same as {!span_f} but for Lwt functions *)
-val span_s : profiler -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+val span_s :
+  cpu:bool option ->
+  profiler ->
+  verbosity ->
+  ids ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
 
 (** [unplugged ()] returns a new profiler *)
 val unplugged : unit -> profiler
@@ -313,10 +352,10 @@ module type GLOBAL_PROFILER = sig
   (** Open a sequence in the current sequence.
       If currently aggregating (not all aggregation scopes are closed),
       this has the same semantics as {!aggregate} instead. *)
-  val record : verbosity -> id -> unit
+  val record : cpu:bool option -> verbosity -> id -> unit
 
   (** Open an aggregation node in the current sequence. *)
-  val aggregate : verbosity -> id -> unit
+  val aggregate : cpu:bool option -> verbosity -> id -> unit
 
   (** Close the most recently opened sequence or aggregation scope. *)
   val stop : unit -> unit
@@ -324,13 +363,13 @@ module type GLOBAL_PROFILER = sig
   (** {3 Profiling} *)
 
   (** Record a timestamp in the most recently opened sequence. *)
-  val stamp : verbosity -> id -> unit
+  val stamp : cpu:bool option -> verbosity -> id -> unit
 
   (** Count this event's occurences in the most recent sequence. *)
   val mark : verbosity -> ids -> unit
 
   (** Sum the time spent in this event in the most recent sequence. *)
-  val span : verbosity -> span -> ids -> unit
+  val span : cpu:bool option -> verbosity -> span -> ids -> unit
 
   (** Include a report in the current sequence. *)
   val inc : report -> unit
@@ -341,10 +380,11 @@ module type GLOBAL_PROFILER = sig
         f ();
         stop ();
       ]} *)
-  val record_f : verbosity -> id -> (unit -> 'a) -> 'a
+  val record_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 
   (** Same as {!record_f} but for Lwt function *)
-  val record_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val record_s :
+    cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
   (** [aggregate_f verbosity label f] will call:
       {[
@@ -352,17 +392,19 @@ module type GLOBAL_PROFILER = sig
         f ();
         stop ();
       ]} *)
-  val aggregate_f : verbosity -> id -> (unit -> 'a) -> 'a
+  val aggregate_f : cpu:bool option -> verbosity -> id -> (unit -> 'a) -> 'a
 
   (** Same as {!aggregate_f} but for Lwt functions *)
-  val aggregate_s : verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val aggregate_s :
+    cpu:bool option -> verbosity -> id -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 
   (** [span_f verbosity label_list f] will compute [span] but specifically
       around [f] *)
-  val span_f : verbosity -> ids -> (unit -> 'a) -> 'a
+  val span_f : cpu:bool option -> verbosity -> ids -> (unit -> 'a) -> 'a
 
   (** Same as {!span_f} but for Lwt functions *)
-  val span_s : verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  val span_s :
+    cpu:bool option -> verbosity -> ids -> (unit -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 (** [wrap profiler] stores [profiler] in a {!GLOBAL_PROFILER} module
@@ -382,6 +424,7 @@ type 'a section_maker = 'a * metadata -> unit
     @param profiler - profiler instance used to track sections and record profiling data. *)
 val section_maker :
   ?verbosity:verbosity ->
+  ?cpu:bool ->
   ('a -> 'a -> bool) ->
   ('a -> string) ->
   profiler ->

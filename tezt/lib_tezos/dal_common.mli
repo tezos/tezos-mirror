@@ -40,7 +40,7 @@ module Parameters : sig
 
   val from_protocol_parameters : JSON.t -> t
 
-  val from_client : Client.t -> t Lwt.t
+  val from_client : ?block:string -> Client.t -> t Lwt.t
 
   val from_endpoint : Endpoint.t -> t Lwt.t
 
@@ -75,6 +75,8 @@ module Helpers : sig
   (** Abstract version of a slot to deal with messages content which
      are smaller than the expected size of a slot. *)
   type slot
+
+  val bytes_of_slot : slot -> bytes
 
   (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
@@ -197,6 +199,13 @@ module RPC : sig
   (* Profiles tracked by the DAL node. *)
   type profile = Bootstrap | Controller of controller_profiles
 
+  (* The status of a slot id (published level + slot index) on L1. *)
+  type slot_id_status =
+    | Waiting_attestation
+    | Attested of int (* of attestation lag *)
+    | Unattested
+    | Unpublished
+
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
     slot_level : int;
@@ -236,7 +245,7 @@ module RPC : sig
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
         the commitment associated to the given level and index. *)
-  val get_level_index_commitment :
+  val get_level_slot_commitment :
     slot_level:int -> slot_index:int -> commitment RPC_core.t
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
@@ -250,7 +259,9 @@ module RPC : sig
   (** Call RPC "GET /levels/<slot_level>/slots/<slot_index>/status" to
       get the status known about the given slot. *)
   val get_level_slot_status :
-    slot_level:int -> slot_index:int -> string RPC_core.t
+    slot_level:int -> slot_index:int -> slot_id_status RPC_core.t
+
+  val pp_slot_id_status : Format.formatter -> slot_id_status -> unit
 
   (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
@@ -258,6 +269,17 @@ module RPC : sig
         level. *)
   val get_assigned_shard_indices :
     level:int -> pkh:string -> int list RPC_core.t
+
+  type trap = {delegate : string; slot_index : int}
+
+  (** Call RPC
+    "GET /published_levels/<published_level>/known_traps?delegate=<pkh>&slot_index=<slot_index>"
+    and returns the list of traps recorded by the DAL node at [~published_level]. *)
+  val get_published_level_known_traps :
+    published_level:int ->
+    pkh:commitment_proof ->
+    slot_index:int ->
+    trap list RPC_core.t
 
   type slot_set = bool list
 
@@ -380,6 +402,8 @@ module Check : sig
   val profiles_typ : RPC.profile Check.typ
 
   val topics_peers_typ : (RPC.topic * string list) list Check.typ
+
+  val slot_id_status_typ : RPC.slot_id_status Check.typ
 
   val slot_header_typ : RPC.slot_header Check.typ
 

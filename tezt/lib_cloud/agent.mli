@@ -17,7 +17,10 @@ module Configuration : sig
 
   type vm = private {
     machine_type : string;
+    disk_type : string option;
+    disk_size_gb : int option;
     docker_image : docker_image;
+    dockerbuild_args : (string * string) list;
     max_run_duration : int option;
     binaries_path : string;
     os : Types.Os.t;
@@ -29,12 +32,20 @@ module Configuration : sig
 
   val uri_of_docker_image : docker_image -> string Lwt.t
 
+  val registry_uri_of_docker_image : docker_image -> string option Lwt.t
+
+  val docker_image_name : docker_image -> string
+
   (** [make ?machine_type ()] is a smart-constructor to make a VM
       configuration.
 
     Default value for [max_run_duration] is [7200].
 
     Default value for [machine_type] is [n1-standard-2].
+
+    Default value for [disk_type] is [pd-ssd].
+
+    Default value for [disk_size_gb] is [200].
 
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environment variable [$TEZT_CLOUD].
@@ -44,17 +55,21 @@ module Configuration : sig
     ?binaries_path:string ->
     ?max_run_duration:int option ->
     ?machine_type:string ->
+    ?disk_type:string ->
+    ?disk_size_gb:int ->
     ?docker_image:docker_image ->
+    ?dockerbuild_args:(string * string) list ->
     ?name:string ->
     unit ->
     t
 end
 
-(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name ()]
-    creates an [agent] from the given parameters. [~next_available_port] should
-    always provide an available port or raise [Not_found] otherwise.
-    [~vm_name] is the name of the VM. [?ssh_id] and [?point] are used to potentially
-    create a [runner] for the [agent]. *)
+(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
+    ~artifacts_dir ()] creates an [agent] from the given parameters.
+    [~next_available_port] should always provide an available port or raise
+    [Not_found] otherwise. [~vm_name] is the name of the VM. [?ssh_id] and
+    [?point] are used to potentially create a [runner] for the [agent].
+    [daily_logs_dir] stands for the path to the agent's daily logs. *)
 val make :
   ?zone:string ->
   ?ssh_id:string ->
@@ -63,6 +78,7 @@ val make :
   next_available_port:(unit -> int) ->
   vm_name:string option ->
   process_monitor:Process_monitor.t option ->
+  artifacts_dir:string option ->
   unit ->
   t
 
@@ -88,6 +104,9 @@ val runner : t -> Runner.t option
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
 
+(** [artifacts_dir agent] artifacts directory associated to the agent. *)
+val artifacts_dir : t -> string option
+
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 
@@ -99,6 +118,13 @@ val process_monitor : t -> Process_monitor.t option
 
 (** Returns the service manager if any *)
 val service_manager : t -> Service_manager.t option
+
+(** Returns the path in which the agent aims it's data. *)
+val temp_execution_path : unit -> string
+
+(** Register a callback that will be executed as soon as the agent is shutting
+    down. *)
+val register_shutdown_callback : t -> (unit -> unit Lwt.t) -> unit
 
 (** Run a command on the docker image run by the agent.
 
@@ -115,7 +141,8 @@ val service_manager : t -> Service_manager.t option
     automatically created in /tmp/tezt-$n with the name of the command as
     prefix (warning: it can causes duplicates).
  *)
-val docker_run_command : t -> ?detach:bool -> string -> string list -> Process.t
+val docker_run_command :
+  ?name:string -> t -> ?detach:bool -> string -> string list -> Process.t
 
 (** [copy ?refresh ?is_directory ?destination agent ~source] copies the file
     into the [agent] directory and returns the directory where the file
@@ -145,3 +172,13 @@ val copy :
   t ->
   source:string ->
   string Lwt.t
+
+(** [scp agent ~is_directory ~source ~destination direction] runs scp to copy a
+    file/directory from or to the agent, depending on the [direction]. *)
+val scp :
+  t ->
+  is_directory:bool ->
+  source:string ->
+  destination:string ->
+  [< `FromRunner | `ToRunner] ->
+  unit Lwt.t

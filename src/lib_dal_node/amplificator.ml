@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -144,30 +144,28 @@ let proved_shards_encoding =
     (req "shards" (list Cryptobox.shard_encoding))
     (req "proofs" shards_proofs_encoding)
 
-(* This module contains the logic for a shard proving process worker running in
-   background. It communicates with the main dal process via pipe ipc. *)
-module Reconstruction_process_worker = struct
-  let read_init_message_from_parent ic =
-    let open Lwt_result_syntax in
-    let* () =
-      let* r = Process_worker.read_message ic in
-      match r with
-      | `End_of_file ->
-          fail
-            [
-              Reconstruction_process_worker_error
-                "Invalid initialization message";
-            ]
-      | `Message b when Bytes.equal b welcome -> return_unit
-      | `Message b -> fail_with_exn (Invalid_argument (String.of_bytes b))
-    in
-    return_unit
+(* This module contains the logic for a shard-proving process worker running in
+   background. It communicates with the main DAL process via Eio streams.
+   All the functions within this modules are expected to be run within the
+   [Process_worker] runtime, that is a Eio dedicated domain. Thus, Lwt code
+   needs to be properly wrapped with the adequate [Lwt_eio] wrapper.
+ *)
+module Reconstruction_process_worker : sig
+  val reconstruct_process_worker :
+    Bytes.t Eio.Stream.t ->
+    Bytes.t Eio.Stream.t ->
+    Cryptobox.t * Cryptobox.shards_proofs_precomputation ->
+    unit
+end = struct
+  let welcome_handshake input =
+    let r = Process_worker.read_message input in
+    match r with
+    | b when Bytes.equal b welcome -> ()
+    | b -> raise (Invalid_argument (String.of_bytes b))
 
   let reconstruct cryptobox precomputation shards =
-    let open Lwt_result_syntax in
-    let* polynomial =
-      Slot_manager.polynomial_from_shards cryptobox shards |> Errors.to_tzresult
-    in
+    let open Result_syntax in
+    let* polynomial = Slot_manager.polynomial_from_shards cryptobox shards in
     let shards =
       Cryptobox.shards_from_polynomial cryptobox polynomial |> List.of_seq
     in
@@ -181,208 +179,175 @@ module Reconstruction_process_worker = struct
     in
     return proved_shards_encoded
 
+  (* Utility function to reply on successfully validated shards. *)
+  let reply_success ~output ~query_id ~proved_shards_encoded =
+    (* Sends back the proved_shards_encoded to the main DAL process. *)
+    let () =
+      Tezos_bees.Hive.async_lwt (fun () ->
+          Event.emit_crypto_process_sending_reply ~query_id)
+    in
+    let () = Eio.Stream.add output (Bytes.of_string (Int.to_string query_id)) in
+    let () = Process_worker.write_message output (Bytes.of_string "OK") in
+    let () = Process_worker.write_message output proved_shards_encoded in
+    ()
+
+  (* Utility function to reply on unsuccessful validated shard. *)
+  let reply_error_query ~output ~query_id ~error =
+    (* Sends back the proved_shards_encoded to the main DAL process. *)
+    let () =
+      Tezos_bees.Hive.async_lwt (fun () ->
+          Event.emit_crypto_process_sending_reply_error ~query_id)
+    in
+    let () = Eio.Stream.add output (Bytes.of_string (Int.to_string query_id)) in
+    let () = Process_worker.write_message output (Bytes.of_string "ERR") in
+    let bytes = Bytes.of_string error in
+    let () = Process_worker.write_message output bytes in
+    ()
+
+  (* Utility function to trigger a shard reconstruction. *)
+  let process_query ~query_id ~input cryptobox shards_proofs_precomputation =
+    let open Result_syntax in
+    (* Read query from main dal process *)
+    let bytes_shards = Process_worker.read_message input in
+    let shards =
+      Data_encoding.(
+        Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
+      |> List.to_seq
+    in
+    let () =
+      Tezos_bees.Hive.async_lwt (fun () ->
+          Event.emit_crypto_process_received_query ~query_id)
+    in
+    (* crypto computation *)
+    let* proved_shards_encoded =
+      reconstruct cryptobox shards_proofs_precomputation shards
+    in
+    return proved_shards_encoded
+
   (* The main function that is run in the [Process_worker.t].
+     [input] is the stream on which the apmlificator will read requests from the
+     DAL node. [output] is the stream on which the amplificator will answer to
+     the DAL node.
      Initialization phase:
        receive init message: proto_parameters
      Running phase:
        loop
-         - receive shards
-         - calculate all shards and their proofs
-         - sent shards and proofs *)
-  let reconstruct_process_worker ic oc (cryptobox, shards_proofs_precomputation)
+         - receive shards,
+         - calculate all shards and their proofs,
+         - sent shards and proofs.
+   *)
+  let reconstruct_process_worker (input : Bytes.t Eio.Stream.t)
+      (output : Bytes.t Eio.Stream.t) (cryptobox, shards_proofs_precomputation)
       =
-    let open Lwt_result_syntax in
-    let reply_success ~oc ~query_id ~proved_shards_encoded =
-      (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
-      let*! () = Lwt_io.write_int oc query_id in
-      let*! _ = Process_worker.write_message oc (Bytes.of_string "OK") in
-      let*! _ = Process_worker.write_message oc proved_shards_encoded in
-      Lwt.return_unit
-    in
-    let reply_error_query ~oc ~query_id ~error =
-      (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.emit_crypto_process_sending_reply_error ~query_id in
-      let*! () = Lwt_io.write_int oc query_id in
-      let*! _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
-      let bytes = Bytes.of_string error in
-      let*! _ = Process_worker.write_message oc bytes in
-      Lwt.return_unit
-    in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
-    let* () = read_init_message_from_parent ic in
-    let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
-    let process_query query_id =
-      (* Read query from main dal process *)
-      let* bytes_shards =
-        let* r = Process_worker.read_message ic in
-        match r with
-        | `End_of_file ->
-            fail
-              [
-                Reconstruction_process_worker_error
-                  "Incomplete message received. Terminating.";
-              ]
-        | `Message msg -> return msg
-      in
-      let shards =
-        Data_encoding.(
-          Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
-        |> List.to_seq
-      in
-
-      let*! () = Event.emit_crypto_process_received_query ~query_id in
-
-      (* crypto computation *)
-      let* proved_shards_encoded =
-        reconstruct cryptobox shards_proofs_precomputation shards
-      in
-      return proved_shards_encoded
+    let () = welcome_handshake input in
+    let () =
+      Tezos_bees.Hive.async_lwt (fun () -> Event.emit_crypto_process_started ())
     in
     let rec loop () =
-      Lwt.catch
-        (fun () ->
-          (* Note: this read_int is very unlikely to appear unless obvious issue *)
-          let*! query_id = Lwt_io.read_int ic in
-          let* () =
-            Lwt.catch
-              (fun () ->
-                let*! r = process_query query_id in
-                match r with
-                | Ok proved_shards_encoded ->
-                    let*! () =
-                      reply_success ~query_id ~proved_shards_encoded ~oc
-                    in
-                    loop ()
-                | Error err ->
-                    let err =
-                      Format.asprintf "%a" Error_monad.pp_print_trace err
-                    in
-                    (* send a reply with the error, and continue *)
-                    let*! () = reply_error_query ~oc ~query_id ~error:err in
-                    loop ())
-              (function
-                | End_of_file -> raise End_of_file
-                | exn ->
-                    let error = Printexc.to_string exn in
-                    let*! () = reply_error_query ~oc ~query_id ~error in
-                    return_unit)
+      let query_id =
+        Eio.Stream.take input |> Bytes.to_string |> int_of_string
+      in
+      try
+        let r =
+          process_query ~query_id ~input cryptobox shards_proofs_precomputation
+        in
+        match r with
+        | Ok proved_shards_encoded ->
+            let () = reply_success ~query_id ~proved_shards_encoded ~output in
+            loop ()
+        | Error err ->
+            let (`Other err) = err in
+            let error = Format.asprintf "%a" Error_monad.pp_print_trace err in
+            (* send a reply with the error, and continue *)
+            let () = reply_error_query ~output ~query_id ~error in
+            loop ()
+      with
+      | Eio.Cancel.Cancelled _ ->
+          Tezos_bees.Hive.async_lwt (fun () ->
+              Event.emit_crypto_process_stopped ())
+      | exn ->
+          let error = Printexc.to_string exn in
+          let () =
+            Tezos_bees.Hive.async_lwt (fun () ->
+                Event.emit_crypto_process_error ~msg:error)
           in
-          return_unit)
-        (function
-          | Lwt.Canceled
-            (* if terminated by direct signal (normal termination) *)
-          | End_of_file ->
-              (* Buffer was closed by the parent (normal termination) *)
-              let*! () = Event.emit_crypto_process_stopped () in
-              return_unit
-          | exn ->
-              (* Lwt_io.read_int could fail, in this case, there is an severe
-                 issue: pipe issue between the processes, memory full ?
-                 In this case, we give up *)
-              let msg = Printexc.to_string exn in
-              let*! () = Event.emit_crypto_process_error ~msg in
-              fail [error_of_exn exn])
+          let () = reply_error_query ~output ~query_id ~error in
+          raise exn
     in
-    let* () = loop () in
-    return_unit
+    loop ()
 end
 
 (* Serialize queries to crypto worker process while the query queue is not
- * empty. Wait until the query queue contains
- * anything *)
+   empty. Wait until the query queue contains anything. This function aims to be
+   run by the main DAL node process. *)
 let query_sender_job {query_pipe; process; _} =
   let open Lwt_result_syntax in
+  let process_input = Process_worker.input_channel process in
   let rec loop () =
     let*! (Query_msg {query_id; shards; _}) =
       Lwt_pipe.Unbounded.pop query_pipe
     in
-    let oc = Process_worker.output_channel process in
     let*! () = Event.emit_main_process_sending_query ~query_id in
     (* Serialization: query_id, then shards *)
-    let*! () = Lwt_io.write_int oc query_id in
-    let* () =
-      let* r = Process_worker.write_message oc shards in
-      match r with
-      | `End_of_file ->
-          fail
-            [
-              Reconstruction_process_worker_error
-                "Incomplete message. Terminating";
-            ]
-      | `Write_ok -> return_unit
+    let*! () =
+      Lwt_eio.run_eio (fun () ->
+          Eio.Stream.add
+            process_input
+            (Bytes.of_string (Int.to_string query_id)))
+    in
+    let*! () =
+      Lwt_eio.run_eio (fun () ->
+          Process_worker.write_message process_input shards)
     in
     loop ()
   in
-  Lwt.catch loop (function
-      (* Buffer was closed by the parent before proceeding an entire message
-         (sigterm, etc.) *)
-      | End_of_file -> return_unit
+  Lwt.catch loop (function exn ->
       (* Unknown exception *)
-      | exn ->
-          let err = [error_of_exn exn] in
-          Lwt.return (Error err))
+      let err = [error_of_exn exn] in
+      Lwt.return (Error err))
 
+(* This job aims to read the responses (completed jobs) sent by the amplificator
+   process. This function aims to be run by the main DAL node process. *)
 let reply_receiver_job {process; query_store; _} node_context =
   let open Lwt_result_syntax in
-  let ic = Process_worker.input_channel process in
+  let process_output = Process_worker.output_channel process in
   let gs_worker = Node_context.get_gs_worker node_context in
   let node_store = Node_context.get_store node_context in
   let rec loop () =
-    let*! id = Lwt_io.read_int ic in
+    let*! query_id =
+      Lwt_eio.run_eio (fun () ->
+          Eio.Stream.take process_output |> Bytes.to_string |> int_of_string)
+    in
     let (Query
-          {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
-      Query_store.find query_store id
+           {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
+      Query_store.find query_store query_id
     in
     (* Messages queue is unbounded *)
-    Query_store.remove query_store id ;
+    Query_store.remove query_store query_id ;
     let length = Query_store.length query_store in
     let () = Dal_metrics.update_amplification_queue_length length in
     (* The first message should be a OK | ERR *)
-    let* msg =
-      let* r = Process_worker.read_message ic in
-      match r with
-      | `End_of_file ->
-          fail
-            [
-              Amplification_reply_receiver_job
-                "Incomplete message received. Terminating";
-            ]
-      | `Message msg -> return msg
+    let*! msg =
+      Lwt_eio.run_eio (fun () -> Process_worker.read_message process_output)
     in
     match Bytes.to_string msg with
     | "ERR" ->
-        let* msg =
-          let* r = Process_worker.read_message ic in
-          match r with
-          | `End_of_file ->
-              fail
-                [
-                  Amplification_reply_receiver_job
-                    "Incomplete message received. Terminating";
-                ]
-          | `Message msg -> return msg
+        let*! msg =
+          Lwt_eio.run_eio (fun () -> Process_worker.read_message process_output)
         in
         (* The error message *)
         let msg = Bytes.to_string msg in
         let*! () =
-          Event.emit_main_process_received_reply_error ~query_id:id ~msg
+          Event.emit_main_process_received_reply_error ~query_id ~msg
         in
         loop ()
     | "OK" ->
-        let* msg =
-          let* r = Process_worker.read_message ic in
-          match r with
-          | `End_of_file ->
-              fail
-                [
-                  Amplification_reply_receiver_job
-                    "Incomplete message received. Terminating";
-                ]
-          | `Message msg -> return msg
+        let*! msg =
+          Lwt_eio.run_eio (fun () -> Process_worker.read_message process_output)
         in
-        let*! () = Event.emit_main_process_received_reply ~query_id:id in
+        let*! () = Event.emit_main_process_received_reply ~query_id in
         let shards, shard_proofs =
           Data_encoding.Binary.of_bytes_exn proved_shards_encoding msg
         in
@@ -392,10 +357,19 @@ let reply_receiver_job {process; query_store; _} node_context =
           |> Errors.to_tzresult
         in
         let* () =
+          Attestable_slots.may_notify_attestable_slot_or_trap
+            node_context
+            ~slot_id
+        in
+        let level_committee ~level =
+          let* res = Node_context.fetch_committees node_context ~level in
+          return (Signature.Public_key_hash.Map.map fst res)
+        in
+        let* () =
           Slot_manager.publish_proved_shards
             node_context
             slot_id
-            ~level_committee:(Node_context.fetch_committee node_context)
+            ~level_committee
             proto_parameters
             commitment
             shards
@@ -415,33 +389,32 @@ let reply_receiver_job {process; query_store; _} node_context =
         let*! () = Event.emit_crypto_process_error ~msg:"Unexpected message" in
         fail [Amplification_reply_receiver_job "Unexpected message"]
   in
-  Lwt.catch loop (function
-      (* Buffer was closed before proceeding an entire message (sigterm, etc.) *)
-      | End_of_file -> return_unit
+  Lwt.catch loop (function exn ->
       (* Unknown exception *)
-      | exn ->
-          let err = [error_of_exn exn] in
-          let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
-          Lwt.return (Error err))
+      let err = [error_of_exn exn] in
+      Lwt.return (Error err))
 
 let determine_amplification_delays node_ctxt =
   let open Result_syntax in
   let+ parameters =
     Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
   in
-  (* The propagation window is the attestation lag minus 4 levels, because:
-     - the daemon waits 2 levels for the head to be finalized
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/8138
+     This comment is valid for protocol S and T bakers, not later ones.
+
+     The propagation window is the attestation lag minus 3 levels, because:
+     - the daemon waits 1 level for the head to be finalized
      - attestation operations are included in the block at the next level
      - the baker asks attestation information one level in advance *)
   let propagation_period =
-    (parameters.attestation_lag - 4)
+    (parameters.attestation_lag - 3)
     * Int64.to_int parameters.minimal_block_delay
   in
   (* We split this window in 3: one third for the normal propagation round, one
      third for amplification; one third for the second propagation round. Note,
      currently for Mainnet: 4 * 8s = 32s, so roughly 10s; for Ghostnet: 16s, so
      roughly 5s. We round to the lowest integer. *)
-  let amplification_period = float_of_int (propagation_period / 3) in
+  let amplification_period = float_of_int propagation_period /. 3. in
   let amplification_random_delay_min = amplification_period in
   let amplification_random_delay_max = 2. *. amplification_period in
   (amplification_random_delay_min, amplification_random_delay_max)
@@ -460,11 +433,13 @@ let start_amplificator node_ctxt =
     | None -> fail [Errors.Amplificator_initialization_failed]
     | Some v -> return v
   in
-  (* Fork a process to offload cryptographic calculations *)
-  let* process =
-    Process_worker.run
-      Reconstruction_process_worker.reconstruct_process_worker
-      (cryptobox, shards_proofs_precomputation)
+  (* Offload cryptographic calculations into a dedicated Eio domain using the
+     [Process_worker]. *)
+  let*! process =
+    Lwt_eio.run_eio (fun () ->
+        Process_worker.run
+          Reconstruction_process_worker.reconstruct_process_worker
+          (cryptobox, shards_proofs_precomputation))
   in
   let query_pipe = Lwt_pipe.Unbounded.create () in
   let query_store = Query_store.create 23 in
@@ -481,14 +456,11 @@ let start_amplificator node_ctxt =
       amplification_random_delay_max;
     }
   in
-  let (_ : Lwt_exit.clean_up_callback_id) =
-    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
-        let pid = Process_worker.pid process in
-        Unix.kill pid Sys.sigterm ;
-        let _exit = Lwt_unix.waitpid [Lwt_unix.WNOHANG] pid in
-        Lwt.return_unit)
-  in
   return amplificator
+
+let welcome_handshake amplificator =
+  let ic = Process_worker.input_channel amplificator.process in
+  Lwt_eio.run_eio (fun () -> Process_worker.write_message ic welcome)
 
 let make node_ctxt =
   let open Lwt_result_syntax in
@@ -498,7 +470,12 @@ let make node_ctxt =
     let*! r = query_sender_job amplificator in
     match r with
     | Ok () -> return_unit
+    | Error [Exn Lwt.Canceled] -> (* Graceful cancellation *) return_unit
     | Error e ->
+        let msg =
+          Format.asprintf "Unexpected error: %a" Error_monad.pp_print_trace e
+        in
+        let*! () = Event.emit_crypto_process_fatal ~msg in
         Lwt_result_syntax.fail
           (Amplification_query_sender_job "Error running query sender job" :: e)
   in
@@ -507,7 +484,12 @@ let make node_ctxt =
     let*! r = reply_receiver_job amplificator node_ctxt in
     match r with
     | Ok () -> return_unit
+    | Error [Exn Lwt.Canceled] -> (* Graceful cancellation *) return_unit
     | Error e ->
+        let msg =
+          Format.asprintf "Unexpected error: %a" Error_monad.pp_print_trace e
+        in
+        let*! () = Event.emit_crypto_process_fatal ~msg in
         Lwt_result_syntax.fail
           (Amplification_reply_receiver_job "Error in reply receiver job" :: e)
   in
@@ -517,18 +499,7 @@ let make node_ctxt =
         let () = Lwt.cancel amplificator_reply_receiver_job in
         Lwt.return_unit)
   in
-  let* () =
-    let oc = Process_worker.output_channel amplificator.process in
-    let* r = Process_worker.write_message oc welcome in
-    match r with
-    | `End_of_file ->
-        fail
-          [
-            Reconstruction_process_worker_error
-              "Impossible to write init message. Terminating.";
-          ]
-    | `Write_ok -> return_unit
-  in
+  let*! () = welcome_handshake amplificator in
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
@@ -576,8 +547,8 @@ let amplify node_store commitment (slot_id : Types.slot_id)
   let shards =
     Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
     |> Seq_s.filter_map (function
-           | _, index, Ok share -> Some Cryptobox.{index; share}
-           | _ -> None)
+         | _, index, Ok share -> Some Cryptobox.{index; share}
+         | _ -> None)
   in
   let*? shards =
     Seq_s.take
@@ -654,7 +625,7 @@ let try_amplification commitment slot_metrics slot_id amplificator =
       Store.Shards.count_values (Store.shards node_store) slot_id
     in
     let t = Unix.gettimeofday () in
-    let duration = t -. slot_metrics.Dal_metrics.time_first_shard in
+    let duration = t -. slot_metrics.Dal_metrics.time_first_shard_received in
     (* There is no point trying a reconstruction if we have not received
        enough shards.
        If we have received all the shards while waiting the random

@@ -122,7 +122,7 @@ module Maker (Config : Conf.S) = struct
       module Remote = Brassaia.Backend.Remote.None (Commit.Key) (B)
 
       module Gc = Gc.Make (struct
-        module Async = Async.Unix
+        module Async = Async
         module File_manager = File_manager
         module Dict = Dict
         module Dispatcher = Dispatcher
@@ -254,7 +254,7 @@ module Maker (Config : Conf.S) = struct
                 | None ->
                     Error
                       (`Commit_key_is_dangling
-                        (Brassaia.Type.to_string XKey.t key))
+                         (Brassaia.Type.to_string XKey.t key))
                 | Some (k, _kind) -> Ok k)
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =
@@ -273,11 +273,12 @@ module Maker (Config : Conf.S) = struct
             let current_generation = File_manager.generation t.file_manager in
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
+            let async_domain = Conf.async_domain t.config in
             let* gc =
               Gc.init_and_start ~root ~lower_root ~generation:next_generation
                 ~unlink ~dispatcher:t.dispatcher ~file_manager:t.file_manager
                 ~contents:t.contents ~node:t.node ~commit:t.commit ~output
-                commit_key
+                ~async_domain commit_key
             in
             t.running_gc <- Some { gc; use_auto_finalisation };
             Ok ()

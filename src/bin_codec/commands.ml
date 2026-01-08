@@ -144,7 +144,9 @@ let pp_slices format ppf slices =
   | `Waterfall ->
       let (_ : int) =
         List.fold_left
-          (fun margin {Data_encoding.Binary.Slicer.name; value; pretty_printed} ->
+          (fun margin
+               {Data_encoding.Binary.Slicer.name; value; pretty_printed}
+             ->
             let value = Format.asprintf "%a" Hex.pp (Hex.of_string value) in
             Format.fprintf
               ppf
@@ -210,20 +212,20 @@ let commands () =
             (Json.to_string
                ~minify
                (`A
-                 (Registration.list ()
-                 |> List.map (fun (id, enc) ->
-                        `O
-                          [
-                            ("id", `String id);
-                            ( "json",
-                              Json.construct
-                                Json.schema_encoding
-                                (Registration.json_schema enc) );
-                            ( "binary",
-                              Json.construct
-                                Binary_schema.encoding
-                                (Registration.binary_schema enc) );
-                          ]))))
+                  (Registration.list ()
+                  |> List.map (fun (id, enc) ->
+                         `O
+                           [
+                             ("id", `String id);
+                             ( "json",
+                               Json.construct
+                                 Json.schema_encoding
+                                 (Registration.json_schema enc) );
+                             ( "binary",
+                               Json.construct
+                                 Binary_schema.encoding
+                                 (Registration.binary_schema enc) );
+                           ]))))
         in
         Lwt_result_syntax.return_unit);
     command
@@ -245,16 +247,16 @@ let commands () =
             (Json.to_string
                ~minify
                (`O
-                 [
-                   ( "json",
-                     Json.construct
-                       Json.schema_encoding
-                       (Registration.json_schema registered_encoding) );
-                   ( "binary",
-                     Json.construct
-                       Binary_schema.encoding
-                       (Registration.binary_schema registered_encoding) );
-                 ]))
+                  [
+                    ( "json",
+                      Json.construct
+                        Json.schema_encoding
+                        (Registration.json_schema registered_encoding) );
+                    ( "binary",
+                      Json.construct
+                        Binary_schema.encoding
+                        (Registration.binary_schema registered_encoding) );
+                  ]))
         in
         Lwt_result_syntax.return_unit);
     (* JSON -> Binary *)

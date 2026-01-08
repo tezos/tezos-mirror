@@ -71,7 +71,10 @@ let bigstring_of_file filename ~hash =
     let st =
       Hacl_star.EverCrypt.Hash.init ~alg:Hacl_star.SharedDefs.HashDefs.BLAKE2b
     in
-    let len = 48 (* works for both g1 and g2 *) in
+    let len =
+      48
+      (* works for both g1 and g2 *)
+    in
     let msg = Bytes.create len in
     for i = 0 to (Bigstringaf.length bs / len) - 1 do
       Bigstringaf.blit_to_bytes bs ~src_off:(i * len) msg ~dst_off:0 ~len ;

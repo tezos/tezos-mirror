@@ -121,10 +121,7 @@ let finalized_heads_monitor ~name ~last_notified_level ~last_seen_head_ref
     Dal_metrics.new_layer1_head ~head_level:shell_header_level ;
     cache_shell_header headers_cache hash shell_header ;
     if shell_header_level <= !last_notified_level then return_unit
-    else if Int32.equal shell_header_level 1l then (
-      stream_push (Some (hash, shell_header)) ;
-      last_notified_level := shell_header_level ;
-      return_unit)
+    else if shell_header_level <= 2l then return_unit
     else
       let* pred_hash, pred_level =
         get_predecessor crawler_lib hash shell_header_level

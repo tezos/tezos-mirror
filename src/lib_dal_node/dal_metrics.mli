@@ -80,12 +80,22 @@ val sample_time :
   metric_updater:(float -> unit) ->
   'a
 
-(* Stores metrics about reception of shards for a slot *)
+(* Stores metrics about reception and validation of shards for a slot *)
 type slot_metrics = {
-  time_first_shard : float;
-  duration_enough_shards : float option;
-  duration_all_shards : float option;
+  time_first_shard_received : float;
+  duration_all_shards_received : float option;
+  duration_first_shard_validated : float option;
+  duration_enough_shards_validated : float option;
+  duration_all_shards_validated : float option;
 }
+
+val slot_metrics_encoding : slot_metrics Data_encoding.t
+
+val pp_slot_metrics : Format.formatter -> slot_metrics -> unit
+
+(** [pp_slot_metrics_received] only prints the time and duration to receive the
+    p2p messages, omitting completely the information about validation time.*)
+val pp_slot_metrics_received : Format.formatter -> slot_metrics -> unit
 
 (* Stores the [slot_metric] for the slots *)
 module Slot_id_bounded_map : Vache.MAP with type key = Types.Slot_id.t
@@ -94,24 +104,48 @@ module Slot_id_bounded_map : Vache.MAP with type key = Types.Slot_id.t
     from the given GS Worker state. *)
 val collect_gossipsub_metrics : Gossipsub.Worker.t -> unit
 
-(** [update_timing_shard_received cryptobox shards_timing_table slot_id
-    ~number_of_already_stored_shards ~number_of_shards] updates the timing
-    metrics associated with [slot_id] in the [shards_timing_table].
+(** [update_timing_shard_received shards_timing_table  ~last_expected_shards slot_id]
+    updates the timing metrics associated with [slot_id] in the [shards_timing_table].
 
     This function should be called each time a shard is received. It records the
-    timestamp of the first shard received for a slot, and updates the durations
-    for:
-    - when enough shards are received (based on the [redundancy_factor])
-    - when all shards are received.
+    timestamp of the first shard received for a slot, and updates the duration
+    when all shards are received.
+    The [last_expected_shard] boolean indicates that this shard is the last
+    expected one, meaning that if all shards received until now are valid, then
+    the slot is attestable (in attester mode) / we have all the
+    [cryptobox_parameters.number_of_shards] shards for the slot (in observer mode).
 
-    The update occurs only if the number of already stored shards has increased
-    and the corresponding duration has not yet been set. No I/O is performed;
-    the function only modifies the in-memory timing table.
+    This function outputs the up-to-date [slot_metrics] with a [boolean] stating
+    if it has been updated or not.
+
+    No I/O is performed; the function only modifies the in-memory timing table.
 *)
 val update_timing_shard_received :
-  Cryptobox.t ->
   slot_metrics Slot_id_bounded_map.t ->
+  last_expected_shard:bool ->
   Slot_id_bounded_map.key ->
+  bool * slot_metrics
+
+(** [update_timing_shard_validated shards_timing_table  ~number_of_already_stored_shards
+    ~number_of_expected_shards ?min_shards_to_reconstruct_slot slot_id]
+    updates the timing metrics associated with [slot_id] in the [shards_timing_table].
+
+    This function should be called each time a shard is validated.
+    This function is very similar to [update_timing_shard_received].
+    There are two main differences:
+    - Since this function is called after validation, the shard has been added
+      to the store, hence this function uses the [number_of_already_stored_shards]
+      and the [number_of_expected_shards] to compute itself if it is the last
+      expected shard that just got validated.
+    - If the [min_shards_to_reconstruct_slot] argument is passed, it also updates
+      the time when this number of shards are validated.
+
+    No I/O is performed; the function only modifies the in-memory timing table.
+*)
+val update_timing_shard_validated :
+  slot_metrics Slot_id_bounded_map.t ->
   number_of_already_stored_shards:int ->
-  number_of_shards:int ->
-  slot_metrics
+  number_of_expected_shards:int ->
+  ?min_shards_to_reconstruct_slot:int ->
+  Slot_id_bounded_map.key ->
+  bool * slot_metrics

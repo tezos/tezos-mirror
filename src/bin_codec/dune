@@ -78,6 +78,9 @@
   (select void_for_linking-octez-protocol-023-PtSeouLo-libs-client from
    (octez-protocol-023-PtSeouLo-libs.client -> void_for_linking-octez-protocol-023-PtSeouLo-libs-client.empty)
    (-> void_for_linking-octez-protocol-023-PtSeouLo-libs-client.empty))
+  (select void_for_linking-octez-protocol-024-PtTALLiN-libs-client from
+   (octez-protocol-024-PtTALLiN-libs.client -> void_for_linking-octez-protocol-024-PtTALLiN-libs-client.empty)
+   (-> void_for_linking-octez-protocol-024-PtTALLiN-libs-client.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty)))
@@ -117,4 +120,5 @@
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-023-PtSeouLo-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-024-PtTALLiN-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty ""))))

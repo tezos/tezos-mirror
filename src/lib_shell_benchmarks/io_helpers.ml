@@ -441,7 +441,10 @@ end
 
 let with_memory_restriction gib f =
   let blocks = ref ([] : Dummy_memory.t list) in
-  let block_size = 1024 * 1024 * 100 (* 100MiB *) in
+  let block_size =
+    1024 * 1024 * 100
+    (* 100MiB *)
+  in
   let target = int_of_float (gib *. 1024. *. 1024. *. 1024.) in
   let restrict () =
     let rec loop acc =

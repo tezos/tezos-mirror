@@ -491,7 +491,10 @@ let read_iterator_block_range_in_floating_stores block_store ~ro_store ~rw_store
       (Block_repr.hash high_block)
       nb_blocks
   in
-  let chunk_length = List.length block_hashes (* effective size *) in
+  let chunk_length =
+    List.length block_hashes
+    (* effective size *)
+  in
   let reading_sequence =
     Floating_block_store.raw_retrieve_blocks_seq
       ~src_floating_stores:[ro_store; rw_store]
@@ -1177,14 +1180,14 @@ let move_all_floating_stores block_store ~new_ro_store =
              "promote new rw floating as rw"])
       in
       (* Load the swapped stores *)
-      (let*! ro = Floating_block_store.init chain_dir ~readonly:false RO in
-       block_store.ro_floating_block_stores <- [ro] ;
-       let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
-       block_store.rw_floating_block_store <- rw ;
-       return_unit)
+      ((let*! ro = Floating_block_store.init chain_dir ~readonly:false RO in
+        block_store.ro_floating_block_stores <- [ro] ;
+        let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
+        block_store.rw_floating_block_store <- rw ;
+        return_unit)
       [@profiler.record_s
         {verbosity = Debug; metadata = [("prometheus", "")]}
-          "open new floating stores"])
+          "open new floating stores"]))
 
 let check_store_consistency block_store ~cementing_highwatermark =
   let open Lwt_result_syntax in
@@ -1459,8 +1462,8 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
   ()
-  [@profiler.reset_block_section
-    {verbosity = Notice} (Block_repr.hash new_head)] ;
+  [@profiler.overwrite
+    Profiler.reset_block_section (Block_repr.hash new_head, [])] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->
@@ -1478,11 +1481,11 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       let* () =
         Lwt.finalize
           (fun () ->
-            (let*! () = lock block_store.stored_data_lockfile in
-             Block_store_status.set_merge_status block_store.status_data)
+            ((let*! () = lock block_store.stored_data_lockfile in
+              Block_store_status.set_merge_status block_store.status_data)
             [@profiler.record_s
               {verbosity = Notice; metadata = [("prometheus", "")]}
-                "write status"])
+                "write status"]))
           (fun () -> unlock block_store.stored_data_lockfile)
       in
       let new_head_lpbl =

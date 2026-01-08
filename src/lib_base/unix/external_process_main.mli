@@ -39,9 +39,10 @@ end
 
 module Make
     (Params : External_process_parameters.S)
-    (Processing : EXTERNAL_PROCESSING
-                    with type parameters := Params.parameters
-                     and type 'response request := 'response Params.request) : sig
+    (Processing :
+      EXTERNAL_PROCESSING
+        with type parameters := Params.parameters
+         and type 'response request := 'response Params.request) : sig
   (** Main entry point of the external process. *)
   val main : socket_dir:string -> unit tzresult Lwt.t
 end

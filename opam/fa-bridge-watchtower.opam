@@ -19,11 +19,11 @@ depends: [
   "re" { >= "1.10.0" }
   "octez-l2-libs"
   "efunc_core"
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "tezos-openapi"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

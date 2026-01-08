@@ -53,7 +53,6 @@
   test_global_constants_storage
   test_level_module
   test_liquidity_baking_repr
-  test_merkle_list
   test_operation_repr
   test_qty
   test_receipt
@@ -72,13 +71,15 @@
   test_sc_rollup_wasm
   test_local_contexts
   test_dal_slot_proof
+  test_dal_past_parameters_storage
   test_adaptive_issuance
-  test_adaptive_issuance_ema
   test_percentage
   test_full_staking_balance_repr
   test_slashing_percentage
   test_staking_operations
-  test_consecutive_round_zero))
+  test_consecutive_round_zero
+  test_address_registry
+  test_native_contracts))
 
 (executable
  (name main)

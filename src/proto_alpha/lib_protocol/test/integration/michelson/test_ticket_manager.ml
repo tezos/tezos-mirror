@@ -140,7 +140,7 @@ let all_contracts current_block =
   let open Lwt_result_wrap_syntax in
   let* result = Incremental.begin_construction current_block in
   let ctxt = Incremental.alpha_ctxt result in
-  let*! cs = Contract.list ctxt in
+  let*! cs = Contract.For_RPC.list ctxt in
   return cs
 
 (* Fetch all added contracts between [before] and [after]. *)

@@ -28,19 +28,20 @@ let parse url process =
   let* output = Process.check_and_read_stdout process in
   return (JSON.parse ~origin:url output)
 
-let get0 ?runner ?(args = []) url format =
-  let process = Process.spawn ?runner "curl" (args @ ["-s"; url]) in
+let get0 ?name ?runner ?(args = []) url format =
+  let process = Process.spawn ?name ?runner "curl" (args @ ["-s"; url]) in
   Runnable.{value = process; run = format}
 
-let get ?runner ?args url = get0 ?runner ?args url (parse url)
+let get ?name ?runner ?args url = get0 ?name ?runner ?args url (parse url)
 
-let get_raw ?runner ?args url =
-  get0 ?runner ?args url Process.check_and_read_stdout
+let get_raw ?name ?runner ?args url =
+  get0 ?name ?runner ?args url Process.check_and_read_stdout
 
-let post_put meth ?runner ?(args = []) url data format =
+let post_put ?name meth ?runner ?(args = []) url data format =
   let process =
     Process.spawn
       ?runner
+      ?name
       "curl"
       (args
       @ [
@@ -56,14 +57,14 @@ let post_put meth ?runner ?(args = []) url data format =
   in
   Runnable.{value = process; run = format}
 
-let post ?runner ?args url data =
-  post_put "POST" ?runner ?args url data (parse url)
+let post ?name ?runner ?args url data =
+  post_put ?name "POST" ?runner ?args url data (parse url)
 
-let post_raw ?runner ?args url data =
-  post_put "POST" ?runner ?args url data Process.check_and_read_stdout
+let post_raw ?name ?runner ?args url data =
+  post_put ?name "POST" ?runner ?args url data Process.check_and_read_stdout
 
-let put ?runner ?args url data =
-  post_put "PUT" ?runner ?args url data (parse url)
+let put ?name ?runner ?args url data =
+  post_put ?name "PUT" ?runner ?args url data (parse url)
 
-let put_raw ?runner ?args url data =
-  post_put "PUT" ?runner ?args url data Process.check_and_read_stdout
+let put_raw ?name ?runner ?args url data =
+  post_put ?name "PUT" ?runner ?args url data Process.check_and_read_stdout

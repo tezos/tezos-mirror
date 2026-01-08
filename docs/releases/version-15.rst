@@ -45,7 +45,9 @@ block without prechecking it first, when the active protocol is Lima.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v15.1

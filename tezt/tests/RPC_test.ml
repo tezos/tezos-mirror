@@ -746,6 +746,19 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
       unit
     else unit
   in
+  let* () =
+    if Protocol.(number protocol >= 024) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_tz4_baker_number_ratio ()
+      in
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_abaab_activation_level ()
+      in
+      unit
+    else unit
+  in
   unit
 
 let mempool_hooks =
@@ -1695,6 +1708,17 @@ let register protocols =
       "misc_protocol"
       ~test_function:test_misc_protocol
       ~parameter_overrides:consensus_threshold ;
+    check_rpc_regression
+      "misc_protocol_abaab"
+      ~test_function:test_misc_protocol
+      ~supports:(Protocol.From_protocol 024)
+      ~parameter_overrides:(fun protocol ->
+        (* Activates All bakers attest *)
+        [
+          ( ["all_bakers_attest_activation_threshold"],
+            `O [("numerator", `Float 0.); ("denominator", `Float 1.)] );
+        ]
+        @ consensus_threshold protocol) ;
     (match test_mode_tag with
     | `Light -> ()
     | _ ->

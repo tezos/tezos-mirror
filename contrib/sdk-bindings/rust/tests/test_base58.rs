@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos::{keys::*, Error};
+use tezos::{hash::*, Error};
 use tezos_crypto_rs::base58;
 
 macro_rules! test_b58check {
@@ -23,6 +23,22 @@ macro_rules! test_b58check {
 }
 
 // All keys were generated using `octez-client`
+
+test_b58check!(
+    block_hash_decode_encode,
+    BlockHash,
+    "BKiHLREqU3JkXfzEDYAkmmfX48gBDtYhMrpA98s7Aq4SzbUAB6M",
+    "BMa4rETz3gBbgRfTNp1swZL9GbUSSCf2riufwBDav26xEDsEmGe",
+    "BLJWtjDMGwa31xTPsyeTBSCuxzUPBMcXehfXJ4v2aShHm3VYWvm"
+);
+
+test_b58check!(
+    kt1_decode_encode,
+    ContractKt1Hash,
+    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+    "KT1BzqPeYDt8xWmgjkGJupRtdxMsZS37Xm7U",
+    "KT1Bt81PD1FwEw8cou8z391vdWAKtLaEnC8z"
+);
 
 test_b58check!(
     tz1_decode_encode,
@@ -50,19 +66,6 @@ test_b58check!(
     ContractTz4Hash,
     // sk: BLsk27Wo9tVS8XbNDfCD7X9FnQBwZ4o2gQCZxXkJRmdFYoUTvuTu1S
     "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF"
-);
-
-test_b58check!(
-    pkh_decode_encode,
-    PublicKeyHash,
-    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
-    "tz1Pta3ShQiC5uZRjfivFUmYQYd4Lai1vJrU",
-    // sk: spsk236JVFEqgJtsg4EbVeMjcppsumD1CdwNiBnP1YWeDhHubWRh1Z
-    "tz2QwAWxWWyUyPsNyaQsXM6PpbggDA5Tc3im",
-    // sk: p2sk3ne2WApaPmU9QiBK7BKgaSi18YB2J7Sv81YMykyFwWaYYyAoHz
-    "tz3dvgoUnnXoAP9MDqAwiZwRtvTFHcuDMxTR",
-    // sk: BLsk1wk9JVZKhzsdHExkMR2kAPeZrdtpLaACTMtwxzvavje3n22msQ
-    "tz4KAEXbRNNbgK2UqYrAsHXPmwFponv1mnXC",
 );
 
 test_b58check!(
@@ -94,16 +97,17 @@ test_b58check!(
 );
 
 test_b58check!(
-    pk_decode_encode,
-    PublicKey,
-    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
-    "edpkuWbLgKBsLVDE5dn678Y4ogZUjBQtCdh4HebhfJ9CaTR2o6WpFp",
-    // sk: spsk236JVFEqgJtsg4EbVeMjcppsumD1CdwNiBnP1YWeDhHubWRh1Z
-    "sppk7ZMef32rXEYsxrAE7jjLVqrcbHPRA3ikSSrywzREro52PPKU42B",
-    // sk: p2sk3ne2WApaPmU9QiBK7BKgaSi18YB2J7Sv81YMykyFwWaYYyAoHz
-    "p2pk674NNbXHqaDT5HcDuLJrR3csgjdLNrq4yMUXD1zMrx4uTcwEPzA",
-    // sk: BLsk1wk9JVZKhzsdHExkMR2kAPeZrdtpLaACTMtwxzvavje3n22msQ
-    "BLpk1uJ3JLHwYWUrpk6rPmZ4jAjCzbQ3xjkW7HgumJMcT8WRiwTbYdzU9dF4mKK1hP4DaYvvCfZB",
+    unknown_sig_decode_encode,
+    UnknownSignature,
+    // sk: edsk4QUBg4kqJD5u5mvkwWe6qnmimoL3sAy8v2vDWEnWPbJeEcMMZp
+    // msg: "a"
+    "sigWrzQCbre6B7VLP4kGntoQGrEBLLvc8cFPySNiDj5m2cTd4DfJG2feBLhgyjtHcTiLenwrActDgp9y6pxp3MS5m5sqVCY2",
+    // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
+    // msg: "a"
+    "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp",
+    // sk: p2sk3EC67qL8iPQv6o2j14bgqKR6JaPBahXHpZFypVCGkbeMvv5H5G
+    // msg: "a"
+    "sigTCLMigPjVA1ogWQP16sp6DpcAb3Wf4wkxUWDBHUa8wuixro5AVQLkWCGtBH91iYdcDLwPqW2yFs2XppXfBdbCSdbD3v9f",
 );
 
 test_b58check!(
@@ -139,17 +143,39 @@ test_b58check!(
 );
 
 test_b58check!(
-    unknown_sig_decode_encode,
-    UnknownSignature,
-    // sk: edsk4QUBg4kqJD5u5mvkwWe6qnmimoL3sAy8v2vDWEnWPbJeEcMMZp
-    // msg: "a"
-    "sigWrzQCbre6B7VLP4kGntoQGrEBLLvc8cFPySNiDj5m2cTd4DfJG2feBLhgyjtHcTiLenwrActDgp9y6pxp3MS5m5sqVCY2",
-    // sk: spsk36wmmgfs88ffW7ujgw9wm511zhZUkM4GnsYxhHMD9ZDy1AsKRa
-    // msg: "a"
-    "sigaeDzBgzkdvQRhYV2YUFpzYGE19bRe62YdZnnodZMDSXD9P97jBro2v8W2o8a1wRxfJEWJpLEbv2W1TM8jKqBdFCCuKcDp",
-    // sk: p2sk3EC67qL8iPQv6o2j14bgqKR6JaPBahXHpZFypVCGkbeMvv5H5G
-    // msg: "a"
-    "sigTCLMigPjVA1ogWQP16sp6DpcAb3Wf4wkxUWDBHUa8wuixro5AVQLkWCGtBH91iYdcDLwPqW2yFs2XppXfBdbCSdbD3v9f",
+    contract_decode_encode,
+    Contract,
+    "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+    "tz2PbzLDYrPAZS38BteBY7gqtnZfsTqHF2xu",
+    "tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn",
+    "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
+    "KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT",
+);
+
+test_b58check!(
+    pk_decode_encode,
+    PublicKey,
+    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
+    "edpkuWbLgKBsLVDE5dn678Y4ogZUjBQtCdh4HebhfJ9CaTR2o6WpFp",
+    // sk: spsk236JVFEqgJtsg4EbVeMjcppsumD1CdwNiBnP1YWeDhHubWRh1Z
+    "sppk7ZMef32rXEYsxrAE7jjLVqrcbHPRA3ikSSrywzREro52PPKU42B",
+    // sk: p2sk3ne2WApaPmU9QiBK7BKgaSi18YB2J7Sv81YMykyFwWaYYyAoHz
+    "p2pk674NNbXHqaDT5HcDuLJrR3csgjdLNrq4yMUXD1zMrx4uTcwEPzA",
+    // sk: BLsk1wk9JVZKhzsdHExkMR2kAPeZrdtpLaACTMtwxzvavje3n22msQ
+    "BLpk1uJ3JLHwYWUrpk6rPmZ4jAjCzbQ3xjkW7HgumJMcT8WRiwTbYdzU9dF4mKK1hP4DaYvvCfZB",
+);
+
+test_b58check!(
+    pkh_decode_encode,
+    PublicKeyHash,
+    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
+    "tz1Pta3ShQiC5uZRjfivFUmYQYd4Lai1vJrU",
+    // sk: spsk236JVFEqgJtsg4EbVeMjcppsumD1CdwNiBnP1YWeDhHubWRh1Z
+    "tz2QwAWxWWyUyPsNyaQsXM6PpbggDA5Tc3im",
+    // sk: p2sk3ne2WApaPmU9QiBK7BKgaSi18YB2J7Sv81YMykyFwWaYYyAoHz
+    "tz3dvgoUnnXoAP9MDqAwiZwRtvTFHcuDMxTR",
+    // sk: BLsk1wk9JVZKhzsdHExkMR2kAPeZrdtpLaACTMtwxzvavje3n22msQ
+    "tz4KAEXbRNNbgK2UqYrAsHXPmwFponv1mnXC",
 );
 
 test_b58check!(

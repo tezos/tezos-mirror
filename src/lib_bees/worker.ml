@@ -289,9 +289,10 @@ module Make_internal
     (Name : Worker_intf.NAME)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
-    (Worker_events : Worker_events.S
-                       with type view = Request.view
-                        and type critical_error = tztrace) =
+    (Worker_events :
+      Worker_events.S
+        with type view = Request.view
+         and type critical_error = tztrace) =
 struct
   module Name = Name
   module Request = Request
@@ -455,16 +456,14 @@ struct
     | None, _ -> assert false
     | Some state, _ -> state
 
-  let with_state :
-      type a.
+  let with_state : type a.
       a t ->
       (Types.state -> (unit, 'request_error) result Lwt.t) ->
       (unit, 'request_error) result Lwt.t =
    fun w f ->
     match w.state with None -> Lwt.return (Ok ()) | Some state -> f state
 
-  let with_state_eio :
-      type a.
+  let with_state_eio : type a.
       a t ->
       (Types.state -> (unit, 'request_error) result) ->
       (unit, 'request_error) result =
@@ -719,8 +718,7 @@ struct
   let create_table buffer_kind =
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
-  let init (type kind launch_error) (table : kind table) ?timeout name
-      parameters =
+  let init (type kind) (table : kind table) ?timeout name parameters =
     let buffer : kind buffer =
       match table.buffer_kind with
       | Queue -> Queue_buffer (Eio.Stream.create max_int)
@@ -763,27 +761,34 @@ struct
       (module Handlers : EIO_HANDLERS
         with type self = kind t
          and type launch_error = launch_error) =
-    let state = Handlers.on_launch worker name parameters in
-    if id_name = base_name then
-      Worker_events.(emit__dont_wait__use_with_care started) ()
-    else
-      Worker_events.(emit__dont_wait__use_with_care started_for)
-        (Format.asprintf "%a" Name.pp name) ;
-    match state with
-    | Ok state ->
-        worker.state <- Some state ;
-        worker.status <- Worker_types.Running (Time.System.now ()) ;
-        Hive.launch_worker
-          worker
-          ~bee_name:(Format.asprintf "%a" Name.pp name)
-          ~domains
-          (worker_loop (module Handlers)) ;
-        Ok worker
-    | Error e -> Error e
+    try
+      let state =
+        Hive.run_on_main (fun () -> Handlers.on_launch worker name parameters)
+      in
+      if id_name = base_name then
+        Hive.async_lwt (fun () -> Worker_events.(emit started) ())
+      else
+        Hive.async_lwt (fun () ->
+            Worker_events.(emit started_for) (Format.asprintf "%a" Name.pp name)) ;
+      match state with
+      | Ok state ->
+          worker.state <- Some state ;
+          worker.status <- Worker_types.Running (Time.System.now ()) ;
+          Hive.run_on_main (fun () ->
+              Hive.launch_worker
+                worker
+                ~bee_name:(Format.asprintf "%a" Name.pp name)
+                ~domains
+                (worker_loop (module Handlers))) ;
+          Ok worker
+      | Error e -> Error e
+    with exn ->
+      (* Ensure any partially started worker is shut down before propagating. *)
+      (try shutdown_eio worker with _ -> ()) ;
+      raise exn
 
   (** [launch table name parameters handlers] creates a single worker
-      instance, using exclusively Lwt handlers. As such, it won't start multiple
-      domains. *)
+      instance, using exclusively Lwt handlers. *)
   let launch (type kind launch_error) (table : kind table) ?timeout ?domains
       name parameters
       (module Lwt_handlers : HANDLERS

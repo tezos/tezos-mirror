@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Michelson type to use when originating the EVM rollup. *)
-val evm_type : string
-
 (** [u16_to_bytes n] translate an int in a binary string of two bytes
     (little endian).
     NB: Ints greater than 2 bytes are truncated. *)
@@ -64,11 +61,6 @@ val genesis_timestamp : Client.timestamp
 val days : int -> Ptime.span
 
 val get_timestamp : int -> string
-
-(** [next_rollup_node_level ~sc_rollup_node ~client] moves
-    [sc_rollup_node] to the next level l1. *)
-val next_rollup_node_level :
-  sc_rollup_node:Sc_rollup_node.t -> client:Client.t -> int Lwt.t
 
 (** [produce_block timestampt ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
@@ -212,12 +204,26 @@ val wait_for_transaction_receipt :
   unit ->
   Transaction.transaction_receipt Lwt.t
 
-(** [wait_for_application ~produce_block apply] returns only when the `apply`
-    yields, or fails when 10 blocks (produced with [produce_block] have passed. *)
+(** [wait_for_application ?time_between_blocks ~produce_block apply] returns
+    only when the `apply` yields, or fails when [max_blocks] blocks (10 by
+    default, produced with [produce_block], every [time_between_blocks] -- 5s by
+    default, have passed. *)
 val wait_for_application :
+  ?time_between_blocks:float ->
+  ?max_blocks:int ->
   produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
   (unit -> 'b Lwt.t) ->
   'b Lwt.t
+
+val wait_for_event :
+  ?timeout:float ->
+  ?levels:int ->
+  'a Lwt.t ->
+  sequencer:Evm_node.t ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  client:Client.t ->
+  error_msg:(unit Lwt.t, Format.formatter, unit, 'b) format4 ->
+  'a Lwt.t
 
 (** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
     to the [evm_node] and returns the requests and transaction hashes. *)
@@ -261,11 +267,14 @@ val find_and_execute_withdrawal :
   int Lwt.t
 
 (** Runs a sequencer in mode sandbox, with no connection needed to a
-    rollup node. *)
+    rollup node. Will setup bootstrap accounts by default, for activated
+    runtimes (EVM is always active). *)
 val init_sequencer_sandbox :
   ?maximum_gas_per_transaction:int64 ->
   ?genesis_timestamp:Client.timestamp ->
-  ?tx_pool_tx_per_addr_limit:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
@@ -275,6 +284,9 @@ val init_sequencer_sandbox :
   ?kernel:Uses.t ->
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   unit ->
   Evm_node.t Lwt.t
 
@@ -313,3 +325,45 @@ val deposit :
   l2_address:string ->
   Client.t ->
   unit Lwt.t
+
+(** [check_operations ~client ~block ~expected] fetches the list of hashes of
+    the manager operations of [block] and check it's equal to [expected]. *)
+val check_operations :
+  client:Client.t -> block:string -> expected:string list -> unit Lwt.t
+
+(** [produce_block_and_wait_for ~sequencer n] Produces a block and wait for
+    blueprint [n] to be applied. *)
+val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
+
+val register_sandbox :
+  __FILE__:string ->
+  ?kernel:Kernel.t ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  title:string ->
+  ?set_account_code:(string * string) list ->
+  ?da_fee_per_byte:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  tags:string list ->
+  ?patch_config:(JSON.t -> JSON.t) ->
+  ?websockets:bool ->
+  ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
+  (Evm_node.t -> unit Lwt.t) ->
+  unit
+
+type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
+
+val register_sandbox_with_observer :
+  __FILE__:string ->
+  ?kernel:Kernel.t ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  title:string ->
+  ?set_account_code:(string * string) list ->
+  ?da_fee_per_byte:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  tags:string list ->
+  ?patch_config:(JSON.t -> JSON.t) ->
+  ?websockets:bool ->
+  ?sequencer_keys:Account.key list ->
+  (sandbox_test -> unit Lwt.t) ->
+  unit

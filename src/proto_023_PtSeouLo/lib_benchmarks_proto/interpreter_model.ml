@@ -60,13 +60,12 @@ let arity_to_int : type a b c. (a, b, c) Model.arity -> int =
  fun arity ->
   let rec aux : type x y z. int -> (x, y, z) Model.arity -> int =
    fun i -> function
-    | Model.Zero_arity -> i
-    | Succ_arity arity -> aux (i + 1) arity
+     | Model.Zero_arity -> i
+     | Succ_arity arity -> aux (i + 1) arity
   in
   aux 0 arity
 
-let model_with_conv :
-    type a.
+let model_with_conv : type a.
     Interpreter_workload.instr_or_cont_name ->
     a Model.model ->
     Interpreter_workload.ir_sized_step Model.t =
@@ -75,8 +74,8 @@ let model_with_conv :
   let module M = (val model) in
   let module I = Model.Instantiate (Costlang.Void) (M) in
   let arity_init = I.arity in
-  let rec make_args :
-      type x y z. arg list -> arg list -> (x, y, z) Model.arity -> z =
+  let rec make_args : type x y z.
+      arg list -> arg list -> (x, y, z) Model.arity -> z =
    fun args_init args arity ->
     match (args, arity) with
     | [], Zero_arity -> ()

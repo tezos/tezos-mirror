@@ -1,24 +1,25 @@
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 300
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
+  "rpc_timeout": 30,
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
@@ -28,13 +29,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -70,34 +66,50 @@
   },
   "opentelemetry": {
     "enable": false,
+    "environment": null,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
-    "batch_timeout_ms": 500
-  }
+    "batch_logs": 400,
+    "batch_timeout_ms": 2000,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    },
+    "trace_host_functions": false
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
+  },
+  "performance_profile": "default"
 }
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 0
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
+  "rpc_timeout": 30,
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
@@ -107,13 +119,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -132,7 +139,7 @@
   },
   "kernel_execution": {
     "preimages": "hidden",
-    "native_execution_policy": "never"
+    "native_execution_policy": "rpcs_only"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
@@ -149,38 +156,54 @@
   },
   "opentelemetry": {
     "enable": false,
+    "environment": null,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
-    "batch_timeout_ms": 500
-  }
+    "batch_logs": 400,
+    "batch_timeout_ms": 2000,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    },
+    "trace_host_functions": false
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
+  },
+  "performance_profile": "default"
 }
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 300
   },
   "observer": {
     "evm_node_endpoint": "hidden",
     "rollup_node_tracking": true
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
+  "rpc_timeout": 30,
   "verbose": "notice",
   "experimental_features": {
     "drop_duplicate_on_injection": true,
@@ -190,13 +213,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
@@ -233,10 +251,25 @@
   },
   "opentelemetry": {
     "enable": false,
+    "environment": null,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
-    "batch_timeout_ms": 500
-  }
+    "batch_logs": 400,
+    "batch_timeout_ms": 2000,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    },
+    "trace_host_functions": false
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
+  },
+  "performance_profile": "default"
 }

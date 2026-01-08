@@ -29,8 +29,6 @@ module P2p_reader_event = Distributed_db_event.P2p_reader_event
 
 module Profiler = (val Profiler.wrap Shell_profiling.p2p_reader_profiler)
 
-let profiler_init = ref false
-
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 type connection =
@@ -583,9 +581,6 @@ type worker = Worker.callback Worker.t
 
 let on_launch (_ : worker) gid
     {p2p; conn; disk; protocol_db; active_chains; unregister} =
-  if not !profiler_init then (
-    () [@profiler.record {verbosity = Notice} "start"] ;
-    profiler_init := true) ;
   let canceler = Lwt_canceler.create () in
   let state =
     {
@@ -629,8 +624,8 @@ module Handlers = struct
   let on_launch (self : self) gid parameters : (t, launch_error) result Lwt.t =
     Lwt_result.return @@ on_launch self gid parameters
 
-  let on_request :
-      type res err. self -> (res, err) req -> (res, err) result Lwt.t =
+  let on_request : type res err.
+      self -> (res, err) req -> (res, err) result Lwt.t =
    fun self (Message msg) ->
     let open Lwt_result_syntax in
     match msg with
@@ -643,8 +638,7 @@ module Handlers = struct
 
   let on_close _ = Lwt.return_unit
 
-  let on_error :
-      type res err.
+  let on_error : type res err.
       self -> _ -> (res, err) req -> err -> [> `Shutdown] tzresult Lwt.t =
    fun self _ (Message _) _ -> on_error (Worker.state self)
 

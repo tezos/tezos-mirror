@@ -14,23 +14,25 @@ depends: [
   "base64" { >= "3.3.0" }
   "ocplib-endian"
   "conduit-lwt" { >= "7.1.0" }
-  "cohttp" { >= "5.3.1" }
+  "cohttp" { = "5.3.1~octez" }
   "mirage-crypto-rng" { >= "1.0.0" }
-  "octez-libs"
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "lwt_log"
+  "octez-libs"
   "octez-l2-libs"
+  "octez-lwt-domain"
   "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
-  "octez-protocol-022-PsRiotum-libs"
-  "tezos-protocol-022-PsRiotum"
+  "octez-protocol-023-PtSeouLo-libs"
+  "tezos-protocol-023-PtSeouLo"
   "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "octez-connpool"
   "octez-version"
   "lwt-exit"
@@ -42,7 +44,7 @@ conflicts: [
   "websocket"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

@@ -8,6 +8,7 @@
 module Path = Path
 module Agent = Agent
 module Types = Types
+module Ssh = Ssh
 
 module Chronos : sig
   (** A scheduler task. *)
@@ -137,6 +138,10 @@ end
 module Cloud : sig
   type t
 
+  (* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined. *)
+  val set_faketime : Agent.t -> string -> unit Lwt.t
+
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module.
@@ -155,7 +160,8 @@ module Cloud : sig
   val register :
     ?proxy_files:string list ->
     ?proxy_args:string list ->
-    ?vms:Agent.Configuration.t list Lwt.t ->
+    ?vms:(unit -> Agent.Configuration.t list Lwt.t) ->
+    ?dockerbuild_args:(string * string) list ->
     __FILE__:string ->
     title:string ->
     tags:string list ->
@@ -214,20 +220,23 @@ module Cloud : sig
     unit ->
     unit Lwt.t
 
-  (** [service_register: name executable on_alive_callback agent] register a
-      service, ie, a long running background process, that we want to monitor
-      for launch and crash.
+  (** [service_register: name executable on_alive_callback on_shutdowan agent]
+      register a service, ie, a long running background process, that we want to
+      monitor for launch and crash.
       [name] is a unique name to identify the service.
       [on_alive_callback] is a callback whose argument is a boolean which
       represent the service started if true, or the service was shutdown if
       false. This callback is called regularly, and expects to be update some
       metrics.
+      [on_shutdown] is a list of callbacks that will be called as soon as the
+      shutdown of a service will be triggered.
       TODO: change arguments executable and pid to a abstraction for tezt Daemon.t
             and merge register_binary functionality into register_service *)
   val service_register :
     name:string ->
     executable:string ->
     ?on_alive_callback:(alive:bool -> unit) ->
+    on_shutdown:(unit -> unit Lwt.t) list ->
     Agent.t ->
     unit
 
@@ -252,12 +261,66 @@ module Prometheus : sig
   val get_query_endpoint : query:string -> Uri.t option
 end
 
+(** Expose the elements of [Cli] which are useful for the scenario. *)
 module Tezt_cloud_cli : sig
-  (** Equivalent to [Cli.prometheus] *)
+  module Types : module type of Cli.Types
+
   val prometheus : bool
+
+  val scenario_specific_json : (string * Data_encoding.Json.t) option
+
+  (** Equivalent to [Cli.retrieve_daily_logs] *)
+  val retrieve_daily_logs : bool
+
+  (** Equivalent to [Cli.retrieve_ppx_profiling_traces] *)
+  val retrieve_ppx_profiling_traces : bool
+
+  val artifacts_dir : string option
+
+  val binaries_path : string
+
+  val teztale_artifacts : bool
+
+  val faketime : string option
+
+  val to_json_config :
+    ?scenario_config:string * Data_encoding.Json.t ->
+    unit ->
+    Data_encoding.Json.t
+
+  (** Equivalent to [Cli.localhost] *)
+  val localhost : bool
+
+  (** Equivalent to [Cli.proxy] *)
+  val proxy : bool
+
+  (** Equivalent to [Cli.dns_domains] *)
+  val dns_domains : string list
+end
+
+module Artifact_helpers : sig
+  (** [local_path path] ensures that the path (as a list of subdirectories) is a
+      valid directory, creates it otherwise, then returns the path. If the first
+      directory starts with `/`, it will start from the root of the
+      filesystem. *)
+  val local_path : string list -> string
+
+  (** [prepate_artifacts ?scenario_config ()] ensures the
+      `Tezt_cloud_cli.artifacts_dir` is a valid dir (and creates it if needed),
+      and push the full configuration in it. *)
+  val prepare_artifacts :
+    ?scenario_config:string * Data_encoding.json -> unit -> unit
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)
 val register : tags:string list -> unit
+
+module Gcloud : sig
+  module DNS : sig
+    (** [add_subdomain ~zone ~name ~value] adds a dns entry for the domain name
+    [~name], associated to the value [~value]. The value being an ip *)
+    val add_subdomain : zone:string -> name:string -> value:string -> unit Lwt.t
+  end
+end

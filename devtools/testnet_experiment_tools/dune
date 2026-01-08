@@ -40,14 +40,14 @@
   octez-shell-libs.store
   octez-shell-libs.store.shared
   octez-shell-libs.context-ops
-  octez-protocol-022-PsRiotum-libs.baking
-  octez-protocol-022-PsRiotum-libs.client
-  octez-protocol-022-PsRiotum-libs.client.commands
-  tezos-protocol-022-PsRiotum.protocol
   octez-protocol-023-PtSeouLo-libs.baking
   octez-protocol-023-PtSeouLo-libs.client
   octez-protocol-023-PtSeouLo-libs.client.commands
   tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-024-PtTALLiN-libs.baking
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-protocol-024-PtTALLiN-libs.client.commands
+  tezos-protocol-024-PtTALLiN.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -63,7 +63,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context_ops)
- (modules sigs tool_022_PsRiotum tool_023_PtSeouLo tool_alpha))
+ (modules sigs tool_023_PtSeouLo tool_024_PtTALLiN tool_alpha))
 
 (executable
  (name simulation_scenario)

@@ -218,12 +218,14 @@ module Internal_validator_process = struct
 
   let[@warning "-32"] headless_reports validator =
     let report =
-      Tezos_profiler.Profiler.report validator.environment_headless
+      Tezos_profiler.Profiler.report ~cpu:None validator.environment_headless
     in
     (match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    let report = Tezos_profiler.Profiler.report validator.context_headless in
+    let report =
+      Tezos_profiler.Profiler.report ~cpu:None validator.context_headless
+    in
     match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())
@@ -742,12 +744,12 @@ let validate_block (E {validator_process = (module VP); validator}) chain_store
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index context_hash ~gc_lockfile_path =
-  (VP.context_garbage_collection
-     validator
-     context_index
-     context_hash
-     ~gc_lockfile_path
-   [@profiler.record_s {verbosity = Notice} "context_garbage_collection"])
+  VP.context_garbage_collection
+    validator
+    context_index
+    context_hash
+    ~gc_lockfile_path
+  [@profiler.record_s {verbosity = Notice} "context_garbage_collection"]
 
 let context_split (E {validator_process = (module VP); validator}) context_index
     =

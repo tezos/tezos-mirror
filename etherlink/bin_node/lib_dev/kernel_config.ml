@@ -114,7 +114,7 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
           (fun manager ->
             let make_account_field key value converter =
               let path_prefix =
-                manager |> Signature.V1.Public_key.hash
+                manager |> Signature.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
                 |> Tezlink_durable_storage.Path.account
                 |> String.split_on_char '/' |> clean_path
@@ -143,16 +143,47 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
     | Some contracts ->
         contracts
         |> List.map (fun (address, script, storage) ->
+               let encode_len (s : string) =
+                 s |> String.length |> Z.of_int
+                 |> Data_encoding.Binary.to_string_exn Data_encoding.n
+               in
+
+               let encode_hexa_with_len x =
+                 let encoded = encode_hexa x in
+                 let encoded_len = encode_len encoded in
+                 (encoded, encoded_len)
+               in
+
                let path_prefix =
                  address |> Tezlink_durable_storage.Path.account
                  |> String.split_on_char '/' |> clean_path
                in
-               let make_account_field key value converter =
-                 make_instr ~path_prefix (Some (key, converter value))
+
+               let encoded_balance =
+                 Data_encoding.Binary.to_string_exn
+                   Tezos_types.Tez.encoding
+                   tez_bootstrap_balance
                in
 
-               make_account_field "data/code" script encode_hexa
-               @ make_account_field "data/storage" storage encode_hexa)
+               let encoded_script, encoded_script_len =
+                 encode_hexa_with_len script
+               in
+               let encoded_storage, encoded_storage_len =
+                 encode_hexa_with_len storage
+               in
+
+               let instr key value =
+                 make_instr ~path_prefix (Some (key, value))
+               in
+
+               [
+                 ("balance", encoded_balance);
+                 ("data/code", encoded_script);
+                 ("len/code", encoded_script_len);
+                 ("data/storage", encoded_storage);
+                 ("len/storage", encoded_storage_len);
+               ]
+               |> List.concat_map (fun (k, v) -> instr k v))
         |> List.flatten
   in
 
@@ -169,6 +200,28 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
           set_account_codes
         |> List.flatten
   in
+
+  (* We initialize the big map id counter to 4 because Liquidity Baking bootstrap contracts use 4 big maps. *)
+  let first_big_map_id = Z.of_int 4 in
+  let set_first_big_map_id =
+    let path_prefix =
+      Tezlink_durable_storage.Path.big_map |> String.split_on_char '/'
+      |> clean_path
+    in
+    let set : type f. f L2_types.chain_family -> _ = function
+      | L2_types.Michelson ->
+          make_instr
+            ~path_prefix
+            (Some
+               ( "next_id",
+                 Data_encoding.Binary.to_string_exn
+                   Data_encoding.z
+                   first_big_map_id ))
+      | L2_types.EVM -> []
+    in
+    set l2_chain_family
+  in
+
   let config_instrs =
     (* These configuration parameter will not be stored in the world_state of an l2 chain but are parameter for an l2 chain *)
     (* To do so we put them into another path /evm/config/<l2_chain_id> *)
@@ -199,9 +252,43 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
       ~path_prefix:world_state_prefix
       sequencer_pool_address
     @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ tez_bootstrap_contracts
-    @ set_account_code
+    @ set_account_code @ set_first_big_map_id
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
+
+let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
+  let balance =
+    Tezos_types.Tez.to_mutez_z tez_bootstrap_balance |> Rlp.encode_z
+  in
+  let nonce = Rlp.encode_int 0 in
+  List.map
+    (fun manager ->
+      let address =
+        Signature.Public_key.hash manager
+        |> Signature.Public_key_hash.to_b58check
+      in
+      let public_key =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding manager
+      in
+      let (`Hex alias) =
+        let address = Bytes.of_string address in
+        let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest address in
+        Bytes.sub alias 0 20 |> Hex.of_bytes
+      in
+      let payload =
+        Rlp.(
+          List [Value balance; Value nonce; Value public_key]
+          |> encode |> Bytes.to_string)
+      in
+      make_instr
+        ~path_prefix:["evm"; "world_state"; "eth_accounts"; "tezos"; address]
+        (Some ("info", payload))
+      @ make_instr
+          ~path_prefix:
+            ["evm"; "world_state"; "eth_accounts"; "tezos"; "names"; "ethereum"]
+          (Some (alias, address)))
+    tez_bootstrap_accounts
+  |> List.flatten
 
 let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
@@ -212,7 +299,8 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
     ?enable_revm ?enable_dal ?dal_slots ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ?evm_version ~output () =
+    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
+    ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -226,6 +314,12 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
               (Some ("balance", balance)))
           eth_bootstrap_accounts
         |> List.flatten
+  in
+  let tez_bootstrap_accounts =
+    match tez_bootstrap_accounts with
+    | None -> []
+    | Some tez_bootstrap_accounts ->
+        make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts
   in
 
   let set_account_code =
@@ -274,6 +368,12 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
           @@ match evm_version with Shanghai -> Z.zero | Cancun -> Z.one ))
       evm_version
   in
+  let with_runtimes =
+    List.map
+      (fun runtime ->
+        Installer_config.make ~key:(Tezosx.feature_flag runtime) ~value:"")
+      with_runtimes
+  in
   let instrs =
     (if mainnet_compat then make_instr ticketer
      else
@@ -307,7 +407,7 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ eth_bootstrap_accounts @ set_account_code
+    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr
@@ -325,6 +425,6 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
-    @ chain_ids_instr
+    @ chain_ids_instr @ with_runtimes
   in
   Installer_config.to_file instrs ~output

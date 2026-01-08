@@ -1,18 +1,3 @@
-
-./octez-codec encode 023-PtSeouLo.vote.ballot from '"nay"'
-01
-
-./octez-codec decode 023-PtSeouLo.vote.ballot from 01
-"nay"
-
-./octez-codec encode 023-PtSeouLo.vote.ballot from '"pass"'
-02
-
-./octez-codec decode 023-PtSeouLo.vote.ballot from 02
-"pass"
-
-./octez-codec encode 023-PtSeouLo.vote.ballot from '"yay"'
-00
-
-./octez-codec decode 023-PtSeouLo.vote.ballot from 00
-"yay"
+vote.ballot-nay: 01
+vote.ballot-pass: 02
+vote.ballot-yay: 00

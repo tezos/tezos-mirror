@@ -47,13 +47,13 @@ exception Type_mismatch of {expected : Types.Valkind.t; got : Types.Valkind.t}
 
 let () =
   Printexc.register_printer (function
-      | Type_mismatch {expected; got} ->
-          Some
-            (Printf.sprintf
-               "Type mismatch: %s <> %s"
-               (Unsigned.UInt8.to_string expected)
-               (Unsigned.UInt8.to_string got))
-      | _ -> None)
+    | Type_mismatch {expected; got} ->
+        Some
+          (Printf.sprintf
+             "Type mismatch: %s <> %s"
+             (Unsigned.UInt8.to_string expected)
+             (Unsigned.UInt8.to_string got))
+    | _ -> None)
 
 let check : type a. a t -> Types.Valtype.t Ctypes.ptr -> unit =
  fun typ valtype ->

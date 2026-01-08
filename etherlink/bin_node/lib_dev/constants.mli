@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -18,7 +19,14 @@ val network_of_address :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.supported_network option
 
-type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1
+type kernel =
+  | Bifrost
+  | Calypso
+  | Calypso2
+  | Dionysus
+  | DionysusR1
+  | Ebisu
+  | Farfadet
 
 val kernel_from_string : string -> kernel option
 

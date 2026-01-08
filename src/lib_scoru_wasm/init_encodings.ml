@@ -64,8 +64,7 @@ let create_elem_kont_encoding =
 
 type (_, _) eq = Eq : ('a, 'a) eq
 
-let init_section_eq :
-    type kont kont' a b c d.
+let init_section_eq : type kont kont' a b c d.
     (kont, a, b) init_section ->
     (kont', c, d) init_section ->
     ((kont, a, b) init_section, (kont', c, d) init_section) eq option =
@@ -77,8 +76,7 @@ let init_section_eq :
   | Memory, Memory -> Some Eq
   | _, _ -> None
 
-let aggregate_cases :
-    type kont a b.
+let aggregate_cases : type kont a b.
     string ->
     (kont, a, b) init_section ->
     kont t ->
@@ -120,8 +118,7 @@ let aggregate_cases :
       (function m, t -> IK_Aggregate_concat (m, sec, t));
   ]
 
-let aggregate_cases_either :
-    type a b.
+let aggregate_cases_either : type a b.
     string ->
     ((a, b) Either.t, a, b) init_section ->
     a t ->

@@ -13,6 +13,7 @@ class TestBase58Check: XCTestCase {
       ("pkDecodeEncode", pkDecodeEncode),
       ("p2SigDecodeEncode", p2SigDecodeEncode),
       ("sigDecodeEncode", sigDecodeEncode),
+      ("kt1DecodeEncode", kt1DecodeEncode),
       ("decodeInvalidChecksum", decodeInvalidChecksum),
     ]
 
@@ -56,6 +57,13 @@ class TestBase58Check: XCTestCase {
         let sig = try! Signature.fromB58check(data: baseB58Sig)
         let b58Sig = sig.toB58check()
         XCTAssertEqual(baseB58Sig, b58Sig)
+    }
+
+    func kt1DecodeEncode() {
+        let baseB58Kt1 = "KT1DvqNXfdigfmDeh2zyF9Q4mTFruyUr1rmv"
+        let kt1 = try! ContractKt1Hash.fromB58check(data: baseB58Kt1)
+        let b58Kt1 = kt1.toB58check()
+        XCTAssertEqual(baseB58Kt1, b58Kt1)
     }
 
     func decodeInvalidChecksum() {

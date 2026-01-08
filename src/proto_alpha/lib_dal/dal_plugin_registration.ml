@@ -40,24 +40,60 @@ module Plugin = struct
 
   type tb_slot = Slot.t
 
-  type error += Aggregation_result_size_error
+  let tb_slot_to_int tb_slot = Slot.to_int tb_slot
+
+  type error +=
+    | Attested_level_mismatch of {
+        attested_level : int32;
+        published_level : int32;
+        attestation_lag : int;
+      }
+    | Unexpected_RPC_outcome of string
 
   let () =
     Protocol_client_context.register_error_kind
       `Permanent
-      ~id:"Aggregation_result_size_error"
-      ~title:"Bad aggregagtion result size"
+      ~id:"Attested_level_mismatch"
+      ~title:"Mismatch between computed and given attested level"
       ~description:
-        "Aggregation result should have as many elements as the original \
-         aggregated attestation"
-      ~pp:(fun ppf () ->
+        "Mismatch between the given attested level and the computed one from \
+         published_level and the lag"
+      ~pp:(fun ppf (attested_level, published_level, attestation_lag) ->
         Format.fprintf
           ppf
-          "Aggregation result should have as many elements as the original \
-           aggregated attestation")
-      Data_encoding.unit
-      (function Aggregation_result_size_error -> Some () | _ -> None)
-      (fun () -> Aggregation_result_size_error)
+          "Mismatch between the given attested level %ld and the computed one \
+           as %ld + %d."
+          attested_level
+          published_level
+          attestation_lag)
+      Data_encoding.(
+        obj3
+          (req "attested_level" int32)
+          (req "published_level" int32)
+          (req "attestation_lag" int8))
+      (function
+        | Attested_level_mismatch
+            {attested_level; published_level; attestation_lag} ->
+            Some (attested_level, published_level, attestation_lag)
+        | _ -> None)
+      (fun (attested_level, published_level, attestation_lag) ->
+        Attested_level_mismatch
+          {attested_level; published_level; attestation_lag})
+
+  let () =
+    Protocol_client_context.register_error_kind
+      `Permanent
+      ~id:"Unexpected_RPC_outcome"
+      ~title:"Unexpected outcome from L1 RPC"
+      ~description:"An RPC to the L1 node gave an unexpected answer"
+      ~pp:(fun ppf rpc_string ->
+        Format.fprintf
+          ppf
+          "The RPC %s to the L1 node gave an unexpected answer"
+          rpc_string)
+      Data_encoding.(obj1 (req "rpc" string))
+      (function Unexpected_RPC_outcome s -> Some s | _ -> None)
+      (fun s -> Unexpected_RPC_outcome s)
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -152,6 +188,61 @@ module Plugin = struct
     let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
     return_unit
 
+  let publish cctxt ~block_level ~source ~slot_index ~commitment
+      ~commitment_proof ~src_sk () =
+    let open Lwt_result_syntax in
+    let chain = `Main in
+    let block = `Level block_level in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
+    let* {dal = {number_of_slots; _}; _} =
+      Plugin.Constants_services.parametric cpctxt (chain, block)
+    in
+    let*? slot_index =
+      Dal.Slot_index.of_int ~number_of_slots slot_index
+      |> Environment.wrap_tzresult
+    in
+    let* block_hash =
+      Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
+    in
+    let* counter =
+      let* pcounter =
+        Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
+      in
+      return (Manager_counter.succ pcounter)
+    in
+    let operation =
+      Dal_publish_commitment {slot_index; commitment; commitment_proof}
+    in
+    let operation =
+      (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+         - tz1: fees of 513µtz and 1333 gas consumed
+         - tz2: fees of 514µtz and 1318 gas consumed
+         - tz3: fees of 543µtz and 1607 gas consumed
+         - tz4: fees of 700µtz and 2837 gas consumed
+         We added a margin to it.
+         The storage limit value has been selected purely arbitrarily
+         (it worked with this value when I experimented, so I did not change it). *)
+      Alpha_context.(
+        Manager_operation
+          {
+            source;
+            fee = Tez.of_mutez_exn (Int64.of_int 750);
+            counter;
+            operation;
+            gas_limit = Gas.Arith.integral_of_int_exn 3000;
+            storage_limit = Z.of_int 100;
+          })
+    in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        ({branch = block_hash}, Contents_list (Single operation))
+    in
+    let bytes =
+      Signature.append ~watermark:Signature.Generic_operation src_sk bytes
+    in
+    Shell_services.Injection.operation cctxt ~chain bytes
+
   let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
@@ -203,7 +294,7 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
         cpctxt
         ~block:(`Level block_level)
-        ~metadata:`Always
+        ~metadata:`Never
         0
     in
     Lwt.return @@ Result.map List.flatten
@@ -211,7 +302,7 @@ module Plugin = struct
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
-           | Single (Attestation attestation) -> (
+           | Single (Attestation attestation) ->
                let packed_operation =
                  Op
                    {
@@ -226,26 +317,8 @@ module Plugin = struct
                      (dal_content.attestation :> dal_attestation))
                    attestation.dal_content
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result (Attestation_result result) ->
-                       let delegate =
-                         Tezos_crypto.Signature.Of_V2.public_key_hash
-                           result.delegate
-                       in
-                       Ok
-                         [
-                           ( tb_slot,
-                             Some delegate,
-                             packed_operation,
-                             dal_attestation );
-                         ]
-                   | _ ->
-                       Ok [(tb_slot, None, packed_operation, dal_attestation)])
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok [(tb_slot, None, packed_operation, dal_attestation)])
-           | Single (Attestations_aggregate {committee; _}) -> (
+               Ok [(tb_slot, packed_operation, dal_attestation)]
+           | Single (Attestations_aggregate {committee; _}) ->
                let packed_operation =
                  Op
                    {
@@ -263,46 +336,65 @@ module Plugin = struct
                          dal_content_opt ))
                    committee
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result
-                       (Attestations_aggregate_result {committee; _}) ->
-                       List.map2
-                         ~when_different_lengths:[Aggregation_result_size_error]
-                         (fun (tb_slot, dal_attestation) (consensus_key, _) ->
-                           ( tb_slot,
-                             Some consensus_key.Consensus_key.delegate,
-                             packed_operation,
-                             dal_attestation ))
-                         slots_and_dal_attestations
-                         committee
-                   | _ ->
-                       Ok
-                         (List.map
-                            (fun (tb_slot, dal_attestation) ->
-                              (tb_slot, None, packed_operation, dal_attestation))
-                            slots_and_dal_attestations))
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok
-                     (List.map
-                        (fun (tb_slot, dal_attestation) ->
-                          (tb_slot, None, packed_operation, dal_attestation))
-                        slots_and_dal_attestations))
+               Ok
+                 (List.map
+                    (fun (tb_slot, dal_attestation) ->
+                      (tb_slot, packed_operation, dal_attestation))
+                    slots_and_dal_attestations)
            | _ -> Ok [])
          consensus_ops
 
-  let get_committee ctxt ~level =
+  let get_committees ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let*? level = Raw_level.of_int32 level |> wrap in
-    let+ pkh_to_shards =
+    let* pkh_to_shards =
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
-    List.fold_left
+    let* pkh_to_tb_slot =
+      let* res =
+        Plugin.RPC.Attestation_rights.get
+          cpctxt
+          (`Main, `Head 0)
+          ~levels:[level]
+      in
+      match res with
+      | [{delegates_rights; _}] -> return delegates_rights
+      | _ ->
+          tzfail
+            (Unexpected_RPC_outcome
+               (Resto.Path.to_string
+                  Plugin.RPC.Attestation_rights.S.attestation_path))
+    in
+    let pkh_to_tb_slot_map =
+      List.fold_left
+        (fun map Plugin.RPC.Attestation_rights.{delegate; first_slot; _} ->
+          Signature.Public_key_hash.Map.add delegate first_slot map)
+        Signature.Public_key_hash.Map.empty
+        pkh_to_tb_slot
+    in
+    List.fold_left_es
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
-        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+        let delegate_pkh =
+          Tezos_crypto.Signature.Of_V2.public_key_hash delegate
+        in
+        let* tb_slot =
+          match
+            Signature.Public_key_hash.Map.find delegate_pkh pkh_to_tb_slot_map
+          with
+          | Some slot -> return (Slot.to_int slot)
+          | None ->
+              (* A delegate with assigned DAL shards also has attestation rights. *)
+              tzfail
+                (Unexpected_RPC_outcome
+                   (Resto.Path.to_string
+                      Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
+        in
+        return
+        @@ Tezos_crypto.Signature.Public_key_hash.Map.add
+             delegate_pkh
+             (indexes, tb_slot)
+             acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
@@ -353,6 +445,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
+    let back_pointer cell ~index =
+      Ok (Dal.Slots_history.back_pointer cell ~index)
+
     (* This function returns the list of cells of the DAL skip list constructed
        at the level of the block whose info are given. For that, it calls the
        {!Plugin.RPC.Dal.skip_list_cells_of_level} RPC that directly retrieves
@@ -379,7 +474,7 @@ module Plugin = struct
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
       else
-        let+ cells =
+        let* cells =
           Plugin.RPC.Dal.skip_list_cells_of_level
             cpctxt
             (`Main, `Level attested_level)
@@ -387,14 +482,26 @@ module Plugin = struct
         in
         (* 2. For other levels, fetch the cells and retrieve the slot indices
            from the cells' content. *)
-        List.map
+        let module H = Dal.Slots_history in
+        List.map_es
           (fun (hash, cell) ->
-            let slot_index =
-              Dal.(
-                Slots_history.(content cell |> content_id).index
-                |> Slot_index.to_int)
+            let cell_id = H.(content cell |> content_id) in
+            let slot_id = cell_id.H.header_id in
+            let slot_index = Dal.Slot_index.to_int slot_id.index in
+            let attestation_lag =
+              H.attestation_lag_value cell_id.attestation_lag
             in
-            (hash, cell, slot_index))
+            let* () =
+              let expected_attested_level =
+                Raw_level.(
+                  add slot_id.published_level attestation_lag |> to_int32)
+              in
+              fail_unless
+                (Int32.equal attested_level expected_attested_level)
+                (Attested_level_mismatch
+                   {attested_level; published_level; attestation_lag})
+            in
+            return (hash, cell, slot_index, attestation_lag))
           cells
 
     let slot_header_of_cell cell =
@@ -409,6 +516,15 @@ module Plugin = struct
                 slot_index = Dal.Slot_index.to_int id.index;
                 commitment;
               }
+
+    let proto_attestation_status cell =
+      Option.some
+      @@
+      match Dal.Slots_history.(content cell) with
+      | Dal.Slots_history.Unpublished _ -> `Unpublished
+      | Published {is_proto_attested; attestation_lag; _} ->
+          let lag = Dal.Slots_history.attestation_lag_value attestation_lag in
+          if is_proto_attested then `Attested lag else `Unattested
   end
 
   module RPC = struct

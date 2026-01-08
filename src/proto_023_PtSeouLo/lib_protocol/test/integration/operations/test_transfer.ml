@@ -127,10 +127,10 @@ let test_transfer_zero_implicit () =
   let* op = Op.transaction (I i) src dest Tez.zero in
   let*! res = Incremental.add_operation i op in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Empty_implicit_contract _ as err ->
-          Assert.test_error_encodings err ;
-          true
-      | _ -> false)
+    | Contract_storage.Empty_implicit_contract _ as err ->
+        Assert.test_error_encodings err ;
+        true
+    | _ -> false)
 
 (** Transfer to originated contract. *)
 let test_transfer_to_originate_with_fee () =
@@ -288,11 +288,11 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   let* i = Incremental.begin_construction b in
   let* (_ : Incremental.t) =
     Incremental.add_operation i op ~expect_apply_failure:(function
-        | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as err)
-          :: _ ->
-            Assert.test_error_encodings err ;
-            return_unit
-        | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
+      | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as err)
+        :: _ ->
+          Assert.test_error_encodings err ;
+          return_unit
+      | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
   in
   return_unit
 
@@ -476,10 +476,10 @@ let test_empty_implicit () =
   let* incr = Incremental.begin_construction b in
   let*! res = Incremental.add_operation incr op in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Empty_implicit_contract _ as err ->
-          Assert.test_error_encodings err ;
-          true
-      | _ -> false)
+    | Contract_storage.Empty_implicit_contract _ as err ->
+        Assert.test_error_encodings err ;
+        true
+    | _ -> false)
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
@@ -578,10 +578,10 @@ let invalid_counter () =
   let* i = Incremental.begin_construction b in
   let*! b = Incremental.add_operation i op2 in
   Assert.proto_error ~loc:__LOC__ b (function
-      | Contract_storage.Counter_in_the_past _ as err ->
-          Assert.test_error_encodings err ;
-          true
-      | _ -> false)
+    | Contract_storage.Counter_in_the_past _ as err ->
+        Assert.test_error_encodings err ;
+        true
+    | _ -> false)
 
 (** Same as before but through a different way to perform this
     error. *)
@@ -599,10 +599,10 @@ let test_add_the_same_operation_twice () =
   in
   let*! b = Incremental.add_operation i op_transfer in
   Assert.proto_error ~loc:__LOC__ b (function
-      | Contract_storage.Counter_in_the_past _ as err ->
-          Assert.test_error_encodings err ;
-          true
-      | _ -> false)
+    | Contract_storage.Counter_in_the_past _ as err ->
+        Assert.test_error_encodings err ;
+        true
+    | _ -> false)
 
 (** The counter is in the future *)
 let invalid_counter_in_the_future () =
@@ -614,10 +614,10 @@ let invalid_counter_in_the_future () =
   let* op = Op.transaction (I b) contract_1 contract_2 Tez.one ~counter in
   let*! b = Incremental.add_operation b op in
   Assert.proto_error ~loc:__LOC__ b (function
-      | Contract_storage.Counter_in_the_future _ as err ->
-          Assert.test_error_encodings err ;
-          true
-      | _ -> false)
+    | Contract_storage.Counter_in_the_future _ as err ->
+        Assert.test_error_encodings err ;
+        true
+    | _ -> false)
 
 (** Check ownership. *)
 let test_ownership_sender () =

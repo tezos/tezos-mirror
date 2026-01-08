@@ -48,10 +48,10 @@ let test_error_encodings e =
 
 let proto_error ~loc v f =
   error ~loc v (function
-      | Environment.Ecoproto_error err ->
-          test_error_encodings err ;
-          f err
-      | _ -> false)
+    | Environment.Ecoproto_error err ->
+        test_error_encodings err ;
+        f err
+    | _ -> false)
 
 let proto_error_with_info ?(error_info_field = `Title) ~loc v
     expected_error_info =
@@ -274,7 +274,8 @@ let equal_result ~loc ~pp_ok ~pp_error eq_ok eq_error a b =
 let is_error ~loc ~pp =
   let open Lwt_result_syntax in
   function
-  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc | Error _ -> return_unit
+  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc
+  | Error _ -> return_unit
 
 let get_ok ~__LOC__ =
   let open Lwt_result_syntax in

@@ -17,17 +17,17 @@ depends: [
   "octez-shell-libs" { = version }
 ]
 depopts: [
-  "tezos-injector-022-PsRiotum"
   "tezos-injector-023-PtSeouLo"
+  "tezos-injector-024-PtTALLiN"
   "tezos-injector-alpha"
 ]
 conflicts: [
-  "tezos-injector-022-PsRiotum" { != version }
   "tezos-injector-023-PtSeouLo" { != version }
+  "tezos-injector-024-PtTALLiN" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

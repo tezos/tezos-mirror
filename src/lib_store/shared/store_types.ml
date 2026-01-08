@@ -137,7 +137,7 @@ let block_descriptor_encoding =
   tup2 Block_hash.encoding int32
 
 let pp_block_descriptor fmt (hash, level) =
-  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp hash level
+  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp_short hash level
 
 (* chain_config *)
 
@@ -249,7 +249,8 @@ module Protocol_levels = struct
                predecessor_block_metadata_hash;
                predecessor_ops_metadata_hash;
                parents_contexts;
-             } ->
+             }
+           ->
           ( author,
             message,
             test_chain_status,
@@ -263,7 +264,8 @@ module Protocol_levels = struct
                data_merkle_root,
                predecessor_block_metadata_hash,
                predecessor_ops_metadata_hash,
-               parents_contexts ) ->
+               parents_contexts )
+           ->
           {
             author;
             message;

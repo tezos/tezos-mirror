@@ -163,8 +163,11 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
         state_recorder;
         pre_emptive_forge_time;
         remote_calls_timeout;
+        allow_signing_delay;
       } baking_mode sources cctxt =
   let open Lwt_result_syntax in
+  Octez_baking_common.Signing_delay.enforce_signing_delay_gating
+    ~allow:allow_signing_delay ;
   may_lock_pidfile pidfile @@ fun () ->
   let* () =
     check_node_version cctxt node_version_check_bypass node_version_allowed
@@ -177,9 +180,7 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     else Lwt.return per_block_vote_file
   in
   let*! () =
-    if Option.is_some adaptive_issuance_vote then
-      Events.(emit unused_cli_adaptive_issuance_vote ())
-    else Lwt.return_unit
+    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for

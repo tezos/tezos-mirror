@@ -135,6 +135,38 @@ let health :
     ~output:Health.encoding
     Tezos_rpc.Path.(open_root / "health")
 
+let synchronized :
+    < meth : [`GET]
+    ; input : unit
+    ; output : L1_crawler_status.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the current synchronization status of the DAL node with the L1 \
+       node."
+    ~query:Tezos_rpc.Query.empty
+    ~output:L1_crawler_status.encoding
+    Tezos_rpc.Path.(open_root / "synchronized")
+
+let monitor_synchronized :
+    < meth : [`GET]
+    ; input : unit
+    ; output : L1_crawler_status.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the stream of synchronization statuses of the DAL node with the \
+       L1 node."
+    ~query:Tezos_rpc.Query.empty
+    ~output:L1_crawler_status.encoding
+    Tezos_rpc.Path.(open_root / "monitor" / "synchronized")
+
 let post_slot :
     < meth : [`POST]
     ; input : string
@@ -151,7 +183,10 @@ let post_slot :
        the sent data is smaller than the size of a DAL slot, it is padded with \
        the character provided as padding query parameter (defaults to \\000). \
        If the slot_index query parameter is provided, the DAL node checks that \
-       its profile allows to publish data on the given slot index."
+       its profile allows to publish data on the given slot index. However, \
+       slot_index is optional and has NO SEMANTIC EFFECT on the produced \
+       commitment. It exists solely to help reverse proxies route POST /slots \
+       requests to a DAL node subscribed to the corresponding topics."
     ~query:slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
@@ -237,8 +272,11 @@ let get_slot_commitment :
     service =
   Tezos_rpc.Service.get_service
     ~description:
-      "Return the accepted commitment associated to the given slot index and \
-       published at the given level."
+      "Return the commitment associated to the given slot index and published \
+       at the given level, if any. The commitment is fetched from the \
+       skip-list storage. Note that the commitment is not present in the \
+       storage immediately after publication, but only when its attestation \
+       status is known and final."
     ~query:Tezos_rpc.Query.empty
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(
@@ -254,7 +292,8 @@ let get_slot_status :
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
-    ~description:"Return the status for the given slot."
+    ~description:
+      "Return the status for the given slot. For operator nodes only."
     ~query:Tezos_rpc.Query.empty
     ~output:header_status_encoding
     Tezos_rpc.Path.(
@@ -363,6 +402,28 @@ let get_attestable_slots :
     Tezos_rpc.Path.(
       open_root / "profiles" /: Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
+
+let monitor_attestable_slots :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.Attestable_event.t
+    ; prefix : unit
+    ; params : unit * Signature.public_key_hash
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Stream attestable slot ids for a given public key hash [pkh]. A slot is \
+       attestable for attested level L if it was published at (L - \
+       attestation_lag) and *all* shards assigned at level L to [pkh] are \
+       available in the DAL node's store. If some shards of the slot are \
+       detected as traps for the baker, the slot should not be attested, so \
+       the id is not sent via the stream."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Types.Attestable_event.encoding
+    Tezos_rpc.Path.(
+      open_root / "profiles" /: Signature.Public_key_hash.rpc_arg / "monitor"
+      / "attestable_slots")
 
 let get_traps :
     < meth : [`GET]

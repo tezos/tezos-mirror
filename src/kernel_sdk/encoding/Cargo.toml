@@ -53,10 +53,14 @@ optional = true
 workspace = true
 optional = true
 
+[dependencies.tezos-protocol]
+workspace = true
+optional = true
+
 [features]
 default = ["alloc", "tezos-encoding", "crypto", "bls"]
-testing = ["crypto", "num-bigint", "num-traits", "proptest"]
-crypto = ["tezos_crypto_rs"]
+testing = ["crypto", "num-bigint", "num-traits", "proptest", "tezos-protocol/testing"]
+crypto = ["tezos_crypto_rs", "tezos-protocol"]
 bls = ["tezos_crypto_rs/bls"]
 alloc = ["crypto", "thiserror", "hex", "num-traits", "num-bigint", "regex"]
 tezos-encoding = ["dep:tezos_data_encoding", "time"]

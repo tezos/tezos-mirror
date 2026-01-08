@@ -101,15 +101,20 @@ See :ref:`this page<consensus_key_details>` for further important details,
 including client commands that are helpful for handling consensus keys.
 
 
-Active and passive delegates
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Active delegates and deactivation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _active_delegate_alpha:
 
-A delegate can be marked as either active or passive. A passive
-delegate cannot participate in the consensus algorithm.
+A delegate can be marked as active or not. An inactive delegate stops
+receiving baking and attesting rights for future cycles.
 
-A delegate is marked as active at its registration.
+A delegate is marked as active when it registers. An inactive delegate
+may reactivate itself by :ref:`registering as a
+delegate<DelegateRegistration>` again. Moreover, if an inactive baker
+participates in the consensus (from leftover rights it had received
+back when it was still active), then it gets automatically marked as
+active again.
 
 At the end of a cycle, a delegate gets deactivated if the chain has
 not witnessed any consensus activity (baking, attesting) from it during the
@@ -185,7 +190,7 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 10800 blocks
+     - 14400 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``MINIMAL_STAKE``

@@ -123,8 +123,8 @@ let () =
   in
   let*! b = Block.bake ~operation:stake b in
   Assert.proto_error ~loc:__LOC__ b (function
-      | Protocol.Apply.Invalid_self_transaction_destination -> true
-      | _ -> false)
+    | Protocol.Apply.Invalid_self_transaction_destination -> true
+    | _ -> false)
 
 (* low balance for staked amount itself *)
 let stake_low_spendable_balance ~self_delegate_staker =
@@ -150,9 +150,9 @@ let stake_low_spendable_balance ~self_delegate_staker =
   else
     let*! b = Block.bake ~operation:stake b in
     Assert.proto_error ~loc:__LOC__ b (function
-        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
-        | _ -> false)
+      | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+      | _ -> false)
 
 let () =
   register_test ~title:"stake with low spendable balance (external staker)"
@@ -211,9 +211,9 @@ let fee_low_spendable_balance_non_zero_staked ~self_delegate_staker =
   else
     let*! b = Block.bake ~operation:unstake b in
     Assert.proto_error ~loc:__LOC__ b (function
-        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
-        | _ -> false)
+      | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+      | _ -> false)
 
 let () =
   register_test
@@ -299,9 +299,9 @@ let fee_low_spendable_balance_non_zero_unfinalizable_unstake
   else
     let*! b = Block.bake ~operation:finalize b in
     Assert.proto_error ~loc:__LOC__ b (function
-        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
-        | _ -> false)
+      | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+      | _ -> false)
 
 let () =
   register_test
@@ -398,9 +398,9 @@ let fee_low_spendable_balance_non_zero_finalizable_unstake ~self_delegate_staker
   else
     let*! b = Block.bake ~operation:finalize b in
     Assert.proto_error ~loc:__LOC__ b (function
-        | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
-            Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
-        | _ -> false)
+      | Protocol.Contract_storage.Empty_implicit_delegated_contract c ->
+          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn staker)
+      | _ -> false)
 
 let () =
   register_test
@@ -423,7 +423,7 @@ let () =
 (* Finn POC: creates 2 stakers whose unstake requests are finalized
    from a different account (finn). Note that we delay unstake
    requests so that they are issued in different cycles. *)
-let finn_finalize_batch =
+let finn_finalize_batch () =
   let open Lwt_result_syntax in
   let amount = Tez_helpers.of_int 10_000 in
   let* b, delegate = Context.init_with_constants1 constants in
@@ -570,14 +570,14 @@ let finn_finalize_batch =
 let () =
   register_test
     ~title:"Finn: Finn finalizes staker1 and staker2 in a single batch."
-  @@ fun () -> finn_finalize_batch
+  @@ fun () -> finn_finalize_batch ()
 
 (* Finn POC: Following Raphael's remark we test what happens if the
    finalize operation is submitted twice in a block. We create 3
    stakers whose unstake requests are finalized from a diffrerent
    account (finn). Note that we delay unstake requests so that they
    are issued in different cycles. *)
-let finn_finalize_interferance =
+let finn_finalize_interferance () =
   let open Lwt_result_syntax in
   let amount = Tez_helpers.of_int 10_000 in
   let* b, delegate = Context.init_with_constants1 constants in
@@ -772,4 +772,4 @@ let () =
     ~title:
       "Finn: Finn batch finalizes correctly even if one of the stakers submits \
        a finalize operation in parallel."
-  @@ fun () -> finn_finalize_interferance
+  @@ fun () -> finn_finalize_interferance ()

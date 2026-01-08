@@ -27,78 +27,71 @@ open Protocol
 open Alpha_context
 open Baking_state_types
 
-(** A delegate slot consists of the delegate's consensus key, its public key
-    hash, its first slot, and its attesting power at some level. *)
-type delegate_slot = {
-  delegate : Delegate.t;
-  first_slot : Slot.t;
-  attesting_power : int;
-}
+val pp_delegate_info : Format.formatter -> delegate_info -> unit
 
-val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
-
-module Delegate_slots : sig
+module Delegate_infos : sig
   (** Information regarding the slot distribution at some level. *)
   type t
 
   (** Returns the list of our own delegates that have at least a slot. There are
       no duplicates, the associated slot is the first one. *)
-  val own_delegates : t -> delegate_slot list
+  val own_delegates : t -> delegate_info list
 
-  (** Returns, among our *own* delegates, the delegate (together with its
-      first attesting slot) that owns the given slot, if any (even if the
-      given slot is not the delegate's first slot). *)
-  val own_slot_owner : t -> slot:Slot.t -> delegate_slot option
+  (** Returns the list of the delegate ids from [own_delegates]. *)
+  val own_delegate_ids : t -> Delegate_id.t list
 
   (** Returns, among our *own* delegates, the delegate (together with its
       first attesting slot) that owns the given round, if any. *)
   val own_round_owner :
-    t -> committee_size:int -> round:Round.t -> delegate_slot option tzresult
+    t -> committee_size:int -> round:Round.t -> delegate_info option tzresult
 
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
-  val voting_power : t -> slot:Slot.t -> int option
+  val voting_power : t -> slot:Slot.t -> int64 option
 
-  (** Finds the first slot greater than or equal to [slot]. Returns the
-     corresponding (slot, delegate) pair if found, or [None] if no such slot
+  (** Finds the first round greater than or equal to [round]. Returns the
+     corresponding (round, delegate) pair if found, or [None] if no such round
      exist. *)
-  val find_first_slot_from : t -> slot:Slot.t -> (Slot.t * delegate_slot) option
+  val find_first_round_from :
+    t -> round:Round.t -> (Round.t * delegate_info) option
 
-  (** Returns the slot with the smallest index, along with its associated
+  (** Returns the round with the smallest index, along with its associated
       delegate. Returns [None] if the map is empty. *)
-  val min_slot : t -> (Slot.t * delegate_slot) option
+  val min_round : t -> (Round.t * delegate_info) option
+
+  (** Returns the consensus threshold at the level the slots were computed *)
+  val consensus_threshold : t -> int64
+
+  (** Returns the consensus committee at the level the slots were computed *)
+  val consensus_committee : t -> int64
 end
 
-type delegate_slots = Delegate_slots.t
+type delegate_infos = Delegate_infos.t
 
-val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
+val pp_delegate_infos : Format.formatter -> delegate_infos -> unit
 
-(** [compute_delegate_slots cctxt ?block ~level ~chain delegates] computes the
+(** [compute_delegate_infos cctxt ?block ~level ~chain delegates] computes the
     delegate slots of the given [delegates] for the [level]
     @param block default to [`Head 0]*)
-val compute_delegate_slots :
+val compute_delegate_infos :
   Protocol_client_context.full ->
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
   Key.t list ->
-  delegate_slots tzresult Lwt.t
+  delegate_infos tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
-
-(* An association list between delegates and promises for their DAL attestations
-   at some level (as obtained through the [get_attestable_slots] RPC). See usage
-   in {!level_state}. *)
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
 
 type consensus_vote_kind = Attestation | Preattestation
 
 val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
 
 val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
+
+val pp_dal_content : Format.formatter -> dal_content -> unit
+
+val dal_content_encoding : dal_content Data_encoding.t
 
 (** An unsigned consensus vote consists of the consensus vote kind, either an
     attestation or a preattestation, the delegate keys and its protocol and dal
@@ -109,6 +102,18 @@ type unsigned_consensus_vote = {
   delegate : Delegate.t;
   dal_content : dal_content option;
 }
+
+val pp_unsigned_consensus_vote :
+  Format.formatter -> unsigned_consensus_vote -> unit
+
+(** Partial encoding that omits secret keys to avoid leaking them in
+    event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val unsigned_consensus_vote_encoding_for_logging__cannot_decode :
+  unsigned_consensus_vote Data_encoding.t
 
 (** A batch content contains information common to all consensus operation in a
     batch of consensus votes. *)
@@ -157,6 +162,17 @@ type signed_consensus_vote = {
   signed_operation : packed_operation;
 }
 
+val pp_signed_consensus_vote : Format.formatter -> signed_consensus_vote -> unit
+
+(** Partial encoding that omits secret keys to avoid leaking them in
+    event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val signed_consensus_vote_encoding_for_logging__cannot_decode :
+  signed_consensus_vote Data_encoding.t
+
 (** Similar to {!unsigned_consensus_vote_batch} type but the list of the operation
     are signed consensus votes. *)
 type signed_consensus_vote_batch = private {
@@ -192,37 +208,11 @@ val make_singleton_consensus_vote_batch :
 
 (** {2 Block info types and functions}  *)
 
-(** A prequorum consists of a level, a round, a block_payload_hash and the list
-    of preattestations that has a total voting power higher than the protocol
-    threshold. *)
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : Kind.preattestation operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : Kind.attestation operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 val block_info_encoding : block_info Data_encoding.t
 
 val pp_block_info : Format.formatter -> block_info -> unit
 
 (** {2 Proposal type and functions}  *)
-
-(** A proposal consists of information about the current block proposal and its
-    predecessor. *)
-type proposal = {block : block_info; predecessor : block_info}
 
 val proposal_encoding : proposal Data_encoding.t
 
@@ -286,18 +276,13 @@ type level_state = {
           round. *)
   elected_block : elected_block option;
       (** A quorum has been reached on an applied proposal. *)
-  delegate_slots : delegate_slots;
-      (** Delegate slots for the baker delegates at the current level *)
-  next_level_delegate_slots : delegate_slots;
-      (** Delegate slots for the baker delegates at the next level *)
+  delegate_infos : delegate_infos;
+      (** Delegate infos for the baker delegates at the current level *)
+  next_level_delegate_infos : delegate_infos;
+      (** Delegate infos for the baker delegates at the next level *)
   next_level_latest_forge_request : Round.t option;
       (** Some if a forge request has been sent for the next level on the given
           round *)
-  dal_attestable_slots : dal_attestable_slots;
-      (** For each (own) delegate having a DAL slot at the current level, store
-          a promise to obtain the attestable slots for that level. *)
-  next_level_dal_attestable_slots : dal_attestable_slots;
-      (** and similarly for the next level *)
 }
 
 val pp_level_state : Format.formatter -> level_state -> unit
@@ -400,6 +385,8 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
+val pp_forge_event : Format.formatter -> forge_event -> unit
+
 (** Partial encoding for {!forge_event} that omits secret keys to
     avoid leaking them in event logs; see
     {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
@@ -442,6 +429,7 @@ type global_state = {
   constants : Constants.t;
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
   delegates : Key.t list;
@@ -469,7 +457,7 @@ val update_current_phase : t -> phase -> t
     that has a proposer slot at the given round and the current or next level,
     if any. *)
 val round_proposer :
-  state -> level:[`Current | `Next] -> Round.t -> delegate_slot option
+  state -> level:[`Current | `Next] -> Round.t -> delegate_info option
 
 (** Memoization wrapper for {!Round.timestamp_of_round}. *)
 val timestamp_of_round :
@@ -542,6 +530,11 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
+val pp_event : Format.formatter -> event -> unit
+
+(** Prints event description in a few words. *)
+val pp_short_event : Format.formatter -> event -> unit
+
 (** Partial encoding for {!event} that omits secret keys to avoid
     leaking them in event logs; see
     {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
@@ -549,5 +542,3 @@ type event =
     Warning: As a consequence, decoding from this encoding will always
     fail. *)
 val event_encoding_for_logging__cannot_decode : event Data_encoding.t
-
-val pp_short_event : Format.formatter -> event -> unit

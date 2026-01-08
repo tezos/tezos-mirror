@@ -179,7 +179,10 @@ let commands () =
          no_print_source_flag
          custom_gas_flag)
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
-      (fun (show_types, emacs_mode, no_print_source, original_gas) program cctxt ->
+      (fun (show_types, emacs_mode, no_print_source, original_gas)
+           program
+           cctxt
+         ->
         match program with
         | program, [] ->
             resolve_max_gas cctxt cctxt#block original_gas
@@ -365,7 +368,8 @@ let commands () =
            bytes
            (_, (key_locator, _))
            signature
-           (cctxt : #Alpha_client_context.full) ->
+           (cctxt : #Alpha_client_context.full)
+         ->
         Client_keys_v0.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->

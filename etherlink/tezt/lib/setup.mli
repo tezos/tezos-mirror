@@ -14,6 +14,7 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+  fa_deposit : string;
 }
 
 type multichain_sequencer_setup = {
@@ -50,6 +51,12 @@ type sequencer_setup = {
   l2_chains : Evm_node.l2_setup list;
 }
 
+type tx_queue_config = {
+  max_lifespan : int;
+  max_size : int;
+  tx_per_addr_limit : int;
+}
+
 (** [uses protocol] returns the list of dependencies for the tests. *)
 val uses : Protocol.t -> Uses.t list
 
@@ -61,16 +68,16 @@ val setup_l1_contracts :
 (** [run_new_rpc_endpoint node] starts a new rpc node following the setup. *)
 val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
 
-(**[run_new_rpc_endpoint ~sc_rollup_node node] starts a new observer following
+(**[run_new_observer_node ~sc_rollup_node node] starts a new observer following
    the setup. *)
 val run_new_observer_node :
   ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
-  sc_rollup_node:Sc_rollup_node.t ->
+  sc_rollup_node:Sc_rollup_node.t option ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?l2_chain:Evm_node.l2_setup ->
   Evm_node.t ->
   Evm_node.t Lwt.t
@@ -95,6 +102,7 @@ val register_test :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
@@ -104,7 +112,6 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -118,10 +125,13 @@ val register_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -146,6 +156,7 @@ val register_multichain_test :
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
@@ -155,7 +166,6 @@ val register_multichain_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -170,9 +180,12 @@ val register_multichain_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?signatory:bool ->
+  ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -199,6 +212,7 @@ val register_test_for_kernels :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
@@ -208,7 +222,6 @@ val register_test_for_kernels :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   ?commitment_period:int ->
   ?challenge_window:int ->
@@ -221,10 +234,12 @@ val register_test_for_kernels :
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -251,6 +266,7 @@ val setup_sequencer :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernel:Uses.t ->
   ?da_fee:Wei.t ->
@@ -260,7 +276,6 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?drop_duplicate_when_injection:bool ->
@@ -272,10 +287,12 @@ val setup_sequencer :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?signatory:bool ->
   ?l2_chains:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   Protocol.t ->
   sequencer_setup Lwt.t
 
@@ -296,8 +313,6 @@ type feature_test_registration =
 
 val ci_enabled_dal_registration : feature_test_registration
 
-val activate_revm_registration : feature_test_registration
-
 val register_all :
   __FILE__:string ->
   ?max_delayed_inbox_blueprint_length:int ->
@@ -315,6 +330,7 @@ val register_all :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
@@ -335,11 +351,12 @@ val register_all :
   ?history_mode:Evm_node.history_mode ->
   ?use_dal:feature_test_registration ->
   ?use_multichain:feature_test_registration ->
-  ?use_revm:feature_test_registration ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
+  ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->

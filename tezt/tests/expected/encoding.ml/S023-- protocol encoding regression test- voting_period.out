@@ -1,20 +1,2 @@
-
-./octez-codec encode 023-PtSeouLo.voting_period from '{
-  "start_position": 1159026,
-  "kind": "proposal",
-  "index": 0
-}'
-00000000000011af72
-
-./octez-codec decode 023-PtSeouLo.voting_period from 00000000000011af72
-{ "index": 0, "kind": "proposal", "start_position": 1159026 }
-
-./octez-codec encode 023-PtSeouLo.voting_period from '{
-  "start_position": 0,
-  "kind": "proposal",
-  "index": 0
-}'
-000000000000000000
-
-./octez-codec decode 023-PtSeouLo.voting_period from 000000000000000000
-{ "index": 0, "kind": "proposal", "start_position": 0 }
+voting_period-positive: 00000000000011af72
+voting_period-zero: 000000000000000000

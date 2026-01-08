@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_tezedge_context)
+ (public_name octez-shell-libs.tezedge-context)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  octez-libs.tezos-context-tezedge)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

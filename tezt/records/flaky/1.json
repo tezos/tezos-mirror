@@ -8,9 +8,10 @@
       "quick"
     ],
     "successful_runs": {
-      "total_time": "100432",
+      "total_time": "378308",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 178699000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -20,9 +21,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "3124198",
+      "total_time": "2945295",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 517370000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -32,9 +34,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "10843129",
+      "total_time": "11338048",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 428120000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -44,9 +47,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "5316416",
+      "total_time": "2964550",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 487835000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -56,9 +60,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "595303",
+      "total_time": "461206",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 536403000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -68,9 +73,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "599842",
+      "total_time": "464987",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 541522000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_pool.ml",
@@ -80,9 +86,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "596776",
+      "total_time": "458267",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 536484000
   },
   {
     "file": "src/lib_p2p/tezt/test_p2p_node.ml",
@@ -92,9 +99,10 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "324918",
+      "total_time": "307744",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 388424000
   },
   {
     "file": "irmin/test/test_lib_irmin_store.ml",
@@ -106,226 +114,7 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "5517",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "data",
-      "evm",
-      "evm_node",
-      "flaky",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "sequencer",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "47851174",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "data",
-      "evm",
-      "evm_node",
-      "flaky",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "sequencer",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "56170419",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Sequencer is resilient to rollup node disconnection (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "data",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "flaky",
-      "latest",
-      "node",
-      "sequencer",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "66551209",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "auto",
-      "client",
-      "evm",
-      "evm_node",
-      "flaky",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "sequencer",
-      "sequencer_upgrade",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "sync"
-    ],
-    "successful_runs": {
-      "total_time": "43194415",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "auto",
-      "client",
-      "evm",
-      "evm_node",
-      "flaky",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "node",
-      "sequencer",
-      "sequencer_upgrade",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "sync"
-    ],
-    "successful_runs": {
-      "total_time": "37247680",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_sequencer.ml",
-    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (sequencer, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "auto",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "flaky",
-      "latest",
-      "node",
-      "sequencer",
-      "sequencer_upgrade",
-      "smart_rollup_installer",
-      "smart_rollup_node",
-      "sync"
-    ],
-    "successful_runs": {
-      "total_time": "36764425",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, mainnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "evm",
-      "evm_node",
-      "flaky",
-      "loop",
-      "mainnet",
-      "mainnet_evm_kernel",
-      "node",
-      "out_of_ticks",
-      "proxy",
-      "reboot",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "96550317",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, ghostnet, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "evm",
-      "evm_node",
-      "flaky",
-      "ghostnet",
-      "ghostnet_evm_kernel",
-      "loop",
-      "node",
-      "out_of_ticks",
-      "proxy",
-      "reboot",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "97466256",
-      "count": "1"
-    }
-  },
-  {
-    "file": "etherlink/tezt/tests/evm_rollup.ml",
-    "title": "Alpha: Check that the kernel can handle transactions that take too many ticks for a single run (proxy, latest, without dal)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "evm",
-      "evm_kernel",
-      "evm_node",
-      "flaky",
-      "latest",
-      "loop",
-      "node",
-      "out_of_ticks",
-      "proxy",
-      "reboot",
-      "smart_rollup_installer",
-      "smart_rollup_node"
-    ],
-    "successful_runs": {
-      "total_time": "97462632",
+      "total_time": "27559",
       "count": "1"
     }
   },
@@ -339,7 +128,21 @@
       "flaky"
     ],
     "successful_runs": {
-      "total_time": "6493",
+      "total_time": "35259",
+      "count": "1"
+    }
+  },
+  {
+    "file": "brassaia-eio/test/test_lib_brassaia_store.ml",
+    "title": "brassaia_eio_disk:simple",
+    "tags": [
+      "layer1",
+      "brassaia_eio",
+      "store",
+      "flaky"
+    ],
+    "successful_runs": {
+      "total_time": "54790",
       "count": "1"
     }
   },
@@ -356,9 +159,10 @@
       "trusted"
     ],
     "successful_runs": {
-      "total_time": "36432413",
+      "total_time": "6764889",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 2295699000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -376,10 +180,11 @@
       "smart_rollup_node",
       "wasm_2_0_0"
     ],
-    "successful_runs": {
-      "total_time": "36696639",
+    "failed_runs": {
+      "total_time": "258585283",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1576132000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -397,58 +202,38 @@
       "smart_rollup_node",
       "wasm_2_0_0"
     ],
-    "successful_runs": {
-      "total_time": "59032141",
+    "failed_runs": {
+      "total_time": "376465619",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1535363000
   },
   {
-    "file": "tezt/tests/sc_rollup.ml",
-    "title": "Alpha: wasm_2_0_0 - garbage collection is triggered and finishes correctly (full) (many_gc)",
+    "file": "tezt/tests/agnostic_baker_test.ml",
+    "title": "Protocol migration reconnect from t024 to alpha",
     "tags": [
       "admin_client",
+      "agnostic",
+      "agnostic_baker",
       "alpha",
+      "baker",
       "client",
-      "etherlink",
       "flaky",
-      "full",
-      "gc",
-      "many_gc",
+      "migration",
       "node",
-      "sc_rollup",
-      "smart_rollup_node",
-      "wasm_2_0_0"
-    ],
-    "successful_runs": {
-      "total_time": "14695822",
-      "count": "1"
-    }
-  },
-  {
-    "file": "tezt/tests/sc_rollup.ml",
-    "title": "Alpha: wasm_2_0_0 - garbage collection is triggered and finishes correctly (full) (sparse_gc)",
-    "tags": [
-      "admin_client",
-      "alpha",
-      "client",
-      "etherlink",
-      "flaky",
-      "full",
-      "gc",
-      "node",
-      "sc_rollup",
-      "smart_rollup_node",
-      "sparse_gc",
-      "wasm_2_0_0"
+      "protocol",
+      "reconnect",
+      "t024"
     ],
     "failed_runs": {
-      "total_time": "105582505",
+      "total_time": "48253971",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1493030000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Quebeca->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "title": "T024->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
     "tags": [
       "admin_client",
       "alpha",
@@ -458,15 +243,20 @@
       "l2",
       "migration",
       "node",
-      "quebeca",
       "refutation",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "55730759",
+      "count": "1"
+    },
+    "peak_memory_usage": 1717915000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Quebeca->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "title": "T024->Alpha: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
     "tags": [
       "admin_client",
       "alpha",
@@ -476,15 +266,20 @@
       "l2",
       "migration",
       "node",
-      "quebeca",
       "refutation",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "55978808",
+      "count": "1"
+    },
+    "peak_memory_usage": 1775122000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Quebeca->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "title": "T024->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
     "tags": [
       "admin_client",
       "alpha",
@@ -494,15 +289,20 @@
       "l2",
       "migration",
       "node",
-      "quebeca",
       "refutation",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "57420442",
+      "count": "1"
+    },
+    "peak_memory_usage": 1725059000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Quebeca->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "title": "T024->Alpha: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
     "tags": [
       "admin_client",
       "alpha",
@@ -512,15 +312,43 @@
       "l2",
       "migration",
       "node",
-      "quebeca",
       "refutation",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "58658915",
+      "count": "1"
+    },
+    "peak_memory_usage": 1709360000
+  },
+  {
+    "file": "tezt/tests/agnostic_baker_test.ml",
+    "title": "Protocol migration reconnect from s023 to t024",
+    "tags": [
+      "admin_client",
+      "agnostic",
+      "agnostic_baker",
+      "baker",
+      "client",
+      "flaky",
+      "migration",
+      "node",
+      "protocol",
+      "reconnect",
+      "s023",
+      "t024"
+    ],
+    "failed_runs": {
+      "total_time": "540285583",
+      "count": "1"
+    },
+    "peak_memory_usage": 1484419000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Parisc->Quebeca: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
+    "title": "S023->T024: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_inbox)",
     "tags": [
       "admin_client",
       "client",
@@ -529,16 +357,21 @@
       "l2",
       "migration",
       "node",
-      "parisc",
-      "quebeca",
       "refutation",
+      "s023",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "54516110",
+      "count": "1"
+    },
+    "peak_memory_usage": 1340606000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Parisc->Quebeca: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
+    "title": "S023->T024: wasm_2_0_0 - refutation games over migrations (inbox_proof_1_at_published_commitment)",
     "tags": [
       "admin_client",
       "client",
@@ -547,16 +380,21 @@
       "l2",
       "migration",
       "node",
-      "parisc",
-      "quebeca",
       "refutation",
+      "s023",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "55112290",
+      "count": "1"
+    },
+    "peak_memory_usage": 1425802000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Parisc->Quebeca: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
+    "title": "S023->T024: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_inbox)",
     "tags": [
       "admin_client",
       "client",
@@ -565,16 +403,21 @@
       "l2",
       "migration",
       "node",
-      "parisc",
-      "quebeca",
       "refutation",
+      "s023",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "54695664",
+      "count": "1"
+    },
+    "peak_memory_usage": 1480620000
   },
   {
     "file": "tezt/tests/sc_rollup_migration.ml",
-    "title": "Parisc->Quebeca: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
+    "title": "S023->T024: wasm_2_0_0 - refutation games over migrations (pvm_proof_2_at_published_commitment)",
     "tags": [
       "admin_client",
       "client",
@@ -583,16 +426,21 @@
       "l2",
       "migration",
       "node",
-      "parisc",
-      "quebeca",
       "refutation",
+      "s023",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "54650332",
+      "count": "1"
+    },
+    "peak_memory_usage": 1520149000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
-    "title": "Quebeca: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
+    "title": "T024-: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "client",
@@ -600,15 +448,20 @@
       "etherlink",
       "flaky",
       "node",
-      "quebeca",
       "sc_rollup",
       "smart_rollup_node",
+      "t024",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "17251308",
+      "count": "1"
+    },
+    "peak_memory_usage": 1301915000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
-    "title": "Parisc: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
+    "title": "S023-: wasm_2_0_0 - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "client",
@@ -616,11 +469,16 @@
       "etherlink",
       "flaky",
       "node",
-      "parisc",
+      "s023",
       "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "17008009",
+      "count": "1"
+    },
+    "peak_memory_usage": 1308402000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -636,11 +494,16 @@
       "sc_rollup",
       "smart_rollup_node",
       "wasm_2_0_0"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "17583433",
+      "count": "1"
+    },
+    "peak_memory_usage": 1318391000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
-    "title": "Quebeca: arith - rollup node - correct handling of commitments (non_final_level)",
+    "title": "T024-: arith - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "arith",
@@ -649,14 +512,19 @@
       "etherlink",
       "flaky",
       "node",
-      "quebeca",
       "sc_rollup",
-      "smart_rollup_node"
-    ]
+      "smart_rollup_node",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "17265779",
+      "count": "1"
+    },
+    "peak_memory_usage": 1318000000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
-    "title": "Parisc: arith - rollup node - correct handling of commitments (non_final_level)",
+    "title": "S023-: arith - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "admin_client",
       "arith",
@@ -665,10 +533,15 @@
       "etherlink",
       "flaky",
       "node",
-      "parisc",
+      "s023",
       "sc_rollup",
       "smart_rollup_node"
-    ]
+    ],
+    "successful_runs": {
+      "total_time": "17778535",
+      "count": "1"
+    },
+    "peak_memory_usage": 1324335000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -684,11 +557,16 @@
       "node",
       "sc_rollup",
       "smart_rollup_node"
-    ]
+    ],
+    "failed_runs": {
+      "total_time": "15277173",
+      "count": "1"
+    },
+    "peak_memory_usage": 1328508000
   },
   {
     "file": "tezt/tests/stresstest_command.ml",
-    "title": "Quebeca: stresstest multiple nodes",
+    "title": "T024-: stresstest multiple nodes",
     "tags": [
       "admin_client",
       "client",
@@ -696,13 +574,13 @@
       "layer1",
       "multiple_nodes",
       "node",
-      "quebeca",
-      "stresstest"
+      "stresstest",
+      "t024"
     ]
   },
   {
     "file": "tezt/tests/stresstest_command.ml",
-    "title": "Parisc: stresstest multiple nodes",
+    "title": "S023-: stresstest multiple nodes",
     "tags": [
       "admin_client",
       "client",
@@ -710,7 +588,7 @@
       "layer1",
       "multiple_nodes",
       "node",
-      "parisc",
+      "s023",
       "stresstest"
     ]
   },
@@ -730,32 +608,77 @@
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: bootstrap: test threshold zero",
+    "title": "T024-: check synchronization state",
     "tags": [
       "admin_client",
-      "baker_psquebec",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "quebeca",
+      "sync",
       "synchronisation_threshold",
+      "t024"
+    ]
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "S023-: check synchronization state",
+    "tags": [
+      "admin_client",
+      "bootstrap",
+      "client",
+      "flaky",
+      "layer1",
+      "node",
+      "s023",
+      "sync",
+      "synchronisation_threshold"
+    ]
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "Alpha: check synchronization state",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "bootstrap",
+      "client",
+      "flaky",
+      "layer1",
+      "node",
+      "sync",
+      "synchronisation_threshold"
+    ]
+  },
+  {
+    "file": "tezt/tests/synchronisation_heuristic.ml",
+    "title": "T024-: bootstrap: test threshold zero",
+    "tags": [
+      "admin_client",
+      "agnostic_baker",
+      "bootstrap",
+      "client",
+      "flaky",
+      "layer1",
+      "node",
+      "synchronisation_threshold",
+      "t024",
       "threshold"
     ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: bootstrap: test threshold zero",
+    "title": "S023-: bootstrap: test threshold zero",
     "tags": [
       "admin_client",
-      "baker_psparisc",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "parisc",
+      "s023",
       "synchronisation_threshold",
       "threshold"
     ]
@@ -765,8 +688,8 @@
     "title": "Alpha: bootstrap: test threshold zero",
     "tags": [
       "admin_client",
+      "agnostic_baker",
       "alpha",
-      "baker_alpha",
       "bootstrap",
       "client",
       "flaky",
@@ -778,32 +701,32 @@
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: bootstrap: test threshold two",
+    "title": "T024-: bootstrap: test threshold two",
     "tags": [
       "admin_client",
-      "baker_psquebec",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "quebeca",
       "synchronisation_threshold",
+      "t024",
       "threshold"
     ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: bootstrap: test threshold two",
+    "title": "S023-: bootstrap: test threshold two",
     "tags": [
       "admin_client",
-      "baker_psparisc",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "parisc",
+      "s023",
       "synchronisation_threshold",
       "threshold"
     ]
@@ -813,8 +736,8 @@
     "title": "Alpha: bootstrap: test threshold two",
     "tags": [
       "admin_client",
+      "agnostic_baker",
       "alpha",
-      "baker_alpha",
       "bootstrap",
       "client",
       "flaky",
@@ -826,32 +749,32 @@
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: bootstrap: test threshold stuck",
+    "title": "T024-: bootstrap: test threshold stuck",
     "tags": [
       "admin_client",
-      "baker_psquebec",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "quebeca",
       "synchronisation_threshold",
+      "t024",
       "threshold"
     ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: bootstrap: test threshold stuck",
+    "title": "S023-: bootstrap: test threshold stuck",
     "tags": [
       "admin_client",
-      "baker_psparisc",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "parisc",
+      "s023",
       "synchronisation_threshold",
       "threshold"
     ]
@@ -861,8 +784,8 @@
     "title": "Alpha: bootstrap: test threshold stuck",
     "tags": [
       "admin_client",
+      "agnostic_baker",
       "alpha",
-      "baker_alpha",
       "bootstrap",
       "client",
       "flaky",
@@ -874,32 +797,32 @@
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: bootstrap: test threshold split view",
+    "title": "T024-: bootstrap: test threshold split view",
     "tags": [
       "admin_client",
-      "baker_psquebec",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "quebeca",
       "synchronisation_threshold",
+      "t024",
       "threshold"
     ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: bootstrap: test threshold split view",
+    "title": "S023-: bootstrap: test threshold split view",
     "tags": [
       "admin_client",
-      "baker_psparisc",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "flaky",
       "layer1",
       "node",
-      "parisc",
+      "s023",
       "synchronisation_threshold",
       "threshold"
     ]
@@ -909,8 +832,8 @@
     "title": "Alpha: bootstrap: test threshold split view",
     "tags": [
       "admin_client",
+      "agnostic_baker",
       "alpha",
-      "baker_alpha",
       "bootstrap",
       "client",
       "flaky",
@@ -922,7 +845,7 @@
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: Check prevalidator start",
+    "title": "T024-: Check prevalidator start",
     "tags": [
       "admin_client",
       "bootstrap",
@@ -931,13 +854,13 @@
       "layer1",
       "node",
       "prevalidator",
-      "quebeca",
-      "synchronisation_threshold"
+      "synchronisation_threshold",
+      "t024"
     ]
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: Check prevalidator start",
+    "title": "S023-: Check prevalidator start",
     "tags": [
       "admin_client",
       "bootstrap",
@@ -945,8 +868,8 @@
       "flaky",
       "layer1",
       "node",
-      "parisc",
       "prevalidator",
+      "s023",
       "synchronisation_threshold"
     ]
   },

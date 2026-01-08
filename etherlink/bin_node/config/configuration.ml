@@ -6,14 +6,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type supported_network = Mainnet | Testnet
+type supported_network = Mainnet | Testnet | Shadownet
 
 let pp_supported_network fmt network =
   Format.pp_print_string
     fmt
-    (match network with Mainnet -> "mainnet" | Testnet -> "testnet")
+    (match network with
+    | Mainnet -> "mainnet"
+    | Testnet -> "testnet"
+    | Shadownet -> "shadownet")
+
+let positive_encoding = Data_encoding.ranged_int 0 ((1 lsl 30) - 1)
 
 let strictly_positive_encoding = Data_encoding.ranged_int 1 ((1 lsl 30) - 1)
+
+let positive_i64_encoding =
+  Data_encoding.(conv Int64.to_int Int64.of_int positive_encoding)
 
 type log_filter_config = {
   max_nb_blocks : int;
@@ -34,7 +42,7 @@ type blueprints_publisher_config = {
 type native_execution_policy = Always | Rpcs_only | Never
 
 type kernel_execution_config = {
-  preimages : string;
+  preimages : string option;
   preimages_endpoint : Uri.t option;
   native_execution_policy : native_execution_policy;
 }
@@ -64,7 +72,11 @@ type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
 let chain_id network =
   L2_types.Chain_id
-    (Z.of_int (match network with Mainnet -> 0xa729 | Testnet -> 0x1f47b))
+    (Z.of_int
+       (match network with
+       | Mainnet -> 0xa729
+       | Testnet -> 0x1f47b
+       | Shadownet -> 0x1F34F))
 
 let chain_id_encoding : L2_types.chain_id Data_encoding.t =
   let open L2_types in
@@ -99,12 +111,14 @@ let tx_queue_encoding =
            max_transaction_batch_length;
            max_lifespan_s;
            tx_per_addr_limit;
-         } ->
+         }
+       ->
       (max_size, max_transaction_batch_length, max_lifespan_s, tx_per_addr_limit))
     (fun ( max_size,
            max_transaction_batch_length,
            max_lifespan_s,
-           tx_per_addr_limit ) ->
+           tx_per_addr_limit )
+       ->
       {
         max_size;
         max_transaction_batch_length;
@@ -119,24 +133,6 @@ let tx_queue_encoding =
           default_tx_queue.max_transaction_batch_length)
        (dft "max_lifespan" int31 default_tx_queue.max_lifespan_s)
        (dft "tx_per_addr_limit" int64 default_tx_queue.tx_per_addr_limit))
-
-let tx_queue_opt_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"tx queue configuration"
-        Json_only
-        (option tx_queue_encoding)
-        (function Some tx_queue -> Some (Some tx_queue) | None -> Some None)
-        Fun.id;
-      case
-        ~title:"tx queue enable"
-        Json_only
-        bool
-        (function _ -> None)
-        (function true -> Some default_tx_queue | _ -> None);
-    ]
 
 type websocket_rate_limit = {
   max_frames : int;
@@ -175,8 +171,8 @@ type experimental_features = {
   rpc_server : rpc_server;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
+  preconfirmation_stream_enabled : bool;
 }
 
 type gcp_key = {
@@ -192,8 +188,9 @@ type sequencer_key = Wallet of Client_keys.sk_uri | Gcp_key of gcp_key
 type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
-  sequencer : sequencer_key option;
+  sequencer : sequencer_key list;
   blueprints_publisher_config : blueprints_publisher_config;
+  sunset_sec : int64;
 }
 
 type gcp_authentication_method = Gcloud_auth | Metadata_server
@@ -243,7 +240,15 @@ type rpc = {
 
 type db = {pool_size : int; max_conn_reuse_count : int option}
 
+type performance_profile = Default | Performance
+
+type telemetry_config = {
+  config : Octez_telemetry.Opentelemetry_config.t;
+  trace_host_functions : bool;
+}
+
 type t = {
+  data_dir : string;
   public_rpc : rpc;
   private_rpc : rpc option;
   websockets : websockets_config option;
@@ -253,22 +258,19 @@ type t = {
   observer : observer option;
   proxy : proxy;
   gcp_kms : gcp_kms;
-  tx_pool_timeout_limit : int64;
-  tx_pool_addr_limit : int64;
-  tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
-  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  opentelemetry : telemetry_config;
+  tx_queue : tx_queue;
+  performance_profile : performance_profile;
 }
-
-let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
-  Option.is_some enable_tx_queue
 
 let retrieve_chain_family ~l2_chains =
   match l2_chains with
@@ -280,7 +282,7 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   {
     max_nb_blocks = Option.value ~default:100 max_nb_blocks;
     max_nb_logs = Option.value ~default:1000 max_nb_logs;
-    chunk_size = Option.value ~default:10 chunk_size;
+    chunk_size = Option.value ~default:1000 chunk_size;
   }
 
 let default_enable_send_raw_transaction = true
@@ -331,8 +333,8 @@ let default_experimental_features =
     rpc_server = Resto;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
-    enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
+    preconfirmation_stream_enabled = false;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -344,6 +346,8 @@ let default_keep_alive = false
 let default_finalized_view = false
 
 let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
+
+let default_rpc_timeout_s = 30. (* seconds *)
 
 let default_rollup_node_tracking = true
 
@@ -373,13 +377,23 @@ let default_db = {pool_size = 8; max_conn_reuse_count = None}
 let default_max_active_connections =
   Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
 
-let default_preimages data_dir = Filename.Infix.(data_dir // "wasm_2_0_0")
+let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
+
+let get_data_dir ~data_dir = Option.value data_dir ~default:default_data_dir
+
+let config_filename ~data_dir ?config_file () =
+  match config_file with
+  | None -> Filename.concat (get_data_dir ~data_dir) "config.json"
+  | Some config_file -> config_file
 
 let default_preimages_endpoint = function
   | Mainnet ->
       Uri.of_string "https://snapshots.tzinit.org/etherlink-mainnet/wasm_2_0_0"
   | Testnet ->
       Uri.of_string "https://snapshots.tzinit.org/etherlink-ghostnet/wasm_2_0_0"
+  | Shadownet ->
+      Uri.of_string
+        "https://snapshots.tzinit.org/etherlink-shadownet/wasm_2_0_0"
 
 let default_time_between_blocks = Time_between_blocks 5.
 
@@ -392,12 +406,6 @@ let hard_maximum_number_of_chunks =
   max_cumulated_chunks_size / chunk_size
 
 let default_max_number_of_chunks = hard_maximum_number_of_chunks
-
-let default_tx_pool_timeout_limit = Int64.of_int 3600
-
-let default_tx_pool_addr_limit = Int64.of_int 4000
-
-let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
 let default_blueprints_publisher_config_without_dal =
   {
@@ -443,6 +451,8 @@ let default_blueprints_publisher_config_with_dal =
   }
 
 let default_fee_history = {max_count = Limit 1024; max_past = None}
+
+let default_performance_profile = Default
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
@@ -508,10 +518,10 @@ let restricted_rpcs_encoding =
 
 let default_native_execution_policy = Rpcs_only
 
-let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
+let kernel_execution_config_dft ?preimages ?preimages_endpoint
     ?native_execution_policy () =
   {
-    preimages = Option.value ~default:(default_preimages data_dir) preimages;
+    preimages;
     preimages_endpoint;
     native_execution_policy =
       Option.value
@@ -519,9 +529,11 @@ let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
         native_execution_policy;
   }
 
+let default_sequencer_sunset_sec = 300L
+
 let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?dal_slots () =
+    ?catchup_cooldown ?dal_slots ?sunset_sec () =
   let default_blueprints_publisher_config =
     if Option.is_some dal_slots then
       default_blueprints_publisher_config_with_dal
@@ -553,20 +565,19 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
       Option.value ~default:default_time_between_blocks time_between_blocks;
     max_number_of_chunks =
       Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-    sequencer;
+    sequencer = Option.value ~default:[] sequencer;
     blueprints_publisher_config;
+    sunset_sec = Option.value ~default:default_sequencer_sunset_sec sunset_sec;
   }
 
 let observer_evm_node_endpoint = function
   | Mainnet -> "https://relay.mainnet.etherlink.com"
   | Testnet -> "https://relay.ghostnet.etherlink.com"
+  | Shadownet -> "https://relay.shadownet.etherlink.com"
 
-let observer_config_dft ~evm_node_endpoint ?rollup_node_tracking () =
-  {
-    evm_node_endpoint;
-    rollup_node_tracking =
-      Option.value ~default:default_rollup_node_tracking rollup_node_tracking;
-  }
+let observer_config_dft ~evm_node_endpoint
+    ?(rollup_node_tracking = default_rollup_node_tracking) () =
+  {evm_node_endpoint; rollup_node_tracking}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -623,7 +634,8 @@ let blueprints_publisher_config_encoding =
            max_blueprints_catchup;
            catchup_cooldown;
            dal_slots;
-         } ->
+         }
+       ->
       ( max_blueprints_lag,
         max_blueprints_ahead,
         max_blueprints_catchup,
@@ -633,7 +645,8 @@ let blueprints_publisher_config_encoding =
            max_blueprints_ahead,
            max_blueprints_catchup,
            catchup_cooldown,
-           dal_slots ) ->
+           dal_slots )
+       ->
       {
         max_blueprints_lag;
         max_blueprints_ahead;
@@ -701,7 +714,7 @@ let gcp_key_from_string_opt key_handler =
   let* key_handler = String.remove_prefix ~prefix:"gcpkms://" key_handler in
   match String.split '/' key_handler with
   | [project; region; keyring; key; version] ->
-      Some {project; keyring; key; region; version = int_of_string version}
+      Some {project; region; keyring; key; version = int_of_string version}
   | _ -> None
 
 let gcp_key_uri_encoding =
@@ -724,15 +737,15 @@ let gcp_key_uri_encoding =
 let gcp_key_full_encoding =
   let open Data_encoding in
   conv
-    (fun {region; project; keyring; key; version} ->
-      (region, project, keyring, key, version))
-    (fun (region, project, keyring, key, version) ->
-      {region; project; keyring; key; version})
+    (fun {project; region; keyring; key; version} ->
+      (project, region, keyring, key, version))
+    (fun (project, region, keyring, key, version) ->
+      {project; region; keyring; key; version})
     (obj5
        (req "project" ~description:"GCP project hosting the key" string)
+       (req "region" ~description:"GCP region hosting the keyring" string)
        (req "keyring" ~description:"Keyring owning the key" string)
        (req "key" ~description:"Key name" string)
-       (req "region" ~description:"GCP region hosting the keyring" string)
        (req "version" ~description:"Key version number" int31))
 
 let gcp_key_encoding =
@@ -749,18 +762,36 @@ let sequencer_key_encoding =
     [
       case
         Json_only
+        ~title:"GCP Key"
+        gcp_key_encoding
+        (function Gcp_key k -> Some k | _ -> None)
+        (fun k -> Gcp_key k);
+      case
+        Json_only
         ~title:"Wallet"
         (string' Plain)
         (function
           | Wallet sk_uri -> Some (Client_keys.string_of_sk_uri sk_uri)
           | _ -> None)
         (fun sk_uri -> Wallet (Client_keys.sk_uri_of_string sk_uri));
+    ]
+
+let sequencer_key_list_encoding =
+  let open Data_encoding in
+  union
+    [
       case
         Json_only
-        ~title:"GCP Key"
-        gcp_key_encoding
-        (function Gcp_key k -> Some k | _ -> None)
-        (fun k -> Gcp_key k);
+        ~title:"List"
+        (list sequencer_key_encoding)
+        (function l -> Some l)
+        Fun.id;
+      case
+        Json_only
+        ~title:"Single"
+        sequencer_key_encoding
+        (function [k] -> Some k | _ -> None)
+        (fun k -> [k]);
     ]
 
 let sequencer_encoding =
@@ -774,32 +805,46 @@ let sequencer_encoding =
            max_number_of_chunks;
            sequencer;
            blueprints_publisher_config;
-         } ->
+           sunset_sec;
+         }
+       ->
       ( time_between_blocks,
         max_number_of_chunks,
         sequencer,
-        blueprints_publisher_config ))
+        blueprints_publisher_config,
+        sunset_sec ))
     (fun ( time_between_blocks,
            max_number_of_chunks,
            sequencer,
-           blueprints_publisher_config ) ->
+           blueprints_publisher_config,
+           sunset_sec )
+       ->
       {
         time_between_blocks;
         max_number_of_chunks;
         sequencer;
         blueprints_publisher_config;
+        sunset_sec;
       })
-    (obj4
+    (obj5
        time_between_blocks_field
        max_number_of_chunks_field
-       (opt
-          ~description:"Secret key URI of the sequencer."
+       (dft
+          ~description:"List of (or single) Secret key URI of the sequencer."
           "sequencer"
-          sequencer_key_encoding)
+          sequencer_key_list_encoding
+          [])
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding
-          default_blueprints_publisher_config))
+          default_blueprints_publisher_config)
+       (dft
+          ~description:
+            "Number of seconds prior to a sequencer operator upgrade before \
+             which the current sequencer stops producing blocks"
+          "sunset_sec"
+          positive_i64_encoding
+          default_sequencer_sunset_sec))
 
 let observer_encoding ?network () =
   let open Data_encoding in
@@ -976,9 +1021,10 @@ let experimental_features_encoding =
            rpc_server;
            spawn_rpc;
            l2_chains : l2_chain list option;
-           enable_tx_queue;
            periodic_snapshot_path;
-         } ->
+           preconfirmation_stream_enabled;
+         }
+       ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
           enable_send_raw_transaction,
@@ -988,8 +1034,8 @@ let experimental_features_encoding =
         ( rpc_server,
           spawn_rpc,
           l2_chains,
-          enable_tx_queue,
-          periodic_snapshot_path ) ))
+          periodic_snapshot_path,
+          preconfirmation_stream_enabled ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
@@ -999,8 +1045,9 @@ let experimental_features_encoding =
            ( rpc_server,
              spawn_rpc,
              l2_chains,
-             enable_tx_queue,
-             periodic_snapshot_path ) ) ->
+             periodic_snapshot_path,
+             preconfirmation_stream_enabled ) )
+       ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -1009,8 +1056,8 @@ let experimental_features_encoding =
         rpc_server;
         spawn_rpc;
         l2_chains;
-        enable_tx_queue;
         periodic_snapshot_path;
+        preconfirmation_stream_enabled;
       })
     (merge_objs
        (obj6
@@ -1083,15 +1130,17 @@ let experimental_features_encoding =
              (option (list l2_chain_encoding))
              default_l2_chains)
           (dft
-             "enable_tx_queue"
-             ~description:"Replace the observer tx pool by a tx queue"
-             tx_queue_opt_encoding
-             default_experimental_features.enable_tx_queue)
-          (dft
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
              (option string)
-             default_experimental_features.periodic_snapshot_path)))
+             default_experimental_features.periodic_snapshot_path)
+          (dft
+             "preconfirmation_stream_enabled"
+             ~description:
+               "Activate or not the preconfirmation stream. This includes the \
+                sequencer as well as the observer."
+             bool
+             default_experimental_features.preconfirmation_stream_enabled)))
 
 let proxy_encoding =
   let open Data_encoding in
@@ -1175,7 +1224,8 @@ let gcp_kms_encoding =
             authentication_timeout_sec;
             gcloud_path;
           } :
-           gcp_kms) ->
+           gcp_kms)
+       ->
       ( pool_size,
         authentication_method,
         authentication_retries,
@@ -1189,7 +1239,8 @@ let gcp_kms_encoding =
            authentication_frequency_min,
            authentication_retry_backoff_sec,
            authentication_timeout_sec,
-           gcloud_path ) ->
+           gcloud_path )
+       ->
       {
         pool_size;
         authentication_method;
@@ -1334,7 +1385,7 @@ let native_execution_policy_encoding =
     @@ string_enum
          [("never", Never); ("rpcs_only", Rpcs_only); ("always", Always)])
 
-let kernel_execution_encoding ?network data_dir =
+let kernel_execution_encoding ?network () =
   Data_encoding.(
     let preimages_endpoint_field ~description name encoding =
       match network with
@@ -1352,13 +1403,12 @@ let kernel_execution_encoding ?network data_dir =
       (fun (preimages, preimages_endpoint, native_execution_policy) ->
         {preimages; preimages_endpoint; native_execution_policy})
       (obj3
-         (dft
+         (opt
             ~description:
               "Path to a directory containing the preimages the kernel can \
                reveal."
             "preimages"
-            string
-            (default_preimages data_dir))
+            string)
          (preimages_endpoint_field
             ~description:
               "Endpoint for downloading the preimages that cannot be found in \
@@ -1389,7 +1439,8 @@ let rpc_encoding =
              batch_limit;
              restricted_rpcs;
              max_active_connections;
-           } ->
+           }
+         ->
         ( port,
           addr,
           cors_origins,
@@ -1403,7 +1454,8 @@ let rpc_encoding =
              cors_headers,
              batch_limit,
              restricted_rpcs,
-             max_active_connections ) ->
+             max_active_connections )
+         ->
         {
           port;
           addr;
@@ -1495,7 +1547,32 @@ let db_encoding =
           ~description:"Maximum number of times a connection can be reused"
           int31))
 
-let encoding ?network data_dir : t Data_encoding.t =
+let performance_profile_encoding =
+  Data_encoding.string_enum [("default", Default); ("performance", Performance)]
+
+let default_telemetry_config =
+  {
+    config = Octez_telemetry.Opentelemetry_config.default;
+    trace_host_functions = false;
+  }
+
+let telemetry_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {config; trace_host_functions} -> (config, trace_host_functions))
+    (fun (config, trace_host_functions) -> {config; trace_host_functions})
+  @@ Octez_telemetry.Opentelemetry_config.extended_encoding
+       (obj1
+          (dft
+             "trace_host_functions"
+             ~description:
+               "Activate tracing for kernel host functions. Only recommended \
+                for debug or profiling as this will emit a lot of spans."
+             bool
+             default_telemetry_config.trace_host_functions))
+       default_telemetry_config.trace_host_functions
+
+let encoding ?network () : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
     match network with
@@ -1512,6 +1589,7 @@ let encoding ?network data_dir : t Data_encoding.t =
   in
   conv
     (fun {
+           data_dir;
            public_rpc;
            private_rpc;
            websockets;
@@ -1520,11 +1598,9 @@ let encoding ?network data_dir : t Data_encoding.t =
            observer;
            proxy;
            gcp_kms;
-           tx_pool_timeout_limit;
-           tx_pool_addr_limit;
-           tx_pool_tx_per_addr_limit;
            keep_alive;
            rollup_node_endpoint;
+           rpc_timeout;
            verbose;
            experimental_features;
            fee_history;
@@ -1533,13 +1609,14 @@ let encoding ?network data_dir : t Data_encoding.t =
            history_mode;
            db;
            opentelemetry;
-         } ->
-      ( (log_filter, sequencer, observer),
-        ( ( tx_pool_timeout_limit,
-            tx_pool_addr_limit,
-            tx_pool_tx_per_addr_limit,
-            keep_alive,
+           tx_queue;
+           performance_profile;
+         }
+       ->
+      ( (data_dir, log_filter, sequencer, observer, None, None, None),
+        ( ( keep_alive,
             rollup_node_endpoint,
+            rpc_timeout,
             verbose,
             experimental_features,
             proxy,
@@ -1552,13 +1629,19 @@ let encoding ?network data_dir : t Data_encoding.t =
             finalized_view,
             history_mode,
             db,
-            opentelemetry ) ) ))
-    (fun ( (log_filter, sequencer, observer),
-           ( ( tx_pool_timeout_limit,
-               tx_pool_addr_limit,
-               tx_pool_tx_per_addr_limit,
-               keep_alive,
+            opentelemetry,
+            tx_queue,
+            performance_profile ) ) ))
+    (fun ( ( data_dir,
+             log_filter,
+             sequencer,
+             observer,
+             _tx_pool_timeout_limit,
+             _tx_pool_addr_limit,
+             _tx_pool_tx_per_addr_limit ),
+           ( ( keep_alive,
                rollup_node_endpoint,
+               rpc_timeout,
                verbose,
                experimental_features,
                proxy,
@@ -1571,8 +1654,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                finalized_view,
                history_mode,
                db,
-               opentelemetry ) ) ) ->
+               opentelemetry,
+               tx_queue,
+               performance_profile ) ) )
+       ->
       {
+        data_dir;
         public_rpc;
         private_rpc;
         websockets;
@@ -1581,11 +1668,9 @@ let encoding ?network data_dir : t Data_encoding.t =
         observer;
         proxy;
         gcp_kms;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
         keep_alive;
         rollup_node_endpoint;
+        rpc_timeout;
         verbose;
         experimental_features;
         fee_history;
@@ -1594,36 +1679,43 @@ let encoding ?network data_dir : t Data_encoding.t =
         history_mode;
         db;
         opentelemetry;
+        tx_queue;
+        performance_profile;
       })
     (merge_objs
-       (obj3
+       (obj7
+          (dft
+             "data_dir"
+             ~description:"The path to the EVM node data directory."
+             string
+             default_data_dir)
           (dft
              "log_filter"
              log_filter_config_encoding
              (default_filter_config ()))
           (dft "sequencer" sequencer_encoding (sequencer_config_dft ()))
-          (observer_field "observer" (observer_encoding ?network ())))
+          (observer_field "observer" (observer_encoding ?network ()))
+          (opt
+             "tx_pool_timeout_limit"
+             ~description:
+               "Transaction timeout limit inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_lifespan\" instead."
+             int64)
+          (opt
+             "tx_pool_addr_limit"
+             ~description:
+               "Maximum allowed addresses inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_size\" instead."
+             int64)
+          (opt
+             "tx_pool_tx_per_addr_limit"
+             ~description:
+               "Maximum allowed transactions per user address inside the \
+                transaction pool. DEPRECATED: You should use \
+                \"tx_pool.tx_per_addr_limit\" instead."
+             int64))
        (merge_objs
-          (obj10
-             (dft
-                "tx_pool_timeout_limit"
-                ~description:
-                  "Transaction timeout limit inside the transaction pool"
-                int64
-                default_tx_pool_timeout_limit)
-             (dft
-                "tx_pool_addr_limit"
-                ~description:
-                  "Maximum allowed addresses inside the transaction pool."
-                int64
-                default_tx_pool_addr_limit)
-             (dft
-                "tx_pool_tx_per_addr_limit"
-                ~description:
-                  "Maximum allowed transactions per user address inside the \
-                   transaction pool."
-                int64
-                default_tx_pool_tx_per_addr_limit)
+          (obj8
              (dft
                 "keep_alive"
                 ~description:
@@ -1641,6 +1733,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                    Layer 1 blocks."
                 Tezos_rpc.Encoding.uri_encoding
                 default_rollup_node_endpoint)
+             (dft
+                "rpc_timeout"
+                ~description:
+                  "Timeout in seconds for RPC calls made by the EVM node."
+                float
+                default_rpc_timeout_s)
              (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
              (dft
                 "experimental_features"
@@ -1649,14 +1747,13 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj8
+          (obj10
              (dft
                 "kernel_execution"
-                (kernel_execution_encoding ?network data_dir)
+                (kernel_execution_encoding ?network ())
                 (kernel_execution_config_dft
                    ?preimages_endpoint:
                      (Option.map default_preimages_endpoint network)
-                   ~data_dir
                    ()))
              (dft "public_rpc" rpc_encoding (default_rpc ()))
              (opt "private_rpc" rpc_encoding)
@@ -1681,21 +1778,31 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft
                 "opentelemetry"
                 ~description:"Enable or disable opentelemetry profiling"
-                Octez_telemetry.Opentelemetry_config.encoding
-                Octez_telemetry.Opentelemetry_config.default))))
+                telemetry_config_encoding
+                default_telemetry_config)
+             (dft
+                "tx_pool"
+                ~description:"Configuration for the tx pool"
+                tx_queue_encoding
+                default_tx_queue)
+             (dft
+                "performance_profile"
+                ~description:"Performance profile for EVM node GC"
+                performance_profile_encoding
+                default_performance_profile))))
 
-let pp_print_json ~data_dir fmt config =
+let pp_print_json fmt config =
   let json =
     Data_encoding.Json.construct
       ~include_default_fields:`Always
-      (encoding data_dir)
+      (encoding ())
       config
   in
   Data_encoding.Json.pp fmt json
 
-let save ~force ~data_dir config config_file =
+let save ~force config config_file =
   let open Lwt_result_syntax in
-  let json = Data_encoding.Json.construct (encoding data_dir) config in
+  let json = Data_encoding.Json.construct (encoding ()) config in
   let*! exists = Lwt_unix.file_exists config_file in
   if exists && not force then
     failwith
@@ -1798,6 +1905,45 @@ let migrate_experimental_feature ?new_path ?(transform = Fun.id) path json =
       Ezjsonm.update json new_path (Some (transform v))
   | _, _ -> (* Don't override otherwise *) json
 
+let merge_tx_pool_values json =
+  let open Json_syntax in
+  let tx_queue = json |-> ["tx_pool"] in
+  let tx_pool_timeout_limit =
+    json |-> ["tx_pool_timeout_limit"]
+    |> Option.map (fun v -> Int64.of_string (Ezjsonm.get_string v))
+  in
+  let tx_pool_tx_per_addr_limit =
+    json
+    |-> ["tx_pool_tx_per_addr_limit"]
+    |> Option.map (fun v -> Int64.of_string (Ezjsonm.get_string v))
+  in
+  let json =
+    match (tx_queue, tx_pool_timeout_limit) with
+    | Some _, None -> json
+    | None, None -> json
+    | None, Some tx_pool_timeout_limit ->
+        Ezjsonm.update
+          json
+          ["tx_pool"; "max_lifespan"]
+          (Some (`String (Int64.to_string tx_pool_timeout_limit)))
+    | Some _, Some _ ->
+        Fmt.failwith
+          "tx_pool_timeout_limit and tx_pool.max_lifespan are both defined. \
+           Only define one of them"
+  in
+  match (tx_queue, tx_pool_tx_per_addr_limit) with
+  | Some _, None -> json
+  | None, None -> json
+  | None, Some tx_pool_tx_per_addr_limit ->
+      Ezjsonm.update
+        json
+        ["tx_pool"; "tx_per_addr_limit"]
+        (Some (`String (Int64.to_string tx_pool_tx_per_addr_limit)))
+  | Some _, Some _ ->
+      Fmt.failwith
+        "tx_pool_tx_per_addr_limit and tx_pool.tx_per_addr_limit both are \
+         defined. Only define one of them"
+
 let migrate_stabilized_experimental_features json =
   let open Json_syntax in
   json
@@ -1829,24 +1975,22 @@ let migrate_stabilized_experimental_features json =
   |> migrate_experimental_feature
        ["websocket_rate_limit"]
        ~new_path:["websockets"; "rate_limit"]
+  |> migrate_experimental_feature ["tx_queue"] ~new_path:["tx_pool"]
+  |> merge_tx_pool_values
 
-let load_file ?network ~data_dir path =
+let load_file ?network path =
   let open Lwt_result_syntax in
   let* json = Lwt_utils_unix.Json.read_file path in
   let* () = precheck json in
   let json = migrate_stabilized_experimental_features json in
-  let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
+  let config = Data_encoding.Json.destruct (encoding ?network ()) json in
   return config
 
-let load ?network ~data_dir config_file =
-  load_file ?network ~data_dir config_file
+let load ?network config_file = load_file ?network config_file
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
-let sequencer_key {sequencer = {sequencer; _}; _} =
-  Option.to_result
-    ~none:(error_missing_config ~name:"sequencer.sequencer")
-    sequencer
+let sequencer_keys {sequencer = {sequencer; _}; _} = Ok sequencer
 
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
@@ -1858,6 +2002,9 @@ let evm_node_endpoint_resolved network evm_node_endpoint =
        (fun network -> Uri.of_string (observer_evm_node_endpoint network))
        network)
 
+let preimages_path {data_dir; kernel_execution = {preimages; _}; _} =
+  Option.value preimages ~default:Filename.Infix.(data_dir // "wasm_2_0_0")
+
 module Cli = struct
   let default ~data_dir ?evm_node_endpoint ?network () =
     let observer =
@@ -1867,11 +2014,11 @@ module Cli = struct
     in
     let kernel_execution =
       kernel_execution_config_dft
-        ~data_dir
         ?preimages_endpoint:(Option.map default_preimages_endpoint network)
         ()
     in
     {
+      data_dir = Option.value data_dir ~default:default_data_dir;
       public_rpc = default_rpc ();
       private_rpc = None;
       websockets = None;
@@ -1881,25 +2028,23 @@ module Cli = struct
       observer;
       proxy = default_proxy ();
       gcp_kms = default_gcp_kms;
-      tx_pool_timeout_limit = default_tx_pool_timeout_limit;
-      tx_pool_addr_limit = default_tx_pool_addr_limit;
-      tx_pool_tx_per_addr_limit = default_tx_pool_tx_per_addr_limit;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
+      rpc_timeout = default_rpc_timeout_s;
       verbose = Internal_event.Notice;
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
       finalized_view = default_finalized_view;
       history_mode = None;
       db = default_db;
-      opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+      opentelemetry = default_telemetry_config;
+      tx_queue = default_tx_queue;
+      performance_profile = default_performance_profile;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
       ?preimages_endpoint ?native_execution_policy () =
-    let preimages =
-      Option.value preimages ~default:kernel_execution.preimages
-    in
+    let preimages = Option.either preimages kernel_execution.preimages in
     let preimages_endpoint =
       Option.either preimages_endpoint kernel_execution.preimages_endpoint
     in
@@ -1924,17 +2069,17 @@ module Cli = struct
         Option.value ~default:rpc.max_active_connections max_active_connections;
     }
 
-  let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
-      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
-      ?preimages ?preimages_endpoint ?native_execution_policy
+  let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port
+      ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
+      ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+      ?keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ?verbose
+      ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?log_filter_max_nb_blocks
+      ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots configuration =
+      ?dal_slots ?sunset_sec ?rpc_timeout configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1954,6 +2099,9 @@ module Cli = struct
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
     in
+    let rpc_timeout =
+      Option.value rpc_timeout ~default:configuration.rpc_timeout
+    in
     let finalized_view =
       Option.value finalized_view ~default:configuration.finalized_view
     in
@@ -1965,7 +2113,14 @@ module Cli = struct
     let opentelemetry =
       match profiling with
       | None -> configuration.opentelemetry
-      | Some enable -> {configuration.opentelemetry with enable}
+      | Some enable ->
+          {
+            configuration.opentelemetry with
+            config =
+              Octez_telemetry.Opentelemetry_config.enable
+                configuration.opentelemetry.config
+                enable;
+          }
     in
     let sequencer =
       let sequencer_config = configuration.sequencer in
@@ -1994,6 +2149,12 @@ module Cli = struct
             Option.either dal_slots blueprints_publisher_config.dal_slots;
         }
       in
+      let sunset_sec =
+        Option.value ~default:sequencer_config.sunset_sec sunset_sec
+      in
+      let sequencer_keys =
+        Option.value ~default:sequencer_config.sequencer sequencer_keys
+      in
       {
         time_between_blocks =
           Option.value
@@ -2003,8 +2164,9 @@ module Cli = struct
           Option.value
             ~default:sequencer_config.max_number_of_chunks
             max_number_of_chunks;
-        sequencer = Option.either sequencer_key sequencer_config.sequencer;
+        sequencer = sequencer_keys;
         blueprints_publisher_config;
+        sunset_sec;
       }
     in
     let observer =
@@ -2079,7 +2241,25 @@ module Cli = struct
       | Some false -> None
       | Some true -> Some default_websockets_config
     in
+    let tx_queue =
+      {
+        configuration.tx_queue with
+        max_lifespan_s =
+          Option.value
+            ~default:configuration.tx_queue.max_lifespan_s
+            tx_queue_max_lifespan;
+        max_size =
+          Option.value
+            ~default:configuration.tx_queue.max_size
+            tx_queue_max_size;
+        tx_per_addr_limit =
+          Option.value
+            ~default:configuration.tx_queue.tx_per_addr_limit
+            tx_queue_tx_per_addr_limit;
+      }
+    in
     {
+      data_dir = Option.value data_dir ~default:configuration.data_dir;
       public_rpc;
       private_rpc;
       websockets;
@@ -2089,20 +2269,9 @@ module Cli = struct
       observer;
       proxy;
       gcp_kms = configuration.gcp_kms;
-      tx_pool_timeout_limit =
-        Option.value
-          ~default:configuration.tx_pool_timeout_limit
-          tx_pool_timeout_limit;
-      tx_pool_addr_limit =
-        Option.value
-          ~default:configuration.tx_pool_addr_limit
-          tx_pool_addr_limit;
-      tx_pool_tx_per_addr_limit =
-        Option.value
-          ~default:configuration.tx_pool_tx_per_addr_limit
-          tx_pool_tx_per_addr_limit;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
+      rpc_timeout;
       verbose;
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
@@ -2110,29 +2279,33 @@ module Cli = struct
       history_mode = Option.either history_mode configuration.history_mode;
       db = configuration.db;
       opentelemetry;
+      tx_queue;
+      performance_profile = configuration.performance_profile;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
-      ?cors_headers ?enable_websocket ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?cors_headers ?enable_websocket ?tx_queue_max_lifespan ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
+      ?rpc_timeout () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
+         ~data_dir
          ?rpc_addr
          ?rpc_port
          ?rpc_batch_limit
          ?cors_origins
          ?cors_headers
          ?enable_websocket
-         ?tx_pool_timeout_limit
-         ?tx_pool_addr_limit
-         ?tx_pool_tx_per_addr_limit
+         ?tx_queue_max_lifespan
+         ?tx_queue_max_size
+         ?tx_queue_tx_per_addr_limit
          ?keep_alive
          ?rollup_node_endpoint
          ?dont_track_rollup_node
@@ -2144,7 +2317,7 @@ module Cli = struct
          ?time_between_blocks
          ?max_number_of_chunks
          ?private_rpc_port
-         ?sequencer_key
+         ?sequencer_keys
          ?evm_node_endpoint
          ?log_filter_max_nb_blocks
          ?log_filter_max_nb_logs
@@ -2158,25 +2331,29 @@ module Cli = struct
          ?proxy_ignore_block_param
          ?dal_slots
          ?history_mode
+         ?sunset_sec
+         ?rpc_timeout
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
+      ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
+      ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?keep_alive
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?max_blueprints_lag
+      ?sequencer_keys ?evm_node_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode config_file =
+      ?network ?history_mode ?sunset_sec ?rpc_timeout config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
        node *)
     let* () =
       let*! identity_file_in_data_dir_exists =
-        Lwt_unix.file_exists (data_dir // "identity.json")
+        match data_dir with
+        | Some data_dir -> Lwt_unix.file_exists (data_dir // "identity.json")
+        | None -> Lwt.return_false
       in
       if identity_file_in_data_dir_exists then
         failwith
@@ -2188,9 +2365,10 @@ module Cli = struct
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ?network ~data_dir config_file in
+      let* configuration = load ?network config_file in
       let configuration =
         patch_configuration_from_args
+          ~data_dir
           ?rpc_addr
           ?rpc_port
           ?rpc_batch_limit
@@ -2198,7 +2376,7 @@ module Cli = struct
           ?cors_headers
           ?enable_websocket
           ?keep_alive
-          ?sequencer_key
+          ?sequencer_keys
           ?evm_node_endpoint
           ?preimages
           ?preimages_endpoint
@@ -2210,9 +2388,9 @@ module Cli = struct
           ?max_blueprints_ahead
           ?max_blueprints_catchup
           ?catchup_cooldown
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
+          ?tx_queue_max_lifespan
+          ?tx_queue_max_size
+          ?tx_queue_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
@@ -2225,6 +2403,8 @@ module Cli = struct
           ?proxy_ignore_block_param
           ?history_mode
           ?dal_slots
+          ?sunset_sec
+          ?rpc_timeout
           configuration
       in
       return configuration
@@ -2239,7 +2419,7 @@ module Cli = struct
           ?cors_headers
           ?enable_websocket
           ?keep_alive
-          ?sequencer_key
+          ?sequencer_keys
           ?evm_node_endpoint
           ?preimages
           ?preimages_endpoint
@@ -2251,9 +2431,9 @@ module Cli = struct
           ?max_blueprints_ahead
           ?max_blueprints_catchup
           ?catchup_cooldown
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
+          ?tx_queue_max_lifespan
+          ?tx_queue_max_size
+          ?tx_queue_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
@@ -2267,11 +2447,12 @@ module Cli = struct
           ?dal_slots
           ?network
           ?history_mode
+          ?sunset_sec
+          ?rpc_timeout
           ()
       in
       return config
 end
 
 let describe () =
-  Data_encoding.Json.schema (encoding "DATA_DIR_PATH")
-  |> Format.printf "%a" Json_schema.pp
+  Data_encoding.Json.schema (encoding ()) |> Format.printf "%a" Json_schema.pp

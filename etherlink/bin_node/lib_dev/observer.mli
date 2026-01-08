@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ?kernel_path ~data_dir ~config ~no_sync ()] starts the main
+(** [main ?kernel_path ~config ~no_sync ()] starts the main
     event-loop of the Observer, consuming the blueprints received from
     the EVM node endpoint, unless [no_sync] is true.
 
@@ -14,8 +14,7 @@
     was not already created. *)
 val main :
   ?network:Configuration.supported_network ->
-  ?kernel_path:Wasm_debugger.kernel ->
-  data_dir:string ->
+  ?kernel_path:Pvm_types.kernel ->
   config:Configuration.t ->
   no_sync:bool ->
   init_from_snapshot:string option ->

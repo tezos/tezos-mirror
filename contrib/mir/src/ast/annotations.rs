@@ -1,14 +1,13 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Tezos annotations on a [Micheline][crate::ast::Micheline] nodes and
 //! utilities for working with them.
 
+use super::ByteReprError;
 use std::borrow::Cow;
+use tezos_protocol::entrypoint::{self, Entrypoint};
 
 /// A single Micheline annotation. Annotations are optionally-owned, meaning
 /// they should use references when feasible, but can use owned heap-allocated
@@ -84,6 +83,12 @@ impl std::fmt::Debug for Annotations<'_> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FieldAnnotation<'a>(Cow<'a, str>);
 
+impl<'a> Default for FieldAnnotation<'a> {
+    fn default() -> Self {
+        Self::from_str_unchecked(entrypoint::DEFAULT_EP_NAME)
+    }
+}
+
 impl<'a> FieldAnnotation<'a> {
     /// View the field annotation contents as a [str] slice. The leading `%` is
     /// _not_ included.
@@ -99,6 +104,32 @@ impl<'a> FieldAnnotation<'a> {
     /// Get the field annotation from a string slice.
     pub fn from_str_unchecked(s: &'a str) -> Self {
         FieldAnnotation(Cow::Borrowed(s))
+    }
+
+    /// Get the field annotation from a string. This will allocate a new
+    pub fn from_string(s: String) -> Self {
+        FieldAnnotation(Cow::Owned(s))
+    }
+}
+
+impl TryFrom<FieldAnnotation<'_>> for Entrypoint {
+    type Error = ByteReprError;
+
+    /// NB: This only checks for the entrypoint length. `default` is sometimes
+    /// forbidden when converting from field annotations, other times not, it's
+    /// left to the discretion of the caller to make that check.
+    fn try_from(x: FieldAnnotation<'_>) -> Result<Self, Self::Error> {
+        let s = x.as_str();
+        entrypoint::check_ep_name_len(s.as_bytes())?;
+        // SAFETY: we already checked for allowed characters when constructing a field
+        // annotation, so here we only check length.
+        Ok(Entrypoint::from_string_unchecked(s.to_owned()))
+    }
+}
+
+impl From<Entrypoint> for FieldAnnotation<'_> {
+    fn from(entrypoint: Entrypoint) -> Self {
+        FieldAnnotation::from_string(entrypoint.to_string())
     }
 }
 

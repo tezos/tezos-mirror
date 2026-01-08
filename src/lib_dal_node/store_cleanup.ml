@@ -49,7 +49,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let*? dal_constants =
       Node_context.get_proto_parameters ctxt ~level:(`Level level)
     in
-    Block_handler.store_skip_list_cells
+    Block_handler.fetch_and_store_skip_list_cells
       ctxt
       cctxt
       dal_constants
@@ -88,7 +88,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let rec clean_up_at_level level =
       if level > last_level then return_unit
       else
-        let*! () =
+        let* () =
           Block_handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
@@ -127,7 +127,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
   in
   let start_level = Int32.succ last_processed_level in
   let end_level = target_level head_level in
-  let levels_to_clean_up = Int32.(succ @@ sub end_level last_processed_level) in
+  let levels_to_clean_up = Int32.(succ @@ sub end_level start_level) in
   if levels_to_clean_up > 0l then
     let*! () =
       Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
@@ -184,9 +184,13 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
       let*! () = Event.emit_end_catchup () in
       return_unit
     else
-      let*! () =
+      let* () =
         Block_handler.remove_old_level_stored_data proto_parameters ctxt level
       in
+      L1_crawler_status.catching_up_or_synced_status
+        ~head_level
+        ~last_processed_level:level
+      |> Node_context.set_l1_crawler_status ctxt ;
       cleanup @@ Int32.succ level
   in
   let start_level = Int32.succ last_processed_level in

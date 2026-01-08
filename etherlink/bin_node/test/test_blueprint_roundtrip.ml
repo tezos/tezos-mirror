@@ -59,14 +59,19 @@ let smart_rollup_address =
 
 let make_blueprint ~delayed_transactions ~transactions =
   let cctxt = wallet () in
-  let* chunks =
-    Sequencer_blueprint.prepare
-      ~signer:(Signer.wallet cctxt sequencer_key)
-      ~timestamp:Time.Protocol.epoch
+  let chunks =
+    Sequencer_blueprint.make_blueprint_chunks
       ~number:(Qty Z.zero)
-      ~parent_hash:zero_hash
-      ~delayed_transactions
-      ~transactions
+      {
+        parent_hash = zero_hash;
+        delayed_transactions;
+        transactions;
+        timestamp = Time.Protocol.epoch;
+      }
+  in
+
+  let* chunks =
+    Sequencer_blueprint.sign ~signer:(Signer.wallet cctxt sequencer_key) ~chunks
   in
   let blueprint =
     Sequencer_blueprint.create_inbox_payload

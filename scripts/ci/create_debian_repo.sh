@@ -37,7 +37,6 @@ ARCHITECTURES=${ARCHITECTURES:-"amd64"}
 
 #The prefix used for these packages in the repository. E.g. 'next'
 PREFIX=${PREFIX:-""}
-
 # The linux distribution for which we are creating the apt repository
 # E.g. 'ubuntu' or 'debian'
 DISTRIBUTION=${1}
@@ -58,6 +57,9 @@ oldPWD=$PWD
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
   TARGETDIR="public/$PREFIX/RC/$DISTRIBUTION"
+  ;;
+Beta | TestBeta)
+  TARGETDIR="public/$PREFIX/BETA/$DISTRIBUTION"
   ;;
 Release | TestRelease)
   TARGETDIR="public/$PREFIX/$DISTRIBUTION"
@@ -103,9 +105,9 @@ for release in $RELEASES; do             # unstable, jammy, noble ...
     done
 
     # we also add the data packages that we built for
-    # bookworm, that are distribution independent. Only for next packages
+    # trixie, that are distribution independent.
     if [ -z "$PREFIX" ]; then
-      for file in packages/debian/bookworm/*_all.deb; do
+      for file in packages/debian/trixie/*_all.deb; do
         cp "$file" "$TARGETDIR/${target}/"
         echo "Adding data package $file to $TARGETDIR/${target}/"
       done

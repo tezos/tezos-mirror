@@ -23,12 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let number_of_slots = 32
+
+let number_of_shards = 512
+
+let attestation_lag = 8
+
+let traps_fraction = Q.(1 // 2000)
+
 (* Each entry in the cache maintains two open file descriptors (one via
    regular file opening and one via mmap on the bitset region).
-   So the selected value should be bigger than twice the number of slots per level,
-   since there are 32 slots, the selected value is 64.
+   So the selected value should be bigger than twice the number of slots per level.
    Note that setting a too high value causes a "Too many open files" error. *)
-let shards_store_lru_size = 64
+let shards_store_lru_size = 2 * number_of_slots
 
 (* There is no real rationale for the slot and status parts of the
    store; we just put low-enough values to avoid consuming too many
@@ -48,7 +55,7 @@ let committee_cache_size = 50
    finalize it) but a few more levels may be needed if the commitment
    is not published immediately so we consider a cache large enough to
    keep the shards for 5 levels. *)
-let cache_size =
+let not_yet_published_cache_size =
   let number_of_levels_to_keep = 5 in
   let number_of_slots = 5 in
   number_of_levels_to_keep * number_of_slots
@@ -56,7 +63,18 @@ let cache_size =
 (* This cache is being used for the validation of message ids, in particular
    messages in the future, it does not have to be big. We take the number of
    slots multiplied by the attestation lag, which sounds reasonable. *)
-let slot_id_cache_size = 32 * 8
+let slot_id_cache_size = number_of_slots * attestation_lag
+
+(* This cache is used for transient slot header status info.
+   Permanent info is stored on disk.
+   The size needs to be at least [number_of_slots * (attestation_lag + 1) * 2].
+   That's because the slot status of a slot published at [L] is first added
+   to the cache at level [L + 1], and then updated at level
+   [L + attestation_lag + tb_finality]. Also, when a block is finalized,
+   the slots will be updated with a attested/unattested status, and you don't
+   want it to erase later levels from statuses cache. Using twice the cache
+   size solves this problem. *)
+let statuses_cache_size = number_of_slots * (attestation_lag + 1) * 2
 
 let shards_verification_sampling_frequency = 100
 
@@ -83,10 +101,18 @@ let crawler_re_processing_delay = 5.
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 let bootstrap_dns_refresh_delay = 300.
 
-(* This size is being used for the node store's traps cache. While
-   [proto_parameters.Dal_plugin.attestation_lag] defines the minimum
-   number of levels for which traps must be retained, we maintain a
-   larger cache capacity of 50 levels. This extended size is
-   acceptable since the cache is sparsely populated due to
-   [proto_parameters.traps_fraction]. *)
-let traps_cache_size = 50
+(* The size of the node store's traps cache. We set it to 2 times the maximum
+   expected size when all slots are used. *)
+let traps_cache_size =
+  let open Q in
+  mul (of_int 2)
+  @@ mul (of_int number_of_slots)
+  @@ mul (of_int number_of_shards)
+  @@ mul (of_int attestation_lag)
+  @@ traps_fraction
+  |> to_int
+
+(* The expected time, in seconds, sufficient to subscribe and connect to new
+   peers on a (new) topic. This was not measured and the value is meant to be a
+   gross over-approximation. *)
+let time_to_join_new_topics = 5

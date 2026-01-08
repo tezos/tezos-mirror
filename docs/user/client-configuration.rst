@@ -41,8 +41,8 @@ The config command
 
    ./octez-client config init
 
-This will initialize a configuration file for the client in
-``$HOME/.tezos-client/config``, using default values. For instance, it
+This will initialize a configuration file for the client in the default client
+``base-dir``: ``$HOME/.tezos-client/config``, using default values. For instance, it
 specifies that the client will use the local node as an RPC endpoint.
 
 The easiest way to amend this default configuration is to use commands such as:
@@ -64,6 +64,9 @@ You may also edit the configuration file directly (``$HOME/.tezos-client/config`
 To run the client in multiple configurations on the same machine, you can duplicate and edit
 ``$HOME/.tezos-client/config`` while making sure they don't share
 the same ``base-dir``. Then run your client with ``./octez-client run --base-dir=</path/to/alternate_cfg>``.
+
+The config file could also be created outside of the client ``base-dir``
+(``$HOME/.tezos-client/`` by default) with the ``--config-file <path/to/alternate-cfg>`` option.
 
 .. _client_variables:
 

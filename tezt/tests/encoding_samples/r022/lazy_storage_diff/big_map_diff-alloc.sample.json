@@ -1,0 +1,14 @@
+[{
+  "kind":"big_map",
+  "id":"0",
+  "diff":
+  {
+  "action": "alloc",
+  "updates": [],
+  "key_type": {
+    "prim": "nat"
+  },
+  "value_type": {
+    "prim": "unit"
+  }
+}}]

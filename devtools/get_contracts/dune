@@ -7,10 +7,10 @@
   octez-libs.micheline
   octez-libs.base
   octez-shell-libs.store
-  tezos-protocol-022-PsRiotum.protocol
-  octez-protocol-022-PsRiotum-libs.client
   tezos-protocol-023-PtSeouLo.protocol
   octez-protocol-023-PtSeouLo-libs.client
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))

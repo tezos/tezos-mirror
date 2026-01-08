@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Michelson parser.
 
@@ -82,6 +79,7 @@ pub(crate) fn spanned_lexer(
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_helpers {
     use super::*;
 

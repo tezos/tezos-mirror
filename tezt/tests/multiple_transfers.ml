@@ -175,8 +175,8 @@ let test_multiple_transfer =
       if payer = source then
         match protocol with
         | Protocol.Alpha -> Tez.of_mutez_int 0_000_835
+        | Protocol.T024 -> Tez.of_mutez_int 0_000_835
         | Protocol.S023 -> Tez.of_mutez_int 0_000_835
-        | Protocol.R022 -> Tez.of_mutez_int 0_000_835
       else Tez.zero
     in
     Check.(

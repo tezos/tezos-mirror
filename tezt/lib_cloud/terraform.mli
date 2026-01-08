@@ -34,6 +34,8 @@ module VM : sig
     auto_approve:bool ->
     max_run_duration:int option ->
     machine_type:string ->
+    disk_type:string option ->
+    disk_size_gb:int option ->
     base_port:int ->
     ports_per_vm:int ->
     number_of_vms:int ->

@@ -257,8 +257,7 @@ module DSL = struct
     let module Tg = (val tag : DEF with type t = a) in
     Tg.pp
 
-  let ( -% ) :
-      type a d.
+  let ( -% ) : type a d.
       (?tags:set -> a) -> (a, Format.formatter, unit, d) arg -> ?tags:set -> d =
    fun f -> function
     | A (tag, v) ->

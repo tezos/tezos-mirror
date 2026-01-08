@@ -121,6 +121,14 @@ let block_number ~root read n =
           @@ Invalid_block_structure
                "Unexpected [None] value for [current_number]'s [answer]")
 
+let list_runtimes read =
+  let open Lwt_result_syntax in
+  let check_runtime r =
+    let* bytes_opt = read (Tezosx.feature_flag r) in
+    if Option.is_some bytes_opt then return @@ Some r else return None
+  in
+  List.filter_map_ep check_runtime Tezosx.known_runtimes
+
 module Make (Reader : READER) = struct
   let read_with_state ?block () =
     let open Lwt_result_syntax in
@@ -181,4 +189,9 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     block_number ~root read Durable_storage_path.Block.Current
+
+  let list_runtimes () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    list_runtimes read
 end

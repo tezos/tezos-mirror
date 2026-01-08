@@ -4,9 +4,9 @@ set -eu
 
 help() {
   cat << EOT
-This script updates opam/virtual/octez-deps.opam.locked.
-This lock file contains the version number for all of Octez dependencies,
-both direct and indirect. It does not include dev-only dependencies.
+This script updates lock files in opam/virtual/.
+These lock files contain the version number for our dependencies,
+both direct and indirect. They do not include dev-only dependencies.
 
 To produce this lock file, this scripts asks opam to use the commit:
 
@@ -82,9 +82,16 @@ export OPAMSWITCH="$tmp_opam_switch"
 # The default timeout (60 seconds) is often not enough.
 export OPAMSOLVERTIMEOUT="${OPAMSOLVERTIMEOUT:-600}"
 
-# Pin stdcompat to a commit that's compatible with OCaml 5.2.1
-echo "---- Pinning stdcompat"
-opam pin add https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99 -n -y
+# Pin dream to 1.0.0~alpha8-octez and dream-httpaf to 1.0.0~alpha4-octez
+echo "---- Pinning dream and dream-httpaf"
+opam pin add dream-httpaf.1.0.0~alpha4-octez https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee -n -y
+opam pin add dream.1.0.0~alpha8-octez https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee -n -y
+
+# Pin cohttp to 5.3.1-octez
+echo "---- Pinning cohttp"
+opam pin add cohttp.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
+opam pin add cohttp-lwt.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
+opam pin add cohttp-lwt-unix.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
 
 # Pin base to a commit that's compatible with latest versions of Mac OS.
 #
@@ -93,7 +100,7 @@ opam pin add https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a
 # `v0.16.4` cherry-picking a work-in-progress pull request that improves the
 # mechanism to check `-mpopcnt` compatibility.
 echo "---- Pinning base"
-opam pin add https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6 -y
+opam pin add https://github.com/vch9/base.git#7f6581ba5e29fd340266cb901a59f24ebfbe67f1 -y
 
 # Ask opam to find a solution that covers both:
 # - 'octez-deps', so that we can compile Octez;
@@ -101,7 +108,7 @@ opam pin add https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5
 #   may want to install.
 # We use --fake to tell opam not to actually compile the packages.
 echo "---- Run: 'opam install'"
-opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --update-invariant
+opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam opam/virtual/release-tools-deps.opam --update-invariant
 
 # The utop package is a special case.
 # The pyml package, which is an actual dependency, optionally depends on utop.
@@ -113,17 +120,32 @@ opam remove --yes --fake utop
 
 echo "---- Run: 'opam lock'"
 opam lock opam/virtual/octez-deps.opam
+opam lock opam/virtual/release-tools-deps.opam
 
 # Starting with `ocaml/opam-repository` commit hash
 # 0b240d2960133fd3d8aa8f008d7aa79534caa3b9, ocaml-base-compiler now explicitly
-# depends on system libraries. We need to remove them from our lockfile,
-# otherwise they won’t be portable.
+# depends on system libraries.
 # See https://github.com/ocaml/opam-repository/commit/0b240d2960133fd3d8aa8f008d7aa79534caa3b9
+# Similarly, since we rely on eio_main, our dependencies tree contain system
+# dependent libraries (e.g, on Linux, we use uring).
+#
+# Having these system-dependent libraries listed in our lock file make this
+# lock file system-dependent as well. Fortunately, lock files are not close
+# sets of dependencies we are allowed to use, but rather subsets of
+# dependencies we are obligated to install. By dropping system-dependent
+# dependencies from the lock file, we basically defer to Opam the choice to
+# pick the most suited one, ensuring our lock file is portable.
 ed -s octez-deps.opam.locked << EOF
 g/host-arch-/d
 g/host-system-/d
+g/eio_linux/d
+g/eio_posix/d
+g/uring/d
 w
 EOF
 
 mv octez-deps.opam.locked opam/virtual
 echo "---- Updated: opam/virtual/octez-deps.opam.locked"
+
+mv release-tools-deps.opam.locked opam/virtual
+echo "---- Updated: opam/virtual/release-tools-deps.opam.locked"

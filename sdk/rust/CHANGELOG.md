@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `Contract` defining contract address.
 - Add `Entrypoint` defining transaction entrypoint.
 - Add `OperationContent`, `ManagerOperationContent`, `RevealContent`, `TransactionContent` defining operations contents for reveal and transaction.
+- Add `DelegationContent` defining operation content for delegation.
+- Add `OriginationContent` defining operation content for origination.
 
 ### Changed
 

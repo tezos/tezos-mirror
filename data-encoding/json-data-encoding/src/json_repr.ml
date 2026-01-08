@@ -123,8 +123,7 @@ end
 
 type yojson = Yojson.value
 
-let convert :
-    type tt tf.
+let convert : type tt tf.
     (module Repr with type value = tf) ->
     (module Repr with type value = tt) ->
     tf ->

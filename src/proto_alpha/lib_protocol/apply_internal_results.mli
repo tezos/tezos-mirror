@@ -45,7 +45,7 @@ type 'kind internal_operation_contents =
       -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
-      script : Script.t;
+      script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination internal_operation_contents
@@ -87,6 +87,7 @@ type successful_transaction_result =
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
+      address_registry_diff : Address_registry.diff list;
     }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;

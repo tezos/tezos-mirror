@@ -30,9 +30,10 @@ end
 
 module Make
     (Params : External_process_parameters.S)
-    (Processing : EXTERNAL_PROCESSING
-                    with type parameters := Params.parameters
-                     and type 'response request := 'response Params.request) =
+    (Processing :
+      EXTERNAL_PROCESSING
+        with type parameters := Params.parameters
+         and type 'response request := 'response Params.request) =
 struct
   type error += Inconsistent_handshake of string
 

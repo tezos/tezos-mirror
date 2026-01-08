@@ -1893,8 +1893,8 @@ type (_, _, _) init_section =
   | Table : ((table, table_inst) Either.t, table, table_inst) init_section
   | Memory : ((memory, memory_inst) Either.t, memory, memory_inst) init_section
 
-let section_fetch_vec :
-    type kont a b. module_inst -> (kont, a, b) init_section -> b Vector.t =
+let section_fetch_vec : type kont a b.
+    module_inst -> (kont, a, b) init_section -> b Vector.t =
  fun inst sec ->
   match sec with
   | Func -> inst.funcs
@@ -1902,8 +1902,7 @@ let section_fetch_vec :
   | Table -> inst.tables
   | Memory -> inst.memories
 
-let section_set_vec :
-    type kont a b.
+let section_set_vec : type kont a b.
     module_inst -> (kont, a, b) init_section -> b Vector.t -> module_inst =
  fun inst sec vec ->
   match (sec, vec) with
@@ -2018,8 +2017,7 @@ type init_kont =
   | IK_Eval of config
   | IK_Stop
 
-let section_next_init_kont :
-    type kont a b.
+let section_next_init_kont : type kont a b.
     module_ -> module_inst -> (kont, a, b) init_section -> init_kont =
  fun m inst0 sec ->
   match sec with
@@ -2033,8 +2031,7 @@ let section_next_init_kont :
             m.it.exports
             {exports = NameMap.create (); exports_memory_0 = false} )
 
-let section_inner_kont :
-    type kont a b.
+let section_inner_kont : type kont a b.
     stack_size_limit:int -> module_key -> (kont, a, b) init_section -> a -> kont
     =
  fun ~stack_size_limit self sec x ->
@@ -2044,8 +2041,8 @@ let section_inner_kont :
   | Table -> Left x
   | Memory -> Left x
 
-let section_inner_completed :
-    type kont a b. (kont, a, b) init_section -> kont -> b option =
+let section_inner_completed : type kont a b.
+    (kont, a, b) init_section -> kont -> b option =
  fun sec kont ->
   match (sec, kont) with
   | Func, Right y -> Some y
@@ -2054,8 +2051,7 @@ let section_inner_completed :
   | Memory, Right y -> Some y
   | _ -> None
 
-let section_inner_step :
-    type kont a b.
+let section_inner_step : type kont a b.
     host_funcs:Host_funcs.registry ->
     module_inst ModuleMap.t ->
     module_key ->

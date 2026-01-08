@@ -32,7 +32,7 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
 
 3. Add NL Repository
 --------------------
-**If using Debian**, add the NL package repository and install the ``octez-node`` package:
+**If using Debian** (see other :ref:`supported platforms <installing_deb>`), add the NL package repository and install the ``octez-node`` package:
 
 .. code:: shell
 
@@ -106,16 +106,20 @@ Install the baker::
 
     sudo apt install octez-baker
 
+During installation, depending on the interaction settings, the configuration dialog may offer you the choice between running the unique baker executable or several protocol-suffixed executables.
+
 If you want to install RPM packages rather then Debian ones, refer to :ref:`installing_rpm`.
 
 Then enable and start the baking service::
 
-    sudo systemctl enable octez-baker-active
-    sudo systemctl start octez-baker-active
+    sudo systemctl enable octez-baker
+    sudo systemctl start octez-baker
 
 You may then inspect its trace with::
 
-    sudo tail -f /var/log/tezos/baker-active.log
+    sudo tail -f /var/log/tezos/baker.log
+
+If you configured the package to use several protocol-suffixed binaries, the log names would bear the protocol suffixes (``baker-<PROTO>.log``).
 
 Context and Explanations
 ========================
@@ -141,15 +145,10 @@ Baker Configuration
 The installation procedure of ``octez-baker`` will ask a few questions.
 Since the configuration of the baker keys lives in the Octez client data, we don't have to migrate these, but check that the keys are still relevant.
 
-The ``octez-baker`` package manages two services:
-
-- ``octez-baker-active``: For the current protocol.
-- ``octez-baker-next``: For the upcoming protocol.
-
-The protocol associated with these two services can be changed by reconfiguring the package::
+The baker binary or binaries ran by the ``octez-baker`` service for the active and next protocols can be changed by reconfiguring the package::
 
     sudo dpkg-reconfigure octez-baker
 
-or manually editing the files in ``/etc/default/octez-baker*``.
+or manually editing the file ``/etc/default/octez-baker``.
 
 After the migration is complete, if you are using Debian packages consider removing all leftover configuration files from the Serokell packages, by doing ``apt purge tezos-client tezos-node tezos-baking``.

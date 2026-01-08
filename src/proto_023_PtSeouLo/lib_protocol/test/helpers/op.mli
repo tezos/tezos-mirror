@@ -58,19 +58,89 @@ val sign :
 
 val create_proof : Signature.secret_key -> Signature.Bls.t option
 
+(** Information needed on the author of a (pre)attestation: slot
+    (written into the (pre)attestation) and consensus key (required
+    for signing). *)
+type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
+
+(** Builds an {!attesting_slot} with the attester's consensus key and
+    canonical slot, that is, its first slot. *)
+val attesting_slot_of_attester : Context.attester -> attesting_slot
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators}. *)
+val get_attesting_slot : attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of delegate [manager_pkh]
+    for [attested_block]. Fails if it doesn't have any attesting
+    rights for this block. *)
+val get_attesting_slot_of_delegate :
+  manager_pkh:public_key_hash ->
+  attested_block:Block.t ->
+  attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is different from [consensus_pkh_to_avoid]. *)
+val get_different_attesting_slot :
+  consensus_pkh_to_avoid:public_key_hash ->
+  attested_block:Block.t ->
+  attesting_slot tzresult Lwt.t
+
+(** Builds an {!attesting_slot} with the attester's consensus key and
+    its second-smallest slot (that is, a non-canonical slot that still
+    belongs to the attester). *)
+val non_canonical_attesting_slot_of_attester :
+  Context.attester -> attesting_slot
+
+(** Retrieves the first attester returned by
+    {!Plugin.RPC.Validators.S.validators} and builds a non-canonical
+    {!attesting_slot} for it, where {!field-slot} is its
+    second-smallest slot. *)
+val get_non_canonical_attesting_slot :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Default committee for a (pre)attestations aggregate, that is, the
+    canonical attesting slots of all delegates with attesting rights
+    on [attested_block] whose consensus keys are BLS keys. *)
+val default_committee :
+  attested_block:Block.t -> attesting_slot list tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is a BLS key. *)
+val get_attesting_slot_with_bls_key :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is a non-BLS key. *)
+val get_attesting_slot_with_non_bls_key :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} corresponding to a
+    {!RPC.Attestation_rights.delegate_rights}. *)
+val attesting_slot_of_delegate_rights :
+  RPC.Attestation_rights.delegate_rights -> attesting_slot
+
 (** Create an unpacked attestation that is expected for given [Block.t].
 
     Optional parameters allow to specify the attested values: [level],
     [round], [block_payload_hash], and/or [dal_content].
 
-    They also allow to specify the attester ([delegate]), and/or the
-    [slot]. These default to the first slot and its delegate.
+    The consensus slot and signer are the ones from [attesting_slot]
+    if provided, otherwise the canonical ones for the delegate with
+    [manager_pkh] if provided (and the function fails if [manager_pkh]
+    is not the manager key of a delegate with attesting rights at the
+    given [Block.t]'s level); otherwise, they default to the attesting
+    slot returned by {!get_attesting_slot}. The function fails if both
+    [attesting_slot] and [manager_pkh] are provided.
 
     Finally, the operation [branch] can be specified. It defaults to the
     predecessor of the attested block. *)
 val raw_attestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -84,8 +154,8 @@ val raw_attestation :
 
     Optional parameters are the same than {!raw_attestation}. *)
 val raw_preattestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -96,8 +166,8 @@ val raw_preattestation :
 (** Create a packed attestation that is expected for a given
     [Block.t] by packing the result of {!raw_attestation}. *)
 val attestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -106,36 +176,44 @@ val attestation :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed attestations_aggregate that is expected for a given
-    [Block.t]. Block context is expected to include at least one delegate with a
-    BLS key (or a registered consensus keys). *)
+(** Crafts an {!Attestations_aggregate} operation pointing to the
+    given {!Block.t}. Block context is expected to include at least
+    one delegate with a BLS consensus key, otherwise this function
+    will return an error.
+
+    The committee consists of the concatenation of [committee] with
+    [dal_content = None] for each member, and of
+    [committee_with_dal]. If neither is provided, it defaults to
+    {!default_committee} with no DAL contents.
+
+    Other parameters are the same as in {!raw_attestation}. *)
+val raw_attestations_aggregate :
+  ?committee:attesting_slot list ->
+  ?committee_with_dal:(attesting_slot * dal_content option) list ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?branch:Block_hash.t ->
+  Block.t ->
+  Kind.attestations_aggregate Operation.t tzresult Lwt.t
+
+(** Same as {!raw_preattestations_aggregate} but returns the packed
+    operation. *)
 val attestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:attesting_slot list ->
+  ?committee_with_dal:(attesting_slot * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
-
-(** Aggregate a list of attestations in a single Attestations_aggregate.
-    Attestations signed by non-bls delegates are ignored. Evaluates to {!None} if
-    no bls-signed attestations are found or if signature_aggregation failed
-    (due to unreadable signature representation). *)
-val raw_aggregate :
-  Kind.attestation_consensus_kind Kind.consensus operation trace ->
-  Kind.attestations_aggregate operation option
-
-(** Same as {!raw_aggregate} but returns the packed operation. *)
-val aggregate :
-  Kind.attestation_consensus_kind Kind.consensus operation trace ->
-  Operation.packed option
 
 (** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preattestation}. *)
 val preattestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -143,11 +221,16 @@ val preattestation :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed preattestations_aggregate that is expected for a given
-    [Block.t]. Block context is expected to include at least one delegate with a
-    BLS key (or a registered consensus keys). *)
+(** Crafts a {!Preattestations_aggregate} operation pointing to the
+    given {!Block.t}. Block context is expected to include at least
+    one delegate with a BLS consensus key, otherwise this function
+    will return an error.
+
+    [committee] defaults to {!default_committee}.
+
+    Other parameters are the same as in {!raw_attestation}. *)
 val raw_preattestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:attesting_slot list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -158,26 +241,13 @@ val raw_preattestations_aggregate :
 (** Same as {!raw_preattestations_aggregate} but returns the packed
     operation. *)
 val preattestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:attesting_slot list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
-
-(** Aggregate a list of preattestations in a single Preattestations_aggregate.
-    Preattestations signed by non-bls delegates are ignored. Evaluates to {!None} if
-    no bls-signed attestations are found or if signature_aggregation failed. *)
-val raw_aggregate_preattestations :
-  Kind.preattestation_consensus_kind Kind.consensus operation trace ->
-  Kind.preattestations_aggregate operation option
-
-(** Same as {!raw_aggregate_preattestations} but returns the packed
-    operation. *)
-val aggregate_preattestations :
-  Kind.preattestation_consensus_kind Kind.consensus operation trace ->
-  Operation.packed option
 
 type gas_limit =
   | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)
@@ -322,7 +392,7 @@ val increase_paid_storage :
     {li [?forge_proof]: use a provided [proof] instead of creating a
     correct proof for [pkh]. Useful for forging non-honest reveal
     operations}
-    
+
     {li [?storage_limit:Z.t]: forces a storage limit, otherwise
     set to [Z.zero]}}
 *)
@@ -787,14 +857,17 @@ type tested_mode = Application | Construction | Mempool
 
     - When [tested_mode] is [Mempool], a mempool is initialized using
       [predecessor] as head, then {!Incremental.add_operation} is called
-      on [operation].
+      on [operation], then {!Incremental.finalize_block_with_metadata}.
 
-    When [error] is [None], we check that everything succeeds,
-    otherwise we check that the error identified by [error] is
-    returned.
+    When [check_after] is provided, it is called on the resulting
+    block. When [error] is provided, we check that an error identified
+    by [error] is returned. When neither is provided, we return unit
+    if there the validation and application returned [Ok], or the
+    unchanged error. When both are provided, the function fails.
 *)
 val check_validation_and_application :
   loc:string ->
+  ?check_after:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?error:(Environment.Error_monad.error -> bool) ->
   predecessor:Block.t ->
   tested_mode ->
@@ -802,9 +875,12 @@ val check_validation_and_application :
   unit tzresult Lwt.t
 
 (** Calls {!check_validation_and_application} on all {!tested_mode}s
-    successively, with respective errors. *)
+    successively, with respective checks or errors. *)
 val check_validation_and_application_all_modes_different_outcomes :
   loc:string ->
+  ?check_after_application:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
+  ?check_after_construction:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
+  ?check_after_mempool:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?application_error:(Environment.Error_monad.error -> bool) ->
   ?construction_error:(Environment.Error_monad.error -> bool) ->
   ?mempool_error:(Environment.Error_monad.error -> bool) ->
@@ -813,9 +889,11 @@ val check_validation_and_application_all_modes_different_outcomes :
   unit tzresult Lwt.t
 
 (** Calls {!check_validation_and_application} on all {!tested_mode}s
-    successively, with the same [error] provided for each mode. *)
+    successively, with the same [check_after] or [error] provided for
+    each mode. *)
 val check_validation_and_application_all_modes :
   loc:string ->
+  ?check_after:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?error:(Environment.Error_monad.error -> bool) ->
   predecessor:Block.t ->
   t ->

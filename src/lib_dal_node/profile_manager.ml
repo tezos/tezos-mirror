@@ -239,7 +239,7 @@ let get_attested_data_default_store_period t proto_parameters =
         (has_operator, period)
     | Bootstrap ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
-           This period should be zero. *)
+     This period should be zero. *)
         let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
         (false, bootstrap_node_period)
   in

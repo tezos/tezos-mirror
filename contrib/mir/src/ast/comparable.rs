@@ -1,12 +1,18 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 use super::TypedValue;
 
+// `TypedValue` is partially ordered: two `TypedValue`s are only
+// comparable when they have the same type and this common type is
+// comparable. Unfortunately, we need `TypedValue` to implement `Ord`
+// to build use them as elements in sets and keys in maps. Therefore
+// we have an implementation of `Ord` which can panic and a
+// non-canonical (in the sense that it can return `None`, despite
+// `Ord` being implemented) implementation of `PartialOrd`.
+
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for TypedValue<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use TypedValue::*;

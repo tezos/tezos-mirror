@@ -359,14 +359,6 @@ let secrets =
 
 (** {3 Context Manipulations } *)
 
-let pick_two_attesters ctxt =
-  let open Lwt_result_syntax in
-  let module V = Plugin.RPC.Validators in
-  let* attesters = Context.get_attesters ctxt in
-  match attesters with
-  | a :: b :: _ -> return (a.V.consensus_key, b.V.consensus_key)
-  | _ -> assert false
-
 let pick_addr_attester ctxt =
   let open Lwt_result_syntax in
   let module V = Plugin.RPC.Validators in

@@ -272,8 +272,11 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       Gen.stream_proof
       (encoding_test
          Encoding.stream_proof_encoding
-         (fun (* stream proof uses Seq.t *)
-                a b ->
+         (fun
+           (* stream proof uses Seq.t *)
+             a
+           b
+         ->
            a.version = b.version && a.before = b.before && a.after = b.after
            && List.of_seq a.state = List.of_seq b.state))
 
@@ -482,8 +485,11 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       Gen.stream_proof
       (encoding_test
          Encoding.stream_proof_encoding
-         (fun (* stream proof uses Seq.t *)
-                a b ->
+         (fun
+           (* stream proof uses Seq.t *)
+             a
+           b
+         ->
            a.version = b.version && a.before = b.before && a.after = b.after
            && List.of_seq a.state = List.of_seq b.state))
 

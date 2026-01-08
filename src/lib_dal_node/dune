@@ -9,6 +9,7 @@
   bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
+  octez-libs.tezos-bees
   tezos-dal-node-services
   dal_node_migrations
   octez-shell-libs.protocol-updater
@@ -33,7 +34,8 @@
   octez-libs.base.p2p-identity-file
   octez-shell-libs.shell-services
   opentelemetry
-  octez-libs.opentelemetry-client-cohttp-lwt
+  opentelemetry-client-cohttp-lwt
+  octez-libs.octez-telemetry
   octez-libs.prometheus-app
   octez-libs.prometheus
   octez-crawler

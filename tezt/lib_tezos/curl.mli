@@ -30,17 +30,26 @@
     Fails if [curl] is not found in path.
   *)
 val get :
-  ?runner:Runner.t -> ?args:string list -> string -> JSON.t Runnable.process
+  ?name:string ->
+  ?runner:Runner.t ->
+  ?args:string list ->
+  string ->
+  JSON.t Runnable.process
 
 (** Same as [get] but does not parse the returned value *)
 val get_raw :
-  ?runner:Runner.t -> ?args:string list -> string -> string Runnable.process
+  ?name:string ->
+  ?runner:Runner.t ->
+  ?args:string list ->
+  string ->
+  string Runnable.process
 
 (** [post url data] returns a runnable posting [data] to [url] with curl.
 
     The response is parsed and returned as JSON.
     Fails if [curl] is not found in path. *)
 val post :
+  ?name:string ->
   ?runner:Runner.t ->
   ?args:string list ->
   string ->
@@ -49,6 +58,7 @@ val post :
 
 (** Same as [post] but does not parse the returned value *)
 val post_raw :
+  ?name:string ->
   ?runner:Runner.t ->
   ?args:string list ->
   string ->
@@ -60,6 +70,7 @@ val post_raw :
     The response is parsed and returned as JSON.
     Fails if [curl] is not found in path. *)
 val put :
+  ?name:string ->
   ?runner:Runner.t ->
   ?args:string list ->
   string ->
@@ -68,6 +79,7 @@ val put :
 
 (** Same as [put] but does not parse the returned value *)
 val put_raw :
+  ?name:string ->
   ?runner:Runner.t ->
   ?args:string list ->
   string ->

@@ -719,10 +719,10 @@ module MakeService (Encoding : ENCODING) : sig
     exception Not_equal
 
     type (_, _) eq =
-      | Eq
-          : ( ('query, 'input, 'output, 'error) types,
-              ('query, 'input, 'output, 'error) types )
-            eq
+      | Eq :
+          ( ('query, 'input, 'output, 'error) types,
+            ('query, 'input, 'output, 'error) types )
+          eq
 
     val eq :
       ('query1, 'input1, 'output1, 'error1) types ->

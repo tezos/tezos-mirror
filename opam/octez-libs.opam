@@ -9,7 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "Apache-2.0"
 depends: [
   "dune" { >= "3.11.1" }
-  "ocaml" { >= "5.2.1" & < "5.3.0" }
+  "ocaml" { >= "5.3.0" & < "5.4.0" }
   "uri" { >= "3.1.0" }
   "hex" { >= "1.3.0" }
   "crowbar" { with-test & >= "0.2" }
@@ -20,22 +20,17 @@ depends: [
   "zarith" { >= "1.13" & < "1.14" }
   "bigstringaf" { >= "0.5.0" }
   "ppx_expect"
-  "ppx_sexp_conv"
   "lwt" { >= "5.7.0" & < "5.9.0" }
-  "cohttp" { >= "5.3.1" }
-  "logs"
-  "fmt" { >= "0.8.7" }
-  "conduit-lwt" { >= "7.1.0" }
-  "magic-mime" { >= "1.3.1" }
-  "conduit-lwt-unix" { >= "7.1.0" }
-  "lwt_ppx"
-  "mtime" { >= "2.0.0" }
-  "opentelemetry"
   "astring"
   "asetmap" { >= "0.8.1" }
   "re" { >= "1.10.0" }
+  "cohttp-lwt" { = "5.3.1~octez" }
+  "fmt" { >= "0.8.7" }
   "cmdliner" { >= "1.1.0" }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
+  "logs"
   "alcotest-lwt" { >= "1.5.0" }
+  "conduit-lwt-unix" { >= "7.1.0" }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "qcheck-core"
   "qcheck-alcotest" { >= "0.20" }
@@ -60,16 +55,20 @@ depends: [
   "lwt-exit"
   "ipaddr" { >= "5.3.0" & < "6.0.0" }
   "ptime" { >= "1.1.0" }
+  "mtime" { >= "2.0.0" }
   "conf-libev"
   "progress" { >= "0.1.0" }
   "camlp-streams" { >= "5.0.1" }
+  "octez-lwt-domain"
   "terminal"
   "uutf"
   "eio"
-  "eio_main"
+  "eio_posix"
   "lwt_eio"
   "ppxlib" { >= "0.34.0" }
+  "opentelemetry" { >= "0.12" }
   "ambient-context-lwt" { = "0.1.0" }
+  "opentelemetry-client-cohttp-lwt"
   "bheap" { >= "2.0.0" }
   "digestif" { >= "0.9.0" }
   "jsonm"
@@ -79,12 +78,14 @@ depends: [
   "lru" { >= "0.3.0" }
   "semaphore-compat" { >= "1.0.1" }
   "checkseum" { != "0.5.0" }
+  "saturn" { >= "0.5.0" }
   "ringo" { >= "1.1.0" }
   "octez-internal-libs" { = version }
   "conf-rust"
   "integers"
   "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
+  "octez-rust-tezos-context" { = version }
   "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
@@ -95,14 +96,11 @@ x-opam-monorepo-opam-provided: [
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
-  "cohttp-lwt"
-  "cohttp-lwt-unix"
   "data-encoding"
   "hacl_x25519"
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
-  "opentelemetry-client-cohttp-lwt"
   "prometheus"
   "prometheus-app"
   "resto"
@@ -116,7 +114,7 @@ conflicts: [
   "result" { < "1.5" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

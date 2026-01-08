@@ -405,7 +405,10 @@ let test_bad_revelations =
      operation's application has failed with the [%s] protocol error."
     previously_revealed_error ;
   let* () =
-    let source = Constant.bootstrap1 (* this source is already revealed *) in
+    let source =
+      Constant.bootstrap1
+      (* this source is already revealed *)
+    in
     let manager_op = Operation.Manager.(make ~source (reveal source ())) in
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
@@ -517,7 +520,10 @@ let test_misc_manager_ops_from_fresh_account =
       `Client
       ()
   in
-  let amount = 10_000_000 (* amount of the final transaction (in mutez) *) in
+  let amount =
+    10_000_000
+    (* amount of the final transaction (in mutez) *)
+  in
   Log.info
     "Create a fresh account by giving it [2 x amount] mutez, then baking a \
      block to apply the transaction." ;

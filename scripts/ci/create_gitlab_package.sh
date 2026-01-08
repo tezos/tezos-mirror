@@ -8,8 +8,8 @@ set -eu
 # you should manually delete any previously created package, otherwise it will
 # reupload the files inside the same package, creating duplicates
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
+# shellcheck source=./scripts/releases/octez-release.sh
+. ./scripts/releases/octez-release.sh
 
 # Checks if running in dry-mode
 for arg in "$@"; do
@@ -70,6 +70,32 @@ gitlab_upload() {
 . scripts/ci/repository-keys.sh
 # GPG Signatures
 echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import --
+
+# create the apt repository root directory and copy the public key
+mkdir -p public
+cp "$GPG_PUBLIC_KEY" "public/octez.asc"
+
+# If it's a protected branch the value of $BUCKET will
+# be set accordingly by the CI.
+BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+
+if [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
+  echo "### Logging into protected repo ..."
+  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
+  gcloud auth activate-service-account --key-file=protected_sa.json
+else
+  echo "### Logging into standard repo ..."
+  # Nothing to do
+fi
+
+GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+export GOOGLE_OAUTH_ACCESS_TOKEN
+
+echo "Push to $BUCKET"
+# Upload only if not running in dry-run
+if [ -z "${dry_run:-}" ]; then
+  gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+fi
 
 # Loop over architectures
 for architecture in ${architectures}; do

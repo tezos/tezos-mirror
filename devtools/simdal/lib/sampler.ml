@@ -80,8 +80,9 @@ let decr_degree degrees v =
 let node_error (lo, hi) deg =
   assert (0 <= lo && lo <= hi) ;
   if lo <= deg then
-    if deg <= hi then 0.0 else (* deg > hi *)
-                            err (float_of_int (deg - hi))
+    if deg <= hi then 0.0
+    else (* deg > hi *)
+      err (float_of_int (deg - hi))
   else (* deg < low *)
     err (float_of_int (lo - deg))
 

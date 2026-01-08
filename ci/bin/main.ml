@@ -12,13 +12,10 @@
 
 open Gitlab_ci
 open Gitlab_ci.Types
-open Gitlab_ci.Util
 open Tezos_ci
+open Tezos_ci.Cache
 
 let () = Tezos_ci.Cli.init ()
-
-(* Sets up the [default:] top-level configuration element. *)
-let default = default ~interruptible:true ()
 
 (* Top-level [variables:] *)
 let variables : variables =
@@ -44,6 +41,8 @@ let variables : variables =
       "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_sdk_bindings_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
+    ( "rust_sdk_bindings_image_name_protected",
+      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
     ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
     ( "jsonnet_image_name_protected",
       "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );
@@ -66,9 +65,9 @@ let variables : variables =
        set to true in the opam jobs where we want to run the tests
        --with-test. *)
     ("RUNTEZTALIAS", "false");
-    ("CARGO_HOME", Common.cargo_home);
+    ("CARGO_HOME", cargo_home);
     (* To avoid Cargo accessing the network in jobs without caching (see
-       {!Common.enable_cargo_cache}), we turn of net access by default. *)
+       {!Common.enable_cargo_cache}), we turn off net access by default. *)
     ("CARGO_NET_OFFLINE", "true");
     (* Reduce the verbosity of Cargo. *)
     ("CARGO_TERM_QUIET", "true");
@@ -97,6 +96,28 @@ let variables : variables =
    - how;
    - and by whom it is triggered (a developer? a release manager? some automated system?). *)
 
+(** {3 Components} *)
+
+(* This must be done before registering shared pipelines. *)
+
+let () = Grafazos_ci.register ()
+
+let () = Teztale_ci.register ()
+
+let () = Rollup_node_ci.register ()
+
+let () = Documentation_ci.register ()
+
+let () = Etherlink_ci.register ()
+
+let () = Client_libs_ci.register ()
+
+let () = Tezos_ci_jobs.Misc.register ()
+
+let () = Tezos_ci_jobs.Kernels.register ()
+
+let () = Tezos_ci_jobs.Tezt.register ()
+
 (** {3 General pipelines} *)
 
 let () =
@@ -105,7 +126,8 @@ let () =
   register
     "before_merging"
     If.(on_tezos_namespace && merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging @ !Hooks.before_merging)
+    ~jobs:
+      (Code_verification.jobs Before_merging @ Cacio.get_before_merging_jobs ())
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -116,7 +138,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
+    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_before_merging_jobs ())
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -130,7 +152,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:Master_branch.jobs
+    ~jobs:(Master_branch.jobs @ Cacio.get_master_jobs ())
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -153,10 +175,6 @@ let () =
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
-  (* Matches Grafazos release tags, e.g. [grafazos-v1.2]. *)
-  let grafazos_release_tag_re = "/^grafazos-v\\d+\\.\\d+$/" in
-  (* Matches Teztale release tags, e.g. [teztale-v1.2]. *)
-  let teztale_release_tag_re = "/^teztale-v\\d+\\.\\d+$/" in
   (* Matches smart rollup node release tags,
      e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
      [octez-smart-rollup-node-v1.2-rc4]. *)
@@ -187,18 +205,17 @@ let () =
       octez_release_tags
       @ [
           octez_evm_node_release_tag_re;
-          grafazos_release_tag_re;
-          teztale_release_tag_re;
           octez_smart_rollup_node_release_tag_re;
+          Sdk_bindings_ci.Release.tag_re;
         ]
-      @ !Hooks.release_tags
+      @ Cacio.get_release_tag_rexes ()
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
   in
   let release_description =
     "\n\n\
      For more information on Octez' release system, see: \
-     https://tezos.gitlab.io/releases/releases.html"
+     https://octez.tezos.com/docs/releases/releases.html"
   in
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
@@ -228,20 +245,26 @@ let () =
        'nomadic-labs/tezos' project." ;
   (* TODO: simplify dry run pipelines by having them all be on tezos/tezos? *)
   register
-    "octez_release_tag"
-    If.(
-      on_tezos_namespace && push
-      && (has_tag_match octez_major_release_tag_re
-         || has_tag_match octez_minor_release_tag_re))
-    ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
+    "octez_major_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~major:true Release_tag)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
-      ("Release tag pipelines for Octez.\n\n\
+      ("Release tag pipelines for major Octez release.\n\n\
         This pipeline is created when the release manager pushes a tag in the \
-        format octez-vX.Y(-rcN). It creates and publishes release on GitLab \
-        with the associated artifacts (static binaries, Docker images, .deb \
-        packages, etc.). It also prepares for a new opam package release by \
-        updating https://github.com/tezos/opam-repository."
+        format octez-vX.0(-rcN).\n\
+        Publishes release assets for all the components of Octez."
      ^ release_description) ;
+  register
+    "octez_minor_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for minor Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.Y.\n\
+        Publishes release assets for Octez L1 only." ^ release_description) ;
   register
     "octez_beta_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
@@ -273,53 +296,17 @@ let () =
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  (* TODO: We should be able to register this pipeline in [grafazos/ci]. *)
   register
-    "grafazos_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_match grafazos_release_tag_re)
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-      :: Grafazos.Release.jobs ~test:true ())
-    ~description:
-      "Test release pipeline for Grafazos.\n\n\
-       This pipeline checks that 'grafazos_release_tag' pipelines work as \
-       intended, without publishing any release. Developers or release \
-       managers can create this pipeline by pushing a tag to a fork of \
-       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  (* TODO: We should be able to register this pipeline in [teztale/ci]. *)
-  register
-    "teztale_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_match teztale_release_tag_re)
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Teztale.Release.jobs ~test:true ())
-    ~description:
-      "Test release pipeline for Teztale.\n\n\
-       This pipeline checks that 'teztale_release_tag' pipelines work as \
-       intended, without publishing any release. Developers or release \
-       managers can create this pipeline by pushing a tag to a fork of \
-       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  register
-    "octez_smart_rollup_node_release_tag_test"
+    "octez_beta_release_tag_test"
     If.(
-      not_on_tezos_namespace && push
-      && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Rollup_node.Release.jobs ~test:true ())
+      not_on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~test:true Beta_release_tag)
     ~description:
-      "Test release pipeline for the Smart Rollup node.\n\n\
-       This pipeline checks that 'octez_smart_rollup_node_release_tag' \
-       pipelines work as intended, without publishing any release. Developers \
-       or release managers can create this pipeline by pushing a tag to a fork \
-       of 'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  register
-    "octez_smart_rollup_node_release_tag"
-    If.(push && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Rollup_node.Release.jobs ())
-    ~description:
-      ("Release tag pipelines for the Smart Rollup node.\n\n\
-        Created when the release manager pushes a tag in the format \
-        octez-smart-rollup-node-vX.Y(-rcN|betaN). Creates and publishes a \
-        release on GitLab with associated artifacts for the smart rollup node \
-        (static binaries and Docker image)." ^ release_description) ;
+      "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
+       This pipeline checks that 'octez_beta_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
     "octez_evm_node_release_tag"
     If.(push && has_tag_match octez_evm_node_release_tag_re)
@@ -364,8 +351,9 @@ let () =
     "schedule_extended_test"
     schedule_extended_tests
     ~jobs:
-      (Code_verification.jobs Schedule_extended_test
-      |> List.map (with_interruptible false))
+      ((Code_verification.jobs Schedule_extended_test
+       |> List.map (with_interruptible false))
+      @ Cacio.get_schedule_extended_test_jobs ())
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -374,10 +362,49 @@ let () =
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
        daily." ;
   register
+    "debian.daily"
+    debian_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Debian_repository.(jobs ~limit_dune_build_jobs:true Full)
+      |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all Debian jobs (build and extended tests)." ;
+  register
+    "rpm.daily"
+    rpm_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Rpm_repository.(jobs ~limit_dune_build_jobs:true Full)
+      |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all RPM jobs (build and extended tests)." ;
+  register
+    "homebrew.daily"
+    homebrew_daily
+    ~jobs:(Homebrew.(jobs Full) |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
+  register
+    "base_images.daily"
+    base_images_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace :: Base_images.jobs
+      |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all Base Images jobs (build and merge)." ;
+  register
+    "opam.daily"
+    opam_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace :: Opam.jobs_opam_packages ()
+      |> List.map (with_interruptible false))
+    ~description:"Daily pipeline containing all OPAM jobs." ;
+  let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
+  register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
        'master'.\n\n\
@@ -386,8 +413,7 @@ let () =
   register
     "schedule_extended_validation_test"
     schedule_extended_validation_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\
@@ -396,8 +422,7 @@ let () =
   register
     "schedule_extended_baker_remote_mode_test"
     schedule_extended_baker_remote_mode_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with baker using remote node, weekly on \
        'master'.\n\n\
@@ -405,8 +430,7 @@ let () =
   register
     "schedule_extended_dal_use_baker"
     schedule_extended_dal_use_baker
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
        'master'.\n\n\
@@ -421,28 +445,60 @@ let () =
   register
     "schedule_container_scanning_master"
     schedule_container_scanning_master
-    ~jobs:(Container_scanning.jobs "tezos/tezos:master")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "master";
+            dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-master";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
        Docker image" ;
   register
     "schedule_container_scanning_octez_releases"
     schedule_container_scanning_octez_releases
-    ~jobs:(Container_scanning.jobs "tezos/tezos:latest")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "latest";
+            dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-latest";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
        Docker image" ;
   register
     "schedule_container_scanning_evm_node_releases"
     schedule_container_scanning_evm_node_releases
-    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-evm-node-latest")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "octez-evm-node-latest";
+            dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-octez-evm-node-latest";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
        tezos/tezos:octez-evm-node-latest Docker image" ;
   register
     "schedule_container_scanning_octez_rc"
     schedule_container_scanning_octez_rc
-    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-v22.0-rc3")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "octez-v22.0-rc3";
+            dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-octez--v22.0-rc3";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
        the latest release candidate of Octez" ;
@@ -453,16 +509,6 @@ let () =
     ~description:
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images" ;
-  register
-    "schedule_documentation"
-    schedule_documentation
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Master_branch.job_static_x86_64
-       :: Master_branch.jobs_documentation
-      |> List.map (with_interruptible false))
-    ~description:
-      "Scheduled pipeline that updates the octez.com/docs documentation \
-       without being interrupted." ;
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
@@ -484,19 +530,21 @@ let () =
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
     ~jobs:
-      [
-        Tezos_ci.job_datadog_pipeline_trace;
-        Release_tag.job_release_page ~test:true ();
-      ]
+      ([
+         Tezos_ci.job_datadog_pipeline_trace;
+         Release_tag.job_release_page ~test:true ();
+       ]
+      @ Cacio.get_global_test_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
     If.(api_release_page && on_tezos_namespace)
     ~jobs:
-      [
-        Tezos_ci.job_datadog_pipeline_trace;
-        Release_tag.job_release_page ~test:false ();
-      ]
+      ([
+         Tezos_ci.job_datadog_pipeline_trace;
+         Release_tag.job_release_page ~test:false ();
+       ]
+      @ Cacio.get_global_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)
@@ -506,8 +554,21 @@ let () =
      If argument --inline-source, then print generation info in yml files. *)
   match Cli.config.action with
   | Write ->
-      Pipeline.write ~default ~variables ~filename:".gitlab-ci.yml" () ;
-      Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
+      Pipeline.write
+        ~default:Pipeline.default_config
+        ~variables
+        ~filename:".gitlab-ci.yml"
+        () ;
+      Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files () ;
+      if Cli.config.verbose then
+        (* Note: [Tezos_ci] jobs include [Cacio] jobs, since [Cacio] registers
+           jobs using [Tezos_ci.job]. *)
+        Printf.printf
+          "%d/%d jobs were defined using Cacio.\n%!"
+          (Cacio.get_number_of_declared_jobs ())
+          (Tezos_ci.get_number_of_declared_jobs ())
   | List_pipelines -> Pipeline.list_pipelines ()
   | Overview_pipelines -> Pipeline.overview_pipelines ()
   | Describe_pipeline {name} -> Pipeline.describe_pipeline name
+
+let () = Cacio.output_tezt_job_list "script-inputs/cacio-tezt-jobs"

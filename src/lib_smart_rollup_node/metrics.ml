@@ -187,6 +187,9 @@ end
 module Info = struct
   open Tezos_version
 
+  let set_genesis_level =
+    set_gauge "Rollup genesis level" "genesis_level" Int32.to_float
+
   let node_general_info =
     v_labels_counter
       ~help:"General information on the node"
@@ -219,6 +222,7 @@ module Info = struct
         configuration.sc_rollup_address
     in
     let mode = Configuration.string_of_mode configuration.mode in
+    let () = set_genesis_level genesis_level in
     let genesis_level = Int32.to_string genesis_level in
     let genesis_hash = Commitment.Hash.to_b58check genesis_hash in
     let history_mode = Configuration.string_of_history_mode history_mode in
@@ -250,13 +254,22 @@ module Info = struct
       Int32.to_float
 
   let set_lpc_level_l1 =
-    set_gauge "Last published commitment on L1" "lpc_level_l1" Int32.to_float
+    let gauge =
+      v_gauge ~help:"Last published commitment on L1" "lpc_level_l1"
+    in
+    fun lpc ->
+      let new_lpc = Int32.to_float lpc in
+      let old_lpc = Gauge.read gauge in
+      Gauge.set gauge (max new_lpc old_lpc)
 
   let set_lpc_level_local =
-    set_gauge
-      "Last published commitment by operator"
-      "lpc_level_local"
-      Int32.to_float
+    let gauge =
+      v_gauge ~help:"Last published commitment by operator" "lpc_level_local"
+    in
+    fun lpc ->
+      let new_lpc = Int32.to_float lpc in
+      let old_lpc = Gauge.read gauge in
+      Gauge.set gauge (max new_lpc old_lpc)
 
   let set_commitment_period =
     set_gauge "Current commitment period" "commitment_period" float_of_int
@@ -266,8 +279,8 @@ module Info = struct
 
   let set_dal_enabled =
     set_gauge "DAL enabled in protocol" "dal_enabled" (function
-        | true -> 1.
-        | false -> 0.)
+      | true -> 1.
+      | false -> 0.)
 
   let set_dal_attestation_lag =
     set_gauge "DAL attestation lag" "dal_attestation_lag" float_of_int

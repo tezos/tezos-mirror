@@ -38,10 +38,11 @@ depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-023-PtSeouLo-libs"
+  "octez-protocol-024-PtTALLiN-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_007_PsDELPH1
@@ -115,7 +115,7 @@
   tezos-protocol-007-PsDELPH1.protocol.raw)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Protocol Tezos_protocol_007_PsDELPH1))
 
@@ -216,7 +216,7 @@
  (action
   (run
    %{bin:octez-protocol-compiler}
-   -warning -6-7-9-16-29-32-51-68
+   -warning -6-7-9-16-29-32-34-51-68
    -warn-error +a
    .)))
 
@@ -230,7 +230,7 @@
   tezos-protocol-007-PsDELPH1.protocol)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives
   -open Tezos_protocol_007_PsDELPH1)
  (modules Lifted_protocol))
@@ -249,7 +249,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Functor))
 
@@ -345,7 +345,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68)
+  -w -6-7-9-16-29-32-34-51-68)
  (modules Registerer))
 
 (rule

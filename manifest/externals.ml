@@ -85,7 +85,11 @@ let clap = external_lib "clap" V.(at_least "0.3.0")
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
-let cohttp = external_lib "cohttp" V.(at_least "5.3.1")
+let cohttp = external_lib "cohttp" V.(exactly "5.3.1~octez")
+
+let cohttp_lwt = external_lib "cohttp-lwt" V.(exactly "5.3.1~octez")
+
+let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(exactly "5.3.1~octez")
 
 let conduit = external_lib "conduit-lwt" V.(at_least "7.1.0")
 
@@ -115,7 +119,9 @@ let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
 let digestif = external_lib "digestif" V.(at_least "0.9.0")
 
-let dream = external_lib "dream" V.(at_least "1.0.0~alpha7")
+let domainslib = external_lib "domainslib" V.(at_least "0.5.2")
+
+let dream = external_lib "dream" V.(at_least "1.0.0~alpha8-octez")
 
 let dune_configurator = external_lib "dune-configurator" V.True
 
@@ -123,7 +129,7 @@ let dynlink = external_lib "dynlink" V.True ~opam:""
 
 let eio = external_lib "eio" V.True
 
-let eio_main = external_lib "eio_main" V.True
+let eio_posix = external_lib "eio_posix" V.True
 
 let lwt_eio = external_lib "lwt_eio" V.True
 
@@ -200,7 +206,7 @@ let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 let ocaml_protoc_compiler =
   external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
 
-let ocamlformat = opam_only "ocamlformat" V.(exactly "0.26.2")
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.27.0")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
 
@@ -214,12 +220,15 @@ let ocplib_ocamlres =
 
 let opam_file_format = external_lib "opam-file-format" V.(at_least "2.1.6")
 
-let opentelemetry = external_lib "opentelemetry" V.True
+let opentelemetry = external_lib "opentelemetry" V.(at_least "0.12")
 
 let opentelemetry_ambient_context_lwt =
   external_sublib opentelemetry "opentelemetry.ambient-context.lwt"
 
 let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
+
+let opentelemetry_client_cohttp_lwt =
+  external_lib "opentelemetry-client-cohttp-lwt" V.True
 
 let optint = external_lib "optint" V.True
 
@@ -267,6 +276,8 @@ let repr = external_lib "repr" V.True
 
 let ringo = external_lib "ringo" V.(at_least "1.1.0")
 
+let rss = external_lib "rss" V.True
+
 let rusage = external_lib "rusage" V.True
 
 let aches = external_lib "aches" V.(at_least "1.1.0")
@@ -274,6 +285,8 @@ let aches = external_lib "aches" V.(at_least "1.1.0")
 let aches_lwt = external_lib "aches-lwt" V.(at_least "1.1.0")
 
 let safepass = external_lib "safepass" V.True
+
+let saturn = external_lib "saturn" V.(at_least "0.5.0")
 
 let secp256k1_internal =
   let version = V.(at_least "0.4.0") in
@@ -366,8 +379,8 @@ let () =
     (add_dep_to_profile "octez-dev-deps")
     [
       external_lib "merlin" V.(at_least "4.18");
-      external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
-      external_lib "odoc" V.(at_least "2.4.2" && less_than "3.0.0");
+      external_lib "ocaml-lsp-server" V.(at_least "1.23.0");
+      external_lib "odoc" V.(at_least "3.0.0");
       external_lib "ocp-indent" V.True;
       external_lib "merge-fmt" V.True;
     ]

@@ -1,0 +1,39 @@
+code
+  {
+    VIEW "a" nat ;
+    DIP { VIEW "b" nat } ;
+    DIP 2 { VIEW "c" nat }
+  };
+
+input
+  {
+    Stack_elt unit Unit ; Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" ;
+    Stack_elt unit Unit ; Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" ;
+    Stack_elt unit Unit ; Stack_elt address "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
+  };
+
+output
+  {
+    Stack_elt (option nat) (Some 1) ;
+    Stack_elt (option nat) (Some 2) ;
+    Stack_elt (option nat) (Some 3) 
+  };
+
+views
+  {
+    Views
+      "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+      {
+        View "a" unit nat { DROP; PUSH nat 1 } ;
+        View "b" unit nat { DROP; PUSH nat 2 }
+      } ;
+    Views
+      "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
+      { View "c" unit nat { DROP; PUSH nat 3 } }
+  };
+
+storages
+  {
+    Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit ;
+    Storage "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" unit Unit ;
+  };

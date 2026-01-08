@@ -11,6 +11,7 @@ license = "MIT"
 [dependencies]
 thiserror.workspace = true
 anyhow.workspace = true
+typed-arena.workspace = true
 
 tezos_crypto_rs.workspace = true
 hex.workspace = true
@@ -30,3 +31,7 @@ tezos-smart-rollup.workspace = true
 tezos_tezlink.workspace = true
 tezos-evm-logging.workspace = true
 mir.workspace = true
+tezos-protocol.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"

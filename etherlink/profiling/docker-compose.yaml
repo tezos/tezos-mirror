@@ -5,10 +5,11 @@ services:
     volumes:
       - ./config/otelcol-config.yaml:/etc/otelcol-config.yaml
     command: ["--config=/etc/otelcol-config.yaml"]
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - HOSTNAME=${HOSTNAME:-etherlink-test}
     ports:
       - "4318:4318"
-    depends_on:
-      - tempo
 
   tempo:
     image: grafana/tempo:latest
@@ -16,16 +17,37 @@ services:
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./config/tempo-config.yaml:/etc/tempo.yaml
+      - tempo_data:/var/tempo
     ports:
-      - "3200:3200"
+      - "3200:3200" # Tempo UI
+      - "4317:4317" # OTLP gRPC receiver
+
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes:
+      - ./config/loki-config.yml:/etc/loki.yaml
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
+      - loki
       - tempo
+
+volumes:
+  loki_data:
+  tempo_data:
+  grafana_data:

@@ -95,16 +95,16 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
-  | Tezt_tezos.Protocol.R022 ->
-      Some
-        (Filename.concat
-           network_parameters_templates_dir
-           "proto_022_PsRiotum_mainnet.json")
   | Tezt_tezos.Protocol.S023 ->
       Some
         (Filename.concat
            network_parameters_templates_dir
            "proto_023_PtSeouLo_mainnet.json")
+  | Tezt_tezos.Protocol.T024 ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_024_PtTALLiN_mainnet.json")
   | Tezt_tezos.Protocol.Alpha ->
       (* Fetching the network parameters from the src/proto_alpha directory,
          to be sure that we are in synch with current protocl parameters. *)
@@ -306,7 +306,14 @@ module Local = struct
       |> Lwt_list.map_s (fun alias ->
              let* () = Lwt_io.printf "." in
              let* account_key = Client.show_address ~alias client in
-             return (account_key, bootstrap_amount_mutez))
+             return
+               ( account_key,
+                 Some
+                   {
+                     Protocol.balance = bootstrap_amount_mutez;
+                     consensus_key = None;
+                     delegate = None;
+                   } ))
     in
     let* () = Lwt_io.printf "\n" in
     let* () =
@@ -316,7 +323,7 @@ module Local = struct
     in
     let* _filename =
       Tezt_tezos.Protocol.write_parameter_file
-        ~bootstrap_accounts
+        ~overwrite_bootstrap_accounts:(Some bootstrap_accounts)
         ~base:(Either.Left activation_parameters_filename)
         ~output_file:output_parameters_filename
         []
@@ -373,7 +380,7 @@ let () =
     ~__FILE__
     ~title:"Generate Network Activation Parameters"
     ~tags:["generate_activation_parameters"]
-    (Local.generate_network_activation_parameters Protocol.R022) ;
+    (Local.generate_network_activation_parameters Protocol.S023) ;
   register
     ~__FILE__
     ~title:"Partition bakers by node"

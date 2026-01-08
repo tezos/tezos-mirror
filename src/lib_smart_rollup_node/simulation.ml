@@ -61,9 +61,11 @@ let set_simulation_kernel_log ?log_kernel_debug_file
         in
         let log_kernel_debug_file = Filename.concat logs_dir file in
         Node_context.make_kernel_logger
-          Event.simulation_kernel_debug
+          ~enable_tracing:false
           ~log_kernel_debug_file
-          logs_dir
+          ~logs_dir
+          node_ctxt.config
+          Event.simulation_kernel_debug
     | _ -> return (Event.simulation_kernel_debug, fun () -> return_unit)
   in
   return {node_ctxt with kernel_debug_logger; finaliser}

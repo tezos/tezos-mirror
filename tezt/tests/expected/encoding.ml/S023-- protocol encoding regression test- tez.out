@@ -1,12 +1,2 @@
-
-./octez-codec encode 023-PtSeouLo.tez from '"7322135"'
-97f4be03
-
-./octez-codec decode 023-PtSeouLo.tez from 97f4be03
-"7322135"
-
-./octez-codec encode 023-PtSeouLo.tez from '"0"'
-00
-
-./octez-codec decode 023-PtSeouLo.tez from 00
-"0"
+tez-positive: 97f4be03
+tez-zero: 00

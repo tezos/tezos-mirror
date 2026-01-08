@@ -163,8 +163,8 @@ let main commands =
        (let*! retcode =
           let*! r =
             Lwt.catch run (function
-                | Failure msg -> failwith "%s" msg
-                | exn -> failwith "%s" (Printexc.to_string exn))
+              | Failure msg -> failwith "%s" msg
+              | exn -> failwith "%s" (Printexc.to_string exn))
           in
           match r with
           | Ok () -> Lwt.return 0

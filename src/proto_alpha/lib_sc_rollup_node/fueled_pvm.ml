@@ -141,20 +141,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                Sc_rollup.Metadata.encoding
                metadata)
       | (Request_dal_page _ | Request_adal_page _) as xdal_request -> (
-          let ( dal_page,
-                attestation_threshold_percent,
-                restricted_commitments_publishers ) =
+          let dal_page =
             match xdal_request with
-            | Request_dal_page dal_page -> (dal_page, None, None)
-            | Request_adal_page
-                {
-                  page_id;
-                  attestation_threshold_percent;
-                  restricted_commitments_publishers;
-                } ->
-                ( page_id,
-                  Some attestation_threshold_percent,
-                  restricted_commitments_publishers )
+            | Request_dal_page dal_page -> dal_page
+            | Request_adal_page _ -> Stdlib.failwith "Not_implemented"
             | _ ->
                 (* This case is not reachable because we know that [xdal_request]
                    is either [Request_dal_page] or [Request_adal_page] *)
@@ -167,8 +157,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               ~dal_attested_slots_validity_lag
               ~inbox_level:(Int32.of_int level)
               node_ctxt
-              ~attestation_threshold_percent
-              ~restricted_commitments_publishers
               dal_page
           in
           match content with
@@ -177,14 +165,43 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                  a tzresult. *)
               (* This happens when, for example, the kernel requests a page from a future level. *)
               Lwt.fail (Error_wrapper error)
-          | Ok None ->
-              (* The page was not confirmed by L1.
-                 We return empty string in this case, as done in the slow executon. *)
-              Lwt.return ""
-          | Ok (Some b) -> Lwt.return (Bytes.to_string b))
+          | Ok data_opt -> (
+              let data_opt =
+                let published_level =
+                  Raw_level.to_int32 dal_page.slot_id.published_level
+                in
+                let slot_index = Dal.Slot_index.to_int dal_page.slot_id.index in
+                let page_index = dal_page.page_index in
+                match
+                  Loser_mode.is_invalid_dal_page
+                    node_ctxt.config.loser_mode
+                    ~published_level
+                    ~slot_index
+                    ~page_index
+                    ~page_size:(Int64.to_int dal_parameters.page_size)
+                    ~honest_payload:data_opt
+                with
+                | Either.Left () -> data_opt
+                | Either.Right data_opt -> data_opt
+              in
+              match data_opt with
+              | None ->
+                  (* The page was not confirmed by L1.
+                     We return empty string in this case, as done in the slow executon. *)
+                  Lwt.return ""
+              | Some b -> Lwt.return (Bytes.to_string b)))
       | Reveal_dal_parameters ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
              Consider supporting revealing of historical DAL parameters. *)
+          let dal_parameters =
+            match
+              Loser_mode.is_invalid_dal_parameters node_ctxt.config.loser_mode
+            with
+            | None -> dal_parameters
+            | Some {number_of_slots; attestation_lag; slot_size; page_size} ->
+                Sc_rollup.Dal_parameters.
+                  {number_of_slots; attestation_lag; slot_size; page_size}
+          in
           Lwt.return
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Dal_parameters.encoding
@@ -299,20 +316,10 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               go fuel (Int64.succ current_tick) failing_ticks state)
       | Needs_reveal
           ((Request_dal_page _ | Request_adal_page _) as xdal_request) -> (
-          let ( page_id,
-                attestation_threshold_percent,
-                restricted_commitments_publishers ) =
+          let page_id =
             match xdal_request with
-            | Request_dal_page page_id -> (page_id, None, None)
-            | Request_adal_page
-                {
-                  page_id;
-                  attestation_threshold_percent;
-                  restricted_commitments_publishers;
-                } ->
-                ( page_id,
-                  Some attestation_threshold_percent,
-                  restricted_commitments_publishers )
+            | Request_dal_page page_id -> page_id
+            | Request_adal_page _ -> Stdlib.failwith "Not_implemented"
             | _ ->
                 (* This case is not reachable because we know that [xdal_request]
                    is either [Request_dal_page] or [Request_adal_page] *)
@@ -328,8 +335,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                   ~dal_activation_level
                   ~dal_attested_slots_validity_lag
                   node_ctxt
-                  ~attestation_threshold_percent
-                  ~restricted_commitments_publishers
                   page_id
               in
               let*! () =

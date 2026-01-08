@@ -113,7 +113,7 @@ val identity_file : t -> string
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Debug]. *)
+    it is set to [`Info]. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
@@ -172,6 +172,7 @@ val init_config :
   ?history_mode:history_mode ->
   ?slots_backup_uris:string list ->
   ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
   t ->
   unit Lwt.t
 
@@ -185,6 +186,7 @@ val update_config :
   ?history_mode:history_mode ->
   ?slots_backup_uris:string list ->
   ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
   t ->
   unit Lwt.t
 
@@ -253,7 +255,7 @@ module Proxy : sig
   type proxy
 
   (** Represents a possible response from a proxy route. *)
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
 
   (** A route definition. *)
   type route
@@ -271,11 +273,18 @@ module Proxy : sig
     callback:
       (path:string ->
       fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      fetch_stream:(unit -> (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t) ->
       answer option Lwt.t) ->
     route
 
   (** Creates a new proxy instance. *)
-  val make : name:string -> routes:route list -> proxy
+  val make :
+    name:string ->
+    attestation_lag:int ->
+    number_of_slots:int ->
+    faulty_delegate:string ->
+    target_attested_level:int ->
+    proxy
 
   (** Starts running the proxy server. *)
   val run : proxy -> honest_dal_node:t -> faulty_dal_node:t -> unit
@@ -292,7 +301,7 @@ module Mockup : sig
   type t
 
   (** Represents a possible response from a mocked-up route. *)
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of string Lwt_stream.t]
 
   (** A route definition. *)
   type route

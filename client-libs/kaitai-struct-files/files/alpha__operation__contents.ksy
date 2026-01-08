@@ -1993,6 +1993,12 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   alpha__operation__alpha__contents_tag:
     1: seed_nonce_revelation
     2: double_consensus_operation_evidence
@@ -2032,15 +2038,9 @@ enums:
     251: zk_rollup_publish
     252: zk_rollup_update
   alpha__per_block_votes_tag:
-    0: case_0
-    1: case_1
-    2: case_2
-    4: case_4
-    5: case_5
-    6: case_6
-    8: case_8
-    9: case_9
-    10: case_10
+    0: per_block_vote_on
+    1: per_block_vote_off
+    2: per_block_vote_pass
   bool:
     0: false
     255: true

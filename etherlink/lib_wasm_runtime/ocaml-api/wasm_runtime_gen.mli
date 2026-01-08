@@ -7,5 +7,5 @@ open! Bigarray
 type context
 external wasm_runtime_logger_init: unit -> unit = "wasm_runtime_logger_init"
 external wasm_runtime_new_context: unit -> context = "wasm_runtime_new_context"
-external wasm_runtime_run: context -> string -> string option -> bool -> string -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree = "wasm_runtime_run_bytecode" "wasm_runtime_run"
+external wasm_runtime_run: context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> bool -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree = "wasm_runtime_run_bytecode" "wasm_runtime_run"
 external wasm_runtime_preload_kernel: context -> Irmin_context.tree -> bool = "wasm_runtime_preload_kernel"

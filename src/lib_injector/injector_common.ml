@@ -61,7 +61,8 @@ let fee_parameter_encoding ~(default_fee_parameter : fee_parameter) =
            force_low_fee;
            fee_cap;
            burn_cap;
-         } ->
+         }
+       ->
       ( minimal_fees,
         minimal_nanotez_per_byte,
         minimal_nanotez_per_gas_unit,
@@ -73,7 +74,8 @@ let fee_parameter_encoding ~(default_fee_parameter : fee_parameter) =
            minimal_nanotez_per_gas_unit,
            force_low_fee,
            fee_cap,
-           burn_cap ) ->
+           burn_cap )
+       ->
       {
         minimal_fees;
         minimal_nanotez_per_byte;

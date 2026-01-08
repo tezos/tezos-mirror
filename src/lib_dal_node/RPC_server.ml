@@ -31,8 +31,6 @@ let call_handler1 handler = handler () |> Errors.to_option_tzresult
 
 type error +=
   | Cryptobox_error of string * string
-  | Post_slot_too_large of {expected : int; got : int}
-  | No_prover_profile
   | Cannot_publish_on_slot_index of Types.slot_index
 
 let () =
@@ -52,31 +50,6 @@ let () =
     (fun (f, msg) -> Cryptobox_error (f, msg)) ;
   register_error_kind
     `Permanent
-    ~id:"post_slot_too_large"
-    ~title:"Post slot too large"
-    ~description:
-      "The length of posted data exceeds the expected size of DAL slots."
-    ~pp:(fun fmt (expected, got) ->
-      Format.fprintf
-        fmt
-        "The RPC expects a slot_size of at most '%d'. Got: '%d' expected got"
-        expected
-        got)
-    Data_encoding.(obj2 (req "expected" int31) (req "got" int31))
-    (function
-      | Post_slot_too_large {expected; got} -> Some (expected, got) | _ -> None)
-    (fun (expected, got) -> Post_slot_too_large {expected; got}) ;
-  register_error_kind
-    `Permanent
-    ~id:"no_prover_profile"
-    ~title:"No prover profile"
-    ~description:
-      "The DAL node does not have a prover profile to accept slots injection."
-    Data_encoding.unit
-    (function No_prover_profile -> Some () | _ -> None)
-    (fun () -> No_prover_profile) ;
-  register_error_kind
-    `Permanent
     ~id:"cannot_publish_on_slot_index"
     ~title:"Cannot publish on requested slot index with current profiles"
     ~description:
@@ -92,25 +65,6 @@ module Slots_handlers = struct
     call_handler1 (fun () ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_content ~reconstruct_if_missing:true ctxt slot_id)
-
-  let commitment_proof_from_polynomial cryptobox polynomial =
-    let open Result_syntax in
-    match Cryptobox.prove_commitment cryptobox polynomial with
-    (* [polynomial] was produced with the parameters from
-       [cryptobox], thus we can always compute the proof from
-       [polynomial] except if an error happens with the loading of the SRS. *)
-    | Error
-        (`Invalid_degree_strictly_less_than_expected _ | `Prover_SRS_not_loaded)
-      ->
-        Error
-          (Errors.other
-             [
-               Cryptobox_error
-                 ( "prove_commitment",
-                   "Unexpected error. Maybe an issue with the SRS from the DAL \
-                    node." );
-             ])
-    | Ok proof -> return proof
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
     call_handler1 (fun () ->
@@ -142,120 +96,52 @@ module Slots_handlers = struct
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 
-  (* This module is used below to maintain a bounded cache of recently injected
-     slots to quickly return the commitment and commitment_proof of an already
-     known slot. *)
-  module Injected_slots_cache =
-    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-      (struct
-        type t = string
-
-        let equal = String.equal
-
-        let hash = Hashtbl.hash
-      end)
+  let error_pp ppf (slot : [`Not_found | `Other of error trace]) =
+    match slot with
+    | `Not_found -> Format.pp_print_string ppf "slot not found"
+    | `Other errors -> pp_print_trace ppf errors
 
   let post_slot =
-    let slots_cache = Injected_slots_cache.create Constants.cache_size in
-    fun ctxt query slot ->
-      call_handler1 (fun () ->
-          let open Lwt_result_syntax in
-          let store = Node_context.get_store ctxt in
-          match Injected_slots_cache.find_opt slots_cache slot with
-          | Some (commitment, commitment_proof)
-            when Option.is_some
-                   (Store.Commitment_indexed_cache.find_opt
-                      (Store.cache store)
-                      commitment) ->
-              return (commitment, commitment_proof)
-          | _ ->
-              let cryptobox = Node_context.get_cryptobox ctxt in
-              let profile = Node_context.get_profile_ctxt ctxt in
-              let* () =
-                if not (Profile_manager.is_prover_profile profile) then
-                  fail (Errors.other [No_prover_profile])
-                else return_unit
-              in
-              let* () =
-                match query#slot_index with
-                | Some slot_index
-                  when not
-                         (Profile_manager.can_publish_on_slot_index
-                            slot_index
-                            profile) ->
-                    fail
-                      (Errors.other [Cannot_publish_on_slot_index slot_index])
-                | None | Some _ -> return_unit
-              in
-              let* proto_parameters =
-                Node_context.get_proto_parameters ctxt ~level:`Last_proto
-                |> Lwt.return
-                |> lwt_map_error (fun e -> `Other e)
-              in
-              let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-              let slot_length = String.length slot in
-              let*? slot_bytes =
-                if slot_length > slot_size then
-                  Error
-                    (Errors.other
-                       [
-                         Post_slot_too_large
-                           {expected = slot_size; got = slot_length};
-                       ])
-                else if slot_length = slot_size then Ok (Bytes.of_string slot)
-                else
-                  let padding =
-                    String.make (slot_size - slot_length) query#padding
-                  in
-                  Ok (Bytes.of_string (slot ^ padding))
-              in
-              let*? polynomial =
-                Slot_manager.polynomial_from_slot cryptobox slot_bytes
-              in
-              let*? commitment = Slot_manager.commit cryptobox polynomial in
-              let*? commitment_proof =
-                commitment_proof_from_polynomial cryptobox polynomial
-              in
-              let shards_proofs_precomputation =
-                Node_context.get_shards_proofs_precomputation ctxt
-              in
-              let* () =
-                Slot_manager.add_commitment_shards
-                  ~shards_proofs_precomputation
-                  store
-                  cryptobox
-                  commitment
-                  slot_bytes
-                  polynomial
-              in
-              Injected_slots_cache.replace
-                slots_cache
-                slot
-                (commitment, commitment_proof) ;
-              return (commitment, commitment_proof))
+   fun ctxt query slot ->
+    call_handler1 @@ fun () ->
+    let open Lwt_result_syntax in
+    let profile = Node_context.get_profile_ctxt ctxt in
+    let* () =
+      match query#slot_index with
+      | Some slot_index
+        when not (Profile_manager.can_publish_on_slot_index slot_index profile)
+        ->
+          fail (Errors.other [Cannot_publish_on_slot_index slot_index])
+      | None | Some _ -> return_unit
+    in
+    (Slot_production.produce_commitment_and_proof
+       ctxt
+       query#padding
+       slot
+     [@profiler.wrap_f
+       {driver_ids = [Opentelemetry]}
+         (Opentelemetry_helpers.trace_slot_after_es
+            ~name:"inject_slot"
+            ?slot_index:query#slot_index
+            ~error_pp
+            ~commitment_of_result:fst)])
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        let* content =
-          Slot_manager.get_slot_content
-            ~reconstruct_if_missing:true
-            ctxt
-            slot_id
+        let* slot_header_opt =
+          Slot_manager.try_get_slot_header_from_indexed_skip_list ctxt slot_id
+          |> Errors.other_lwt_result
         in
-        let cryptobox = Node_context.get_cryptobox ctxt in
-        let*? polynomial =
-          Slot_manager.polynomial_from_slot cryptobox content
-        in
-        let*? commitment = Slot_manager.commit cryptobox polynomial in
-        return commitment)
+        match slot_header_opt with
+        | None -> fail `Not_found
+        | Some slot_header -> return slot_header.Dal_plugin.commitment)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
-        let store = Node_context.get_store ctxt in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_status ~slot_id store)
+        Slot_manager.get_slot_status ~slot_id ctxt)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
     call_handler1 (fun () ->
@@ -313,10 +199,9 @@ module Profile_handlers = struct
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
-  let warn_missing_shards store attester published_level
+  let warn_missing_shards ctxt attester published_level
       expected_number_of_shards number_of_stored_shards_per_slot =
     let open Lwt_syntax in
-    let statuses_store = Store.slot_header_statuses store in
     let* problems =
       List.filter_map_s
         (fun (Types.Slot_id.{slot_index; _}, num_stored) ->
@@ -324,13 +209,17 @@ module Profile_handlers = struct
             Lwt.return_some (`Ok (slot_index, num_stored))
           else
             let* res =
-              Store.Statuses.get_slot_status
-                statuses_store
+              Slot_manager.get_slot_status
+                ctxt
                 ~slot_id:{slot_level = published_level; slot_index}
             in
             match res with
             | Error `Not_found ->
-                (* that is, it was not published *)
+                let* () =
+                  Event.emit_slot_header_status_not_found
+                    ~published_level
+                    ~slot_index
+                in
                 Lwt.return_none
             | Error (`Other error) ->
                 let* () =
@@ -344,7 +233,8 @@ module Profile_handlers = struct
                 match res with
                 | `Waiting_attestation ->
                     Lwt.return_some (`Not_ok (slot_index, num_stored))
-                | status ->
+                | `Unpublished -> Lwt.return_none
+                | (`Attested _ | `Unattested) as status ->
                     (* Most probably the RPC was called/handled too late. This
                        may mean that that DAL node is lagging. *)
                     let* () =
@@ -363,11 +253,13 @@ module Profile_handlers = struct
     let* () =
       if List.is_empty ok then Lwt.return_unit
       else
-        let ok =
-          List.filter_map (function `Ok v -> Some v | `Not_ok _ -> None) ok
+        let slots_indices =
+          List.filter_map
+            (function
+              | `Ok (slot_index, _num_stored) -> Some slot_index
+              | `Not_ok _ -> None)
+            ok
         in
-        (* TODO: improve (do not go twice through the list)  *)
-        let slots_indices, _ = List.split ok in
         Event.emit_get_attestable_slots_ok_notice
           ~attester
           ~published_level
@@ -418,74 +310,26 @@ module Profile_handlers = struct
         ~current_baker_level
     else Lwt.return_unit
 
-  let is_slot_attestable_with_traps shards_store traps_fraction pkh
-      assigned_shard_indexes slot_id =
-    let open Lwt_result_syntax in
-    List.for_all_es
-      (fun shard_index ->
-        let* {index = _; share} =
-          Store.Shards.read shards_store slot_id shard_index
-        in
-        (* Note: here [pkh] should identify the baker using its delegate key
-           (not the consensus key) *)
-        let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
-        match trap_res with
-        | Ok true ->
-            let*! () =
-              Event.emit_cannot_attest_slot_because_of_trap
-                ~pkh
-                ~published_level:slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-            in
-            return_false
-        | Ok false -> return_true
-        | Error _ ->
-            (* assume the worst, that it is a trap *)
-            let*! () =
-              Event.emit_trap_check_failure
-                ~published_level:slot_id.Types.Slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-                ~delegate:pkh
-            in
-            return false)
-      assigned_shard_indexes
-
   let get_attestable_slots ctxt pkh attested_level () () =
-    let get_attestable_slots ~shard_indices store proto_parameters
+    let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
       let open Lwt_result_syntax in
       let number_of_assigned_shards = List.length shard_indices in
       if number_of_assigned_shards = 0 then return Types.Not_in_committee
       else
         let published_level =
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
-             Correctly compute [published_level] in case of protocol changes, in
-             particular a change of the value of [attestation_lag]. *)
           Int32.(
-            sub attested_level (of_int proto_parameters.Types.attestation_lag))
+            sub
+              attested_level
+              (of_int last_known_parameters.Types.attestation_lag))
         in
-        if published_level < 1l then
+        if published_level <= 1l then
           let slots =
-            Stdlib.List.init proto_parameters.number_of_slots (fun _ -> false)
+            Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+                false)
           in
           return (Types.Attestable_slots {slots; published_level})
         else
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-
-             Normally, for checking whether the incentives are enabled we would
-             use the (parameters at) [attested_level].  However, the attestation
-             level may be in the future and we may not have the plugin for
-             it. *)
-          let* proto_parameters =
-            Node_context.get_proto_parameters
-              ctxt
-              ~level:(`Level published_level)
-            |> Lwt.return
-            |> lwt_map_error (fun e -> `Other e)
-          in
-
           let shards_store = Store.shards store in
           let number_of_shards_stored slot_index =
             let slot_id : Types.slot_id =
@@ -500,12 +344,6 @@ module Profile_handlers = struct
             in
             (slot_id, number_stored_shards)
           in
-          let all_slot_indexes =
-            Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
-          in
-          let* number_of_stored_shards_per_slot =
-            List.map_es number_of_shards_stored all_slot_indexes
-          in
           let* published_level_parameters =
             Node_context.get_proto_parameters
               ctxt
@@ -513,17 +351,23 @@ module Profile_handlers = struct
             |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
+          let all_slot_indexes =
+            Utils.Infix.(0 -- (published_level_parameters.number_of_slots - 1))
+          in
+          let* number_of_stored_shards_per_slot =
+            List.map_es number_of_shards_stored all_slot_indexes
+          in
           let* flags =
             List.map_es
               (fun (slot_id, num_stored) ->
                 let all_stored = num_stored = number_of_assigned_shards in
-                if not published_level_parameters.incentives_enable then
+                if not last_known_parameters.incentives_enable then
                   return all_stored
                 else if not all_stored then return false
                 else
-                  is_slot_attestable_with_traps
+                  Attestable_slots.is_attestable_slot_with_traps
                     shards_store
-                    published_level_parameters.traps_fraction
+                    last_known_parameters.traps_fraction
                     pkh
                     shard_indices
                     slot_id)
@@ -532,7 +376,7 @@ module Profile_handlers = struct
           Lwt.dont_wait
             (fun () ->
               warn_missing_shards
-                store
+                ctxt
                 pkh
                 published_level
                 number_of_assigned_shards
@@ -540,6 +384,32 @@ module Profile_handlers = struct
             (fun _exn -> ()) ;
           return (Types.Attestable_slots {slots = flags; published_level})
     in
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+    let get_attestable_slots ~shard_indices store last_known_parameters
+        ~attested_level =
+      let open Lwt_result_syntax in
+      let* should_drop_due_to_migration =
+        Attestable_slots.attested_just_after_migration ctxt ~attested_level
+        |> Lwt.return
+        |> lwt_map_error (fun e -> `Other e)
+      in
+      if should_drop_due_to_migration then
+        let*! () = Event.emit_skip_attesting_shards ~level:attested_level in
+
+        let slots =
+          Stdlib.List.init last_known_parameters.Types.number_of_slots (fun _ ->
+              false)
+        in
+        return (Types.Attestable_slots {slots; published_level = 0l})
+      else
+        get_attestable_slots
+          ~shard_indices
+          store
+          last_known_parameters
+          ~attested_level
+    in
+
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
         let last_finalized_level = Node_context.get_last_finalized_level ctxt in
@@ -555,8 +425,8 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
-        let* proto_parameters =
-          Node_context.get_proto_parameters ctxt ~level:`Last_proto
+        let* last_known_parameters =
+          Node_context.get_proto_parameters ctxt ~level:(`Level attested_level)
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
@@ -564,8 +434,15 @@ module Profile_handlers = struct
         get_attestable_slots
           ~shard_indices
           store
-          proto_parameters
+          last_known_parameters
           ~attested_level)
+
+  let monitor_attestable_slots ctxt pkh () () =
+    let open Lwt_syntax in
+    let* Resto_directory.Answer.{next; shutdown} =
+      Attestable_slots.subscribe ctxt ~pkh
+    in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
 end
 
 let version ctxt () () =
@@ -714,6 +591,20 @@ module Health = struct
         return {status = Up; checks}
 end
 
+module Synchronized = struct
+  let get_synchronized ctxt () () =
+    Lwt_result_syntax.return @@ Node_context.get_l1_crawler_status ctxt
+
+  let get_monitor_synchronized ctxt () () =
+    let l1_crawler_status_input =
+      Node_context.get_l1_crawler_status_input ctxt
+    in
+    let stream, stopper = Lwt_watcher.create_stream l1_crawler_status_input in
+    let next () = Lwt_stream.get stream in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
+end
+
 let add_service registerer service handler directory =
   registerer directory service handler
 
@@ -757,6 +648,10 @@ let register :
        Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register1
+       Services.monitor_attestable_slots
+       (Profile_handlers.monitor_attestable_slots ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
        Services.get_traps
@@ -858,6 +753,14 @@ let register :
        Tezos_rpc.Directory.register0
        Services.health
        (Health.get_health ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.synchronized
+       (Synchronized.get_synchronized ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register0
+       Services.monitor_synchronized
+       (Synchronized.get_monitor_synchronized ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register0
        Services.get_last_processed_level

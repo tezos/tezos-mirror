@@ -12,12 +12,13 @@ type t = {
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-  index : Irmin_context.ro_index;
+  index : Pvm.Context.ro_index;
   finalized_view : bool;
-  block_storage_sqlite3 : bool;
+  execution_pool : Lwt_domain.pool;
+  trace_host_funs : bool;
 }
 
-(** [load ~data_dir configuration] creates a new read-only handler on the
+(** [load configuration] creates a new read-only handler on the
     node’s context. You can have as many read-only handlers as you want split
     over as many processes.
 
@@ -27,9 +28,9 @@ type t = {
     If [network] is set, the function performs additional sanity checks to
     ensure its local context is consistent with the expected network. *)
 val load :
+  pool:Lwt_domain.pool ->
   ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
-  data_dir:string ->
   Configuration.t ->
   t tzresult Lwt.t
 
@@ -73,8 +74,7 @@ val replay :
   t ->
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
-  ?alter_evm_state:
-    (Irmin_context.tree -> (Irmin_context.tree, tztrace) result Lwt.t) ->
+  ?alter_evm_state:(Pvm.State.t -> (Pvm.State.t, tztrace) result Lwt.t) ->
   Ethereum_types.quantity ->
   replay_result tzresult Lwt.t
 

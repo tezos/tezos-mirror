@@ -62,7 +62,8 @@ let read_consensus_key_mapping ?runner client =
 let create ?runner ?(path = Uses.path Constant.yes_wallet) ?name () =
   {path; runner; name}
 
-let create_from_context ?(aliases = List []) ~node ~client ~network t =
+let create_from_context ?rich_accounts ?(aliases = List []) ~node ~client
+    ~network t =
   let {path; name; runner} = t in
   let* aliases_filename =
     match aliases with
@@ -74,21 +75,25 @@ let create_from_context ?(aliases = List []) ~node ~client ~network t =
       ?runner
       ?name
       path
-      [
-        "create";
-        "from";
-        "context";
-        Node.data_dir node;
-        "in";
-        Client.base_dir client;
-        "--network";
-        network;
-        "--aliases";
-        aliases_filename;
-        "--force";
-        "--active-bakers-only";
-        "--consensus-key-override";
-      ]
+      ([
+         "create";
+         "from";
+         "context";
+         Node.data_dir node;
+         "in";
+         Client.base_dir client;
+         "--network";
+         network;
+         "--aliases";
+         aliases_filename;
+         "--force";
+         "--active-bakers-only";
+       ]
+      @
+      match rich_accounts with
+      | None -> []
+      | Some (nb_account, over) ->
+          ["--rich-accounts-over"; sf "%d,%d" nb_account over])
     |> Process.check
   in
   Lwt.return aliases_filename

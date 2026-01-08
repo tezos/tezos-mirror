@@ -30,6 +30,8 @@ let version = "v1"
 
 let mainnet_id = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"
 
+let shadownet_id = Chain_id.of_b58check_exn "NetXsqzbfFenSTS"
+
 (* The fitness version number was:
    - "\000" until and including proto 004
    - "\001" until and including proto 010
@@ -145,7 +147,8 @@ let fixed_encoding =
              _slashing_delay,
              _sc_max_wrapped_proof_binary_size,
              _sc_rollup_message_size_limit,
-             _sc_rollup_number_of_messages_per_level ) ) -> ())
+             _sc_rollup_number_of_messages_per_level ) )
+       -> ())
     (merge_objs
        (obj10
           (req "proof_of_work_nonce_size" uint8)
@@ -323,7 +326,8 @@ let check_constants constants =
        Compare.Int32.(
          sc_rollup_max_lookahead_in_blocks
          > Int32.of_int constants.sc_rollup.commitment_period_in_blocks
-         && (* Check that [smart_rollup_challenge_window_in_blocks <
+         &&
+         (* Check that [smart_rollup_challenge_window_in_blocks <
                smart_rollup_max_lookahead_in_blocks]. Otherwise committers would be
                forced to commit at an artificially slow rate, affecting the
                throughput of the rollup. *)
@@ -413,9 +417,18 @@ module Generated = struct
       consensus_committee_size - consensus_threshold_size
     in
     let base_total_issued_per_minute = Tez_repr.of_mutez_exn 80_007_812L in
-    let reward_parts_whole = 20480 (* = 256 * 80 *) in
-    let reward_parts_half = 10240 (* = reward_parts_whole / 2 *) in
-    let reward_parts_quarter = 5120 (* = reward_parts_whole / 4 *) in
+    let reward_parts_whole =
+      20480
+      (* = 256 * 80 *)
+    in
+    let reward_parts_half =
+      10240
+      (* = reward_parts_whole / 2 *)
+    in
+    let reward_parts_quarter =
+      5120
+      (* = reward_parts_whole / 4 *)
+    in
     let baking_reward_fixed_portion_weight =
       (* 1/4 or 1/2 *)
       if Compare.Int.(bonus_committee_size <= 0) then
@@ -514,13 +527,15 @@ module Derived = struct
              issuance_modification_delay;
              consensus_key_activation_delay;
              unstake_finalization_delay;
-           } ->
+           }
+         ->
         ( issuance_modification_delay,
           consensus_key_activation_delay,
           unstake_finalization_delay ))
       (fun ( issuance_modification_delay,
              consensus_key_activation_delay,
-             unstake_finalization_delay ) ->
+             unstake_finalization_delay )
+         ->
         {
           issuance_modification_delay;
           consensus_key_activation_delay;

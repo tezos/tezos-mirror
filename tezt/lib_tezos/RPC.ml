@@ -374,15 +374,15 @@ let get_chain_is_bootstrapped ?(chain = "main") () =
   JSON.
     {
       sync_state =
-        (json |-> "sync_state" |> as_string |> function
-         | "synced" -> Synced
-         | "unsynced" -> Unsynced
-         | "stuck" -> Stuck
-         | state ->
-             Test.fail
-               "/chains/%s/is_bootstrapped returned unexpected sync_state: %s"
-               chain
-               state);
+        ( json |-> "sync_state" |> as_string |> function
+          | "synced" -> Synced
+          | "unsynced" -> Unsynced
+          | "stuck" -> Stuck
+          | state ->
+              Test.fail
+                "/chains/%s/is_bootstrapped returned unexpected sync_state: %s"
+                chain
+                state );
       bootstrapped = json |-> "bootstrapped" |> as_bool;
     }
 
@@ -876,10 +876,11 @@ let get_chain_block_helper_attestation_rights ?(chain = "main")
     Fun.id
 
 let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
-    ?delegate ?level () =
+    ?delegate ?consensus_key ?level () =
   let query_string =
     Query_arg.opt "delegate" Fun.id delegate
     @ Query_arg.opt "level" Int.to_string level
+    @ Query_arg.opt "consensus_key" Fun.id consensus_key
   in
   make
     ~query_string
@@ -1911,6 +1912,21 @@ let get_chain_block_context_dal_commitments_history ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "dal"; "commitments_history"]
     Fun.id
 
+let get_chain_block_context_dal_cells_of_level ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "dal";
+      "skip_list_cells_of_level";
+    ]
+    Fun.id
+
 let get_chain_block_context_raw_json ?(chain = "main") ?(block = "head")
     ?(path = []) () =
   make
@@ -2015,3 +2031,54 @@ let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
           baking_power = frozen_stake + delegated_stake;
         })
     bakers_with_pow
+
+let get_baking_power_distribution_for_current_cycle ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "baking_power_distribution_for_current_cycle";
+    ]
+    Fun.id
+
+let get_tz4_baker_number_ratio ?(chain = "main") ?(block = "head") ?cycle () =
+  let query_string = Option.map (fun c -> [("cycle", Int.to_string c)]) cycle in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "tz4_baker_number_ratio"]
+    Fun.id
+
+let get_abaab_activation_level ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "all_bakers_attest_activation_level";
+    ]
+    Fun.id
+
+let get_chain_block_context_destination_index ?(chain = "main")
+    ?(block = "head") destination =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "destination";
+      destination;
+      "index";
+    ]
+  @@ JSON.as_int_opt

@@ -926,7 +926,8 @@ module Interpreter_tests = struct
             (function
               | Environment.Ecoproto_error
                   (Tezos_protocol_023_PtSeouLo.Protocol.Script_tc_errors
-                   .Unexpected_forged_value _) ->
+                   .Unexpected_forged_value
+                     _) ->
                   true
               | _ -> false)
             errs) ;

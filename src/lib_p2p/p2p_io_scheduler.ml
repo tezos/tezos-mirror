@@ -301,8 +301,7 @@ module Scheduler (IO : IO) = struct
           readys_low = Queue.create ();
         }
 
-    let on_request :
-        type resp err.
+    let on_request : type resp err.
         self -> (resp, err) P2p_workers.loop -> (resp, err) result Lwt.t =
      fun self P2p_workers.Loop ->
       let open Lwt_result_syntax in
@@ -313,8 +312,7 @@ module Scheduler (IO : IO) = struct
 
     let on_close _ = Lwt.return_unit
 
-    let on_error :
-        type resp err.
+    let on_error : type resp err.
         self ->
         Tezos_base.Worker_types.request_status ->
         (resp, err) P2p_workers.loop ->
@@ -322,8 +320,7 @@ module Scheduler (IO : IO) = struct
         [`Continue | `Shutdown] tzresult Lwt.t =
      fun _ _ _ _ -> Lwt.return_ok `Continue
 
-    let on_completion :
-        type resp err.
+    let on_completion : type resp err.
         self ->
         (resp, err) P2p_workers.loop ->
         resp ->

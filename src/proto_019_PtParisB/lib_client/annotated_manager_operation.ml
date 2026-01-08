@@ -126,8 +126,8 @@ let manager_from_annotated operation =
   @@ Manager_operation
        {source; fee; counter; gas_limit; storage_limit; operation}
 
-let rec manager_list_from_annotated :
-    type kind. kind annotated_list -> kind Kind.manager contents_list tzresult =
+let rec manager_list_from_annotated : type kind.
+    kind annotated_list -> kind Kind.manager contents_list tzresult =
   let open Result_syntax in
   function
   | Single_manager operation ->

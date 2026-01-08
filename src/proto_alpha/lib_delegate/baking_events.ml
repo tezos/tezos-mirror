@@ -28,146 +28,13 @@ open Alpha_context
 open Baking_state_types
 open Baking_state
 
-let section = [Protocol.name; "baker"]
+let section = Baking_events_section.section
 
 let pp_int32 fmt n = Format.fprintf fmt "%ld" n
 
 let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
 let waiting_color = Internal_event.Magenta
-
-module Op_info_for_logging = struct
-  type kind = Preattestation | Attestation_without_dal | Attestation_with_dal
-
-  type t = {
-    kind : kind;
-    level : Protocol.Alpha_context.Raw_level.t;
-    round : Protocol.Alpha_context.Round.t;
-    delegate : Delegate.t;
-  }
-
-  let pp_kind fmt = function
-    | Preattestation -> Format.fprintf fmt "preattestation"
-    | Attestation_without_dal -> Format.fprintf fmt "attestation (without DAL)"
-    | Attestation_with_dal -> Format.fprintf fmt "attestation (with DAL)"
-
-  let pp fmt {kind; delegate; level; round} =
-    let companion_key_is_relevant =
-      match kind with
-      | Attestation_with_dal -> Key.is_bls delegate.consensus_key
-      | Attestation_without_dal | Preattestation -> false
-    in
-    Format.fprintf
-      fmt
-      "%a@ for level %a, round %a@ for delegate@ %a"
-      pp_kind
-      kind
-      Protocol.Alpha_context.Raw_level.pp
-      level
-      Protocol.Alpha_context.Round.pp
-      round
-      (if companion_key_is_relevant then Delegate.pp
-       else Delegate.pp_without_companion_key)
-      delegate
-
-  let kind_encoding =
-    Data_encoding.string_enum
-      [
-        ("preattestation", Preattestation);
-        ("attestation_without_dal", Attestation_without_dal);
-        ("attestation_with_dal", Attestation_with_dal);
-      ]
-
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {kind; level; round; delegate} -> (kind, level, round, delegate))
-      (fun (kind, level, round, delegate) -> {kind; level; round; delegate})
-      (obj4
-         (req "op_kind" kind_encoding)
-         (req "level" Protocol.Alpha_context.Raw_level.encoding)
-         (req "round" Protocol.Alpha_context.Round.encoding)
-         (req "delegate" Delegate.encoding_for_logging__cannot_decode))
-
-  let of_unsigned_consensus_vote
-      (unsigned_consensus_vote : unsigned_consensus_vote) =
-    let kind =
-      match unsigned_consensus_vote.vote_kind with
-      | Preattestation -> Preattestation
-      | Attestation ->
-          if Option.is_some unsigned_consensus_vote.dal_content then
-            Attestation_with_dal
-          else Attestation_without_dal
-    in
-    {
-      kind;
-      delegate = unsigned_consensus_vote.delegate;
-      level = unsigned_consensus_vote.vote_consensus_content.level;
-      round = unsigned_consensus_vote.vote_consensus_content.round;
-    }
-end
-
-let pp_unsigned_consensus_vote fmt unsigned_consensus_vote =
-  Op_info_for_logging.(
-    pp fmt (of_unsigned_consensus_vote unsigned_consensus_vote))
-
-let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
-  pp_unsigned_consensus_vote fmt unsigned_consensus_vote
-
-let pp_forge_event fmt = function
-  | Block_ready {signed_block_header; round; delegate; _} ->
-      Format.fprintf
-        fmt
-        "block ready@ at level %ld, round %a@ for@ delegate@ %a "
-        signed_block_header.shell.level
-        Round.pp
-        round
-        Delegate.pp_without_companion_key
-        delegate
-  | Preattestation_ready signed_op | Attestation_ready signed_op ->
-      Format.fprintf
-        fmt
-        "operation ready:@ %a"
-        pp_signed_consensus_vote
-        signed_op
-
-let pp_event fmt =
-  let open Baking_state in
-  function
-  | New_valid_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new valid proposal received: %a"
-        pp_block_info
-        proposal.block
-  | New_head_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new head proposal received: %a"
-        pp_block_info
-        proposal.block
-  | Prequorum_reached (candidate, preattestations) ->
-      Format.fprintf
-        fmt
-        "prequorum reached with %d preattestations for %a at round %a"
-        (List.length preattestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | Quorum_reached (candidate, attestations) ->
-      Format.fprintf
-        fmt
-        "quorum reached with %d attestations for %a at round %a"
-        (List.length attestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | New_forge_event forge_event ->
-      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
-  | Timeout kind ->
-      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
 
 module Commands = struct
   include Internal_event.Simple
@@ -220,26 +87,44 @@ module Commands = struct
       ~pp1:Uri.pp
       ("endpoint", Tezos_rpc.Encoding.uri_encoding)
 
-  let recommend_octez_baker =
+  let deprecated_proto_specific_baker =
     declare_0
       ~section
-      ~name:"recommend_octez_baker"
+      ~name:"deprecated_proto_specific_baker"
       ~level:Warning
       ~msg:
-        "The `octez-baker` binary is now available. We recommend using it \
-         instead of `octez-baker-<protocol>`, as it automatically handles \
-         protocol switches."
+        "DEPRECATED: The `octez-baker-<protocol>` binaries are deprecated, and \
+         will be removed in the next major version of Octez. Please use \
+         `octez-baker` instead, which automatically handles protocol switches."
       ()
 
-  let unused_cli_adaptive_issuance_vote =
+  let deprecated_proto_specific_accuser =
     declare_0
       ~section
-      ~name:"unused_cli_adaptive_issuance_vote"
+      ~name:"deprecated_proto_specific_accuser"
       ~level:Warning
       ~msg:
-        "Adaptive issuance is now enabled, voting is no longer necessary. \
-         Please remove the argument from the CLI."
+        "DEPRECATED: The `octez-accuser-<protocol>` binaries are deprecated, \
+         and will be removed in the next major version of Octez. Please use \
+         `octez-accuser` instead, which automatically handles protocol \
+         switches."
       ()
+
+  let deprecated_adaptive_issuance_vote =
+    declare_0
+      ~section
+      ~name:"deprecated_adaptive_issuance_vote"
+      ~level:Warning
+      ~msg:
+        "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument \
+         (placeholder 'vote') is deprecated. It is already ignored by the \
+         baker, and will be removed in the next major version of Octez."
+      ()
+
+  let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
+    if Option.is_some adaptive_issuance_vote then
+      emit deprecated_adaptive_issuance_vote ()
+    else Lwt.return_unit
 end
 
 module State_transitions = struct
@@ -578,90 +463,76 @@ module State_transitions = struct
       ~pp2:pp_event
       ("event", event_encoding_for_logging__cannot_decode)
 
-  let discarding_preattestation =
-    declare_3
-      ~section
-      ~name:"discarding_preattestation"
-      ~level:Info
-      ~msg:
-        "discarding outdated preattestation for {delegate} at level {level}, \
-         round {round}"
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
-
   let discarding_attestation =
-    declare_3
+    declare_1
       ~section
       ~name:"discarding_attestation"
       ~level:Info
-      ~msg:
-        "discarding outdated attestation for {delegate} at level {level}, \
-         round {round}"
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
+      ~msg:"discarding outdated {operation_information}"
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
 
   let discarding_unexpected_preattestation_with_different_payload =
-    declare_5
+    declare_3
       ~section
       ~name:"discarding_unexpected_preattestation_with_different_payload"
       ~level:Warning
       ~msg:
-        "discarding preattestation for {delegate} with payload {payload} at \
-         level {level}, round {round} where the prequorum was locked on a \
-         different payload {state_payload}."
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+        "discarding {operation_information} with payload {operation_payload} \
+         where the prequorum was locked on a different payload \
+         {state_payload}."
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:Block_payload_hash.pp
-      ("payload", Block_payload_hash.encoding)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-      ~pp5:Block_payload_hash.pp
+      ("operation_payload", Block_payload_hash.encoding)
+      ~pp3:Block_payload_hash.pp
       ("state_payload", Block_payload_hash.encoding)
 
-  let discarding_unexpected_attestation_without_prequorum_payload =
+  let emit_discarding_unexpected_preattestation_with_different_payload
+      signed_preattestation ~state_payload =
+    let op_payload =
+      signed_preattestation.unsigned_consensus_vote.vote_consensus_content
+        .block_payload_hash
+    in
+    emit
+      discarding_unexpected_preattestation_with_different_payload
+      (signed_preattestation, op_payload, state_payload)
+
+  let discarding_unexpected_attestation_not_matching_prequorum =
     declare_3
       ~section
-      ~name:"discarding_unexpected_attestation_without_prequorum"
+      ~name:"discarding_unexpected_attestation_not_matching_prequorum"
       ~level:Warning
       ~msg:
-        "discarding attestation for {delegate} at level {level}, round {round} \
-         where no prequorum was reached."
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
-
-  let discarding_unexpected_attestation_with_different_prequorum_payload =
-    declare_5
-      ~section
-      ~name:"discarding_unexpected_attestation_with_different_prequorum"
-      ~level:Warning
-      ~msg:
-        "discarding attestation for {delegate} with payload {payload} at level \
-         {level}, round {round} where the prequorum was on a different payload \
-         {state_payload}."
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+        "discarding {operation_information} with payload {operation_payload} \
+         where {prequorum_payload_if_any}."
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:Block_payload_hash.pp
-      ("payload", Block_payload_hash.encoding)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-      ~pp5:Block_payload_hash.pp
-      ("state_payload", Block_payload_hash.encoding)
+      ("operation_payload", Block_payload_hash.encoding)
+      ~pp3:(fun fmt -> function
+        | None -> Format.fprintf fmt "no prequorum was reached"
+        | Some prequorum_payload ->
+            Format.fprintf
+              fmt
+              "the prequorum was on a different payload %a"
+              Block_payload_hash.pp
+              prequorum_payload)
+      ( "prequorum_payload_if_any",
+        Data_encoding.option Block_payload_hash.encoding )
+
+  let emit_discarding_unexpected_attestation_not_matching_prequorum
+      signed_attestation ~attestable_payload_hash_opt =
+    let attestation_payload =
+      signed_attestation.unsigned_consensus_vote.vote_consensus_content
+        .block_payload_hash
+    in
+    emit
+      discarding_unexpected_attestation_not_matching_prequorum
+      (signed_attestation, attestation_payload, attestable_payload_hash_opt)
 
   let discarding_unexpected_prequorum_reached =
     declare_2
@@ -688,38 +559,6 @@ module State_transitions = struct
       ("candidate", Block_hash.encoding)
       ~pp2:pp_phase
       ("phase", phase_encoding)
-end
-
-module Node_rpc = struct
-  include Internal_event.Simple
-
-  let section = section @ ["rpc"]
-
-  let error_while_monitoring_heads =
-    declare_1
-      ~section
-      ~name:"error_while_monitoring_heads"
-      ~level:Error
-      ~msg:"error while monitoring heads {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let error_while_monitoring_valid_proposals =
-    declare_1
-      ~section
-      ~name:"error_while_monitoring_valid_proposals"
-      ~level:Error
-      ~msg:"error while monitoring valid proposals {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let chain_id =
-    declare_1
-      ~section
-      ~name:"node_chain_id"
-      ~level:Info
-      ~msg:"Running baker with chain id: {chain_id}"
-      ("chain_id", Chain_id.encoding)
 end
 
 module Launch = struct
@@ -953,53 +792,27 @@ module Actions = struct
   let section = section @ ["actions"]
 
   let skipping_consensus_vote =
-    declare_5
+    declare_2
       ~section
       ~name:"skipping_consensus_vote"
       ~level:Error
-      ~msg:
-        "unable to sign {vote_kind} for {delegate} at level {level}, round \
-         {round} -- {trace}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-      ~pp5:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let failed_to_get_dal_attestations =
-    declare_2
-      ~section
-      ~name:"failed_to_get_attestations"
-      ~level:Error
-      ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
-      ("delegate", Delegate_id.encoding)
+      ~msg:"unable to sign {operation_information} -- {trace}"
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_get_dal_attestations_in_time =
-    declare_1
-      ~section
-      ~name:"failed_to_get_attestations_in_time"
-      ~level:Error
-      ~msg:"unable to get DAL attestation for {delegate} in time"
-      ("delegate", Delegate_id.encoding)
-
   let failed_to_inject_consensus_vote =
-    declare_3
+    declare_2
       ~section
       ~name:"failed_to_inject_consensus_vote"
       ~level:Error
-      ~msg:"failed to inject {vote_kind} for {delegate} -- {trace}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp3:Error_monad.pp_print_trace
+      ~msg:"failed to inject {operation_information} -- {trace}"
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
+      ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_forge_block =
@@ -1030,30 +843,25 @@ module Actions = struct
       ~name:"consensus_operation_injected"
       ~level:Notice
       ~msg:"injected {operation_information}{operation_hash}"
-      ~pp1:Op_info_for_logging.pp
-      ("operation_information", Op_info_for_logging.encoding)
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:(fun fmt oph ->
         Format.fprintf fmt "@ (operation hash: %a)" Operation_hash.pp oph)
       ("operation_hash", Operation_hash.encoding)
-
-  let emit_consensus_op_injected unsigned_consensus_op ophash =
-    emit
-      consensus_op_injected
-      ( Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op,
-        ophash )
 
   let attach_dal_attestation =
     declare_5
       ~section
       ~name:"attach_dal_attestation"
-      ~level:Notice
+      ~level:Info
       ~msg:
         "ready to attach DAL attestation for level {attestation_level}, round \
          {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
       ("delegate", Delegate_id.encoding)
-      ~pp2:Z.pp_print
-      ("bitset", Data_encoding.n)
+      ~pp2:pp_dal_content
+      ("bitset", dal_content_encoding)
       ("published_level", Data_encoding.int32)
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
@@ -1202,13 +1010,9 @@ module Actions = struct
       ~name:"signing_consensus_operation"
       ~level:Info
       ~msg:"signing {operation_information}"
-      ~pp1:Op_info_for_logging.pp
-      ("operation_information", Op_info_for_logging.encoding)
-
-  let emit_signing_consensus_op unsigned_consensus_op =
-    emit
-      signing_consensus_op
-      (Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op)
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
 
   let invalid_json_file =
     declare_1
@@ -1242,16 +1046,6 @@ module Actions = struct
       ~msg:"Voting {value} for liquidity baking toggle vote"
       ( "value",
         Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
-
-  let vote_for_adaptive_issuance =
-    declare_1
-      ~section
-      ~name:"vote_for_adaptive_issuance"
-      ~level:Notice
-      ~msg:"Voting {value} for adaptive issuance vote"
-      ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
-      )
 
   let signature_timeout =
     declare_1
@@ -1288,6 +1082,31 @@ module Actions = struct
   let unhealthy_dal_node = Commands.unhealthy_dal_node
 
   let unreachable_dal_node = Commands.unreachable_dal_node
+
+  let stalling_signature =
+    declare_4
+      ~section
+      ~name:"stalling_signature"
+      ~level:Warning
+      ~msg:
+        "Signature call of {kind} for level {level} at round {round} has not \
+         resolved in the last {seconds} seconds"
+      ("kind", Baking_errors.signing_request_encoding)
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("seconds", Data_encoding.float)
+
+  let stalling_forge_block =
+    declare_3
+      ~section
+      ~name:"stalling_forge_block"
+      ~level:Warning
+      ~msg:
+        "Forge block for level {level} at round {round} has not resolved in \
+         the last {seconds} seconds"
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("seconds", Data_encoding.float)
 end
 
 module VDF = struct
@@ -1563,16 +1382,6 @@ module Per_block_votes = struct
       ~msg:"Error reading the block vote file: {errors}"
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
-
-  let adaptive_issuance_vote =
-    declare_1
-      ~section
-      ~name:"read_adaptive_issuance_vote"
-      ~level:Notice
-      ~msg:"read adaptive issuance vote = {value}"
-      ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
-      )
 end
 
 module Selection = struct

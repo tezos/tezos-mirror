@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Gas accounting and costs.
 
@@ -281,9 +278,12 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
+    use tezos_crypto_rs::public_key::PublicKey;
+    use tezos_crypto_rs::CryptoError;
+    use thiserror::Error;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
-    use crate::ast::{Key, KeyHash, Micheline, Or, Ticket, TypedValue};
+    use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -380,6 +380,7 @@ pub mod interpret_cost {
     pub const SOURCE: u32 = 10;
     pub const NOW: u32 = 10;
     pub const IMPLICIT_ACCOUNT: u32 = 10;
+    pub const IS_IMPLICIT_ACCOUNT: u32 = 10;
     pub const VOTING_POWER: u32 = 640;
     pub const TOTAL_VOTING_POWER: u32 = 450;
     pub const EMIT: u32 = 30;
@@ -389,6 +390,7 @@ pub mod interpret_cost {
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
     pub const CREATE_CONTRACT: u32 = 60;
+    pub const VIEW: u32 = 1460; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
         compare(&t1.content, &t2.content)?;
@@ -501,7 +503,7 @@ pub mod interpret_cost {
         (25 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn not_bytes(b: &Vec<u8>) -> Result<u32, OutOfGas> {
+    pub fn not_bytes(b: &[u8]) -> Result<u32, OutOfGas> {
         let sz = Checked::from(b.len());
         (30 + (sz >> 1)).as_gas_cost()
     }
@@ -512,7 +514,7 @@ pub mod interpret_cost {
         Checked::from(w1 + 130).as_gas_cost()
     }
 
-    pub fn lsl_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_2 > 0 {
@@ -528,7 +530,7 @@ pub mod interpret_cost {
         Checked::from((sz >> 1) + 45).as_gas_cost()
     }
 
-    pub fn lsr_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_1 >= (size_2 >> 3) {
@@ -644,9 +646,7 @@ pub mod interpret_cost {
             (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
             (V::Signature(_), _) => incomparable(),
 
-            (V::KeyHash(_), V::KeyHash(_)) => {
-                cmp_bytes(KeyHash::BYTE_SIZE as u64, KeyHash::BYTE_SIZE as u64)?
-            }
+            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
             (V::KeyHash(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
@@ -831,16 +831,32 @@ pub mod interpret_cost {
         }
     }
 
-    pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
-        let len = Checked::from(msg.len());
-        match k {
-            Key::Ed25519(..) => 65800 + ((len >> 3) + len),
-            Key::Secp256k1(..) => 51600 + ((len >> 3) + len),
-            Key::P256(..) => 341000 + ((len >> 3) + len),
+    #[derive(Debug, Error)]
+    pub enum SigCostError {
+        #[error(transparent)]
+        OutOfGas(#[from] OutOfGas),
+        #[error(transparent)]
+        Crypto(#[from] CryptoError),
+    }
+
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
+        let len = msg.len().min(u32::MAX as usize) as u32;
+        let serialization_cost = len << 5;
+        let checked_cost = match k {
+            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
+            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
+            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
             #[cfg(feature = "bls")]
-            Key::Bls(..) => 1570000 + (len * 3),
-        }
-        .as_gas_cost()
+            PublicKey::Bls(..) => 1_570_000 + (len * 3),
+            #[cfg(not(feature = "bls"))]
+            PublicKey::Bls(..) => {
+                return Err(CryptoError::Unsupported(
+                    "bls feature disabled, tz4 signature verification not supported",
+                ))
+            }
+        };
+
+        Ok(serialization_cost + checked_cost)
     }
 
     pub fn slice(length: usize) -> Result<u32, OutOfGas> {

@@ -169,6 +169,7 @@ module Dal = struct
   module Slots_history = Dal_slot_repr.History
   module Slots_storage = Dal_slot_storage
   module Delegate = Dal_already_denounced_storage
+  module Past_parameters = Dal_storage
 end
 
 module Dal_errors = Dal_errors_repr
@@ -243,8 +244,8 @@ module Block_payload = struct
   include Block_payload_repr
 end
 
-module First_level_of_protocol = struct
-  let get = Storage.Tenderbake.First_level_of_protocol.get
+module Protocol_activation_level = struct
+  let get = Storage.Protocol_activation_level.get
 end
 
 module Consecutive_round_zero = struct
@@ -276,6 +277,10 @@ end
 module Cycle = struct
   include Cycle_repr
   include Cycle_storage
+
+  module For_RPC = struct
+    let of_repr c = c
+  end
 end
 
 module Fees = Fees_storage
@@ -359,6 +364,39 @@ end
 module Script = struct
   include Michelson_v1_primitives
   include Script_repr
+
+  type michelson_with_storage = t = {code : lazy_expr; storage : lazy_expr}
+
+  type native_kind = Script_native_repr.t = CLST
+
+  type native_with_storage = Script_native_repr.with_storage = {
+    kind : native_kind;
+    storage : lazy_expr;
+  }
+
+  type t = Contract_repr.originated_kind =
+    | Script of michelson_with_storage
+    | Native of native_with_storage
+
+  let michelson_with_storage_encoding = Script_repr.encoding
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"michelson"
+          (Tag 0)
+          michelson_with_storage_encoding
+          (function Script m -> Some m | Native _ -> None)
+          (fun m -> Script m);
+        case
+          ~title:"native"
+          (Tag 1)
+          Script_native_repr.with_storage_encoding
+          (function Native n -> Some n | Script _ -> None)
+          (fun n -> Native n);
+      ]
 
   type consume_deserialization_gas = Always | When_needed
 
@@ -445,10 +483,34 @@ module Contract = struct
   module Internal_for_tests = struct
     include Contract_repr
     include Contract_storage
+
+    let get_clst_contract_hash ctxt =
+      Storage.Contract.Native_contracts.CLST.get ctxt
   end
 end
 
 module Global_constants_storage = Global_constants_storage
+
+module Address_registry = struct
+  type diff = Raw_context.Address_registry.diff = {
+    address : Destination.t;
+    index : Z.t;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; index} -> (address, index))
+      (fun (address, index) -> {address; index})
+      (obj2 (req "address" Destination.encoding) (req "index" z))
+
+  let register_diff ctxt (diff : diff) =
+    Raw_context.Address_registry.register_diff ctxt diff
+
+  let get_diffs = Raw_context.Address_registry.get_diffs
+
+  include Address_registry_storage
+end
 
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map
@@ -627,7 +689,19 @@ end
 module Stake_distribution = struct
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
-  let slot_owner = Delegate_sampler.slot_owner
+  let attestation_slot_owner ctxt ~attested_level slot =
+    let all_bakers_attest_enabled =
+      Consensus_parameters_storage.check_all_bakers_attest_at_level
+        ctxt
+        ~attested_level
+    in
+    Delegate_sampler.attestation_slot_owner
+      ~all_bakers_attest_enabled
+      ctxt
+      attested_level
+      slot
+
+  let stake_info_for_cycle = Delegate_sampler.stake_info_for_cycle
 
   let stake_info = Delegate_sampler.stake_info
 
@@ -669,6 +743,27 @@ module Commitment = struct
 end
 
 module Migration = Migration_repr
+
+module Attesting_power = struct
+  include Attesting_power_repr
+  include Consensus_parameters_storage
+
+  let get ctxt ~attested_level {slots; baking_power} =
+    let all_bakers_attest_enabled =
+      check_all_bakers_attest_at_level ctxt ~attested_level
+    in
+    if all_bakers_attest_enabled then baking_power else Int64.of_int slots
+
+  let get_slots {slots; _} = slots
+
+  let to_result ctxt ~attested_level =
+    let attested_level = Level_storage.from_raw ctxt attested_level in
+    to_result
+      ~abaab_activated:(check_all_bakers_attest_at_level ctxt ~attested_level)
+
+  let all_bakers_attest_activation_level ctxt =
+    Constants_storage.all_bakers_attest_first_level ctxt
+end
 
 module Consensus = struct
   include Raw_context.Consensus

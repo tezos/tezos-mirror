@@ -16,7 +16,7 @@ function. This will:
 - Create a *test executable* ``main.exe`` in the test folder. The
   test executable links with the test library and consists of a single call to
   Tezt's `Test.run
-  <https://ocaml.org/p/tezt/latest/doc/Tezt/Test/index.html#val-run>`__.
+  <https://ocaml.org/p/tezt/latest/doc/tezt/Tezt/Test/index.html#val-run>`__.
 - Finally, link the test library with Tezt's main entrypoint at
   ``tezt/tests/main.exe`` so that it registers all Alcotezts.
 
@@ -153,7 +153,7 @@ Test Output
 +++++++++++
 
 Alcotezt redirects ``Format``'s output to Tezt's `Log.debug
-<https://ocaml.org/p/tezt/latest/doc/Tezt_core/Log/index.html#val-debug>`__.
+<https://ocaml.org/p/tezt/latest/doc/tezt.core/Tezt_core/Log/index.html#val-debug>`__.
 To see the debug output of an Alcotezt, pass the ``--verbose`` flag to
 Tezt. See the section :ref:`running-alcotezts` above for more
 information on how to pass flags to Tezt when executing Alcotezts.

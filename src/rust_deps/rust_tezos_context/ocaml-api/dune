@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_rust_tezos_context)
+ (public_name octez-rust-tezos-context)
+ (instrumentation (backend bisect_ppx))
+ (flags
+  (:standard)
+  -w -66))

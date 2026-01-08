@@ -11,6 +11,7 @@
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt_etherlink
+  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
   octez-evm-node-libs.evm_node_lib_dev_encoding
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
@@ -25,7 +26,16 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer validate dal_sequencer eth_call gc tezlink))
+ (modules
+  evm_rollup
+  evm_sequencer
+  validate
+  dal_sequencer
+  eth_call
+  gc
+  tezlink
+  preconfirmation
+  tezosx))
 
 (executable
  (name main)

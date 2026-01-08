@@ -219,13 +219,15 @@ let candidate_encoding =
            round_watched;
            payload_hash_watched;
            branch_watched;
-         } ->
+         }
+       ->
       (hash, level_watched, round_watched, payload_hash_watched, branch_watched))
     (fun ( hash,
            level_watched,
            round_watched,
            payload_hash_watched,
-           branch_watched ) ->
+           branch_watched )
+       ->
       {hash; level_watched; round_watched; payload_hash_watched; branch_watched})
     (obj5
        (req "hash" Block_hash.encoding)
@@ -347,7 +349,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
       operation_stream
   in
   let* shell_header =
-    (Shell_services.Blocks.Header.shell_header
+    (Node_rpc.shell_header
        cctxt
        ~chain:cctxt#chain
        ~block:(`Head 0)

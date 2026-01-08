@@ -1,0 +1,201 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- images
+- build
+- publish
+
+oc.docker:rust-sdk-bindings:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_sdk_bindings_image_tag.env
+
+check_sdk_version:
+  image: datadog/ci:v4.1.0
+  stage: start
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  - ./contrib/sdk-bindings/scripts/ci/check_tag_version.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+build_python_sdk_linux:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-sdk-bindings:amd64
+  - check_sdk_version
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - export CARGO_NET_OFFLINE=false
+  - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C contrib/sdk-bindings/rust -f python.mk build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
+build_python_sdk_macos:
+  image: macos-15-xcode-16
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - check_sdk_version
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - export CARGO_NET_OFFLINE=false
+  - export CARGO_HOME=$HOME/.cargo
+  - python3 -m venv $HOME/.venv
+  - . $HOME/.venv/bin/activate
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  - . $HOME/.cargo/env
+  - pip install maturin==1.5.1
+  - brew install sccache
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C contrib/sdk-bindings/rust -f python.mk build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    TAGS: saas-macos-medium-m1
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
+build_python_sdk_windows:
+  stage: build
+  tags:
+  - $TAGS
+  needs:
+  - check_sdk_version
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - '[Environment]::SetEnvironmentVariable(''CARGO_NET_OFFLINE'',''false'')'
+  - '[Environment]::SetEnvironmentVariable(''CARGO_HOME'',''.cargo'')'
+  - $env:Path = "$Env:CI_PROJECT_DIR\.cargo\bin;$env:Path"
+  - Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe
+  - ./rustup-init.exe -y
+  - Remove-Item rustup-init.exe
+  - pip install maturin==1.5.1
+  - choco install make
+  script:
+  - make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f python.mk build
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TAGS: saas-windows-medium-amd64
+    SHELL: powershell
+  artifacts:
+    paths:
+    - contrib/sdk-bindings/rust/target/wheels/*
+
+publish_sdk:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-sdk-bindings:amd64
+  - build_python_sdk_linux
+  - build_python_sdk_macos
+  - build_python_sdk_windows
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  - build_python_sdk_linux
+  - build_python_sdk_macos
+  - build_python_sdk_windows
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - make -C contrib/sdk-bindings publish
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    MATURIN_REPOSITORY: testpypi
+    MATURIN_PYPI_TOKEN: $CI_TESTPYPI_TOKEN

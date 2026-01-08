@@ -60,6 +60,14 @@ impl Signature {
         }
     }
 
+    pub fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
+        Self::from_base58_check(data)
+    }
+
+    pub fn to_b58check(&self) -> String {
+        self.to_base58_check()
+    }
+
     pub fn hash_type(&self) -> HashType {
         match self {
             Self::Ed25519(_) => HashType::Ed25519Signature,
@@ -157,7 +165,7 @@ from_s_for_sig!(P256Signature, P256);
 from_s_for_sig!(BlsSignature, Bls);
 from_s_for_sig!(UnknownSignature, Unknown);
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum TryFromSignatureError {
     #[error("Incorrect signature kind {0:?}.")]
     InvalidKind(HashType),

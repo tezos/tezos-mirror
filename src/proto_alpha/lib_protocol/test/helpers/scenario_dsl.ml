@@ -19,7 +19,8 @@ type ('input, 'output) scenarios =
   | Concat : (('a, 'b) scenarios * ('b, 'c) scenarios) -> ('a, 'c) scenarios
   | Branch : (('a, 'b) scenarios * ('a, 'b) scenarios) -> ('a, 'b) scenarios
   | Tag : (* Name for test branch *) string -> ('t, 't) scenarios
-  | Slow : (* If in scenario branch, makes the test `Slow *)
+  | Slow :
+      (* If in scenario branch, makes the test `Slow *)
       ('t, 't) scenarios
 
 (** Unfolded scenario type *)
@@ -29,8 +30,7 @@ type ('input, 'output) single_scenario =
       (('input -> 't tzresult Lwt.t) * ('t, 'output) single_scenario)
       -> ('input, 'output) single_scenario
 
-let rec cat_ss :
-    type a b c.
+let rec cat_ss : type a b c.
     (a, b) single_scenario -> (b, c) single_scenario -> (a, c) single_scenario =
  fun a b ->
   match a with End_scenario -> b | Cons (act, a') -> Cons (act, cat_ss a' b)
@@ -38,8 +38,7 @@ let rec cat_ss :
 let combine f l1 l2 =
   List.map (fun a -> List.map (fun b -> f a b) l2) l1 |> List.flatten
 
-let rec unfold_scenarios :
-    type input output.
+let rec unfold_scenarios : type input output.
     (input, output) scenarios ->
     ((input, output) single_scenario * string list * bool) list = function
   | Slow -> [(End_scenario, [], true)]
@@ -55,8 +54,7 @@ let rec unfold_scenarios :
         l
         r
 
-let rec run_scenario :
-    type input output.
+let rec run_scenario : type input output.
     (input, output) single_scenario -> input -> output tzresult Lwt.t =
   let open Lwt_result_syntax in
   fun scenario input ->
@@ -115,8 +113,8 @@ let noop = Empty
 
 let no_tag = Empty
 
-let concat :
-    type a b c. (a, b) scenarios -> (b, c) scenarios -> (a, c) scenarios =
+let concat : type a b c.
+    (a, b) scenarios -> (b, c) scenarios -> (a, c) scenarios =
  fun a b ->
   match (a, b) with
   | Empty, Empty -> Empty
@@ -191,6 +189,14 @@ let fold_tag :
     ('a -> ('b, 'c) scenarios) -> (string * 'a) list -> ('b, 'c) scenarios =
  fun f ->
   let f (s, x) = Tag s --> f x in
+  fold f
+
+let fold_tag_opt :
+    ('a -> ('b, 'c) scenarios) ->
+    (string option * 'a) list ->
+    ('b, 'c) scenarios =
+ fun f ->
+  let f (s, x) = (match s with Some s -> Tag s | None -> Empty) --> f x in
   fold f
 
 (** [fold_tag_f f tag l] folds [f] over [l], [tag] returns a tag for each element of [l].

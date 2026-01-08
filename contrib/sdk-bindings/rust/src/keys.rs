@@ -2,92 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::hash::{
+    BlsSignature, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash,
+    Ed25519Signature, P256Signature, PublicKey, PublicKeyBls, PublicKeyEd25519, PublicKeyHash,
+    PublicKeyP256, PublicKeySecp256k1, Secp256k1Signature, Signature, UnknownSignature,
+};
 use crate::Error;
 use paste::paste;
-use tezos_crypto_rs::{
-    hash::{self, HashTrait},
-    public_key, public_key_hash, signature, CryptoError, PublicKeySignatureVerifier,
-    PublicKeyWithHash,
-};
-
-macro_rules! bind_hash {
-    ($bind_name:ident, $name:ty) => {
-        paste! {
-            #[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
-            #[uniffi::export(Debug, Display, Eq)]
-            pub struct $bind_name(pub(crate) $name);
-
-            #[uniffi::export]
-            impl $bind_name {
-                #[doc = "Decodes a Base58Check-encoded string into a `" $bind_name "`."]
-                #[uniffi::constructor]
-                pub fn from_b58check(data: &str) -> Result<Self, Error> {
-                    <$name>::from_b58check(data)
-                        .map(Self)
-                        .map_err(Error::Base58)
-                }
-
-                #[doc = "Encodes the `" $bind_name "` into a Base58Check-encoded string."]
-                pub fn to_b58check(&self) -> String {
-                    <$name>::to_b58check(&self.0)
-                }
-            }
-
-            impl ::std::fmt::Display for $bind_name {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", self.0)
-                }
-            }
-        }
-    };
-}
-
-bind_hash!(ContractTz1Hash, hash::ContractTz1Hash);
-bind_hash!(ContractTz2Hash, hash::ContractTz2Hash);
-bind_hash!(ContractTz3Hash, hash::ContractTz3Hash);
-bind_hash!(ContractTz4Hash, hash::ContractTz4Hash);
-bind_hash!(PublicKeyHash, public_key_hash::PublicKeyHash);
-
-bind_hash!(PublicKeyEd25519, hash::PublicKeyEd25519);
-bind_hash!(PublicKeySecp256k1, hash::PublicKeySecp256k1);
-bind_hash!(PublicKeyP256, hash::PublicKeyP256);
-bind_hash!(PublicKeyBls, hash::PublicKeyBls);
-bind_hash!(PublicKey, public_key::PublicKey);
-
-bind_hash!(UnknownSignature, hash::UnknownSignature);
-bind_hash!(Ed25519Signature, hash::Ed25519Signature);
-bind_hash!(Secp256k1Signature, hash::Secp256k1Signature);
-bind_hash!(P256Signature, hash::P256Signature);
-bind_hash!(BlsSignature, hash::BlsSignature);
-
-// TODO: https://linear.app/tezos/issue/SDK-73.
-// Unable use the `bind_hash!` macro because the `signature::Signature` struct does not implement `from_b58check` and `to_b58check` but `from_base58_check` and `to_base58_check`
-/// Generic signature structure gathering the four types of signature hash and the unknown signature hash.
-#[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
-#[uniffi::export(Debug, Display, Eq)]
-pub struct Signature(pub(crate) signature::Signature);
-
-#[uniffi::export]
-impl Signature {
-    /// Decodes any Base58Check-encoded signature string into a `Signature`.
-    #[uniffi::constructor]
-    pub fn from_b58check(data: &str) -> Result<Self, Error> {
-        signature::Signature::from_base58_check(data)
-            .map(Self)
-            .map_err(Error::Base58)
-    }
-
-    /// Encodes the `Signature` into a Base58Check-encoded string.
-    pub fn to_b58check(&self) -> String {
-        signature::Signature::to_base58_check(&self.0)
-    }
-}
-
-impl ::std::fmt::Display for Signature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+use tezos_crypto_rs::{signature, CryptoError, PublicKeySignatureVerifier, PublicKeyWithHash};
 
 macro_rules! bind_pk_to_pkh {
     ($pk:ident, $pkh:ident) => {
@@ -544,8 +466,7 @@ mod tests {
                         $b58_sig,
                         stringify!($sig_ty)
                     ));
-                    let raw_msg = forge_message($msg)
-                        .expect(&format!("Forging message {} should succeed", $msg));
+                    let raw_msg = forge_message($msg);
                     let res = &pk.verify_signature(&sig, &raw_msg).expect(&format!(
                         "Verifying signature {} with public key {} for message {} should succeed",
                         $b58_pk, $b58_sig, $msg
@@ -642,7 +563,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Ed25519Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         assert!(
             matches!(
                 &pk.verify_signature(&sig, &raw_msg),
@@ -663,7 +584,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Secp256k1Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         let res = &pk.verify_signature(&sig, &raw_msg).expect(&format!(
             "Verifying signature {} with public key {} for message {} should succeed",
             b58_sig, b58_pk, msg
@@ -683,7 +604,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         assert!(
             matches!(
                 &pk.verify_signature(&sig, &raw_msg),

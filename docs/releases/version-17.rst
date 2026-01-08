@@ -24,7 +24,9 @@ Version 17.3 improves Nairobi protocol plugins to discard operations with invali
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v17.3

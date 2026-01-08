@@ -105,4 +105,5 @@ let reports ?dotenv ?junit ?coverage_report ?container_scanning () =
   | _ -> ()) ;
   {dotenv; junit; coverage_report; container_scanning}
 
-let cache ?(policy = Pull_push) ~key paths = {key; paths; policy}
+let cache ?(policy = Pull_push) ?fallback_keys ~key paths =
+  {key; paths; policy; fallback_keys}

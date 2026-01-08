@@ -556,6 +556,12 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   micheline__alpha__michelson_v1__expression_tag:
     0: int
     1: string

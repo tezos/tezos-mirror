@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 
 (** {2 Action types}  *)
 
@@ -54,10 +55,8 @@ and level_update = {
   new_level_proposal : proposal;
   compute_new_state :
     current_round:Round.t ->
-    delegate_slots:delegate_slots ->
-    next_level_delegate_slots:delegate_slots ->
-    dal_attestable_slots:dal_attestable_slots ->
-    next_level_dal_attestable_slots:dal_attestable_slots ->
+    delegate_infos:delegate_infos ->
+    next_level_delegate_infos:delegate_infos ->
     (state * action) Lwt.t;
 }
 
@@ -81,7 +80,7 @@ val pp_action : Format.formatter -> action -> unit
 
     - generating the seed nonce hash if needed
 
-    - setting the votes for liquidity baking and adaptive issuance according to the
+    - setting the vote for liquidity baking according to the
     per_block_vote_file
 
     - calling [Block_forge.forge] to forge the block
@@ -139,6 +138,12 @@ val inject_consensus_votes :
     level and the next one, computes round information by calling [compute_round]
     and updates the state accordingly. *)
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
+
+val only_if_dal_feature_enabled :
+  state ->
+  default_value:'a ->
+  (Tezos_rpc.Context.generic -> 'a tzresult Lwt.t) ->
+  'a tzresult Lwt.t
 
 (** [may_get_dal_content state unsigned_consensus_vote], if the DAL feature is
     enabled, recovers the attestable slots by calling

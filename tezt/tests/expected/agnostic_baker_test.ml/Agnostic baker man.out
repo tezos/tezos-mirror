@@ -15,41 +15,39 @@ Global options (must come before the command):
   -n --no-base-dir-warnings: silence warnings about client data directory
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
-  --chain <hash|tag>: chain on which to apply contextual commands (commands
-    dependent on the context associated with the specified chain). Possible
-    tags are 'main' and 'test'.
-  -b --block <hash|level|tag>: block on which to apply contextual commands
-    (commands dependent on the context associated with the specified block).
-    Possible tags include 'head' and 'genesis' +/- an optional offset (e.g.
-    "octez-client -b head-1 get timestamp"). Note that block queried must
-    exist in node's storage.
-  -w --wait <none|<int>>: how many confirmation blocks are needed before an
-    operation is considered included
+  --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the
+    context associated with the specified chain). Possible tags are 'main' and 'test'.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent
+    on the context associated with the specified block). Possible tags include 'head' and
+    'genesis' +/- an optional offset (e.g. "octez-client -b head-1 get timestamp"). Note that
+    block queried must exist in node's storage.
+  -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is
+    considered included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node
-  --better-errors: Error reporting is more detailed. Can be used if a call to
-    an RPC fails or if you don't know the input accepted by the RPC. It may
-    happen that the RPC calls take more time however.
-  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address
-    of the node
-  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the
-    node
+  --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or
+    if you don't know the input accepted by the RPC. It may happen that the RPC calls take
+    more time however.
+  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address of the node
+  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the node
   -S --tls: [DEPRECATED: use --endpoint instead] use TLS to connect to node.
-  -m --media-type <json, binary, any or default>: Sets the "media-type" value
-    for the "accept" header for RPC requests to the node. The media accept
-    header indicates to the node which format of data serialisation is
-    supported. Use the value "json" for serialisation to the JSON format.
+  -m --media-type <json, binary, any or default>: Sets the "media-type" value for the "accept"
+    header for RPC requests to the node. The media accept header indicates to the node which
+    format of data serialisation is supported. Use the value "json" for serialisation to the
+    JSON format.
   -E --endpoint <uri>: HTTP(S) endpoint of the node RPC interface; e.g.
     'http://localhost:8732'
-  -s --sources <path>: path to JSON file containing sources for --mode light.
-    Example file content: {"min_agreement": 1.0, "uris":
-    ["http://localhost:8732", "https://localhost:8733"]}
+  -s --sources <path>: path to JSON file containing sources for --mode light. Example file
+    content: {"min_agreement": 1.0, "uris": ["http://localhost:8732",
+    "https://localhost:8733"]}
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
-  -M --mode <client|light|mockup|proxy>: how to interact with the
-    node
-  --log-coloring <true|false>: Enable or disable light coloring in default
-    stdout logs. Coloring is enabled by default.
+  -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs.
+    Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified with
+    TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is insecure and should never be
+    used in production.
 
 ./octez-baker --help
 Usage:
@@ -67,41 +65,39 @@ Global options (must come before the command):
   -n --no-base-dir-warnings: silence warnings about client data directory
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
-  --chain <hash|tag>: chain on which to apply contextual commands (commands
-    dependent on the context associated with the specified chain). Possible
-    tags are 'main' and 'test'.
-  -b --block <hash|level|tag>: block on which to apply contextual commands
-    (commands dependent on the context associated with the specified block).
-    Possible tags include 'head' and 'genesis' +/- an optional offset (e.g.
-    "octez-client -b head-1 get timestamp"). Note that block queried must
-    exist in node's storage.
-  -w --wait <none|<int>>: how many confirmation blocks are needed before an
-    operation is considered included
+  --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the
+    context associated with the specified chain). Possible tags are 'main' and 'test'.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent
+    on the context associated with the specified block). Possible tags include 'head' and
+    'genesis' +/- an optional offset (e.g. "octez-client -b head-1 get timestamp"). Note that
+    block queried must exist in node's storage.
+  -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is
+    considered included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node
-  --better-errors: Error reporting is more detailed. Can be used if a call to
-    an RPC fails or if you don't know the input accepted by the RPC. It may
-    happen that the RPC calls take more time however.
-  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address
-    of the node
-  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the
-    node
+  --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or
+    if you don't know the input accepted by the RPC. It may happen that the RPC calls take
+    more time however.
+  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address of the node
+  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the node
   -S --tls: [DEPRECATED: use --endpoint instead] use TLS to connect to node.
-  -m --media-type <json, binary, any or default>: Sets the "media-type" value
-    for the "accept" header for RPC requests to the node. The media accept
-    header indicates to the node which format of data serialisation is
-    supported. Use the value "json" for serialisation to the JSON format.
+  -m --media-type <json, binary, any or default>: Sets the "media-type" value for the "accept"
+    header for RPC requests to the node. The media accept header indicates to the node which
+    format of data serialisation is supported. Use the value "json" for serialisation to the
+    JSON format.
   -E --endpoint <uri>: HTTP(S) endpoint of the node RPC interface; e.g.
     'http://localhost:8732'
-  -s --sources <path>: path to JSON file containing sources for --mode light.
-    Example file content: {"min_agreement": 1.0, "uris":
-    ["http://localhost:8732", "https://localhost:8733"]}
+  -s --sources <path>: path to JSON file containing sources for --mode light. Example file
+    content: {"min_agreement": 1.0, "uris": ["http://localhost:8732",
+    "https://localhost:8733"]}
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
-  -M --mode <client|light|mockup|proxy>: how to interact with the
-    node
-  --log-coloring <true|false>: Enable or disable light coloring in default
-    stdout logs. Coloring is enabled by default.
+  -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs.
+    Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified with
+    TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is insecure and should never be
+    used in production.
 
 ./octez-baker man
 Usage:
@@ -119,41 +115,39 @@ Global options (must come before the command):
   -n --no-base-dir-warnings: silence warnings about client data directory
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
-  --chain <hash|tag>: chain on which to apply contextual commands (commands
-    dependent on the context associated with the specified chain). Possible
-    tags are 'main' and 'test'.
-  -b --block <hash|level|tag>: block on which to apply contextual commands
-    (commands dependent on the context associated with the specified block).
-    Possible tags include 'head' and 'genesis' +/- an optional offset (e.g.
-    "octez-client -b head-1 get timestamp"). Note that block queried must
-    exist in node's storage.
-  -w --wait <none|<int>>: how many confirmation blocks are needed before an
-    operation is considered included
+  --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the
+    context associated with the specified chain). Possible tags are 'main' and 'test'.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent
+    on the context associated with the specified block). Possible tags include 'head' and
+    'genesis' +/- an optional offset (e.g. "octez-client -b head-1 get timestamp"). Note that
+    block queried must exist in node's storage.
+  -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is
+    considered included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node
-  --better-errors: Error reporting is more detailed. Can be used if a call to
-    an RPC fails or if you don't know the input accepted by the RPC. It may
-    happen that the RPC calls take more time however.
-  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address
-    of the node
-  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the
-    node
+  --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or
+    if you don't know the input accepted by the RPC. It may happen that the RPC calls take
+    more time however.
+  -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address of the node
+  -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the node
   -S --tls: [DEPRECATED: use --endpoint instead] use TLS to connect to node.
-  -m --media-type <json, binary, any or default>: Sets the "media-type" value
-    for the "accept" header for RPC requests to the node. The media accept
-    header indicates to the node which format of data serialisation is
-    supported. Use the value "json" for serialisation to the JSON format.
+  -m --media-type <json, binary, any or default>: Sets the "media-type" value for the "accept"
+    header for RPC requests to the node. The media accept header indicates to the node which
+    format of data serialisation is supported. Use the value "json" for serialisation to the
+    JSON format.
   -E --endpoint <uri>: HTTP(S) endpoint of the node RPC interface; e.g.
     'http://localhost:8732'
-  -s --sources <path>: path to JSON file containing sources for --mode light.
-    Example file content: {"min_agreement": 1.0, "uris":
-    ["http://localhost:8732", "https://localhost:8733"]}
+  -s --sources <path>: path to JSON file containing sources for --mode light. Example file
+    content: {"min_agreement": 1.0, "uris": ["http://localhost:8732",
+    "https://localhost:8733"]}
   -R --remote-signer <uri>: URI of the remote signer
   -f --password-filename <filename>: path to the password filename
-  -M --mode <client|light|mockup|proxy>: how to interact with the
-    node
-  --log-coloring <true|false>: Enable or disable light coloring in default
-    stdout logs. Coloring is enabled by default.
+  -M --mode <client|light|mockup|proxy>: how to interact with the node
+  --log-coloring <true|false>: Enable or disable light coloring in default stdout logs.
+    Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified with
+    TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is insecure and should never be
+    used in production.
 
 Access the documentation:
 
@@ -163,8 +157,8 @@ Access the documentation:
 Commands for editing and viewing the client's config file:
 
   config show
-    Show the current config (config file content + command line arguments) or
-    the mockup config files if `--mode mockup` is specified.
+    Show the current config (config file content + command line arguments) or the mockup
+    config files if `--mode mockup` is specified.
   
   config reset
     Reset the config file to the factory defaults.
@@ -195,18 +189,16 @@ Commands related to the DAL daemon.:
     Run the Octez DAL
   
   config dal init 
-    This command creates a configuration file with the parameters provided on
-    the command-line, if no configuration file exists already in the
-    specified or default location. Otherwise, the command-line parameters
-    override the existing ones, and old parameters are lost. This
-    configuration is then used by the run command.
+    This command creates a configuration file with the parameters provided on the
+    command-line, if no configuration file exists already in the specified or default
+    location. Otherwise, the command-line parameters override the existing ones, and old
+    parameters are lost. This configuration is then used by the run command.
   
   config dal update 
-    This command updates the configuration file with the parameters provided
-    on the command-line. If no configuration file exists already, the command
-    will fail.
+    This command updates the configuration file with the parameters provided on the
+    command-line. If no configuration file exists already, the command will fail.
   
-  debug dal print store schemas 
+  debug dal print store schemas
     Print SQL statements describing the tables created in the store.
 
 Miscellaneous commands:

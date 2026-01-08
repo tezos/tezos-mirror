@@ -115,7 +115,8 @@ let commands () =
            message
            (_, (key_locator, _))
            signature
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
         >>=? fun block ->
         check_message cctxt ~key_locator ~block ~quiet ~message ~signature
@@ -141,7 +142,8 @@ let commands () =
       (fun ()
            unsigned_block_header
            delegate
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         let unsigned_header =
           Data_encoding.Binary.to_bytes_exn
             Protocol.Alpha_context.Block_header.unsigned_encoding

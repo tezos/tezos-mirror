@@ -18,8 +18,8 @@ applied_sequencer_upgrade:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 applied_upgrade:
@@ -28,17 +28,16 @@ applied_upgrade:
   section: evm_node.dev
   json format:
     { /* applied_upgrade version 0 */
-      "applied_upgrade.v0":
-        { "root_hash": $unistring,
-          "level": $positive_bignum } }
+      "applied_upgrade.v0": { "root_hash": $unistring,
+                              "level": $positive_bignum } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 block_producer_locked:
@@ -48,6 +47,24 @@ block_producer_locked:
   json format:
     { /* block_producer_locked version 0 */
       "block_producer_locked.v0": any }
+  
+block_producer_operation_rejected:
+  description: operation {op_hash} is not valid with current state: {error}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* block_producer_operation_rejected version 0 */
+      "block_producer_operation_rejected.v0":
+        { "op_hash": $Operation_hash,
+          "error": $unistring } }
+    $Operation_hash:
+      /* A Tezos operation ID (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 block_producer_started:
   description: block producer has been started
@@ -66,8 +83,8 @@ block_producer_transaction_injected:
       "block_producer_transaction_injected.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 block_producer_transaction_rejected:
@@ -76,14 +93,21 @@ block_producer_transaction_rejected:
   section: evm_node.dev
   json format:
     { /* block_producer_transaction_rejected version 0 */
-      "block_producer_transaction_rejected.v0":
-        { "tx_hash": $unistring,
-          "error": $unistring } }
+      "block_producer_transaction_rejected.v0": { "tx_hash": $unistring,
+                                                  "error": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+block_production_sunset:
+  description: block production is sunset ahead of the change of sequencer
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* block_production_sunset version 0 */
+      "block_production_sunset.v0": any }
   
 blueprint_application:
   description: head is now {level}, applied in {process_time}{timestamp}
@@ -112,8 +136,8 @@ blueprint_application:
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 blueprint_catchup:
@@ -122,9 +146,8 @@ blueprint_catchup:
   section: evm_node.dev
   json format:
     { /* blueprint_catchup version 0 */
-      "blueprint_catchup.v0":
-        { "min": $positive_bignum,
-          "max": $positive_bignum } }
+      "blueprint_catchup.v0": { "min": $positive_bignum,
+                                "max": $positive_bignum } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -148,9 +171,8 @@ blueprint_injection_failure:
   section: evm_node.dev
   json format:
     { /* blueprint_injection_failure version 0 */
-      "blueprint_injection_failure.v0":
-        { "level": $positive_bignum,
-          "trace": any } }
+      "blueprint_injection_failure.v0": { "level": $positive_bignum,
+                                          "trace": any } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -213,23 +235,6 @@ blueprint_production:
   json format:
     { /* blueprint_production version 0 */
       "blueprint_production.v0":
-        { "level": $positive_bignum,
-          "process_time": $timespan.system } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-  
-blueprint_proposal:
-  description: crafted a blueprint proposal for level {level} in {process_time}
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* blueprint_proposal version 0 */
-      "blueprint_proposal.v0":
         { "level": $positive_bignum,
           "process_time": $timespan.system } }
     $positive_bignum:
@@ -318,8 +323,8 @@ blueprints_publisher_request_failed:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 call_tracer_read_line:
@@ -328,17 +333,16 @@ call_tracer_read_line:
   section: evm_node.dev.tracer
   json format:
     { /* call_tracer_read_line version 0 */
-      "call_tracer_read_line.v0":
-        { "line": $positive_bignum,
-          "tx": $unistring } }
+      "call_tracer_read_line.v0": { "line": $positive_bignum,
+                                    "tx": $unistring } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 callback_log:
@@ -350,14 +354,13 @@ body: {body}
   section: evm_node.dev
   json format:
     { /* callback_log version 0 */
-      "callback_log.v0":
-        { "uri": $unistring,
-          "method": $unistring,
-          "body": $unistring } }
+      "callback_log.v0": { "uri": $unistring,
+                           "method": $unistring,
+                           "body": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 cannot_fetch_time_between_blocks:
@@ -366,9 +369,8 @@ cannot_fetch_time_between_blocks:
   section: evm_node.dev
   json format:
     { /* cannot_fetch_time_between_blocks version 0 */
-      "cannot_fetch_time_between_blocks.v0":
-        { "tbb": $time_between_blocks,
-          "trace": any } }
+      "cannot_fetch_time_between_blocks.v0": { "tbb": $time_between_blocks,
+                                               "trace": any } }
     $time_between_blocks: number /* Some */ || null /* None */
   
 cannot_refresh_token:
@@ -398,8 +400,8 @@ compressing_snapshot:
       "compressing_snapshot.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 counter_inc_assertion_warning:
@@ -408,13 +410,12 @@ counter_inc_assertion_warning:
   section: evm_node.dev.metrics
   json format:
     { /* counter_inc_assertion_warning version 0 */
-      "counter_inc_assertion_warning.v0":
-        { "increment": number,
-          "label": $unistring } }
+      "counter_inc_assertion_warning.v0": { "increment": number,
+                                            "label": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 deprecation_note:
@@ -426,8 +427,8 @@ deprecation_note:
       "deprecation_note.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 dream_websocket:
@@ -450,8 +451,8 @@ evm_context_gc_finished:
           "duration": number } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_gc_split:
@@ -460,17 +461,15 @@ evm_context_gc_split:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_gc_split version 0 */
-      "evm_context_gc_split.v0":
-        { "level": $unistring,
-          "timestamp": $timestamp.protocol } }
+      "evm_context_gc_split.v0": { "level": $unistring,
+                                   "timestamp": $timestamp.protocol } }
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_gc_started:
@@ -479,13 +478,12 @@ evm_context_gc_started:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_gc_started version 0 */
-      "evm_context_gc_started.v0":
-        { "gc_level": $unistring,
-          "head_level": $unistring } }
+      "evm_context_gc_started.v0": { "gc_level": $unistring,
+                                     "head_level": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_gc_waiter_failed:
@@ -497,8 +495,8 @@ evm_context_gc_waiter_failed:
       "evm_context_gc_waiter_failed.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_get_block_failed:
@@ -507,13 +505,12 @@ evm_context_get_block_failed:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_get_block_failed version 0 */
-      "evm_context_get_block_failed.v0":
-        { "level": $unistring,
-          "trace": any } }
+      "evm_context_get_block_failed.v0": { "level": $unistring,
+                                           "trace": any } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_is_ready:
@@ -533,8 +530,8 @@ evm_context_missing_state:
       "evm_context_missing_state.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_observer_potential_reorg:
@@ -555,8 +552,7 @@ evm_context_observer_reorg_cannot_decode_blueprint:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_observer_reorg_cannot_decode_blueprint version 0 */
-      "evm_context_observer_reorg_cannot_decode_blueprint.v0":
-        $positive_bignum }
+      "evm_context_observer_reorg_cannot_decode_blueprint.v0": $positive_bignum }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -631,10 +627,7 @@ evm_context_request_failed:
                     "event": [ $unistring, $timestamp.protocol ] }
                   || { /* sequencer_upgrade */
                        "kind": $unistring,
-                       "event":
-                         [ $Signature.Public_key,
-                           $unistring,
-                           $timestamp.protocol ] }
+                       "event": [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
                   || { /* blueprint_applied */
                        "kind": $unistring,
                        "event": [ $bignum, $unistring ] }
@@ -660,10 +653,7 @@ evm_context_request_failed:
                        "event": [ $unistring, $timestamp.protocol ] }
                      || { /* sequencer_upgrade */
                           "kind": $unistring,
-                          "event":
-                            [ $Signature.Public_key,
-                              $unistring,
-                              $timestamp.protocol ] }
+                          "event": [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
                      || { /* blueprint_applied */
                           "kind": $unistring,
                           "event": [ $bignum, $unistring ] }
@@ -682,15 +672,17 @@ evm_context_request_failed:
                               $timestamp.protocol,
                               $positive_bignum ] } ... ],
                  "timestamp": $timestamp.protocol,
-                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+                 "chunks":
+                   [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                       "number": $unistring,
+                       "nb_chunks": integer ∈ [-2^30, 2^30],
+                       "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit",
                        $unistring,
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
-            || { /* Delayed_inbox_hashes */
-                 "request": "Delayed_inbox_hashes" }
             || { /* Patch_state */
                  "request": "patch_state",
                  "commit": boolean,
@@ -708,9 +700,7 @@ evm_context_request_failed:
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
                      "sequencer_upgrade"?:
-                       [ $Signature.Public_key,
-                         $unistring,
-                         $timestamp.protocol ],
+                       [ $Signature.Public_key, $unistring, $timestamp.protocol ],
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
@@ -719,7 +709,30 @@ evm_context_request_failed:
                  "request": "finalized_levels",
                  "l1_level": integer ∈ [-2^31-1, 2^31],
                  "start_l2_level": $unistring,
-                 "end_l2_level": $unistring },
+                 "end_l2_level": $unistring }
+            || { /* Execute_single_transaction */
+                 "request": "execute_single_transaction",
+                 "tx":
+                   { /* Common_transaction */
+                     "kind": "Common_transaction",
+                     "transaction":
+                       { /* Evm */
+                         "kind": "evm",
+                         "transaction": $unistring }
+                       || { /* Michelson */
+                            "kind": "michelson",
+                            "transaction": $unistring } }
+                   || { /* Delayed_transaction */
+                        "kind": "Delayed_transaction",
+                        "transaction":
+                          [ "transaction" || "deposit" || "fa_deposit",
+                            $unistring,
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
+                 "hash": $unistring }
+            || { /* Next_block_info */
+                 "request": "next_block_info",
+                 "timestamp": $timestamp.protocol,
+                 "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
@@ -733,13 +746,12 @@ evm_context_request_failed:
          Decimal representation of a positive big number */
       string
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_reset_at_level:
@@ -751,8 +763,8 @@ evm_context_reset_at_level:
       "evm_context_reset_at_level.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_reset_impossible_missing_finalized_state:
@@ -779,9 +791,8 @@ evm_context_start_history_mode:
     { /* evm_context_start_history_mode version 0 */
       "evm_context_start_history_mode.v0": $history_mode }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and
-         `rolling:N` with `N` being the number of days to use as the
-         retention period */
+      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
+         `N` being the number of days to use as the retention period */
       "archive" | "rolling:n"
   
 evm_context_switch_history_mode:
@@ -790,13 +801,11 @@ evm_context_switch_history_mode:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_switch_history_mode version 0 */
-      "evm_context_switch_history_mode.v0":
-        { "from": $history_mode,
-          "to_": $history_mode } }
+      "evm_context_switch_history_mode.v0": { "from": $history_mode,
+                                              "to_": $history_mode } }
     $history_mode:
-      /* Compact notation for the history mode. Can either be `archive` and
-         `rolling:N` with `N` being the number of days to use as the
-         retention period */
+      /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with
+         `N` being the number of days to use as the retention period */
       "archive" | "rolling:n"
   
 evm_context_unexpected_l1_block:
@@ -825,8 +834,8 @@ evm_events_follower_diverged:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_fallback:
@@ -852,8 +861,8 @@ evm_events_follower_missing_blueprint:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_out_of_sync:
@@ -872,8 +881,7 @@ evm_events_follower_rollup_level_already_processed:
   section: evm_node.dev
   json format:
     { /* evm_events_follower_rollup_level_already_processed version 0 */
-      "evm_events_follower_rollup_level_already_processed.v0":
-        integer ∈ [-2^31-1, 2^31] }
+      "evm_events_follower_rollup_level_already_processed.v0": integer ∈ [-2^31-1, 2^31] }
   
 evm_events_follower_rollup_node_ahead:
   description: rollup node confirmed block {level} before we received it
@@ -904,8 +912,8 @@ evm_events_follower_unexpected_key:
       "evm_events_follower_unexpected_key.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_unexpected_number_of_events:
@@ -933,8 +941,8 @@ evm_events_follower_upstream_blueprint_applied:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_new_event:
@@ -949,8 +957,7 @@ evm_events_new_event:
           "event": [ $unistring, $timestamp.protocol ] }
         || { /* sequencer_upgrade */
              "kind": $unistring,
-             "event":
-               [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
+             "event": [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
         || { /* blueprint_applied */
              "kind": $unistring,
              "event": [ $bignum, $unistring ] }
@@ -980,13 +987,12 @@ evm_events_new_event:
          Decimal representation of a positive big number */
       string
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_request_failed:
@@ -1024,8 +1030,8 @@ exporting_snapshot:
       "exporting_snapshot.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 failed_sequencer_upgrade:
@@ -1036,8 +1042,7 @@ failed_sequencer_upgrade:
     { /* failed_sequencer_upgrade version 0 */
       "failed_sequencer_upgrade.v0":
         { "new_sequencer": $Signature.Public_key,
-          "current_sequencer":
-            $Signature.Public_key /* Some */ || null /* None */,
+          "current_sequencer": $Signature.Public_key /* Some */ || null /* None */,
           "level": $positive_bignum } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
@@ -1048,8 +1053,8 @@ failed_sequencer_upgrade:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 failed_upgrade:
@@ -1058,17 +1063,16 @@ failed_upgrade:
   section: evm_node.dev
   json format:
     { /* failed_upgrade version 0 */
-      "failed_upgrade.v0":
-        { "root_hash": $unistring,
-          "level": $positive_bignum } }
+      "failed_upgrade.v0": { "root_hash": $unistring,
+                             "level": $positive_bignum } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 finished_exporting_snapshot:
@@ -1080,8 +1084,8 @@ finished_exporting_snapshot:
       "finished_exporting_snapshot.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 flush_delayed_inbox:
@@ -1098,13 +1102,12 @@ flush_delayed_inbox:
          Decimal representation of a positive big number */
       string
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 gcp_kms_is_ready:
@@ -1119,8 +1122,8 @@ gcp_kms_is_ready:
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 ignored_kernel_arg:
@@ -1131,6 +1134,14 @@ ignored_kernel_arg:
     { /* ignored_kernel_arg version 0 */
       "ignored_kernel_arg.v0": any }
   
+ignored_performance_profile:
+  description: GC parameters were changed through OCAMLRUNPARAM, ignoring performance profile
+  level: warning
+  section: evm_node
+  json format:
+    { /* ignored_performance_profile version 0 */
+      "ignored_performance_profile.v0": any }
+  
 ignored_periodic_snapshot_arg:
   description: ignored the periodic snapshot feature since the EVM node is running in Archive mode
   level: warning
@@ -1138,6 +1149,14 @@ ignored_periodic_snapshot_arg:
   json format:
     { /* ignored_periodic_snapshot_arg version 0 */
       "ignored_periodic_snapshot_arg.v0": any }
+  
+ignored_preconfirmations:
+  description: Inclusion preconfirmations and preconfirmed receipts will be ignored since the kernel does not support it
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* ignored_preconfirmations version 0 */
+      "ignored_preconfirmations.v0": any }
   
 import_finished:
   description: snapshot import is finished
@@ -1161,8 +1180,8 @@ import_snapshot_archive_in_progress:
       number
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 importing_legacy_snapshot:
@@ -1182,9 +1201,30 @@ importing_snapshot:
       "importing_snapshot.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+inclusion:
+  description: received inclusion confirmation for the transaction {txn_hash}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* inclusion version 0 */
+      "inclusion.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+invalidated_token:
+  description: authentication token was invalidated before its expired date
+  level: warning
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* invalidated_token version 0 */
+      "invalidated_token.v0": any }
   
 is_ready:
   description: the EVM node RPC server ({backend}) is listening to {addr}:{port} {websockets}
@@ -1199,8 +1239,8 @@ is_ready:
           "websockets": boolean } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_debug:
@@ -1212,8 +1252,8 @@ kernel_log_debug:
       "kernel_log_debug.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_debug:
@@ -1225,8 +1265,8 @@ kernel_log_debug:
       "kernel_log_debug.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_error:
@@ -1238,8 +1278,8 @@ kernel_log_error:
       "kernel_log_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_error:
@@ -1251,8 +1291,8 @@ kernel_log_error:
       "kernel_log_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_fatal:
@@ -1264,8 +1304,8 @@ kernel_log_fatal:
       "kernel_log_fatal.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_fatal:
@@ -1277,8 +1317,8 @@ kernel_log_fatal:
       "kernel_log_fatal.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_info:
@@ -1290,8 +1330,8 @@ kernel_log_info:
       "kernel_log_info.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_notice:
@@ -1303,17 +1343,17 @@ kernel_log_notice:
       "kernel_log_notice.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
-legacy_mode:
-  description: node is using the (deprecated) legacy block storage, import a recent snapshot to start using the new block storage
+list_runtime_failed:
+  description: runtime flags read failed with error {error}
   level: warning
-  section: evm_node.dev
+  section: evm_node.dev.tezosx
   json format:
-    { /* legacy_mode version 0 */
-      "legacy_mode.v0": any }
+    { /* list_runtime_failed version 0 */
+      "list_runtime_failed.v0": any }
   
 migrations_from_the_future:
   description: store has {applied} migrations applied but the EVM node is only aware of {known}
@@ -1372,6 +1412,22 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
+next_block_timestamp:
+  description: received timestamp of the next block {timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* next_block_timestamp version 0 */
+      "next_block_timestamp.v0": $timestamp.protocol }
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 no_l1_latest_level:
   description: no l1 level processed, no EVM events catch up will occur
   level: warning
@@ -1397,8 +1453,29 @@ node_da_fees:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+patched_sequencer_key:
+  description: patched state with sequencer key {pk} ({pkh})
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* patched_sequencer_key version 0 */
+      "patched_sequencer_key.v0":
+        { "pk": $Signature.Public_key,
+          "pkh": $Signature.Public_key_hash } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $Signature.Public_key_hash:
+      /* A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 patched_state:
@@ -1411,8 +1488,8 @@ patched_state:
                             "level": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 pending_sequencer_upgrade:
@@ -1429,13 +1506,12 @@ pending_sequencer_upgrade:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
       $unistring
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 pending_upgrade:
@@ -1444,18 +1520,24 @@ pending_upgrade:
   section: evm_node.dev
   json format:
     { /* pending_upgrade version 0 */
-      "pending_upgrade.v0":
-        { "root_hash": $unistring,
-          "timestamp": $timestamp.protocol } }
+      "pending_upgrade.v0": { "root_hash": $unistring,
+                              "timestamp": $timestamp.protocol } }
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+performance_profile:
+  description: running with {profile} profile
+  level: notice
+  section: evm_node
+  json format:
+    { /* performance_profile version 0 */
+      "performance_profile.v0": "performance" | "default" }
   
 predownload_kernel:
   description: kernel {version} successfully predownloaded
@@ -1466,8 +1548,8 @@ predownload_kernel:
       "predownload_kernel.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 predownload_kernel_failed:
@@ -1480,8 +1562,8 @@ predownload_kernel_failed:
                                         "error": any } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 preloaded_kernel:
@@ -1493,9 +1575,25 @@ preloaded_kernel:
       "preloaded_kernel.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+prevalidator_cannot_start:
+  description: prevalidator cannot start with current node data dir, will retry later
+  level: warning
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_cannot_start version 0 */
+      "prevalidator_cannot_start.v0": any }
+  
+prevalidator_is_ready:
+  description: prevalidator is ready
+  level: notice
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_is_ready version 0 */
+      "prevalidator_is_ready.v0": any }
   
 private_server_is_ready:
   description: the EVM node private RPC server ({backend}) is listening to {addr}:{port} {websockets}
@@ -1510,8 +1608,8 @@ private_server_is_ready:
           "websockets": boolean } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 received_upgrade:
@@ -1523,8 +1621,8 @@ received_upgrade:
       "received_upgrade.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 reconstruct_replace_mainnet_kernel:
@@ -1544,8 +1642,25 @@ replay_csv_available:
       "replay_csv_available.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+replicate_operation_dropped:
+  description: operation {hash} was dropped because it is now invalid ({reason})
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* replicate_operation_dropped version 0 */
+      "replicate_operation_dropped.v0": { "hash": $Operation_hash,
+                                          "reason": $unistring } }
+    $Operation_hash:
+      /* A Tezos operation ID (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 replicate_transaction_dropped:
@@ -1554,13 +1669,12 @@ replicate_transaction_dropped:
   section: evm_node.dev
   json format:
     { /* replicate_transaction_dropped version 0 */
-      "replicate_transaction_dropped.v0":
-        { "hash": $unistring,
-          "reason": $unistring } }
+      "replicate_transaction_dropped.v0": { "hash": $unistring,
+                                            "reason": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 request_completed_debug:
@@ -1600,13 +1714,13 @@ request_completed_debug:
          A date in RFC 3339 notation. */
       $unistring
     $timestamp.system:
-      /* A timestamp as seen by the underlying, local computer:
-         subsecond-level precision, epoch or rfc3339 based. */
+      /* A timestamp as seen by the underlying, local computer: subsecond-level precision,
+         epoch or rfc3339 based. */
       $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 request_failed:
@@ -1647,13 +1761,13 @@ request_failed:
          A date in RFC 3339 notation. */
       $unistring
     $timestamp.system:
-      /* A timestamp as seen by the underlying, local computer:
-         subsecond-level precision, epoch or rfc3339 based. */
+      /* A timestamp as seen by the underlying, local computer: subsecond-level precision,
+         epoch or rfc3339 based. */
       $timestamp.rfc /* RFC encoding */ || $int64 /* Second since epoch */
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 retrying_connect:
@@ -1666,8 +1780,8 @@ retrying_connect:
                                "delay": number } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 rollup_node_follower_connection_acquired:
@@ -1744,8 +1858,8 @@ rpc_call_fallback:
                                 "error": any } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 rpc_server_error:
@@ -1757,9 +1871,17 @@ rpc_server_error:
       "rpc_server_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+runtime_activated:
+  description: the runtime {runtime} is activated
+  level: notice
+  section: evm_node.dev.tezosx
+  json format:
+    { /* runtime_activated version 0 */
+      "runtime_activated.v0": "tezos" }
   
 sandbox_started:
   description: starting sandbox mode at level {level}
@@ -1774,7 +1896,7 @@ sandbox_started:
       string
   
 sequencer_disabled_native_execution:
-  description: native execution is disabled in sequencer mode
+  description: native execution is disabled for block application in sequencer mode
   level: warning
   section: evm_node
   json format:
@@ -1839,13 +1961,12 @@ signal_publisher_commited_or_included_injector_id:
         { "injector_op_hash": $injector_operation_hash,
           "publish_level": integer ∈ [-2^31-1, 2^31] } }
     $injector_operation_hash:
-      /* An identifier (hash) for an operation in the injector
-         (Base58Check-encoded) */
+      /* An identifier (hash) for an operation in the injector (Base58Check-encoded) */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 signal_publisher_is_ready:
@@ -1880,8 +2001,8 @@ signal_publisher_signal_signed:
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 signal_publisher_untracking:
@@ -1892,13 +2013,12 @@ signal_publisher_untracking:
     { /* signal_publisher_untracking version 0 */
       "signal_publisher_untracking.v0": $injector_operation_hash }
     $injector_operation_hash:
-      /* An identifier (hash) for an operation in the injector
-         (Base58Check-encoded) */
+      /* An identifier (hash) for an operation in the injector (Base58Check-encoded) */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 spawn_rpc_is_ready:
@@ -1918,8 +2038,8 @@ start:
       "start.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 still_compressing_snapshot:
@@ -1937,8 +2057,8 @@ still_compressing_snapshot:
       number
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 still_exporting_snapshot:
@@ -1956,8 +2076,8 @@ still_exporting_snapshot:
       number
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 store_applied_migration:
@@ -1966,16 +2086,15 @@ store_applied_migration:
   section: evm_node.dev
   json format:
     { /* store_applied_migration version 0 */
-      "store_applied_migration.v0":
-        { "name": $unistring,
-          "time": $timespan.system } }
+      "store_applied_migration.v0": { "name": $unistring,
+                                      "time": $timespan.system } }
     $timespan.system:
       /* A span of time, as seen by the local computer. */
       number
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 store_init:
@@ -1995,8 +2114,8 @@ tracer_input:
       "tracer_input.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_data_size_limit_reached:
@@ -2016,8 +2135,8 @@ tx_pool_add_transaction:
       "tx_pool_add_transaction.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_pool_connection_lost:
@@ -2037,8 +2156,8 @@ tx_pool_invalid_transaction:
       "tx_pool_invalid_transaction.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_pool_started:
@@ -2066,8 +2185,8 @@ tx_pool_transaction_injected:
       "tx_pool_transaction_injected.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_pool_transaction_injection_failed:
@@ -2095,8 +2214,8 @@ tx_queue_add_transaction:
       "tx_queue_add_transaction.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_callback_error:
@@ -2123,6 +2242,14 @@ tx_queue_injecting_transaction:
     { /* tx_queue_injecting_transaction version 0 */
       "tx_queue_injecting_transaction.v0": integer ∈ [-2^30, 2^30] }
   
+tx_queue_injecting_transactions_failed:
+  description: injecting transactions failed: {error}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_injecting_transactions_failed version 0 */
+      "tx_queue_injecting_transactions_failed.v0": any }
+  
 tx_queue_is_ready:
   description: tx queue is ready
   level: notice
@@ -2140,8 +2267,8 @@ tx_queue_missing_tx_object:
       "tx_queue_missing_tx_object.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_rpc_error:
@@ -2152,13 +2279,12 @@ tx_queue_rpc_error:
   section: evm_node.dev.tx_queue
   json format:
     { /* tx_queue_rpc_error version 0 */
-      "tx_queue_rpc_error.v0":
-        { "code": integer ∈ [-2^31-1, 2^31],
-          "message": $unistring } }
+      "tx_queue_rpc_error.v0": { "code": integer ∈ [-2^31-1, 2^31],
+                                 "message": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_transaction_confirmed:
@@ -2170,8 +2296,8 @@ tx_queue_transaction_confirmed:
       "tx_queue_transaction_confirmed.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_transaction_dropped:
@@ -2183,8 +2309,8 @@ tx_queue_transaction_dropped:
       "tx_queue_transaction_dropped.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 txs_per_user_threshold_reached:
@@ -2196,8 +2322,8 @@ txs_per_user_threshold_reached:
       "txs_per_user_threshold_reached.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 unexpected_blueprint_from_remote_node:
@@ -2231,8 +2357,8 @@ websocket_missing_worker:
       "websocket_missing_worker.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 websocket_monitoring_exception:
@@ -2241,13 +2367,12 @@ websocket_monitoring_exception:
   section: evm_node.websocket
   json format:
     { /* websocket_monitoring_exception version 0 */
-      "websocket_monitoring_exception.v0":
-        { "conn": $unistring,
-          "exception": $unistring } }
+      "websocket_monitoring_exception.v0": { "conn": $unistring,
+                                             "exception": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 websocket_shutdown:
@@ -2262,8 +2387,8 @@ websocket_shutdown:
           "subscriptions": integer ∈ [-2^30, 2^30] } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 websocket_starting:
@@ -2275,8 +2400,8 @@ websocket_starting:
       "websocket_starting.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 websocket_unsubscribe:
@@ -2291,8 +2416,8 @@ websocket_unsubscribe:
           "reason": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 
@@ -2311,9 +2436,8 @@ blueprint_injection_failure:
   section: evm_node.dev
   json format:
     { /* blueprint_injection_failure version 0 */
-      "blueprint_injection_failure.v0":
-        { "level": $positive_bignum,
-          "trace": any } }
+      "blueprint_injection_failure.v0": { "level": $positive_bignum,
+                                          "trace": any } }
     $positive_bignum:
       /* Positive big number
          Decimal representation of a positive big number */
@@ -2386,8 +2510,8 @@ blueprints_publisher_request_failed:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 cannot_fetch_time_between_blocks:
@@ -2396,9 +2520,8 @@ cannot_fetch_time_between_blocks:
   section: evm_node.dev
   json format:
     { /* cannot_fetch_time_between_blocks version 0 */
-      "cannot_fetch_time_between_blocks.v0":
-        { "tbb": $time_between_blocks,
-          "trace": any } }
+      "cannot_fetch_time_between_blocks.v0": { "tbb": $time_between_blocks,
+                                               "trace": any } }
     $time_between_blocks: number /* Some */ || null /* None */
   
 cannot_refresh_token:
@@ -2415,13 +2538,12 @@ evm_context_get_block_failed:
   section: evm_node.dev.evm_context
   json format:
     { /* evm_context_get_block_failed version 0 */
-      "evm_context_get_block_failed.v0":
-        { "level": $unistring,
-          "trace": any } }
+      "evm_context_get_block_failed.v0": { "level": $unistring,
+                                           "trace": any } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_context_request_failed:
@@ -2441,10 +2563,7 @@ evm_context_request_failed:
                     "event": [ $unistring, $timestamp.protocol ] }
                   || { /* sequencer_upgrade */
                        "kind": $unistring,
-                       "event":
-                         [ $Signature.Public_key,
-                           $unistring,
-                           $timestamp.protocol ] }
+                       "event": [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
                   || { /* blueprint_applied */
                        "kind": $unistring,
                        "event": [ $bignum, $unistring ] }
@@ -2470,10 +2589,7 @@ evm_context_request_failed:
                        "event": [ $unistring, $timestamp.protocol ] }
                      || { /* sequencer_upgrade */
                           "kind": $unistring,
-                          "event":
-                            [ $Signature.Public_key,
-                              $unistring,
-                              $timestamp.protocol ] }
+                          "event": [ $Signature.Public_key, $unistring, $timestamp.protocol ] }
                      || { /* blueprint_applied */
                           "kind": $unistring,
                           "event": [ $bignum, $unistring ] }
@@ -2492,15 +2608,17 @@ evm_context_request_failed:
                               $timestamp.protocol,
                               $positive_bignum ] } ... ],
                  "timestamp": $timestamp.protocol,
-                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+                 "chunks":
+                   [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                       "number": $unistring,
+                       "nb_chunks": integer ∈ [-2^30, 2^30],
+                       "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit",
                        $unistring,
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
-            || { /* Delayed_inbox_hashes */
-                 "request": "Delayed_inbox_hashes" }
             || { /* Patch_state */
                  "request": "patch_state",
                  "commit": boolean,
@@ -2518,9 +2636,7 @@ evm_context_request_failed:
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
                      "sequencer_upgrade"?:
-                       [ $Signature.Public_key,
-                         $unistring,
-                         $timestamp.protocol ],
+                       [ $Signature.Public_key, $unistring, $timestamp.protocol ],
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
@@ -2529,7 +2645,30 @@ evm_context_request_failed:
                  "request": "finalized_levels",
                  "l1_level": integer ∈ [-2^31-1, 2^31],
                  "start_l2_level": $unistring,
-                 "end_l2_level": $unistring },
+                 "end_l2_level": $unistring }
+            || { /* Execute_single_transaction */
+                 "request": "execute_single_transaction",
+                 "tx":
+                   { /* Common_transaction */
+                     "kind": "Common_transaction",
+                     "transaction":
+                       { /* Evm */
+                         "kind": "evm",
+                         "transaction": $unistring }
+                       || { /* Michelson */
+                            "kind": "michelson",
+                            "transaction": $unistring } }
+                   || { /* Delayed_transaction */
+                        "kind": "Delayed_transaction",
+                        "transaction":
+                          [ "transaction" || "deposit" || "fa_deposit",
+                            $unistring,
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
+                 "hash": $unistring }
+            || { /* Next_block_info */
+                 "request": "next_block_info",
+                 "timestamp": $timestamp.protocol,
+                 "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
@@ -2543,13 +2682,12 @@ evm_context_request_failed:
          Decimal representation of a positive big number */
       string
     $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
+      /* A timestamp as seen by the protocol: second-level precision, epoch based. */
       $unistring
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_diverged:
@@ -2568,8 +2706,8 @@ evm_events_follower_diverged:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_missing_blueprint:
@@ -2587,8 +2725,8 @@ evm_events_follower_missing_blueprint:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 evm_events_follower_out_of_sync:
@@ -2620,8 +2758,8 @@ kernel_log_error:
       "kernel_log_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_error:
@@ -2633,8 +2771,8 @@ kernel_log_error:
       "kernel_log_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_fatal:
@@ -2646,8 +2784,8 @@ kernel_log_fatal:
       "kernel_log_fatal.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 kernel_log_fatal:
@@ -2659,8 +2797,8 @@ kernel_log_fatal:
       "kernel_log_fatal.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 migrations_from_the_future:
@@ -2705,8 +2843,8 @@ node_da_fees:
       string
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 rollup_node_follower_connection_failed:
@@ -2742,8 +2880,8 @@ rpc_server_error:
       "rpc_server_error.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_pool_connection_lost:
@@ -2770,6 +2908,14 @@ tx_queue_callback_error:
     { /* tx_queue_callback_error version 0 */
       "tx_queue_callback_error.v0": any }
   
+tx_queue_injecting_transactions_failed:
+  description: injecting transactions failed: {error}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_injecting_transactions_failed version 0 */
+      "tx_queue_injecting_transactions_failed.v0": any }
+  
 tx_queue_missing_tx_object:
   description: transaction {tx_hash} has no associated object
   level: error
@@ -2779,8 +2925,8 @@ tx_queue_missing_tx_object:
       "tx_queue_missing_tx_object.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 tx_queue_rpc_error:
@@ -2791,13 +2937,12 @@ tx_queue_rpc_error:
   section: evm_node.dev.tx_queue
   json format:
     { /* tx_queue_rpc_error version 0 */
-      "tx_queue_rpc_error.v0":
-        { "code": integer ∈ [-2^31-1, 2^31],
-          "message": $unistring } }
+      "tx_queue_rpc_error.v0": { "code": integer ∈ [-2^31-1, 2^31],
+                                 "message": $unistring } }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 websocket_missing_worker:
@@ -2809,7 +2954,7 @@ websocket_missing_worker:
       "websocket_missing_worker.v0": $unistring }
     $unistring:
       /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   

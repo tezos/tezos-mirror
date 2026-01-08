@@ -20,6 +20,62 @@
 open Setup
 open Test_helpers
 
+let call_evm_rpc_no_err ?private_ node req =
+  let* response = Evm_node.call_evm_rpc ?private_ node req in
+  let err = JSON.(response |-> "error") in
+  match JSON.unannotate err with
+  | `Null ->
+      (* No error *)
+      return @@ Evm_node.extract_result response
+  | _ ->
+      Test.fail
+        "JSONRPC call to %s failed with %s"
+        req.method_
+        (JSON.encode err)
+
+let call_evm_rpc_err ?private_ node req =
+  let* response = Evm_node.call_evm_rpc ?private_ node req in
+  let err = Evm_node.extract_error_message response in
+  match JSON.unannotate err with
+  | `Null ->
+      (* No error *)
+      Test.fail "JSONRPC call to %s did not fail" req.method_
+  | _ -> return @@ JSON.as_string err
+
+let eth_call_and_estimate_gas ?private_ node parameters =
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc_no_err
+        ?private_
+        node
+        {method_ = "eth_call"; parameters = `A parameters})
+  in
+  let* _ =
+    Evm_node.(
+      call_evm_rpc_no_err
+        ?private_
+        node
+        {method_ = "eth_estimateGas"; parameters = `A parameters})
+  in
+  return call_result
+
+let eth_call_and_estimate_gas_err ?private_ node parameters =
+  let* error_message =
+    Evm_node.(
+      call_evm_rpc_err
+        ?private_
+        node
+        {method_ = "eth_call"; parameters = `A parameters})
+  in
+  let* _ =
+    Evm_node.(
+      call_evm_rpc_err
+        ?private_
+        node
+        {method_ = "eth_estimateGas"; parameters = `A parameters})
+  in
+  return error_message
+
 let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
     ?(kernels = Kernel.all) ?preimages_dir ?maximum_allowed_ticks
     ?enable_fa_bridge ?rollup_history_mode ?additional_uses ~title ~tags body
@@ -38,17 +94,13 @@ let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
     ?rollup_history_mode
     ~enable_dal:false
     ~enable_multichain:false
-    ~enable_revm:false
-    ~title
-    ~tags
+    ~title:(title ^ " in eth_call and eth_estimateGas")
+    ~tags:(tags @ ["evm"; "state_override"; "eth_call"; "eth_estimategas"])
     body
     protocols
 
 let test_call_state_override_balance =
-  register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "balance_override"; "eth_call"]
-    ~title:"Can override balance in eth_call"
+  register ~tags:["balance_override"] ~title:"Can override balance"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows balance override.
@@ -77,40 +129,29 @@ let test_call_state_override_balance =
         ("data", `String calldata);
       ]
   in
-  let* call_result =
-    Evm_node.(
-      call_evm_rpc sequencer {method_ = "eth_call"; parameters = `A [call]})
-  in
+  let* call_result = eth_call_and_estimate_gas sequencer [call] in
   Check.(
-    (Evm_node.extract_result call_result
-    |> JSON.as_string
-    = "0x0000000000000000000000000000000000000000000000000000000000000000")
+    (call_result |> JSON.as_string
+   = "0x0000000000000000000000000000000000000000000000000000000000000000")
       string)
     ~error_msg:"Expected result %R but got %L " ;
   let override_balance =
     `O [(caller_address, `O [("balance", `String "0xffff")])]
   in
   let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        sequencer
-        {method_ = "eth_call"; parameters = `A [call; override_balance]})
+    eth_call_and_estimate_gas sequencer [call; override_balance]
     (* we omit the block paramater to test the encoding *)
   in
   Check.(
-    (Evm_node.extract_result call_result
-    |> JSON.as_string
-    = "0x000000000000000000000000000000000000000000000000000000000000ffff")
+    (call_result |> JSON.as_string
+   = "0x000000000000000000000000000000000000000000000000000000000000ffff")
       string)
     ~error_msg:"Expected result %R but got %L " ;
 
   unit
 
 let test_call_state_override_code =
-  register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "code_override"; "eth_call"]
-    ~title:"Can override code in eth_call"
+  register ~tags:["code_override"] ~title:"Can override code"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows code override.
@@ -137,16 +178,10 @@ let test_call_state_override_code =
   let call = `O [("to", `String contract); ("data", `String calldata)] in
 
   (* Check that the contract normaly doesn't allow "getCount()" *)
-  let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        sequencer
-        {method_ = "eth_call"; parameters = `A [call; `String "latest"]})
+  let* err_msg =
+    eth_call_and_estimate_gas_err sequencer [call; `String "latest"]
   in
-  Check.(
-    (Evm_node.extract_error_message call_result
-    |> JSON.as_string = "execution reverted")
-      string)
+  Check.((err_msg = "execution reverted") string)
     ~error_msg:"Expected error %R but got %L " ;
 
   (* try again with an override *)
@@ -154,28 +189,18 @@ let test_call_state_override_code =
     `O [(contract, `O [("code", `String ("0x" ^ bytecode_accessor))])]
   in
   let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        sequencer
-        {
-          method_ = "eth_call";
-          parameters = `A [call; `String "latest"; override_code];
-        })
+    eth_call_and_estimate_gas sequencer [call; `String "latest"; override_code]
   in
   Check.(
-    (Evm_node.extract_result call_result
-    |> JSON.as_string
-    = "0x000000000000000000000000000000000000000000000000000000000000002a")
+    (call_result |> JSON.as_string
+   = "0x000000000000000000000000000000000000000000000000000000000000002a")
       string)
     ~error_msg:"Expected result %R but got %L " ;
 
   unit
 
 let test_call_state_override_nonce =
-  register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "nonce_override"; "eth_call"]
-    ~title:"Can override nonce in eth_call"
+  register ~tags:["nonce_override"] ~title:"Can override nonce"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows nonce override.
@@ -209,25 +234,16 @@ let test_call_state_override_nonce =
 
   (* Call a first time to have an address *)
   let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        sequencer
-        {method_ = "eth_call"; parameters = `A [call; `String "latest"]})
+    eth_call_and_estimate_gas sequencer [call; `String "latest"]
   in
-  let addr1 = Evm_node.extract_result call_result |> JSON.as_string in
+  let addr1 = call_result |> JSON.as_string in
 
   (* try again with an override *)
   let override_code = `O [(contract, `O [("nonce", `String "0x2a")])] in
   let* call_result =
-    Evm_node.(
-      call_evm_rpc
-        sequencer
-        {
-          method_ = "eth_call";
-          parameters = `A [call; `String "latest"; override_code];
-        })
+    eth_call_and_estimate_gas sequencer [call; `String "latest"; override_code]
   in
-  let addr2 = Evm_node.extract_result call_result |> JSON.as_string in
+  let addr2 = call_result |> JSON.as_string in
 
   (* the two address were calculated with different nonce so should be different
      (hopefully) *)
@@ -237,10 +253,7 @@ let test_call_state_override_nonce =
   unit
 
 let test_call_state_override_state_diff =
-  register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "state_diff"; "eth_call"]
-    ~title:"Can override part of account storage in eth_call"
+  register ~tags:["state_diff"] ~title:"Can override part of account storage"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state diff override.
@@ -267,15 +280,15 @@ let test_call_state_override_state_diff =
     let* calldata = Cast.calldata m in
     return (`O [("to", `String contract); ("data", `String calldata)])
   in
-  let make_call ?(override = []) m =
+  let make_call ?(error = false) ?(override = []) m =
     let* call = call_method m in
-    Evm_node.call_evm_rpc
-      sequencer
-      {method_ = "eth_call"; parameters = `A (call :: override)}
+    if not error then eth_call_and_estimate_gas sequencer (call :: override)
+    else
+      let* msg = eth_call_and_estimate_gas_err sequencer (call :: override) in
+      return (JSON.annotate ~origin:"err" (`String msg))
   in
   let check_value call_result expected =
-    Check.(
-      (Evm_node.extract_result call_result |> JSON.as_string = expected) string)
+    Check.((call_result |> JSON.as_string = expected) string)
       ~error_msg:"Expected result %R but got %L "
   in
 
@@ -330,10 +343,9 @@ let test_call_state_override_state_diff =
       ]
   in
   let override = [`O [(contract, `O [("stateDiff", invalid)])]] in
-  let* call_result = make_call ~override "getCount()" in
+  let* call_result = make_call ~error:true ~override "getCount()" in
   Check.(
-    (Evm_node.extract_error_message call_result
-    |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
+    (call_result |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
       string)
     ~error_msg:"Expected error %R but got %L " ;
 
@@ -341,9 +353,8 @@ let test_call_state_override_state_diff =
 
 let test_call_state_override_state =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "state_replace"; "eth_call"]
-    ~title:"Can override completely account storage in eth_call"
+    ~tags:["state_replace"]
+    ~title:"Can override completely account storage"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state override.
@@ -370,15 +381,15 @@ let test_call_state_override_state =
     let* calldata = Cast.calldata m in
     return (`O [("to", `String contract); ("data", `String calldata)])
   in
-  let make_call ?(override = []) m =
+  let make_call ?(error = false) ?(override = []) m =
     let* call = call_method m in
-    Evm_node.call_evm_rpc
-      sequencer
-      {method_ = "eth_call"; parameters = `A (call :: override)}
+    if not error then eth_call_and_estimate_gas sequencer (call :: override)
+    else
+      let* msg = eth_call_and_estimate_gas_err sequencer (call :: override) in
+      return (JSON.annotate ~origin:"err" (`String msg))
   in
   let check_value call_result expected =
-    Check.(
-      (Evm_node.extract_result call_result |> JSON.as_string = expected) string)
+    Check.((call_result |> JSON.as_string = expected) string)
       ~error_msg:"Expected result %R but got %L "
   in
 
@@ -442,19 +453,17 @@ let test_call_state_override_state =
       ]
   in
   let override = [`O [(contract, `O [("state", invalid)])]] in
-  let* call_result = make_call ~override "getCount()" in
+  let* call_result = make_call ~error:true ~override "getCount()" in
   Check.(
-    (Evm_node.extract_error_message call_result
-    |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
+    (call_result |> JSON.as_string = "Error:\n  00 is not a valid storage key\n")
       string)
     ~error_msg:"Expected error %R but got %L " ;
   unit
 
 let test_call_state_override_state_empty =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "state_override"; "state_empty"; "eth_call"]
-    ~title:"Can override completely account storage in eth_call by empty state"
+    ~tags:["state_empty"]
+    ~title:"Can override completely account storage by empty state"
   @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state override.
@@ -483,13 +492,10 @@ let test_call_state_override_state_empty =
   in
   let make_call ?(override = []) m =
     let* call = call_method m in
-    Evm_node.call_evm_rpc
-      sequencer
-      {method_ = "eth_call"; parameters = `A (call :: override)}
+    eth_call_and_estimate_gas sequencer (call :: override)
   in
   let check_value call_result expected =
-    Check.(
-      (Evm_node.extract_result call_result |> JSON.as_string = expected) string)
+    Check.((call_result |> JSON.as_string = expected) string)
       ~error_msg:"Expected result %R but got %L "
   in
 

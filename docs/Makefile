@@ -16,17 +16,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = rio s023
+NAMED_PROTOS  = seoul tallinn
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-rio_long      = PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7
-s023_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
+seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
+tallinn_long   = PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-rio_short    = PsRiotum
-s023_short    = PtSeouLo
+seoul_short    = PtSeouLo
+tallinn_short    = PtTALLiN
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -61,14 +61,15 @@ $(BUILDDIR)/octezdoc.txt: $(BUILDDIR)/index.html
 # Build the manuals for a given protocol
 %/octez-client.html:
 	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-baker.html:
-	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-accuser.html:
-	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 # Binary non-protocol specific manuals for clic binaries.
 api/%.html:
 	@../$* man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/$*.html
+# separate case for baker for now, because $* expands to octez-baker- in above rule
+api/octez-baker.html:
+	@../octez-baker man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+api/octez-accuser.html:
+	@../octez-accuser man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 # Binary non-protocol specific manuals for cmdliner binaries.
 api/octez-node.txt:
@@ -84,14 +85,14 @@ api/octez-dal-node-config-init.txt:
 .PHONY: manuals
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
-	 $(PROTOCOLS:%=%/octez-baker.html) \
-	 $(PROTOCOLS:%=%/octez-accuser.html) \
 	 api/octez-admin-client.html \
 	 api/octez-signer.html \
 	 api/octez-codec.html \
 	 api/octez-snoop.html \
 	 api/octez-smart-rollup-node.html \
 	 api/octez-node.txt \
+	 api/octez-baker.html \
+	 api/octez-accuser.html \
 	 api/octez-dal-node.txt \
 	 api/octez-dal-node-config-init.txt
 
@@ -101,7 +102,7 @@ odoc:
 
 .PHONY: odoc-lite
 odoc-lite:
-	$(MAKE) odoc-raw slim_mode=on odoc_errors=true
+	$(MAKE) odoc-raw slim_mode=on odoc_errors=false
 
 .PHONY: odoc-raw
 odoc-raw:
@@ -109,7 +110,8 @@ odoc-raw:
 	mkdir -p $(TMPDOCDIR)/
 	cd ..; rsync --recursive --links --perms --exclude=target \
 		$$(cat script-inputs/octez-source-content) \
-		client-libs etherlink websocket $(TMPDOCDIR)/
+		client-libs etherlink websocket lwt_domain efunc-core \
+		$(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/slim-mode.sh $$slim_mode
 	ODOC_WARN_ERROR=$$odoc_errors dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(CURDIR)/odoc.log 2>&1; \
 		RESULT=$$?; \
@@ -141,8 +143,8 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) s023
-	$(CHECKXREFS) rio
+	$(CHECKXREFS) tallinn
+	$(CHECKXREFS) seoul
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
@@ -225,7 +227,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/rio" || true
+	@ln -s active "$(BUILDDIR)/seoul" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -314,6 +316,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html s023/octez-*.html rio/octez-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html tallinn/octez-*.html seoul/octez-*.html
 	@-rm -Rf ../openapi-tmp

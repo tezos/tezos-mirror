@@ -8,6 +8,7 @@
 type 'a handler = {
   pool : Octez_connpool.t;
   key_path : string;
+  config : Configuration.gcp_kms;
   gcp_key : Configuration.gcp_key;
   public_key : 'a;
   mutable auth_token : string;
@@ -22,17 +23,21 @@ type partial = unit handler
    interpret their responses. *)
 type t = Signature.public_key handler
 
-type signature_algorithm = EC_SIGN_P256_SHA256
+type signature_algorithm = EC_SIGN_P256_SHA256 | EC_SIGN_SECP256K1_SHA256
 
 let signature_algorithm (kms : t) =
-  match kms.public_key with P256 _ -> EC_SIGN_P256_SHA256 | _ -> assert false
+  match kms.public_key with
+  | P256 _ -> EC_SIGN_P256_SHA256
+  | Secp256k1 _ -> EC_SIGN_SECP256K1_SHA256
+  | _ -> assert false
 
-type hash_algorithm = Blake2B
+type hash_algorithm = Blake2B | Keccak256
 
 let signature_algorithm_of_string =
   let open Result_syntax in
   function
   | "EC_SIGN_P256_SHA256" -> return EC_SIGN_P256_SHA256
+  | "EC_SIGN_SECP256K1_SHA256" -> return EC_SIGN_SECP256K1_SHA256
   | algo -> tzfail (error_of_fmt "Unsupported algorithm %s" algo)
 
 let service_name = "Gcp_kms"
@@ -48,30 +53,19 @@ let metadata_server_uri =
     ~path:"/computeMetadata/v1/instance/service-accounts/default/token"
     ()
 
-exception Timeout
-
 let run_without_error cmd args =
   let open Lwt_syntax in
   let+ status =
-    Lwt_process.with_process_full
+    Tezos_stdlib_unix.Process_manager.with_process_full
       (cmd, Array.of_list (cmd :: args))
       (fun pc -> pc#status)
   in
   match status with Unix.WEXITED 0 -> true | _ -> false
 
-let with_timeout t k =
-  let open Lwt_result_syntax in
-  Lwt.pick
-    [
-      k ();
-      (let*! () = Lwt_unix.sleep (float_of_int t) in
-       fail_with_exn Timeout);
-    ]
-
 let rec retry ~timeout ~backoff ~on_error remaining_count k =
   let open Lwt_syntax in
   if remaining_count > 0 then
-    let* try_result = protect (fun () -> with_timeout timeout k) in
+    let* try_result = protect (fun () -> Misc.with_timeout timeout k) in
     match try_result with
     | Error err ->
         let* () = on_error err in
@@ -81,7 +75,7 @@ let rec retry ~timeout ~backoff ~on_error remaining_count k =
   else Lwt_exit.exit_and_raise Node_error.exit_code_when_gcp_kms_auth_error
 
 let get_token_using_gcloud gcloud_path () =
-  Lwt_process.with_process_full
+  Tezos_stdlib_unix.Process_manager.with_process_full
     (gcloud_path, [|"gcloud"; "auth"; "print-access-token"; "--quiet"|])
   @@ fun pc ->
   let open Lwt_result_syntax in
@@ -185,7 +179,11 @@ let get_public_key kms_handler =
   let open Lwt_result_syntax in
   let headers = request_header kms_handler in
   let* response, body_str =
-    Octez_connpool.get ~headers kms_handler.pool (Route.public_key kms_handler)
+    Octez_connpool.get
+      ~timeout:2.0
+      ~headers
+      kms_handler.pool
+      (Route.public_key kms_handler)
   in
   if Cohttp.Response.status response = `OK then
     match Ezjsonm.value_from_string_result body_str with
@@ -215,24 +213,29 @@ let extract_tail der_str n =
   if len < n then error_with "input is too short"
   else Result.return (String.sub der_str (len - n) n)
 
+let pem_to_der pem =
+  let lines = String.split_on_char '\n' pem in
+  let b64 =
+    lines
+    |> List.filter (fun l -> not (String.starts_with ~prefix:"-----" l))
+    |> String.concat ""
+  in
+  Base64.decode_exn b64
+
+let tag = function
+  | EC_SIGN_SECP256K1_SHA256 -> '\x01'
+  | EC_SIGN_P256_SHA256 -> '\x02'
+
 let key_of_pem algo pem =
   let open Result_syntax in
-  match algo with
-  | EC_SIGN_P256_SHA256 -> (
-      let* pem =
-        match X509.Public_key.decode_pem pem with
-        | Ok pem -> return pem
-        | Error (`Msg err) ->
-            error_with "Could not decode pem public key (%s)" err
-      in
-      let key_str = X509.Public_key.encode_der pem in
-      let* key_str = extract_tail key_str 65 in
-      match
-        Signature.Public_key.of_bytes_without_validation
-          (Bytes.unsafe_of_string (Format.sprintf "\x02%s" key_str))
-      with
-      | Some res -> return res
-      | _ -> error_with "Not a valid public key")
+  let der = pem_to_der pem in
+  let* key_str = extract_tail der 65 in
+  match
+    Signature.Public_key.of_bytes_without_validation
+      (Bytes.unsafe_of_string (Format.sprintf "%c%s" (tag algo) key_str))
+  with
+  | Some res -> return res
+  | _ -> error_with "Not a valid public key"
 
 let public_key kms_handler =
   let open Lwt_result_syntax in
@@ -252,13 +255,13 @@ let pad32 s =
   else error_with "Unexpected length for r or s: %d" (String.length s)
 
 let digest hash payload =
+  Base64.encode_string
+  @@
   match hash with
-  | Blake2B ->
-      Tezos_crypto.(
-        Base64.encode_string @@ Blake2B.to_string
-        @@ Blake2B.hash_bytes [payload])
+  | Blake2B -> Tezos_crypto.(Blake2B.to_string @@ Blake2B.hash_bytes [payload])
+  | Keccak256 -> Digestif.KECCAK_256.(to_raw_string @@ digest_bytes payload)
 
-let sign_rpc kms_handler digest =
+let rec sign_rpc ~allow_refresh kms_handler digest =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult
     ~service_name
@@ -267,6 +270,7 @@ let sign_rpc kms_handler digest =
   let headers = request_header kms_handler in
   let* response, body =
     Octez_connpool.post
+      ~timeout:2.0
       ~headers
       ~body:
         (Cohttp_lwt.Body.of_string
@@ -287,6 +291,11 @@ let sign_rpc kms_handler digest =
         failwith
           "Could not decode the response of the kms (%s)"
           (Ezjsonm.read_error_description err)
+  else if allow_refresh && Cohttp.Response.status response = `Unauthorized then (
+    let*! () = Gcp_kms_events.invalidated_token () in
+    let*! token = get_token kms_handler.config in
+    kms_handler.auth_token <- token ;
+    sign_rpc ~allow_refresh:false kms_handler digest)
   else failwith "KMS failed %a" Cohttp.Response.pp_hum response
 
 let signature_of_b64encoded algo b64_sig =
@@ -310,11 +319,14 @@ let signature_of_b64encoded algo b64_sig =
   | EC_SIGN_P256_SHA256 ->
       let*? p256_sig = Signature.P256.of_string signature in
       return (Signature.of_p256 p256_sig)
+  | EC_SIGN_SECP256K1_SHA256 ->
+      let*? secp256k1_sig = Signature.Secp256k1.of_string signature in
+      return (Signature.of_secp256k1 secp256k1_sig)
 
 let sign kms_handler hash payload =
   let open Lwt_result_syntax in
   let digest = digest hash payload in
-  let* b64_sig = sign_rpc kms_handler digest in
+  let* b64_sig = sign_rpc ~allow_refresh:true kms_handler digest in
   signature_of_b64encoded (signature_algorithm kms_handler) b64_sig
 
 let assert_authentication_method config =
@@ -357,6 +369,7 @@ let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
           gcp_key.key
           gcp_key.version;
       gcp_key;
+      config;
       public_key = ();
       auth_token;
     }
@@ -364,10 +377,20 @@ let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
   (* We fetch the necessary information which will allow us to interpret the
      KMS response and wrap them into the correct Signature.t constructor. *)
   let* public_key = public_key kms_handler in
+  let kms_handler = {kms_handler with public_key} in
   let*! () = Gcp_kms_events.is_ready public_key in
   Lwt.dont_wait (fun () -> Octez_connpool.warm kms_handler.pool) ignore ;
   Lwt.dont_wait (fun () -> wait_and_refresh config kms_handler) ignore ;
   (* We return the full handler *)
-  return {kms_handler with public_key}
+  return kms_handler
 
 let public_key t = t.public_key
+
+let ethereum_address_opt kms =
+  let pk = public_key (kms : t) in
+  match pk with
+  | Secp256k1 s ->
+      let str = Signature.Secp256k1.eth_address_of_public_key s in
+      let (`Hex hex) = Hex.of_bytes str in
+      Some Ethereum_types.(Address (Hex hex))
+  | _ -> None

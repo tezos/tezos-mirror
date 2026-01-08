@@ -46,22 +46,32 @@ let push ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let args = ["push"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
   Process.spawn ~name ~color "docker" args
 
-let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
+let pull ?runner ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let alias = Option.value ~default:Env.dockerfile_alias alias in
   let image_name = Option.value ~default:alias image_name in
   let args = ["pull"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
-  Process.spawn ~name ~color "docker" args
+  Process.spawn ?runner ~name ~color "docker" args
 
 let network ~command ~network_name =
   Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])
 
 let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
-    ?volumes image args =
+    ?custom_docker_options ?volumes image args =
   let publish_ports =
     match publish_ports with
     | None -> []
     | Some (hstart, hstop, rstart, rstop) ->
         ["-p"; Format.asprintf "%s-%s:%s-%s" hstart hstop rstart rstop]
+  in
+  (* NET_ADMIN capability is currently used in order to
+     tweak network latency with [tc] *)
+  let net_admin =
+    (* Let's prevent the user to accidentally mess with their network configuration *)
+    let enable = not (Cli.localhost && Cli.docker_host_network) in
+    if enable then (
+      Log.warn "Running docker containers with NET_ADMIN capability" ;
+      ["--cap-add"; "NET_ADMIN"])
+    else []
   in
   let network =
     match network with None -> [] | Some network -> ["--network"; network]
@@ -85,7 +95,8 @@ let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
     ~color
     "docker"
     (["run"] @ detach @ rm @ name @ macos_platform_arg @ volumes @ network
-   @ publish_ports
+   @ net_admin @ publish_ports
+    @ Option.value ~default:[] custom_docker_options
     @ [Format.asprintf "%s" image]
     @ args)
 

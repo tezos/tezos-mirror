@@ -12,9 +12,10 @@ depends: [
   "ocaml" { >= "4.14" }
   "bls12-381" { = version }
   "octez-libs" { = version }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

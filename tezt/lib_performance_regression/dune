@@ -7,7 +7,7 @@
  (libraries
   octez-libs.tezt-wrapper
   uri
-  octez-libs.cohttp-lwt-unix)
+  cohttp-lwt-unix)
  (flags
   (:standard)
   -open Tezt_wrapper

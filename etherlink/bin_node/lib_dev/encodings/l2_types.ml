@@ -66,9 +66,7 @@ module Tezos_block = struct
     parent_hash : Ethereum_types.block_hash;
         (* Deserialization of operation and receipts is delayed to
            avoid introducing a dependency from this lib_encodings to
-           the protocol. This field is deserialized in the
-           [operations] function of the [Tezlink_services_impl]
-           module. *)
+           the protocol. *)
     operations : bytes;
   }
 

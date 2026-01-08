@@ -11,11 +11,13 @@ evm_kernel: evm_kernel.wasm
 accuser: octez-accuser
 accuser_psriotum: octez-accuser-PsRiotum
 accuser_ptseoulo: octez-accuser-PtSeouLo
+accuser_tallinn: octez-accuser-PtTALLiN
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
 agnostic_baker: octez-baker
 baker_psriotum: octez-baker-PsRiotum
 baker_ptseoulo: octez-baker-PtSeouLo
+baker_psd5wvtj: octez-baker-PtTALLiN
 baker_alpha: octez-baker-alpha
 client: octez-client
 codec: octez-codec
@@ -40,6 +42,7 @@ riscv: src/riscv/assets/jstz.checksum
 riscv: src/riscv/assets/preimages
 riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
+echo_dal_reveal_parameters: tezt/tests/kernels/echo_dal_reveal_parameters.wasm
 riscv: tezt/tests/riscv-tests/jstz-inbox.json
 alpha_json: tezt/tests/weeklynet_configs/alpha.json
 last_snapshotted_protocol_json: tezt/tests/weeklynet_configs/last_snapshotted_protocol.json

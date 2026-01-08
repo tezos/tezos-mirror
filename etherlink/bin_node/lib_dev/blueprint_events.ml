@@ -109,16 +109,6 @@ let blueprint_catchup =
     ("min", Data_encoding.n)
     ("max", Data_encoding.n)
 
-let blueprint_proposal =
-  declare_2
-    ~section
-    ~name:"blueprint_proposal"
-    ~msg:"crafted a blueprint proposal for level {level} in {process_time}"
-    ~level:Debug
-    ~pp2:Ptime.Span.pp
-    ("level", Data_encoding.n)
-    ("process_time", Time.System.Span.encoding)
-
 let blueprint_production =
   declare_2
     ~section
@@ -240,9 +230,6 @@ let catching_up min max = emit blueprint_catchup (min, max)
 let missing_blueprints count Ethereum_types.(Qty from) Ethereum_types.(Qty to_)
     =
   emit missing_blueprints (count, from, to_)
-
-let blueprint_proposal Ethereum_types.(Qty level) time =
-  emit blueprint_proposal (level, time)
 
 let blueprint_production Ethereum_types.(Qty level) time =
   emit blueprint_production (level, time)

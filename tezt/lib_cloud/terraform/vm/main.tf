@@ -16,6 +16,18 @@ variable "machine_type" {
   description = "Machine type of the VM instance."
 }
 
+variable "disk_type" {
+  type        = string
+  description = "Disk type of the VM instance."
+  default     = "pd-ssd"
+}
+
+variable "disk_size_gb" {
+  type        = number
+  description = "Disk size of the VM instance in GB."
+  default     = 200
+}
+
 variable "number_of_vms" {
   type        = number
   description = "The target number of running VM."
@@ -283,7 +295,7 @@ resource "google_compute_firewall" "default" {
   # Rule to enable static page web access
   allow {
     protocol = "tcp"
-    ports    = ["80", "8080"]
+    ports    = ["80", "443", "8080"]
   }
 
   # Rule to enable prometheus access
@@ -343,8 +355,8 @@ resource "google_compute_instance_template" "default" {
   disk {
     source_image = local.os_image_map[var.os]
     type         = "PERSISTENT"
-    disk_type    = "pd-ssd"
-    disk_size_gb = 200
+    disk_type    = var.disk_type
+    disk_size_gb = var.disk_size_gb
     boot         = true
     auto_delete  = true
   }

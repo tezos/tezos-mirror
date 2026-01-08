@@ -67,7 +67,7 @@ let request_encoding =
         (function
           | Erequest
               (Start_server
-                {config; internal_events; rpc_comm_socket_path; node_version})
+                 {config; internal_events; rpc_comm_socket_path; node_version})
             ->
               Some (config, internal_events, rpc_comm_socket_path, node_version)
           | _ -> None)

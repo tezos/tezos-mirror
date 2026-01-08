@@ -1,0 +1,27 @@
+# prebuild + release page dependencies
+#
+# This image builds upon the `prebuild` image,
+# see its header for details on its content.
+#
+# This image is intended for
+# - building the Octez release page
+
+# hadolint ignore=DL3006
+FROM prebuild as release-page
+
+LABEL org.opencontainers.image.title="release-page"
+
+# SHELL already set in runtime
+
+USER root
+
+# hadolint ignore=DL3018,DL3019
+RUN apk add aws-cli pandoc
+
+USER tezos
+WORKDIR /home/tezos
+
+RUN opam repo add ocaml https://opam.ocaml.org && opam update \
+    && opam install --yes \
+       clap.0.3.0 tezt.4.3.0 rss.3.0 \
+    && opam clean

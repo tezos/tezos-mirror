@@ -77,7 +77,7 @@ let make_uri endpoint rpc =
     ~scheme:(Endpoint.rpc_scheme endpoint)
     ~host:(Endpoint.rpc_host endpoint)
     ~port:(Endpoint.rpc_port endpoint)
-    ~path:(String.concat "/" rpc.path)
+    ~path:(String.concat "/" (endpoint.path :: rpc.path))
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
 

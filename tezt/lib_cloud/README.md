@@ -30,6 +30,8 @@ Once it is done, you also need to have some tools installed locally:
   the script deploying VM onto GCP
 - [`docker`](https://docs.docker.com/desktop/): to build and run images that
   will be used on VMs
+- [`docker-buildx`](https://github.com/docker/buildx): to install extra
+  dependencies to use `docker`
 
 Check out the different project pages to know how to install those tools on your
 machine.
@@ -80,6 +82,12 @@ This variable is also used to determine the dockerfile to be used for
 your experiment. In case you want to use a different dockerfile, you
 can use the CLI option `--dockerfile-alias`.
 
+You can use several namespaces by switching between several values of the `TEZT_CLOUD`
+variable but avoid values which are prefixes of each other. For instance use
+`<username>`, `test-<username>`, and `prod-<username>` instead of `<username>`,
+`<username>-test`, and `<username>-prod`; otherwise destroying the machines
+(with the `CLOUD terraform destroy` command) of the `<username>` namespace
+would also destroy the machines of the `<username>-test` and `<username>-prod` namespaces.
 # Docker
 
 The library relies mainly on docker. Each VM that will be deployed
@@ -212,6 +220,10 @@ dune exec tezt/tests/cloud/main.exe -- CLOUD terraform destroy -v
 However, all your VMs may come with a time to live parameter. For the
 `--cloud` mode, it is set to 2 hours. For the proxy mode (see below),
 it is not set by default.
+
+Also, note that the role of the `TEZT_CLOUD` variable (or the `--tezt-cloud`
+option) is crucial here, as the VMs being destroyed are the ones whose name have
+a prefix that is the value of `TEZT_CLOUD`.
 
 ## Monitoring
 

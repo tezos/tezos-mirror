@@ -9,19 +9,6 @@ echoerr() { echo "$@" 1>&2; }
 
 db_version 2.0
 
-# work directory to store temporary files associated to this package
-mkdir -p /run/octez-baker
-
-for file in /usr/bin/octez-baker-*; do
-  file=$(basename "$file")
-  suffix=$(echo "$file" | sed 's/^octez-baker-//')
-  if [ -z "$PROTO_CHOICES" ]; then
-    PROTO_CHOICES="$suffix"
-  else
-    PROTO_CHOICES="$PROTO_CHOICES $suffix"
-  fi
-done
-
 case "${1}" in
 configure)
   # if $2 is empty, then we're doing a fresh install.
@@ -30,40 +17,20 @@ configure)
   if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
     echoerr "Fresh installation (or reconfigure) of the Octez baker"
 
-    db_get octez-baker/liquidity-vote
-    echo "LQVOTE=${RET}" > /etc/default/octez-baker
-
-    db_get octez-baker/baker-key
-    echo "BAKER_KEY=${RET}" >> /etc/default/octez-baker
-
-    db_get octez-baker/agnostic-baker
-    echo "AGNOSTIC_BAKER=${RET}" >> /etc/default/octez-baker
-    echoerr "AGNOSTIC_BAKER=${RET}"
-
-    db_get octez-baker/dal-node
-    DAL=${RET}
-    case "$DAL" in
-    true)
-      db_get octez-baker/dal-node-url
-      DALURL=${RET}
-      echo "RUNTIME_OPTS=\"--keep-alive --dal-node $DALURL\"" >> /etc/default/octez-baker
-      ;;
-    false)
-      echo "RUNTIME_OPTS=\"--keep-alive --without-dal\"" >> /etc/default/octez-baker
-      ;;
-    esac
-
     mkdir -p /var/tezos/.tezos-client
     chown tezos:tezos /var/tezos/.tezos-client
   else
     echoerr "Upgrading octez-baker from version $2 ( postinst )"
+  fi
+
+  # Reload systemd if unit files changed during upgrade
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
   fi
   ;;
 *)
   : nop
   ;;
 esac
-
-systemctl daemon-reload || true
 
 #DEBHELPER#

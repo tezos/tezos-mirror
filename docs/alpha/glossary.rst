@@ -68,8 +68,10 @@ _`Metadata`
     the prefix ``../<block_id>/metadata``.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates block_\ s
-    and operation_\ s.
+    A peer in a Tezos P2P network.
+    The term "node" can refer to a few different kinds of nodes, including Tezos Layer 1 nodes, `DAL node`_\ s, and `Smart Rollup`_ nodes.
+    The context should help to disambiguate between these, but in most cases, the term "node" refers to a Layer 1 node.
+    Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
 
 _`Operation`
     An operation transforms the context_; this is what makes the state of the chain
@@ -120,10 +122,22 @@ _`Account`
 
     An account can be either a `user account`_ or a `smart contract`_.
 
+_`Attestation lag`
+    A delay of a certain number of blocks that gives DAL nodes time to verify that DAL data is available.
+    Attesters (via their DAL nodes) include their DAL attestations in their attestation operations immediately after the attestation lag has passed.
+
+_`Attestation quorum`
+    As described in :doc:`The consensus algorithm<consensus>`, the minimal number of attestations that are needed to consider a block as pre-attested or attested.
+
+_`Attestation threshold`
+    In the DAL, the minimum percentage of DAL shard_\ s that must be attested before the data is considered available to Smart Rollups.
+
 _`Attesting`
+    The process of asserting that some other operation is valid.
     When a block_ is created and propagated on the network, delegates that have
     `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
     Attestation operations are included in the next block_.
+    Beyond serving in the L1 consensus protocol for attesting block_\ s, attestation operations provide specific fields used in the DAL_ for attesting available shard_\ s.
 
 _`Attesting rights`
     See `baking rights`_.
@@ -137,7 +151,7 @@ _`Baker`
 
     When using :ref:`Octez <octez>`, baking and other consensus actions are handled by the baker
     daemon, on behalf of one or more delegate_ accounts.
-    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf.
+    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf, participating in governance and in the DAL.
 
 _`Baking`
     The act of creating a new block_ by a baker_.
@@ -185,10 +199,23 @@ _`Cycle`
     constant_, and thus might change across different
     Tezos protocols.
 
+_`DAL`
+    See `Data Availability Layer`_
+
+_`DAL node`
+    DAL nodes (instances of the ``octez-dal-node`` binary) are responsible for distributing the data that users submit to the DAL.
+
+_`DAL slot`
+    Each block has a certain number of slots to which Data Availability Layer users can post raw data (also called blobs, for binary large objects) to distribute via the DAL.
+
+_`Data Availability Layer`
+    The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
+    See :doc:`../shell/dal`.
+
 .. _def_delegate_alpha:
 
 _`Delegate`
-    A `user account`_ that can participate in consensus and in governance.
+    A `user account`_ that can participate in consensus, in governance, and in the DAL.
     Actual participation is under further provisions, like having a `minimal stake`_.
     A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
@@ -249,7 +276,7 @@ _`Layer 1`
 
 _`Layer 2`
     Layer 2 (L2) includes sidechains, rollups, payment channels, etc. that batch their transactions and
-    write to the `Layer 1`_ chain. By processing transactions on layer 2 networks,
+    write to the `Layer 1`_ chain. By processing transactions on Layer 2 networks,
     greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
     the Layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
     the security of the L1 chain backs those operations. Currently, Layer 2 solutions on Tezos are built as `smart rollup`_\ s.
@@ -278,6 +305,10 @@ _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
+_`Page`
+    A portion of the raw (unexpanded) data in a `DAL slot`_ of a fixed size that is small enough to fit in a Layer 1 operation.
+    The DAL splits the raw data in each slot into pages that can be requested individually so that for example refutation games can run properly.
+
 _`PVM`
    A PVM (Proof-generating Virtual Machine) is a reference
    implementation for a device on top of which a `smart rollup`_ can be
@@ -285,6 +316,10 @@ _`PVM`
    protocol`_ and is the unique source of truth regarding the semantics
    of rollups. The PVM is able to produce proofs enforcing this truth.
    This ability is used during the final step of a `refutation game`_.
+
+_`Redundancy factor`
+    The amount of redundancy that the protocol uses when expanding and splitting DAL data into shard_\ s.
+    The higher the redundancy factor, the fewer shards are needed to reconstruct the initial data.
 
 _`Refutation game`
    A process by which the `economic protocol`_ solves a conflict between two
@@ -340,6 +375,12 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
+_`Shard`
+    Raw data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards.
+    The DAL distributes these shards to DAL nodes.
+    Attesters are assigned shards to download (via DAL nodes) and attest.
+    Thanks to redundancy, not every shard needs to be attested for the full data to be considered available.
+
 _`Smart contract`
     Account_ which is associated to a Michelson_ script.
     They are created with an
@@ -360,6 +401,9 @@ _`Staker`
     The security deposit accrues to the stake of the user account's delegate and is
     subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_alpha>`.
 
+_`Tenderbake`
+   The algorithm that Tezos uses to create consensus from bakers' proposals and attestations of blocks.
+
 _`Tez`
     A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
     See also XTZ_.
@@ -367,6 +411,10 @@ _`Tez`
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+_`Trap`
+   A DAL shard_ that is treated specially by the protocol for a particular attester to ensure that attesters are honestly downloading and attesting to data.
+   If a DAL attester attests to a trap, that attester will not receive DAL rewards.
 
 .. _def_user_account_alpha:
 

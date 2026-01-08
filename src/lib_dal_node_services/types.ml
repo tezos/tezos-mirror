@@ -31,6 +31,8 @@ type slot_index = int
 
 type page_index = int
 
+type attestation_lag = int
+
 module Topic = struct
   type t = {slot_index : int; pkh : Signature.Public_key_hash.t}
 
@@ -345,7 +347,11 @@ type slot_set = {slots : bool list; published_level : int32}
 
 type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
-type header_status = [`Waiting_attestation | `Attested | `Unattested]
+type header_status =
+  [ `Waiting_attestation
+  | `Attested of attestation_lag
+  | `Unattested
+  | `Unpublished ]
 
 type shard_index = int
 
@@ -412,7 +418,7 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
           | _ -> None)
         (function
           | (), slots, published_level ->
-              Attestable_slots {slots; published_level});
+          Attestable_slots {slots; published_level});
       case
         ~title:"not_in_committee"
         (Tag 1)
@@ -421,9 +427,8 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
         (function () -> Not_in_committee);
     ]
 
-(* Note: this encoding is used to store statuses on disk using the
-   [Key_value_store] module. As such, it's important that this is a
-   fixed-size encoding. *)
+let legacy_attestation_lag = 8
+
 let header_status_encoding : header_status Data_encoding.t =
   let open Data_encoding in
   union
@@ -438,20 +443,34 @@ let header_status_encoding : header_status Data_encoding.t =
         ~title:"attested"
         (Tag 1)
         (constant "attested")
-        (function `Attested -> Some () | _ -> None)
-        (function () -> `Attested);
+        (function _ -> None (* Don't encode with this case anymore *))
+        (function () -> `Attested legacy_attestation_lag);
       case
         ~title:"unattested"
         (Tag 2)
         (constant "unattested")
         (function `Unattested -> Some () | _ -> None)
         (function () -> `Unattested);
+      case
+        ~title:"unpublished"
+        (Tag 3)
+        (constant "unpublished")
+        (function `Unpublished -> Some () | _ -> None)
+        (function () -> `Unpublished);
+      case
+        ~title:"attested_with_lag"
+        (Tag 4)
+        (obj2 (req "kind" (constant "attested")) (req "attestation_lag" uint8))
+        (function
+          | `Attested attestation_lag -> Some ((), attestation_lag) | _ -> None)
+        (function (), attestation_lag -> `Attested attestation_lag);
     ]
 
 let pp_header_status fmt = function
   | `Waiting_attestation -> Format.fprintf fmt "waiting_attestation"
-  | `Attested -> Format.fprintf fmt "attested"
+  | `Attested lag -> Format.fprintf fmt "attested(lag:%d)" lag
   | `Unattested -> Format.fprintf fmt "unattested"
+  | `Unpublished -> Format.fprintf fmt "unpublished"
 
 let slot_header_encoding =
   let open Data_encoding in
@@ -516,7 +535,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
            dal_attested_slots_validity_lag;
            blocks_per_cycle;
            minimal_block_delay;
-         } ->
+         }
+       ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
@@ -540,7 +560,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
              commitment_period_in_blocks,
              dal_attested_slots_validity_lag,
              blocks_per_cycle,
-             minimal_block_delay ) ) ->
+             minimal_block_delay ) )
+       ->
       {
         feature_enable;
         incentives_enable;
@@ -755,4 +776,85 @@ module Health = struct
          (fun fmt (name, status) ->
            Format.fprintf fmt "(%s: %a)" name pp_status status))
       checks
+end
+
+module SlotIdSet =
+  Aches.Vache.Set (Aches.Vache.LRU_Sloppy) (Aches.Vache.Strong)
+    (struct
+      type t = Slot_id.t
+
+      let equal = Slot_id.equal
+
+      let hash = Slot_id.hash
+    end)
+
+module Attestable_event = struct
+  type backfill_payload = {
+    slot_ids : slot_id list;
+    trap_slot_ids : slot_id list;
+    no_shards_attestation_levels : level list;
+  }
+
+  type t =
+    | Attestable_slot of {slot_id : slot_id}
+    | No_shards_assigned of {attestation_level : level}
+    | Slot_has_trap of {slot_id : slot_id}
+    | Backfill of {backfill_payload : backfill_payload}
+
+  let backfill_payload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {slot_ids; trap_slot_ids; no_shards_attestation_levels} ->
+        (slot_ids, trap_slot_ids, no_shards_attestation_levels))
+      (fun (slot_ids, trap_slot_ids, no_shards_attestation_levels) ->
+        {slot_ids; trap_slot_ids; no_shards_attestation_levels})
+      (obj3
+         (req "slot_ids" (list slot_id_encoding))
+         (req "trap_slot_ids" (list slot_id_encoding))
+         (req "no_shards_attestation_levels" (list int32)))
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"attestable_slot"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attestable_slot"))
+             (req "slot_id" slot_id_encoding))
+          (function
+            | Attestable_slot {slot_id} -> Some ((), slot_id) | _ -> None)
+          (fun ((), slot_id) -> Attestable_slot {slot_id});
+        case
+          ~title:"no_shards_assigned"
+          (Tag 1)
+          (obj2
+             (req "kind" (constant "no_shards_assigned"))
+             (req "attestation_level" int32))
+          (function
+            | No_shards_assigned {attestation_level} ->
+                Some ((), attestation_level)
+            | _ -> None)
+          (fun ((), attestation_level) ->
+            No_shards_assigned {attestation_level});
+        case
+          ~title:"slot_has_trap"
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "slot_has_trap"))
+             (req "slot_id" slot_id_encoding))
+          (function Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
+          (fun ((), slot_id) -> Slot_has_trap {slot_id});
+        case
+          ~title:"backfill"
+          (Tag 3)
+          (obj2
+             (req "kind" (constant "backfill"))
+             (req "backfill_payload" backfill_payload_encoding))
+          (function
+            | Backfill {backfill_payload} -> Some ((), backfill_payload)
+            | _ -> None)
+          (fun ((), backfill_payload) -> Backfill {backfill_payload});
+      ]
 end

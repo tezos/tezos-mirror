@@ -133,7 +133,7 @@ let add_level_info ~predecessor ctxt =
       witness
   in
   let current_level = (Raw_context.current_level ctxt).level in
-  let+ first_level = Storage.Tenderbake.First_level_of_protocol.get ctxt in
+  let+ first_level = Storage.Protocol_activation_level.get ctxt in
   let is_first_level_of_protocol =
     (* first_level is set at the last block of a protocol, when mig is
        run. *)

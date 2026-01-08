@@ -21,6 +21,31 @@ types:
       size: 20
     - id: secret
       size: 20
+  address_registry_diff:
+    seq:
+    - id: address_registry_diff_entries
+      type: address_registry_diff_entries
+      repeat: eos
+  address_registry_diff_0:
+    seq:
+    - id: len_address_registry_diff
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: address_registry_diff
+      type: address_registry_diff
+      size: len_address_registry_diff
+  address_registry_diff_entries:
+    seq:
+    - id: address
+      type: alpha__transaction_destination
+      doc: ! >-
+        A destination of a transaction: A destination notation compatible with the
+        contract notation as given to an RPC or inside scripts. Can be a base58 implicit
+        contract hash, a base58 originated contract hash, a base58 originated transaction
+        rollup, or a base58 originated smart rollup.
+    - id: index
+      type: z
   alpha__apply_internal_results__alpha__operation_result:
     seq:
     - id: alpha__apply_internal_results__alpha__operation_result_tag
@@ -1488,6 +1513,14 @@ types:
       type: n
     - id: size
       type: z
+  baking_power:
+    seq:
+    - id: baking_power_tag
+      type: u1
+      enum: baking_power_tag
+    - id: some
+      type: s8be
+      if: (baking_power_tag == baking_power_tag::some)
   ballot:
     seq:
     - id: source
@@ -1632,7 +1665,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: consensus_power
-      type: int31
+      type: consensus_power
   committee_entries_1:
     seq:
     - id: committee_elt
@@ -1645,6 +1678,12 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
+  consensus_power:
+    seq:
+    - id: slots
+      type: int31
+    - id: baking_power
+      type: baking_power
   contents:
     seq:
     - id: contents_entries
@@ -2138,7 +2177,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: consensus_power
-      type: int31
+      type: consensus_power
     - id: consensus_key
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
@@ -2149,7 +2188,7 @@ types:
     - id: committee
       type: committee_2
     - id: total_consensus_power
-      type: int31
+      type: total_consensus_power
   metadata_1:
     seq:
     - id: punished_delegate
@@ -3576,6 +3615,8 @@ types:
     - id: lazy_storage_diff
       type: alpha__lazy_storage_diff
       if: (lazy_storage_diff_tag == bool::true)
+    - id: address_registry_diff
+      type: address_registry_diff_0
   to_contract_0:
     seq:
     - id: storage_tag
@@ -3605,6 +3646,8 @@ types:
     - id: lazy_storage_diff
       type: alpha__lazy_storage_diff
       if: (lazy_storage_diff_tag == bool::true)
+    - id: address_registry_diff
+      type: address_registry_diff_0
   to_smart_rollup:
     seq:
     - id: consumed_milligas
@@ -3617,6 +3660,12 @@ types:
       type: n
     - id: ticket_updates
       type: ticket_updates_0
+  total_consensus_power:
+    seq:
+    - id: slots
+      type: int31
+    - id: baking_power
+      type: baking_power
   transaction:
     seq:
     - id: source
@@ -4515,6 +4564,12 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   alpha__operation__alpha__contents_tag:
     1: seed_nonce_revelation
     2: double_consensus_operation_evidence
@@ -4751,15 +4806,9 @@ enums:
     3: simulation
     4: delayed_operation
   alpha__per_block_votes_tag:
-    0: case_0
-    1: case_1
-    2: case_2
-    4: case_4
-    5: case_5
-    6: case_6
-    8: case_8
-    9: case_9
-    10: case_10
+    0: per_block_vote_on
+    1: per_block_vote_off
+    2: per_block_vote_pass
   alpha__staker_tag:
     0: single
     1: shared
@@ -4774,6 +4823,9 @@ enums:
   backtracked_tag:
     0: to_contract
     2: to_smart_rollup
+  baking_power_tag:
+    0: none
+    1: some
   bool:
     0: false
     255: true

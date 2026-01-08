@@ -437,7 +437,8 @@ let commands =
       (prefixes ["run"; "simulation"] @@ operations_file_param @@ stop)
       (fun (op_per_mempool, min_manager_queues)
            operations_file_path
-           (cctxt : Client_context.full) ->
+           (cctxt : Client_context.full)
+         ->
         let* () =
           run_injector
             cctxt
@@ -460,7 +461,8 @@ let commands =
       (fun patch_max_op_ttl
            data_dir
            block_time_target
-           (_cctxt : Client_context.full) ->
+           (_cctxt : Client_context.full)
+         ->
         let* () =
           patch_block_time ~data_dir ~block_time_target ~patch_max_op_ttl
         in

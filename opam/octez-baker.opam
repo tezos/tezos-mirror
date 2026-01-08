@@ -15,19 +15,21 @@ depends: [
   "bls12-381" { = version }
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
-  "octez-protocol-022-PsRiotum-libs" { = version }
   "octez-protocol-023-PtSeouLo-libs" { = version }
+  "octez-protocol-024-PtTALLiN-libs" { = version }
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "octez-protocol-021-PsQuebec-libs" { != version }
+  "octez-protocol-022-PsRiotum-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

@@ -211,7 +211,9 @@ fn filter_inbox_message<'a, Host: Runtime>(
                 let slot_size = 32768;
                 let page_size = 128;
                 let num_pages = slot_size / page_size;
-                let published_level = (_inbox_level - attestation_lag) as i32;
+                // Before importing a slot, we wait 2 blocks for finality + 1 block for DAL node processing
+                let import_extra_delay = 3;
+                let published_level = (_inbox_level - attestation_lag - import_extra_delay) as i32;
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6400
                 // Make it possible to track multiple slot indexes.
                 let slot_index = storage::dal::get_or_set_slot_index(host, 0 as u8)?;
@@ -313,8 +315,8 @@ const MAX_ENVELOPE_CONTENT_SIZE: usize =
 
 #[cfg(test)]
 mod test {
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_encoding::{
-        contract::Contract,
         michelson::ticket::StringTicket,
         michelson::{MichelsonPair, MichelsonString},
     };

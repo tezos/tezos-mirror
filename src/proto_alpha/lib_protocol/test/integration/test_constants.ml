@@ -134,23 +134,31 @@ let cycles_to_period
   let*?@ res = Alpha_context.Period.mult c one_cycle_period in
   return res
 
+type duration = Days of int32 | Hours of int32
+
 let check_protocol_time_correlation
-    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles ~days =
+    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles
+    ~duration =
   let open Lwt_result_wrap_syntax in
   let open Protocol in
-  let days_to_period x =
-    let*?@ res = Protocol.Alpha_context.Period.(mult x one_day) in
+  let duration_to_period x =
+    let x, period =
+      match x with
+      | Days x -> (x, Protocol.Alpha_context.Period.one_day)
+      | Hours x -> (x, Protocol.Alpha_context.Period.one_hour)
+    in
+    let*?@ res = Protocol.Alpha_context.Period.mult x period in
     return res
   in
+  let* duration = duration_to_period duration in
   let* constant = cycles_to_period ~constants cycles in
-  let* days = days_to_period days in
   Assert.equal
     ~loc:__LOC__
     (fun x y -> Alpha_context.Period.compare x y = 0)
-    "constant in cycles is not equal to given days"
+    "constant in cycles is not equal to given period"
     Alpha_context.Period.pp
     constant
-    days
+    duration
 
 let () =
   register_test
@@ -165,7 +173,7 @@ let () =
 let () =
   register_test ~title:"one cycle is 1 day" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  check_protocol_time_correlation ~constants ~cycles:1l ~days:1l
+  check_protocol_time_correlation ~constants ~cycles:1l ~duration:(Days 1l)
 
 let () =
   register_test ~title:"voting period is 14 days" @@ fun () ->
@@ -173,7 +181,7 @@ let () =
   check_protocol_time_correlation
     ~constants
     ~cycles:constants.cycles_per_voting_period
-    ~days:14l
+    ~duration:(Days 14l)
 
 let () =
   register_test ~title:"delegate parameters activation delay is 5 days"
@@ -182,7 +190,7 @@ let () =
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.delegate_parameters_activation_delay)
-    ~days:5l
+    ~duration:(Days 5l)
 
 let () =
   register_test ~title:"tolerated inactivity period is 2 days" @@ fun () ->
@@ -190,7 +198,7 @@ let () =
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
-    ~days:2l
+    ~duration:(Days 2l)
 
 let () =
   register_test ~title:"Nonce commitment per cycle is above 128" @@ fun () ->
@@ -229,7 +237,7 @@ let () =
     ~title:"Nonce revelation period is short enough for VDF to fit in a cycle "
   @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int32.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
@@ -249,7 +257,7 @@ let () =
   let constants = Default_parameters.constants_mainnet in
   let open Lwt_result_syntax in
   let* cycle_period = cycles_to_period ~constants 1l in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int64.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
@@ -420,22 +428,15 @@ let () =
     Protocol.Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       constants
   in
-  let*?@ baking_reward_bonus_per_slot =
-    get_reward ~reward_kind:Baking_reward_bonus_per_slot
-  in
-  let*? baking_reward_bonus =
-    baking_reward_bonus_per_slot
-    *? Int64.of_int (constants.consensus_committee_size / 3)
+  let*?@ baking_reward_bonus =
+    get_reward ~reward_kind:Baking_reward_bonus_per_block
   in
   let*?@ baking_reward_fixed_portion =
     get_reward ~reward_kind:Baking_reward_fixed_portion
   in
   let*? baking_rewards = baking_reward_fixed_portion +? baking_reward_bonus in
-  let*?@ attesting_reward_per_slot =
-    get_reward ~reward_kind:Attesting_reward_per_slot
-  in
-  let*? validators_rewards =
-    attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
+  let*?@ validators_rewards =
+    get_reward ~reward_kind:Attesting_reward_per_block
   in
   let*?@ dal_attesting_reward_per_shard =
     get_reward ~reward_kind:Dal_attesting_reward_per_shard
@@ -455,5 +456,8 @@ let () =
       constants
   in
   let*? diff = liquidity_baking_subsidy -? expected_subsidy in
-  let max_diff = 1000 (* mutez *) in
+  let max_diff =
+    1000
+    (* mutez *)
+  in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff

@@ -537,8 +537,7 @@ module Make
         let entrypoint = entrypoint rng_state in
         {destination; entrypoint}
 
-    let generate_originated_contract :
-        type arg argc.
+    let generate_originated_contract : type arg argc.
         (arg, argc) Script_typed_ir.ty ->
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
@@ -552,8 +551,7 @@ module Make
            destination
            entrypoint)
 
-    let generate_sc_rollup_contract :
-        type arg argc.
+    let generate_sc_rollup_contract : type arg argc.
         (arg, argc) Script_typed_ir.ty ->
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
@@ -566,8 +564,7 @@ module Make
            destination
            Alpha_context.Entrypoint.default)
 
-    let generate_any_type_contract :
-        type arg argc.
+    let generate_any_type_contract : type arg argc.
         (arg, argc) Script_typed_ir.ty ->
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
@@ -576,8 +573,7 @@ module Make
       if b then generate_originated_contract arg_ty
       else generate_sc_rollup_contract arg_ty
 
-    let generate_contract :
-        type arg argc.
+    let generate_contract : type arg argc.
         (arg, argc) Script_typed_ir.ty ->
         arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
@@ -663,16 +659,14 @@ module Make
             fail_sampling "Michelson_samplers: chest key not handled yet"
         | Chest_t -> fail_sampling "Michelson_samplers: chest not handled yet"
 
-    and generate_lambda :
-        type arg argc ret retc.
+    and generate_lambda : type arg argc ret retc.
         (arg, argc) Script_typed_ir.ty ->
         (ret, retc) Script_typed_ir.ty ->
         (arg, ret) Script_typed_ir.lambda sampler =
      fun _arg_ty _ret_ty _rng_state ->
       fail_sampling "Michelson_samplers: lambda not handled yet"
 
-    and generate_list :
-        type elt eltc.
+    and generate_list : type elt eltc.
         (elt, eltc) Script_typed_ir.ty -> elt Script_list.t sampler =
      fun elt_type ->
       let open M in
@@ -685,8 +679,7 @@ module Make
 
     (* Note that we might very well generate sets smaller than the specified range (consider the
        case of a set of type [unit]). *)
-    and generate_set :
-        type elt.
+    and generate_set : type elt.
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty ->
       let open M in
@@ -701,8 +694,7 @@ module Make
            (Script_set.empty elt_ty)
            elements
 
-    and generate_map :
-        type key elt eltc.
+    and generate_map : type key elt eltc.
         key Script_typed_ir.comparable_ty ->
         (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.map sampler =
@@ -718,8 +710,7 @@ module Make
         keys
         elts
 
-    and generate_big_map :
-        type key elt eltc.
+    and generate_big_map : type key elt eltc.
         key Script_typed_ir.comparable_ty ->
         (elt, eltc) Script_typed_ir.ty ->
         (key, elt) Script_typed_ir.big_map sampler =
@@ -788,8 +779,7 @@ module Make
       | Some x -> x
       | None -> assert false
 
-    and generate_ticket :
-        type a ac.
+    and generate_ticket : type a ac.
         (a, ac) Script_typed_ir.ty -> a Script_typed_ir.ticket sampler =
      fun ty rng_state ->
       let contents = value ty rng_state in

@@ -49,7 +49,8 @@ module Protocol_types = struct
                _level_position,
                cycle,
                cycle_position,
-               _expected_commitment ) ->
+               _expected_commitment )
+           ->
           let level = Raw_level.to_int32 level in
           let cycle = Cycle.to_int32 cycle in
           {level; cycle; cycle_position})
@@ -76,20 +77,21 @@ module Protocol_types = struct
       Tezos_types.convert_using_serialization
         ~name:"counter"
         ~dst:encoding
-        ~src:Data_encoding.z
+        ~src:Data_encoding.n
   end
 end
 
 module type BLOCK_SERVICES = sig
   include Tezos_shell_services.Block_services.S
 
+  val deserialize_operations :
+    chain_id:Chain_id.t -> bytes -> operation list tzresult
+
   val mock_block_header_data :
     chain_id:Chain_id.t -> Proto.block_header_data tzresult
 
   val mock_block_header_metadata :
     Tezos_types.level -> Proto.block_header_metadata tzresult
-
-  val operations : operation list list
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -117,11 +119,110 @@ module Imported_protocol = struct
     {contents; signature}
 end
 
-module Block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make
-      (Imported_protocol)
-      (Imported_protocol)
+type error +=
+  | Deserialize_operation of string * string * string
+  | Deserialize_operations_header of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.deserialize_operation"
+    ~title:"Failed to deserialize operation informations"
+    ~description:
+      "Failed to deserialize an operation informations (operation and receipt)."
+    ~pp:(fun ppf (op, error, raw_receipt) ->
+      Format.fprintf
+        ppf
+        "Failed to deserialize the information of operation %s with error %s \
+         (raw data: [0x%s])"
+        op
+        error
+        raw_receipt)
+    Data_encoding.(
+      obj3 (req "op" string) (req "error_msg" string) (req "raw_receipt" string))
+    (function
+      | Deserialize_operation (op, error, raw_receipt) ->
+          Some (op, error, raw_receipt)
+      | _ -> None)
+    (fun (op, error, raw_receipt) ->
+      Deserialize_operation (op, error, raw_receipt))
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.deserialize_operations_header"
+    ~title:"Failed to deserialize the headers of operations"
+    ~description:"Failed to deserialize the headers of a set of operations."
+    ~pp:(fun ppf error ->
+      Format.fprintf
+        ppf
+        "Failed to deserialize the headers of a set of operations: %s"
+        error)
+    Data_encoding.(obj1 (req "error_msg" string))
+    (function Deserialize_operations_header error -> Some error | _ -> None)
+    (fun error -> Deserialize_operations_header error)
+
+module Make_block_service
+    (Proto : Tezos_shell_services.Block_services.PROTO)
+    (Next_proto : Tezos_shell_services.Block_services.PROTO) =
+struct
+  include Tezos_shell_services.Block_services.Make (Proto) (Next_proto)
+
+  let deserialize_operations_header bytes =
+    let open Result_syntax in
+    let operations =
+      Data_encoding.Binary.to_bytes_exn Data_encoding.bytes bytes
+    in
+    Data_encoding.Binary.of_bytes
+      Data_encoding.(
+        list
+          (tup3
+             Operation_hash.encoding
+             Tezos_base.Operation.shell_header_encoding
+             bytes))
+      operations
+    |> Result.map_error_e (fun read_error ->
+           tzfail
+           @@ Deserialize_operations_header
+                (Format.asprintf
+                   "%a"
+                   Data_encoding.Binary.pp_read_error
+                   read_error))
+
+  let deserialize_operations ~chain_id bytes =
+    let open Result_syntax in
+    let* operations = deserialize_operations_header bytes in
+    List.map_e
+      (fun (hash, (shell_header : Tezos_base.Operation.shell_header), op_receipt)
+         ->
+        let* protocol_data, receipt =
+          Data_encoding.Binary.of_bytes
+            Proto.operation_data_and_receipt_encoding
+            op_receipt
+          |> Result.map_error_e (fun read_error ->
+                 tzfail
+                 @@ Deserialize_operation
+                      ( Operation_hash.to_b58check hash,
+                        Format.asprintf
+                          "%a"
+                          Data_encoding.Binary.pp_read_error
+                          read_error,
+                        Hex.show (Hex.of_bytes op_receipt) ))
+        in
+        return
+          ({
+             chain_id;
+             hash;
+             shell = shell_header;
+             protocol_data;
+             receipt = Receipt receipt;
+           }
+            : operation))
+      operations
+end
+
+module Current_block_services = struct
+  include Make_block_service (Imported_protocol) (Imported_protocol)
 
   let voting_period ~cycles_per_voting_period ~position ~level_info =
     let open Tezos_types in
@@ -182,20 +283,15 @@ module Block_services = struct
     let proposer =
       Imported_protocol.Alpha_context.Consensus_key.
         {
-          delegate = Tezlink_mock.bootstrap_account.public_key_hash;
-          consensus_pkh = Tezlink_mock.bootstrap_account.public_key_hash;
+          delegate = Tezlink_mock.baker_account.public_key_hash;
+          consensus_pkh = Tezlink_mock.baker_account.public_key_hash;
         }
     in
     let balance_updates =
-      if Int32.equal level_info.Tezos_types.level 2l then
-        Tezlink_mock.balance_udpdate_bootstrap
-          ~amount:200_000_000_000L
-          ~bootstrap:Tezlink_mock.bootstrap_account.public_key_hash
-      else
-        let amount = Alpha_context.Tez.of_mutez_exn 0L in
-        Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.bootstrap_account.public_key_hash
-          ~amount
+      let amount = Alpha_context.Tez.of_mutez_exn 0L in
+      Tezlink_mock.balance_udpdate_rewards
+        ~baker:Tezlink_mock.baker_account.public_key_hash
+        ~amount
     in
 
     let constant = Tezlink_constants.all_constants.parametric in
@@ -229,12 +325,103 @@ module Block_services = struct
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
 
-  let operations = [[]; []; []; []]
+  let transfer_receipt account balance : operation_receipt =
+    let open Alpha_context.Receipt in
+    let open Imported_protocol.Apply_results in
+    let contract = Tezos_types.Contract.of_implicit account in
+    let mint =
+      item
+        (Contract
+           (Alpha_context.Contract.Implicit Tezlink_mock.faucet_public_key_hash))
+        (Debited balance)
+        Block_application
+    in
+    let bootstrap =
+      item (Contract contract) (Credited balance) Block_application
+    in
+    let balance_updates = [mint; bootstrap] in
+    let operation_result =
+      Transaction_result
+        (Transaction_to_contract_result
+           {
+             storage = None;
+             lazy_storage_diff = None;
+             balance_updates;
+             ticket_receipt = [];
+             originated_contracts = [];
+             consumed_gas = Alpha_context.Gas.Arith.zero;
+             storage_size = Z.zero;
+             paid_storage_size_diff = Z.zero;
+             allocated_destination_contract = false;
+           })
+    in
+    let internal_operation_results = [] in
+    let operation_result =
+      Imported_protocol.Apply_operation_result.Applied operation_result
+    in
+    let contents =
+      Single_result
+        (Manager_operation_result
+           {balance_updates = []; operation_result; internal_operation_results})
+    in
+    Receipt (Operation_metadata {contents})
+
+  let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"faucet_counter"
+      ~src:Data_encoding.z
+      ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      Z.zero
+
+  let create_transfer ~chain_id (account : Alpha_context.public_key_hash)
+      (balance : Alpha_context.Tez.t) : operation tzresult =
+    let open Result_syntax in
+    let open Imported_protocol.Alpha_context in
+    let operation =
+      Transaction
+        {
+          amount = balance;
+          parameters = Alpha_context.Script.unit_parameter;
+          entrypoint = Entrypoint.default;
+          destination = Implicit account;
+        }
+    in
+    let* counter = faucet_counter () in
+    let contents =
+      Single
+        (Manager_operation
+           {
+             source = Tezlink_mock.faucet_public_key_hash;
+             fee = Tez.zero;
+             counter;
+             operation;
+             gas_limit = Gas.Arith.zero;
+             storage_limit = Z.zero;
+           })
+    in
+    let signature = None in
+    let protocol_data = Operation_data {contents; signature} in
+    let shell : Tezos_base.Operation.shell_header =
+      {branch = Tezos_crypto.Hashed.Block_hash.zero}
+    in
+    let receipt = transfer_receipt account balance in
+    let hash = Operation_hash.zero in
+    return {chain_id; hash; receipt; shell; protocol_data}
+
+  let activate_bootstraps_with_transfers ~chain_id
+      (module Backend : Tezlink_backend_sig.S) =
+    let open Lwt_result_syntax in
+    let* bootstrap_accounts = Backend.bootstrap_accounts () in
+    let*? ops =
+      List.map_e
+        (fun (account, balance) -> create_transfer ~chain_id account balance)
+        bootstrap_accounts
+    in
+    return ops
 end
 
 module Zero_block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make (Zero_protocol) (Genesis_protocol)
+  include Make_block_service (Zero_protocol) (Genesis_protocol)
 
   let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
@@ -249,20 +436,15 @@ module Zero_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
-
-  let operations = []
 end
 
 module Genesis_block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make
-      (Genesis_protocol)
-      (Imported_protocol)
+  include Make_block_service (Genesis_protocol) (Imported_protocol)
 
   let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
     let parameter =
       Imported_protocol_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts:[Tezlink_mock.bootstrap_account]
+        ~bootstrap_accounts:[Tezlink_mock.baker_account]
         Tezlink_constants.all_constants.parametric
     in
     let parameter_format_json =
@@ -292,8 +474,6 @@ module Genesis_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
-
-  let operations = []
 end
 
 (** [wrap conversion service_implementation] changes the output type
@@ -327,48 +507,12 @@ module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
 
   type protocols = Shell_impl.protocols
-
-  let current =
-    Shell_impl.
-      {
-        current_protocol = Imported_protocol.hash;
-        next_protocol = Imported_protocol.hash;
-      }
 end
 
-(* Copied from src/proto_alpha/lib_protocol/constants_services.ml. *)
-(* TODO: #7875
-   Import from the protocol once it is exposed instead of copying it here. *)
-module Constants_services = struct
-  let custom_root : tezlink_rpc_context Tezos_rpc.Path.context =
-    Tezos_rpc.Path.(open_root / "context" / "constants")
-
-  let all =
-    let open Tezos_rpc in
-    Service.get_service
-      ~description:"All constants"
-      ~query:Query.empty
-      ~output:Alpha_context.Constants.encoding
-      custom_root
-end
-
-(* Copied from src/proto_alpha/lib_plugin/adaptive_issuance_services.ml. *)
-(* TODO: #7875
-   It's exposed in proto_alpha, but not in the plugin of Rio. Import when we
-   move to a protocol that exposes it. *)
 module Adaptive_issuance_services = struct
+  include Imported_protocol_plugin.Adaptive_issuance_services
   module Cycle = Protocol_types.Cycle
   module Tez = Tezos_types.Tez
-
-  type expected_rewards = {
-    cycle : Cycle.t;
-    baking_reward_fixed_portion : Tez.t;
-    baking_reward_bonus_per_slot : Tez.t;
-    attesting_reward_per_slot : Tez.t;
-    dal_attesting_reward_per_shard : Tez.t;
-    seed_nonce_revelation_tip : Tez.t;
-    vdf_revelation_tip : Tez.t;
-  }
 
   let dummy_reward i =
     {
@@ -387,66 +531,17 @@ module Adaptive_issuance_services = struct
   let dummy_rewards current_cycle =
     List.init ~when_negative_length:[] (consensus_rights_delay + 1) (fun i ->
         dummy_reward Cycle.(add (of_int32_exn current_cycle) i))
-
-  let expected_rewards_encoding : expected_rewards Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {
-             cycle;
-             baking_reward_fixed_portion;
-             baking_reward_bonus_per_slot;
-             attesting_reward_per_slot;
-             dal_attesting_reward_per_shard;
-             seed_nonce_revelation_tip;
-             vdf_revelation_tip;
-           } ->
-        ( cycle,
-          baking_reward_fixed_portion,
-          baking_reward_bonus_per_slot,
-          attesting_reward_per_slot,
-          seed_nonce_revelation_tip,
-          vdf_revelation_tip,
-          dal_attesting_reward_per_shard ))
-      (fun ( cycle,
-             baking_reward_fixed_portion,
-             baking_reward_bonus_per_slot,
-             attesting_reward_per_slot,
-             seed_nonce_revelation_tip,
-             vdf_revelation_tip,
-             dal_attesting_reward_per_shard ) ->
-        {
-          cycle;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          attesting_reward_per_slot;
-          dal_attesting_reward_per_shard;
-          seed_nonce_revelation_tip;
-          vdf_revelation_tip;
-        })
-      (obj7
-         (req "cycle" Cycle.encoding)
-         (req "baking_reward_fixed_portion" Tez.encoding)
-         (req "baking_reward_bonus_per_slot" Tez.encoding)
-         (req "attesting_reward_per_slot" Tez.encoding)
-         (req "seed_nonce_revelation_tip" Tez.encoding)
-         (req "vdf_revelation_tip" Tez.encoding)
-         (req "dal_attesting_reward_per_shard" Tez.encoding))
-
-  let expected_issuance_path =
-    let open Tezos_rpc in
-    (Path.(open_root / "context" / "issuance" / "expected_issuance")
-      : tezlink_rpc_context Path.context)
-
-  let expected_issuance =
-    let open Tezos_rpc in
-    Service.get_service
-      ~description:
-        "Returns the expected issued tez for the provided block and the next \
-         'consensus_rights_delay' cycles (in mutez)"
-      ~query:Query.empty
-      ~output:(Data_encoding.list expected_rewards_encoding)
-      expected_issuance_path
 end
+
+let expected_issuance :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Adaptive_issuance_services.expected_rewards list )
+    Tezos_rpc.Service.t =
+  import_service Adaptive_issuance_services.S.expected_issuance
 
 (* Raw services normally represents the context of the Tezos blockchain.
    But because context in Tezlink is different, we need to mock some rpcs
@@ -513,6 +608,18 @@ let contract_info :
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.info
 
+let list_entrypoints :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      Imported_protocol_plugin.Contract_services.S.normalize_types_query,
+      unit,
+      Imported_protocol.Michelson_v1_primitives.prim list list
+      * (string * Alpha_context.Script.expr) list )
+    Tezos_rpc.Service.t =
+  import_service_with_arg
+    Imported_protocol_plugin.Contract_services.S.list_entrypoints
+
 let balance :
     ( [`GET],
       tezlink_rpc_context,
@@ -552,7 +659,7 @@ let constants :
       unit,
       Protocol_types.Alpha_context.Constants.t )
     Tezos_rpc.Service.t =
-  import_service Constants_services.all
+  import_service Imported_protocol_plugin.Constants_services.S.all
 
 let hash :
     ( [`GET],
@@ -562,31 +669,11 @@ let hash :
       unit,
       Block_hash.t )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.hash
+  import_service Current_block_services.S.hash
 
 let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Chain_services.S.chain_id
-
-let header :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Block_services.block_header )
-    Tezos_rpc.Service.t =
-  import_service Block_services.S.header
-
-let shell_header :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Block_header.shell_header )
-    Tezos_rpc.Service.t =
-  import_service Block_services.S.Header.shell_header
 
 let operation_hashes :
     ( [`GET],
@@ -596,7 +683,7 @@ let operation_hashes :
       unit,
       Operation_hash.t list list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Operation_hashes.operation_hashes
+  import_service Current_block_services.S.Operation_hashes.operation_hashes
 
 let operation :
     ( [`GET],
@@ -606,9 +693,23 @@ let operation :
       ; metadata : [`Always | `Never] option
       ; version : Tezos_shell_services.Block_services.version >,
       unit,
-      Tezos_shell_services.Block_services.version * Block_services.operation )
+      Tezos_shell_services.Block_services.version
+      * Current_block_services.operation )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst2 Block_services.S.Operations.operation
+  Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
+
+let operations :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      < force_metadata : bool
+      ; metadata : [`Always | `Never] option
+      ; version : Tezlink_protocols.Shell_impl.version >,
+      unit,
+      Tezos_shell_services.Block_services.version
+      * Current_block_services.operation list list )
+    Tezos_rpc.Service.t =
+  import_service Current_block_services.S.Operations.operations
 
 let bootstrapped :
     ( [`GET],
@@ -619,6 +720,18 @@ let bootstrapped :
       Block_hash.t * Time.Protocol.t )
     Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Monitor_services.S.bootstrapped
+
+let is_bootstrapped :
+    ( [`GET],
+      chain,
+      chain,
+      unit,
+      unit,
+      bool
+      * Tezos_shell_services.Chain_validator_worker_state.synchronisation_status
+    )
+    Tezos_rpc.Service.t =
+  import_service Tezos_shell_services.Chain_services.S.is_bootstrapped
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
 (* We need a proper implementation *)
@@ -677,7 +790,7 @@ let preapply_operations :
         * Imported_protocol.operation_receipt)
         list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Helpers.Preapply.operations
+  import_service Current_block_services.S.Helpers.Preapply.operations
 
 let raw_json_cycle :
     ( [`GET],
@@ -688,3 +801,15 @@ let raw_json_cycle :
       Storage_repr.Cycle.storage_cycle )
     Tezos_rpc.Service.t =
   import_service_with_arg Raw_services.cycle
+
+module Forge = struct
+  let operations :
+      ( [`POST],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        Operation.shell_header * Alpha_context.packed_contents_list,
+        bytes )
+      Tezos_rpc.Service.t =
+    import_service Imported_protocol_plugin.RPC.Forge.S.operations
+end

@@ -1211,8 +1211,9 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           let* to_route = peers_to_route sender peers_in_mesh topic in
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
-             Filter out peers from which we already received the message, or an
-             IHave message? *)
+
+         Filter out peers from which we already received the message, or an
+         IHave message? *)
           Route_message {to_route} |> return
       | In_batches _ ->
           let* to_route = peers_to_route sender peers_in_mesh topic in
@@ -1251,7 +1252,8 @@ module Make (C : AUTOMATON_CONFIG) :
           Monad.map_fold
             (fun ( ( ({sender; topic; message_id; message} as received_msg),
                      peers ),
-                   result ) ->
+                   result )
+               ->
               match result with
               | `Valid ->
                   let* () =
@@ -1669,7 +1671,6 @@ module Make (C : AUTOMATON_CONFIG) :
                introducing good scoring peers that may have been gossiping at
                us. This allows us to get out of sticky situations where we are
                stuck with poor peers and also recover from churn of good peers. *)
-
             (* Compute the median peer score in the mesh. *)
             let median_score =
               let sorted_scores =

@@ -249,7 +249,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, source)
              threshold
              keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Client_proto_contracts.Raw_contract_alias.of_fresh
             cctxt
             force
@@ -335,7 +336,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              amount
              (_, destination)
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
           in
@@ -374,7 +376,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              lambda
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression lambda
           >>=? fun {expanded = lambda; _} ->
@@ -407,7 +410,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              delegate
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
@@ -433,7 +437,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun ()
              (_, multisig_contract)
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
@@ -465,7 +470,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              sk
              new_threshold
              new_keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           List.map_es
             (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys
@@ -524,7 +530,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, destination)
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
           in
@@ -619,7 +626,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              lambda
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -702,7 +710,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              delegate
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -777,7 +786,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -856,7 +866,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              new_keys
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -949,7 +960,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              (_, source)
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None ->
               failwith
@@ -1017,7 +1029,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              amount
              (_, destination)
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
           in
@@ -1053,7 +1066,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun bytes_only
              (_, multisig_contract)
              lambda
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression lambda
           >>=? fun {expanded = lambda; _} ->
@@ -1084,7 +1098,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun bytes_only
              (_, multisig_contract)
              new_delegate
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
@@ -1108,7 +1123,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         @@ stop)
         (fun bytes_only
              (_, multisig_contract)
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           Client_proto_multisig.prepare_multisig_transaction
             cctxt
             ~chain:cctxt#chain
@@ -1136,7 +1152,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              (_, multisig_contract)
              new_threshold
              new_keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           List.map_es
             (fun (pk_uri, _) -> Client_keys_v0.public_key pk_uri)
             new_keys

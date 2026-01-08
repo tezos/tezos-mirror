@@ -45,7 +45,6 @@ type error +=
   | Invalid_transfer_to_sc_rollup
   | Invalid_sender of Destination.t
   | Invalid_self_transaction_destination
-  | Staking_for_delegator_while_external_staking_disabled
   | Staking_to_delegate_that_refuses_external_staking
   | Stake_modification_with_no_delegate_set
   | Invalid_nonzero_transaction_amount of Tez.t
@@ -231,25 +230,6 @@ let () =
     Data_encoding.unit
     (function Invalid_self_transaction_destination -> Some () | _ -> None)
     (fun () -> Invalid_self_transaction_destination) ;
-  let staking_for_delegator_while_external_staking_disabled_description =
-    "As long as external staking is not enabled, staking operations are only \
-     allowed from delegates."
-  in
-  register_error_kind
-    `Permanent
-    ~id:"operations.staking_for_delegator_while_external_staking_disabled"
-    ~title:"Staking for a delegator while external staking is disabled"
-    ~description:
-      staking_for_delegator_while_external_staking_disabled_description
-    ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        staking_for_delegator_while_external_staking_disabled_description)
-    Data_encoding.unit
-    (function
-      | Staking_for_delegator_while_external_staking_disabled -> Some ()
-      | _ -> None)
-    (fun () -> Staking_for_delegator_while_external_staking_disabled) ;
   let stake_modification_without_delegate_description =
     "(Un)Stake operations are only allowed when delegate is set."
   in
@@ -377,6 +357,7 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -396,15 +377,6 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
   match delegate_opt with
   | None -> tzfail Stake_modification_with_no_delegate_set
   | Some delegate ->
-      let allowed =
-        Signature.Public_key_hash.(delegate = sender)
-        || Constants.adaptive_issuance_enable ctxt
-      in
-      let*? () =
-        error_unless
-          allowed
-          Staking_for_delegator_while_external_staking_disabled
-      in
       let* {limit_of_staking_over_baking_millionth; _} =
         Delegate.Staking_parameters.of_delegate ctxt delegate
       in
@@ -432,6 +404,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
             storage_size = Z.zero;
             paid_storage_size_diff = Z.zero;
             allocated_destination_contract;
+            address_registry_diff = [];
           }
       in
       return (ctxt, result, [])
@@ -464,6 +437,7 @@ let apply_unstake ~ctxt ~sender ~amount ~destination ~before_operation =
             storage_size = Z.zero;
             paid_storage_size_diff = Z.zero;
             allocated_destination_contract = false;
+            address_registry_diff = [];
           }
       in
       return (ctxt, result, [])
@@ -489,6 +463,7 @@ let apply_finalize_unstake ~ctxt ~amount ~destination ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -525,6 +500,7 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = false;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -583,12 +559,13 @@ let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
           storage_size = Z.zero;
           paid_storage_size_diff = Z.zero;
           allocated_destination_contract = not already_allocated;
+          address_registry_diff = [];
         },
       [] )
 
 let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter ~script
-    ~script_ir ~cache_key ?(paid_storage_diff_acc = Z.zero)
+    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter
+    ~(script : Script.t) ~script_ir ~cache_key ?(paid_storage_diff_acc = Z.zero)
     ?(ticket_receipt_acc = []) () =
   let open Lwt_result_syntax in
   let contract = Contract.Originated contract_hash in
@@ -628,6 +605,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
            operations;
            ticket_diffs;
            ticket_receipt;
+           address_registry_diff;
          },
          ctxt ) =
     execute
@@ -659,11 +637,18 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
   let* originated_contracts =
     Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
   in
+  let updated_script =
+    match script with
+    | Script.Script script ->
+        Script.Script {script with storage = Script.lazy_expr storage}
+    | Script.Native native ->
+        Native {native with storage = Script.lazy_expr storage}
+  in
   let*? ctxt =
     Script_cache.update
       ctxt
       cache_key
-      ({script with storage = Script.lazy_expr storage}, updated_cached_script)
+      (updated_script, updated_cached_script)
       updated_size
   in
   let result =
@@ -686,6 +671,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
               paid_storage_diff_acc
               (add contract_paid_storage_size_diff ticket_paid_storage_diff));
         allocated_destination_contract = false;
+        address_registry_diff;
       }
   in
   return (ctxt, result, operations)
@@ -776,8 +762,7 @@ let find_contract_from_cache ctxt contract_hash =
   | None -> tzfail (Contract.Non_existing_contract (Originated contract_hash))
   | Some (script, script_ir) -> return (ctxt, (cache_key, script, script_ir))
 
-let apply_internal_operation_contents :
-    type kind.
+let apply_internal_operation_contents : type kind.
     context ->
     payer:public_key_hash ->
     sender:Destination.t ->
@@ -976,8 +961,7 @@ let apply_internal_operation_contents :
         in
         (ctxt, IDelegation_result {consumed_gas; balance_updates}, ops)
 
-let apply_manager_operation :
-    type kind.
+let apply_manager_operation : type kind.
     context ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
@@ -1362,7 +1346,7 @@ let apply_manager_operation :
             ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
             ~allow_forged_tickets_in_storage:false
             ~allow_forged_lazy_storage_id_in_storage:false
-            script
+            (Script script)
         in
         let (Script {storage_type; views; storage; _}) = parsed_script in
         let views_result =
@@ -1755,6 +1739,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               paid_storage_size_diff = payload.paid_storage_size_diff;
               allocated_destination_contract =
                 payload.allocated_destination_contract;
+              address_registry_diff = payload.address_registry_diff;
             } )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
   | Transaction_to_zk_rollup_result payload ->
@@ -1803,8 +1788,7 @@ let burn_origination_storage_fees ctxt
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
-let burn_manager_storage_fees :
-    type kind.
+let burn_manager_storage_fees : type kind.
     context ->
     kind successful_manager_operation_result ->
     storage_limit:Z.t ->
@@ -1928,8 +1912,7 @@ let burn_manager_storage_fees :
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
-let burn_internal_storage_fees :
-    type kind.
+let burn_internal_storage_fees : type kind.
     context ->
     kind successful_internal_operation_result ->
     storage_limit:Z.t ->
@@ -2060,8 +2043,7 @@ type _ fees_updated_contents_list =
       * 'rest Kind.manager fees_updated_contents_list
       -> ('kind * 'rest) Kind.manager fees_updated_contents_list
 
-let rec mark_skipped :
-    type kind.
+let rec mark_skipped : type kind.
     payload_producer:Consensus_key.t ->
     Level.t ->
     kind Kind.manager fees_updated_contents_list ->
@@ -2104,8 +2086,7 @@ let rec mark_skipped :
    [take_fees] cannot return an error. *)
 let take_fees ctxt contents_list =
   let open Lwt_result_syntax in
-  let rec take_fees_rec :
-      type kind.
+  let rec take_fees_rec : type kind.
       context ->
       kind Kind.manager contents_list ->
       (context * kind Kind.manager fees_updated_contents_list) tzresult Lwt.t =
@@ -2135,8 +2116,7 @@ let take_fees ctxt contents_list =
   let*! result = take_fees_rec ctxt contents_list in
   Lwt.return (record_trace Error_while_taking_fees result)
 
-let rec apply_manager_contents_list_rec :
-    type kind.
+let rec apply_manager_contents_list_rec : type kind.
     context ->
     payload_producer:Consensus_key.t ->
     Chain_id.t ->
@@ -2148,7 +2128,8 @@ let rec apply_manager_contents_list_rec :
       ~payload_producer
       chain_id
       ~consume_gas_for_sig_check
-      fees_updated_contents_list ->
+      fees_updated_contents_list
+    ->
     let level = Level.current ctxt in
     match fees_updated_contents_list with
     | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates}
@@ -2192,19 +2173,16 @@ let rec apply_manager_contents_list_rec :
             (ctxt_result, Cons_result (result, results)))
 
 let mark_backtracked results =
-  let mark_results :
-      type kind.
+  let mark_results : type kind.
       kind Kind.manager contents_result -> kind Kind.manager contents_result =
    fun results ->
-    let mark_manager_operation_result :
-        type kind.
+    let mark_manager_operation_result : type kind.
         kind manager_operation_result -> kind manager_operation_result =
       function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
-    let mark_internal_operation_result :
-        type kind.
+    let mark_internal_operation_result : type kind.
         kind internal_operation_result -> kind internal_operation_result =
       function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
@@ -2226,8 +2204,7 @@ let mark_backtracked results =
                 op.internal_operation_results;
           }
   in
-  let rec traverse_apply_results :
-      type kind.
+  let rec traverse_apply_results : type kind.
       kind Kind.manager contents_result_list ->
       kind Kind.manager contents_result_list = function
     | Single_result res -> Single_result (mark_results res)
@@ -2263,8 +2240,6 @@ type application_state = {
   op_count : int;
   migration_balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
-  adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
 }
@@ -2293,8 +2268,7 @@ let find_in_slot_map slot slot_map =
       | None ->
           (* This should not happen: operation validation should have failed. *)
           tzfail Faulty_validation_wrong_slot
-      | Some (consensus_key, power, dal_power) ->
-          return (consensus_key, power, dal_power))
+      | Some x -> return x)
 
 let record_preattestation ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
@@ -2309,6 +2283,12 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   let mk_preattestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:content.level
+        consensus_power
+    in
     Single_result
       (Preattestation_result
          {
@@ -2320,17 +2300,17 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power, _dal_power =
+      let*? {consensus_key; attesting_power; dal_power = _} =
         find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
         Consensus.record_preattestation
           ctxt
           ~initial_slot:content.slot
-          ~power
+          ~power:attesting_power
           content.round
       in
-      return (ctxt, mk_preattestation_result consensus_key power)
+      return (ctxt, mk_preattestation_result consensus_key attesting_power)
   | Partial_construction _ ->
       (* In mempool mode, preattestations are allowed for various levels
          and rounds. We do not record preattestations because we could get
@@ -2340,19 +2320,39 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
          preattestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
-        let level = Level.from_raw ctxt content.level in
-        Stake_distribution.slot_owner ctxt level content.slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:(Level.from_raw ctxt content.level)
+          content.slot
       in
-      return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
+      return
+        ( ctxt,
+          mk_preattestation_result
+            consensus_key
+            Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt slot ~dal_power = function
-  | None -> Result.return ctxt
+let record_dal_content ctxt level slot ~dal_power dal_content =
+  let open Lwt_result_syntax in
+  match dal_content with
+  | None -> return ctxt
   | Some {attestation} ->
-      Dal_apply.apply_attestation
-        ctxt
-        ~tb_slot:slot
-        attestation
-        ~power:dal_power
+      let* proto_activation_level = Protocol_activation_level.get ctxt in
+      let lag = Constants.dal_attestation_lag ctxt in
+      let attestation =
+        if Raw_level.(level < add proto_activation_level lag) then
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+             CODE TO BE REVERTED IN PROTOCOL V *)
+          Dal.Attestation.empty
+        else attestation
+      in
+      let*? ctxt =
+        Dal_apply.apply_attestation
+          ctxt
+          ~tb_slot:slot
+          attestation
+          ~power:dal_power
+      in
+      return ctxt
 
 let record_attestation ctxt (mode : mode) (consensus : consensus_content)
     (dal : dal_content option) :
@@ -2360,6 +2360,12 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   let open Lwt_result_syntax in
   let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:consensus.level
+        consensus_power
+    in
     Single_result
       (Attestation_result
          {
@@ -2371,14 +2377,19 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power, dal_power =
+      let*? {consensus_key; attesting_power; dal_power} =
         find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_attestation ctxt ~initial_slot:consensus.slot ~power
+        Consensus.record_attestation
+          ctxt
+          ~initial_slot:consensus.slot
+          ~power:attesting_power
       in
-      let*? ctxt = record_dal_content ctxt consensus.slot ~dal_power dal in
-      return (ctxt, mk_attestation_result consensus_key power)
+      let* ctxt =
+        record_dal_content ctxt consensus.level consensus.slot ~dal_power dal
+      in
+      return (ctxt, mk_attestation_result consensus_key attesting_power)
   | Partial_construction _ ->
       (* In mempool mode, attestations are allowed for various levels
          and rounds. We do not record attestations because we could get
@@ -2388,34 +2399,62 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
          attestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
-        let level = Level.from_raw ctxt consensus.level in
-        Stake_distribution.slot_owner ctxt level consensus.slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:(Level.from_raw ctxt consensus.level)
+          consensus.slot
       in
-      return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
+      return
+        ( ctxt,
+          mk_attestation_result
+            consensus_key
+            Attesting_power.zero (* Fake power. *) )
 
-let record_attestations_aggregate ctxt (mode : mode) committee :
+let record_attestations_aggregate ctxt (mode : mode)
+    (content : consensus_aggregate_content) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
     =
   let open Lwt_result_syntax in
   match mode with
   | Application _ | Full_construction _ ->
       let slot_map = Consensus.allowed_attestations ctxt in
-      let*? ctxt, rev_committee, total_consensus_power =
-        let open Result_syntax in
-        List.fold_left_e
+      let* ctxt, rev_committee, total_consensus_power =
+        List.fold_left_es
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
-            let* {delegate; consensus_pkh; _}, power, dal_power =
+            let*? {
+                    consensus_key = {delegate; consensus_pkh; _};
+                    attesting_power;
+                    dal_power;
+                  } =
               find_in_slot_map slot slot_map
             in
-            let* ctxt =
-              Consensus.record_attestation ctxt ~initial_slot:slot ~power
+            let*? ctxt =
+              Consensus.record_attestation
+                ctxt
+                ~initial_slot:slot
+                ~power:attesting_power
             in
-            let* ctxt = record_dal_content ctxt slot ~dal_power dal in
+            let* ctxt =
+              record_dal_content ctxt content.level slot ~dal_power dal
+            in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
-              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
-          (ctxt, [], 0)
+              ( ctxt,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
+                Attesting_power.add attesting_power consensus_power ))
+          (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Attestations_aggregate_result
@@ -2453,21 +2492,38 @@ let record_preattestations_aggregate ctxt (mode : mode)
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) slot ->
-            let* {delegate; consensus_pkh; _}, power, _dal_power =
+            let* {
+                   consensus_key = {delegate; consensus_pkh; _};
+                   attesting_power;
+                   dal_power = _;
+                 } =
               find_in_slot_map slot slot_map
             in
             let* ctxt =
               Consensus.record_preattestation
                 ctxt
                 ~initial_slot:slot
-                ~power
+                ~power:attesting_power
                 round
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
-              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
-          (ctxt, [], 0)
+              ( ctxt,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
+                Attesting_power.add attesting_power consensus_power ))
+          (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Preattestations_aggregate_result
@@ -2521,7 +2577,7 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
+let punish_double_signing ctxt ~operation_hash delegate misbehaviour
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded_delegate = payload_producer.Consensus_key.delegate in
@@ -2531,7 +2587,6 @@ let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
       ~operation_hash
       misbehaviour
       delegate
-      level
       ~rewarded:rewarded_delegate
   in
   let contents_result =
@@ -2539,8 +2594,8 @@ let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
   in
   return (ctxt, contents_result)
 
-let punish_double_consensus_operation (type kind) ctxt ~operation_hash
-    ~payload_producer contents =
+let punish_double_consensus_operation ctxt ~operation_hash ~payload_producer
+    contents =
   let open Lwt_result_syntax in
   let (Double_consensus_operation_evidence {slot; op1; op2 = _}) = contents in
   let misbehaviour =
@@ -2555,14 +2610,17 @@ let punish_double_consensus_operation (type kind) ctxt ~operation_hash
         | Attestations_aggregate {consensus_content = {level; round; _}; _} ) ->
         Misbehaviour.{level; round; kind = Double_attesting}
   in
-  let level = Level.from_raw ctxt misbehaviour.level in
-  let* ctxt, {delegate; _} = Stake_distribution.slot_owner ctxt level slot in
+  let* ctxt, {delegate; _} =
+    Stake_distribution.attestation_slot_owner
+      ctxt
+      ~attested_level:(Level.from_raw ctxt misbehaviour.level)
+      slot
+  in
   let* ctxt, contents_result =
     punish_double_signing
       ctxt
       ~operation_hash
       delegate
-      level
       misbehaviour
       ~payload_producer
   in
@@ -2586,7 +2644,6 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
       ctxt
       ~operation_hash
       delegate
-      level
       {level = raw_level; round; kind = Double_baking}
       ~payload_producer
   in
@@ -2614,13 +2671,13 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
       record_preattestations_aggregate ctxt mode consensus_content committee
-  | Single (Attestations_aggregate {committee; _}) ->
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
       let*? () =
         error_unless
           (Constants.aggregate_attestation ctxt)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
-      record_attestations_aggregate ctxt mode committee
+      record_attestations_aggregate ctxt mode consensus_content committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in
@@ -2657,19 +2714,22 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single
       (Dal_entrapment_evidence {attestation; consensus_slot; slot_index; _}) ->
       let (Single
-            (* Note that since the evidence has been successfully
+             (* Note that since the evidence has been successfully
                validated, [attestation] cannot be a preattestation or
                preattestations aggregate (also [consensus_slot] is
                consistent, and [slot_index] is an attested trap, etc.) *)
-            ( Preattestation {level; _}
-            | Attestation {consensus_content = {level; _}; _}
-            | Preattestations_aggregate {consensus_content = {level; _}; _}
-            | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+             ( Preattestation {level; _}
+             | Attestation {consensus_content = {level; _}; _}
+             | Preattestations_aggregate {consensus_content = {level; _}; _}
+             | Attestations_aggregate {consensus_content = {level; _}; _} )) =
         attestation.protocol_data.contents
       in
       let level = Level.from_raw ctxt level in
       let* ctxt, consensus_pk =
-        Stake_distribution.slot_owner ctxt level consensus_slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:level
+          consensus_slot
       in
       let delegate = consensus_pk.delegate in
       let*! ctxt, _already_denounced =
@@ -2703,8 +2763,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         Token.transfer
           ctxt
           (`Contract (Contract.Implicit delegate))
-          (`Contract
-            (Contract.Implicit payload_producer.Consensus_key.delegate))
+          (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
           fees
       in
       let balance_updates = drain_balance_updates @ fees_balance_updates in
@@ -2875,6 +2934,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                      operations;
                      ticket_diffs;
                      ticket_receipt;
+                     address_registry_diff;
                    },
                    ctxt ) =
               Script_interpreter.execute_with_typed_parameter
@@ -2917,12 +2977,19 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                 let consumed_gas =
                   Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                 in
+                let updated_script =
+                  match script with
+                  | Script.Script script ->
+                      Script.Script
+                        {script with storage = Script.lazy_expr storage}
+                  | Script.Native native ->
+                      Native {native with storage = Script.lazy_expr storage}
+                in
                 let*? ctxt =
                   Script_cache.update
                     ctxt
                     cache_key
-                    ( {script with storage = Script.lazy_expr storage},
-                      updated_cached_script )
+                    (updated_script, updated_cached_script)
                     updated_size
                 in
                 let result =
@@ -2944,6 +3011,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                          paid_storage_size_diff =
                            Z.add paid_storage_size_diff ticket_paid_storage_diff;
                          allocated_destination_contract = false;
+                         address_registry_diff;
                        })
                 in
                 let ctxt = Gas.set_unlimited ctxt in
@@ -2959,7 +3027,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
 
 let are_attestations_required ctxt ~level =
   let open Lwt_result_syntax in
-  let+ first_level = First_level_of_protocol.get ctxt in
+  let+ first_level = Protocol_activation_level.get ctxt in
   (* NB: the first level is the level of the migration block. There
      are no attestations for this block. Therefore the block at the
      next level cannot contain attestations. *)
@@ -2974,8 +3042,9 @@ let record_attesting_participation ctxt dal_attestation =
   | Some validators ->
       Slot.Map.fold_es
         (fun initial_slot
-             ((consensus_pk : Consensus_key.pk), power, dal_power)
-             ctxt ->
+             ({consensus_key; attesting_power; dal_power} : Consensus_key.power)
+             ctxt
+           ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
               Delegate.Participated
@@ -2984,13 +3053,13 @@ let record_attesting_participation ctxt dal_attestation =
           let* ctxt =
             Delegate.record_attesting_participation
               ctxt
-              ~delegate:consensus_pk.delegate
+              ~delegate:consensus_key.delegate
               ~participation
-              ~attesting_power:power
+              ~attesting_slots:(Attesting_power.get_slots attesting_power)
           in
           Dal_apply.record_participation
             ctxt
-            consensus_pk.delegate
+            consensus_key.delegate
             initial_slot
             ~dal_power
             dal_attestation)
@@ -3024,13 +3093,6 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote =
-      block_header.Block_header.protocol_data.contents.per_block_votes
-        .adaptive_issuance_vote
-    in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
-  in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info
       ~predecessor:block_header.shell.predecessor
@@ -3055,8 +3117,6 @@ let begin_application ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_issuance_vote_ema;
-      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -3094,12 +3154,6 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
   in
-  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote =
-      block_data_contents.per_block_votes.adaptive_issuance_vote
-    in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
-  in
   let* ctxt =
     Sc_rollup.Inbox.add_level_info ~predecessor:predecessor_hash ctxt
   in
@@ -3123,8 +3177,6 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_issuance_vote_ema;
-      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -3138,10 +3190,6 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let per_block_vote = Per_block_votes.Per_block_vote_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~per_block_vote
-  in
-  let* ctxt, adaptive_issuance_launch_cycle, adaptive_issuance_vote_ema =
-    let adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass in
-    Adaptive_issuance.update_ema ctxt ~vote:adaptive_issuance_vote
   in
   let* ctxt =
     (* The mode [Partial_construction] is used in simulation. We try to
@@ -3161,8 +3209,6 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
       op_count = 0;
       migration_balance_updates;
       liquidity_baking_toggle_ema;
-      adaptive_issuance_vote_ema;
-      adaptive_issuance_launch_cycle;
       implicit_operations_results =
         Apply_results.pack_migration_operation_results
           migration_operation_results
@@ -3170,8 +3216,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     }
 
 let finalize_application ctxt block_data_contents ~round ~predecessor_hash
-    ~liquidity_baking_toggle_ema ~adaptive_issuance_vote_ema
-    ~adaptive_issuance_launch_cycle ~implicit_operations_results
+    ~liquidity_baking_toggle_ema ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
@@ -3182,11 +3227,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Gas.block_level ctxt)
   in
-  let level = Level.current ctxt in
-  let attestation_power = Consensus.current_attestation_power ctxt in
-  let* required_attestations =
-    are_attestations_required ctxt ~level:level.level
-  in
+  let current_level = Level.current ctxt in
+  let attesting_power = Consensus.current_attesting_power ctxt in
   let block_payload_hash =
     Block_payload.hash
       ~predecessor_hash
@@ -3209,7 +3251,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     if Round.(round = zero) then Consecutive_round_zero.incr ctxt
     else Consecutive_round_zero.reset ctxt
   in
-  (* end of level  *)
+  (* end of level *)
   let* ctxt =
     match block_data_contents.Block_header.seed_nonce_hash with
     | None -> return ctxt
@@ -3217,14 +3259,65 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let* ctxt, reward_bonus =
+  let* ctxt, reward_bonus, attestation_result =
+    let* required_attestations =
+      are_attestations_required ctxt ~level:current_level.level
+    in
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
-      let*? rewards_bonus =
-        Baking.bonus_baking_reward ctxt ~attestation_power
-      in
-      return (ctxt, Some rewards_bonus)
-    else return (ctxt, None)
+      (* The attested level is the predecessor of the block's level. *)
+      match Level.pred ctxt current_level with
+      | None ->
+          (* This cannot happen because [required_attestations = true]
+             ensures that [current_level >= 2]. *)
+          assert false
+      | Some attested_level ->
+          let* ctxt, rewards_bonus =
+            Baking.bonus_baking_reward ctxt ~attested_level ~attesting_power
+          in
+          let* ctxt, consensus_committee =
+            Attesting_power.consensus_committee ctxt ~attested_level
+          in
+          let* ctxt, consensus_threshold =
+            Attesting_power.consensus_threshold ctxt ~attested_level
+          in
+          let consensus_recorded_power =
+            Attesting_power.get ctxt ~attested_level attesting_power
+          in
+          return
+            ( ctxt,
+              Some rewards_bonus,
+              Some
+                {
+                  consensus_committee;
+                  consensus_threshold;
+                  consensus_recorded_power;
+                } )
+    else return (ctxt, None, None)
+  in
+  let* ctxt, preattestation_result =
+    let lre = Consensus.locked_round_evidence ctxt in
+    match lre with
+    | None -> return (ctxt, None)
+    | Some (_round, preattesting_power) ->
+        let attested_level = current_level in
+        let* ctxt, consensus_committee =
+          Attesting_power.consensus_committee ctxt ~attested_level
+        in
+        let* ctxt, consensus_threshold =
+          Attesting_power.consensus_threshold ctxt ~attested_level
+        in
+        let consensus_recorded_power =
+          Attesting_power.get ctxt ~attested_level preattesting_power
+        in
+        return
+          ( ctxt,
+            Some
+              {
+                consensus_committee;
+                consensus_threshold;
+                consensus_recorded_power;
+              } )
   in
   let*? baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
   let* ctxt, baking_receipts =
@@ -3249,22 +3342,26 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
   let+ voting_period_info = Voting_period.get_rpc_current_info ctxt in
+  let abaab_activation_level =
+    Attesting_power.all_bakers_attest_activation_level ctxt
+  in
   let receipt =
     Apply_results.
       {
         proposer = payload_producer;
         baker = block_producer;
-        level_info = level;
+        level_info = current_level;
         voting_period_info;
         nonce_hash = block_data_contents.seed_nonce_hash;
         consumed_gas;
         deactivated;
         balance_updates;
         liquidity_baking_toggle_ema;
-        adaptive_issuance_vote_ema;
-        adaptive_issuance_launch_cycle;
         implicit_operations_results;
         dal_attestation;
+        abaab_activation_level;
+        attestations = attestation_result;
+        preattestations = preattestation_result;
       }
   in
   (ctxt, receipt)
@@ -3312,8 +3409,6 @@ let finalize_block (application_state : application_state) shell_header_opt =
   let {
     ctxt;
     liquidity_baking_toggle_ema;
-    adaptive_issuance_vote_ema;
-    adaptive_issuance_launch_cycle;
     implicit_operations_results;
     migration_balance_updates;
     op_count;
@@ -3354,8 +3449,6 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash
           ~liquidity_baking_toggle_ema
-          ~adaptive_issuance_vote_ema
-          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer
@@ -3386,10 +3479,11 @@ let finalize_block (application_state : application_state) shell_header_opt =
               deactivated = [];
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
-              adaptive_issuance_vote_ema;
-              adaptive_issuance_launch_cycle;
               implicit_operations_results;
               dal_attestation = Dal.Attestation.empty;
+              abaab_activation_level = None;
+              attestations = None;
+              preattestations = None;
             } )
   | Application
       {
@@ -3410,8 +3504,6 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ~round
           ~predecessor_hash:shell.predecessor
           ~liquidity_baking_toggle_ema
-          ~adaptive_issuance_vote_ema
-          ~adaptive_issuance_launch_cycle
           ~implicit_operations_results
           ~migration_balance_updates
           ~block_producer

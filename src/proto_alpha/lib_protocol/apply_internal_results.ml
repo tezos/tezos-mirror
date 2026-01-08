@@ -37,7 +37,7 @@ type 'kind internal_operation_contents =
       -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
-      script : Script.t;
+      script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination internal_operation_contents
@@ -142,6 +142,7 @@ type successful_transaction_result =
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
+      address_registry_diff : Address_registry.diff list;
     }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
@@ -239,7 +240,7 @@ module Internal_operation = struct
         case
           ~title:"To_contract"
           (Tag 0)
-          (obj9
+          (obj10
              (opt "storage" Script.expr_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (dft "ticket_receipt" Ticket_receipt.encoding [])
@@ -248,7 +249,8 @@ module Internal_operation = struct
              (dft "storage_size" z Z.zero)
              (dft "paid_storage_size_diff" z Z.zero)
              (dft "allocated_destination_contract" bool false)
-             (opt "lazy_storage_diff" Lazy_storage.encoding))
+             (opt "lazy_storage_diff" Lazy_storage.encoding)
+             (dft "address_registry_diff" (list Address_registry.encoding) []))
           (function
             | Transaction_to_contract_result
                 {
@@ -261,6 +263,7 @@ module Internal_operation = struct
                   storage_size;
                   paid_storage_size_diff;
                   allocated_destination_contract;
+                  address_registry_diff;
                 } ->
                 Some
                   ( storage,
@@ -271,7 +274,8 @@ module Internal_operation = struct
                     storage_size,
                     paid_storage_size_diff,
                     allocated_destination_contract,
-                    lazy_storage_diff )
+                    lazy_storage_diff,
+                    address_registry_diff )
             | _ -> None)
           (fun ( storage,
                  balance_updates,
@@ -281,7 +285,9 @@ module Internal_operation = struct
                  storage_size,
                  paid_storage_size_diff,
                  allocated_destination_contract,
-                 lazy_storage_diff ) ->
+                 lazy_storage_diff,
+                 address_registry_diff )
+             ->
             Transaction_to_contract_result
               {
                 storage;
@@ -293,6 +299,7 @@ module Internal_operation = struct
                 storage_size;
                 paid_storage_size_diff;
                 allocated_destination_contract;
+                address_registry_diff;
               });
         case
           ~title:"To_smart_rollup"
@@ -306,7 +313,7 @@ module Internal_operation = struct
             | _ -> None)
           (function
             | consumed_gas, ticket_receipt ->
-                Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
+            Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
       ]
 
   let transaction_case =
@@ -367,7 +374,7 @@ module Internal_operation = struct
           obj3
             (req "balance" Tez.encoding)
             (opt "delegate" Signature.Public_key_hash.encoding)
-            (req "script" Script.encoding);
+            (req "script" Script.michelson_with_storage_encoding);
         iselect : Kind.origination iselect =
           (function
           | Internal_operation_result
@@ -427,7 +434,8 @@ module Internal_operation = struct
           | _ -> None);
         select =
           (function
-          | Internal_operation_contents (Event _ as op) -> Some op | _ -> None);
+          | Internal_operation_contents (Event _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Event {ty; tag; payload} ->

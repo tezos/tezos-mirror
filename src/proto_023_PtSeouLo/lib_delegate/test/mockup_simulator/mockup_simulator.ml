@@ -911,11 +911,11 @@ class tezt_printer : Tezos_client_base.Client_context.printer =
   let open Client_context in
   let wrap_tezt_log : (_ format4 -> _) -> _ format4 -> _ =
    fun f x ->
-    Format.kasprintf
-      (fun msg ->
-        f "%s" msg ;
-        Lwt.return_unit)
-      x
+     Format.kasprintf
+       (fun msg ->
+         f "%s" msg ;
+         Lwt.return_unit)
+       x
   in
   object
     method error : type a b. (a, b) lwt_format -> a =
@@ -965,7 +965,8 @@ let baker_process ~(delegates : Baking_state_types.Key.t list) ~base_dir
   let*! () = User_hooks.on_start_baker ~baker_position:i ~delegates ~cctxt in
   let* () =
     List.iter_es
-      (fun ({alias; public_key; id; secret_key_uri} : Baking_state_types.Key.t) ->
+      (fun ({alias; public_key; id; secret_key_uri} : Baking_state_types.Key.t)
+         ->
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
         let pkh = Baking_state_types.Key_id.to_pkh id in
         Client_keys.register_key
@@ -1019,9 +1020,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
       Protocol.Per_block_votes_repr.liquidity_baking_vote =
         Baking_configuration.default_votes_config
           .Baking_configuration.liquidity_baking_vote;
-      adaptive_issuance_vote =
-        Baking_configuration.default_votes_config
-          .Baking_configuration.adaptive_issuance_vote;
+      adaptive_issuance_vote = Per_block_vote_pass;
     }
   in
   let contents =

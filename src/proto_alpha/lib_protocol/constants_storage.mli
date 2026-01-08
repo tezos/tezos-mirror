@@ -130,6 +130,8 @@ val dal_number_of_slots : Raw_context.t -> int
 
 val dal_number_of_shards : Raw_context.t -> int
 
+val dal_attestation_lag : Raw_context.t -> int
+
 val dal_enable : Raw_context.t -> bool
 
 val zk_rollup_enable : Raw_context.t -> bool
@@ -139,8 +141,6 @@ val zk_rollup_min_pending_to_process : Raw_context.t -> int
 val zk_rollup_origination_size : Raw_context.t -> int
 
 val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
-
-val adaptive_issuance_enable : Raw_context.t -> bool
 
 val adaptive_issuance_global_limit_of_staking_over_baking : Raw_context.t -> int
 
@@ -164,11 +164,15 @@ val tolerated_inactivity_period : Raw_context.t -> int
 (* attestation aggregation feature flag *)
 val aggregate_attestation : Raw_context.t -> bool
 
-val all_bakers_attest_activation_level :
-  Raw_context.t -> Raw_level_repr.t option
+val all_bakers_attest_activation_threshold : Raw_context.t -> Ratio_repr.t
+
+val all_bakers_attest_first_level : Raw_context.t -> Level_repr.t option
 
 (** See {!Raw_context.round_durations}. *)
 val round_durations : Raw_context.t -> Round_repr.Durations.t
+
+(** Native contracts feature flag *)
+val native_contracts_enable : Raw_context.t -> bool
 
 (** Builds a representation of all constants (fixed and parametric)
     from the context. *)

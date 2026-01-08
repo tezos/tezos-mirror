@@ -26,7 +26,8 @@
 
 type error +=
   | (* `Temporary *)
-      Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
+      Balance_too_low of
+      Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
@@ -40,9 +41,11 @@ type error +=
       found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.t
+      Non_existing_contract of
+      Contract_repr.t
   | (* `Branch *)
-      Empty_implicit_contract of Signature.Public_key_hash.t
+      Empty_implicit_contract of
+      Signature.Public_key_hash.t
   | (* `Branch *)
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
@@ -443,6 +446,29 @@ let raw_originate c ~prepaid_bootstrap_storage
   in
   Storage.Contract.Used_storage_space.init c contract total_size
 
+let native_originate ctxt contract ~script =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Originated contract in
+  let* ctxt =
+    Storage.Contract.Spendable_balance.init ctxt contract Tez_repr.zero
+  in
+  let {Script_native_repr.kind; storage}, lazy_storage_diff = script in
+  let* ctxt, kind_size = Storage.Contract.Native.init ctxt contract kind in
+  let* ctxt, storage_size =
+    Storage.Contract.Storage.init ctxt contract storage
+  in
+  let* ctxt, lazy_storage_size =
+    update_script_lazy_storage ctxt lazy_storage_diff
+  in
+  let total_size =
+    Z.add (Z.add (Z.of_int kind_size) (Z.of_int storage_size)) lazy_storage_size
+  in
+  assert (Compare.Z.(total_size >= Z.zero)) ;
+  let* ctxt =
+    Storage.Contract.Paid_storage_space.init ctxt contract total_size
+  in
+  Storage.Contract.Used_storage_space.init ctxt contract total_size
+
 let create_implicit c manager ~balance =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit manager in
@@ -503,8 +529,6 @@ let must_be_allocated c contract =
       | Implicit pkh -> tzfail (Empty_implicit_contract pkh)
       | Originated _ -> tzfail (Non_existing_contract contract))
 
-let list c = Storage.Contract.list c
-
 let fresh_contract_from_current_nonce c =
   let open Result_syntax in
   let+ c, nonce = Raw_context.increment_origination_nonce c in
@@ -557,8 +581,16 @@ let get_script c contract_hash =
   let* c, storage = Storage.Contract.Storage.find c contract in
   match (code, storage) with
   | None, None -> return (c, None)
-  | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
-  | None, Some _ | Some _, None -> failwith "get_script"
+  | Some code, Some storage ->
+      return (c, Some (Contract_repr.Script {Script_repr.code; storage}))
+  | None, Some storage -> (
+      let* c, native_kind = Storage.Contract.Native.find c contract in
+      match native_kind with
+      | None -> return (c, None)
+      | Some native_kind ->
+          return (c, Some (Contract_repr.Native {kind = native_kind; storage})))
+  (* A contract without storage is an illformed contract. *)
+  | Some _, None -> failwith "get_script"
 
 let get_storage ctxt contract_hash =
   let open Lwt_result_syntax in
@@ -858,6 +890,10 @@ let simulate_spending ctxt ~balance ~amount source =
 let get_total_supply ctxt = Storage.Contract.Total_supply.get ctxt
 
 module For_RPC = struct
+  let list c = Storage.Contract.list c
+
+  let fold c = Storage.Contract.fold c
+
   let get_staked_balance ctxt =
     let open Lwt_result_syntax in
     function

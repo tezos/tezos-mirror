@@ -26,7 +26,9 @@ val env_exn : unit -> Eio_unix.Stdenv.base
 
 (** Retrieve the main switch for the current [main_run] being executed.
     The returned switch must not escape the scope of this [main_run]
-    execution.
+    execution. Call only from the main domain; code running off-main should
+    schedule work via {!Tezos_bees.Hive.run_on_main} or an equivalent helper to
+    avoid deadlocking while waiting for the switch.
 
     Ideally, an Eio-based function that needs to allocate resources locally
     should create its own switch to have better control over resource usage.

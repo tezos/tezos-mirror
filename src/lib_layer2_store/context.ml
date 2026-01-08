@@ -58,8 +58,7 @@ type rw = [`Read | `Write] t
 let make ~index ~tree ~pvm_context_impl ~equality_witness ~impl_name =
   Context {index; tree; pvm_context_impl; equality_witness; impl_name}
 
-let load :
-    type tree repo.
+let load : type tree repo.
     (repo, tree) pvm_context_impl ->
     cache_size:int ->
     'a Access_mode.t ->
@@ -166,12 +165,12 @@ module PVMState = struct
 
   let empty : type a. a t -> value =
    fun (Context
-         {
-           pvm_context_impl = (module Pvm_Context_Impl);
-           equality_witness;
-           impl_name;
-           _;
-         }) ->
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            equality_witness;
+            impl_name;
+            _;
+          }) ->
     make_pvmstate
       ~pvm_context_impl:(module Pvm_Context_Impl)
       ~equality_witness
@@ -180,14 +179,14 @@ module PVMState = struct
 
   let find : type a. a t -> value option Lwt.t =
    fun (Context
-         {
-           pvm_context_impl = (module Pvm_Context_Impl);
-           index;
-           tree;
-           equality_witness;
-           impl_name;
-           _;
-         }) ->
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            index;
+            tree;
+            equality_witness;
+            impl_name;
+            _;
+          }) ->
     let open Lwt_syntax in
     let+ pvmstate = Pvm_Context_Impl.PVMState.find {index; tree} in
     match pvmstate with
@@ -216,7 +215,7 @@ module PVMState = struct
 
   let set : type a. a t -> value -> a t Lwt.t =
    fun (Context
-         ({pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} as o1))
+          ({pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} as o1))
        (PVMState o2) ->
     let open Lwt_syntax in
     match equiv o1.equality_witness o2.equality_witness with

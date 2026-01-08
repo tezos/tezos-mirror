@@ -13,9 +13,11 @@ depends: [
   "bls12-381"
   "octez-libs"
   "octez-version"
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
+  "cohttp-lwt" { = "5.3.1~octez" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

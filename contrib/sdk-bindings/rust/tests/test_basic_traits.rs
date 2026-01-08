@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use paste::paste;
-use tezos::keys::*;
+use tezos::hash::*;
 
 // All keys were generated using `octez-client`
 
@@ -34,6 +34,18 @@ macro_rules! generate_tests {
         }
     };
 }
+
+generate_tests!(
+    BlockHash,
+    "BLzGG2VsshDHBxmgWpMbUQKX8LWEMLLG3fEEE8NaGpEmh4NSjsZ",
+    "BL4d8vHu4UQQ9D7ZSF4adpA9HcFm1oG8QfrnDpg1UmXXHiTUHkH"
+);
+
+generate_tests!(
+    ContractKt1Hash,
+    "KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4",
+    "KT1WPztCUj2wXnsXvgG6C3RnFe9pv2MY9Pv2"
+);
 
 generate_tests!(
     ContractTz1Hash,
@@ -68,14 +80,6 @@ generate_tests!(
 );
 
 generate_tests!(
-    PublicKeyHash,
-    // sk: edsk3x51ok91omWQd5ZBzBuMV3pjCyFCjxh4fyoTRJ4QYuk59sjZch
-    "tz1XnHxtAwqiJzwNicuU1A1haG2RW5sxJ2VJ",
-    // sk: p2sk432A1xe56akKM7n8vk4g7tSyTTWodJgcwwH9mSmA6jjrApUB3F
-    "tz3co4CsEMspEpBC7TstUupntak7zTixZyhH"
-);
-
-generate_tests!(
     PublicKeyEd25519,
     // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
     "edpkuWbLgKBsLVDE5dn678Y4ogZUjBQtCdh4HebhfJ9CaTR2o6WpFp",
@@ -105,14 +109,6 @@ generate_tests!(
     "BLpk1uJ3JLHwYWUrpk6rPmZ4jAjCzbQ3xjkW7HgumJMcT8WRiwTbYdzU9dF4mKK1hP4DaYvvCfZB",
     // sk: BLsk2CJPzPttewLrtdN5cTg6bXfMM2goVvMRKh2b9MPGZiZMcnKhwC
     "BLpk1zYRUvTi2pEQDhDNqpHCAR4Mocz3izibPgQCNJTBP8wA8cyGMMCadqbsU6Gj2WDqNQmKQhM8"
-);
-
-generate_tests!(
-    PublicKey,
-    // sk: spsk1ppL4ohtyZeighKZehzfGr2p6dL51kwQqEV2N1sNT7rx9cg5jG
-    "sppk7cW8fKpjrM2713enEhvk6e5xhctLdhVCbE2YzMLCmNBHhphH4zE",
-    // sk: BLsk27Wo9tVS8XbNDfCD7X9FnQBwZ4o2gQCZxXkJRmdFYoUTvuTu1S
-    "BLpk1xwPVMQMstf4Nt41TGYeFNeck9RQJ7pHGqWpJQYgsQqGSPnhfoMMmU6fTzr1BD3mPLyzCoQB"
 );
 
 generate_tests!(
@@ -163,6 +159,29 @@ generate_tests!(
     // sk: BLsk2SdiXbRuYrWkfkSDbN1tCBGjGV7tTHxjVrokaiJsv17rDd8scd
     // msg: "a"
     "BLsigBjCT4gTkW7e3yaWrum16tApsZNxw12NQxjpJTTQJyjVt4yJeNjnqxNrzKzrLQ2VqkcJr8djGUeDS3fmgoDn4kukS5zEMGPxGaduG5nrpMd5Vzkray9D9nzpcakWrscVf11KzkH4A6"
+);
+
+generate_tests!(
+    Contract,
+    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
+    "tz1Pta3ShQiC5uZRjfivFUmYQYd4Lai1vJrU",
+    "KT1DvqNXfdigfmDeh2zyF9Q4mTFruyUr1rmv"
+);
+
+generate_tests!(
+    PublicKey,
+    // sk: spsk1ppL4ohtyZeighKZehzfGr2p6dL51kwQqEV2N1sNT7rx9cg5jG
+    "sppk7cW8fKpjrM2713enEhvk6e5xhctLdhVCbE2YzMLCmNBHhphH4zE",
+    // sk: BLsk27Wo9tVS8XbNDfCD7X9FnQBwZ4o2gQCZxXkJRmdFYoUTvuTu1S
+    "BLpk1xwPVMQMstf4Nt41TGYeFNeck9RQJ7pHGqWpJQYgsQqGSPnhfoMMmU6fTzr1BD3mPLyzCoQB"
+);
+
+generate_tests!(
+    PublicKeyHash,
+    // sk: edsk3x51ok91omWQd5ZBzBuMV3pjCyFCjxh4fyoTRJ4QYuk59sjZch
+    "tz1XnHxtAwqiJzwNicuU1A1haG2RW5sxJ2VJ",
+    // sk: p2sk432A1xe56akKM7n8vk4g7tSyTTWodJgcwwH9mSmA6jjrApUB3F
+    "tz3co4CsEMspEpBC7TstUupntak7zTixZyhH"
 );
 
 generate_tests!(

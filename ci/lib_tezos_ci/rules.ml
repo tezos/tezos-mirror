@@ -54,6 +54,17 @@ let scheduled = pipeline_source_eq Schedule
 let schedule_extended_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_TESTS"
 
+let debian_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "debian.daily"
+
+let rpm_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "rpm.daily"
+
+let homebrew_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "homebrew.daily"
+
+let base_images_daily =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "base_images.daily"
+
+let opam_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "opam.daily"
+
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 
@@ -112,6 +123,10 @@ let is_final_pipeline =
 
 let has_mr_label label =
   Predefined_vars.ci_merge_request_labels =~ "/(?:^|,)" ^ label ^ "(?:$|,)/"
+
+let force_rebuild =
+  var "DOCKER_FORCE_BUILD" == str "true"
+  || var "DOCKER_FORCE_BUILD" == str "True"
 
 let never = var "foo" == str "bar" && var "foo" != str "bar"
 

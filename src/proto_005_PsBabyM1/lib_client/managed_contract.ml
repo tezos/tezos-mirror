@@ -80,59 +80,60 @@ let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     contract (* the KT1 to delegate *)
     (delegate : Tezos_crypto.Signature.V0.public_key_hash option) =
   let entrypoint = "do" in
-  (Michelson_v1_entrypoints.contract_entrypoint_type
-     cctxt
-     ~chain
-     ~block
-     ~contract
-     ~entrypoint
-   >>=? function
-   | Some _ ->
-       (* their is a "do" entrypoint (we could check its type here)*)
-       let lambda =
-         match delegate with
-         | Some delegate ->
-             let (`Hex delegate) =
-               Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
-             in
-             Format.asprintf
-               "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; \
-                SET_DELEGATE ; CONS }"
-               delegate
-         | None ->
-             "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
-       in
-       parse lambda >>=? fun param -> return (param, entrypoint)
-   | None -> (
-       (*  their is no "do" entrypoint trying "set_delegate" *)
-       let entrypoint = "set_delegate" in
-       Michelson_v1_entrypoints.contract_entrypoint_type
-         cctxt
-         ~chain
-         ~block
-         ~contract
-         ~entrypoint
-       >>=? function
-       | Some _ ->
-           (*  their is a "set_delegate" entrypoint *)
-           let delegate_data =
-             match delegate with
-             | Some delegate ->
-                 let (`Hex delegate) =
-                   Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
-                 in
-                 "0x" ^ delegate
-             | None -> "Unit"
-           in
-           let entrypoint =
-             match delegate with
-             | Some _ -> "set_delegate"
-             | None -> "remove_delegate"
-           in
-           parse delegate_data >>=? fun param -> return (param, entrypoint)
-       | None ->
-           cctxt#error
-             "Cannot find a %%do or %%set_delegate entrypoint in contract@."))
+  ( Michelson_v1_entrypoints.contract_entrypoint_type
+      cctxt
+      ~chain
+      ~block
+      ~contract
+      ~entrypoint
+  >>=? function
+    | Some _ ->
+        (* their is a "do" entrypoint (we could check its type here)*)
+        let lambda =
+          match delegate with
+          | Some delegate ->
+              let (`Hex delegate) =
+                Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
+              in
+              Format.asprintf
+                "{ DROP ; NIL operation ; PUSH key_hash 0x%s ; SOME ; \
+                 SET_DELEGATE ; CONS }"
+                delegate
+          | None ->
+              "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
+        in
+        parse lambda >>=? fun param -> return (param, entrypoint)
+    | None -> (
+        (*  their is no "do" entrypoint trying "set_delegate" *)
+        let entrypoint = "set_delegate" in
+        Michelson_v1_entrypoints.contract_entrypoint_type
+          cctxt
+          ~chain
+          ~block
+          ~contract
+          ~entrypoint
+        >>=? function
+        | Some _ ->
+            (*  their is a "set_delegate" entrypoint *)
+            let delegate_data =
+              match delegate with
+              | Some delegate ->
+                  let (`Hex delegate) =
+                    Tezos_crypto.Signature.V0.Public_key_hash.to_hex delegate
+                  in
+                  "0x" ^ delegate
+              | None -> "Unit"
+            in
+            let entrypoint =
+              match delegate with
+              | Some _ -> "set_delegate"
+              | None -> "remove_delegate"
+            in
+            parse delegate_data >>=? fun param -> return (param, entrypoint)
+        | None ->
+            cctxt#error
+              "Cannot find a %%do or %%set_delegate entrypoint in contract@.")
+  )
   >>=? fun (parameters, entrypoint) ->
   let operation =
     Transaction

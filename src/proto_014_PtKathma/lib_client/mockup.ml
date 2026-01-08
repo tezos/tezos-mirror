@@ -148,7 +148,8 @@ module Protocol_constants_overrides = struct
                tx_rollup_cost_per_byte_ema_factor,
                tx_rollup_max_ticket_payload_size,
                tx_rollup_rejection_max_proof_size,
-               tx_rollup_sunset_level ) ) ->
+               tx_rollup_sunset_level ) )
+         ->
         {
           enable = tx_rollup_enable;
           origination_size = tx_rollup_origination_size;
@@ -206,7 +207,8 @@ module Protocol_constants_overrides = struct
              sc_rollup_commitment_period_in_blocks,
              sc_rollup_max_lookahead_in_blocks,
              sc_rollup_max_active_outbox_levels,
-             sc_rollup_max_outbox_messages_per_level ) ->
+             sc_rollup_max_outbox_messages_per_level )
+         ->
         {
           enable = sc_rollup_enable;
           origination_size = sc_rollup_origination_size;
@@ -317,7 +319,8 @@ module Protocol_constants_overrides = struct
                    ( ( cache_script_size,
                        cache_stake_distribution_cycles,
                        cache_sampler_state_cycles ),
-                     (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
+                     (tx_rollup, (dal, sc_rollup)) ) ) ) ) )
+         ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -1313,7 +1316,8 @@ module Protocol_parameters = struct
       (fun ( initial_timestamp,
              bootstrap_accounts,
              bootstrap_contracts,
-             constants ) ->
+             constants )
+         ->
         {initial_timestamp; bootstrap_accounts; bootstrap_contracts; constants})
       (obj4
          (req "initial_timestamp" Time.Protocol.encoding)

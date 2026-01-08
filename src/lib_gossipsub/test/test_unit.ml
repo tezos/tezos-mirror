@@ -2067,12 +2067,12 @@ let test_ignore_too_many_messages_in_ihave rng limits parameters =
   unit
 
 (* Check the following scenario:
-   * we joined a topic and we have a unique peer in the mesh
-   * the peer has a negative score
-   * the heartbeat removes that peer
-   * a new peer subscribes to the same topic
-   * a new heartbeat adds to the new peer to the mesh
-*)
+ * we joined a topic and we have a unique peer in the mesh
+ * the peer has a negative score
+ * the heartbeat removes that peer
+ * a new peer subscribes to the same topic
+ * a new heartbeat adds to the new peer to the mesh
+ *)
 let test_heartbeat_scenario rng limits parameters =
   Tezt_core.Test.register
     ~__FILE__

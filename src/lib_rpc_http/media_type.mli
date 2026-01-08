@@ -30,6 +30,7 @@ type t = Resto_cohttp.Media_type.Make(Tezos_rpc.Encoding).t = {
   construct : 'a. 'a Data_encoding.t -> 'a -> string;
   construct_seq : 'a. 'a Data_encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
   destruct : 'a. 'a Data_encoding.t -> string -> ('a, string) result;
+  destruct_many : 'a. 'a Data_encoding.t -> string -> 'a list * string;
 }
 
 val name : t -> string

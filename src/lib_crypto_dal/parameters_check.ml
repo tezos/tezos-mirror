@@ -68,7 +68,7 @@ let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
       (* The redundancy factor should be a power of 2 so that n is a power of 2
          for proper FFT sizing. The variable [polynomial_length] is assumed to be a power of 2
          as the output of [slot_as_polynomial_length]. *)
-        (fun () ->
+      (fun () ->
         Format.asprintf
           "Redundancy factor is expected to be a power of 2 and greater than \
            2. Given: %d"
@@ -81,7 +81,7 @@ let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
       (* The size of a page must be greater than 31 bytes (32 > 31 is the next
          power of two), the size in bytes of a scalar element, and strictly less
          than the slot size. *)
-        (fun () ->
+      (fun () ->
         Format.asprintf
           "Page size is expected to be greater than '32' and strictly less \
            than the slot_size '%d'. Got: %d"
@@ -118,7 +118,7 @@ let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
          the domains for the FFT contain only one element and we cannot build
          FFT domains with only one element. Given that [erasure_encoded_polynomial_length] is a power of two,
          it follows that the maximum number of shards is [erasure_encoded_polynomial_length/2]. *)
-        (fun () ->
+      (fun () ->
         Format.asprintf
           "The number of shards must divide, and not be equal to %d. For the \
            given parameter, the maximum number of shards is %d. Got: %d."
@@ -153,7 +153,7 @@ let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
          the constraint to a product of primes dividing the order of the group
          G1 thanks to the Prime Factorization Algorithm, as we currently do with
          the FFTs on scalar elements, if the need arises. *)
-        (fun () ->
+      (fun () ->
         (* [domain_length = 2 * max_polynomial_length / shard_length
                           = 2 * max_polynomial_length / (redundancy_factor * max_polynomial_length / number_of_shards)
                           = 2 * number_of_shards / redundancy_factor] *)

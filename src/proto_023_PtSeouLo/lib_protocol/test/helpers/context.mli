@@ -38,29 +38,44 @@ val pred_branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-(** Given a context, returns the list of attesters charactized by
-    the [level], the public key hash of the [delegate], its [consensus_key]
-    and its assigned [slots].
-    see {! Plugin.RPC.Validator.t}. *)
-val get_attesters : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
+(** A delegate's keys and attesting slots at a given level. *)
+type attester = Plugin.RPC.Validators.t = {
+  level : Raw_level.t;
+  delegate : Signature.public_key_hash;
+  consensus_key : Signature.public_key_hash;
+  companion_key : Signature.Bls.Public_key_hash.t option;
+  slots : Slot.t list;
+}
+
+(** Retrieves the attesting rights at the level of the given context
+    by calling {!Plugin.RPC.Validators.S.validators}. *)
+val get_attesters : t -> attester list tzresult Lwt.t
+
+(** Returns an attester at the level of the given context.
+
+    If [manager_pkh] is provided, returns the attester with this
+    manager key ({!field-delegate}) and fails if there is no such
+    attester. If [manager_pkh] is omitted, returns the first element
+    of the output of {!get_attesters}. *)
+val get_attester : ?manager_pkh:public_key_hash -> t -> attester tzresult Lwt.t
 
 (** Return the two first elements of the list returns by [get_attesters]. *)
 val get_first_different_attesters :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
-(** Return the first element [delegate,slot] of the list returns by
-    [get_attesters], where [delegate] is the [consensus key] when
-    is set. *)
-val get_attester : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
-
-(** Given a [delegate], and a context [ctxt], if [delegate] is in
-    [get_attesters ctxt] returns the [slots] of [delegate] otherwise
-    return [None]. *)
-val get_attester_slot :
-  t -> public_key_hash -> Slot.t list option tzresult Lwt.t
-
 (** Return the [n]th element of the list returns by [get_attesters]. *)
 val get_attester_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
+
+(** Whether the {!type-attester}'s **consensus key** is a BLS key. *)
+val attester_has_bls_key : attester -> bool
+
+(** Same as {!get_attesters} but returns only attesters with a BLS
+    consensus key. *)
+val get_attesters_with_bls_key : t -> attester list tzresult Lwt.t
+
+(** Returns an attester with a BLS consensus key (the first eligible
+    attester returned by {!get_attesters}). *)
+val get_attester_with_bls_key : t -> attester tzresult Lwt.t
 
 (** Counts the number of attesting slots that the given delegate has
     in the requested level. If ommited, [level] defaults to the next
@@ -444,6 +459,11 @@ val init_with_constants_n :
   ?algo:Signature.algo ->
   Constants.Parametric.t ->
   int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+val init_with_constants_algo_list :
+  Constants.Parametric.t ->
+  Signature.algo option list ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
 val init_with_constants1 :

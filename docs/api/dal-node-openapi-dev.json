@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 1111.0~rc2+dev (958bc09e)"
+    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
   },
   "paths": {
     "/health": {
@@ -107,7 +107,7 @@
     },
     "/levels/{int32}/slots/{int}/commitment": {
       "get": {
-        "description": "Return the accepted commitment associated to the given slot index and published at the given level.",
+        "description": "Return the commitment associated to the given slot index and published at the given level, if any. The commitment is fetched from the skip-list storage. Note that the commitment is not present in the storage immediately after publication, but only when its attestation status is known and final.",
         "parameters": [
           {
             "name": "int32",
@@ -363,7 +363,7 @@
     },
     "/levels/{int32}/slots/{int}/status": {
       "get": {
-        "description": "Return the status for the given slot.",
+        "description": "Return the status for the given slot. For operator nodes only.",
         "parameters": [
           {
             "name": "int32",
@@ -408,6 +408,164 @@
                       "type": "string",
                       "enum": [
                         "unattested"
+                      ]
+                    },
+                    {
+                      "title": "unpublished",
+                      "type": "string",
+                      "enum": [
+                        "unpublished"
+                      ]
+                    },
+                    {
+                      "title": "attested_with_lag",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "attested"
+                          ]
+                        },
+                        "attestation_lag": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "attestation_lag"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor/synchronized": {
+      "get": {
+        "description": "Returns the stream of synchronization statuses of the DAL node with the L1 node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Catching_up",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Catching_up"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "Synced",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Synced"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Lagging",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Lagging"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "L1_bootstrapping",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_bootstrapping"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "L1_unreachable",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_unreachable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Unknown",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
                       ]
                     }
                   ]
@@ -2339,6 +2497,191 @@
         }
       }
     },
+    "/profiles/{pkh}/monitor/attestable_slots": {
+      "get": {
+        "description": "Stream attestable slot ids for a given public key hash [pkh]. A slot is attestable for attested level L if it was published at (L - attestation_lag) and *all* shards assigned at level L to [pkh] are available in the DAL node's store. If some shards of the slot are detected as traps for the baker, the slot should not be attested, so the id is not sent via the stream.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "attestable_slot",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "attestable_slot"
+                          ]
+                        },
+                        "slot_id": {
+                          "type": "object",
+                          "properties": {
+                            "slot_level": {
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "slot_level",
+                            "slot_index"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "slot_id"
+                      ]
+                    },
+                    {
+                      "title": "no_shards_assigned",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "no_shards_assigned"
+                          ]
+                        },
+                        "attestation_level": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "attestation_level"
+                      ]
+                    },
+                    {
+                      "title": "slot_has_trap",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "slot_has_trap"
+                          ]
+                        },
+                        "slot_id": {
+                          "type": "object",
+                          "properties": {
+                            "slot_level": {
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "slot_level",
+                            "slot_index"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "slot_id"
+                      ]
+                    },
+                    {
+                      "title": "backfill",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "backfill"
+                          ]
+                        },
+                        "backfill_payload": {
+                          "type": "object",
+                          "properties": {
+                            "slot_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "slot_level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "slot_index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "slot_level",
+                                  "slot_index"
+                                ]
+                              }
+                            },
+                            "no_shards_attestation_levels": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              }
+                            }
+                          },
+                          "required": [
+                            "slot_ids",
+                            "no_shards_attestation_levels"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "backfill_payload"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/protocol_parameters": {
       "get": {
         "description": "Returns the protocol parameters as known by the DAL node. An optional 'level' argument can specify for which level to retrieve them.",
@@ -2579,7 +2922,7 @@
     },
     "/slots": {
       "post": {
-        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index.",
+        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index. However, slot_index is optional and has NO SEMANTIC EFFECT on the produced commitment. It exists solely to help reverse proxies route POST /slots requests to a DAL node subscribed to the corresponding topics.",
         "parameters": [
           {
             "name": "padding",
@@ -2648,6 +2991,136 @@
                   "required": [
                     "commitment",
                     "commitment_proof"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/synchronized": {
+      "get": {
+        "description": "Returns the current synchronization status of the DAL node with the L1 node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Catching_up",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Catching_up"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "Synced",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Synced"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Lagging",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Lagging"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "L1_bootstrapping",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_bootstrapping"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "L1_unreachable",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_unreachable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Unknown",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
                   ]
                 }
               }

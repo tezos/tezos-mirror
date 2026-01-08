@@ -211,9 +211,9 @@ module Merge = struct
     let v = 0 in
     let d = register0_list v [s1; s2; s3] in
     Directory.register_dynamic_directory1 d dyn1 (function
-        | 0 -> Lwt.return @@ register1 v s5 Directory.empty
-        | 2 -> Lwt.return @@ register1 v s7 Directory.empty
-        | _ -> Lwt.return @@ Directory.empty)
+      | 0 -> Lwt.return @@ register1 v s5 Directory.empty
+      | 2 -> Lwt.return @@ register1 v s7 Directory.empty
+      | _ -> Lwt.return @@ Directory.empty)
 
   (* root
      ├── dir1
@@ -235,9 +235,9 @@ module Merge = struct
     let v = 1 in
     let d = register0_list v [s2; s3; s4] in
     Directory.register_dynamic_directory1 d dyn1 (function
-        | 1 -> Lwt.return @@ register1 v s6 Directory.empty
-        | 2 -> register1 v s7 Directory.empty |> register2 v s8 |> Lwt.return
-        | _ -> Lwt.return @@ Directory.empty)
+      | 1 -> Lwt.return @@ register1 v s6 Directory.empty
+      | 2 -> register1 v s7 Directory.empty |> register2 v s8 |> Lwt.return
+      | _ -> Lwt.return @@ Directory.empty)
 
   let path_of_service s =
     let {Service.uri; _} = Service.forge_request s () () in

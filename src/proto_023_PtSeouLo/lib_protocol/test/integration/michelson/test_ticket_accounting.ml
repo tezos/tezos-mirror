@@ -341,15 +341,15 @@ let origination_operation ctxt ~sender ~script:(code, storage) ~orig_contract =
   let unparsed_storage = storage in
   let*@ ( Script_ir_translator.Ex_script
             (Script
-              {
-                storage_type;
-                storage;
-                code = _;
-                arg_type = _;
-                views = _;
-                entrypoints = _;
-                code_size = _;
-              }),
+               {
+                 storage_type;
+                 storage;
+                 code = _;
+                 arg_type = _;
+                 views = _;
+                 entrypoints = _;
+                 code_size = _;
+               }),
           ctxt ) =
     Script_ir_translator.parse_script
       ctxt

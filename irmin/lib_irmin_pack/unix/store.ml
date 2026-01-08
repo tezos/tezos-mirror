@@ -128,7 +128,7 @@ module Maker (Config : Conf.S) = struct
       module Remote = Irmin.Backend.Remote.None (Commit.Key) (B)
 
       module Gc = Gc.Make (struct
-        module Async = Async.Unix
+        module Async = Async
         module Fm = File_manager
         module Errs = Errs
         module Dict = Dict
@@ -239,8 +239,7 @@ module Maker (Config : Conf.S) = struct
                 match Commit.CA.index_direct_with_kind t.commit h with
                 | None ->
                     Error
-                      (`Commit_key_is_dangling
-                        (Irmin.Type.to_string XKey.t key))
+                      (`Commit_key_is_dangling (Irmin.Type.to_string XKey.t key))
                 | Some (k, _kind) -> Ok k)
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =
@@ -259,10 +258,11 @@ module Maker (Config : Conf.S) = struct
             let current_generation = File_manager.generation t.fm in
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
+            let async_domain = Conf.async_domain t.config in
             let* gc =
               Gc.v ~root ~lower_root ~generation:next_generation ~unlink
                 ~dispatcher:t.dispatcher ~fm:t.fm ~contents:t.contents
-                ~node:t.node ~commit:t.commit ~output commit_key
+                ~node:t.node ~commit:t.commit ~output ~async_domain commit_key
             in
             t.running_gc <- Some { gc; use_auto_finalisation };
             Ok ()

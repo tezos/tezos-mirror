@@ -185,10 +185,11 @@ let gen_inbox =
     return (Sc_rollup.Inbox.finalize_inbox_level_no_history inbox witness)
   in
   return
-  @@ (witness_and_inbox |> function
-      | Ok v -> Sc_rollup_proto_types.Inbox.to_octez v
-      | Error e ->
-          Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
+  @@ ( witness_and_inbox |> function
+       | Ok v -> Sc_rollup_proto_types.Inbox.to_octez v
+       | Error e ->
+           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e)
+     )
 
 let number_of_slots = 256
 
@@ -240,8 +241,8 @@ let gen_slot_headers_with_statuses =
   let+ l = list_size size gen_slot_header_with_status in
   List.sort
     (fun ((h1 : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status1)
-         ((h2 : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status2) ->
-      compare_slot_header_id h1.id h2.id)
+         ((h2 : Octez_smart_rollup.Dal.Slot_header.t), _publisher, _status2)
+       -> compare_slot_header_id h1.id h2.id)
     l
   |> fun l ->
   match l with
@@ -250,7 +251,9 @@ let gen_slot_headers_with_statuses =
       let min_level = h.id.published_level in
       (* smallest level *)
       List.mapi
-        (fun i ((h : Octez_smart_rollup.Dal.Slot_header.t), publisher, status) ->
+        (fun i
+             ((h : Octez_smart_rollup.Dal.Slot_header.t), publisher, status)
+           ->
           (* patch the published level to comply with the invariants *)
           let published_level = Int32.(add min_level (of_int i)) in
           let h = {h with id = {h.id with published_level}} in
@@ -278,11 +281,13 @@ let gen_slot_history =
   in
   List.fold_left_e
     (fun hist (published_level, attested_slots) ->
-      Dal.Slots_history.update_skip_list_no_cache
-        ~number_of_slots
-        hist
-        ~published_level
-        attested_slots)
+      Dal.Slots_history.(
+        update_skip_list_no_cache
+          ~number_of_slots
+          hist
+          ~published_level
+          attested_slots
+          ~attestation_lag:Legacy))
     Dal.Slots_history.genesis
     l
   |> function
@@ -312,12 +317,14 @@ let gen_slot_history_cache =
   in
   List.fold_left_e
     (fun (hist, cache) (published_level, attested_slots) ->
-      Dal.Slots_history.update_skip_list
-        ~number_of_slots
-        hist
-        cache
-        ~published_level
-        attested_slots)
+      Dal.Slots_history.(
+        update_skip_list
+          ~number_of_slots
+          hist
+          cache
+          ~published_level
+          attested_slots
+          ~attestation_lag:Legacy))
     (Dal.Slots_history.genesis, cache)
     l
   |> function

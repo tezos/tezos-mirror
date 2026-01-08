@@ -143,7 +143,8 @@ let test_vectors_anemoi128_2 () =
 
   List.iter
     (fun ( (x1_s, x2_s, y1_s, y2_s),
-           (exp_res_x1_s, exp_res_x2_s, exp_res_y1_s, exp_res_y2_s) ) ->
+           (exp_res_x1_s, exp_res_x2_s, exp_res_y1_s, exp_res_y2_s) )
+       ->
       let x1 = Bls12_381.Fr.of_string x1_s in
       let x2 = Bls12_381.Fr.of_string x2_s in
       let y1 = Bls12_381.Fr.of_string y1_s in
@@ -228,7 +229,8 @@ let test_vectors_anemoi128_3 () =
              exp_res_x3_s,
              exp_res_y1_s,
              exp_res_y2_s,
-             exp_res_y3_s ) ) ->
+             exp_res_y3_s ) )
+       ->
       let x1 = Bls12_381.Fr.of_string x1_s in
       let x2 = Bls12_381.Fr.of_string x2_s in
       let x3 = Bls12_381.Fr.of_string x3_s in
@@ -315,7 +317,8 @@ let test_vectors_anemoi128_4 () =
              exp_res_y1_s,
              exp_res_y2_s,
              exp_res_y3_s,
-             exp_res_y4_s ) ) ->
+             exp_res_y4_s ) )
+       ->
       let x1 = Bls12_381.Fr.of_string x1_s in
       let x2 = Bls12_381.Fr.of_string x2_s in
       let x3 = Bls12_381.Fr.of_string x3_s in

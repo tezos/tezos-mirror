@@ -247,10 +247,25 @@ end
 
 include Semantic_tag
 
-let pp_centered width ppf s =
-  let start = (width / 2) + (String.length s / 2) in
-  Format.fprintf ppf "%*s%*s" start s (width - start) ""
+let pp_with_padding left right char ppf s =
+  let left_padding = String.make left char in
+  let right_padding = String.make right char in
+  Format.fprintf ppf "%s%s%s" left_padding s right_padding
 
-let pp_right_aligned width ppf s =
+let pp_centered ?char width ppf s =
+  let start = (width / 2) + (String.length s / 2) in
+  match char with
+  | None -> Format.fprintf ppf "%*s%*s" start s (width - start) ""
+  | Some char -> pp_with_padding start (width - start) char ppf s
+
+let pp_right_aligned ?char width ppf s =
   let left_margin = width - String.length s in
-  Format.fprintf ppf "%*s%s" left_margin "" s
+  match char with
+  | None -> Format.fprintf ppf "%*s%s" left_margin "" s
+  | Some char -> pp_with_padding left_margin 0 char ppf s
+
+let pp_left_aligned ?char width ppf s =
+  let right_margin = width - String.length s in
+  match char with
+  | None -> Format.fprintf ppf "%s%*s" s right_margin ""
+  | Some char -> pp_with_padding 0 right_margin char ppf s

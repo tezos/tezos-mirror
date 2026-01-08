@@ -1,0 +1,7 @@
+{ parameter (list address) ;
+  storage (list nat) ;
+  code { CAR ;
+         MAP { INDEX_ADDRESS } ;
+         NIL operation ;
+         PAIR } ;
+  view "v" address (option nat) { CAR; GET_ADDRESS_INDEX } }

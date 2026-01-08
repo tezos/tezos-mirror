@@ -117,8 +117,8 @@ let test_null_amount () =
   let open Lwt_result_syntax in
   let*! result = test_balances ~amount:Z.zero in
   Assert.proto_error ~loc:__LOC__ result (function
-      | Fees_storage.Negative_storage_input -> true
-      | _ -> false)
+    | Fees_storage.Negative_storage_input -> true
+    | _ -> false)
 
 (** We test the operation when the amount given is negative. *)
 let test_negative_amount () =
@@ -126,8 +126,8 @@ let test_negative_amount () =
   let amount = Z.of_int (-10) in
   let*! result = test_balances ~amount in
   Assert.proto_error ~loc:__LOC__ result (function
-      | Fees_storage.Negative_storage_input -> true
-      | _ -> false)
+    | Fees_storage.Negative_storage_input -> true
+    | _ -> false)
 
 (** We create an implicit account with not enough tez to pay for the
     storage increase. *)
@@ -160,8 +160,8 @@ let test_no_tez_to_pay () =
   in
   let*! inc = Incremental.add_operation inc op in
   Assert.proto_error ~loc:__LOC__ inc (function
-      | Fees_storage.Cannot_pay_storage_fee -> true
-      | _ -> false)
+    | Fees_storage.Cannot_pay_storage_fee -> true
+    | _ -> false)
 
 (** To test when there is no smart contract at the address given. *)
 let test_no_contract () =
@@ -172,8 +172,8 @@ let test_no_contract () =
   let* op = Op.increase_paid_storage (I inc) ~source ~destination Z.zero in
   let*! inc = Incremental.add_operation inc op in
   Assert.proto_error ~loc:__LOC__ inc (function
-      | Raw_context.Storage_error (Missing_key (_, Raw_context.Get)) -> true
-      | _ -> false)
+    | Raw_context.Storage_error (Missing_key (_, Raw_context.Get)) -> true
+    | _ -> false)
 
 (** To test if the increase in storage is effective. *)
 let test_effectiveness () =
@@ -204,8 +204,8 @@ let test_effectiveness () =
   let*! inc_test = Incremental.add_operation inc op in
   let* () =
     Assert.proto_error ~loc:__LOC__ inc_test (function
-        | Fees.Operation_quota_exceeded -> true
-        | _ -> false)
+      | Fees.Operation_quota_exceeded -> true
+      | _ -> false)
   in
   let* b = Incremental.finalize_block inc in
   let* inc = Incremental.begin_construction b in

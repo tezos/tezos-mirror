@@ -4,13 +4,13 @@
   "staker": {
     "baker_own_stake": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -19,13 +19,13 @@
   "staker": {
     "baker_own_stake": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -34,13 +34,13 @@
   "staker": {
     "baker_own_stake": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -49,13 +49,13 @@
   "staker": {
     "baker_own_stake": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -64,18 +64,18 @@
   "staker": {
     "baker_own_stake": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 GET http://[HOST]:[PORT]/chains/main/blocks/head/context/issuance/expected_issuance
 200 OK
-[{"cycle":0,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_slot":"1171","attesting_reward_per_slot":"2343","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":1,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_slot":"1171","attesting_reward_per_slot":"2343","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":2,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_slot":"1171","attesting_reward_per_slot":"2343","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"}]
+[{"cycle":0,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_block":"300010","attesting_reward_per_block":"600020","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":1,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_block":"300010","attesting_reward_per_block":"600020","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":2,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_block":"300010","attesting_reward_per_block":"600020","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"}]
 
 GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY_HASH]/dal_participation
 200 OK
@@ -108,13 +108,13 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
   "staker": {
     "baker_own_stake": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 {
@@ -123,24 +123,24 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY
   "staker": {
     "baker_own_stake": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
   },
-  "change": "10634",
+  "change": "29002",
   "origin": "block"
 }
 {
   "kind": "contract",
   "contract": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-  "change": "202046",
+  "change": "183678",
   "origin": "block"
 }
 GET http://[HOST]:[PORT]/chains/main/blocks/head/context/issuance/expected_issuance
 200 OK
-[{"cycle":1,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_slot":"1171","attesting_reward_per_slot":"2343","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":2,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_slot":"1171","attesting_reward_per_slot":"2343","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":3,"baking_reward_fixed_portion":"7847","baking_reward_bonus_per_slot":"30","attesting_reward_per_slot":"61","seed_nonce_revelation_tip":"6","vdf_revelation_tip":"6","dal_attesting_reward_per_shard":"13"}]
+[{"cycle":1,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_block":"300010","attesting_reward_per_block":"600020","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":2,"baking_reward_fixed_portion":"300010","baking_reward_bonus_per_block":"300010","attesting_reward_per_block":"600020","seed_nonce_revelation_tip":"234","vdf_revelation_tip":"234","dal_attesting_reward_per_shard":"520"},{"cycle":3,"baking_reward_fixed_portion":"7847","baking_reward_bonus_per_block":"7847","attesting_reward_per_block":"15695","seed_nonce_revelation_tip":"6","vdf_revelation_tip":"6","dal_attesting_reward_per_shard":"13"}]
 
 GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY_HASH]/dal_participation
 200 OK
-{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":0,"delegate_attestable_dal_slots":6,"expected_dal_rewards":"212680","sufficient_dal_participation":false,"denounced":false}
+{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":0,"delegate_attestable_dal_slots":5,"expected_dal_rewards":"212680","sufficient_dal_participation":false,"denounced":false}
 
 GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY_HASH]/dal_participation
 200 OK
-{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":6,"delegate_attestable_dal_slots":6,"expected_dal_rewards":"212680","sufficient_dal_participation":true,"denounced":false}
+{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":5,"delegate_attestable_dal_slots":5,"expected_dal_rewards":"212680","sufficient_dal_participation":true,"denounced":false}
 

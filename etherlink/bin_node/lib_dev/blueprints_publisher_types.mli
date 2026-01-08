@@ -14,7 +14,7 @@ module Request : sig
       extracted from the store to be republished as is. *)
   type payload =
     | Blueprint of {
-        chunks : Sequencer_blueprint.t list;
+        chunks : Sequencer_blueprint.chunked_blueprint;
         inbox_payload : Blueprint_types.payload;
       }
     | Inbox of Blueprint_types.payload

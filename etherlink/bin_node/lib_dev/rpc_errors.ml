@@ -42,8 +42,8 @@ let method_not_found method_ =
 let invalid_params reason =
   JSONRPC.{code = -32602; message = reason; data = None}
 
-let internal_error reason =
-  JSONRPC.{code = -32603; message = reason; data = None}
+let internal_error ?data reason =
+  JSONRPC.{code = -32603; message = reason; data}
 
 let invalid_input =
   JSONRPC.{code = -32000; message = "Invalid input"; data = None}

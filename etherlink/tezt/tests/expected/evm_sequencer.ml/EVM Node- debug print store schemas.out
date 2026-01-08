@@ -93,4 +93,9 @@ CREATE TABLE sequencer_upgrades (
   pool_address TEXT NOT NULL,
   activation_timestamp INT NOT NULL,
   applied_before INT
+);
+
+CREATE UNIQUE INDEX unapplied_sequencer_upgrade
+ON sequencer_upgrades (
+  COALESCE(applied_before, -1)
 )

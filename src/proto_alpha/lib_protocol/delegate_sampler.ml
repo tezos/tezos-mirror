@@ -25,6 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validate.invalid_slot"
+    ~title:"Invalid slot"
+    ~description:"The provided slot is not valid."
+    ~pp:(fun ppf (level, slot) ->
+      Format.fprintf
+        ppf
+        "Cannot provide the delegate for slot %a at level %a."
+        Slot_repr.pp
+        slot
+        Level_repr.pp
+        level)
+    Data_encoding.(
+      obj2 (req "level" Level_repr.encoding) (req "slot" Slot_repr.encoding))
+    (function Invalid_slot {level; slot} -> Some (level, slot) | _ -> None)
+    (fun (level, slot) -> Invalid_slot {level; slot})
+
 module Delegate_sampler_state = struct
   module Cache_client = struct
     type cached_value = Delegate_consensus_key.pk Sampler.t
@@ -46,17 +67,22 @@ module Delegate_sampler_state = struct
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
     let* ctxt = Storage.Delegate_sampler_state.init ctxt cycle sampler_state in
-    let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
+    let size =
+      1
+      (* that's symbolic: 1 cycle = 1 entry *)
+    in
     let*? ctxt = Cache.update ctxt id (Some (sampler_state, size)) in
     return ctxt
 
   let get ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    let* v_opt = Cache.find ctxt id in
+    let* ctxt, v_opt = Cache.find ctxt id in
     match v_opt with
-    | None -> Storage.Delegate_sampler_state.get ctxt cycle
-    | Some v -> return v
+    | None ->
+        let* v = Storage.Delegate_sampler_state.get ctxt cycle in
+        return (ctxt, v)
+    | Some v -> return (ctxt, v)
 
   let remove_existing ctxt cycle =
     let open Lwt_result_syntax in
@@ -122,8 +148,8 @@ module Random = struct
     let open Lwt_result_syntax in
     let read ctxt =
       let* seed = Seed_storage.for_cycle ctxt cycle in
-      let+ state = Delegate_sampler_state.get ctxt cycle in
-      (seed, state)
+      let+ ctxt, state = Delegate_sampler_state.get ctxt cycle in
+      (ctxt, seed, state)
     in
     Raw_context.sampler_for_cycle ~read ctxt cycle
 
@@ -141,15 +167,9 @@ module Random = struct
     return (c, pk)
 end
 
-let check_all_bakers_attest_at_level ctxt level =
-  match Constants_storage.all_bakers_attest_activation_level ctxt with
-  | None -> false
-  | Some act_level -> Raw_level_repr.(level.Level_repr.level >= act_level)
-
-let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
-
 let baking_rights_owner c (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
+  (* This committee is used for rounds *)
   let committee_size = Constants_storage.consensus_committee_size c in
   (* We use [Round.to_slot] to have a limited number of unique rounds
      (it should loop after some time) *)
@@ -173,7 +193,9 @@ let stake_info_for_cycle ctxt cycle =
   let read ctxt =
     let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
     let total_stake = Stake_repr.staking_weight total_stake in
-    let* stakes_pkh = Stake_storage.get_selected_distribution ctxt cycle in
+    let* ctxt, stakes_pkh =
+      Stake_storage.get_selected_distribution ctxt cycle
+    in
     let* stakes_pk =
       List.rev_map_es
         (fun (pkh, stake) ->
@@ -183,8 +205,9 @@ let stake_info_for_cycle ctxt cycle =
           (pk, Stake_repr.staking_weight stake))
         stakes_pkh
     in
-    return (total_stake, stakes_pk)
+    return (ctxt, total_stake, stakes_pk)
   in
+  (* The returned list of delegates is already sorted *)
   Raw_context.stake_info_for_cycle ~read ctxt cycle
 
 let stake_info ctxt level =
@@ -197,6 +220,16 @@ let load_stake_info_for_cycle ctxt cycle =
     stake_info_for_cycle ctxt cycle
   in
   return ctxt
+
+let attestation_slot_owner ~all_bakers_attest_enabled ctxt level slot =
+  let open Lwt_result_syntax in
+  if all_bakers_attest_enabled then
+    let* ctxt, _, info = stake_info ctxt level in
+    let i = Slot_repr.to_int slot in
+    match List.nth info i with
+    | None -> tzfail (Invalid_slot {level; slot})
+    | Some (owner, _) -> return (ctxt, owner)
+  else Random.owner ctxt level (Slot_repr.to_int slot)
 
 let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   let open Lwt_result_syntax in
@@ -251,23 +284,40 @@ let select_distribution_for_cycle ctxt cycle =
       stakes
       total_stake
   in
-  let* stakes_pk =
+  let* stakes_pk, tz4_number_bakers =
     List.fold_left_es
-      (fun acc (pkh, stake) ->
-        let+ pk =
+      (fun (list_acc, tz4_count_acc) (pkh, stake) ->
+        let* pk =
           Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
         in
-        (pk, Stake_repr.staking_weight stake) :: acc)
-      []
+        let stake_weight = Stake_repr.staking_weight stake in
+        let tz4_count =
+          match pk.consensus_pk with
+          | Bls _ -> tz4_count_acc + 1
+          | _ -> tz4_count_acc
+        in
+        return ((pk, stake_weight) :: list_acc, tz4_count))
+      ([], 0)
       stakes
   in
+  let total_stake = Stake_repr.staking_weight total_stake in
   let state = Sampler.create stakes_pk in
   let* ctxt = Delegate_sampler_state.init ctxt cycle state in
   (* pre-allocate the sampler *)
   let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
   (* pre-allocate the raw stake distribution info *)
   let*? ctxt =
-    Raw_context.init_stake_info_for_cycle ctxt cycle total_stake stakes_pk
+    Raw_context.init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk
+  in
+  (* Update all bakers attest activation level if tz4 stake
+     is above activation threshold *)
+  let*! ctxt =
+    All_bakers_attest_activation_storage
+    .may_update_all_bakers_attest_first_level
+      ctxt
+      cycle
+      ~total_number_bakers:(List.length stakes)
+      ~tz4_number_bakers
   in
   return ctxt
 
@@ -284,24 +334,46 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
       let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
-let attesting_rights_count ctxt level =
-  let consensus_committee_size =
-    Constants_storage.consensus_committee_size ctxt
-  in
+let attesting_power ~all_bakers_attest_enabled ctxt level =
   let open Lwt_result_syntax in
-  let*? slots = Slot_repr.Range.create ~min:0 ~count:consensus_committee_size in
-  Slot_repr.Range.fold_es
-    (fun (ctxt, map) slot ->
-      let* ctxt, consensus_pk = slot_owner ctxt level slot in
-      let map =
-        Signature.Public_key_hash.Map.update
-          consensus_pk.delegate
-          (function None -> Some 1 | Some slots_n -> Some (slots_n + 1))
-          map
-      in
-      return (ctxt, map))
-    (ctxt, Signature.Public_key_hash.Map.empty)
-    slots
+  if all_bakers_attest_enabled then
+    let* ctxt, _, delegates = stake_info ctxt level in
+    let map =
+      List.fold_left
+        (fun map_acc
+             ((consensus_pk : Raw_context.consensus_pk), staking_power)
+           ->
+          Signature.Public_key_hash.Map.add
+            consensus_pk.delegate
+            staking_power
+            map_acc)
+        Signature.Public_key_hash.Map.empty
+        delegates
+    in
+    return (ctxt, map)
+  else
+    let consensus_committee_size =
+      Constants_storage.consensus_committee_size ctxt
+    in
+    let*? slots =
+      Slot_repr.Range.create ~min:0 ~count:consensus_committee_size
+    in
+    Slot_repr.Range.fold_es
+      (fun (ctxt, map) slot ->
+        let* ctxt, consensus_pk =
+          (* all_bakers_attest_enabled = false *)
+          attestation_slot_owner ~all_bakers_attest_enabled ctxt level slot
+        in
+        let map =
+          Signature.Public_key_hash.Map.update
+            consensus_pk.delegate
+            (function
+              | None -> Some 1L | Some slots_n -> Some (Int64.succ slots_n))
+            map
+        in
+        return (ctxt, map))
+      (ctxt, Signature.Public_key_hash.Map.empty)
+      slots
 
 module For_RPC = struct
   let delegate_current_baking_power ctxt delegate =

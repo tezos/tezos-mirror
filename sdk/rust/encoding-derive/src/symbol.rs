@@ -41,6 +41,7 @@ pub const COMPOSITE: Symbol = Symbol("composite");
 
 /// Attribute name used to mark field/variant as ignored.
 pub const SKIP: Symbol = Symbol("skip");
+pub const HASH: Symbol = Symbol("hash");
 
 pub const ENCODING: Symbol = Symbol("encoding");
 pub const BYTES: Symbol = Symbol("bytes");

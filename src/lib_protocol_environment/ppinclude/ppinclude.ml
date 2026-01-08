@@ -87,7 +87,13 @@ let () =
           {
             pstr_desc =
               Pstr_eval
-                ({pexp_desc = Pexp_constant (Pconst_string (file, _, _)); _}, _);
+                ( {
+                    pexp_desc =
+                      Pexp_constant
+                        {pconst_desc = Pconst_string (file, _, _); _};
+                    _;
+                  },
+                  _ );
             _;
           };
         ] ->

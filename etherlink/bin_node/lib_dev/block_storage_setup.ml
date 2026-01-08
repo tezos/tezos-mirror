@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let enable ~keep_alive ?evm_node_endpoint store =
+let enable ~keep_alive ~timeout ?evm_node_endpoint store =
   let get_block_from_store n =
     Evm_store.(
       use store @@ fun conn ->
@@ -15,6 +15,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
     Batch.call
       (module Rpc_encodings.Get_block_by_number)
       ~keep_alive
+      ~timeout
       ~evm_node_endpoint
       (Ethereum_types.Block_parameter.(Number n), false)
   in
@@ -65,13 +66,14 @@ let enable ~keep_alive ?evm_node_endpoint store =
   let tmp_world_state_path = tmp_path ^ world_state_path in
   let store_get_hash tree key =
     let open Lwt_syntax in
+    let evm_node_state = Pvm.Wasm_internal.of_irmin tree in
     let enable_fallback =
       match
-        Lwt_preemptive.run_in_main @@ fun () -> Evm_state.storage_version tree
+        Lwt_domain.run_in_main @@ fun () ->
+        Evm_state.storage_version evm_node_state
       with
       | Ok storage_version ->
-          (* See case [StorageVersion::V17] in [migration::migrate_to] *)
-          storage_version < 17
+          Storage_version.kernel_has_txs_in_storage ~storage_version
       | Error _ ->
           (* This should not be possible. Etherlink kernel is designed such
              that it always write its storage version in the durable storage.
@@ -81,11 +83,11 @@ let enable ~keep_alive ?evm_node_endpoint store =
     in
     if enable_fallback && key = tmp_world_state_path ^ "/transactions_receipts"
     then
-      Lwt_preemptive.run_in_main @@ fun () ->
+      Lwt_domain.run_in_main @@ fun () ->
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root
-          tree
+          evm_node_state
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
@@ -94,11 +96,11 @@ let enable ~keep_alive ?evm_node_endpoint store =
     else if
       enable_fallback && key = tmp_world_state_path ^ "/transactions_objects"
     then
-      Lwt_preemptive.run_in_main @@ fun () ->
+      Lwt_domain.run_in_main @@ fun () ->
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root
-          tree
+          evm_node_state
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in

@@ -332,7 +332,8 @@ module Encodings = struct
                     finalized,
                     cemented )
             | _ -> None)
-          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented) ->
+          (fun ((), op, (oph, op_index, l1_block, l1_level), finalized, cemented)
+             ->
             Included
               {op; oph; op_index; l1_block; l1_level; finalized; cemented});
         case
@@ -389,7 +390,8 @@ module Encodings = struct
                  commitment,
                  commitment_hash,
                  first_published_at_level,
-                 published_at_level ) ->
+                 published_at_level )
+             ->
             Committed
               {
                 op;
@@ -416,7 +418,8 @@ module Encodings = struct
              last_gc_started_at;
              last_context_split_level;
              last_successful_gc_target;
-           } ->
+           }
+         ->
         ( first_available_level,
           last_gc_started_at,
           last_context_split_level,
@@ -424,7 +427,8 @@ module Encodings = struct
       (fun ( first_available_level,
              last_gc_started_at,
              last_context_split_level,
-             last_successful_gc_target ) ->
+             last_successful_gc_target )
+         ->
         {
           first_available_level;
           last_gc_started_at;
@@ -475,7 +479,8 @@ module Encodings = struct
              compactions;
              top_heap_words;
              stack_size;
-           } ->
+           }
+         ->
         ( ( minor_words,
             promoted_words,
             major_words,
@@ -501,7 +506,8 @@ module Encodings = struct
                  fragments,
                  compactions,
                  top_heap_words,
-                 stack_size ) ) ) ->
+                 stack_size ) ) )
+         ->
         {
           minor_words;
           promoted_words;
@@ -1010,6 +1016,13 @@ module Global = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Sc_rollup_block.encoding
       (path / "monitor_blocks")
+
+  let finalized_block_watcher =
+    Tezos_rpc.Service.get_service
+      ~description:"Monitor and streaming the L2 finalized blocks"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Sc_rollup_block.encoding
+      (path / "monitor_finalized_blocks")
 end
 
 module Block = struct

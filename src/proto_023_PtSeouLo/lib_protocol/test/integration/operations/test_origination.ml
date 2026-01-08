@@ -189,15 +189,6 @@ let test_not_tez_in_contract_to_pay_fee () =
   let*! inc = Incremental.add_operation inc op in
   Assert.proto_error_with_info ~loc:__LOC__ inc "Balance too low"
 
-(* Set the attester of the block as manager/delegate of the originated
-   account. *)
-let register_contract_get_attester () =
-  let open Lwt_result_syntax in
-  let* b, contract = Context.init1 () in
-  let* inc = Incremental.begin_construction b in
-  let+ account_attester, _slots = Context.get_attester (I inc) in
-  (inc, contract, account_attester)
-
 (* Create multiple originated contracts and ask contract to pay the fee. *)
 let n_originations n ?credit ?fee () =
   let open Lwt_result_syntax in

@@ -39,14 +39,14 @@ pub fn address<H: Handler>(runtime: &mut Runtime) -> Control<H> {
 	Control::Continue
 }
 
-pub fn balance<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
+pub fn balance<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> {
 	pop!(runtime, address);
 	push_u256!(runtime, handler.balance(address.into()));
 
 	Control::Continue
 }
 
-pub fn selfbalance<H: Handler>(runtime: &mut Runtime, handler: &H) -> Control<H> {
+pub fn selfbalance<H: Handler>(runtime: &mut Runtime, handler: &mut H) -> Control<H> {
 	push_u256!(runtime, handler.balance(runtime.context.address));
 
 	Control::Continue

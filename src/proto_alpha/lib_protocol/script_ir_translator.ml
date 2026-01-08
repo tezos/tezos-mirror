@@ -79,8 +79,7 @@ let close_descr {loc; bef; aft; instr} =
   let kinstr = instr.apply (IHalt loc) in
   {kloc = loc; kbef = bef; kaft = aft; kinstr}
 
-let compose_descr :
-    type a s b u c v.
+let compose_descr : type a s b u c v.
     Script.location ->
     (a, s, b, u) descr ->
     (b, u, c, v) descr ->
@@ -145,8 +144,7 @@ let check_kind kinds expr =
     let loc = location expr in
     tzfail (Invalid_kind (loc, kinds, kind))
 
-let check_comparable :
-    type a ac.
+let check_comparable : type a ac.
     Script.location -> (a, ac) ty -> (ac, Dependent_bool.yes) eq tzresult =
   let open Result_syntax in
   fun loc ty ->
@@ -257,8 +255,7 @@ let check_dupable_ty ctxt loc ty =
   let* res, ctxt = Gas_monad.run ctxt gas in
   match res with Ok () -> return ctxt | Error e -> tzfail e
 
-let type_metadata_eq :
-    type error_trace.
+let type_metadata_eq : type error_trace.
     error_details:(_, error_trace) error_details ->
     'a ty_metadata ->
     'b ty_metadata ->
@@ -271,8 +268,7 @@ let default_ty_eq_error loc ty1 ty2 =
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (loc, ty1, ty2)
 
-let memo_size_eq :
-    type error_trace.
+let memo_size_eq : type error_trace.
     error_details:(_, error_trace) error_details ->
     Sapling.Memo_size.t ->
     Sapling.Memo_size.t ->
@@ -290,16 +286,14 @@ let memo_size_eq :
    The result is an equality witness between the types of the two inputs within
    the gas monad (for gas consumption).
 *)
-let ty_eq :
-    type a ac b bc error_trace.
+let ty_eq : type a ac b bc error_trace.
     error_details:(Script.location, error_trace) error_details ->
     (a, ac) ty ->
     (b, bc) ty ->
     (((a, ac) ty, (b, bc) ty) eq, error_trace) Gas_monad.t =
   let open Result_syntax in
   fun ~(error_details : (_, error_trace) error_details) ty1 ty2 ->
-    let record_trace_eval :
-        type a.
+    let record_trace_eval : type a.
         (Script.location -> error) ->
         (a, error_trace) result ->
         (a, error_trace) result =
@@ -312,16 +306,14 @@ let ty_eq :
       |> record_trace_eval (fun loc -> default_ty_eq_error loc ty1 ty2)
     in
     let memo_size_eq ms1 ms2 = memo_size_eq ~error_details ms1 ms2 in
-    let rec help :
-        type ta tac tb tbc.
+    let rec help : type ta tac tb tbc.
         (ta, tac) ty ->
         (tb, tbc) ty ->
         (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) result =
      fun ty1 ty2 ->
       help0 ty1 ty2
       |> record_trace_eval (fun loc -> default_ty_eq_error loc ty1 ty2)
-    and help0 :
-        type ta tac tb tbc.
+    and help0 : type ta tac tb tbc.
         (ta, tac) ty ->
         (tb, tbc) ty ->
         (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) result =
@@ -451,8 +443,7 @@ let ty_eq :
 (* Same as ty_eq but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors. *)
-let rec stack_eq :
-    type ta tb ts tu.
+let rec stack_eq : type ta tb ts tu.
     Script.location ->
     context ->
     int ->
@@ -491,8 +482,7 @@ type ('a, 's, 'b, 'u, 'c, 'v) branch = {
 }
 [@@unboxed]
 
-let merge_branches :
-    type a s b u c v.
+let merge_branches : type a s b u c v.
     context ->
     Script.location ->
     (a, s) judgement ->
@@ -552,11 +542,10 @@ type ex_parameter_ty_and_entrypoints_node =
 *)
 type ('ret, 'name) parse_ty_ret =
   | Don't_parse_entrypoints : (ex_ty, unit) parse_ty_ret
-  | Parse_entrypoints
-      : (ex_parameter_ty_and_entrypoints_node, Entrypoint.t option) parse_ty_ret
+  | Parse_entrypoints :
+      (ex_parameter_ty_and_entrypoints_node, Entrypoint.t option) parse_ty_ret
 
-let rec parse_ty :
-    type ret name.
+let rec parse_ty : type ret name.
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -576,7 +565,8 @@ let rec parse_ty :
       ~allow_contract
       ~allow_ticket
       ~ret
-      node ->
+      node
+    ->
     let* ctxt = Gas.consume ctxt Typecheck_costs.parse_type_cycle in
     if Compare.Int.(stack_depth > 10000) then
       tzfail Typechecking_too_many_recursive_calls
@@ -755,11 +745,11 @@ let rec parse_ty :
               ((Ex_ty ty : ret), ctxt)
           | Parse_entrypoints ->
               let (Ex_parameter_ty_and_entrypoints_node
-                    {arg_type = tl; entrypoints = left}) =
+                     {arg_type = tl; entrypoints = left}) =
                 parsed_l
               in
               let (Ex_parameter_ty_and_entrypoints_node
-                    {arg_type = tr; entrypoints = right}) =
+                     {arg_type = tr; entrypoints = right}) =
                 parsed_r
               in
               let+ (Ty_ex_c arg_type) = or_t loc tl tr in
@@ -963,8 +953,7 @@ and parse_comparable_ty :
           (Comparable_type_expected
              (location node, Micheline.strip_locations node))
 
-and parse_passable_ty :
-    type ret name.
+and parse_passable_ty : type ret name.
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -1125,7 +1114,7 @@ let check_packable ~allow_contract loc root =
     | Chest_key_t -> return_unit
     | Chest_t -> return_unit
   in
-  check root
+  record_trace (Unpackable_type loc) (check root)
 
 type toplevel = {
   code_field : Script.node;
@@ -1134,10 +1123,21 @@ type toplevel = {
   views : view_map;
 }
 
-type ('arg, 'storage) code =
-  | Code : {
+type ('arg, 'storage) implementation =
+      ('arg, 'storage) Script_typed.implementation =
+  | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+    }
+      -> ('arg, 'storage) implementation
+  | Native : {
+      kind : ('arg, 'storage) Script_native_types.kind;
+    }
+      -> ('arg, 'storage) implementation
+
+type ('arg, 'storage) code =
+  | Code : {
+      implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) ty;
       storage_type : ('storage, _) ty;
       views : view_map;
@@ -1146,7 +1146,7 @@ type ('arg, 'storage) code =
     }
       -> ('arg, 'storage) code
 
-type ex_script = Ex_script : ('a, 'c) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'c) Script_typed.script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
@@ -1213,8 +1213,7 @@ type (_, _, _) dup_n_proof_argument =
       ('a, 'b, 's, 't) dup_n_gadt_witness * ('t, _) ty
       -> ('a, 'b, 's) dup_n_proof_argument
 
-let rec make_dug_proof_argument :
-    type a s x xc.
+let rec make_dug_proof_argument : type a s x xc.
     location ->
     int ->
     (x, xc) ty ->
@@ -1229,8 +1228,8 @@ let rec make_dug_proof_argument :
          Dug_proof_argument (KPrefix (loc, v, n'), Item_t (v, aft'))
   | _, _ -> None
 
-let rec make_comb_get_proof_argument :
-    type b bc. int -> (b, bc) ty -> b comb_get_proof_argument option =
+let rec make_comb_get_proof_argument : type b bc.
+    int -> (b, bc) ty -> b comb_get_proof_argument option =
  fun n ty ->
   match (n, ty) with
   | 0, value_ty -> Some (Comb_get_proof_argument (Comb_get_zero, value_ty))
@@ -1243,8 +1242,7 @@ let rec make_comb_get_proof_argument :
          Comb_get_proof_argument (Comb_get_plus_two comb_get_left_witness, ty')
   | _ -> None
 
-let rec make_comb_set_proof_argument :
-    type value valuec before beforec a s.
+let rec make_comb_set_proof_argument : type value valuec before beforec a s.
     context ->
     (a, s) stack_ty ->
     location ->
@@ -1283,8 +1281,7 @@ let find_entrypoint (type full fullc error_context error_trace)
     (full : (full, fullc) ty) (entrypoints : full entrypoints) entrypoint :
     (full ex_ty_cstr, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
-  let rec find_entrypoint :
-      type t tc.
+  let rec find_entrypoint : type t tc.
       (t, tc) ty ->
       t entrypoints_node ->
       Entrypoint.t ->
@@ -1341,10 +1338,10 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
           Gas_monad.bind_recover
             (ty_eq ~error_details:Fast ty expected)
             (function
-              | Ok Eq -> return (Entrypoint.default, (ty : (exp, expc) ty))
-              | Error Inconsistent_types_fast ->
-                  let+ Eq = ty_eq ~error_details full expected in
-                  (Entrypoint.root, (full : (exp, expc) ty)))
+            | Ok Eq -> return (Entrypoint.default, (ty : (exp, expc) ty))
+            | Error Inconsistent_types_fast ->
+                let+ Eq = ty_eq ~error_details full expected in
+                (Entrypoint.root, (full : (exp, expc) ty)))
       | _ ->
           let+ Eq = ty_eq ~error_details ty expected in
           (entrypoint, (ty : (exp, expc) ty)))
@@ -1371,8 +1368,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
         if Entrypoint.Set.mem name all then tzfail (Duplicate_entrypoint name)
         else return ((first_unreachable, Entrypoint.Set.add name all), true)
   in
-  let rec check :
-      type t tc.
+  let rec check : type t tc.
       (t, tc) ty ->
       t entrypoints_node ->
       prim list ->
@@ -2078,8 +2074,7 @@ let normalized_lam_rec ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
              [allow_forged_lazy_storage_id] should be [false] but [allow_forged_tickets] should be [true] as users are allowed to transfer tickets. Checking ticket ownership is handled by the ticket table.
            *)
 
-let rec parse_data :
-    type a ac.
+let rec parse_data : type a ac.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -2549,8 +2544,7 @@ let rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_chest_key ctxt expr
   | Chest_t, expr -> Lwt.return @@ traced_no_lwt @@ parse_chest ctxt expr
 
-and parse_view :
-    type storage storagec.
+and parse_view : type storage storagec.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
@@ -2562,7 +2556,8 @@ and parse_view :
       ~elab_conf
       ctxt
       storage_type
-      {input_ty; output_ty; view_code} ->
+      {input_ty; output_ty; view_code}
+    ->
     let legacy = elab_conf.legacy in
     let input_ty_loc = location input_ty in
     let*? Ex_ty input_ty, ctxt =
@@ -2625,8 +2620,7 @@ and parse_view :
                 ctxt )
         | _ -> tzfail (ill_type_view aft loc))
 
-and parse_views :
-    type storage storagec.
+and parse_views : type storage storagec.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     context ->
@@ -2645,8 +2639,7 @@ and parse_views :
     in
     Script_map.map_es_in_context aux ctxt views
 
-and parse_kdescr :
-    type arg argc ret retc.
+and parse_kdescr : type arg argc ret retc.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -2664,7 +2657,8 @@ and parse_kdescr :
       ctxt
       arg
       ret
-      script_instr ->
+      script_instr
+    ->
     let* result =
       parse_instr
         ~unparse_code_rec
@@ -2700,8 +2694,7 @@ and parse_kdescr :
               : (arg, end_of_stack, ret, end_of_stack) kdescr),
             ctxt )
 
-and parse_lam_rec :
-    type arg argc ret retc.
+and parse_lam_rec : type arg argc ret retc.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -2773,8 +2766,7 @@ and parse_lam_rec :
         (close_descr (descr (Item_t (ret, Bot_t))))
         script_instr
 
-and parse_instr :
-    type a s.
+and parse_instr : type a s.
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -2855,8 +2847,7 @@ and parse_instr :
   | Prim (loc, I_DROP, [n], result_annot), whole_stack ->
       let*? whole_n = parse_uint10 n in
       let*? ctxt = Gas.consume ctxt (Typecheck_costs.proof_argument whole_n) in
-      let rec make_proof_argument :
-          type a s.
+      let rec make_proof_argument : type a s.
           int -> (a, s) stack_ty -> (a, s) dropn_proof_argument tzresult =
         let open Result_syntax in
         fun n stk ->
@@ -2894,8 +2885,7 @@ and parse_instr :
       typed ctxt loc dup (Item_t (v, stack))
   | Prim (loc, I_DUP, [n], v_annot), (Item_t _ as stack_ty) ->
       let*? () = check_var_annot loc v_annot in
-      let rec make_proof_argument :
-          type a b s.
+      let rec make_proof_argument : type a b s.
           int -> (a, b * s) stack_ty -> (a, b, s) dup_n_proof_argument tzresult
           =
         let open Result_syntax in
@@ -2928,9 +2918,8 @@ and parse_instr :
       let dupn = {apply = (fun k -> IDup_n (loc, n, witness, k))} in
       typed ctxt loc dupn (Item_t (after_ty, stack_ty))
   | Prim (loc, I_DIG, [n], result_annot), stack ->
-      let rec make_proof_argument :
-          type a s. int -> (a, s) stack_ty -> (a, s) dig_proof_argument tzresult
-          =
+      let rec make_proof_argument : type a s.
+          int -> (a, s) stack_ty -> (a, s) dig_proof_argument tzresult =
         let open Result_syntax in
         fun n stk ->
           match (Compare.Int.(n = 0), stk) with
@@ -3070,8 +3059,7 @@ and parse_instr :
       typed ctxt loc cons_pair stack_ty
   | Prim (loc, I_PAIR, [n], annot), (Item_t _ as stack_ty) ->
       let*? () = check_var_annot loc annot in
-      let rec make_proof_argument :
-          type a b s.
+      let rec make_proof_argument : type a b s.
           int -> (a, b * s) stack_ty -> (a, b, s) comb_proof_argument tzresult =
         let open Result_syntax in
         fun n stack_ty ->
@@ -3096,8 +3084,7 @@ and parse_instr :
       typed ctxt loc comb after_ty
   | Prim (loc, I_UNPAIR, [n], annot), (Item_t _ as stack_ty) ->
       let*? () = error_unexpected_annot loc annot in
-      let rec make_proof_argument :
-          type a b s.
+      let rec make_proof_argument : type a b s.
           int -> (a, b * s) stack_ty -> (a, b, s) uncomb_proof_argument tzresult
           =
         let open Result_syntax in
@@ -3813,8 +3800,7 @@ and parse_instr :
   | Prim (loc, I_DIP, [n; code], result_annot), stack ->
       let*? n = parse_uint10 n in
       let*? ctxt = Gas.consume ctxt (Typecheck_costs.proof_argument n) in
-      let rec make_proof_argument :
-          type a s.
+      let rec make_proof_argument : type a s.
           int -> (a, s) stack_ty -> (a, s) dipn_proof_argument tzresult Lwt.t =
        fun n stk ->
         match (Compare.Int.(n = 0), stk) with
@@ -4321,6 +4307,21 @@ and parse_instr :
       let*? () = check_var_annot loc annot in
       let instr = {apply = (fun k -> IIs_implicit_account (loc, k))} in
       let stack = Item_t (key_hash_option_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, (I_INDEX_ADDRESS as prim), [], annot), Item_t (Address_t, rest)
+    ->
+      (* Indexing an address is forbidden in views as it is stateful, which
+         defeats views semantics. *)
+      let*? () = Tc_context.check_not_in_view loc ~legacy tc_context prim in
+      let*? () = check_var_annot loc annot in
+      let instr = {apply = (fun k -> IIndex_address (loc, k))} in
+      let stack = Item_t (Nat_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_GET_ADDRESS_INDEX, [], annot), Item_t (Address_t, rest) ->
+      let*? () = check_var_annot loc annot in
+      let instr = {apply = (fun k -> IGet_address_index (loc, k))} in
+      let*? ty = option_t loc Nat_t in
+      let stack = Item_t (ty, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, (I_CREATE_CONTRACT as prim), [(Seq _ as code)], annot),
       Item_t
@@ -4881,10 +4882,10 @@ and parse_instr :
              I_VIEW;
              I_VOTING_POWER;
              I_XOR;
+             I_INDEX_ADDRESS;
            ]
 
-and parse_contract_data :
-    type arg argc.
+and parse_contract_data : type arg argc.
     stack_depth:int ->
     context ->
     Script.location ->
@@ -4919,8 +4920,7 @@ and parse_contract_data :
    The inner [result] is turned into an [option] by [parse_contract_for_script].
    Both [tzresult] are merged by [parse_contract_data].
 *)
-and parse_contract :
-    type arg argc err.
+and parse_contract : type arg argc err.
     stack_depth:int ->
     context ->
     error_details:(location, err) error_details ->
@@ -5066,8 +5066,7 @@ and parse_contract :
    if the expected type doesn't match the actual one. In that case None is
    returned and some overapproximation of the typechecking gas is consumed.
    This can still fail on gas exhaustion. *)
-let parse_contract_for_script :
-    type arg argc.
+let parse_contract_for_script : type arg argc.
     context ->
     Script.location ->
     (arg, argc) ty ->
@@ -5110,6 +5109,28 @@ let code_size ctxt code views =
      [ir_size] during their typechecking. *)
   let+ ctxt = Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes) in
   (code_size, ctxt)
+
+let get_typed_native_code :
+    context -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t =
+ fun ctxt ~kind ->
+  let open Lwt_result_syntax in
+  let*? (Script_native_types.Ex_kind_and_types
+           (kind, {arg_type; storage_type; entrypoints})) =
+    Script_native_types.get_typed_kind_and_types kind
+  in
+  let implementation = Native {kind} in
+  return
+    ( Ex_code
+        (Code
+           {
+             implementation;
+             arg_type;
+             storage_type;
+             entrypoints;
+             views = Script_map.empty string_t;
+             code_size = Saturation_repr.zero;
+           }),
+      ctxt )
 
 let parse_code :
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
@@ -5169,7 +5190,15 @@ let parse_code :
     let*? code_size, ctxt = code_size ctxt code views in
     return
       ( Ex_code
-          (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
+          (Code
+             {
+               implementation = Lambda {code};
+               arg_type;
+               storage_type;
+               views;
+               entrypoints;
+               code_size;
+             }),
         ctxt )
 
 let parse_storage :
@@ -5188,7 +5217,8 @@ let parse_storage :
       ~allow_forged_tickets
       ~allow_forged_lazy_storage_id
       storage_type
-      ~storage ->
+      ~storage
+    ->
     let*? storage, ctxt =
       Script.force_decode_in_context
         ~consume_deserialization_gas:When_needed
@@ -5223,12 +5253,27 @@ let parse_script :
       ctxt
       ~allow_forged_tickets_in_storage
       ~allow_forged_lazy_storage_id_in_storage
-      {code; storage} ->
-    let* ( Ex_code
-             (Code
-               {code; arg_type; storage_type; views; entrypoints; code_size}),
-           ctxt ) =
-      parse_code ~unparse_code_rec ~elab_conf ctxt ~code
+      script
+    ->
+    let* ( ( Ex_code
+               (Code
+                  {
+                    implementation;
+                    arg_type;
+                    storage_type;
+                    views;
+                    entrypoints;
+                    code_size;
+                  }),
+             ctxt ),
+           storage ) =
+      match script with
+      | Script {code; storage} ->
+          let* ex_code = parse_code ~unparse_code_rec ~elab_conf ctxt ~code in
+          return (ex_code, storage)
+      | Native {kind; storage} ->
+          let* ex_code = get_typed_native_code ctxt ~kind in
+          return (ex_code, storage)
     in
     let+ storage, ctxt =
       parse_storage
@@ -5244,7 +5289,7 @@ let parse_script :
         (Script
            {
              code_size;
-             code;
+             implementation;
              arg_type;
              storage;
              storage_type;
@@ -5359,8 +5404,7 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
                Entrypoint.Map.add name (Ex_ty ty, original_type_expr) all )),
           true )
   in
-  let rec fold_tree :
-      type t tc.
+  let rec fold_tree : type t tc.
       (t, tc) ty ->
       t entrypoints_node ->
       prim list ->
@@ -5398,7 +5442,7 @@ let unparse_code_rec : unparse_code_rec =
     let* code, ctxt = unparse_code ctxt ~stack_depth mode node in
     return (Micheline.root code, ctxt)
 
-let parse_and_unparse_script_unaccounted ctxt ~legacy
+let parse_and_unparse_michelson_script_unaccounted ctxt ~legacy
     ~allow_forged_tickets_in_storage ~allow_forged_lazy_storage_id_in_storage
     mode ~normalize_types {code; storage} =
   let open Lwt_result_syntax in
@@ -5451,8 +5495,8 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy
         Script_map.map_es_in_context
           (fun ctxt
                _name
-               (Typed_view
-                 {input_ty; output_ty; kinstr = _; original_code_expr}) ->
+               (Typed_view {input_ty; output_ty; kinstr = _; original_code_expr})
+             ->
             let*? input_ty, ctxt = unparse_ty ~loc ctxt input_ty in
             let*? output_ty, ctxt = unparse_ty ~loc ctxt output_ty in
             return ({input_ty; output_ty; view_code = original_code_expr}, ctxt))
@@ -5684,8 +5728,7 @@ let rec has_lazy_storage : type t tc. (t, tc) ty -> t has_lazy_storage =
 
        *)
 let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
-  let rec aux :
-      type a ac.
+  let rec aux : type a ac.
       context ->
       unparsing_mode ->
       temporary:bool ->
@@ -5827,8 +5870,7 @@ end
 (** Prematurely abort if [f] generates an error. Use this function without the
            [unit] type for [error] if you are in a case where errors are impossible.
        *)
-let rec fold_lazy_storage :
-    type a ac error.
+let rec fold_lazy_storage : type a ac error.
     f:('acc, error) Fold_lazy_storage.result Lazy_storage.IdSet.fold_f ->
     init:'acc ->
     context ->
@@ -5869,7 +5911,8 @@ let rec fold_lazy_storage :
     | List_f has_lazy_storage, List_t (ty, _), l ->
         List.fold_left_e
           (fun ((init, ctxt) : ('acc, error) Fold_lazy_storage.result * context)
-               x ->
+               x
+             ->
             match init with
             | Fold_lazy_storage.Ok init ->
                 fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
@@ -5881,7 +5924,8 @@ let rec fold_lazy_storage :
           (fun _
                v
                (acc :
-                 (('acc, error) Fold_lazy_storage.result * context) tzresult) ->
+                 (('acc, error) Fold_lazy_storage.result * context) tzresult)
+             ->
             let* init, ctxt = acc in
             match init with
             | Fold_lazy_storage.Ok init ->
@@ -5987,8 +6031,7 @@ let parse_comparable_data ?type_logger ctxt ty t =
     ty
     t
 
-let parse_instr :
-    type a s.
+let parse_instr : type a s.
     elab_conf:elab_conf ->
     tc_context ->
     context ->
@@ -6088,16 +6131,16 @@ let get_single_sapling_state ctxt ty x =
        *)
 let script_size
     (Ex_script
-      (Script
-        {
-          code_size;
-          code = _;
-          arg_type = _;
-          storage;
-          storage_type;
-          entrypoints = _;
-          views = _;
-        })) =
+       (Script
+          {
+            code_size;
+            implementation = _;
+            arg_type = _;
+            storage;
+            storage_type;
+            entrypoints = _;
+            views = _;
+          })) =
   let nodes, storage_size =
     Script_typed_ir_size.value_size storage_type storage
   in

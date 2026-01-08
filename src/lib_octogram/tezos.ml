@@ -260,8 +260,8 @@ module Start_octez_node = struct
 
   type r = start_octez_node_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Start_octez_node args -> Some args
     | _ -> None
 
@@ -286,7 +286,8 @@ module Start_octez_node = struct
                metrics_port;
                rpc_port;
                dal_cryptobox_parameters;
-             } ->
+             }
+           ->
           ( name,
             path_node,
             network,
@@ -306,7 +307,8 @@ module Start_octez_node = struct
                net_port,
                metrics_port,
                rpc_port,
-               dal_cryptobox_parameters ) ->
+               dal_cryptobox_parameters )
+           ->
           {
             name;
             path_node;
@@ -563,7 +565,8 @@ let dal_parameters_encoding =
            attestation_lag;
            attestation_threshold;
            number_of_slots;
-         } ->
+         }
+       ->
       ( cryptobox,
         (attestation_lag, attestation_threshold, number_of_slots, feature_enable)
       ))
@@ -571,7 +574,8 @@ let dal_parameters_encoding =
            ( attestation_lag,
              attestation_threshold,
              number_of_slots,
-             feature_enable ) ) ->
+             feature_enable ) )
+       ->
       {
         feature_enable;
         cryptobox;
@@ -616,8 +620,8 @@ module Generate_protocol_parameters_file = struct
 
   type r = generate_protocol_parameters_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Generate_protocol_parameters_file args -> Some args
     | _ -> None
 
@@ -642,7 +646,8 @@ module Generate_protocol_parameters_file = struct
              dal;
              minimal_block_delay;
              path_client;
-           } ->
+           }
+         ->
         ( base_file,
           output_file_name,
           wallet,
@@ -662,7 +667,8 @@ module Generate_protocol_parameters_file = struct
              balance_updates,
              dal,
              minimal_block_delay,
-             path_client ) ->
+             path_client )
+         ->
         {
           base_file;
           output_file_name;
@@ -925,8 +931,8 @@ module Activate_protocol = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Active_protocol args -> Some args
     | _ -> None
 
@@ -1040,8 +1046,8 @@ module Wait_for_bootstrapped = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Wait_for_bootstrapped args -> Some args
     | _ -> None
 
@@ -1100,8 +1106,8 @@ module Originate_smart_rollup = struct
 
   type r = originate_smart_rollup_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Originate_smart_rollup args -> Some args
     | _ -> None
 
@@ -1123,10 +1129,12 @@ module Originate_smart_rollup = struct
                kernel_path;
                parameters_type;
                wait;
-             } ->
+             }
+           ->
           (client_base, (wallet, alias, src, kernel_path, parameters_type, wait)))
         (fun ( client_base,
-               (wallet, alias, src, kernel_path, parameters_type, wait) ) ->
+               (wallet, alias, src, kernel_path, parameters_type, wait) )
+           ->
           {client_base; wallet; alias; src; kernel_path; parameters_type; wait})
         (merge_objs
            (client_base_args_encoding uri_encoding)
@@ -1255,8 +1263,8 @@ module Originate_smart_contract = struct
 
   type r = originate_smart_contract_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Originate_smart_contract args -> Some args
     | _ -> None
 
@@ -1270,9 +1278,11 @@ module Originate_smart_contract = struct
   let encoding uri_encoding =
     Data_encoding.(
       conv
-        (fun {client_base; wallet; alias; src; script_path; amount; init; wait} ->
+        (fun {client_base; wallet; alias; src; script_path; amount; init; wait}
+           ->
           (client_base, (wallet, alias, src, script_path, amount, init, wait)))
-        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait)) ->
+        (fun (client_base, (wallet, alias, src, script_path, amount, init, wait))
+           ->
           {client_base; wallet; alias; src; script_path; amount; init; wait})
         (merge_objs
            (client_base_args_encoding uri_encoding)
@@ -1388,8 +1398,8 @@ module Transfer = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Transfer args -> Some args
     | _ -> None
 
@@ -1498,8 +1508,8 @@ module Start_rollup_node = struct
 
   type r = start_rollup_node_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Start_rollup_node args -> Some args
     | _ -> None
 
@@ -1526,7 +1536,8 @@ module Start_rollup_node = struct
                rpc_port;
                metrics_port;
                kernel_log_path;
-             } ->
+             }
+           ->
           ( ( name,
               path_rollup_node,
               path_client,
@@ -1548,7 +1559,8 @@ module Start_rollup_node = struct
                  address,
                  data_dir_path,
                  rpc_port ),
-               (metrics_port, kernel_log_path) ) ->
+               (metrics_port, kernel_log_path) )
+           ->
           {
             name;
             path_rollup_node;
@@ -1709,8 +1721,8 @@ module Prepare_kernel_installer = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Prepare_kernel_installer args -> Some args
     | _ -> None
 
@@ -1730,7 +1742,8 @@ module Prepare_kernel_installer = struct
                preimage_directory_path;
                installer_kernel_path;
                setup;
-             } ->
+             }
+           ->
           ( installer_generator_path,
             kernel_path,
             preimage_directory_path,
@@ -1740,7 +1753,8 @@ module Prepare_kernel_installer = struct
                kernel_path,
                preimage_directory_path,
                installer_kernel_path,
-               setup ) ->
+               setup )
+           ->
           {
             installer_generator_path;
             kernel_path;
@@ -1923,8 +1937,8 @@ module Smart_rollups_add_messages = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Smart_rollups_add_messages args -> Some args
     | _ -> None
 
@@ -2025,8 +2039,8 @@ module Generate_keys = struct
 
   type r = generate_keys_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Generate_keys args -> Some args
     | _ -> None
 
@@ -2169,8 +2183,8 @@ module Start_octez_dal_node = struct
 
   type r = start_dal_node_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Start_octez_dal_node args -> Some args
     | _ -> None
 
@@ -2197,7 +2211,8 @@ module Start_octez_dal_node = struct
              producer_profiles;
              path_client;
              base_dir;
-           } ->
+           }
+         ->
         ( ( name,
             path_node,
             rpc_port,
@@ -2219,7 +2234,8 @@ module Start_octez_dal_node = struct
                bootstrap_profile,
                attester_profiles,
                producer_profiles ),
-             (path_client, base_dir) ) ->
+             (path_client, base_dir) )
+         ->
         {
           name;
           path_node;
@@ -2465,8 +2481,8 @@ module Start_octez_baker = struct
 
   type r = start_octez_baker_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Start_octez_baker args -> Some args
     | _ -> None
 
@@ -2489,7 +2505,8 @@ module Start_octez_baker = struct
              dal_node_uri;
              delegates;
              baker_path;
-           } ->
+           }
+         ->
         ( name,
           protocol,
           base_dir,
@@ -2505,7 +2522,8 @@ module Start_octez_baker = struct
              node_data_dir,
              dal_node_uri,
              delegates,
-             baker_path ) ->
+             baker_path )
+         ->
         {
           name;
           protocol;
@@ -2690,8 +2708,8 @@ module Publish_dal_slot : Remote_procedure.S = struct
 
   type r = publish_dal_slot_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Publish_dal_slot args -> Some args
     | _ -> None
 
@@ -2713,7 +2731,8 @@ module Publish_dal_slot : Remote_procedure.S = struct
              base_dir;
              source;
              path_client;
-           } ->
+           }
+         ->
         ( slot_info,
           target_published_level,
           l1_node_uri,
@@ -2727,7 +2746,8 @@ module Publish_dal_slot : Remote_procedure.S = struct
              dal_node_uri,
              base_dir,
              source,
-             path_client ) ->
+             path_client )
+         ->
         {
           slot_info;
           target_published_level;

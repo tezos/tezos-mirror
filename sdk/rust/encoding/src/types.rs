@@ -43,7 +43,7 @@ impl From<&BigInt> for num_bigint::BigInt {
 }
 
 /// Zarith number
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Zarith(pub num_bigint::BigInt);
 
 impl From<num_bigint::BigInt> for Zarith {
@@ -82,10 +82,34 @@ impl From<&Zarith> for BigInt {
     }
 }
 
+impl From<i32> for Zarith {
+    fn from(value: i32) -> Self {
+        Zarith(value.into())
+    }
+}
+
+impl From<u64> for Zarith {
+    fn from(value: u64) -> Self {
+        Zarith(value.into())
+    }
+}
+
+impl From<num_bigint::BigUint> for Zarith {
+    fn from(from: num_bigint::BigUint) -> Self {
+        Zarith(num_bigint::BigInt::from(from))
+    }
+}
+
+impl From<Narith> for Zarith {
+    fn from(from: Narith) -> Self {
+        Zarith(num_bigint::BigInt::from(from.0))
+    }
+}
+
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Narith(pub num_bigint::BigUint);
 
 #[deprecated = "Mutez has been replaced by Narith, which has identical semantics for encoding & decoding"]
@@ -416,6 +440,53 @@ impl<'de> serde::Deserialize<'de> for Bytes {
             let bytes = serde::Deserialize::deserialize(deserializer)?;
             Ok(Self(bytes))
         }
+    }
+}
+
+/// This is a wrapper to encode an `A` as an `Option<A>` such that
+/// `A::default()` is encoded as `None`.
+#[derive(PartialEq, Debug, Clone)]
+pub struct WithDefaultValue<A: PartialEq + Default + Clone> {
+    as_option: Option<A>,
+}
+
+impl<A: PartialEq + Default + Clone> From<A> for WithDefaultValue<A> {
+    fn from(a: A) -> Self {
+        let as_option = if a == A::default() { None } else { Some(a) };
+        Self { as_option }
+    }
+}
+
+impl<A: PartialEq + Default + Clone> WithDefaultValue<A> {
+    pub fn into(self) -> A {
+        self.as_option.unwrap_or_default()
+    }
+}
+
+impl<A> BinWriter for WithDefaultValue<A>
+where
+    A: BinWriter + PartialEq + Default + Clone,
+{
+    fn bin_write(&self, out: &mut Vec<u8>) -> crate::enc::BinResult {
+        crate::enc::field(
+            "WithDefaultValue::as_option",
+            crate::enc::optional_field(A::bin_write),
+        )(&self.as_option, out)
+    }
+}
+
+impl<'a, A> NomReader<'a> for WithDefaultValue<A>
+where
+    A: NomReader<'a> + PartialEq + Default + Clone,
+{
+    fn nom_read(bytes: &'a [u8]) -> crate::nom::NomResult<'a, Self> {
+        nom::combinator::map(
+            crate::nom::field(
+                "WithDefaultValue::as_option",
+                crate::nom::optional_field(A::nom_read),
+            ),
+            |as_option| WithDefaultValue { as_option },
+        )(bytes)
     }
 }
 

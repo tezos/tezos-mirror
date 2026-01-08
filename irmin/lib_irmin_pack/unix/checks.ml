@@ -48,7 +48,7 @@ let path =
   @@ pos 0 (some string) None
   @@ info ~doc:"Path to the Irmin store on disk" ~docv:"PATH" []
 
-let deprecated_info = (Cmdliner.Term.info [@alert "-deprecated"])
+let deprecated_info = Cmdliner.Term.info [@alert "-deprecated"]
 
 let ppf_or_null ppf =
   let null =
@@ -383,10 +383,11 @@ end
 
 module Integrity_checks
     (XKey : Pack_key.S)
-    (X : Irmin.Backend.S
-           with type Commit.key = XKey.t
-            and type Node.key = XKey.t
-            and type Schema.Hash.t = XKey.hash)
+    (X :
+      Irmin.Backend.S
+        with type Commit.key = XKey.t
+         and type Node.key = XKey.t
+         and type Schema.Hash.t = XKey.hash)
     (Index : Pack_index.S) =
 struct
   let check_always ?ppf ~auto_repair ~check index =

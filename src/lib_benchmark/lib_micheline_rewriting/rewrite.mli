@@ -52,10 +52,11 @@ module Make
     (X : Algebraic_signature.S)
     (M : Micheline_sig.S with type head = X.t)
     (Path : Path.S)
-    (Patt : Pattern.S
-              with type head = X.t
-               and type path = Path.t
-               and type node = M.node) :
+    (Patt :
+      Pattern.S
+        with type head = X.t
+         and type path = Path.t
+         and type node = M.node) :
   S
     with type label = M.label
      and type head = X.t

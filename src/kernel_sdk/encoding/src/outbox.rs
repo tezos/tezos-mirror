@@ -16,8 +16,8 @@
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
+use tezos_protocol::contract::Contract;
 
-use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use crate::michelson::Michelson;
 use crate::public_key_hash::PublicKeyHash;

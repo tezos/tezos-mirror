@@ -1,0 +1,23 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/bls12_381_fr_z_nat.tz on storage 0x5b0ecd0fa853810e356f1eb79721e80b30510fcc3a455f4fc02fdd9a90c5401f and input 33644916630334844239120348434626468649534186770809802792596996408934105684394 --level 1 --trace-stack
+storage
+  0x2ef123703093cbbbd124e15f2054fa5781ed0b8d092ec3c6e5d76b4ca918a221
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 4.278)
+    [ (Pair 33644916630334844239120348434626468649534186770809802792596996408934105684394
+            0x5b0ecd0fa853810e356f1eb79721e80b30510fcc3a455f4fc02fdd9a90c5401f) ]
+  - location: 7 (just consumed gas: 0.010)
+    [ 33644916630334844239120348434626468649534186770809802792596996408934105684394
+      0x5b0ecd0fa853810e356f1eb79721e80b30510fcc3a455f4fc02fdd9a90c5401f ]
+  - location: 8 (just consumed gas: 0.299)
+    [ 0x2ef123703093cbbbd124e15f2054fa5781ed0b8d092ec3c6e5d76b4ca918a221 ]
+  - location: 9 (just consumed gas: 0.010)
+    [ {}
+      0x2ef123703093cbbbd124e15f2054fa5781ed0b8d092ec3c6e5d76b4ca918a221 ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Pair {} 0x2ef123703093cbbbd124e15f2054fa5781ed0b8d092ec3c6e5d76b4ca918a221) ]
+

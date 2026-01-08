@@ -283,7 +283,7 @@ module Make_daemon (Agent : AGENT) :
       (Rpc_services.get_block_hash
          ~node_addr [@profiler.record_s {verbosity = Notice} "get_block_hash"])
     in
-    () [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
+    () [@profiler.overwrite Profiler.reset_block_section (block_hash, [])] ;
     let* period_kind, remaining =
       (Rpc_services.get_current_period
          ~node_addr
@@ -404,7 +404,7 @@ module Make_daemon (Agent : AGENT) :
             old_baker.baker.process.thread
       | None ->
           (* If there is no [old_baker], this promise is not expected to resolve
-             anytime. *)
+           anytime. *)
           Lwt_utils.never_ending ()
     in
     let head_stream =

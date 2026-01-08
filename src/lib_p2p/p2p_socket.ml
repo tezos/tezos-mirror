@@ -553,8 +553,7 @@ module Reader = struct
 
     type error += No_stream
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         self ->
         (r, request_error) P2p_workers.loop ->
         (r, request_error) result Lwt.t =
@@ -726,8 +725,7 @@ module Writer = struct
 
     type launch_error = tztrace
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         self ->
         (r, request_error) P2p_workers.loop ->
         (r, request_error) result Lwt.t =
@@ -935,8 +933,8 @@ let catch_closed_pipe f =
   let open Lwt_result_syntax in
   let*! r =
     Lwt.catch f (function
-        | Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
-        | exn -> fail_with_exn exn)
+      | Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
+      | exn -> fail_with_exn exn)
   in
   match r with
   | Error (Exn Lwt_pipe.Closed :: _) -> tzfail P2p_errors.Connection_closed

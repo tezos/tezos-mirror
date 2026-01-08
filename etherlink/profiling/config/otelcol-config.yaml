@@ -3,19 +3,76 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4318
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      paging:
+        metrics:
+          system.paging.utilization:
+            enabled: true
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      disk:
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+      load:
+      memory:
+      network:
+      processes:
 
 exporters:
   debug:
     verbosity: detailed
-  otlphttp/tempo:
-    endpoint: http://tempo:4318
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp:
+    endpoint: http://loki:3100/otlp
+  datadog/exporter:
+    hostname: "${HOSTNAME}"
+    api:
+      site: "datadoghq.eu"
+      key: "${DD_API_KEY}"
+    tls:
+      insecure_skip_verify: true
+    metrics:
+      resource_attributes_as_tags: true
+
+connectors:
+  # The Datadog connector is necessary for APM Trace metrics.
+  datadog/connector:
+    traces:
+      compute_stats_by_span_kind: true
+      peer_tags_aggregation: true
+      peer_tags:
+        ["_dd.base_service","amqp.destination","amqp.exchange","amqp.queue","aws.queue.name","aws.s3.bucket","bucketname","db.cassandra.contact.points","db.couchbase.seed.nodes","db.hostname","db.instance","db.name","db.namespace","db.system","grpc.host","hostname","http.host","http.server_name","messaging.destination","messaging.destination.name","messaging.kafka.bootstrap.servers","messaging.rabbitmq.exchange","messaging.system","mongodb.db","msmq.queue.path","net.peer.name","network.destination.name","peer.hostname","peer.service","queuename","rpc.service","rpc.system","server.address","streamname","tablename","topicname"]
 
 processors:
   batch:
+    send_batch_max_size: 100
+    send_batch_size: 10
+    timeout: 10s
 
 service:
   pipelines:
+    metrics:
+      receivers: [otlp, datadog/connector, hostmetrics]
+      processors: [batch]
+      exporters: [datadog/exporter]
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, otlphttp/tempo]
+      exporters: [otlp, datadog/exporter, datadog/connector]
+    logs/loki:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp]
+    logs/datadog:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [datadog/exporter]

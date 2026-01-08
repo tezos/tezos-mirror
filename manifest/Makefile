@@ -9,9 +9,8 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        externals.ml \
        internals.ml \
        product_data_encoding.mli product_data_encoding.ml \
-       product_cohttp.mli product_cohttp.ml \
        product_websocket.mli product_websocket.ml \
-       product_opentelemetry.mli product_opentelemetry.ml \
+       product_lwt_domain.ml \
        product_prometheus.mli product_prometheus.ml \
        product_resto.mli product_resto.ml \
        product_efunc_core.mli product_efunc_core.ml \
@@ -119,6 +118,7 @@ check: all
 	  echo "You should not edit generated dune and .opam files directly."; \
 	  echo "Edit manifest/main.ml instead."; \
 	  echo "Then run 'make -C manifest' and commit the difference."; \
+		git status; \
 	  exit 1 \
 	)
 

@@ -194,6 +194,16 @@ let mode_to_endpoint = function
 let string_of_endpoint ?hostname e =
   sf "%s://%s:%d%s" (scheme e) (address ?hostname e) (rpc_port e) (rpc_path e)
 
+let url_encoded_string_of_endpoint ?hostname e =
+  sf
+    "%s%s%s%s%d%s"
+    (scheme e)
+    "%3A%2F%2F"
+    (address ?hostname e)
+    "%3A"
+    (rpc_port e)
+    (rpc_path e)
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
@@ -594,6 +604,7 @@ let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
     match secret_key with
     | Encrypted _ -> Account.uri_of_secret_key secret_key
     | Unencrypted _ -> Test.fail "Unencrypted key"
+    | Remote _ -> Test.fail "Remote key"
   in
   spawn_command_with_stdin
     ?hooks
@@ -628,9 +639,8 @@ let spawn_import_public_key ?(force = false) ?endpoint client public_key ~alias
 
 let spawn_import_secret_key ?(force = false) ?endpoint client
     (secret_key : Account.secret_key) ~alias =
-  let sk_uri =
-    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ secret_key
-  in
+  Account.require_unencrypted_or_remote_secret_key ~__LOC__ secret_key ;
+  let sk_uri = Account.uri_of_secret_key secret_key in
   let force = if force then ["--force"] else [] in
   spawn_command
     ?endpoint
@@ -1247,17 +1257,18 @@ let spawn_add_address ?(force = false) client ~alias ~src =
 let add_address ?force client ~alias ~src =
   spawn_add_address ?force client ~alias ~src |> Process.check
 
-let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
-    ?arg ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client
-    =
+let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
+    ?(wait = "none") ?burn_cap ?fee ?fee_cap ?gas_limit ?safety_guard
+    ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
+    ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?env
     ?log_output
     ?endpoint
     ?hooks
     client
-    (["--wait"; wait]
+    ((if log_requests then ["--log-requests"] else [])
+    @ ["--wait"; wait]
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
     @ Option.fold
         ~none:[]
@@ -1274,11 +1285,12 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
-let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?fee_cap
-    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
-    ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
+let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
+    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
+    ?arg ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?env
+    ?log_requests
     ?log_output
     ?endpoint
     ?hooks
@@ -1421,13 +1433,14 @@ let call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint ?arg
     client
   |> Process.check
 
-let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
-    ~src client =
+let reveal ?endpoint ?(log_requests = false) ?(wait = "none") ?fee ?fee_cap
+    ?(force_low_fee = false) ~src client =
   let value =
     spawn_command
       ?endpoint
       client
-      (["--wait"; wait]
+      ((if log_requests then ["--log-requests"] else [])
+      @ ["--wait"; wait]
       @ ["reveal"; "key"; "for"; src]
       @ optional_arg "fee" Tez.to_string fee
       @ optional_arg "fee-cap" Tez.to_string fee_cap
@@ -1877,8 +1890,8 @@ let write_stresstest_sources_file ?runner ~sources filename =
       Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
 let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
-    ?transfers ?tps ?fresh_probability ?smart_contract_parameters client
-    sources_filename =
+    ?transfers ?tps ?fresh_probability ?smart_contract_parameters ?strategy
+    ?level_limit client sources_filename =
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1898,6 +1911,10 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
     | Some (arg : float) -> [name; Float.to_string arg]
     | None -> []
   in
+  let make_string_int_opt_arg (name : string) s = function
+    | Some (arg : int) -> [name; sf "%s%s" s (Int.to_string arg)]
+    | None -> []
+  in
   let fee_arg =
     match fee with None -> [] | Some x -> ["--fee"; Tez.to_string x]
   in
@@ -1909,21 +1926,22 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
           "--smart-contract-parameters";
           Ezjsonm.value_to_string
             (`O
-              (List.map
-                 (fun ( alias,
-                        {probability; invocation_fee; invocation_gas_limit} ) ->
-                   ( alias,
-                     `O
-                       [
-                         ("probability", Ezjsonm.float probability);
-                         ( "invocation_fee",
-                           Ezjsonm.string
-                             (Int.to_string (Tez.to_mutez invocation_fee)) );
-                         ( "invocation_gas_limit",
-                           Ezjsonm.string (Int.to_string invocation_gas_limit)
-                         );
-                       ] ))
-                 items));
+               (List.map
+                  (fun ( alias,
+                         {probability; invocation_fee; invocation_gas_limit} )
+                     ->
+                    ( alias,
+                      `O
+                        [
+                          ("probability", Ezjsonm.float probability);
+                          ( "invocation_fee",
+                            Ezjsonm.string
+                              (Int.to_string (Tez.to_mutez invocation_fee)) );
+                          ( "invocation_gas_limit",
+                            Ezjsonm.string (Int.to_string invocation_gas_limit)
+                          );
+                        ] ))
+                  items));
         ]
   in
   spawn_command ?env ?endpoint client
@@ -1941,6 +1959,8 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
+  @ make_string_int_opt_arg "--level-limit" "+" level_limit
+  @ make_string_int_opt_arg "--strategy" "fixed:" strategy
 
 let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
@@ -2100,13 +2120,17 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
   |> Process.check
 
 let stresstest_fund_accounts_from_source ?env ?endpoint ~source_key_pkh
-    ?batch_size ?batches_per_block ?initial_amount client =
+    ?burn_cap ?fee_cap ?default_gas_limit ?batch_size ?batches_per_block
+    ?initial_amount client =
   spawn_command
     ?env
     ?endpoint
     client
     (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
     @ optional_arg "batch-size" string_of_int batch_size
+    @ optional_arg "burn-cap" string_of_int burn_cap
+    @ optional_arg "fee-cap" string_of_int fee_cap
+    @ optional_arg "default-gas-limit" string_of_int default_gas_limit
     @ optional_arg "batches-per-block" string_of_int batches_per_block
     @ optional_arg
         "initial-amount"
@@ -3189,7 +3213,16 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
       | None -> acc
       | Some accounts ->
           List.fold_left
-            (fun acc x -> (x, default_accounts_balance, revealed) :: acc)
+            (fun acc x ->
+              ( x,
+                Some
+                  {
+                    Protocol.balance = default_accounts_balance;
+                    consensus_key = None;
+                    delegate = None;
+                  },
+                revealed )
+              :: acc)
             acc
             accounts
     in
@@ -3204,6 +3237,7 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
     in
     let* parameter_file =
       Protocol.write_parameter_file
+        ~overwrite_bootstrap_accounts:None
         ~additional_bootstrap_accounts
         ~base:
           (Option.fold
@@ -4876,3 +4910,8 @@ let threshold_bls_signatures ~pk ~msg client id_signatures =
     |> Process.check_and_read_stdout
   in
   return (String.trim s)
+
+(* Environment variable names for experimental client/baker features *)
+let signing_delay_env_var = "TEZOS_SIGN_DELAY_I_KNOW_WHAT_I_AM_DOING"
+
+let fixed_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"

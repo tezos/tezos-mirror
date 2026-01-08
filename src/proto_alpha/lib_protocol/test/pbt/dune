@@ -44,7 +44,6 @@
  (modules
   liquidity_baking_pbt
   saturation_fuzzing
-  test_merkle_list
   test_gas_properties
   test_sampler
   test_script_comparison

@@ -53,12 +53,23 @@ let pk_json (alias, _pkh, pk, _ck) =
    ed25519 pk sk : 32+1 bytes
 *)
 
-let sk_of_pk (pk_s : string) : string =
+let fake_sk_of_pk (pk_s : string) : string =
   let open Tezos_crypto.Signature.V_latest in
   let pk = Public_key.of_b58check_exn pk_s in
   let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
-  let sk_b = Bytes.sub pk_b 0 33 in
-  let sk = Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b in
+  let sk : Signature.Secret_key.t =
+    match pk with
+    | Ed25519 _ | Secp256k1 _ | P256 _ ->
+        let sk_b = Bytes.sub pk_b 0 33 in
+        (* Extracting fake secret key from the associated public key.*)
+        Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b
+    | Bls _ ->
+        (* For BLS we cannot easily encode secret key from public key bytes. It
+           is simpler to generate a new random secret key with the public key as
+           seed. *)
+        let sk = Bls12_381_signature.generate_sk pk_b in
+        Bls sk
+  in
   let sk_s = Secret_key.to_b58check sk in
   sk_s
 
@@ -66,7 +77,8 @@ let sk_json (alias, _pkh, pk, _ck) =
   Ezjsonm.(
     dict
       [
-        ("name", string alias); ("value", string @@ "unencrypted:" ^ sk_of_pk pk);
+        ("name", string alias);
+        ("value", string @@ "unencrypted:" ^ fake_sk_of_pk pk);
       ])
 
 let ck_json (alias, pkh, _pk, ck) =
@@ -177,8 +189,14 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
   match share with
   | None ->
       List.map
-        (fun (pkh, pk, ck, stb, frz, unstk_frz) ->
-          (pkh, pk, ck, to_mutez stb, to_mutez frz, to_mutez unstk_frz))
+        (fun (pkh, pk, consensus_key, companion_key, stb, frz, unstk_frz) ->
+          ( pkh,
+            pk,
+            consensus_key,
+            companion_key,
+            to_mutez stb,
+            to_mutez frz,
+            to_mutez unstk_frz ))
         keys_list
   | Some share ->
       let staking_amount_limit =
@@ -193,17 +211,65 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
         staking_amount_limit ;
       let rec loop ((keys_acc, stb_acc) as acc) = function
         | [] -> acc
-        | (pkh, pk, ck, stb, frz, unstk_frz) :: l ->
+        | (pkh, pk, consensus_key, companion_key, stb, frz, unstk_frz) :: l ->
             if Compare.Int64.(stb_acc > staking_amount_limit) then acc
               (* Stop whenever the limit is exceeded. *)
             else
               loop
-                ( (pkh, pk, ck, to_mutez stb, to_mutez frz, to_mutez unstk_frz)
+                ( ( pkh,
+                    pk,
+                    consensus_key,
+                    companion_key,
+                    to_mutez stb,
+                    to_mutez frz,
+                    to_mutez unstk_frz )
                   :: keys_acc,
                   Int64.add (to_mutez stb) stb_acc )
                 l
       in
       loop ([], 0L) keys_list |> fst |> List.rev
+
+let get_consensus_keys (type ctxt pkh)
+    (module P : Sigs.PROTOCOL
+      with type context = ctxt
+       and type Signature.public_key_hash = pkh) (ctxt : ctxt) pk (pkh : pkh) =
+  let open Lwt_result_syntax in
+  let* cpk, pending_cpks = P.Delegate.consensus_keys ctxt pkh in
+  let cpk = P.Signature.To_latest.public_key cpk in
+  let pending_cpks =
+    List.map
+      (fun pending_pk ->
+        let pending_pk = P.Signature.To_latest.public_key pending_pk in
+        let pending_pkh = Tezos_crypto.Signature.Public_key.hash pending_pk in
+        (pending_pkh, pending_pk))
+      pending_cpks
+  in
+  if Tezos_crypto.Signature.Public_key.equal pk cpk then
+    return (None, pending_cpks)
+  else
+    let cpkh = Tezos_crypto.Signature.Public_key.hash cpk in
+    return (Some (cpkh, cpk), pending_cpks)
+
+let get_companion_keys (type ctxt pkh)
+    (module P : Sigs.PROTOCOL
+      with type context = ctxt
+       and type Signature.public_key_hash = pkh) (ctxt : ctxt) (pkh : pkh) =
+  let open Lwt_result_syntax in
+  let* cpk, pending_cpks = P.Delegate.companion_keys ctxt pkh in
+  let pending_cpks =
+    List.map
+      (fun pending_pk ->
+        let pending_pkh =
+          Tezos_crypto.Signature.Bls.Public_key.hash pending_pk
+        in
+        (pending_pkh, pending_pk))
+      pending_cpks
+  in
+  match cpk with
+  | Some cpk ->
+      let cpkh = Tezos_crypto.Signature.Bls.Public_key.hash cpk in
+      return (Some (cpkh, cpk), pending_cpks)
+  | None -> return (None, pending_cpks)
 
 let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
     (header : Block_header.shell_header) active_bakers_only staking_share_opt
@@ -236,20 +302,15 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       ~order:`Sorted
       ~init:(Ok ([], P.Tez.zero))
       ~f:(fun pkh acc ->
-        let* pk = P.Delegate.pubkey ctxt pkh in
-        let* ck =
-          let* cpk = P.Delegate.consensus_key ctxt pkh in
-          if
-            Tezos_crypto.Signature.Public_key.equal
-              (P.Signature.To_latest.public_key pk)
-              (P.Signature.To_latest.public_key cpk)
-          then return_none
-          else
-            let cpkh =
-              Tezos_crypto.Signature.Public_key.hash
-                (P.Signature.To_latest.public_key cpk)
-            in
-            return_some (cpkh, P.Signature.To_latest.public_key cpk)
+        let* pk =
+          P.Delegate.pubkey ctxt pkh
+          |> Lwt_result.map P.Signature.To_latest.public_key
+        in
+        let* active_consensus_key, pending_consensus_keys =
+          get_consensus_keys (module P) ctxt pk pkh
+        in
+        let* active_companion_key, pending_companion_keys =
+          get_companion_keys (module P) ctxt pkh
         in
         let*? key_list_acc, staking_balance_acc = acc in
         let* staking_balance = P.Delegate.staking_balance ctxt pkh in
@@ -263,13 +324,19 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
         let staking_balance_info :
             Signature.public_key_hash
             * Signature.public_key
-            * (Signature.public_key_hash * Signature.public_key) option
+            * ((Signature.public_key_hash * Signature.public_key) option
+              * (Signature.public_key_hash * Signature.public_key) list)
+            * ((Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+               option
+              * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+                list)
             * P.Tez.t
             * P.Tez.t
             * P.Tez.t =
           ( P.Signature.To_latest.public_key_hash pkh,
-            P.Signature.To_latest.public_key pk,
-            ck,
+            pk,
+            (active_consensus_key, pending_consensus_keys),
+            (active_companion_key, pending_companion_keys),
             staking_balance,
             frozen_deposits,
             unstaked_frozen_deposits )
@@ -291,9 +358,10 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
   in
   return
     ( filter_up_to_staking_share staking_share_opt total_stake P.Tez.to_mutez
-      @@ (* By swapping x and y we do a descending sort *)
+      @@
+      (* By swapping x and y we do a descending sort *)
       List.sort
-        (fun (_, _, _, x, _, _) (_, _, _, y, _, _) -> P.Tez.compare y x)
+        (fun (_, _, _, _, x, _, _) (_, _, _, _, y, _, _) -> P.Tez.compare y x)
         delegates,
       accounts )
 
@@ -343,7 +411,7 @@ let get_contracts (module P : Sigs.PROTOCOL) ?dump_contracts context
              },
              0,
              0 ))
-      ~f:(fun acc contract ->
+      ~f:(fun contract acc ->
         let*? contract_list_acc, total_info_acc, nb_account, nb_failures =
           acc
         in
@@ -551,7 +619,169 @@ let get_context ?level ~network_opt base_dir =
   in
   let*! protocol_hash = Store.Block.protocol_hash_exn main_chain_store block in
   let header = header.shell in
-  return (protocol_hash, context, header, store)
+  return (protocol_hash, context, header, store, block)
+
+let load_cache (module P : Sigs.PROTOCOL) context store block =
+  let open Lwt_result_syntax in
+  let open Tezos_store in
+  let predecessor_context = context in
+  let chain_store = Store.main_chain_store store in
+  let chain_id = Store.Chain.chain_id chain_store in
+  let Block_header.
+        {
+          timestamp = predecessor_timestamp;
+          level = predecessor_level;
+          fitness = predecessor_fitness;
+          _;
+        } =
+    Store.Block.shell_header block
+  in
+  let predecessor = Store.Block.hash block in
+  let timestamp = Time.System.to_protocol (Time.System.now ()) in
+  let* value_of_key =
+    P.value_of_key
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+  in
+  Tezos_protocol_environment.Context.load_cache
+    predecessor
+    predecessor_context
+    `Lazy
+    value_of_key
+
+let unexpected_protocol protocol_hash =
+  if
+    protocol_hash
+    = Protocol_hash.of_b58check_exn
+        "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+  then
+    Error_monad.failwith
+      "Context was probably ill loaded, found Genesis protocol.@;\
+       Known protocols are: %a"
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+          Protocol_hash.pp)
+      (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+      @@ Known_protocols.get_all ())
+  else
+    Error_monad.failwith
+      "Unknown protocol hash: %a.@;Known protocols are: %a"
+      Protocol_hash.pp
+      protocol_hash
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+          Protocol_hash.pp)
+      (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+      @@ Known_protocols.get_all ())
+
+let get_context_with_loaded_cache ?level ~network_opt base_dir =
+  let open Lwt_result_syntax in
+  let* protocol_hash, context, header, store, block =
+    get_context ?level ~network_opt base_dir
+  in
+  match protocol_of_hash protocol_hash with
+  | None -> unexpected_protocol protocol_hash
+  | Some protocol ->
+      Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+      let* context = load_cache protocol context store block in
+      return (protocol, context, header, store)
+
+exception
+  Done of (Signature.public_key_hash * Signature.public_key * int64) list
+
+let get_rich_accounts (module P : Sigs.PROTOCOL) context
+    (header : Block_header.shell_header) ~count ~min_threshold =
+  let open Lwt_result_syntax in
+  let level = header.Block_header.level in
+  let predecessor_timestamp = header.timestamp in
+  let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
+  let* context =
+    P.prepare_context context ~level ~predecessor_timestamp ~timestamp
+  in
+  Format.printf "Searching %d accounts over %Ld tez@." count min_threshold ;
+  (* Convert to mutez *)
+  let min_threshold_tz =
+    P.Tez.of_mutez_exn (Int64.mul min_threshold 1_000_000L)
+  in
+  Tezos_stdlib_unix.Animation.(
+    three_dots ~progress_display_mode:Auto ~msg:"Loading rich accounts")
+    (fun () ->
+      let* accounts =
+        Lwt.catch
+          (fun () ->
+            P.Contract.fold context ~init:(Ok []) ~f:(fun contract acc ->
+                let*? acc in
+                let* balance = P.Contract.balance context contract in
+                if balance >= min_threshold_tz then
+                  let pkh = P.Contract.contract_address contract in
+                  match
+                    Tezos_crypto.Signature.V_latest.Public_key_hash
+                    .of_b58check_opt
+                      pkh
+                  with
+                  | None -> return acc
+                  | Some k -> (
+                      let pkh =
+                        match P.Signature.Of_latest.public_key_hash k with
+                        | None ->
+                            (* Not expected at all. *)
+                            assert false
+                        | Some k -> k
+                      in
+                      let*! pk = P.Contract.get_manager_key context pkh in
+                      match pk with
+                      | Error _ ->
+                          (* Can fail for missing_manager_contract or
+                             Unrevealed_manager_key errors. Ignoring these
+                             accounts. *)
+                          return acc
+                      | Ok pk ->
+                          let res =
+                            ( P.Signature.To_latest.public_key_hash pkh,
+                              P.Signature.To_latest.public_key pk,
+                              P.Tez.to_mutez balance )
+                            :: acc
+                          in
+                          if List.length res >= count then raise (Done res)
+                          else return res)
+                else return acc))
+          (function
+            | Done res -> return res
+            | e -> failwith "Unexpected error: %s@." (Printexc.to_string e))
+      in
+      let sorted_accounts =
+        List.sort (fun (_, _, x) (_, _, y) -> Int64.compare y x) accounts
+      in
+      let selected_accounts =
+        Tezos_stdlib.TzList.take_n count sorted_accounts
+      in
+      let res =
+        List.mapi
+          (fun i (pkh, pk, tez) ->
+            let alias = Format.sprintf "rich_%d" i in
+            (alias, pkh, pk, tez))
+          selected_accounts
+      in
+      Format.printf
+        "Extracted the %d accounts with a spendable balance over %Ldꜩ:@."
+        count
+        min_threshold ;
+      List.iter
+        (fun (alias, pkh, _, tez) ->
+          Format.printf
+            "%s (%s): %Ldꜩ@."
+            alias
+            (Signature.Public_key_hash.to_b58check pkh)
+            (Int64.div tez 1_000_000L))
+        res ;
+      return res)
 
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
     ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context
@@ -565,75 +795,59 @@ let get_context ?level ~network_opt base_dir =
     context from this level instead of head, if it exists.
 *)
 let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
-    ~active_bakers_only base_dir alias_pkh_pk_list other_accounts_pkh =
+    ?rich_accounts_over ~active_bakers_only base_dir alias_pkh_pk_list
+    other_accounts_pkh =
   let open Lwt_result_syntax in
-  let* protocol_hash, context, header, store =
-    get_context ?level ~network_opt base_dir
+  let* protocol, context, header, store =
+    get_context_with_loaded_cache ?level ~network_opt base_dir
   in
   let* ( (delegates :
            (Signature.public_key_hash
            * Signature.public_key
-           * (Signature.public_key_hash * Signature.public_key) option
+           * ((Signature.public_key_hash * Signature.public_key) option
+             * (Signature.public_key_hash * Signature.public_key) list)
+           * ((Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+              option
+             * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+               list)
            * int64
            * int64
            * int64)
            list),
          other_accounts ) =
-    match protocol_of_hash protocol_hash with
-    | None ->
-        if
-          protocol_hash
-          = Protocol_hash.of_b58check_exn
-              "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-        then
-          Error_monad.failwith
-            "Context was probably ill loaded, found Genesis protocol.@;\
-             Known protocols are: %a"
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-        else
-          Error_monad.failwith
-            "Unknown protocol hash: %a.@;Known protocols are: %a"
-            Protocol_hash.pp
-            protocol_hash
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-    | Some protocol ->
-        Format.printf
-          "@[<h>Detected protocol:@;<10 0>%a@]@."
-          pp_protocol
-          protocol ;
-        get_delegates_and_accounts
-          protocol
-          context
-          header
-          active_bakers_only
-          staking_share_opt
-          other_accounts_pkh
+    Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+    get_delegates_and_accounts
+      protocol
+      context
+      header
+      active_bakers_only
+      staking_share_opt
+      other_accounts_pkh
   in
-  let*! () = Tezos_store.Store.close_store store in
   let with_alias =
-    List.mapi
-      (fun i (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
-        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-        let ck =
-          match ck with
-          | Some (cpkh, cpk) ->
-              let cpkh =
-                Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
-              in
-              let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
-              Some (cpkh, cpk)
-          | None -> None
+    List.fold_left_i
+      (fun i
+           acc
+           ( pkh,
+             pk,
+             (active_consensus_key, pending_consensus_keys),
+             (active_companion_key, pending_companion_keys),
+             stake,
+             frozen_deposits,
+             unstake_frozen_deposits )
+         ->
+        let to_b58check (pkh, pk) =
+          ( Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
+            Tezos_crypto.Signature.Public_key.to_b58check pk )
+        in
+        let pkh, pk = to_b58check (pkh, pk) in
+        let active_consensus_key, consensus_keys =
+          let pendings = List.map to_b58check pending_consensus_keys in
+          match active_consensus_key with
+          | Some keys ->
+              let keys = to_b58check keys in
+              (Some keys, keys :: pendings)
+          | None -> (None, pendings)
         in
         let alias =
           List.find_map
@@ -644,8 +858,59 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
         let alias =
           Option.value_f alias ~default:(fun () -> Format.asprintf "baker_%d" i)
         in
-        (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits))
+        let delegate_alias =
+          ( alias,
+            pkh,
+            pk,
+            active_consensus_key,
+            stake,
+            frozen_deposits,
+            unstake_frozen_deposits )
+        in
+        let consensus_keys_alias =
+          List.mapi
+            (fun i (cpkh, cpk) ->
+              let alias = Format.asprintf "%s_consensus_key_%d" alias i in
+              (alias, cpkh, cpk, None, 0L, 0L, 0L))
+            consensus_keys
+        in
+        let companion_keys_alias =
+          let to_b58check (pkh, pk) =
+            ( Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh,
+              Tezos_crypto.Signature.Bls.Public_key.to_b58check pk )
+          in
+          let companion_keys =
+            let pendings = List.map to_b58check pending_companion_keys in
+            match active_companion_key with
+            | Some keys -> to_b58check keys :: pendings
+            | None -> pendings
+          in
+          List.mapi
+            (fun i (cpkh, cpk) ->
+              let alias = Format.asprintf "%s_companion_key_%d" alias i in
+              (alias, cpkh, cpk, None, 0L, 0L, 0L))
+            companion_keys
+        in
+        companion_keys_alias @ consensus_keys_alias @ (delegate_alias :: acc))
+      []
       delegates
+    |> List.rev
+  in
+  let* rich_accounts =
+    match rich_accounts_over with
+    | Some (count, min) ->
+        let* r =
+          get_rich_accounts protocol context header ~count ~min_threshold:min
+        in
+        List.map
+          (fun (alias, pkh, pk, tez) ->
+            ( alias,
+              Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
+              Tezos_crypto.Signature.Public_key.to_b58check pk,
+              tez ))
+          r
+        |> return
+    | None -> return []
   in
   let other_accounts =
     List.map
@@ -662,7 +927,8 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
         (alias, pkh, pk))
       other_accounts
   in
-  return (with_alias, other_accounts)
+  let*! () = Tezos_store.Store.close_store store in
+  return (with_alias, rich_accounts, other_accounts)
 
 (** [load_contracts ?dump_contracts ?network ?level base_dir] checkouts the block
     context at the given [base_dir] (at level [?level] or defaulting
@@ -671,54 +937,24 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
 *)
 let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   let open Lwt_result_syntax in
-  let* protocol_hash, context, header, store =
-    get_context ?level ~network_opt base_dir
+  let* protocol, context, header, store =
+    get_context_with_loaded_cache ?level ~network_opt base_dir
   in
   let* (contracts : contract_info list) =
-    match protocol_of_hash protocol_hash with
-    | None ->
-        if
-          protocol_hash
-          = Protocol_hash.of_b58check_exn
-              "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-        then
-          Error_monad.failwith
-            "Context was probably ill loaded, found Genesis protocol.@;\
-             Known protocols are: %a"
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-        else
-          Error_monad.failwith
-            "Unknown protocol hash: %a.@;Known protocols are: %a"
-            Protocol_hash.pp
-            protocol_hash
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-    | Some protocol ->
-        Format.printf
-          "@[<h>Detected protocol:@;<10 0>%a@]@."
-          pp_protocol
-          protocol ;
-        get_contracts ?dump_contracts protocol context header
+    Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+    get_contracts ?dump_contracts protocol context header
   in
   let*! () = Tezos_store.Store.close_store store in
   return contracts
 
-let build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases ~other_accounts_pkh =
+let build_yes_wallet ?staking_share_opt ?network_opt ?rich_accounts_over
+    base_dir ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Lwt_result_syntax in
-  let+ bakers, other_accounts =
+  let+ bakers, rich_accounts, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
+      ?rich_accounts_over
       base_dir
       ~active_bakers_only
       aliases
@@ -728,6 +964,12 @@ let build_yes_wallet ?staking_share_opt ?network_opt base_dir
   List.map
     (fun (alias, pkh, pk, ck, _stake, _, _) -> (alias, pkh, pk, ck))
     bakers
+  @ List.map
+      (fun (alias, pkh, pk, _) ->
+        (* Consensus keys are not supported in [rich_accounts]. Setting it to
+           None. *)
+        (alias, pkh, pk, None))
+      rich_accounts
   @ List.map
       (fun (alias, pkh, pk) ->
         (* Consensus keys are not supported in [other_accounts]. Setting it to

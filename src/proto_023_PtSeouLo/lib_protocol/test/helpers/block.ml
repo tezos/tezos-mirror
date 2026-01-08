@@ -43,6 +43,8 @@ type block = t
 
 type full_metadata = block_header_metadata * operation_receipt list
 
+type block_with_metadata = block * full_metadata
+
 let get_alpha_ctxt b =
   let open Lwt_result_wrap_syntax in
   let*@ ctxt, _migration_balance_updates, _migration_operation_results =
@@ -76,6 +78,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 type baking_mode = Application | Baking
 
@@ -171,10 +174,37 @@ let get_next_baker_excluding excludes block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
+let get_next_baker_by_account_and_minimal_round pkh min_round block =
+  let open Lwt_result_wrap_syntax in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~delegates:[pkh] block
+  in
+  let* {delegate = pkh; consensus_key; timestamp; round; _} =
+    match
+      (* The RPC returns the list of all rounds in increasing order,
+         so `find` will find the first round after the requested minimal round
+         for the baker `pkh` to bake *)
+      List.find
+        (fun {Plugin.RPC.Baking_rights.round; _} ->
+          Round.to_int32 round >= Int32.of_int min_round)
+        bakers
+    with
+    | Some b -> return b
+    | None -> tzfail (No_slots_found_for pkh)
+  in
+  let*?@ round = Round.to_int round in
+  return
+    ( pkh,
+      consensus_key,
+      round,
+      WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
+
 let dispatch_policy = function
   | By_round r -> get_next_baker_by_round r
   | By_account a -> get_next_baker_by_account a
   | Excluding al -> get_next_baker_excluding al
+  | By_account_with_minimal_round (pkh, r) ->
+      get_next_baker_by_account_and_minimal_round pkh r
 
 let get_next_baker ?(policy = By_round 0) = dispatch_policy policy
 
@@ -184,6 +214,8 @@ let get_round (b : t) =
   Fitness.(
     let+ fitness = from_raw fitness in
     round fitness)
+
+let get_payload_round (b : t) = b.header.protocol_data.contents.payload_round
 
 let block_producer block =
   let open Lwt_result_wrap_syntax in
@@ -868,11 +900,11 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = finalize_validation validation_state in
   finalize_application application_state shell_header
 
-let detect_manager_failure :
-    type kind. kind Apply_results.operation_metadata -> _ =
+let detect_manager_failure : type kind.
+    kind Apply_results.operation_metadata -> _ =
   let open Result_syntax in
-  let rec detect_manager_failure :
-      type kind. kind Apply_results.contents_result_list -> _ =
+  let rec detect_manager_failure : type kind.
+      kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
     let open Apply_operation_result in
     let open Apply_internal_results in
@@ -1135,8 +1167,7 @@ let balance_update_of_internal_operation_result = function
           | IEvent_result _ ->
               []))
 
-let balance_update_of_operation_result :
-    type a.
+let balance_update_of_operation_result : type a.
     a Protocol.Apply_results.manager_operation_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
@@ -1163,8 +1194,7 @@ let balance_update_of_operation_result :
       | Increase_paid_storage_result {balance_updates; _} ->
           balance_updates)
 
-let balance_updates_of_single_content :
-    type a.
+let balance_updates_of_single_content : type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Proposals_result | Ballot_result
@@ -1192,8 +1222,7 @@ let balance_updates_of_single_content :
         |> List.flatten)
       @ balance_update_of_operation_result operation_result
 
-let rec balance_updates_of_contents :
-    type a.
+let rec balance_updates_of_contents : type a.
     a Protocol.Apply_results.contents_result_list ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Single_result c -> balance_updates_of_single_content c

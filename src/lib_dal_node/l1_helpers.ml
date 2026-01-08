@@ -64,9 +64,13 @@ let fetch_l1_version_info cctxt =
     ~rpc:Version_services.version
     ~requested_info:"version info"
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
+let fetch_l1_chain_id cctxt =
+  fetch_info_from_l1
+    cctxt
+    ~rpc:(fun x -> Chain_services.chain_id x ())
+    ~requested_info:"chain id"
 
-   Remove the legacy case from this function once the migration to V23 is complete.
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7851
 
    The function below infers the DAL network name based on the L1 chain name and
    the DAL node version.
@@ -82,15 +86,13 @@ let fetch_l1_version_info cctxt =
 *)
 let infer_dal_network_name cctxt =
   let open Lwt_result_syntax in
-  let version = Tezos_version_value.Current_git_info.octez_version in
-  if version.major <= 22 then
-    return
-      (Distributed_db_version.Name.of_string
-         Configuration_file.legacy_network_name) (* legacy "dal-sandbox" *)
-  else
-    let+ l1_version = fetch_l1_version_info cctxt in
-    Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
-    |> Distributed_db_version.Name.of_string
+  (* Now that V23 is released and V24 is in the pipeline, we can move to the
+     second migration phase of https://gitlab.com/tezos/tezos/-/issues/7851:
+     all upcoming versions (and master) should advertise only the new DAL node
+     network naming scheme. "dal-sandbox" will no longer be advertised. *)
+  let+ l1_version = fetch_l1_version_info cctxt in
+  Format.sprintf "DAL_%s" (l1_version.network_version.chain_name :> string)
+  |> Distributed_db_version.Name.of_string
 
 let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
   let open Lwt_result_syntax in

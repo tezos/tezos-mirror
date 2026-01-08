@@ -262,7 +262,7 @@ fn generate_final_report(
             let skipped_msg = if skipped == 0 {
                 String::new()
             } else {
-                format!(" with {} test(s) skipped", skipped)
+                format!(" with {skipped} test(s) skipped")
             };
             write_out!(
                 output_file,
@@ -351,93 +351,21 @@ pub fn check_skip(test_file_path: &Path) -> bool {
         file_name,
         // Long tests (all passing)
         | "CALLBlake2f_MaxRounds.json" // ✔
+        | "static_Call50000_sha256.json" // ✔
         | "loopMul.json" // ✔
-
-        // TODO: The two following tests should be investigated.
-        // Context: bugs were discovered thanks to the more finer-grained
-        // generated filler files, these bugs existed prior to Cancun.
-        // They are temporarily skipped and will be fixed seperatly.
-        // See: https://gitlab.com/tezos/tezos/-/issues/7817.
-        | "randomStatetestDEFAULT-Tue_07_58_41-15153-575192.json"
-        | "randomStatetestDEFAULT-Tue_07_58_41-15153-575192_london.json"
 
         // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
         | "chainId.json"
         | "chainid_1.json"
         | "chainid_0.json"
 
-        // Reason: we temporarily reduce stack limit to 256.
-        | "Call1024PreCalls.json"
-        | "gasPriceDiffPlaces.json"
-        | "Create2Recursive.json"
-        | "LoopCallsDepthThenRevert2.json"
-        | "Call1024BalanceTooLow.json"
-        | "CallRecursiveBomb1.json"
-        | "Delegatecall1024.json"
-        | "Call1024OOG.json"
-        | "LoopDelegateCallsDepthThenRevert.json"
-        | "static_Call1024PreCalls2.json"
-        | "CallRecursiveBombLog.json"
-        | "performanceTester.json"
-        | "LoopCallsDepthThenRevert3.json"
-        | "Callcode1024BalanceTooLow.json"
-        | "LoopCallsDepthThenRevert.json"
-        | "Callcode1024OOG.json"
-        | "CallRecursiveBomb0_OOG_atMaxCallDepth.json"
-        | "stackOverflowSWAP.json"
-        | "CallRecursiveBombPreCall.json"
-        | "Create2OnDepth1023.json"
-        | "CallRecursiveBomb2.json"
-        | "ABAcalls2.json"
-        | "diffPlaces.json"
-        | "Delegatecall1024OOG.json"
-        | "CallRecursiveBomb0.json"
-        | "baseFeeDiffPlaces.json"
-        | "Create2OnDepth1024.json"
-        | "CallRecursiveBombLog2.json"
-
-        // Reason: Coinbase related tests that expects an absurd amount of WEI
-        // after the execution.
-        // NB: The expected storage slots for 0x000000000000000000000000000000000000C0DE
-        // which contains the gas cost with hot/cold access are accurate.
-        | "coinbaseT01.json"
-        | "coinbaseT2.json"
-
-        // Reason: relying on precompile contract kzg_point_evaluation from
-        // EIP-4844 which we don't support.
-        | "value_transfer_gas_calculation_0.json"
-        | "value_transfer_gas_calculation_1.json"
-        | "value_transfer_gas_calculation_2.json"
-        | "value_transfer_gas_calculation_3.json"
-
         // Reason: these tests are assuming EIP-7610 is implemented in Cancun.
-        // The EIP is slated for inclusion in the upcoming Pectra upgrade.
+        // The EIP is slated for inclusion in the upcoming upgrades.
         | "RevertInCreateInInit_Paris.json"
         | "dynamicAccountOverwriteEmpty_Paris.json"
         | "RevertInCreateInInitCreate2Paris.json"
         | "create2collisionStorageParis.json"
         | "InitCollisionParis.json"
-
-        // SKIPPED BECAUSE TESTS ARE EXPECTED TO BE RUNNED VIA AN EXTERNAL CLIENT
-
-        // Reason: Invalid transaction. The gas limit is set to less than 21000.
-        // These transactions are usually handled at the client level and directly rejected.
-        // Moreover, if we comply to what's expected by the test we'd remove the balance
-        // but the test is waiting for the nonce to stay untouched, this opens a clear
-        // possibility of potential replay attacks.
-        | "invalidTr.json"
-
-        // Reason: The gas price is computed with max_fee_per_gas. But max_fee_per_gas
-        // is used when you don't know the base fee. Usually the client verifies if the
-        // account has enough funds to pay the max gas price (computed with max_fee_per_gas)
-        // and if that isn't the case then the client directly rejects the transaction.
-        // But in the kernel we know the real gas price because we have a base fee.
-        // Therefore, the test does not pass because it checks if the account has enough funds,
-        // which it doesn't, but with the known base fee the account does have enough funds
-        // and the test should pass.
-        // max_gas_price = max_fee_per_gas x gas_limit
-        // real_gas_price = (base_fee + max_priority_fee_per_gas) x gas_limit
-        | "transactionIntinsicBug.json"
     )
 }
 

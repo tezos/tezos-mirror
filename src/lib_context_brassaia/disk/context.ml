@@ -147,17 +147,6 @@ module Events = struct
       ~name:"gc_launch_failure"
       ~msg:"context garbage collection launch failed: {error}"
       ("error", Data_encoding.string)
-
-  let warning_experimental =
-    declare_0
-      ~section
-      ~level:Warning
-      ~name:"brassaia_warning_experimental"
-      ~msg:
-        "creating a context with Brassaia.\n\
-        \ Brassaia is still experimental and should only be used in testing \
-         environments"
-      ()
 end
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
@@ -734,7 +723,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       let* () =
         Events.(emit init_context (readonly, index_log_size, lru_size, root))
       in
-      let* () = Events.(emit warning_experimental ()) in
       Store.Repo.init
         (Brassaia_pack.config
            ~readonly
@@ -747,7 +735,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let close index =
     let _interrupted_gc = Store.Gc.cancel index.repo in
-    Store.Repo.close index.repo
+    Lwt.catch
+      (fun () -> Store.Repo.close index.repo)
+      (function
+        | Brassaia_pack_unix.Errors.(Pack_error `Double_close) ->
+            Lwt.return_unit
+        | exn -> Lwt.reraise exn)
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 

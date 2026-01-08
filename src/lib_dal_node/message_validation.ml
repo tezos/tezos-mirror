@@ -59,11 +59,13 @@ let gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox
           (Opentelemetry_helpers.trace_slot
              ~attrs:[("shard_index", `Int shard_index)]
              ~name:"verify_shard"
-             Types.Slot_id.
-               {
-                 slot_level = message_id.level;
-                 slot_index = message_id.slot_index;
-               })])
+             ~slot_commitment:commitment
+             ~slot_id:
+               Types.Slot_id.
+                 {
+                   slot_level = message_id.level;
+                   slot_index = message_id.slot_index;
+                 })])
     in
     match res with
     | Ok () -> `Valid
@@ -168,7 +170,7 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
         sub head_level message_id.Types.Message_id.level
         > of_int (proto_parameters.Types.attestation_lag + slack))
     then
-      (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
+      (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
          should only be used for the dissemination of fresh data. Old data could
          be retrieved using another method. *)
       `Outdated
@@ -207,7 +209,7 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
                message) ;
           res
       | other ->
-          (* 4. In the case the message id is not Valid. *)
+          (* 4. In the case the message_id is not valid. *)
           other
 
 type batch_identifier = {level : int32; slot_index : int}
@@ -247,7 +249,8 @@ let triage ctxt head_level proto_parameters batch =
              _topic,
              (Types.Message_id.{level; slot_index; _} as id),
              message,
-             _peers ) ->
+             _peers )
+         ->
         (* Have some slack for outdated messages. *)
         let slack = 4 in
         if
@@ -282,6 +285,111 @@ let triage ctxt head_level proto_parameters batch =
   in
   {to_check_in_batch; not_valid}
 
+module Batches_stats =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      include Int32
+
+      let hash = Hashtbl.hash
+    end)
+
+type stat = {total_shards : int; total_duration : float; batches_count : int}
+
+let batches_stats_tbl = Batches_stats.create 5
+
+let last_stat_level = ref None
+
+let update_batches_stats number_of_slots cryptobox batch_size head_level
+    batch_ll duration =
+  let {Cryptobox.number_of_shards; _} = Cryptobox.parameters cryptobox in
+  let shard_distribution = Array.init number_of_slots (fun _ -> 0) in
+  List.iter
+    (fun l ->
+      List.iter
+        (fun ({slot_index; _}, elems) ->
+          shard_distribution.(slot_index) <- List.length elems)
+        l)
+    batch_ll ;
+  let shard_percentage =
+    float_of_int (Array.fold_left ( + ) 0 shard_distribution)
+    /. (float_of_int number_of_shards *. float_of_int number_of_slots)
+    *. 100.
+  in
+  let s = Batches_stats.find_opt batches_stats_tbl head_level in
+  let batch_id =
+    match s with
+    | None ->
+        Batches_stats.replace
+          batches_stats_tbl
+          head_level
+          {
+            total_shards = batch_size;
+            total_duration = duration;
+            batches_count = 1;
+          } ;
+        1
+    | Some v ->
+        let next_batch_id = v.batches_count + 1 in
+        Batches_stats.replace
+          batches_stats_tbl
+          head_level
+          {
+            total_shards = v.total_shards + batch_size;
+            total_duration = v.total_duration +. duration;
+            batches_count = next_batch_id;
+          } ;
+        next_batch_id
+  in
+  Event.emit_dont_wait__batch_validation_stats
+    ~batch_id
+    ~head_level
+    ~number_of_shards:batch_size
+    ~shard_percentage
+    ~duration ;
+  Event.emit_dont_wait__batch_validation_distribution_stats
+    ~batch_id
+    ~head_level
+    ~shard_distribution
+
+let may_finalize_batch_stats last_stat_level head_level =
+  match !last_stat_level with
+  | None -> last_stat_level := Some head_level
+  | Some last_level ->
+      (* When a new head is received, we assume the completion of the validation
+         of the shards of the previous level. This might be an incorrect
+         assumption when the shard distribution and validation duration exceed
+         the block time but it is good enough to observe the overall
+         behaviour. *)
+      if last_level != head_level then
+        match Batches_stats.find_opt batches_stats_tbl last_level with
+        | None -> ()
+        | Some {total_shards; total_duration; batches_count} ->
+            let () =
+              Event.emit_dont_wait__batch_validation_completion_stats
+                ~level:last_level
+                ~total_shard_processed:total_shards
+                ~total_batches_processed:batches_count
+                ~duration:total_duration
+            in
+            last_stat_level := Some head_level
+      else ()
+
+(* Utility function that splits the given [seq] into a list of [n] lists in a
+   round robin fashion, all sub-lists having roughly the same number of
+   elements. *)
+let round_robin_seq n seq =
+  let rec loop acc_full acc seq =
+    match seq () with
+    | Seq.Nil -> acc @ acc_full
+    | Seq.Cons (hd, tl) -> (
+        match acc with
+        | [] -> loop [] acc_full seq
+        | acc_hd :: acc_tl -> loop ((hd :: acc_hd) :: acc_full) acc_tl tl)
+  in
+  loop [] (Stdlib.List.init n (fun _ -> [])) seq
+
+exception Bee_task_worker_error of string
+
 let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     =
   if Node_context.is_bootstrap_node ctxt then
@@ -304,7 +412,10 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     (* [treat_batch] does not invalidate a whole slot when a single shard is
        invalid, otherwise it would be possible for a byzantine actor to craft
        a wrong message with the id of the published slot to prevent the validation
-       of all the valid shards associated to this slot. *)
+       of all the valid shards associated to this slot.
+       Important: this function is in the scope of Eio runtime and prohibits the
+       usage of Lwt. Lwt calls must be wrapped in a proper way. See
+       https://gitlab.com/tezos/tezos/-/issues/8140. *)
     let rec treat_batch = function
       | [] -> ()
       | ({level; slot_index}, batch_list) :: remaining_to_treat -> (
@@ -340,8 +451,10 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               [@profiler.wrap_f
                 {driver_ids = [Opentelemetry]}
                   (Opentelemetry_helpers.trace_slot
+                     ~attrs:[("number_of_shards", `Int (List.length shards))]
                      ~name:"verify_shards"
-                     Types.Slot_id.{slot_level = level; slot_index})]
+                     ~slot_commitment:commitment
+                     ~slot_id:{Types.Slot_id.slot_level = level; slot_index})]
           in
           match res with
           | Ok () ->
@@ -365,10 +478,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               treat_batch remaining_to_treat
           | Error err ->
               let validation_error = string_of_validation_error err in
-              Event.emit_dont_wait__batch_validation_error
-                ~level
-                ~slot_index
-                ~validation_error ;
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_batch_validation_error
+                    ~level
+                    ~slot_index
+                    ~validation_error) ;
               let batch_size = List.length batch_list in
               if batch_size = 1 then
                 List.iter
@@ -390,10 +504,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
           | exception exn ->
               (* Don't crash if crypto raised an exception. *)
               let validation_error = Printexc.to_string exn in
-              Event.emit_dont_wait__batch_validation_error
-                ~level
-                ~slot_index
-                ~validation_error ;
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_batch_validation_error
+                    ~level
+                    ~slot_index
+                    ~validation_error) ;
               let batch_size = List.length batch_list in
               if batch_size = 1 then
                 List.iter
@@ -408,5 +523,42 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                   :: ({level; slot_index}, second_half)
                   :: remaining_to_treat))
     in
-    treat_batch (Batch_tbl.to_seq to_check_in_batch |> List.of_seq) ;
+    let domains = Tezos_bees.Task_worker.number_of_domains in
+    let s = Unix.gettimeofday () in
+    (* Split the batches into [domains] sub-batches to feed each bee workers.
+       The load's distribution is likely to be slightly unbalanced. *)
+    let sub_batches =
+      round_robin_seq domains (Batch_tbl.to_seq to_check_in_batch)
+    in
+    let results =
+      Tezos_bees.Task_worker.launch_tasks_and_wait
+        "batch"
+        treat_batch
+        sub_batches
+    in
+    (* Ensure that all tasks are successful. *)
+    let () =
+      List.iter
+        (function
+          | Ok () -> ()
+          | Error (Tezos_bees.Task_worker.Closed (Some err)) ->
+              raise
+                (Bee_task_worker_error
+                   (Format.asprintf "%a" Error_monad.pp_print_trace err))
+          | Error (Tezos_bees.Task_worker.Closed None)
+          | Error (Tezos_bees.Task_worker.Request_error _) ->
+              raise (Bee_task_worker_error "Unknown task_worker error")
+          | Error (Tezos_bees.Task_worker.Any exn) ->
+              raise (Bee_task_worker_error (Printexc.to_string exn)))
+        results
+    in
+    let duration = Unix.gettimeofday () -. s in
+    update_batches_stats
+      proto_parameters.number_of_slots
+      cryptobox
+      batch_size
+      head_level
+      sub_batches
+      duration ;
+    let () = may_finalize_batch_stats last_stat_level head_level in
     Array.to_list result

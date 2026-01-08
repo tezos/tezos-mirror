@@ -63,7 +63,8 @@ let sent_requests_encoding =
             protocol_branch;
             predecessor_header;
             other;
-          } ->
+          }
+        ->
        ( branch,
          head,
          block_header,
@@ -85,7 +86,8 @@ let sent_requests_encoding =
             checkpoint,
             protocol_branch,
             predecessor_header,
-            other ) ->
+            other )
+        ->
        {
          branch;
          head;
@@ -204,7 +206,8 @@ let prevalidator_results_encoding =
            refused;
            duplicate;
            outdated;
-         } ->
+         }
+       ->
       ( cannot_download,
         cannot_parse,
         refused_by_prefilter,
@@ -224,7 +227,8 @@ let prevalidator_results_encoding =
            branch_refused,
            refused,
            duplicate,
-           outdated ) ->
+           outdated )
+       ->
       {
         cannot_download;
         cannot_parse;
@@ -434,7 +438,8 @@ let encoding =
             future_blocks_advertised;
             unadvertised;
             advertisements;
-          } ->
+          }
+        ->
        ( ( responses,
            requests,
            valid_blocks,
@@ -452,7 +457,8 @@ let encoding =
               unactivated_chains,
               inactive_chains,
               future_blocks_advertised ),
-            (unadvertised, advertisements) ) ->
+            (unadvertised, advertisements) )
+        ->
        {
          responses;
          requests;

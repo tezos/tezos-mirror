@@ -269,7 +269,7 @@ struct
                 | None ->
                     Error
                       (`Commit_key_is_dangling
-                        (Brassaia.Type.to_string XKey.t key))
+                         (Brassaia.Type.to_string XKey.t key))
                 | Some (k, _kind) -> Ok k)
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =
@@ -606,9 +606,9 @@ struct
               let () =
                 preds
                 |> List.map (function
-                       | s, `Contents h -> (s, `Contents (XKey.to_hash h))
-                       | s, `Inode h -> (s, `Inode (XKey.to_hash h))
-                       | s, `Node h -> (s, `Node (XKey.to_hash h)))
+                     | s, `Contents h -> (s, `Contents (XKey.to_hash h))
+                     | s, `Inode h -> (s, `Inode (XKey.to_hash h))
+                     | s, `Node h -> (s, `Node (XKey.to_hash h)))
                 |> Stats.visit_node t (XKey.to_hash k) ~width ~nb_children
               in
               List.rev_map

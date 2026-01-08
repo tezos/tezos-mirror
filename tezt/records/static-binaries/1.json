@@ -1,0 +1,271 @@
+[
+  {
+    "file": "tezt/tests/cli_tezos.ml",
+    "title": "CLI under connections cap",
+    "tags": [
+      "cli",
+      "connections",
+      "node"
+    ],
+    "successful_runs": {
+      "total_time": "10011993",
+      "count": "1"
+    },
+    "peak_memory_usage": 1343171000
+  },
+  {
+    "file": "tezt/tests/cli_tezos.ml",
+    "title": "CLI above connections cap",
+    "tags": [
+      "bad",
+      "cli",
+      "connections",
+      "node"
+    ],
+    "successful_runs": {
+      "total_time": "1493175",
+      "count": "1"
+    },
+    "peak_memory_usage": 430436000
+  },
+  {
+    "file": "tezt/tests/cli_tezos.ml",
+    "title": "CLI --net-addr collision message",
+    "tags": [
+      "address",
+      "cli",
+      "node"
+    ],
+    "successful_runs": {
+      "total_time": "14598134",
+      "count": "1"
+    },
+    "peak_memory_usage": 1725449000
+  },
+  {
+    "file": "tezt/tests/light.ml",
+    "title": "mode light no endpoint",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "layer1",
+      "light"
+    ],
+    "successful_runs": {
+      "total_time": "1255711",
+      "count": "1"
+    },
+    "peak_memory_usage": 433462000
+  },
+  {
+    "file": "tezt/tests/light.ml",
+    "title": "mode light endpoint not in sources",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "layer1",
+      "light",
+      "node"
+    ],
+    "successful_runs": {
+      "total_time": "1319455",
+      "count": "1"
+    },
+    "peak_memory_usage": 403422000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "check --advertised-net-port=PORT option",
+    "tags": [
+      "cli",
+      "connections",
+      "layer1",
+      "node",
+      "p2p"
+    ],
+    "successful_runs": {
+      "total_time": "24957387",
+      "count": "1"
+    },
+    "peak_memory_usage": 2527433000
+  },
+  {
+    "file": "tezt/tests/agnostic_baker_test.ml",
+    "title": "T024-: Agnostic baker CLI",
+    "tags": [
+      "admin_client",
+      "agnostic",
+      "agnostic_baker",
+      "baker",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "sandbox",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "14360769",
+      "count": "1"
+    },
+    "peak_memory_usage": 1660660000
+  },
+  {
+    "file": "tezt/tests/agnostic_baker_test.ml",
+    "title": "S023-: Agnostic baker CLI",
+    "tags": [
+      "admin_client",
+      "agnostic",
+      "agnostic_baker",
+      "baker",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "s023",
+      "sandbox"
+    ],
+    "successful_runs": {
+      "total_time": "14077237",
+      "count": "1"
+    },
+    "peak_memory_usage": 1623520000
+  },
+  {
+    "file": "tezt/tests/agnostic_baker_test.ml",
+    "title": "Alpha: Agnostic baker CLI",
+    "tags": [
+      "admin_client",
+      "agnostic",
+      "agnostic_baker",
+      "alpha",
+      "baker",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "sandbox"
+    ],
+    "successful_runs": {
+      "total_time": "14308954",
+      "count": "1"
+    },
+    "peak_memory_usage": 1662011000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "T024-: check peer option",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "p2p",
+      "peer",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "21355823",
+      "count": "1"
+    },
+    "peak_memory_usage": 2529154000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "S023-: check peer option",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "p2p",
+      "peer",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "21362349",
+      "count": "1"
+    },
+    "peak_memory_usage": 2526887000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "Alpha: check peer option",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "cli",
+      "client",
+      "layer1",
+      "node",
+      "p2p",
+      "peer"
+    ],
+    "successful_runs": {
+      "total_time": "21839440",
+      "count": "1"
+    },
+    "peak_memory_usage": 2566734000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "T024-: check --connection=1 option",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "connections",
+      "layer1",
+      "node",
+      "p2p",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "22553601",
+      "count": "1"
+    },
+    "peak_memory_usage": 2526853000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "S023-: check --connection=1 option",
+    "tags": [
+      "admin_client",
+      "cli",
+      "client",
+      "connections",
+      "layer1",
+      "node",
+      "p2p",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "22730872",
+      "count": "1"
+    },
+    "peak_memory_usage": 2529472000
+  },
+  {
+    "file": "tezt/tests/p2p.ml",
+    "title": "Alpha: check --connection=1 option",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "cli",
+      "client",
+      "connections",
+      "layer1",
+      "node",
+      "p2p"
+    ],
+    "successful_runs": {
+      "total_time": "22073602",
+      "count": "1"
+    },
+    "peak_memory_usage": 2574104000
+  }
+]

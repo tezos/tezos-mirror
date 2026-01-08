@@ -6,13 +6,15 @@
 //! Tezos account state and storage
 
 use crate::context;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::ValueType,
-    types::{Contract, PublicKey, PublicKeyHash},
+    host::{RuntimeError, ValueType},
+    types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -25,19 +27,11 @@ use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 pub enum Manager {
     #[encoding(tag = 0)]
     NotRevealed(PublicKeyHash),
-    #[encoding(tag = 1)]
+    // Tag 1 is for public key before the Seoul
+    // protocol and therefore is deprecated
+    #[encoding(tag = 2)]
     Revealed(PublicKey),
 }
-
-const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
-
-const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
-
-const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
-
-const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
-
-const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
 
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
@@ -53,36 +47,51 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
 
 pub trait TezlinkAccount {
     fn path(&self) -> &OwnedPath;
+    fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
     fn balance(
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(self.path(), &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         store_bin(balance, host, &path)
+    }
+
+    /// Add amount (in Mutez) to the **balance** held by the account.
+    fn add_balance(
+        &self,
+        host: &mut impl Runtime,
+        amount: u64,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::account::balance_path(self)?;
+        let balance: Narith = match read_nom_value(host, &path) {
+            Ok(balance) => balance,
+            Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)) => {
+                0.into()
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        self.set_balance(host, &Narith(balance.0 + amount))
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkImplicitAccount {
     path: OwnedPath,
-}
-
-impl From<OwnedPath> for TezlinkImplicitAccount {
-    fn from(path: OwnedPath) -> Self {
-        Self { path }
-    }
+    pkh: PublicKeyHash,
 }
 
 impl TezlinkAccount for TezlinkImplicitAccount {
@@ -90,20 +99,22 @@ impl TezlinkAccount for TezlinkImplicitAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }
+    fn contract(&self) -> Contract {
+        Contract::Implicit(self.pkh.clone())
+    }
 }
 
 impl TezlinkImplicitAccount {
+    pub fn pkh(&self) -> &PublicKeyHash {
+        &self.pkh
+    }
     // We must provide the context object to get the full path in the durable storage
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
         match contract {
-            Contract::Implicit(_) => {
-                let index = context::contracts::index(context)?;
-                let path = concat(&index, &account_path(contract)?)?;
-                Ok(path.into())
-            }
+            Contract::Implicit(pkh) => Self::from_public_key_hash(context, pkh),
             _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
         }
     }
@@ -113,10 +124,12 @@ impl TezlinkImplicitAccount {
         pkh: &PublicKeyHash,
     ) -> Result<Self, tezos_storage::error::Error> {
         let index = context::contracts::index(context)?;
-        // The conversion from pkh to contract should always succeed
         let contract = Contract::Implicit(pkh.clone());
         let path = concat(&index, &account_path(&contract)?)?;
-        Ok(path.into())
+        Ok(TezlinkImplicitAccount {
+            path,
+            pkh: pkh.clone(),
+        })
     }
 
     /// Get the **counter** for the Tezlink account.
@@ -124,46 +137,57 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(self.path(), &COUNTER_PATH)?;
+        let path = context::account::counter_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
     /// Set the **counter** for the Tezlink account.
     pub fn set_counter(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &COUNTER_PATH)?;
+        let path = context::account::counter_path(self)?;
         store_bin(counter, host, &path)
     }
 
     /// Set the **counter** for the Tezlink account to the successor of the current value.
     pub fn increment_counter(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
+        validated_operations_count: usize,
     ) -> Result<(), tezos_storage::error::Error> {
-        self.set_counter(host, &Narith(self.counter(host)?.0 + 1u64))
+        self.set_counter(
+            host,
+            &Narith(self.counter(host)?.0 + validated_operations_count),
+        )
     }
 
     pub fn manager(
         &self,
         host: &impl Runtime,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
+        let path = context::account::manager_path(self)?;
         let manager: Manager = read_nom_value(host, &path)?;
         Ok(manager)
+    }
+
+    pub fn set_manager_public_key_hash(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, self.pkh())
     }
 
     /// This function updates the manager with a public key hash in parameter.
     /// Most of the time, we're dealing with references so this function is here to avoid cloning
     /// the public key hash to build a [Manager] object
-    pub fn set_manager_public_key_hash(
-        &mut self,
+    fn set_manager_pk_hash_internal(
+        &self,
         host: &mut impl Runtime,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
+        let path = context::account::manager_path(self)?;
         // The tag for public key hash is 0 (see the Manager enum above)
         let mut buffer = vec![0_u8];
         public_key_hash
@@ -173,17 +197,28 @@ impl TezlinkImplicitAccount {
         Ok(())
     }
 
+    /// This function is used to test a situation in which we have an
+    /// inconsistent manager pkh for an implicit account.
+    #[cfg(test)]
+    pub fn force_set_manager_public_key_hash(
+        &self,
+        host: &mut impl Runtime,
+        pkh: &PublicKeyHash,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_manager_pk_hash_internal(host, pkh)
+    }
+
     /// This function updates the manager with the public key in parameter.
     /// Most of the time, we're dealing with references so this function is here to avoid cloning
     /// the public key hash to build a [Manager] object
     pub fn set_manager_public_key(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
-        // The tag for public key hash is 1 (see the Manager enum above)
-        let mut buffer = vec![1_u8];
+        let path = context::account::manager_path(self)?;
+        // The tag for public key is 2 (see the Manager enum above)
+        let mut buffer = vec![2_u8];
         public_key
             .bin_write(&mut buffer)
             .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
@@ -191,46 +226,38 @@ impl TezlinkImplicitAccount {
         Ok(())
     }
 
+    /// Allocate an account in the durable storage. Does nothing if account was
+    /// already allocated.
+    pub fn allocate(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        if self.allocated(host)? {
+            return Ok(true);
+        }
+        self.set_balance(host, &0_u64.into())?;
+        // TODO: use a global counter instead of initializing counter at 0
+        self.set_counter(host, &0u64.into())?;
+        self.set_manager_public_key_hash(host)?;
+        Ok(false)
+    }
+
+    // Below this comment is multiple functions useful for validate an operation
+
     /// Verify if an account is allocated by attempting to read its balance
     pub fn allocated(
         &self,
         host: &impl Runtime,
     ) -> Result<bool, tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         Ok(Some(ValueType::Value) == host.store_has(&path)?)
-    }
-
-    /// Allocate an account in the durable storage. Does nothing if account was
-    /// already allocated.
-    pub fn allocate(
-        host: &mut impl Runtime,
-        context: &context::Context,
-        contract: &Contract,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        let mut account = Self::from_contract(context, contract)?;
-        if account.allocated(host)? {
-            return Ok(true);
-        }
-        account.set_balance(host, &0_u64.into())?;
-        // Only implicit accounts have counter and manager keys
-        if let Contract::Implicit(pkh) = contract {
-            // TODO: use a global counter instead of initializing counter at 0
-            account.set_counter(host, &0u64.into())?;
-            account.set_manager_public_key_hash(host, pkh)?;
-        }
-        Ok(false)
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
     path: OwnedPath,
-}
-
-impl From<OwnedPath> for TezlinkOriginatedAccount {
-    fn from(path: OwnedPath) -> Self {
-        Self { path }
-    }
+    kt1: ContractKt1Hash,
 }
 
 impl TezlinkAccount for TezlinkOriginatedAccount {
@@ -238,19 +265,34 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }
+    fn contract(&self) -> Contract {
+        Contract::Originated(self.kt1.clone())
+    }
 }
 
 impl TezlinkOriginatedAccount {
+    pub fn kt1(&self) -> &ContractKt1Hash {
+        &self.kt1
+    }
+    pub fn from_kt1(
+        context: &context::Context,
+        kt1: &ContractKt1Hash,
+    ) -> Result<Self, tezos_storage::error::Error> {
+        let index = context::contracts::index(context)?;
+        let contract = Contract::Originated(kt1.clone());
+        let path = concat(&index, &account_path(&contract)?)?;
+        Ok(TezlinkOriginatedAccount {
+            path,
+            kt1: kt1.clone(),
+        })
+    }
+
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
         match contract {
-            Contract::Originated(_) => {
-                let index = context::contracts::index(context)?;
-                let path = concat(&index, &account_path(contract)?)?;
-                Ok(path.into())
-            }
+            Contract::Originated(kt1) => Self::from_kt1(context, kt1),
             _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
         }
     }
@@ -259,26 +301,106 @@ impl TezlinkOriginatedAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = concat(self.path(), &CODE_PATH)?;
-        Ok(host.store_read_all(&path)?)
+        let code_path = context::code::code_path(self)?;
+        let code_size_path = context::code::code_size_path(self)?;
+        let Narith(code_size) = read_nom_value(host, &code_size_path)?;
+        let code = host.store_read(&code_path, 0, code_size.try_into()?)?;
+        Ok(code)
+    }
+
+    fn set_code_size(
+        &self,
+        host: &mut impl Runtime,
+        len: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::code::code_size_path(self)?;
+        store_bin(len, host, &path)
+    }
+
+    pub fn set_code(
+        &self,
+        host: &mut impl Runtime,
+        data: &[u8],
+    ) -> Result<u64, tezos_storage::error::Error> {
+        let path = context::code::code_path(self)?;
+        host.store_write_all(&path, data)?;
+        let code_size = data.len() as u64;
+        self.set_code_size(host, &code_size.into())?;
+        Ok(code_size)
     }
 
     pub fn storage(
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = concat(self.path(), &STORAGE_PATH)?;
-        Ok(host.store_read_all(&path)?)
+        let storage_path = context::code::storage_path(self)?;
+        let storage_size_path = context::code::storage_size_path(self)?;
+        let Narith(storage_size) = read_nom_value(host, &storage_size_path)?;
+        let storage = host.store_read(&storage_path, 0, storage_size.try_into()?)?;
+        Ok(storage)
+    }
+
+    fn set_storage_size(
+        &self,
+        host: &mut impl Runtime,
+        len: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::code::storage_size_path(self)?;
+        store_bin(len, host, &path)
     }
 
     pub fn set_storage(
         &self,
         host: &mut impl Runtime,
         data: &[u8],
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &STORAGE_PATH)?;
+    ) -> Result<u64, tezos_storage::error::Error> {
+        let path = context::code::storage_path(self)?;
         host.store_write_all(&path, data)?;
-        Ok(())
+        let storage_size = data.len() as u64;
+        self.set_storage_size(host, &storage_size.into())?;
+        Ok(storage_size)
+    }
+
+    fn set_paid_bytes(
+        &self,
+        host: &mut impl Runtime,
+        paid: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::code::paid_bytes_path(self)?;
+        store_bin(paid, host, &path)
+    }
+
+    fn set_used_bytes(
+        &self,
+        host: &mut impl Runtime,
+        used: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::code::used_bytes_path(self)?;
+        store_bin(used, host, &path)
+    }
+
+    pub fn init(
+        &self,
+        host: &mut impl Runtime,
+        code: &[u8],
+        storage: &[u8],
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        // Set the smart contract code and its size
+        let code_size = self.set_code(host, code)?;
+
+        // Set the smart contract storage and its size
+        let storage_size = self.set_storage(host, storage)?;
+
+        // TODO: Set the lazy_storage
+        let lazy_storage_size = 0u64;
+
+        // TODO: Set real value for those two fields
+        self.set_paid_bytes(host, &0u64.into())?;
+        self.set_used_bytes(host, &0u64.into())?;
+
+        let total_size = code_size + storage_size + lazy_storage_size;
+
+        Ok(total_size.into())
     }
 }
 
@@ -289,6 +411,7 @@ mod test {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::host::Runtime;
     use tezos_smart_rollup_host::path::Path;
+    use tezos_smart_rollup_host::path::RefPath;
 
     /// obtained by `octez-client show address bootstrap1` in mockup mode
     const BOOTSTRAP1_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
@@ -300,7 +423,7 @@ mod test {
 
     /// obtained by `PublicKey::from_b58check("edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")`
     const BOOTSTRAP1_PUBLIC_KEY_HEX: &str =
-        "01004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
+        "02004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
 
     /// Set a key of bootstrap1 account according to the structure of a Tezos context
     /// We don't use function from [TezlinkImplicitAccount] on purpose to verify that
@@ -390,7 +513,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -416,7 +539,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -454,10 +577,9 @@ mod test {
         let manager = account.manager(&host).expect("Can't read manager");
 
         let pkh = match manager {
-            Manager::NotRevealed(pkh) => panic!(
-                "Manager should be revealed (manager key is a pkh: {:?})",
-                pkh
-            ),
+            Manager::NotRevealed(pkh) => {
+                panic!("Manager should be revealed (manager key is a pkh: {pkh:?})")
+            }
             Manager::Revealed(pk) => pk.pk_hash(),
         };
 
@@ -475,7 +597,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
@@ -505,14 +627,14 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let () = account
-            .set_manager_public_key_hash(&mut host, &pkh)
+            .set_manager_public_key_hash(&mut host)
             .expect("set_manager_public_key_hash should have succeeded");
 
         let manager = Manager::NotRevealed(pkh);
@@ -536,7 +658,7 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let exist = account
@@ -545,7 +667,8 @@ mod test {
 
         assert!(!exist);
 
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Account initialization should have succeeded");
 
         let exist = account
@@ -562,7 +685,8 @@ mod test {
 
         // Calling init on a contract already initialized will do nothing
         // So the balance should not change and still be 1999
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Account initialization should have succeeded");
 
         let read_balance = account

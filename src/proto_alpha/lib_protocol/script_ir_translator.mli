@@ -81,7 +81,7 @@ type ex_parameter_ty_and_entrypoints =
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
-type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'b) Script_typed.script -> ex_script
 
 type toplevel = {
   code_field : Script.node;
@@ -90,14 +90,21 @@ type toplevel = {
   views : Script_typed_ir.view_map;
 }
 
+type ('arg, 'storage) implementation =
+      ('arg, 'storage) Script_typed.implementation =
+  | Lambda : {
+      code :
+        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+    }
+      -> ('arg, 'storage) implementation
+  | Native : {
+      kind : ('arg, 'storage) Script_native_types.kind;
+    }
+      -> ('arg, 'storage) implementation
+
 type ('arg, 'storage) code =
   | Code : {
-      code :
-        ( ('arg, 'storage) Script_typed_ir.pair,
-          ( Script_typed_ir.operation Script_list.t,
-            'storage )
-          Script_typed_ir.pair )
-        Script_typed_ir.lambda;
+      implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) Script_typed_ir.ty;
       storage_type : ('storage, _) Script_typed_ir.ty;
       views : Script_typed_ir.view_map;
@@ -318,6 +325,9 @@ val parse_code :
   code:Script.lazy_expr ->
   (ex_code * context) tzresult Lwt.t
 
+val get_typed_native_code :
+  t -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t
+
 val parse_storage :
   elab_conf:Script_ir_translator_config.elab_config ->
   context ->
@@ -337,15 +347,15 @@ val parse_script :
   (ex_script * context) tzresult Lwt.t
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-val parse_and_unparse_script_unaccounted :
+val parse_and_unparse_michelson_script_unaccounted :
   context ->
   legacy:bool ->
   allow_forged_tickets_in_storage:bool ->
   allow_forged_lazy_storage_id_in_storage:bool ->
   Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
-  Script.t ->
-  (Script.t * context) tzresult Lwt.t
+  Script.michelson_with_storage ->
+  (Script.michelson_with_storage * context) tzresult Lwt.t
 
 val parse_contract_data :
   context ->

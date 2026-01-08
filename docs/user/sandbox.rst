@@ -1,16 +1,18 @@
 Sandboxed mode
 --------------
 
+.. note::
+
+   The following scripts and commands assume that you have built Octez from the source code. 
+   See :ref:`Build from sources<build_from_sources>`.
+   To switch to the master branch, use ``git checkout master`` instead of ``git checkout latest-release``.
+
+
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
 -  ``./src/bin_node/octez-sandboxed-node.sh``
 -  ``./src/bin_client/octez-init-sandboxed-client.sh``
-
-For the moment these scripts are expected to be run on the ``master``
-branch (see :ref:`Build from sources<build_from_sources>`; in
-particular, use ``git checkout master`` instead of ``git checkout
-latest-release``).
 
 Run a sandboxed node
 ~~~~~~~~~~~~~~~~~~~~
@@ -31,7 +33,7 @@ to connect to. Lowering the number of expected connections removes the spurious
 “Too few connections” warnings. Set it to ``1`` for our two-nodes network (and
 you would set it to ``0`` for a single-node network).
 
-More informations can be found in the :package-api:`api page of the octez node
+More information can be found in the :package-api:`api page of the octez node
 config <octez-node-config/Octez_node_config/Shared_arg/index.html#type-t>`: or
 by simply calling
 

@@ -28,8 +28,8 @@ if [ "${CI_COMMIT_REF_NAME:-}" = "master" ]; then
 else
   # we might be interested in the tag even if the branch is not protected
   if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    # shellcheck source=./scripts/ci/octez-release.sh
-    . ./scripts/ci/octez-release.sh
+    # shellcheck source=./scripts/releases/octez-release.sh
+    . ./scripts/releases/octez-release.sh
   fi
 
   if [ ! "${CI_COMMIT_REF_PROTECTED:-}" = "false" ]; then
@@ -43,12 +43,19 @@ else
           else
             export RELEASETYPE="TestReleaseCandidate"
           fi
+        elif [ -n "${gitlab_release_beta_version:-}" ]; then
+          # protected, tag, Beta
+          if [ "${CI_PROJECT_NAMESPACE:-}" = "tezos" ]; then
+            export RELEASETYPE="Beta"
+          else
+            export RELEASETYPE="TestBeta"
+          fi
         else
           # protected, tag, Release
           if [ "${CI_PROJECT_NAMESPACE:-}" = "tezos" ]; then
             export RELEASETYPE="Release"
           else
-            RELEASETYPE="TestRelease"
+            export RELEASETYPE="TestRelease"
           fi
         fi
       else

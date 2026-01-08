@@ -42,7 +42,9 @@ Version 10.3 prevents several corruptions of the store.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v10.3

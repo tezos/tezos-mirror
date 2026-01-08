@@ -1,0 +1,23 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/hash_key.tz on storage None and input '"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"' --level 1 --trace-stack
+storage
+  (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 83.907)
+    [ (Pair "edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES" None) ]
+  - location: 8 (just consumed gas: 0.010)
+    [ "edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES" ]
+  - location: 9 (just consumed gas: 0.605)
+    [ "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k" ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k") ]
+  - location: 11 (just consumed gas: 0.010)
+    [ {}
+      (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k") ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Pair {} (Some "tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k")) ]
+

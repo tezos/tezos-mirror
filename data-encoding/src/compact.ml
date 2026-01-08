@@ -227,8 +227,7 @@ type ('a, 'b, 'layout) case_layout_open = {
 
 type 'a case = Case : ('a, 'b, 'layout) case_open -> 'a case [@@unboxed]
 
-let case :
-    type a b.
+let case : type a b.
     title:string ->
     ?description:string ->
     b t ->
@@ -243,8 +242,7 @@ type 'a case_layout =
   | Case_layout : ('a, 'b, 'layout) case_layout_open -> 'a case_layout
 [@@unboxed]
 
-let case_to_layout_open :
-    type a b layout c.
+let case_to_layout_open : type a b layout c.
     tag ->
     (a, b, layout) case_open ->
     ((a, b, layout) case_layout_open -> c) ->
@@ -259,8 +257,7 @@ let case_to_layout : type a. tag -> a case -> a case_layout list =
 let cases_to_layouts : type a. a case list -> a case_layout list =
  fun cases -> List.mapi (fun i -> case_to_layout i) cases |> List.concat
 
-let classify_with_case_open :
-    type a b layout.
+let classify_with_case_open : type a b layout.
     tag ->
     (a, b, layout) case_open ->
     a ->
@@ -291,8 +288,8 @@ let classify_with_cases_exn : type a. (int * a case) list -> a -> a case_layout
   in
   classify_aux icases
 
-let tag_with_case_layout_open :
-    type a b layout. int -> (a, b, layout) case_layout_open -> tag =
+let tag_with_case_layout_open : type a b layout.
+    int -> (a, b, layout) case_layout_open -> tag =
  fun inner_tag_len {tag; compact; layout; _} ->
   let (module C : S with type input = b and type layout = layout) = compact in
   (tag lsl inner_tag_len) lor C.tag layout
@@ -301,8 +298,8 @@ let tag_with_case_layout : type a. int -> a case_layout -> tag =
  fun inner_tag_len (Case_layout case) ->
   tag_with_case_layout_open inner_tag_len case
 
-let title_with_case_layout_open :
-    type a b layout. (a, b, layout) case_layout_open -> string =
+let title_with_case_layout_open : type a b layout.
+    (a, b, layout) case_layout_open -> string =
  fun {title; _} -> title
 
 let title_with_case_layout : type a. a case_layout -> string =
@@ -316,8 +313,8 @@ let tag_len_of_case_open : type a b layout. (a, b, layout) case_open -> int =
 let tag_len_of_case : type a. a case -> int =
  fun (Case case) -> tag_len_of_case_open case
 
-let partial_encoding_of_case_layout_open :
-    type a b layout. (a, b, layout) case_layout_open -> a Encoding.t =
+let partial_encoding_of_case_layout_open : type a b layout.
+    (a, b, layout) case_layout_open -> a Encoding.t =
  fun {proj; inj; compact; layout; _} ->
   let (module C : S with type input = b and type layout = layout) = compact in
   (* TODO: introduce a [def] combinator. Problem: needs an [id]. *)
@@ -326,8 +323,8 @@ let partial_encoding_of_case_layout_open :
 let partial_encoding_of_case_layout : type a. a case_layout -> a Encoding.t =
  fun (Case_layout layout) -> partial_encoding_of_case_layout_open layout
 
-let case_to_json_data_encoding_case_open :
-    type a b layout. (a, b, layout) case_open -> a Encoding.case =
+let case_to_json_data_encoding_case_open : type a b layout.
+    (a, b, layout) case_open -> a Encoding.case =
  fun {title; description; proj; inj; compact} ->
   let (module C : S with type input = b and type layout = layout) = compact in
   Encoding.case ~title ?description Encoding.Json_only C.json_encoding proj inj
@@ -354,8 +351,8 @@ let union_bits title min = function
       raise
         (Invalid_argument (Format.sprintf "union: not enough %s bits" title))
 
-let union :
-    type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
+let union : type a.
+    ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
   if cases = [] then
     raise
@@ -502,7 +499,9 @@ let tup1 : type a. a t -> a t =
   end)
 
 let tup2 : type a b. a t -> b t -> (a * b) t =
- fun (module A : S with type input = a) (module B : S with type input = b) :
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     :
      (module S with type input = a * b) ->
   (module struct
     type input = A.input * B.input
@@ -536,7 +535,9 @@ let tup2 : type a b. a t -> b t -> (a * b) t =
 let tup3 : type a b c. a t -> b t -> c t -> (a * b * c) t =
  fun (module A : S with type input = a)
      (module B : S with type input = b)
-     (module C : S with type input = c) : (module S with type input = a * b * c) ->
+     (module C : S with type input = c)
+     :
+     (module S with type input = a * b * c) ->
   (module struct
     type input = A.input * B.input * C.input
 
@@ -577,7 +578,8 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
  fun (module A : S with type input = a)
      (module B : S with type input = b)
      (module C : S with type input = c)
-     (module D : S with type input = d) :
+     (module D : S with type input = d)
+     :
      (module S with type input = a * b * c * d) ->
   (module struct
     type input = A.input * B.input * C.input * D.input
@@ -627,13 +629,14 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
         D.json_encoding
   end)
 
-let tup5 :
-    type a b c d e. a t -> b t -> c t -> d t -> e t -> (a * b * c * d * e) t =
+let tup5 : type a b c d e.
+    a t -> b t -> c t -> d t -> e t -> (a * b * c * d * e) t =
  fun (module A : S with type input = a)
      (module B : S with type input = b)
      (module C : S with type input = c)
      (module D : S with type input = d)
-     (module E : S with type input = e) :
+     (module E : S with type input = e)
+     :
      (module S with type input = a * b * c * d * e) ->
   (module struct
     type input = A.input * B.input * C.input * D.input * E.input
@@ -687,15 +690,15 @@ let tup5 :
         E.json_encoding
   end)
 
-let tup6 :
-    type a b c d e f.
+let tup6 : type a b c d e f.
     a t -> b t -> c t -> d t -> e t -> f t -> (a * b * c * d * e * f) t =
  fun (module A : S with type input = a)
      (module B : S with type input = b)
      (module C : S with type input = c)
      (module D : S with type input = d)
      (module E : S with type input = e)
-     (module F : S with type input = f) :
+     (module F : S with type input = f)
+     :
      (module S with type input = a * b * c * d * e * f) ->
   (module struct
     type input = A.input * B.input * C.input * D.input * E.input * F.input
@@ -761,8 +764,7 @@ let tup6 :
         F.json_encoding
   end)
 
-let tup7 :
-    type a b c d e f g.
+let tup7 : type a b c d e f g.
     a t ->
     b t ->
     c t ->
@@ -777,7 +779,8 @@ let tup7 :
      (module D : S with type input = d)
      (module E : S with type input = e)
      (module F : S with type input = f)
-     (module G : S with type input = g) :
+     (module G : S with type input = g)
+     :
      (module S with type input = a * b * c * d * e * f * g) ->
   (module struct
     type input =
@@ -850,8 +853,7 @@ let tup7 :
         G.json_encoding
   end)
 
-let tup8 :
-    type a b c d e f g h.
+let tup8 : type a b c d e f g h.
     a t ->
     b t ->
     c t ->
@@ -868,7 +870,8 @@ let tup8 :
      (module E : S with type input = e)
      (module F : S with type input = f)
      (module G : S with type input = g)
-     (module H : S with type input = h) :
+     (module H : S with type input = h)
+     :
      (module S with type input = a * b * c * d * e * f * g * h) ->
   (module struct
     type input =
@@ -960,8 +963,7 @@ let tup8 :
         H.json_encoding
   end)
 
-let tup9 :
-    type a b c d e f g h i.
+let tup9 : type a b c d e f g h i.
     a t ->
     b t ->
     c t ->
@@ -980,7 +982,8 @@ let tup9 :
      (module F : S with type input = f)
      (module G : S with type input = g)
      (module H : S with type input = h)
-     (module I : S with type input = i) :
+     (module I : S with type input = i)
+     :
      (module S with type input = a * b * c * d * e * f * g * h * i) ->
   (module struct
     type input =
@@ -1079,8 +1082,7 @@ let tup9 :
         I.json_encoding
   end)
 
-let tup10 :
-    type a b c d e f g h i j.
+let tup10 : type a b c d e f g h i j.
     a t ->
     b t ->
     c t ->
@@ -1101,7 +1103,8 @@ let tup10 :
      (module G : S with type input = g)
      (module H : S with type input = h)
      (module I : S with type input = i)
-     (module J : S with type input = j) :
+     (module J : S with type input = j)
+     :
      (module S with type input = a * b * c * d * e * f * g * h * i * j) ->
   (module struct
     type input =
@@ -1223,8 +1226,8 @@ let field_to_inner_compact : type a b. (a, b) field_open -> b t = function
 
 type 'a field = Field : ('b, 'a) field_open -> 'a field [@@unboxed]
 
-let field_to_data_encoding_open :
-    type a b. (a, b) field_open -> b Encoding.field = function
+let field_to_data_encoding_open : type a b.
+    (a, b) field_open -> b Encoding.field = function
   | Req {name; compact} ->
       let (module A) = compact in
       Encoding.req name A.json_encoding
@@ -1250,8 +1253,7 @@ let obj1_open : type a b. (a, b) field_open -> (module S with type input = b) =
 
 let obj1 (Field f1) = obj1_open f1
 
-let obj2_open :
-    type a b c d.
+let obj2_open : type a b c d.
     (a, b) field_open -> (c, d) field_open -> (module S with type input = b * d)
     =
  fun f1 f2 ->
@@ -1269,8 +1271,7 @@ let obj2_open :
 
 let obj2 (Field f1) (Field f2) = obj2_open f1 f2
 
-let obj3_open :
-    type a b c d e f.
+let obj3_open : type a b c d e f.
     (a, b) field_open ->
     (c, d) field_open ->
     (e, f) field_open ->
@@ -1294,8 +1295,7 @@ let obj3_open :
 
 let obj3 (Field f1) (Field f2) (Field f3) = obj3_open f1 f2 f3
 
-let obj4_open :
-    type a b c d e f g h.
+let obj4_open : type a b c d e f g h.
     (a, b) field_open ->
     (c, d) field_open ->
     (e, f) field_open ->
@@ -1322,8 +1322,7 @@ let obj4_open :
 
 let obj4 (Field f1) (Field f2) (Field f3) (Field f4) = obj4_open f1 f2 f3 f4
 
-let obj5_open :
-    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b.
+let obj5_open : type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b.
     (t1a, t1b) field_open ->
     (t2a, t2b) field_open ->
     (t3a, t3b) field_open ->
@@ -1354,8 +1353,7 @@ let obj5_open :
 let obj5 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) =
   obj5_open f1 f2 f3 f4 f5
 
-let obj6_open :
-    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b.
+let obj6_open : type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b.
     (t1a, t1b) field_open ->
     (t2a, t2b) field_open ->
     (t3a, t3b) field_open ->
@@ -1389,8 +1387,7 @@ let obj6_open :
 let obj6 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6) =
   obj6_open f1 f2 f3 f4 f5 f6
 
-let obj7_open :
-    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b.
+let obj7_open : type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b.
     (t1a, t1b) field_open ->
     (t2a, t2b) field_open ->
     (t3a, t3b) field_open ->
@@ -1767,8 +1764,7 @@ let list : type a. bits:int -> a Encoding.t -> a list t =
     let json_encoding = json_encoding encoding
   end)
 
-let or_int32 :
-    type a.
+let or_int32 : type a.
     int32_title:string ->
     alt_title:string ->
     ?alt_description:string ->

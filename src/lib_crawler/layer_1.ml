@@ -148,7 +148,10 @@ let rec do_connect ~count ~previous_status
       (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
       let delay = delay *. (1.5 ** fcount) in
       let delay = min delay 3600. in
-      let randomization_factor = 0.5 (* 50% *) in
+      let randomization_factor =
+        0.5
+        (* 50% *)
+      in
       let delay =
         delay
         +. Random.float (delay *. 2. *. randomization_factor)
@@ -165,14 +168,16 @@ let rec do_connect ~count ~previous_status
       let heads =
         Lwt_stream.map
           (fun ((hash, Tezos_base.Block_header.{shell = {predecessor; _}; _}) as
-                head) ->
+                head)
+             ->
             Precessor_cache.replace l1_ctxt.cache hash predecessor ;
             head)
           heads
       in
       let consumer =
         Lwt_stream.iter_s
-          (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head) ->
+          (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head)
+             ->
             l1_ctxt.last_seen <- Some head ;
             Layer1_event.switched_new_head ~name hash level)
           heads
@@ -289,6 +294,9 @@ type 'a lwt_stream_get_result =
 type lwt_stream_iter_with_timeout_ended = Closed | Timeout of float
 
 let timeout_factor = 10.
+
+let get_chain_id t =
+  Tezos_shell_services.Chain_services.chain_id t.cctxt ~chain:t.chain ()
 
 (** This function is similar to {!Lwt_stream.iter_s} excepted that it resolves
     with {!Get_timeout} if waiting for the next element takes more than some
@@ -482,7 +490,10 @@ let get_tezos_reorg_for_new_head l1_state
     if old_head_level = new_head_level then
       return (old_head, new_head, Reorg.no_reorg)
     else if old_head_level < new_head_level then
-      let max_read = distance + 1 (* reading includes the head *) in
+      let max_read =
+        distance + 1
+        (* reading includes the head *)
+      in
       let+ new_head, new_chain =
         nth_predecessor
           ~get_predecessor:(get_predecessor ~max_read l1_state)
@@ -510,7 +521,10 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
       if new_head_level < l then return Reorg.no_reorg
       else
         let distance = Int32.sub new_head_level l |> Int32.to_int in
-        let max_read = distance + 1 (* reading includes the head *) in
+        let max_read =
+          distance + 1
+          (* reading includes the head *)
+        in
         let* _block_at_l, new_chain =
           nth_predecessor
             ~get_predecessor:(get_predecessor ~max_read l1_state)
@@ -548,55 +562,35 @@ let timeout_promise service timeout =
   in
   Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
 
-let trace_name service =
-  let meth =
-    Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
-  in
-  let path = Tezos_rpc.Service.path service |> Resto.Path.to_string in
-  String.concat " " [meth; path]
-
-let client_context_with_timeout (obj : #Client_context.full) timeout :
-    Client_context.full =
-  let open Lwt_syntax in
+class with_timeout timeout (obj : #Tezos_rpc.Context.generic) :
+  Tezos_rpc.Context.generic =
   object
-    inherit Client_context.proxy_context (obj :> Client_context.full)
+    method base = obj#base
 
-    method! call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun service params query body ->
-        let trace_name = trace_name service in
-        Octez_telemetry.Trace.with_tzresult
-          ~service_name:"L1_rpc_client"
-          ~kind:Span_kind_client
-          trace_name
-        @@ fun _ ->
         Lwt.pick
           [
             obj#call_service service params query body;
             timeout_promise service timeout;
           ]
 
-    method! call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
-        let trace_name = trace_name service in
-        Octez_telemetry.Trace.with_tzresult
-          ~service_name:"L1_rpc_client"
-          ~kind:Span_kind_client
-          trace_name
-        @@ fun _ ->
         Lwt.pick
           [
             obj#call_streamed_service
@@ -609,19 +603,29 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
             timeout_promise service timeout;
           ]
 
-    method! generic_media_type_call meth ?body uri =
+    method generic_media_type_call meth ?body uri =
       let timeout_promise =
+        let open Lwt_syntax in
         let* () = Lwt_unix.sleep timeout in
         Lwt_result_syntax.tzfail
           (RPC_timeout {path = Uri.to_string uri; timeout})
       in
-      let trace_name =
-        String.concat " " [Tezos_rpc.Service.string_of_meth meth; Uri.path uri]
-      in
-      Octez_telemetry.Trace.with_tzresult
-        ~service_name:"L1_rpc_client"
-        ~kind:Span_kind_client
-        trace_name
-      @@ fun _ ->
       Lwt.pick [obj#generic_media_type_call meth ?body uri; timeout_promise]
+  end
+
+let client_context (obj : #Client_context.full) ~timeout :
+    Client_context.full tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let+ chain_id =
+    Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain ()
+  in
+  object
+    inherit Client_context.proxy_context (obj :> Client_context.full)
+
+    inherit!
+      Octez_telemetry.Rpc_context.with_telemetry
+        ~service_name:"L1_rpc_client"
+        (new with_timeout timeout obj)
+
+    method! chain = `Hash chain_id
   end

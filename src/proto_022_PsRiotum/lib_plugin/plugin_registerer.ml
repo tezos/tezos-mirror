@@ -6,11 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Validation = struct
-  include Registerer.Registered
-  module Plugin = Plugin.Mempool
-end
-
 module RPC = struct
   module Proto = Registerer.Registered
   include Plugin.RPC
@@ -33,8 +28,6 @@ module Shell_helpers = struct
 
   let hash = Registerer.Registered.hash
 end
-
-let () = Protocol_plugin.register_validation_plugin (module Validation)
 
 let () = Protocol_plugin.register_rpc (module RPC)
 
@@ -76,14 +69,14 @@ module Delegators_contribution_plugin = struct
         } ->
         return
           (`Ok
-            {
-              Protocol_plugin.min_delegated_amount;
-              min_delegated_level;
-              overstaked;
-              total_delegated_including_overdelegated;
-              total_delegated_after_limits;
-              overdelegated;
-            })
+             {
+               Protocol_plugin.min_delegated_amount;
+               min_delegated_level;
+               overstaked;
+               total_delegated_including_overdelegated;
+               total_delegated_after_limits;
+               overdelegated;
+             })
     | (`Retry_at_level _ | `Cycle_too_far_in_future) as x -> return x
 
   let min_delegated_breakdown context ~delegate_pkh =

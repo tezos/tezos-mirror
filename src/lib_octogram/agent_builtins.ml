@@ -65,8 +65,8 @@ module Quit = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Quit -> Some ()
     | _ -> None
 
@@ -116,8 +116,8 @@ module Start_http_server = struct
 
   type r = start_http_server_r
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Start_http_server args -> Some args
     | _ -> None
 
@@ -187,8 +187,8 @@ module Tar = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Tar args -> Some args
     | _ -> None
 
@@ -260,8 +260,8 @@ module Prefetch = struct
 
   type r = unit
 
-  let of_remote_procedure :
-      type a. (a, 'uri) Remote_procedure.t -> 'uri t option = function
+  let of_remote_procedure : type a.
+      (a, 'uri) Remote_procedure.t -> 'uri t option = function
     | Prefetch args -> Some args
     | _ -> None
 

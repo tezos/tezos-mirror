@@ -71,13 +71,13 @@ exception Export_not_found of {name : string; kind : Unsigned.uint8}
 
 let () =
   Printexc.register_printer (function
-      | Export_not_found {name; kind} ->
-          Some
-            (Format.asprintf
-               "Export %S (%i) not found"
-               name
-               (Unsigned.UInt8.to_int kind))
-      | _ -> None)
+    | Export_not_found {name; kind} ->
+        Some
+          (Format.asprintf
+             "Export %S (%i) not found"
+             name
+             (Unsigned.UInt8.to_int kind))
+    | _ -> None)
 
 let fn exports name typ =
   let kind = Types.Externkind.func in

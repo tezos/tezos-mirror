@@ -10,4 +10,6 @@ contract StorageAccess {
     function setValue(uint256 newValue) public {
         value = newValue;
     }
+
+    receive() external payable {}
 }

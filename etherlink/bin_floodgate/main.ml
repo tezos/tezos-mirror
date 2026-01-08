@@ -13,18 +13,22 @@ module Parameter = struct
   let signer =
     Tezos_clic.parameter (fun _ value ->
         let open Lwt_result_syntax in
-        let* value =
-          try
-            match String.remove_prefix ~prefix:"0x" value with
-            | Some value ->
-                let _ = Hex.show (`Hex value) in
-                return (`Hex value)
-            | None -> raise (Invalid_argument "not prefixed by 0x")
-          with _ ->
-            failwith "%s value is not a valid hexadecimal string" value
-        in
-        let*? secret_key = Signer.secret_key_from_hex value in
-        return (Signer.from_secret_key secret_key))
+        match Configuration.gcp_key_from_string_opt value with
+        | None ->
+            let*? secret_key = Signer.secret_key_from_hex (`Hex value) in
+            return (Signer.from_secret_key secret_key)
+        | Some key ->
+            Signer.from_gcp_key
+              {
+                pool_size = 2;
+                authentication_method = Gcloud_auth;
+                authentication_retries = 2;
+                authentication_frequency_min = 30;
+                authentication_retry_backoff_sec = 5;
+                authentication_timeout_sec = 5;
+                gcloud_path = "gcloud";
+              }
+              key)
 
   let int =
     Tezos_clic.parameter (fun _ n ->
@@ -98,6 +102,15 @@ module Arg = struct
       ~default:"https://node.ghostnet.etherlink.com"
       ~long:"rpc-endpoint"
       ~doc:"Endpoint used to fetch the state of the chain"
+
+  let ws_endpoint =
+    Tezos_clic.arg
+      ~placeholder:"URL"
+      ~long:"ws-endpoint"
+      ~doc:
+        "Enable websocket new heads subscription instead of the blueprint \
+         follower using the provided endpoint."
+      Parameter.endpoint
 
   let signer ~long ~short ~doc =
     Tezos_clic.arg ~doc ~long ~short ~placeholder:"SIGNER" Parameter.signer
@@ -211,6 +224,48 @@ module Arg = struct
         "The number of transactions an EOA inject before waiting for their \
          confirmation."
       Parameter.int
+
+  let dummy_data_size =
+    Tezos_clic.arg
+      ~long:"dummy-data-size"
+      ~placeholder:"BYTES"
+      ~doc:
+        "Size in bytes of dummy data to include in native XTZ transaction \
+         payloads. This allows testing network capacity under load conditions \
+         with data-heavy transactions. Only applicable with the `xtz` \
+         scenario. If not set, no dummy data will be included in the \
+         transactions."
+      Parameter.int
+
+  let retry_attempt =
+    let default = "never" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"retry-attempt"
+      ~short:'a'
+      ~placeholder:"never|always|INT"
+      ~doc:
+        "The number of time a transaction is retried when it has been dropped."
+      (Tezos_clic.parameter
+         Floodgate.(
+           fun _ s ->
+             let open Lwt_result_syntax in
+             match s with
+             | "always" -> return Always
+             | "never" -> return Never
+             | s ->
+                 let*? n =
+                   Option.to_result
+                     ~none:
+                       [
+                         error_of_fmt
+                           "Expected an integer, \"always\" or \"never\", got \
+                            %s"
+                           s;
+                       ]
+                     (int_of_string_opt s)
+                 in
+                 return (Number n)))
 end
 
 let log_config ~verbose () =
@@ -229,10 +284,11 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args13
+      args16
         verbose
         relay_endpoint
         rpc_endpoint
+        ws_endpoint
         controller
         max_active_eoa
         max_transaction_batch_length
@@ -242,11 +298,14 @@ let run_command =
         initial_balance
         scenario
         txs_salvo_eoa
-        elapsed_time_between_report)
+        elapsed_time_between_report
+        dummy_data_size
+        retry_attempt)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
            rpc_endpoint,
+           ws_endpoint,
            controller,
            max_active_eoa,
            max_transaction_batch_length,
@@ -256,16 +315,27 @@ let run_command =
            initial_balance,
            scenario,
            txs_per_salvo,
-           elapsed_time_between_report )
-         () ->
+           elapsed_time_between_report,
+           dummy_data_size,
+           retry_attempt )
+         ()
+       ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
       let* controller =
         require ~error_msg:"Missing argument --controller" controller
       in
+      let* () =
+        if Option.is_some dummy_data_size && scenario <> `XTZ then
+          failwith
+            "the --dummy-data-size argument is only applicable with the `xtz` \
+             scenario."
+        else return_unit
+      in
       Floodgate.run
         ~relay_endpoint
         ~rpc_endpoint
+        ~ws_endpoint
         ~controller
         ~max_active_eoa
         ~max_transaction_batch_length
@@ -275,7 +345,9 @@ let run_command =
         ~initial_balance
         ~txs_per_salvo
         ~elapsed_time_between_report
-        ~scenario)
+        ~scenario
+        ~dummy_data_size
+        ~retry_attempt)
 
 let commands = [run_command]
 

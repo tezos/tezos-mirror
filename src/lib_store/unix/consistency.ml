@@ -848,7 +848,8 @@ let find_activation_blocks_in_cemented block_store ~savepoint_level ~proto_level
             return previous_cycle
           else if
             min_proto_level <= proto_level && proto_level <= max_proto_level
-          then (* Activation have occurred in this cycle. *)
+          then
+            (* Activation have occurred in this cycle. *)
             return cycle
           else
             (* All cases are covered:
@@ -910,7 +911,8 @@ let find_activation_blocks_in_floating block_store ~head ~savepoint_level
         Compare.Int.(
           predecessor_proto_level < block_proto_level
           && block_proto_level = proto_level)
-      then (* Found *)
+      then
+        (* Found *)
         return (block, succ)
       else (* Continue *)
         loop predecessor_proto_level block predecessor

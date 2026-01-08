@@ -52,6 +52,12 @@ module Encoding = struct
     let encoding = Data_encoding.z
   end
 
+  module N : VALUE with type t = Z.t = struct
+    type t = Z.t
+
+    let encoding = Data_encoding.n
+  end
+
   module Manager_counter : VALUE with type t = Manager_counter_repr.t = struct
     type t = Manager_counter_repr.t
 
@@ -112,6 +118,13 @@ module Consecutive_round_zero :
       let name = ["consecutive_round_zero"]
     end)
     (Encoding.Int32)
+
+module Protocol_activation_level =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["protocol_activation_level"]
+    end)
+    (Raw_level_repr)
 
 module Tenderbake = struct
   module First_level_of_protocol =
@@ -465,6 +478,14 @@ module Contract = struct
     let keys_unaccounted = I.keys_unaccounted
   end
 
+  module Native =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["native"]
+      end)
+      (Script_native_repr)
+
   module Code = Make_carbonated_map_expr (struct
     let name = ["code"]
   end)
@@ -570,6 +591,49 @@ module Contract = struct
         let name = ["total_supply"]
       end)
       (Tez_repr)
+
+  module Address_registry = struct
+    module Raw_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["address_registry"]
+        end)
+
+    module Next =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["next"]
+        end)
+        (Encoding.N)
+
+    module Registry =
+      Make_indexed_carbonated_data_storage
+        (Make_subcontext (Registered) (Raw_context)
+           (struct
+             let name = ["addresses"]
+           end))
+           (Make_index (Destination_repr.Index))
+        (Encoding.N)
+  end
+
+  module Native_contracts = struct
+    module Raw_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["native_contracts"]
+        end)
+
+    module CLST =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["clst"]
+        end)
+        (struct
+          type t = Contract_hash.t
+
+          let encoding = Contract_repr.originated_encoding
+        end)
+  end
 end
 
 module type NEXT = sig
@@ -1198,11 +1262,13 @@ module Cycle = struct
                    for_double_preattesting;
                    for_double_attesting;
                    for_double_baking;
-                 } ->
+                 }
+               ->
               (for_double_preattesting, for_double_attesting, for_double_baking))
             (fun ( for_double_preattesting,
                    for_double_attesting,
-                   for_double_baking ) ->
+                   for_double_baking )
+               ->
               {for_double_preattesting; for_double_attesting; for_double_baking})
             (obj3
                (req "for_double_preattesting" bool)
@@ -1697,7 +1763,8 @@ module Ramp_up = struct
                      baking_reward_bonus_per_slot;
                      attesting_reward_per_slot;
                      dal_attesting_reward_per_shard;
-                   } ->
+                   }
+                 ->
                 ( baking_reward_fixed_portion,
                   baking_reward_bonus_per_slot,
                   attesting_reward_per_slot,
@@ -1705,7 +1772,8 @@ module Ramp_up = struct
               (fun ( baking_reward_fixed_portion,
                      baking_reward_bonus_per_slot,
                      attesting_reward_per_slot,
-                     dal_attesting_reward_per_shard ) ->
+                     dal_attesting_reward_per_shard )
+                 ->
                 {
                   baking_reward_fixed_portion;
                   baking_reward_bonus_per_slot;
@@ -1792,13 +1860,6 @@ module Liquidity_baking = struct
 end
 
 module Adaptive_issuance = struct
-  module Launch_ema =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["adaptive_issuance_ema"]
-      end)
-      (Encoding.Int32)
-
   module Activation =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
@@ -1810,6 +1871,17 @@ module Adaptive_issuance = struct
         let encoding = Data_encoding.option Cycle_repr.encoding
       end)
 end
+
+module All_bakers_attest_activation =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["all_bakers_attest_first_level"]
+    end)
+    (struct
+      type t = Level_repr.t
+
+      let encoding = Level_repr.encoding
+    end)
 
 module Ticket_balance = struct
   module Name = struct
@@ -2283,9 +2355,6 @@ module Dal = struct
           let name = ["slot_headers"]
         end)
         (struct
-          (* The size of the list below is at most equal to the
-             [number_of_slots] as declared in the DAL parameters of the
-             protocol. *)
           type t = (Dal_slot_repr.Header.t * Contract_repr.t) list
 
           let encoding =
@@ -2313,8 +2382,6 @@ module Dal = struct
           let name = ["slot_headers_successive_histories_of_level"]
         end)
         (struct
-          (* The size of the list below is always equal to the [number_of_slots]
-             as declared in the DAL parameters of the protocol. *)
           type t =
             (Dal_slot_repr.History.Pointer_hash.t * Dal_slot_repr.History.t)
             list
@@ -2340,6 +2407,19 @@ module Dal = struct
         type t = unit
 
         let encoding = Data_encoding.empty
+      end)
+
+  module Past_parameters =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["past_parameters"]
+      end)
+      (struct
+        type t = Constants_parametric_repr.past_dal_parameters list
+
+        let encoding =
+          Data_encoding.list
+            Constants_parametric_repr.past_dal_parameters_encoding
       end)
 end
 

@@ -23,14 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A block fitness is an abstract list of byte sequences used by nodes to
+    decide whether a newly received block is better than the current head. The
+    meaning of these bytes is protocol-dependent and remains opaque outside the
+    protocol.
+
+    Fitness comparison is defined as:
+    - shorter fitness lists are considered smaller;
+    - when lists have identical length, comparison proceeds lexicographically
+      over each byte sequence. *)
+
 type t = Bytes.t list
 
 include Compare.Make (struct
   type nonrec t = t
 
-  (* Fitness comparison:
-       - shortest lists are smaller ;
-       - lexicographical order for lists of the same length. *)
   let compare_bytes b1 b2 =
     let len1 = Bytes.length b1 in
     let len2 = Bytes.length b2 in
@@ -45,6 +52,9 @@ include Compare.Make (struct
       in
       compare_byte b1 b2 0 len1
 
+  (** Fitness comparison:
+      - shortest lists are smaller ;
+      - lexicographical order for lists of the same length. *)
   let compare f1 f2 =
     let rec compare_rec f1 f2 =
       match (f1, f2) with
@@ -54,7 +64,7 @@ include Compare.Make (struct
           if i = 0 then compare_rec f1 f2 else i
       | _, _ -> assert false
     in
-    let len = compare (List.length f1) (List.length f2) in
+    let len = List.compare_lengths f1 f2 in
     if len = 0 then compare_rec f1 f2 else len
 end)
 

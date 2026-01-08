@@ -47,6 +47,12 @@ type batching_configuration =
     compatibility guarantees. *)
 type experimental_features = unit
 
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Signature.Secret_key.t;
+}
+
 type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)
   rpc_addr : P2p_point.Id.t;
@@ -85,6 +91,7 @@ type t = {
   batching_configuration : batching_configuration;
       (** The configuration of the batching of the shards.
           The default is [Enabled{time_interval=100}]. *)
+  publish_slots_regularly : publish_slots_regularly option;
 }
 
 (** [default] is the default configuration. *)

@@ -64,11 +64,11 @@ let game_status_of_refute_op_result = function
           contents =
             Single_result
               (Manager_operation_result
-                {
-                  operation_result =
-                    Applied (Sc_rollup_refute_result {game_status; _});
-                  _;
-                });
+                 {
+                   operation_result =
+                     Applied (Sc_rollup_refute_result {game_status; _});
+                   _;
+                 });
         };
     ] ->
       game_status
@@ -553,7 +553,8 @@ module Dissection = struct
              start_chunk,
              stop_chunk,
              default_number_of_sections,
-             distance ) ->
+             distance )
+         ->
         let expected_len = distance in
         truncate_and_check_error
           dissection
@@ -619,7 +620,8 @@ module Dissection = struct
              start_chunk,
              stop_chunk,
              default_number_of_sections,
-             new_state_hash ) ->
+             new_state_hash )
+         ->
         (* Check that we can not change the start hash. *)
         let dissection_with_different_start =
           modify_start
@@ -775,7 +777,8 @@ module Dissection = struct
              start_chunk,
              stop_chunk,
              default_number_of_sections,
-             picked_section ) ->
+             picked_section )
+         ->
         (* We put a distance of [1] in every section. Then, we put the
            distance's left in the [picked_section], it will create
            an invalid section. *)
@@ -1521,7 +1524,8 @@ let test_game ?(count = 10) ~p1_strategy ~p2_strategy () =
            p1_client,
            p2_client,
            p1_start,
-           _list_of_messages ) ->
+           _list_of_messages )
+       ->
       let open Lwt_result_syntax in
       (* Otherwise, there is no conflict. *)
       QCheck2.assume

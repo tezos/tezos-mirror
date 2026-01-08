@@ -87,24 +87,24 @@ let () =
 
 let () =
   Printexc.register_printer (function
-      | Json_encoding.Cannot_destruct (path, exc) ->
-          Format.kasprintf
-            Option.some
-            "Json_encoding.Cannot_destruct at %a: %a"
-            (Json_query.print_path_as_json_path ~wildcards:true)
-            path
-            (Data_encoding.Json.print_error ?print_unknown:None)
-            exc
-      | Binary.Read_error re ->
-          Format.kasprintf
-            Option.some
-            "Data_encoding.Read_error(%a)"
-            Binary.pp_read_error
-            re
-      | Binary.Write_error we ->
-          Format.kasprintf
-            Option.some
-            "Data_encoding.Write_error(%a)"
-            Binary.pp_write_error
-            we
-      | _ -> None)
+    | Json_encoding.Cannot_destruct (path, exc) ->
+        Format.kasprintf
+          Option.some
+          "Json_encoding.Cannot_destruct at %a: %a"
+          (Json_query.print_path_as_json_path ~wildcards:true)
+          path
+          (Data_encoding.Json.print_error ?print_unknown:None)
+          exc
+    | Binary.Read_error re ->
+        Format.kasprintf
+          Option.some
+          "Data_encoding.Read_error(%a)"
+          Binary.pp_read_error
+          re
+    | Binary.Write_error we ->
+        Format.kasprintf
+          Option.some
+          "Data_encoding.Write_error(%a)"
+          Binary.pp_write_error
+          we
+    | _ -> None)

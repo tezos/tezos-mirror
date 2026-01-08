@@ -15,6 +15,9 @@ ENV RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
 RUN apk update \
  && apk add --no-cache curl git file make jq websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng
+# Install desync from edge repo as its not yet available in alpine 3.20
+# hadolint ignore=DL3018,DL3019
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y
 
@@ -24,10 +27,10 @@ COPY .cargo/config.toml /root/.cargo/
 # Foundry releases nightly build. We pick the commit of the day (at the time
 # of proposing the change)
 RUN cargo install \
- --git https://github.com/foundry-rs/foundry/ foundry-cast \
+ --git https://github.com/foundry-rs/foundry/ cast \
  --profile release \
  --force --locked \
- --tag nightly-07a1f67114565968b188d1abf42fe2c5c57bfca5 \
+ --tag nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e \
  && cp /root/.cargo/bin/cast /bin
 
 # runtime + end-to-end test dependencies
@@ -92,6 +95,10 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache git file make websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng npm
+# Install desync from edge repo as its not yet available in alpine 3.20
+# hadolint ignore=DL3018,DL3019
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
+
 
 # Install dal SRS setup (need curl)
 COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/

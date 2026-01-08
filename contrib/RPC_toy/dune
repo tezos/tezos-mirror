@@ -10,7 +10,7 @@
   bls12-381.archive
   octez-libs.stdlib-unix
   octez-libs.base
-  octez-libs.cohttp-lwt-unix)
+  cohttp-lwt-unix)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)

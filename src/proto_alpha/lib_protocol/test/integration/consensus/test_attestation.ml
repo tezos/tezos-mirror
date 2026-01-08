@@ -103,26 +103,32 @@ let test_fitness_gap () =
 
 (** Return a delegate and its second smallest slot for the level of [block]. *)
 let delegate_and_second_slot block =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* attesters = Context.get_attesters (B block) in
-  let delegate, slots =
-    (* Find an attester with more than 1 slot. *)
+  let* csts = Context.get_constants (B block) in
+  let committee_size = csts.parametric.consensus_committee_size in
+  let delegate, rounds =
+    (* Find an attester with more than 1 round. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
-         (fun {RPC.Validators.delegate; slots; _} ->
-           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+         (fun {RPC.Validators.delegate; rounds; _} ->
+           if Compare.List_length_with.(rounds > 1) then Some (delegate, rounds)
            else None)
          attesters)
   in
-  (* Check that the slots are sorted and have no duplicates. *)
+  (* Check that the rounds are sorted and have no duplicates. *)
   let rec check_sorted = function
     | [] | [_] -> true
-    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
+    | x :: (y :: _ as t) -> Round.compare x y < 0 && check_sorted t
   in
-  assert (check_sorted slots) ;
-  let slot =
-    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
+  assert (check_sorted rounds) ;
+  let* slot =
+    match rounds with
+    | [] | [_] -> assert false
+    | _ :: round :: _ ->
+        let*?@ slot = Round.to_slot ~committee_size round in
+        return slot
   in
   return (delegate, slot)
 
@@ -143,13 +149,15 @@ let test_negative_slot () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init_n 5 () in
   let* b = Block.bake genesis in
-  let* delegate, _slots = Context.get_attester (B b) in
+  let* attester = Context.get_attester (B b) in
   Lwt.catch
     (fun () ->
       let* (_ : packed_operation) =
+        let slot =
+          Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests (-1)
+        in
         Op.attestation
-          ~delegate
-          ~slot:(Slot.Internal_for_tests.of_int_unsafe_only_use_for_tests (-1))
+          ~attesting_slot:{slot; consensus_pkh = attester.consensus_key}
           b
       in
       failwith "negative slot should not be accepted by the binary format")
@@ -162,38 +170,33 @@ let test_negative_slot () =
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
-  let* delegate, slot = delegate_and_second_slot b in
+  let* attesting_slot = Op.get_non_canonical_attesting_slot ~attested_block:b in
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block:b
-    ~delegate
-    ~slot
+    ~attesting_slot
     ~application_error:error_wrong_slot
     ~construction_error:error_wrong_slot
     ~mempool_error:error_wrong_slot
     Attestation
 
-let delegate_and_someone_elses_slot block =
+let attesting_slot_with_someone_elses_slot block =
   let open Lwt_result_syntax in
   let* attesters = Context.get_attesters (B block) in
-  let delegate, other_delegate_slot =
-    match attesters with
-    | [] | [_] -> assert false (* at least two delegates with rights *)
-    | {delegate; _} :: {slots; _} :: _ ->
-        (delegate, WithExceptions.Option.get ~loc:__LOC__ (List.hd slots))
-  in
-  return (delegate, other_delegate_slot)
+  match attesters with
+  | [] | [_] -> Test.fail ~__LOC__ "Expected at least two delegates with rights"
+  | {consensus_key = consensus_pkh; _} :: {attestation_slot; _} :: _ ->
+      return {Op.slot = attestation_slot; consensus_pkh}
 
 (** Attestation with a slot that does not belong to the delegate. *)
 let test_not_own_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
-  let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
+  let* attesting_slot = attesting_slot_with_someone_elses_slot b in
   Consensus_helpers.test_consensus_operation_all_modes
     ~loc:__LOC__
     ~attested_block:b
-    ~delegate
-    ~slot:other_delegate_slot
+    ~attesting_slot
     ~error:(function
       | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
     Attestation
@@ -206,12 +209,11 @@ let test_mempool_not_own_slot () =
   let* predecessor = Block.bake grandparent ~policy:(By_round 1) in
   let* future_block = Block.bake predecessor in
   let check_not_own_slot_fails loc b =
-    let* delegate, other_delegate_slot = delegate_and_someone_elses_slot b in
+    let* attesting_slot = attesting_slot_with_someone_elses_slot b in
     Consensus_helpers.test_consensus_operation
       ~loc
       ~attested_block:b
-      ~delegate
-      ~slot:other_delegate_slot
+      ~attesting_slot
       ~error:(function
         | Alpha_context.Operation.Invalid_signature -> true | _ -> false)
       Attestation
@@ -408,10 +410,10 @@ let test_wrong_payload_hash () =
 
 let assert_conflict_error ~loc res =
   Assert.proto_error ~loc res (function
-      | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
-        when kind = Validate_errors.Consensus.Attestation ->
-          true
-      | _ -> false)
+    | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
+      when kind = Validate_errors.Consensus.Attestation ->
+        true
+    | _ -> false)
 
 (** Test that attestations conflict with:
     - an identical attestation, and
@@ -594,34 +596,37 @@ let test_attestation_threshold ~sufficient_threshold () =
      about 1 slot so we can get closer to the limit of [consensus_threshold_size]: we
      check that a block with attesting power [consensus_threshold_size - 1] won't be
      baked. *)
+  (* TODO ABAAB: adapt test with new threshold under flag *)
   let* genesis, _contracts = Context.init_n 10 () in
   let* b = Block.bake genesis in
   let* {parametric = {consensus_threshold_size; _}; _} =
     Context.get_constants (B b)
   in
-  let* attesters_list = Context.get_attesters (B b) in
+  let consensus_threshold_size = Int64.of_int consensus_threshold_size in
+  let* attesters = Context.get_attesters (B b) in
   let*?@ round = Block.get_round b in
   let* _, attestations =
     List.fold_left_es
-      (fun (counter, attestations) {Plugin.RPC.Validators.delegate; slots; _} ->
-        let new_counter = counter + List.length slots in
+      (fun (counter, attestations) (attester : Context.attester) ->
+        let new_counter = Int64.add counter attester.attesting_power in
         if
           (sufficient_threshold && counter < consensus_threshold_size)
           || (not sufficient_threshold)
              && new_counter < consensus_threshold_size
         then
-          let* attestation = Op.attestation ~round ~delegate b in
+          let attesting_slot = Op.attesting_slot_of_attester attester in
+          let* attestation = Op.attestation ~attesting_slot ~round b in
           return (new_counter, attestation :: attestations)
         else return (counter, attestations))
-      (0, [])
-      attesters_list
+      (0L, [])
+      attesters
   in
   let*! b = Block.bake ~operations:attestations b in
   if sufficient_threshold then return_unit
   else
     Assert.proto_error ~loc:__LOC__ b (function
-        | Validate_errors.Block.Not_enough_attestations _ -> true
-        | _ -> false)
+      | Validate_errors.Block.Not_enough_attestations _ -> true
+      | _ -> false)
 
 let test_two_attestations_with_same_attester () =
   let open Lwt_result_syntax in
@@ -699,14 +704,14 @@ let test_attester_with_no_assigned_shards () =
     let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
     if in_committee && not has_assigned_shards then
       let dal_content = {attestation = Dal.Attestation.empty} in
-      let* op = Op.attestation ~delegate:pkh ~dal_content b in
+      let* op = Op.attestation ~manager_pkh:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
       let expect_apply_failure = function
         | [
             Environment.Ecoproto_error
               (Alpha_context.Dal_errors
                .Dal_data_availibility_attester_not_in_committee
-                {attester; level; slot = _});
+                 {attester; level; slot = _});
           ]
           when Signature.Public_key_hash.equal attester pkh
                && Raw_level.to_int32 level = b.header.shell.level ->
@@ -768,8 +773,9 @@ let test_dal_attestation_threshold () =
   let* _ =
     List.fold_left_es
       (fun (acc_ops, acc_power)
-           ({delegate; indexes} : RPC.Dal.S.shards_assignment) ->
-        let* op = Op.attestation ~delegate ~dal_content b in
+           ({delegate; indexes} : RPC.Dal.S.shards_assignment)
+         ->
+        let* op = Op.attestation ~manager_pkh:delegate ~dal_content b in
         let ops = op :: acc_ops in
         let power = acc_power + List.length indexes in
         let* _b, (metadata, _ops) =
@@ -797,8 +803,10 @@ let slot_substitution_do_not_affect_signature_check () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
   let* b = Block.bake genesis in
-  let* delegate, _slots = Context.get_attester (B b) in
-  let* signer = Account.find delegate in
+  let* {Context.consensus_key = consensus_pkh; _} =
+    Context.get_attester (B b)
+  in
+  let* signer = Account.find consensus_pkh in
   let watermark = Operation.to_watermark (Attestation Chain_id.zero) in
   let slot_swap_and_check_signature slot
       ({shell = {branch}; protocol_data = {contents; _}} :
@@ -831,7 +839,7 @@ let slot_substitution_do_not_affect_signature_check () =
         else Test.fail "Unexpected signature check failure"
   in
   let* attestation_without_dal =
-    Op.raw_attestation ~delegate ~slot:Slot.zero b
+    Op.raw_attestation ~attesting_slot:{slot = Slot.zero; consensus_pkh} b
   in
   let* () =
     slot_swap_and_check_signature
@@ -841,9 +849,8 @@ let slot_substitution_do_not_affect_signature_check () =
   let* attestation_with_dal =
     (* attestation with dal signed with slot zero *)
     Op.raw_attestation
+      ~attesting_slot:{slot = Slot.zero; consensus_pkh}
       ~dal_content:{attestation = Dal.Attestation.empty}
-      ~delegate
-      ~slot:Slot.zero
       b
   in
   let* () =
@@ -860,8 +867,8 @@ let encoding_incompatibility () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
   let* b = Block.bake genesis in
-  let* delegate, _slots = Context.get_attester (B b) in
-  let* signer = Account.find delegate in
+  let* attester = Context.get_attester (B b) in
+  let* signer = Account.find attester.consensus_key in
   let check_encodings_incompatibily
       ({shell = {branch}; protocol_data = {contents; signature = _}} :
         Kind.attestation operation) =
@@ -920,12 +927,13 @@ let encoding_incompatibility () =
     then Test.fail "Unexpected signature check success (bytes_without_slot)"
     else return_unit
   in
-  let* raw_attestation_without_dal = Op.raw_attestation ~delegate b in
+  let attesting_slot = Op.attesting_slot_of_attester attester in
+  let* raw_attestation_without_dal = Op.raw_attestation ~attesting_slot b in
   let* () = check_encodings_incompatibily raw_attestation_without_dal in
   let* raw_attestation_with_dal =
     Op.raw_attestation
+      ~attesting_slot
       ~dal_content:{attestation = Dal.Attestation.empty}
-      ~delegate
       b
   in
   let* () = check_encodings_incompatibily raw_attestation_with_dal in

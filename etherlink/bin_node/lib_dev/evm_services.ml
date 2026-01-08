@@ -229,9 +229,10 @@ let register get_next_blueprint_number find_blueprint_legacy find_blueprint
   |> register_get_time_between_block_service time_between_blocks
   |> register_broadcast_service find_blueprint get_next_blueprint_number
 
-let get_smart_rollup_address ~keep_alive ~evm_node_endpoint =
+let get_smart_rollup_address ~keep_alive ~timeout evm_node_endpoint =
   Rollup_services.call_service
     ~keep_alive
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_smart_rollup_address_service
@@ -239,11 +240,13 @@ let get_smart_rollup_address ~keep_alive ~evm_node_endpoint =
     ()
     ()
 
-let get_time_between_blocks ?fallback ~evm_node_endpoint () =
+let get_time_between_blocks ?fallback ~timeout ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let*! res =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-      [Media_type.octet_stream]
+    Rollup_services.call_service
+      ~keep_alive:false
+      ~timeout
+      ~media_types:[Media_type.octet_stream]
       ~base:evm_node_endpoint
       get_time_between_blocks_service
       ()
@@ -257,35 +260,11 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
       return res
   | Error trace, None -> fail trace
 
-let call_with_fallback name f always_fallback ~fallback ~map_fallback_result =
-  let open Lwt_result_syntax in
-  let fallback () =
-    let+ res = fallback () in
-    map_fallback_result res
-  in
-  if !always_fallback then
-    (* NOTE: we assume we are always calling [f] on the same endpoint so it's
-       safe to always fallback in the future. *)
-    fallback ()
-  else
-    let*! res = protect f in
-    match res with
-    | Ok res -> return res
-    | Error e ->
-        (match e with
-        | ( Tezos_rpc.Context.Not_found _ (* 404, Unsupported RPC. *)
-          | RPC_client_errors.Request_failed
-              {error = Unauthorized_uri | Forbidden; _}
-          (* 403, Forbidden RPC. *) )
-          :: _ ->
-            always_fallback := true
-        | _ -> ()) ;
-        let*! () = Events.rpc_call_fallback name e in
-        fallback ()
-
-let get_blueprint ~keep_alive ~evm_node_endpoint Ethereum_types.(Qty level) =
+let get_blueprint ~keep_alive ~timeout ~evm_node_endpoint
+    Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_service
@@ -293,10 +272,11 @@ let get_blueprint ~keep_alive ~evm_node_endpoint Ethereum_types.(Qty level) =
     ()
     ()
 
-let get_blueprints ~keep_alive ~evm_node_endpoint ~count
+let get_blueprints ~keep_alive ~timeout ~evm_node_endpoint ~count
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprints_service
@@ -304,10 +284,11 @@ let get_blueprints ~keep_alive ~evm_node_endpoint ~count
     {from_level = Z.to_int64 level; count}
     ()
 
-let get_blueprint_with_events ~keep_alive ~evm_node_endpoint
+let get_blueprint_with_events ~keep_alive ~timeout ~evm_node_endpoint
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_with_events_service
@@ -315,23 +296,11 @@ let get_blueprint_with_events ~keep_alive ~evm_node_endpoint
     ()
     ()
 
-(* TODO: L2-133
-   Can be removed in a future release (0.32), after the RPCs have been properly
-   deprecated. *)
-let get_blueprint_with_events =
-  let always_fallback = ref false in
-  fun ~keep_alive ~evm_node_endpoint level ->
-    call_with_fallback
-      "get_blueprint_with_events"
-      (fun () -> get_blueprint_with_events ~keep_alive ~evm_node_endpoint level)
-      always_fallback
-      ~fallback:(fun () -> get_blueprint ~keep_alive ~evm_node_endpoint level)
-      ~map_fallback_result:Blueprint_types.of_legacy
-
-let get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count
+let get_blueprints_with_events ~keep_alive ~timeout ~evm_node_endpoint ~count
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprints_with_events_service
@@ -339,26 +308,19 @@ let get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count
     {from_level = Z.to_int64 level; count}
     ()
 
-(* TODO: L2-133
-   Can be removed in a future release (0.32), after the RPCs have been properly
-   deprecated. *)
-let get_blueprints_with_events =
-  let always_fallback = ref false in
-  fun ~keep_alive ~evm_node_endpoint ~count level ->
-    call_with_fallback
-      "get_blueprints_with_events"
-      (fun () ->
-        get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count level)
-      always_fallback
-      ~fallback:(fun () ->
-        get_blueprints ~keep_alive ~evm_node_endpoint ~count level)
-      ~map_fallback_result:(List.map Blueprint_types.of_legacy)
-
-let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
+let monitor_blueprints ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
+  let level = Z.to_int64 level in
   let* _spill_all =
+    Rollup_services.with_timeout
+      timeout
+      evm_node_endpoint
+      blueprint_watcher_service
+      ()
+      level
+    @@ fun () ->
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.octet_stream]
       ~base:evm_node_endpoint
@@ -366,16 +328,30 @@ let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
       ~on_chunk
       ~on_close
       ()
-      (Z.to_int64 level)
+      level
       ()
   in
   return stream
 
-let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
+type 'a monitor = {stream : 'a Lwt_stream.t; closefn : unit -> unit}
+
+let close_monitor {closefn; _} = closefn ()
+
+let get_from_monitor {stream; _} = Lwt_stream.get stream
+
+let monitor_messages ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
-  let* _spill_all =
+  let level = Z.to_int64 level in
+  let* closefn =
+    Rollup_services.with_timeout
+      timeout
+      evm_node_endpoint
+      message_watcher_service
+      ()
+      level
+    @@ fun () ->
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.octet_stream]
       ~base:evm_node_endpoint
@@ -383,7 +359,7 @@ let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
       ~on_chunk
       ~on_close
       ()
-      (Z.to_int64 level)
+      level
       ()
   in
-  return stream
+  return {stream; closefn}

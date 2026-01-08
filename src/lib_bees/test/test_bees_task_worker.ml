@@ -17,21 +17,7 @@
     we need to run our tests in a child process or next tests ran
     will fail if using [Unix.fork].
 *)
-let tztest label fn =
-  Tztest.tztest label `Quick @@ fun () ->
-  match Lwt_unix.fork () with
-  | 0 -> (
-      match
-        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true fn
-      with
-      | Ok () -> exit 0
-      | Error _ -> exit 1)
-  | pid -> (
-      let open Lwt_result_syntax in
-      let*! _, status = Lwt_unix.waitpid [] pid in
-      match status with
-      | Unix.WEXITED 0 -> return_unit
-      | _ -> Lwt.return_error [])
+let tztest label fn = Alcotezt_process.test_case_lwt label `Quick fn
 
 let tests_fibonacci =
   let test_fibonacci domains =
@@ -95,10 +81,8 @@ let tests_on_completion_callback =
   in
   ("Run on_completion callback", [test])
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7938 *)
-(* let () = *)
-(*   Alcotest_lwt.run *)
-(*     ~__FILE__ *)
-(*     "Task worker" *)
-(*     [tests_fibonacci; tests_reuse; tests_on_completion_callback] *)
-(*   |> Lwt_main.run *)
+let () =
+  Alcotezt_process.run
+    ~__FILE__
+    "Task worker"
+    [tests_fibonacci; tests_reuse; tests_on_completion_callback]

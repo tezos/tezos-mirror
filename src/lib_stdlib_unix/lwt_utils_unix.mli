@@ -98,6 +98,13 @@ val create_dir : ?perm:int -> string -> unit Lwt.t
     directory. *)
 val copy_dir : ?perm:int -> string -> string -> unit Lwt.t
 
+(** [hardlink_dir ?perm src dst] creates hardlinks for the content of directory
+    [src] in a fresh directory [dst] with the same structure
+
+    @raise Unix_error(ENOTDIR,_,_) if the given file is not a
+    directory. *)
+val hardlink_dir : ?perm:int -> string -> string -> unit Lwt.t
+
 val read_file : string -> string Lwt.t
 
 (** [copy_file ?buffer_size ~src ~dst ()] copies the file from [src]

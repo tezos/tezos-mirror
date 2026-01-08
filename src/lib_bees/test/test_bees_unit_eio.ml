@@ -30,8 +30,7 @@ let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         self -> (r, request_error) Request.t -> (r, request_error) result =
      fun _w request ->
       let () = if slow then sleep 0.2 else () in
@@ -200,11 +199,14 @@ let test_random_requests create_queue =
   let actual =
     List.map
       (fun l ->
-        let w = create_queue "random_worker" in
-        match w with
+        match create_queue "random_worker" with
         | Ok w ->
-            let r = push_multiple_requests w l in
-            let () = Worker.shutdown_eio w in
+            let r =
+              Fun.protect
+                ~finally:(fun () -> Worker.shutdown_eio w)
+                (fun () -> push_multiple_requests w l)
+            in
+            assert_status w "Closed" ;
             r
         | Error _ -> [])
       series
@@ -294,54 +296,147 @@ let test_async_dropbox () =
         ())
       "dropbox_worker"
   in
-  let rq = RqA 1 in
-  let n = 10 in
-  (* First request is sent *)
-  Worker.Dropbox.put_request w rq ;
-  (* Sleep in order to make sure that the first request is handled
-     before the others one are sent *)
-  sleep 0.1 ;
-  (* While the first request is handled, n other requests are sent *)
-  (* These requests should be merged into one *)
-  for _i = 1 to n do
-    Worker.Dropbox.put_request w rq
-  done ;
-  Eio.Promise.resolve u_each () ;
-  Eio.Promise.await t_end ;
-  (* Hence the expected result being two requests, the first blocking one *)
-  (* and the second being the result of the merge *)
-  let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
-  let actual = get_history w in
-  assert_history actual expected ;
-  return_unit
+  Fun.protect
+    ~finally:(fun () ->
+      Worker.shutdown_eio w ;
+      assert_status w "Closed")
+    (fun () ->
+      let rq = RqA 1 in
+      let n = 10 in
+      (* First request is sent *)
+      Worker.Dropbox.put_request w rq ;
+      (* Sleep in order to make sure that the first request is handled
+         before the others one are sent *)
+      sleep 0.1 ;
+      (* While the first request is handled, n other requests are sent *)
+      (* These requests should be merged into one *)
+      for _i = 1 to n do
+        Worker.Dropbox.put_request w rq
+      done ;
+      Eio.Promise.resolve u_each () ;
+      Eio.Promise.await t_end ;
+      (* Hence the expected result being two requests, the first blocking one *)
+      (* and the second being the result of the merge *)
+      let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
+      let actual = get_history w in
+      assert_history actual expected ;
+      return_unit)
 
 let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Result_syntax.return_unit
 
-(** Because our tests might be ran in the same process as other tests,
-    we need to run our tests in a child process or next tests ran
-    will fail if using [Unix.fork].
-*)
-let tztest label fn =
-  Alcotest.test_case label `Quick @@ fun () ->
-  match Lwt_unix.fork () with
-  | 0 -> (
-      (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
-         If so, the tests block at some point. *)
-      match
-        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true
-        @@ fun () -> Lwt_eio.run_eio fn
-      with
-      | Ok () -> exit 0
-      | Error _ -> exit 1)
-  | pid -> (
-      let _, status = Unix.waitpid [] pid in
-      match status with
-      | Unix.WEXITED 0 -> ()
-      | _ ->
-          let msg = Format.sprintf "Error in %s." label in
-          raise (Alcotest.fail msg))
+let test_worker_contention () =
+  let open Result_syntax in
+  (* Scenario: hammer the shared task worker from many fibers at once to ensure
+     contention doesn't break task execution or worker liveness. *)
+  let parallel_fibers =
+    min 16 (max 4 (Tezos_bees.Task_worker.number_of_domains * 2))
+  in
+  let run_job payload =
+    Tezos_bees.Task_worker.launch_task_and_wait
+      "contention"
+      (fun id ->
+        for _ = 1 to 200 do
+          ignore (Sys.opaque_identity ())
+        done ;
+        id)
+      payload
+    |> Eio.Promise.await
+  in
+  let total_jobs = parallel_fibers * 4 in
+  let inputs =
+    let rec aux acc i =
+      if i = total_jobs then List.rev acc else aux (i :: acc) (i + 1)
+    in
+    aux [] 0
+  in
+  Eio.Fiber.List.iter
+    ~max_fibers:parallel_fibers
+    (fun payload ->
+      match run_job payload with
+      | Ok _ -> ()
+      | Error (Closed _) ->
+          Alcotest.fail "worker unexpectedly closed while handling contention"
+      | Error (Request_error _) ->
+          Alcotest.fail "worker request error under contention"
+      | Error (Any exn) -> raise exn)
+    inputs ;
+  return_unit
+
+let test_worker_launch_race () =
+  let open Result_syntax in
+  (* Scenario: spin up multiple domains racing to launch tasks at startup,
+     exercising worker creation path under simultaneous requests. *)
+  let describe_message_error : _ Tezos_bees.Task_worker.message_error -> string
+      = function
+    | Closed _ -> "Closed"
+    | Request_error _ -> "Request_error"
+    | Any exn -> Format.asprintf "Any(%s)" (Printexc.to_string exn)
+  in
+  let fail_on_error err =
+    let msg = describe_message_error err in
+    Alcotest.failf "task worker failure: %s" msg
+  in
+  let env = Tezos_base_unix.Event_loop.env_exn () in
+  let concurrent_domains =
+    max 4 (Tezos_bees.Task_worker.number_of_domains * 4)
+  in
+  let requests_per_domain = 6 in
+  let iterations = 5 in
+  let run_job () =
+    match
+      Tezos_bees.Task_worker.launch_task_and_wait
+        "task-worker-race"
+        (fun () -> ())
+        ()
+      |> Eio.Promise.await
+    with
+    | Ok () -> ()
+    | Error err -> fail_on_error err
+  in
+  let wait_for readiness target =
+    let rec loop () =
+      if Atomic.get readiness < target then (
+        Eio.Time.sleep env#clock 0.00005 ;
+        loop ())
+    in
+    loop ()
+  in
+  let run_iteration iteration =
+    let readiness = Atomic.make 0 in
+    let start_wait, start_signal = Eio.Promise.create () in
+    let main_switch = Tezos_base_unix.Event_loop.main_switch_exn () in
+    let domain_tasks =
+      Array.init concurrent_domains (fun _domain_id ->
+          Eio.Fiber.fork_promise ~sw:main_switch (fun () ->
+              Eio.Domain_manager.run env#domain_mgr (fun () ->
+                  ignore (Atomic.fetch_and_add readiness 1) ;
+                  Eio.Promise.await start_wait ;
+                  for _ = 1 to requests_per_domain do
+                    run_job ()
+                  done)))
+    in
+    wait_for readiness concurrent_domains ;
+    Eio.Promise.resolve start_signal () ;
+    Array.iter
+      (fun promise ->
+        match Eio.Promise.await promise with
+        | Ok () -> ()
+        | Error exn -> raise exn)
+      domain_tasks ;
+    Format.printf "[race] iteration %d/%d complete@\n%!" iteration iterations
+  in
+  Fun.protect ~finally:Tezos_bees.Task_worker.shutdown (fun () ->
+      for iteration = 1 to iterations do
+        run_iteration iteration
+      done) ;
+  return_unit
+
+(** Tests run in fresh processes via [Alcotezt_process] so we do not fork after
+    Eio/domains have been initialised within the current Tezt worker. *)
+let tztest ?timeout label fn =
+  Alcotezt_process.test_case ?timeout label `Quick fn
 
 let tests_history =
   ( "Queue history",
@@ -364,8 +459,21 @@ let tests_status =
 let tests_buffer =
   ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
+let tests_contention =
+  ( "Task worker contention",
+    [
+      tztest
+        ~timeout:30.
+        "Worker creation under contention (eio handlers)"
+        test_worker_contention;
+      tztest
+        ~timeout:30.
+        "Worker launch race across domains (eio handlers)"
+        test_worker_launch_race;
+    ] )
+
 let () =
-  Alcotest.run
+  Alcotezt_process.run
     ~__FILE__
     "Bees_workers (eio handlers)"
-    [tests_history; tests_status; tests_buffer]
+    [tests_history; tests_status; tests_buffer; tests_contention]

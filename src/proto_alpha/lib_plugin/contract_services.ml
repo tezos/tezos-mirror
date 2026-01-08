@@ -193,7 +193,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Access the code and data of the contract."
       ~query:RPC_query.empty
-      ~output:Script.encoding
+      ~output:Script.michelson_with_storage_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "script")
 
   let storage =
@@ -413,7 +413,7 @@ end
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list (fun ctxt () () ->
-      let*! result = Contract.list ctxt in
+      let*! result = Contract.For_RPC.list ctxt in
       return result) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
@@ -567,8 +567,10 @@ let register () =
           let+ counter = Contract.get_counter ctxt mgr in
           Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
-      let+ _, v = Contract.get_script c v in
-      v) ;
+      let* _, v = Contract.get_script c v in
+      match v with
+      | None | Some (Script.Native _) -> return_none
+      | Some (Script.Script s) -> return_some s) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       let* ctxt, script = Contract.get_script ctxt contract in
       match script with
@@ -666,7 +668,8 @@ let register () =
                    Entrypoint.Map.fold_e
                      (fun entry
                           (Script_typed_ir.Ex_ty ty, original_type_expr)
-                          (acc, ctxt) ->
+                          (acc, ctxt)
+                        ->
                        let* ty_expr, ctxt =
                          if normalize_types then
                            let* ty_node, ctxt =
@@ -752,7 +755,7 @@ let register () =
       | Originated contract -> (
           let* ctxt, script = Contract.get_script ctxt contract in
           match script with
-          | None ->
+          | None | Some (Native _) ->
               return
                 {
                   balance;
@@ -761,10 +764,11 @@ let register () =
                   counter = None;
                   revealed = None;
                 }
-          | Some script ->
+          | Some (Script script) ->
               let ctxt = Gas.set_unlimited ctxt in
               let+ script, _ctxt =
-                Script_ir_translator.parse_and_unparse_script_unaccounted
+                Script_ir_translator
+                .parse_and_unparse_michelson_script_unaccounted
                   ctxt
                   ~legacy:true
                   ~allow_forged_tickets_in_storage:true
@@ -776,7 +780,7 @@ let register () =
               {
                 balance;
                 delegate;
-                script = Some script;
+                script = Some (Script script);
                 counter = None;
                 revealed = None;
               })) ;

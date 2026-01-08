@@ -154,8 +154,7 @@ module Make_process_parameters (Params : External_process_parameters.S) = struct
           in
           return ((), {hypervisee = None})
 
-    let handle_request :
-        type a.
+    let handle_request : type a.
         Params.parameters ->
         state ->
         a Params.request ->

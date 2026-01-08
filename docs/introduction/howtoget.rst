@@ -62,7 +62,7 @@ When it comes to installing software, especially for critical
 applications like Tezos/Octez, it’s crucial to ensure a secure and
 stable environment. While compiling from source can provide
 customization options, it often introduces complexities and risks.
-Instead, opting for binary packages sucha as Deb or RPM packages from a trusted source simplifies
+Instead, opting for binary packages such as Deb or RPM packages from a trusted source simplifies
 installation and enhances security.
 
 Deb or RPM packages compiled for a specific platform should be always preferred
@@ -108,29 +108,30 @@ using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
 
+- ``debian/trixie``
 - ``debian/bookworm``
 - ``ubuntu/noble``
 - ``ubuntu/jammy``
 
 both on ``amd64`` and ``arm64`` architectures.
 
-In order to add the Tezos package repository to your machine, do:
+In order to set the Tezos package repository to your machine, do:
 
 ::
 
   export distribution=debian
-  export release=bookworm
+  export release=trixie
 
-and run:
+We also maintain a separate repository for release candidates. To set
+the last release candidate or Beta simply prepend ``RC/`` or ``BETA/`` to the distribution name
+as in ``export distribution=RC/debian``.
+
+Now add the Tezos package repository:
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
    :start-after: [add repository]
    :end-before: [end add repository]
-
-We also maintain a separate repository for release candidates. To install
-the last release candidate simply prepend ``RC/`` to the distribution name
-as in ``export distribution=RC/debian``
 
 Then, to install the binaries, run the following command to install the octez-baker and all its dependencies:
 
@@ -195,7 +196,7 @@ To update the local dnf registry run:
   dnf update
 
 We also maintain a separate repository for release candidates. To install
-the last release candidate simply prepend ``RC/`` to the distribution name
+the last release candidate or Beta simply prepend ``RC/`` or ``BETA/`` to the distribution name
 as in ``export distribution=RC/rockylinux``
 
 Then, to install the binaries, run the following commands:
@@ -234,6 +235,16 @@ However, note that, by embedding all dependencies, static binary executables are
 For upgrading to a newer release, you just have to download and run the new
 versions of the binaries.
 
+Octez static binaries are signed via GPG. To verify that a binary was not tampered with,
+you can download and import our public GPG key and use ``gpg`` to verify the signature associated with the binary.
+
+::
+
+  curl -O https://packages.nomadic-labs.com/octez.asc
+  gpg --import octez.asc
+  ... # download the static binary you want to verify and the associated sig file
+  gpg --verify <bin>.sig <bin>
+
 .. _using_homebrew:
 
 Using Homebrew
@@ -241,7 +252,7 @@ Using Homebrew
 
 On macOS and Linux, you can compile and install Octez using Homebrew. If
 Homebrew is not yet installed on your system, please refer to the official
-[Homebrew installation guide](https://brew.sh/) for detailed instructions.
+`Homebrew installation guide <https://brew.sh/>`__ for detailed instructions.
 
 Once Homebrew is set up, follow these steps to install Octez.
 
@@ -520,7 +531,7 @@ Install Octez OPAM packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The latest Octez release is available (as soon as possible after the
-release) directly as OPAM packages.
+release) directly as OPAM packages in a specific repository (defined below).
 
 .. note::
 
@@ -531,13 +542,13 @@ release) directly as OPAM packages.
    ``$HOME/.zshrc``, ``$HOME/.emacs``, ...) if you asked/allowed OPAM
    to add some lines in them).
 
-The binaries need a specific version of the OCaml compiler (see the value
-of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an environment with it do:
+The binaries need a specific version of the OCaml and Rust compilers (see the values
+of variables ``$ocaml_version`` and ``$recommended_rust_version`` in file ``scripts/version.sh``). To get an environment with them do:
 
 .. literalinclude:: install-opam.sh
   :language: shell
   :start-after: [install ocaml compiler]
-  :end-before: [install tezos]
+  :end-before: [add octez repository]
 
 .. note::
 
@@ -561,6 +572,13 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
    number of seconds), e.g. by adding ``OPAMSOLVERTIMEOUT=1200`` before the
    command. If no timeout occurs, you may omit this part.
 
+The Octez packages are distributed in their own Opam repository, which you have to add:
+
+.. literalinclude:: install-opam.sh
+  :language: shell
+  :start-after: [add octez repository]
+  :end-before: [install tezos]
+
 Now, install all the binaries by:
 
 .. literalinclude:: install-opam.sh
@@ -569,7 +587,7 @@ Now, install all the binaries by:
   :end-before: [test executables]
 
 You can be more specific and only ``opam install octez-node``, ``opam
-install octez-baker-alpha``, ...
+install octez-baker``, ...
 
 .. warning::
 

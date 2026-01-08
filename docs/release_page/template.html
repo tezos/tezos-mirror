@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>$title$</title>
     <link rel="stylesheet" href="$css$">
+    <link rel="alternate" type="application/rss+xml" title="$title$ RSS Feed" href="$path$/feed.xml">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   </head>
   <body>
     <header class="page-header">
       <h1>Octez releases</h1>
+      <p><a href="$path$/feed.xml" title="Subscribe to Octez releases RSS feed">📡 RSS Feed</a></p>
     </header>
     <div id="navbar" class="top-nav">
       <ul class="nav-root">
@@ -26,6 +28,7 @@
 	      return {
 		  nav: [
 		      { title: "Octez", link: "${path}/index.html" },
+		      { title: "Octez Smart Rollup Node", link: "${path}/octez-smart-rollup-node/index.html" },
 		      { title: "Grafazos", link: "${path}/grafazos/index.html" },
 		      { title: "Teztale", link: "${path}/teztale/index.html" }
 		  ]

@@ -10,7 +10,10 @@ open Error_monad
 (** A bitset is a compact structure to store a set of integers. *)
 type t
 
-type error += Invalid_position of int | Invalid_input of string
+type error +=
+  | Invalid_position of int
+  | Invalid_range of {pos : int; length : int}
+  | Invalid_input of string
 
 val encoding : t Data_encoding.t
 
@@ -34,11 +37,26 @@ val mem : t -> int -> bool tzresult
     This functions returns [Invalid_position i] if [i] is negative. *)
 val add : t -> int -> t tzresult
 
+(** [add_many bitset i length] returns a new bitset which contains
+    [i], [i+1], ..., [i+length-1] in addition to the previous integers
+    of [bitset].
+
+    This functions returns [Invalid_range {pos = i; length}] if [i] is
+    negative or length is not positive. *)
+val add_many : t -> int -> int -> t tzresult
+
 (** [remove bitset i] returns a new bitset in which [i] is
     removed from [bitset].
 
     This functions returns [Invalid_position i] if [i] is negative. *)
 val remove : t -> int -> t tzresult
+
+(** [remove_many bitset i length] returns a new bitset in which [i],
+    [i+1], ... [i+length-1] are removed from [bitset].
+
+    This functions returns [Invalid_range {pos = i; length}] if [i] is
+    negative or length is not positive. *)
+val remove_many : t -> int -> int -> t tzresult
 
 (** [shift_right bitset ~offset] returns a new bitset [bitset'] such
     that for any [i] we have:

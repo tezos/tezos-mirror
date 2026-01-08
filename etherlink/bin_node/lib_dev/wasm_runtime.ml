@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -44,24 +45,35 @@ end = struct
   let wrap ?l1_timestamp inbox = (sol :: ipl ?l1_timestamp () :: inbox) @ [eol]
 end
 
-let run ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
-    ~entrypoint tree rollup_address inbox : Irmin_context.tree Lwt.t =
-  Lwt_preemptive.detach
+type kernel_input = [`Inbox of string trace | `Skip_stage_one]
+
+let run ~pool ?(trace_host_funs = false) ?l1_timestamp ~preimages_dir
+    ?preimages_endpoint ~native_execution ~entrypoint tree rollup_address inbox
+    : Irmin_context.tree Lwt.t =
+  let scope = Opentelemetry.Scope.get_ambient_scope () in
+  Lwt_domain.detach
+    pool
     (fun () ->
       wasm_runtime_run
+        ~scope:(Wasm_runtime_callbacks.root_scope scope)
+        ~trace_host_funs
+        ~context:static_context
         ~preimages_dir
         ?preimages_endpoint:(Option.map Uri.to_string preimages_endpoint)
         ~native_execution
         ~entrypoint
-        static_context
-        tree
-        (Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address)
-        0l
-        Shared_inbox.(wrap ?l1_timestamp inbox))
+        ~tree
+        ~rollup_address:
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address)
+        ~level:0l
+        (match inbox with
+        | `Skip_stage_one -> []
+        | `Inbox inbox -> Shared_inbox.(wrap ?l1_timestamp inbox)))
     ()
 
-let preload_kernel tree =
-  Lwt_preemptive.detach
+let preload_kernel ~pool tree =
+  Lwt_domain.detach
+    pool
     (fun () ->
       Evm_node_wasm_runtime.wasm_runtime_preload_kernel static_context tree)
     ()

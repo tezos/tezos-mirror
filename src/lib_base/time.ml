@@ -112,8 +112,7 @@ module Protocol = struct
       ( Json.wrap_error
       (* NOTE: this encoding is only used as a building block for a json
           encoding so we can raise the json exception directly. *)
-      @@
-      fun s ->
+      @@ fun s ->
         match of_notation s with
         | Some i -> i
         | None -> (

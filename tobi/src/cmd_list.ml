@@ -42,12 +42,12 @@ let run ~verbose ~installed version =
       echo "- opam: %s" component.opam ;
       (* Output dependencies. *)
       let* component = Component.load component.name version in
-      (Fun.flip List.iter component.dependencies @@ function
-       | Internal {name; version; with_test} ->
-           echo
-             "- depends on component: %s.%s%s"
-             name
-             (Version.show version)
-             (if with_test then " (only for tests)" else "")
-       | External _ -> ()) ;
+      ( Fun.flip List.iter component.dependencies @@ function
+        | Internal {name; version; with_test} ->
+            echo
+              "- depends on component: %s.%s%s"
+              name
+              (Version.show version)
+              (if with_test then " (only for tests)" else "")
+        | External _ -> () ) ;
       unit)

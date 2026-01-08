@@ -460,7 +460,8 @@ module Make (P : Backend.S) = struct
     let elt_t (t : t Type.t) : elt Type.t =
       let open Type in
       variant "Node.elt" (fun node contents _ -> function
-        | `Node x -> node x | `Contents c -> contents c)
+        | `Node x -> node x
+        | `Contents c -> contents c)
       |~ case1 "Node" t (fun x -> `Node x)
       |~ case1 "Contents" Contents.t (fun x -> `Contents x)
       |~ case1 "Contents-x" (pair Contents.t unit) (fun (x, ()) -> `Contents x)
@@ -478,7 +479,8 @@ module Make (P : Backend.S) = struct
     let update_t (elt : elt Type.t) : update Type.t =
       let open Type in
       variant "Node.update" (fun add remove -> function
-        | Add elt -> add elt | Remove -> remove)
+        | Add elt -> add elt
+        | Remove -> remove)
       |~ case1 "add" elt (fun elt -> Add elt)
       |~ case0 "remove" Remove
       |> sealv
@@ -871,8 +873,8 @@ module Make (P : Backend.S) = struct
             | Node x -> a_of_hashable P.Node.Val.hash_exn x
             | Pnode x -> a_of_hashable P.Node_portable.hash_exn x)
 
-    and hash_preimage_of_map :
-        type r. cache:bool -> t -> map -> (hash_preimage, r) cont =
+    and hash_preimage_of_map : type r.
+        cache:bool -> t -> map -> (hash_preimage, r) cont =
      fun ~cache t map k ->
       cnt.node_val_v <- cnt.node_val_v + 1;
       let bindings = StepMap.to_seq map in
@@ -915,8 +917,8 @@ module Make (P : Backend.S) = struct
         if cache then t.info.value <- Some node;
         k (Node node)
 
-    and hash_preimage_value_of_elt :
-        type r. cache:bool -> elt -> (hash_preimage_value, r) cont =
+    and hash_preimage_value_of_elt : type r.
+        cache:bool -> elt -> (hash_preimage_value, r) cont =
      fun ~cache e k ->
       match e with
       | `Contents c -> (
@@ -928,8 +930,7 @@ module Make (P : Backend.S) = struct
           | Some key -> k (Node_value (`Node key))
           | None -> hash ~cache n (fun hash -> k (Pnode_value (`Node hash))))
 
-    and hash_preimage_of_updates :
-        type r.
+    and hash_preimage_of_updates : type r.
         cache:bool -> t -> hash_preimage -> updatemap -> (hash_preimage, r) cont
         =
      fun ~cache t v updates k ->
@@ -1319,8 +1320,7 @@ module Make (P : Backend.S) = struct
     (** A ('val, 'acc, 'r) cps_folder is a CPS, threaded fold function over
         values of type ['v] producing an accumulator of type ['acc]. *)
 
-    let fold :
-        type acc.
+    let fold : type acc.
         order:[ `Sorted | `Undefined | `Random of Random.State.t ] ->
         force:acc force ->
         cache:bool ->
@@ -1655,7 +1655,8 @@ module Make (P : Backend.S) = struct
   let kinded_key_t : kinded_key Type.ty =
     let open Type in
     variant "kinded_key" (fun contents node -> function
-      | `Contents c -> contents (c, ()) | `Node x -> node x)
+      | `Contents c -> contents (c, ())
+      | `Node x -> node x)
     |~ case1 "Contents" (pair Contents.key_t unit) (fun (x, ()) -> `Contents x)
     |~ case1 "Node" Node.key_t (fun x -> `Node x)
     |> sealv
@@ -1667,7 +1668,8 @@ module Make (P : Backend.S) = struct
   let kinded_hash_t : kinded_hash Type.ty =
     let open Type in
     variant "kinded_hash" (fun contents node -> function
-      | `Contents h -> contents (h, ()) | `Node h -> node h)
+      | `Contents h -> contents (h, ())
+      | `Node h -> node h)
     |~ case1 "Contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
     |~ case1 "Node" hash_t (fun h -> `Node h)
     |> sealv
@@ -1684,7 +1686,8 @@ module Make (P : Backend.S) = struct
   let t : t Type.ty =
     let open Type in
     variant "t" (fun node contents -> function
-      | `Node n -> node n | `Contents c -> contents (c, ()))
+      | `Node n -> node n
+      | `Contents c -> contents (c, ()))
     |~ case1 "Node" node_t (fun n -> `Node n)
     |~ case1 "Contents" (pair Contents.t unit) (fun (x, ()) -> `Contents x)
     |> sealv
@@ -2100,7 +2103,8 @@ module Make (P : Backend.S) = struct
                 "@[<v 2>Tree.export: added inconsistent node binding@,\
                  key: %a@,\
                  value: %a@,\
-                 computed hash: %a@]" pp_node_key key Node.pp_value v pp_hash h'
+                 computed hash: %a@]"
+                pp_node_key key Node.pp_value v pp_hash h'
       in
       k key
     in
@@ -2120,7 +2124,8 @@ module Make (P : Backend.S) = struct
                        assertion_failure
                          "Encountered child node value with uncached key \
                           during export:@,\
-                          @ @[%a@]" dump v)
+                          @ @[%a@]"
+                         dump v)
                | `Contents c -> (
                    match Contents.cached_key c with
                    | Some k -> (step, `Contents k)
@@ -2128,7 +2133,8 @@ module Make (P : Backend.S) = struct
                        assertion_failure
                          "Encountered child contents value with uncached key \
                           during export:@,\
-                          @ @[%a@]" dump v))
+                          @ @[%a@]"
+                         dump v))
         |> P.Node.Val.of_seq
       in
       add_node n node k
@@ -2147,7 +2153,8 @@ module Make (P : Backend.S) = struct
                     assertion_failure
                       "Encountered child node value with uncached key during \
                        export:@,\
-                       @ @[%a@]" dump v)
+                       @ @[%a@]"
+                      dump v)
             | Add (`Contents c as v) -> (
                 match Contents.cached_key c with
                 | Some ptr -> P.Node.Val.add acc k (`Contents ptr)
@@ -2155,7 +2162,8 @@ module Make (P : Backend.S) = struct
                     assertion_failure
                       "Encountered child contents value with uncached key \
                        during export:@,\
-                       @ @[%a@]" dump v))
+                       @ @[%a@]"
+                      dump v))
           updates v
       in
       add_node n node k
@@ -2277,8 +2285,7 @@ module Make (P : Backend.S) = struct
                       (* [n.v = (Key _ | Portable_dirty _ | Pruned _)] is
                          excluded above. *)
                       assert false)))
-    and on_contents :
-        type r.
+    and on_contents : type r.
         [ `Contents of Contents.t ] -> ([ `Content_exported ], r) cont_lwt =
      fun (`Contents c) k ->
       match c.Contents.v with
@@ -2298,14 +2305,14 @@ module Make (P : Backend.S) = struct
                 "@[<v 2>Tree.export: added inconsistent contents binding@,\
                  key: %a@,\
                  value: %a@,\
-                 computed hash: %a@]" pp_contents_key key pp_contents v pp_hash
-                h'
+                 computed hash: %a@]"
+                pp_contents_key key pp_contents v pp_hash h'
           in
           Contents.export ?clear repo c key;
           k `Content_exported
       | Contents.Pruned h -> pruned_hash_exn "export" h
-    and on_node_seq :
-        type r. Node.elt Seq.t -> ([ `Node_children_exported ], r) cont_lwt =
+    and on_node_seq : type r.
+        Node.elt Seq.t -> ([ `Node_children_exported ], r) cont_lwt =
      fun seq k ->
       match seq () with
       | Seq.Nil ->
@@ -2465,7 +2472,8 @@ module Make (P : Backend.S) = struct
     let open Type in
     mu (fun concrete_t ->
         variant "concrete" (fun tree contents -> function
-          | `Tree l -> tree l | `Contents c -> contents (c, ()))
+          | `Tree l -> tree l
+          | `Contents c -> contents (c, ()))
         |~ case1 "Tree" (list (pair Path.step_t concrete_t)) (fun t -> `Tree t)
         |~ case1 "Contents" (pair P.Contents.Val.t unit) (fun (x, ()) ->
                `Contents x)
@@ -2482,8 +2490,7 @@ module Make (P : Backend.S) = struct
           tree StepMap.empty childs (function
             | Empty -> k Empty
             | Non_empty n -> k (Non_empty (`Node n)))
-    and tree :
-        type r.
+    and tree : type r.
         Node.elt StepMap.t ->
         (Path.step * concrete) list ->
         (node or_empty, r) cont =
@@ -2528,8 +2535,7 @@ module Make (P : Backend.S) = struct
      fun c k ->
       let* c = Contents.to_value ~cache:true c >|= get_ok "to_concrete" in
       k (`Contents c)
-    and node :
-        type r.
+    and node : type r.
         (Path.step * concrete) list ->
         (Path.step * Node.elt) list ->
         ((Path.step * concrete) list, r) cont_lwt =
@@ -2643,8 +2649,8 @@ module Make (P : Backend.S) = struct
     (** [of_node_proof n np] is [p] (of type [Tree.Proof.t]) which is very
         similar to [np] (of type [P.Node.Val.proof]) except that the values
         loaded in [n] have been expanded. *)
-    and proof_of_node_proof :
-        type a. node -> node_proof -> (proof_tree -> a) -> a =
+    and proof_of_node_proof : type a.
+        node -> node_proof -> (proof_tree -> a) -> a =
      fun node p k ->
       match p with
       | `Blinded h -> k (Blinded_node h)
@@ -2652,17 +2658,16 @@ module Make (P : Backend.S) = struct
           iproof_of_inode node length proofs (fun p -> proof_of_iproof p |> k)
       | `Values vs -> iproof_of_values node vs (fun p -> proof_of_iproof p |> k)
 
-    and iproof_of_node_proof :
-        type a. node -> node_proof -> (proof_inode -> a) -> a =
+    and iproof_of_node_proof : type a.
+        node -> node_proof -> (proof_inode -> a) -> a =
      fun node p k ->
       match p with
       | `Blinded h -> k (Blinded_inode h)
       | `Inode (length, proofs) -> iproof_of_inode node length proofs k
       | `Values vs -> iproof_of_values node vs k
 
-    and iproof_of_inode :
-        type a. node -> int -> (_ * node_proof) list -> (proof_inode -> a) -> a
-        =
+    and iproof_of_inode : type a.
+        node -> int -> (_ * node_proof) list -> (proof_inode -> a) -> a =
      fun node length proofs k ->
       let rec aux acc = function
         | [] -> k (Inode_tree { length; proofs = List.rev acc })
@@ -2694,8 +2699,7 @@ module Make (P : Backend.S) = struct
                 k (Inode_tree { length; proofs = [ (index, p) ] }))
       | _ -> aux [] proofs
 
-    and iproof_of_values :
-        type a.
+    and iproof_of_values : type a.
         node -> (Path.step * Node.pnode_value) list -> (proof_inode -> a) -> a =
       let findv =
         let value_of_key ~cache:_ _node _repo k =
@@ -2734,8 +2738,7 @@ module Make (P : Backend.S) = struct
           load_extender_proof ~env length segments proof k
 
     (* Recontruct private node from [P.Node.Val.proof] *)
-    and load_extender_proof :
-        type a.
+    and load_extender_proof : type a.
         env:_ -> int -> int list -> proof_inode -> (kinded_hash -> a) -> a =
      fun ~env len segments p k ->
       node_proof_of_proof ~env p (fun p ->
@@ -2756,8 +2759,7 @@ module Make (P : Backend.S) = struct
         p (List.rev segments)
 
     (* Recontruct private node from [P.Node.Val.empty] *)
-    and load_node_proof :
-        type a.
+    and load_node_proof : type a.
         env:_ -> (Path.step * proof_tree) list -> (kinded_hash -> a) -> a =
      fun ~env n k ->
       let rec aux acc = function
@@ -2772,8 +2774,7 @@ module Make (P : Backend.S) = struct
       aux (P.Node_portable.empty ()) n
 
     (* Recontruct private node from [P.Node.Val.proof] *)
-    and load_inode_proof :
-        type a.
+    and load_inode_proof : type a.
         env:_ -> int -> (_ * proof_inode) list -> (kinded_hash -> a) -> a =
      fun ~env len proofs k ->
       let rec aux : _ list -> _ list -> a =
@@ -2796,8 +2797,8 @@ module Make (P : Backend.S) = struct
       in
       aux [] proofs
 
-    and node_proof_of_proof :
-        type a. env:_ -> proof_inode -> (node_proof -> a) -> a =
+    and node_proof_of_proof : type a.
+        env:_ -> proof_inode -> (node_proof -> a) -> a =
      fun ~env t k ->
       match t with
       | Blinded_inode x -> k (`Blinded x)
@@ -2808,9 +2809,8 @@ module Make (P : Backend.S) = struct
           node_proof_of_proof ~env proof (fun p ->
               k (proof_of_extender length segments p))
 
-    and node_proof_of_inode :
-        type a. env:_ -> int -> (_ * proof_inode) list -> (node_proof -> a) -> a
-        =
+    and node_proof_of_inode : type a.
+        env:_ -> int -> (_ * proof_inode) list -> (node_proof -> a) -> a =
      fun ~env length proofs k ->
       let rec aux acc = function
         | [] -> k (`Inode (length, List.rev acc))
@@ -2819,9 +2819,8 @@ module Make (P : Backend.S) = struct
       in
       aux [] proofs
 
-    and node_proof_of_node :
-        type a. env:_ -> (Path.step * proof_tree) list -> (node_proof -> a) -> a
-        =
+    and node_proof_of_node : type a.
+        env:_ -> (Path.step * proof_tree) list -> (node_proof -> a) -> a =
      fun ~env node k ->
       let rec aux acc = function
         | [] -> k (`Values (List.rev acc))

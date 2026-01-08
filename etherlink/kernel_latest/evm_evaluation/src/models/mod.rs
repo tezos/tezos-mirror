@@ -21,6 +21,7 @@ use crate::models::deserializer::*;
 pub enum SpecName {
     Shanghai,
     Cancun,
+    Prague,
     #[serde(other)]
     Unknown,
 }
@@ -31,6 +32,7 @@ impl SpecName {
         let spec_str = match self {
             Self::Shanghai => "Shanghai",
             Self::Cancun => "Cancun",
+            Self::Prague => "Prague",
             Self::Unknown => panic!("Unknown spec"),
         };
         spec_str.to_owned()

@@ -1,0 +1,15 @@
+{
+  "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "contents": [
+    {
+      "kind": "preattestations_aggregate",
+      "consensus_content": {
+        "level": 1331,
+        "round": 0,
+        "block_payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+      },
+      "committee": [ 0, 23, 51, 893 ]
+    }
+  ],
+  "signature": "BLsigBANTUiNcB2UB7VMj1yTn4SgX9NZabdSY3cHBZgDvFoDcJWrtYZZZshA8LEjY46wqxoWM7PvDTatLiDoiCTmc4p2LVdsXLC9CPtDmZYe7mr33uPgLyVutVSqMmrxRF1ej9Ce7p7nRH"
+}

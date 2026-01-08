@@ -26,6 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -w -32-34
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_017_PtNairob
@@ -289,6 +290,7 @@
   tezos-protocol-017-PtNairob.protocol.raw)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Protocol Tezos_protocol_017_PtNairob))
 
@@ -566,7 +568,8 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34 -warn-error +a .)))
 
 (library
  (name tezos_protocol_017_PtNairob_lifted)
@@ -578,6 +581,7 @@
   tezos-protocol-017-PtNairob.protocol)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives
   -open Tezos_protocol_017_PtNairob)
  (modules Lifted_protocol))
@@ -596,6 +600,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Functor))
 
@@ -869,6 +874,9 @@
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -w -32-34)
  (modules Registerer))
 
 (rule

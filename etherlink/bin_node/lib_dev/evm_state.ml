@@ -7,7 +7,7 @@
 
 open Ethereum_types
 
-type t = Irmin_context.PVMState.value
+type t = Pvm.State.t
 
 let kernel_logs_directory ~data_dir = Filename.concat data_dir "kernel_logs"
 
@@ -32,16 +32,18 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
+let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
     ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
+  let to_pvm_inbox = function
+    | `Skip_stage_one -> List.to_seq [[]]
+    | `Inbox inbox -> List.to_seq [inbox]
+  in
   Octez_telemetry.Trace.with_tzresult ~service_name:"Evm_state" "execute"
   @@ fun _ ->
   let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
-  let inbox = List.map (function `Input s -> s) inbox in
-  let inbox = List.to_seq [inbox] in
   let messages = ref [] in
   let write_debug =
     Tezos_scoru_wasm.Builtins.Printer
@@ -68,8 +70,9 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
                    let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
                    Lwt_io.flush oc))
         in
+        let inbox = to_pvm_inbox inbox in
         let* evm_state, _ticks, _inboxes, _level =
-          Wasm_debugger.eval
+          Pvm.Kernel.eval
             ~hooks
             ~migrate_to:Proto_alpha
             ~write_debug
@@ -82,9 +85,10 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
         in
         return evm_state
     | Some Configuration.Flamegraph ->
-        let* function_symbols = Wasm_debugger.get_function_symbols evm_state in
+        let* function_symbols = Pvm.Kernel.get_function_symbols evm_state in
+        let inbox = to_pvm_inbox inbox in
         let* evm_state, _, _ =
-          Wasm_debugger.profile
+          Pvm.Kernel.profile
             ~migrate_to:Proto_alpha
             ~collapse:false
             ~with_time:true
@@ -107,23 +111,23 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
         let*! evm_state =
           Lwt.catch
             (fun () ->
-              let inbox =
-                match Seq.uncons inbox with Some (x, _) -> x | _ -> []
-              in
               Wasm_runtime.run
+                ~pool
+                ~trace_host_funs:config.trace_host_funs
                 ?l1_timestamp:execution_timestamp
                 ~preimages_dir:config.preimage_directory
                 ?preimages_endpoint:config.preimage_endpoint
                 ~native_execution
                 ~entrypoint:wasm_entrypoint
-                evm_state
+                (Pvm.Wasm_internal.to_irmin_exn evm_state)
                 config.destination
                 inbox)
             (fun exn ->
               if wasm_pvm_fallback then
                 let*! () = Events.wasm_pvm_fallback () in
+                let inbox = to_pvm_inbox inbox in
                 let*! res =
-                  Wasm_debugger.eval
+                  Pvm.Kernel.eval
                     ~migrate_to:Proto_alpha
                     ~write_debug
                     ~wasm_entrypoint
@@ -134,12 +138,13 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
                     evm_state
                 in
                 match res with
-                | Ok (evm_state, _, _, _) -> Lwt.return evm_state
+                | Ok (tree, _, _, _) ->
+                    Lwt.return (Pvm.Wasm_internal.to_irmin_exn tree)
                 | Error _err ->
                     Stdlib.failwith "The WASM PVM raised an exception"
               else Lwt.reraise exn)
         in
-        return evm_state
+        return @@ Pvm.Wasm_internal.of_irmin evm_state
   in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
@@ -160,7 +165,7 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
   return evm_state
 
 let modify ?edit_readonly ~key ~value evm_state =
-  Wasm_debugger.set_durable_value ?edit_readonly evm_state key value
+  Pvm.Kernel.set_durable_value ?edit_readonly evm_state key value
 
 let flag_local_exec evm_state =
   modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
@@ -181,12 +186,9 @@ let init_reboot_counter evm_state =
 
 let init ~kernel =
   let open Lwt_result_syntax in
-  let evm_state = Irmin_context.PVMState.empty () in
+  let evm_state = Pvm.State.empty (module Irmin_context) () in
   let* evm_state =
-    Wasm_debugger.start
-      ~tree:evm_state
-      Tezos_scoru_wasm.Wasm_pvm_state.V3
-      kernel
+    Pvm.Kernel.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
   (* The WASM Runtime completely ignores the reboot counter, but some versions
      of the Etherlink kernel will need it to exist. *)
@@ -197,20 +199,20 @@ let init ~kernel =
 let inspect evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* value = Wasm_debugger.find_key_in_durable evm_state key in
+  let* value = Pvm.Kernel.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
 
 let subkeys evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
+  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.list durable key
 
 let exists evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
+  let* durable = Pvm.Kernel.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
@@ -218,6 +220,8 @@ let read state key =
   let open Lwt_result_syntax in
   let*! res = inspect state key in
   return res
+
+let storage_version state = Durable_storage.storage_version (read state)
 
 let kernel_version evm_state =
   let open Lwt_syntax in
@@ -232,9 +236,9 @@ let current_block_height ~root evm_state =
   match current_block_number with
   | None ->
       (* No block has been created yet and we are waiting for genesis,
-         whose number will be [zero]. Since the semantics of [apply_blueprint]
-         is to verify the block height has been incremented once, we default to
-         [-1]. *)
+         whose number will be [zero]. Since the semantics of
+         [apply_unsigned_chunks] is to verify the block height has been
+         incremented once, we default to [-1]. *)
       return (Qty Z.(pred zero))
   | Some current_block_number ->
       let (Qty current_block_number) = decode_number_le current_block_number in
@@ -250,38 +254,8 @@ let current_block_hash ~chain_family evm_state =
   | Some h -> return (decode_block_hash h)
   | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
-(* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
-   dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
-   event loop the resolutions of host functions (notably interacting with
-   Irmin) (`Lwt_preemptive.run_in_main`).
-
-   This means that parallel executions of the Etherlink kernel using the Fast
-   Execution engine competes for the access of the event loop. In practice, it
-   means it is possible for an attacker to slow down block production through
-   RPC calls leading to execute the Etherlink kernel (typically,
-   `eth_estimateGas`).
-
-   Under the hood, `Lwt_preemptive` relies on a pool of 4 workers (implemented
-   using native threads). With this patch, we ensure 1 of these workers is
-   always available to the block production, by limiting the concurrent call to
-   `execute_and_inspect` to 3. *)
-let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
-
-(** Instruments the pool with a few metrics: when adding a callback to the
-    waiting queue we instrument the callback to track how long it stays in the
-    queue before being executed. *)
-let add_callback_to_queue pool callback =
-  Metrics.set_simulation_queue_size (Lwt_pool.wait_queue_length pool) ;
-  let arrival_time = Tezos_base.Time.System.now () in
-  (* instrumenting callback and adding to queue *)
-  Lwt_pool.use pool @@ fun () ->
-  let exec_time = Tezos_base.Time.System.now () in
-  let time_waiting = Ptime.diff exec_time arrival_time in
-  Metrics.inc_time_waiting time_waiting ;
-  callback ()
-
-let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
-    ~native_execution_policy
+let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
+    ~config ~native_execution_policy
     ~input:
       Simulation.Encodings.
         {messages; insight_requests; log_kernel_debug_file; _} ctxt =
@@ -301,10 +275,9 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
       insight_requests
   in
   (* Messages from simulation requests are already valid inputs. *)
-  let messages = List.map (fun s -> `Input s) messages in
   let* evm_state =
-    add_callback_to_queue pool @@ fun () ->
     execute
+      ~pool
       ~native_execution
       ?wasm_pvm_fallback
       ~kind:Simulation
@@ -313,10 +286,60 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
       ?wasm_entrypoint
       ~config
       ctxt
-      messages
+      (`Inbox messages)
   in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
+
+let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
+    =
+  let open Lwt_result_syntax in
+  let (Qty number) = chunk.number in
+  let key =
+    Durable_storage_path.Blueprint.chunk
+      ~blueprint_number:number
+      ~chunk_index:chunk.chunk_index
+  in
+  let value =
+    (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs in
+       kernel_latest/kernel). The [StoreBlueprint] has two variants, and we
+       want to store a [SequencerChunk] whose tag is 0. [Value ""] is the
+       RLP-encoded for 0. *)
+    Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
+    |> Rlp.encode |> Bytes.to_string
+  in
+  let*! evm_state = modify ~key ~value evm_state in
+  return evm_state
+
+let store_blueprint_chunks ~blueprint_number evm_state
+    (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
+  let open Lwt_result_syntax in
+  let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
+  let nb_chunks = List.length chunks in
+  let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
+  let*! evm_state =
+    modify
+      ~key:(Durable_storage_path.Blueprint.nb_chunks ~blueprint_number)
+      ~value:(Z.to_bits (Z.of_int nb_chunks))
+      evm_state
+  in
+  let* version = storage_version evm_state in
+  if version >= 39 then
+    let* current_generation =
+      Durable_storage.inspect_durable_and_decode_default
+        ~default:Qty.zero
+        (read evm_state)
+        Durable_storage_path.Blueprint.current_generation
+        Ethereum_types.decode_number_le
+    in
+    let*! evm_state =
+      modify
+        ~key:(Durable_storage_path.Blueprint.generation ~blueprint_number)
+        ~value:(encode_u256_le current_generation |> Bytes.to_string)
+        evm_state
+    in
+    return evm_state
+  else return evm_state
 
 type apply_result =
   | Apply_success of {
@@ -325,19 +348,21 @@ type apply_result =
     }
   | Apply_failure
 
-let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
+let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
-    (blueprint : Blueprint_types.payload) =
+    (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
-  let exec_inputs =
-    List.map
-      (function `External payload -> `Input ("\001" ^ payload))
-      blueprint
-  in
   let*! (Qty before_height) = current_block_height ~root evm_state in
   let* evm_state =
+    store_blueprint_chunks
+      ~blueprint_number:(Z.succ before_height)
+      evm_state
+      chunks
+  in
+  let* evm_state =
     execute
+      ~pool
       ~native_execution:(native_execution_policy = Configuration.Always)
       ?wasm_pvm_fallback
       ?profile
@@ -346,16 +371,26 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       ~config
       ?log_file
       evm_state
-      exec_inputs
+      `Skip_stage_one
   in
-  let* block_hash = current_block_hash ~chain_family evm_state in
   let root = Durable_storage_path.root_of_chain_family chain_family in
+  let* storage_version = storage_version evm_state in
   let* block =
-    let*! bytes =
-      inspect evm_state (Durable_storage_path.Block.by_hash ~root block_hash)
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    if not (Storage_version.legacy_storage_compatible ~storage_version) then
+      let*! bytes =
+        inspect evm_state (Durable_storage_path.Block.current_block ~root)
+      in
+      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    else
+      let* current_block_hash = current_block_hash ~chain_family evm_state in
+      let*! bytes =
+        inspect
+          evm_state
+          (Durable_storage_path.Block.by_hash ~root current_block_hash)
+      in
+      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
   in
+
   let export_gas_used (Qty gas) =
     match (profile, log_file) with
     | Some Configuration.Minimal, Some log_file ->
@@ -384,22 +419,22 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
 let delete ~kind evm_state path =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
-  let* pvm_state = Wasm_debugger.decode evm_state in
+  let* pvm_state = Pvm.Kernel.decode evm_state in
   let* durable = Tezos_scoru_wasm.Durable.delete ~kind pvm_state.durable key in
-  Wasm_debugger.encode {pvm_state with durable} evm_state
+  Pvm.Kernel.encode {pvm_state with durable} evm_state
 
 let clear_delayed_inbox evm_state =
   delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
 
-let wasm_pvm_version state = Wasm_debugger.get_wasm_version state
-
-let storage_version state = Durable_storage.storage_version (read state)
+let wasm_pvm_version state = Pvm.Kernel.get_wasm_version state
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let preload_kernel evm_state =
+let preload_kernel ~pool evm_state =
   let open Lwt_syntax in
-  let* loaded = Wasm_runtime.preload_kernel evm_state in
+  let* loaded =
+    Wasm_runtime.preload_kernel ~pool (Pvm.Wasm_internal.to_irmin_exn evm_state)
+  in
   if loaded then
     let* version = kernel_version evm_state in
     Events.preload_kernel version
@@ -429,9 +464,16 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
+let clear_events evm_state =
+  delete ~kind:Directory evm_state Durable_storage_path.Evm_events.events
+
 let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
-  (* We have 2 path to clear related to block storage:
+  let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
+    return evm_state
+  else
+    (* We have 2 path to clear related to block storage:
      1. The predecessor block.
      2. The indexes (which is a bit trickier).
 
@@ -439,47 +481,62 @@ let clear_block_storage chain_family block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let block_parent = L2_types.block_parent block in
-  let block_number = L2_types.block_number block in
-  let (Qty number) = block_number in
-  (* Handles case (1.). *)
-  let* evm_state =
-    if number > Z.zero then
-      let pred_block_path =
-        Durable_storage_path.Block.by_hash ~root block_parent
-      in
-      delete ~kind:Value evm_state pred_block_path
-    else return evm_state
-  in
-  (* Handles case (2.). *)
-  let* evm_state =
-    (* The opcode BLOCKHASH must return the hash of the last 256 complete blocks,
+    let root = Durable_storage_path.root_of_chain_family chain_family in
+    let block_parent = L2_types.block_parent block in
+    let block_number = L2_types.block_number block in
+    let (Qty number) = block_number in
+    (* Handles case (1.). *)
+    let* evm_state =
+      if number > Z.zero then
+        let pred_block_path =
+          Durable_storage_path.Block.by_hash ~root block_parent
+        in
+        delete ~kind:Value evm_state pred_block_path
+      else return evm_state
+    in
+    (* Handles case (2.). *)
+    let* evm_state =
+      (* The opcode BLOCKHASH must return the hash of the last 256 complete blocks,
        see the yellow paper for the specification.
        The kernel uses the indexable storage to retrieve the last 256 blocks,
        so we garbage collect only what's possible. *)
-    let to_keep = Z.of_int 256 in
-    if number >= to_keep then
-      let index_path =
-        Durable_storage_path.Indexes.block_by_number
-          ~root
-          (Nth (Z.sub number to_keep))
-      in
-      delete ~kind:Value evm_state index_path
-    else return evm_state
-  in
-  (* Receipts are not necessary for the kernel, we can just remove
+      let to_keep = Z.of_int 256 in
+      if number >= to_keep then
+        let index_path =
+          Durable_storage_path.Indexes.block_by_number
+            ~root
+            (Nth (Z.sub number to_keep))
+        in
+        delete ~kind:Value evm_state index_path
+      else return evm_state
+    in
+    (* Receipts are not necessary for the kernel, we can just remove
      the directories. *)
-  let* evm_state =
-    delete
-      ~kind:Directory
-      evm_state
-      Durable_storage_path.Transaction_receipt.receipts
+    let* evm_state =
+      delete
+        ~kind:Directory
+        evm_state
+        Durable_storage_path.Transaction_receipt.receipts
+    in
+    let* evm_state =
+      delete
+        ~kind:Directory
+        evm_state
+        Durable_storage_path.Transaction_object.objects
+    in
+    return evm_state
+
+let delayed_inbox_hashes evm_state =
+  let open Lwt_syntax in
+  let* keys =
+    subkeys evm_state Durable_storage_path.Delayed_transaction.hashes
   in
-  let* evm_state =
-    delete
-      ~kind:Directory
-      evm_state
-      Durable_storage_path.Transaction_object.objects
+  let hashes =
+    (* Remove the empty, meta keys *)
+    List.filter_map
+      (fun key ->
+        if key = "" || key = "meta" then None
+        else Some (Ethereum_types.hash_of_string key))
+      keys
   in
-  return evm_state
+  return hashes

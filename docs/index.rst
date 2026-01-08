@@ -10,7 +10,8 @@ Welcome to the Octez and Protocol Documentation!
 ================================================
 
 This documentation describes an implementation of the `Tezos blockchain <https://tezos.com>`__ consisting of the **Octez toolsuite** and the **Tezos protocol**, for technical users of various kinds, including Tezos application developers, bakers, and Octez/protocol developers.
-Enjoy reading this website and consider using the feedback button available in any page (:ref:`more details <feedback_doc>`).
+Enjoy reading this website and consider using the feedback button available in any page (:ref:`more details <feedback_doc>`) to improve it.
+If you have questions about Tezos, consider using the ``Ask AI`` button available on the right side of each page (`more details <https://docs.tezos.com/overview/chatbot>`__) before reaching out to the :ref:`Tezos community <tezos_community>`.
 
 .. note::
 
@@ -183,6 +184,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    shell/the_big_picture
    shell/shell
+   shell/baker
    shell/dal
    shell/smart_rollup_node
    shell/p2p_api
@@ -194,8 +196,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Rio Protocol Reference <active/index>
-   S023 Protocol Reference <s023/index>
+   Seoul Protocol Reference <active/index>
+   Tallinn Protocol Reference <tallinn/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -213,7 +215,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    releases/releases
-   releases/version-22
+   releases/version-23
+   releases/version-24
    releases/history
 
 .. toctree::
@@ -222,8 +225,8 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/022_rio
-   protocols/023_s023
+   protocols/023_seoul
+   protocols/024_tallinn
    protocols/alpha
    protocols/history
 

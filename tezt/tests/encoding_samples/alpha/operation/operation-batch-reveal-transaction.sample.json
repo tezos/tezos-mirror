@@ -1,0 +1,23 @@
+{
+  "branch": "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU",
+  "contents": [{
+    "kind": "reveal",
+    "source": "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
+    "fee": "276",
+    "counter": "2",
+    "gas_limit": "171",
+    "storage_limit": "0",
+    "public_key": "edpkuqNrmPPcy2S3G1uKYnxmg7Gov3c8q7AABKRs9EtTVtfDg5Fu7R"
+  },
+  {
+    "kind": "transaction",
+    "source": "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
+    "fee": "365",
+    "counter": "3",
+    "gas_limit": "2101",
+    "storage_limit": "0",
+    "amount": "1000000",
+    "destination": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+  }],
+  "signature": "sigcBAU3AtdyxrMsZ4ScgFRWfTh66dD7mMNXQ2KmGP9y125hiJFgKtgcjmi3jVmUB5ytLjrU3xY6EVTveyfb4XcBvxNvCUDi"
+}

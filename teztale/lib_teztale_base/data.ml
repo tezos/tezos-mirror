@@ -209,7 +209,8 @@ module Block = struct
              reception_times;
              timestamp;
              nonce;
-           } ->
+           }
+         ->
         (hash, predecessor, delegate, round, reception_times, timestamp, nonce))
       (fun ( hash,
              predecessor,
@@ -217,7 +218,8 @@ module Block = struct
              round,
              reception_times,
              timestamp,
-             nonce ) ->
+             nonce )
+         ->
         {hash; predecessor; delegate; round; reception_times; timestamp; nonce})
       (obj7
          (req "hash" Block_hash.encoding)

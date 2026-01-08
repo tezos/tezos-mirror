@@ -1,0 +1,18 @@
+# This contract sends to the address given as argument an updated copy
+# of the stored big_map.  This contract is used to test temporary big
+# map ids which are generated when big maps are transferred from one
+# contract to another.  See also receiver_*.tz and the other
+# sender_*.tz
+parameter (contract (big_map string bytes));
+storage (big_map string bytes);
+code
+  {
+    UNPAIR;
+    PUSH mutez 0;
+    DUP 3;
+    PUSH (option bytes) (Some 0x0010); PUSH string "a"; UPDATE;
+    PUSH (option bytes) None; PUSH string "b"; UPDATE;
+    TRANSFER_TOKENS;
+    NIL operation; SWAP; CONS;
+    PAIR
+  }

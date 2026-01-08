@@ -183,7 +183,8 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                host,
                port,
                timeout )
-             cctxt ->
+             cctxt
+           ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           let* _ =
@@ -222,7 +223,8 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                allow_list_known_keys,
                allow_to_prove_possession,
                path )
-             cctxt ->
+             cctxt
+           ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           let* _ =
@@ -270,7 +272,8 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                allow_to_prove_possession,
                host,
                port )
-             cctxt ->
+             cctxt
+           ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           Http_daemon.run_http
@@ -333,7 +336,8 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
                port )
              cert
              key
-             cctxt ->
+             cctxt
+           ->
           may_setup_pidfile pidfile @@ fun () ->
           let* () = Tezos_signer_backends.Encrypted.decrypt_all cctxt in
           Http_daemon.run_https

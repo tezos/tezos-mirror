@@ -46,6 +46,9 @@ let wait_for_stopping_baker agnostic_baker =
   Agnostic_baker.wait_for agnostic_baker "stopping_agent.v0" (fun _json ->
       Some ())
 
+let wait_for_stopping_accuser accuser =
+  Accuser.wait_for accuser "stopping_agent.v0" (fun _json -> Some ())
+
 let remote_sign client =
   let* () = Client.forget_all_keys client in
   let keys = Constant.activator :: (Account.Bootstrap.keys |> Array.to_list) in
@@ -84,6 +87,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () = Agnostic_baker.run ~extra_arguments:extra_run_arguments baker in
   Log.info "Starting agnostic accuser" ;
   let* () = Accuser.run accuser in
+
   let* () = wait_for_active_protocol_waiting in
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () =
@@ -134,15 +138,17 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     (Protocol.tag migrate_from)
     Agnostic_baker.extra_levels_for_old_baker ;
   let wait_for_stopping_baker = wait_for_stopping_baker baker in
+  let wait_for_stopping_accuser = wait_for_stopping_accuser accuser in
   let* _level =
     Node.wait_for_level
       node
       (migration_level + Agnostic_baker.extra_levels_for_old_baker)
   in
-  let* () = wait_for_stopping_baker in
+  let* () = wait_for_stopping_baker and* () = wait_for_stopping_accuser in
   (* Test that we can still bake after migration *)
   let* _level = Node.wait_for_level node baked_blocks_after_migration in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.terminate baker
+  and* () = Accuser.terminate accuser in
   unit
 
 let migrate ~migrate_from ~migrate_to ~use_remote_signer =

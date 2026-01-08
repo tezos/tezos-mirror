@@ -821,8 +821,8 @@ module Illtyped_originations = struct
         ~init_storage:(`Json (`O [("int", `String "-10")]))
         ~code:
           (`File
-            Michelson_script.(
-              find ["mini_scenarios"; "parsable_contract"] protocol |> path))
+             Michelson_script.(
+               find ["mini_scenarios"; "parsable_contract"] protocol |> path))
         nodes.main.client
     in
     unit
@@ -1005,15 +1005,18 @@ module Gas_limits = struct
       limits.hard_gas_limit_per_block - limits.hard_gas_limit_per_operation
     in
     (* Gas limit per op is ok *)
-    let operations_gas_limit =
-      [limits.hard_gas_limit_per_operation; gas_limit]
+    let operations_gas_limit, expected_statuses =
+      if Protocol.(number protocol <= 023) then
+        ( [limits.hard_gas_limit_per_operation; gas_limit],
+          ["applied"; "applied"] )
+      else
+        (* with 6s block time, [hard_gas_limit_per_operation] =
+           [hard_gas_limit_per_block] *)
+        ([limits.hard_gas_limit_per_operation], ["applied"])
     in
     let* batch = mk_batch ~operations_gas_limit nodes.main.client in
     let* _oph =
-      Memchecks.with_validated_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:["applied"; "applied"]
+      Memchecks.with_validated_checks ~__LOC__ nodes ~expected_statuses
       @@ fun () -> Operation.Manager.inject batch nodes.main.client
     in
     unit
@@ -1030,7 +1033,12 @@ module Gas_limits = struct
       limits.hard_gas_limit_per_block - limits.hard_gas_limit_per_operation
     in
     let operations_gas_limit =
-      [limits.hard_gas_limit_per_operation + 1; gas_limit - 2]
+      if Protocol.(number protocol <= 023) then
+        [limits.hard_gas_limit_per_operation + 1; gas_limit - 2]
+      else
+        (* with 6s block time, [hard_gas_limit_per_operation] =
+           [hard_gas_limit_per_block] *)
+        [limits.hard_gas_limit_per_operation + 1]
     in
     let* batch = mk_batch ~operations_gas_limit nodes.main.client in
     let* _oph =

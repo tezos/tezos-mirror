@@ -223,8 +223,8 @@ module Block = struct
     Shared.use chain_state (fun {validated_blocks; _} ->
         Option.value ~default:Lwt.return_false
         @@ Block_lru_cache.bind validated_blocks hash (function
-               | None -> Lwt.return_false
-               | Some _ -> Lwt.return_true))
+             | None -> Lwt.return_false
+             | Some _ -> Lwt.return_true))
 
   let is_known chain_store hash =
     let open Lwt_syntax in
@@ -368,14 +368,14 @@ module Block = struct
 
   let check_metadata_list ~block_hash ~operations ~ops_metadata =
     fail_unless
-      (List.for_all2
-         ~when_different_lengths:(`X "unreachable")
-         (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
-         operations
-         ops_metadata
-       |> function
-       | Ok b -> b
-       | _ -> assert false)
+      ( List.for_all2
+          ~when_different_lengths:(`X "unreachable")
+          (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
+          operations
+          ops_metadata
+      |> function
+        | Ok b -> b
+        | _ -> assert false )
       (let to_string l =
          Format.asprintf
            "[%a]"
@@ -1835,10 +1835,10 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   context_dirs := context_dir :: !context_dirs ;
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-  let*! context_index, commit_genesis =
+  let* context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
-        let*! context_index =
+        let* context_index =
           Context_ops.init
             ~kind:`Memory
             ~readonly:true
@@ -1846,9 +1846,9 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~data_dir
             ()
         in
-        Lwt.return (context_index, commit_genesis)
+        return (context_index, commit_genesis)
     | None ->
-        let*! context_index =
+        let* context_index =
           Context_ops.init ~kind:`Memory ~readonly ?patch_context ~data_dir ()
         in
         let commit_genesis ~chain_id =
@@ -1858,7 +1858,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~time:genesis.time
             ~protocol:genesis.protocol
         in
-        Lwt.return (context_index, commit_genesis)
+        return (context_index, commit_genesis)
   in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let chain_dir_path = Naming.dir_path chain_dir in

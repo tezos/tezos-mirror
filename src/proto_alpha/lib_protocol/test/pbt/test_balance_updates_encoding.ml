@@ -150,7 +150,8 @@ let eq balance_updates1 balance_updates2 =
     List.for_all2
       ~when_different_lengths:()
       (fun (Balance_update_item (b1, bu1, uo1))
-           (Balance_update_item (b2, bu2, uo2)) ->
+           (Balance_update_item (b2, bu2, uo2))
+         ->
         (let token1 = token_of_balance b1 in
          let token2 = token_of_balance b2 in
          match Token.eq token1 token2 with

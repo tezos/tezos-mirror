@@ -7,8 +7,6 @@
 
 open Baking_state
 open Baking_state_types
-open Protocol
-open Alpha_context
 
 module Events = struct
   include Baking_events.Forge_worker
@@ -136,9 +134,7 @@ let handle_forge_consensus_votes worker baking_state
     (unsigned_consensus_votes : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let batch_branch = unsigned_consensus_votes.batch_branch in
-  let task
-      ({vote_consensus_content; vote_kind; delegate; dal_content = _} as
-       unsigned_consensus_vote) =
+  let task unsigned_consensus_vote =
     let*! signed_consensus_vote_r =
       Baking_actions.forge_and_sign_consensus_vote
         baking_state
@@ -147,17 +143,12 @@ let handle_forge_consensus_votes worker baking_state
     in
     match signed_consensus_vote_r with
     | Error err ->
-        let level, round =
-          ( Raw_level.to_int32 vote_consensus_content.level,
-            vote_consensus_content.round )
-        in
         let*! () =
-          Events.(
-            emit skipping_consensus_vote (vote_kind, delegate, level, round, err))
+          Events.(emit skipping_consensus_vote (unsigned_consensus_vote, err))
         in
         fail err
     | Ok signed_consensus_vote -> (
-        match vote_kind with
+        match unsigned_consensus_vote.vote_kind with
         | Preattestation ->
             worker.push_event
               (Some (Preattestation_ready signed_consensus_vote)) ;

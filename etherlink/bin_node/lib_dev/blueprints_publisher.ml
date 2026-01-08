@@ -13,6 +13,7 @@ type blueprints_range =
 type parameters = {
   blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint_timeout : float;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
   keep_alive : bool;
@@ -24,6 +25,7 @@ type parameters = {
 type state = {
   blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint_timeout : float;
   drop_duplicate : bool;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -68,6 +70,9 @@ module Worker = struct
       (Types)
 
   let rollup_node_endpoint worker = (state worker).rollup_node_endpoint
+
+  let rollup_node_endpoint_timeout worker =
+    (state worker).rollup_node_endpoint_timeout
 
   let latest_level_seen worker = (state worker).latest_level_seen
 
@@ -126,16 +131,18 @@ module Worker = struct
       ?order:(if state.order_enabled then Some level else None)
       ~keep_alive:false
       ~rollup_node_endpoint:state.rollup_node_endpoint
+      ~timeout:state.rollup_node_endpoint_timeout
       payload
 
   let publish_on_dal state level chunks =
     let open Lwt_result_syntax in
     let payloads = Sequencer_blueprint.create_dal_payloads chunks in
-    let nb_chunks = List.length chunks in
+    let nb_chunks = Sequencer_blueprint.nb_chunks chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
     Metrics.record_blueprint_chunks_sent_on_dal chunks ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
+      ~timeout:state.rollup_node_endpoint_timeout
       ~messages:payloads
 
   let publish_on_dal_precondition state use_dal_if_enabled level =
@@ -225,26 +232,48 @@ module Worker = struct
   let retrieve_and_set_latest_level_confirmed self rollup_block_lvl =
     let open Lwt_result_syntax in
     let open Rollup_services in
-    let* finalized_current_number =
+    let keep_alive = keep_alive self in
+    let rollup_node_endpoint = rollup_node_endpoint self in
+    let timeout = rollup_node_endpoint_timeout self in
+    let read_from_rollup_node path =
       call_service
-        ~keep_alive:(keep_alive self)
-        ~base:(rollup_node_endpoint self)
+        ~keep_alive
+        ~base:rollup_node_endpoint
+        ~timeout
         durable_state_value
         ((), Block_id.Level rollup_block_lvl)
-        {
-          key =
-            Durable_storage_path.Block.current_number
-            (* TODO: Remove etherlink root *)
-              ~root:Durable_storage_path.etherlink_root;
-        }
+        {key = path}
         ()
     in
-    match finalized_current_number with
-    | Some bytes ->
-        let (Qty evm_block_number) = Ethereum_types.decode_number_le bytes in
-        set_latest_level_confirmed self evm_block_number ;
-        return_unit
-    | None -> return_unit
+    let* finalized_current_block_header =
+      read_from_rollup_node Durable_storage_path.BlockHeader.current
+    in
+    match finalized_current_block_header with
+    | Some bytes -> (
+        match Rlp.decode bytes with
+        | Ok (Rlp.List [Value number; Value _timestamp; List _chain_header]) ->
+            let (Qty number) = Ethereum_types.decode_number_le number in
+            set_latest_level_confirmed self number ;
+            return_unit
+        | _ -> return_unit)
+    | None -> (
+        (* If the rollup node has no block header in its durable
+           storage, it may be because it is using a very old (< 27)
+           storage version. In that case we fallback to reading the
+           current number from the Etherlink block storage. *)
+        let* finalized_current_number =
+          read_from_rollup_node
+          @@ Durable_storage_path.Block.current_number
+               ~root:Durable_storage_path.etherlink_root
+        in
+        match finalized_current_number with
+        | Some bytes ->
+            let (Qty evm_block_number) =
+              Ethereum_types.decode_number_le bytes
+            in
+            set_latest_level_confirmed self evm_block_number ;
+            return_unit
+        | None -> return_unit)
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -260,6 +289,7 @@ module Handlers = struct
       ({
          blueprints_range;
          rollup_node_endpoint;
+         rollup_node_endpoint_timeout;
          config =
            {
              max_blueprints_lag;
@@ -282,6 +312,7 @@ module Handlers = struct
       | Some dal_slots ->
           Rollup_services.set_dal_slot_indices
             ~rollup_node_endpoint
+            ~timeout:rollup_node_endpoint_timeout
             ~slot_indices:dal_slots
     in
     return
@@ -294,6 +325,7 @@ module Handlers = struct
         latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
+        rollup_node_endpoint_timeout;
         drop_duplicate;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
@@ -305,8 +337,7 @@ module Handlers = struct
         tx_container;
       }
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
    fun self request ->
     let open Lwt_result_syntax in
@@ -363,8 +394,9 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
-    ~keep_alive ~drop_duplicate ~order_enabled ~tx_container () =
+let start ~blueprints_range ~rollup_node_endpoint ~rollup_node_endpoint_timeout
+    ~config ~latest_level_seen ~keep_alive ~drop_duplicate ~order_enabled
+    ~tx_container () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -373,6 +405,7 @@ let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
       {
         blueprints_range;
         rollup_node_endpoint;
+        rollup_node_endpoint_timeout;
         config;
         latest_level_seen;
         keep_alive;

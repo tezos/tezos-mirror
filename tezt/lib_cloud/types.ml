@@ -34,7 +34,10 @@ module Agent_configuration = struct
 
   type vm = {
     machine_type : string;
+    disk_type : string option;
+    disk_size_gb : int option;
     docker_image : docker_image;
+    dockerbuild_args : (string * string) list;
     max_run_duration : int option;
     binaries_path : string;
     os : Os.t;
@@ -68,29 +71,55 @@ module Agent_configuration = struct
              vm =
                {
                  machine_type;
+                 disk_type;
+                 disk_size_gb;
                  binaries_path;
                  docker_image;
+                 dockerbuild_args;
                  max_run_duration = _;
                  os;
                };
-           } -> (name, machine_type, binaries_path, docker_image, os))
-      (fun (name, machine_type, binaries_path, docker_image, os) ->
+           }
+         ->
+        ( name,
+          machine_type,
+          disk_type,
+          disk_size_gb,
+          binaries_path,
+          docker_image,
+          dockerbuild_args,
+          os ))
+      (fun ( name,
+             machine_type,
+             disk_type,
+             disk_size_gb,
+             binaries_path,
+             docker_image,
+             dockerbuild_args,
+             os )
+         ->
         {
           name;
           vm =
             {
               machine_type;
+              disk_type;
+              disk_size_gb;
               binaries_path;
               max_run_duration = None;
               docker_image;
+              dockerbuild_args;
               os;
             };
         })
-      (obj5
+      (obj8
          (req "name" string)
          (req "machine_type" string)
+         (opt "disk_type" string)
+         (opt "disk_size_gb" int31)
          (req "binaries_path" string)
          (req "docker_image" docker_image_encoding)
+         (dft "dockerbuild_args" (list (tup2 string string)) [])
          (req "os" Os.encoding))
 
   let default_gcp_machine_type = "n1-standard-2"
@@ -101,8 +130,8 @@ module Agent_configuration = struct
 
   let default_gcp_binaries_path = Path.tmp_dir // "tezt-runners"
 
-  let make ~os ~binaries_path ?max_run_duration ~machine_type ~docker_image
-      ~name () =
+  let make ~os ~binaries_path ?max_run_duration ?disk_type ?disk_size_gb
+      ?(dockerbuild_args = []) ~machine_type ~docker_image ~name () =
     let binaries_path =
       match docker_image with
       | Gcp _ -> binaries_path
@@ -110,7 +139,17 @@ module Agent_configuration = struct
     in
     {
       name;
-      vm = {os; machine_type; docker_image; max_run_duration; binaries_path};
+      vm =
+        {
+          os;
+          machine_type;
+          disk_type;
+          disk_size_gb;
+          docker_image;
+          dockerbuild_args;
+          max_run_duration;
+          binaries_path;
+        };
     }
 end
 

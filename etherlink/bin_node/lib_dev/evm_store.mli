@@ -64,25 +64,25 @@ end
 
 module Context_hashes : sig
   val store :
-    conn -> Ethereum_types.quantity -> Irmin_context.hash -> unit tzresult Lwt.t
+    conn -> Ethereum_types.quantity -> Pvm.Context.hash -> unit tzresult Lwt.t
 
   val find :
-    conn -> Ethereum_types.quantity -> Irmin_context.hash option tzresult Lwt.t
+    conn -> Ethereum_types.quantity -> Pvm.Context.hash option tzresult Lwt.t
 
   val find_latest :
-    conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val get_latest :
-    conn -> (Ethereum_types.quantity * Irmin_context.hash) tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) tzresult Lwt.t
 
   val find_earliest :
-    conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val get_earliest :
-    conn -> (Ethereum_types.quantity * Irmin_context.hash) tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) tzresult Lwt.t
 
   val find_finalized :
-    conn -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
@@ -229,7 +229,7 @@ module Block_storage_mode : sig
 end
 
 val context_hash_of_block_hash :
-  conn -> Ethereum_types.block_hash -> Irmin_context.hash option tzresult Lwt.t
+  conn -> Ethereum_types.block_hash -> Pvm.Context.hash option tzresult Lwt.t
 
 module Transactions : sig
   val store : conn -> Transaction_info.t -> unit tzresult Lwt.t
@@ -244,6 +244,15 @@ module Transactions : sig
       from level [block_number]. The function does not check if the block exists. *)
   val receipts_of_block_number :
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
+
+  (** [receipts_of_block_range conn block_number len] returns all the receipts
+      found in [len] blocks, starting from level [block_number]. The function does
+      not check if these blocks exist. *)
+  val receipts_of_block_range :
+    conn ->
+    Ethereum_types.quantity ->
+    int ->
+    Transaction_receipt.t list tzresult Lwt.t
 end
 
 module Irmin_chunks : sig

@@ -63,12 +63,14 @@ let register_protocol_independent_tests () =
   Scheduled_pipeline_check.register_protocol_independent () ;
   Snoop_codegen.register_protocol_independent () ;
   Snoop_protocol_codegen.register_protocol_independent () ;
-  Sc_rollup.register_protocol_independent ()
+  Sc_rollup.register_protocol_independent () ;
+  Storage_snapshots.register_protocol_independent ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
   Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
+  Double_consensus.register_migration ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Weeklynet.register () ;
@@ -101,6 +103,7 @@ let register_old_protocol_migration_tests () =
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
           Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
+          Double_consensus.register_migration ~migrate_from ~migrate_to ;
           Sc_rollup_migration.register ~migrate_from ~migrate_to ;
           Dal.register_migration ~migrate_from ~migrate_to)
     Protocol.all
@@ -120,6 +123,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
+  Baker_signing_delay.register ~protocols ;
   Baker_operations_cli_options.register ~protocols ;
   Baking.register ~protocols ;
   Baking.register_operations_pool ~protocols ;
@@ -140,6 +144,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Companion_key.register ~protocols ;
   Contract_baker.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
+  Contract_big_map_transfer.register ~protocols ;
   Contract_entrypoints.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
   Contract_hash_with_origination.register ~protocols ;
@@ -232,7 +237,8 @@ let register_protocol_tests_that_use_supports_correctly () =
   Timelock.register ~protocols ;
   Tzt_regression.register ~protocols ;
   Dal.register ~protocols ;
-  Yes_crypto.register ~protocols
+  Yes_crypto.register ~protocols ;
+  Native_contracts.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as

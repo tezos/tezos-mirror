@@ -6,10 +6,11 @@
 (*****************************************************************************)
 
 type parameters = {
-  signer : Signer.t;
-  smart_rollup_address : string;
+  signer : Signer.map;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
+  sequencer_sunset_sec : int64;
+  preconfirmation_stream_enabled : bool;
 }
 
 (** [start parameters] starts the events follower. *)
@@ -26,6 +27,13 @@ val produce_block :
   force:bool ->
   timestamp:Time.Protocol.t ->
   [`Block_produced of int | `No_block] tzresult Lwt.t
+
+(** [preconfirm_transactions ~transactions] validates each transaction in
+    [transactions] and streams every successfully validated one to the
+    preconfirmation pipeline. *)
+val preconfirm_transactions :
+  transactions:(string * Tx_queue_types.transaction_object_t) list ->
+  Ethereum_types.hash list tzresult Lwt.t
 
 module Internal_for_tests : sig
   val produce_block :

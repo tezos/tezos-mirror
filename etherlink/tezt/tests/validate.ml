@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -480,7 +480,7 @@ let test_validate_gas_limit_above_the_maximum =
     ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
     ~title:"Validate gas limit above the maximum"
     ~tags:["gas_limit"]
-  @@ fun kernel sequencer tx_type ->
+  @@ fun _ sequencer tx_type ->
   let source = Eth_account.bootstrap_accounts.(0) in
   let make_tx_gas_limit ~legacy ~gas =
     Cast.craft_tx
@@ -503,132 +503,11 @@ let test_validate_gas_limit_above_the_maximum =
         return
           "0x01f86982053980843b9aca008411e1a30094d77420f73b4612a7a99dba8c2afd30a1886b03448080c001a026ce5062285cd3ade072bd279e56a5ce0679cd56c8cfaf434f5d2b9a1d211c8ea06ebd07be2e0231557a0f6a3766667faa711f0675469da46e3dceb045d5558fd5"
   in
-  match kernel with
-  | Mainnet ->
-      let*@? err =
-        Rpc.send_raw_transaction ~raw_tx:gas_limit_above_the_maximum sequencer
-      in
-      Check.(err.message =~ rex "Gas limit for execution is too high")
-        ~error_msg:"Gas limit too high for execution, it should fail" ;
-      unit
-  | Latest -> (
-      let* tx_hash =
-        send_transaction_and_wait_confirmation
-          ~raw_tx:gas_limit_above_the_maximum
-          sequencer
-      in
-      let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-      match receipt_opt with
-      | None ->
-          Test.fail
-            ~__LOC__
-            "Expected a receipt for transaction hash %s but got none"
-            tx_hash
-      | Some receipt ->
-          Check.is_true
-            receipt.status
-            ~__LOC__
-            ~error_msg:
-              "Expected status in transaction receipt to be 0x1 (success) but \
-               got 0x0 (failure)" ;
-          Check.((receipt.cumulativeGasUsed = 621_000L) ~__LOC__ int64)
-            ~error_msg:
-              "Expected cumulative gas used in transaction receipt to be lower \
-               than 625_000 but got %L" ;
-
-          unit)
-
-(** This test verifies that transactions with gas consumption over the
-    maximum allowed gas per transaction are properly rejected by
-    confirming gas used equals the maximum gas limit even in case of
-    over-approximated gas limit. *)
-let test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction =
-  let maximum_gas_per_transaction = 10L in
-  register
-    ~maximum_gas_per_transaction
-    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
-    ~title:
-      "Validate custom gas limit greater than the maximum gas per transaction"
-    ~tags:["gas_limit"; "maximum_gas_per_transaction"]
-  @@ fun kernel sequencer tx_type ->
-  assert (tx_type = Legacy) ;
-  let source = Eth_account.bootstrap_accounts.(0) in
-  let inclusion_fees = 600_000 in
-  let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
-  let over_approximated_gas = succ gas in
-  let* tx =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~legacy:true
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ~gas:over_approximated_gas
-      ()
+  let* tx_hash =
+    send_transaction_and_wait_confirmation
+      ~raw_tx:gas_limit_above_the_maximum
+      sequencer
   in
-  match kernel with
-  | Mainnet ->
-      let*@? err = Rpc.send_raw_transaction ~raw_tx:tx sequencer in
-      Check.(err.message =~ rex "Gas limit for execution is too high")
-        ~error_msg:"Gas limit too high for execution, it should fail" ;
-      unit
-  | Latest -> (
-      let* tx_hash =
-        send_transaction_and_wait_confirmation ~raw_tx:tx sequencer
-      in
-      let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-      match receipt_opt with
-      | None ->
-          Test.fail
-            ~__LOC__
-            "Expected a receipt for transaction hash %s but got none"
-            tx_hash
-      | Some receipt ->
-          Check.is_false
-            receipt.status
-            ~__LOC__
-            ~error_msg:
-              "Expected status in transaction receipt to be 0x0 (failure) but \
-               got 0x1 (success)" ;
-          Check.((receipt.cumulativeGasUsed = Int64.of_int gas) ~__LOC__ int64)
-            ~error_msg:
-              "Expected cumulative gas used in transaction receipt to be the \
-               maximum gas per transaction (%R) but got %L" ;
-          unit)
-
-(** This test verifies that transactions with gas consumption over the
-    maximum allowed gas per transaction are properly rejected by
-    confirming gas used equals the gas limit in case of
-    under-approximated gas limit. *)
-let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
-  let maximum_gas_per_transaction = 10L in
-  register
-    ~maximum_gas_per_transaction
-    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
-    ~title:
-      "Validate custom gas limit lower than the maximum gas per transaction"
-    ~tags:["gas_limit"; "maximum_gas_per_transaction"]
-  @@ fun _kernel sequencer tx_type ->
-  assert (tx_type = Legacy) ;
-  let source = Eth_account.bootstrap_accounts.(0) in
-  let inclusion_fees = 600_000 in
-  let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
-  let under_approximated_gas = pred gas in
-  let* tx =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~legacy:true
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ~gas:under_approximated_gas
-      ()
-  in
-  let* tx_hash = send_transaction_and_wait_confirmation ~raw_tx:tx sequencer in
   let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
   match receipt_opt with
   | None ->
@@ -637,20 +516,81 @@ let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
         "Expected a receipt for transaction hash %s but got none"
         tx_hash
   | Some receipt ->
-      Check.is_false
+      Check.is_true
         receipt.status
         ~__LOC__
         ~error_msg:
-          "Expected status in transaction receipt to be 0x0 (failure) but got \
-           0x1 (success)" ;
-      Check.(
-        (receipt.cumulativeGasUsed = Int64.of_int under_approximated_gas)
-          ~__LOC__
-          int64)
+          "Expected status in transaction receipt to be 0x1 (success) but got \
+           0x0 (failure)" ;
+      Check.((receipt.cumulativeGasUsed = 621_000L) ~__LOC__ int64)
         ~error_msg:
-          "Expected cumulative gas used in transaction receipt to be the gas \
-           limit provided (%R) but got %L" ;
+          "Expected cumulative gas used in transaction receipt to be lower \
+           than 625_000 but got %L" ;
+
       unit
+
+(** This test verifies that transactions with gas consumption over the
+    maximum allowed gas per transaction are properly rejected by
+    confirming gas used equals the gas limit in case of
+    under-approximated gas limit. *)
+let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
+  let maximum_gas_per_transaction = 21001L in
+  register
+    ~maximum_gas_per_transaction
+    ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
+    ~title:
+      "Validate custom gas limit lower than the maximum gas per transaction"
+    ~tags:["gas_limit"; "maximum_gas_per_transaction"]
+  @@ fun kernel sequencer tx_type ->
+  if kernel = Kernel.Latest then
+    (* This test isn't relevant on a kernel where REVM is activated. A transaction with a gas limit inferior to 21 000
+       can not be processed. The test rely on a semantic mistake from our Sputnik implementation.
+       TODO: As a follow-up [validate_gas_limit] should refuse transaction with a transaction gas limit < 21 000 to be
+       aligned with other EVM-compatible chains. *)
+    unit
+  else (
+    assert (tx_type = Legacy) ;
+    let source = Eth_account.bootstrap_accounts.(0) in
+    let inclusion_fees = 600_000 in
+    let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
+    let under_approximated_gas = pred gas in
+    let* tx =
+      Cast.craft_tx
+        ~source_private_key:source.private_key
+        ~chain_id:1337
+        ~nonce:0
+        ~gas_price:1_000_000_000
+        ~legacy:true
+        ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+        ~value:Wei.zero
+        ~gas:under_approximated_gas
+        ()
+    in
+    let* tx_hash =
+      send_transaction_and_wait_confirmation ~raw_tx:tx sequencer
+    in
+    let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    match receipt_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Expected a receipt for transaction hash %s but got none"
+          tx_hash
+    | Some receipt ->
+        Check.is_true
+          receipt.status
+          ~__LOC__
+          ~error_msg:
+            "Expected status in transaction receipt to be 0x1 (success) but \
+             got 0x0 (failure)" ;
+        Check.(
+          (receipt.cumulativeGasUsed = Int64.of_int under_approximated_gas)
+            ~__LOC__
+            int64)
+          ~error_msg:
+            "Expected cumulative gas used in transaction receipt to be the gas \
+             limit provided (%R) but got %L" ;
+        unit)
 
 let test_validate_gas_limit =
   register
@@ -683,7 +623,11 @@ let test_validate_gas_limit =
   let*@? err =
     Rpc.send_raw_transaction ~raw_tx:not_enough_gas_limit sequencer
   in
-  Check.(err.message =~ rex "Not enough gas for inclusion fees")
+  Check.(
+    err.message
+    =~ rex
+         "Please increase the gas limit or use eth_estimateGas to get the \
+          recommended amount.")
     ~error_msg:
       "The transaction has not enough gas to pay da_fees, it should fail" ;
   (* This tx is the same as the valid_transaction in eip2930 but with some random entry for access_list *)
@@ -754,6 +698,67 @@ let test_sender_is_not_contract =
 
   unit
 
+let test_base_gas_cost =
+  register
+    ~title:
+      "Transactions with gas limit below the base gas cost (which includes \
+       inclusion fees) are rejected"
+    ~tags:["base_gas_cost_minimum_limit"]
+  @@ fun _kernel sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_raw_tx ~legacy =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~legacy
+      ~gas:20_999
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~value:Wei.zero
+      ()
+  in
+  let* raw_tx =
+    match tx_type with
+    | Legacy -> make_raw_tx ~legacy:true
+    | Eip2930 | Eip1559 -> make_raw_tx ~legacy:false
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex "The provided gas limit")
+    ~error_msg:"The error message should be %R but got %L" ;
+  unit
+
+let test_validate_calldata_cost =
+  register
+    ~da_fee_per_byte:Wei.zero
+    ~title:"Validate that gas limit validation covers calldata cost"
+    ~tags:["calldata_cost"; "gas_limit"]
+  @@ fun _kernel sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_tx ~legacy =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1
+      ~gas:100_000
+      ~legacy
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~arguments:[String.make 100_000 '1']
+      ~value:Wei.zero
+      ()
+  in
+  let* raw_tx =
+    match tx_type with
+    | Legacy -> make_tx ~legacy:true
+    | Eip1559 | Eip2930 -> make_tx ~legacy:false
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex " is insufficient to cover the transaction cost")
+    ~error_msg:
+      "The transaction has not enough gas to pay calldata cost, it should fail" ;
+  unit
+
 let () =
   let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
@@ -766,6 +771,6 @@ let () =
   test_validate_gas_limit all_types ;
   test_validate_gas_limit_above_the_maximum all_types ;
   test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction [Legacy] ;
-  test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction
-    [Legacy] ;
-  test_sender_is_not_contract all_types
+  test_sender_is_not_contract all_types ;
+  test_base_gas_cost all_types ;
+  test_validate_calldata_cost all_types

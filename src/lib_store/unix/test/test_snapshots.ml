@@ -463,7 +463,8 @@ let make_tests_export_import speed genesis_parameters =
            exported_block_level,
            history_mode,
            rolling,
-           export_mode ) ->
+           export_mode )
+       ->
       let test_descr =
         Format.asprintf
           "export => import with %d initial blocks from %a to %s (exported \

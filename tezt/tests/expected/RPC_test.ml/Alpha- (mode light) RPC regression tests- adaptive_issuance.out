@@ -3,6 +3,7 @@
 [ "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
@@ -39,17 +40,20 @@
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/context/issuance/expected_issuance
 [ { "cycle": 0, "baking_reward_fixed_portion": "300010",
-    "baking_reward_bonus_per_slot": "1171",
-    "attesting_reward_per_slot": "2343", "seed_nonce_revelation_tip": "234",
-    "vdf_revelation_tip": "234", "dal_attesting_reward_per_shard": "520" },
+    "baking_reward_bonus_per_block": "300010",
+    "attesting_reward_per_block": "600020",
+    "seed_nonce_revelation_tip": "234", "vdf_revelation_tip": "234",
+    "dal_attesting_reward_per_shard": "520" },
   { "cycle": 1, "baking_reward_fixed_portion": "300010",
-    "baking_reward_bonus_per_slot": "1171",
-    "attesting_reward_per_slot": "2343", "seed_nonce_revelation_tip": "234",
-    "vdf_revelation_tip": "234", "dal_attesting_reward_per_shard": "520" },
+    "baking_reward_bonus_per_block": "300010",
+    "attesting_reward_per_block": "600020",
+    "seed_nonce_revelation_tip": "234", "vdf_revelation_tip": "234",
+    "dal_attesting_reward_per_shard": "520" },
   { "cycle": 2, "baking_reward_fixed_portion": "300010",
-    "baking_reward_bonus_per_slot": "1171",
-    "attesting_reward_per_slot": "2343", "seed_nonce_revelation_tip": "234",
-    "vdf_revelation_tip": "234", "dal_attesting_reward_per_shard": "520" } ]
+    "baking_reward_bonus_per_block": "300010",
+    "attesting_reward_per_block": "600020",
+    "seed_nonce_revelation_tip": "234", "vdf_revelation_tip": "234",
+    "dal_attesting_reward_per_shard": "520" } ]
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/stakers'
 [ { "staker": "[PUBLIC_KEY_HASH]",

@@ -142,7 +142,7 @@ module Handler = struct
   let request_for_public_key =
     declare_1
       ~section
-      ~level:Error
+      ~level
       ~name:"request_for_public_key"
       ~msg:"request for public key {key}"
       ("key", Tezos_crypto.Signature.Public_key_hash.encoding)
@@ -150,7 +150,7 @@ module Handler = struct
   let not_found_public_key =
     declare_1
       ~section
-      ~level
+      ~level:Warning
       ~name:"not_found_public_key"
       ~msg:"no public key found for hash {hash}"
       ("hash", Tezos_crypto.Signature.Public_key_hash.encoding)

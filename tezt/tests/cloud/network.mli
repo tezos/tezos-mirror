@@ -2,36 +2,47 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 type public =
   [ `Mainnet
   | `Ghostnet
-  | `Nextnet of
-    string
+  | `Shadownet
+  | `Nextnet of string
     (* date of the genesis block of the current weeklynet;
        format is YYYYMMDD *)
-  | `Weeklynet of
-    string
+  | `Weeklynet of string
     (* date of the genesis block of the current weeklynet;
        typically it is last wednesday.
        format is YYYY-MM-DD *)
-  | `Rionet ]
+  | `Seoulnet
+  | `Tallinnnet ]
 
 type t = [public | `Sandbox]
 
-type stake_repartition =
-  | Custom of int list
-  | Mimic of {network : public; max_nb_bakers : int option}
+(** ["mainnet" | "ghostnet" | "shadownet" | "seoulnet" | "tallinnnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
+val to_string : [< t] -> string
+
+val public_encoding : public Data_encoding.t
+
+val encoding : t Data_encoding.t
+
+val is_public : t -> bool
 
 val to_public : t -> public
 
-(** ["mainnet" | "ghostnet" | "rionet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
-val to_string : [< t] -> string
+(** Parse the given [string] into an available network option. *)
+val parse : string -> t option
 
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t
+
+(** Block time value for the network *)
+val block_time : t -> int
+
+val next_protocol : t -> Protocol.t
 
 (** Endpoint publicly available with RPC opened *)
 val public_rpc_endpoint : public -> Endpoint.t
@@ -41,7 +52,7 @@ val public_rpc_endpoint : public -> Endpoint.t
 val snapshot_service : public -> string
 
 (** Argument to give to the --network option of `octez-node config init`. *)
-val to_octez_network_options : public -> string
+val to_octez_network_options : t -> string
 
 (** Some node to connect to when bootstrapping your node *)
 val default_bootstrap : public -> string

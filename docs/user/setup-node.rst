@@ -6,6 +6,7 @@ For running a node in the Tezos network with a basic setup, see the introductory
 This section describes different configuration possibilities provided by the Octez node:
 
 - tune various parameters of the node using flexible combinations of: a configuration file, command-line options, and environment variables
+- configure routing
 - specify the Tezos network to connect to, which can be the Mainnet or different test networks.
 - configure the amount of history kept by the node according to different tradeoffs, using history modes
 - rapidly catch up with a given (main or test) network by loading network snapshots
@@ -18,6 +19,11 @@ These possibilities are described in the following pages.
    :maxdepth: 2
 
    node-configuration
+
+.. toctree::
+   :maxdepth: 2
+
+   routing
 
 .. toctree::
    :maxdepth: 2

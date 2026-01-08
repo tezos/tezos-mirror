@@ -7,12 +7,14 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-protocol-022-PsRiotum-libs.plugin
-  tezos-protocol-022-PsRiotum.parameters
+  octez-protocol-023-PtSeouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.parameters
   octez-protocol-000-Ps9mPmXa-libs.client
   octez-libs.base
   octez-shell-libs.shell-services
   octez-libs.version
+  octez-libs.micheline
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   lwt-watcher)
  (flags
   (:standard)

@@ -59,8 +59,11 @@ let get_last_merged_pipeline ~project ~default_branch () =
 
 let get_last_schedule_pipeline ?status ?matching ~project () =
   Log.info
-    "Fetching successful scheduled pipeline for %s%s..."
+    "Fetching scheduled pipelines for %s%s%s..."
     project
+    (match status with
+    | None -> ""
+    | Some status -> sf " with status %s" status)
     (match matching with
     | None -> ""
     | Some pattern -> sf " matching %S" (show_rex pattern)) ;
@@ -76,7 +79,12 @@ let get_last_schedule_pipeline ?status ?matching ~project () =
       |> get)
   in
   let pipelines = JSON.as_list pipelines in
-  Log.info "Found %d successful scheduled pipelines." (List.length pipelines) ;
+  Log.info
+    "Found %d scheduled pipelines%s."
+    (List.length pipelines)
+    (match status with
+    | None -> ""
+    | Some status -> sf " with status %s" status) ;
   let pipelines =
     match matching with
     | None -> pipelines
@@ -87,7 +95,10 @@ let get_last_schedule_pipeline ?status ?matching ~project () =
           | Some name when name =~ pattern -> true
           | _ -> false
         in
-        Log.debug "%d of those match the pattern." (List.length pipelines) ;
+        Log.debug
+          "%d of those match the pattern %S."
+          (List.length pipelines)
+          (show_rex pattern) ;
         pipelines
   in
   match pipelines with

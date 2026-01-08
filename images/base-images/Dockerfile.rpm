@@ -9,12 +9,16 @@ ENV TZ=Etc/UTC
 ARG APT_PROXY
 ENV APT_PROXY=${APT_PROXY:-false}
 
+COPY scripts/kiss-fetch.sh /usr/local/bin/
 COPY images/scripts/configure_rpm_proxy.sh \
      images/scripts/install_datadog_static.sh \
      /tmp/
+ENV PATH=/usr/local/bin:$PATH
 
 #hadolint ignore=DL3041
 RUN /tmp/configure_rpm_proxy.sh && \
     dnf -y update && \
     dnf clean all && \
-    /tmp/install_datadog_static.sh
+    /tmp/install_datadog_static.sh && \
+    rm /tmp/install_datadog_static.sh && \
+    rm /tmp/configure_rpm_proxy.sh

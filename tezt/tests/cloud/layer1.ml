@@ -18,41 +18,24 @@
      not requiring this data
 *)
 
-open Tezos
 open Scenarios_helpers
+open Tezos
+open Yes_crypto
+open Agent_kind
 
-(** A baker account is its public key (pk) and its hash (pkh) *)
-type baker_account = {pk : string; pkh : string}
+type baker_account = {
+  delegate : Account.key;
+  consensus : Account.key list;
+  companion : Account.key list;
+}
 
-let add_prometheus_source node cloud agent =
-  Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
-
-let get_snapshot_info_level node snapshot_path =
-  let* info = Node.snapshot_info node ~json:true snapshot_path in
-  let json = JSON.parse ~origin:"snapshot_info" info in
-  Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
-
-module Network = struct
-  include Network
-
-  type t = [`Mainnet | `Ghostnet]
-
-  let to_string (t : t) = Network.to_string (t :> Network.t)
-
-  let to_octez_network_options (t : t) =
-    Network.to_octez_network_options (t :> Network.public)
-
-  let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
-
-  (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
-  let migrate_to _network = Protocol.Alpha
-end
-
-let yes_crypto_env =
-  String_map.add
-    Tezos_crypto.Helpers.yes_crypto_environment_variable
-    "y"
-    String_map.empty
+(* Public key hashes of a delegate consensus and companion keys *)
+let baking_keys delegate =
+  let pkhs_of_account_list =
+    List.map (fun account -> account.Account.public_key_hash)
+  in
+  pkhs_of_account_list delegate.consensus
+  @ pkhs_of_account_list delegate.companion
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -70,81 +53,19 @@ let stresstest_max_pkh_pre_node = 100
 let nb_stresstester network tps =
   let n1 = tps / stresstest_max_tps_pre_node in
   let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
-  max n1 n2
+  max 1 (max n1 n2)
+
+let extract_agent_index (r : rex) agent =
+  match Agent.name agent =~* r with
+  | None ->
+      Test.fail "Failed to extract index from agent name %s" (Agent.name agent)
+  | Some i -> int_of_string i
+
+let match_agent_name r agent = Agent.name agent =~ r
 
 module Node = struct
-  let runner_of_agent = Agent.runner
-
+  open Snapshot_helpers
   include Node
-
-  (** If snapshot is an URL, download it on the agent's runner.
-      If it is a filename, copy it to the agent's runner if needed. *)
-  let ensure_snapshot agent snapshot =
-    if Re.Str.(string_match (regexp "^https?://.+$") snapshot 0) then
-      let url = snapshot in
-      let filename = "snapshot" in
-      let* () =
-        Process.spawn
-          ?runner:(runner_of_agent agent)
-          "wget"
-          ["-q"; "-O"; filename; url]
-        |> Process.check
-      in
-      Lwt.return filename
-    else Tezt_cloud.Agent.copy agent ~destination:snapshot ~source:snapshot
-
-  (** We are running a private network with yes-crypto enabled.
-      We don't want to connect with the real network.
-  *)
-  let isolated_config ~peers ~network ~delay =
-    [
-      No_bootstrap_peers;
-      Connections (List.length peers);
-      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network (Network.to_octez_network_options network);
-      Expected_pow 0;
-      Cors_origin "*";
-      Storage_maintenance_delay (string_of_int delay);
-    ]
-
-  (** [--private-mode] is mainly useful for the bootstrap node
-      because it is used first to bootstrap a node with real network peers
-      before being disconnected.
-      For the other node, it's an extra security but their ip/identity should
-      not be advertised to the external world anyway.
-  *)
-  let isolated_args peers =
-    Private_mode
-    :: List.fold_left
-         (fun acc peer -> Peer peer :: acc)
-         [Allow_yes_crypto; Force_history_mode_switch]
-         peers
-
-  (** [add_migration_offset_to_config node snapshot ~migration_offset ~network] adds an
-      entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
-      to upgrade to the next protocol of [~network]. This entry is is parametrised by the
-      information obtained from [snapshot]. *)
-  let add_migration_offset_to_config node snapshot ~migration_offset ~network =
-    let* level = get_snapshot_info_level node snapshot in
-    match migration_offset with
-    | None -> Lwt.return_unit
-    | Some migration_offset ->
-        let network_config =
-          match network with
-          | `Mainnet -> Node.Config_file.mainnet_network_config
-          | `Ghostnet -> Node.Config_file.ghostnet_network_config
-        in
-        let migration_level = level + migration_offset in
-        toplog "Add UAU entry for level : %d" migration_level ;
-        Node.Config_file.update node (fun json ->
-            JSON.put
-              ( "network",
-                JSON.annotate
-                  ~origin:"add_migration_offset_to_config"
-                  network_config )
-              json
-            |> Node.Config_file.update_network_with_user_activated_upgrades
-                 [(migration_level, Network.migrate_to network)])
 
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
@@ -163,40 +84,101 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
+  let init_bootstrap_node_from_snapshot ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends (agent, node, name) snapshot network
       migration_offset =
-    let* snapshot = ensure_snapshot agent snapshot in
-    let* () =
-      let toplog s = toplog "/!\\ %s /!\\" s in
-      toplog "Bootstrapping node using the real world" ;
-      let config =
-        [
-          Network (Network.to_octez_network_options network);
-          Expected_pow 26;
-          Cors_origin "*";
-          Synchronisation_threshold 1;
-        ]
-      in
-      let* () = Node.config_init node config in
-      let* () = Node.snapshot_import ~no_check:true node snapshot in
-      let* () =
-        (* When bootstrapping from the real network, we want to use the real time. *)
-        let env = String_map.(add "FAKETIME" "+0" empty) in
-        run ~env node []
-      in
-      let* () = wait_for_ready node in
-      let* _new_level = wait_next_level ~offset:2 node in
-      let* () = terminate node in
-      Lwt.return_unit
+    let* snapshot =
+      ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
-    toplog "Reset node config for private a yes-crypto network" ;
-    let config = isolated_config ~peers ~network ~delay:0 in
-    let* () = Node.config_reset node config in
+    let* version = get_snapshot_info_version node snapshot in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      if version >= 9 then
+        let config =
+          Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:false
+            ~auto_connections:true
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
+        let* () = Node.config_init node config in
+        let* () =
+          import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+        in
+        Lwt.return_unit
+      else
+        let toplog s = toplog "/!\\ %s /!\\" s in
+        toplog "Bootstrapping node using the real world" ;
+        let config =
+          [
+            Network Network.(to_octez_network_options network);
+            Expected_pow 26;
+            Cors_origin "*";
+          ]
+        in
+        let* () = Node.config_init node config in
+        let* () = import_snapshot ~no_check:true ~name node snapshot in
+        let* () =
+          (* When bootstrapping from the real network, we want to use the real time. *)
+          let env = String_map.(add "FAKETIME" "+0" empty) in
+          run ~env node []
+        in
+        let* () = wait_for_ready node in
+        let* _new_level = wait_next_level ~offset:2 node in
+        let* () = terminate node in
+        toplog "Reset node config for private a yes-crypto network" ;
+        let config =
+          Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:true
+            ~auto_connections:true
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
+        let* () = Node.config_reset node config in
+        let () =
+          let peers_file = sf "%s/peers.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner peers_file then (
+            toplog (sf "Removing %s" peers_file) ;
+            Runner.Sys.remove ?runner peers_file)
+          else toplog (sf "%s Not found" peers_file)
+        in
+        let () =
+          let identity_file = sf "%s/identity.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner identity_file then (
+            toplog (sf "Removing %s" identity_file) ;
+            Runner.Sys.remove ?runner identity_file)
+          else toplog (sf "%s Not found" identity_file)
+        in
+        Lwt.return_unit
     in
-    let arguments = isolated_args peers in
-    let* () = run ~env:yes_crypto_env node arguments in
+    let* () =
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
+    in
+    let arguments =
+      (if version >= 9 then
+         (* The auto synchronistaion threshold is set to false so that the
+             bootstrap node will be directly bootstraped *)
+         [Synchronisation_threshold 0]
+       else [ (* Synchronisation_threshold 0 *) ])
+      @ Node_helpers.isolated_args ~private_mode:false peers
+    in
+    let* () =
+      Node.Agent.run
+        ~env:yes_crypto_env
+        node
+        arguments
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
+    in
     wait_for_ready node
 
   (** Initialize a node, which means:
@@ -204,103 +186,231 @@ module Node = struct
       - import the relevant snapshot
       - run it with yes-crypto enabled and allowed peer lists
   *)
-  let init_node_from_snapshot ~delay ~peers ~snapshot ~network ~migration_offset
-      (agent, node) =
-    let* snapshot = ensure_snapshot agent snapshot in
-    let config = isolated_config ~peers ~network ~delay in
+  let init_node_from_snapshot ~delay ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends ~snapshot ~network ~migration_offset
+      (agent, node, name) =
+    let* snapshot =
+      ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
+    in
+    let config =
+      Node_helpers.isolated_config
+        ~auto_synchronisation_threshold:true
+        ~auto_connections:true
+        ~no_bootstrap_peers:true
+        ~peers
+        ~network
+        ~delay
+    in
     let* () = Node.config_init node config in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
     in
-    let* () = Node.snapshot_import ~no_check:true node snapshot in
-    let arguments = isolated_args peers in
-    let* () = run ~env:yes_crypto_env node arguments in
+    let* () =
+      import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+    in
+    let arguments = Node_helpers.isolated_args ~private_mode:false peers in
+    let synchronisation_waiter =
+      Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
+    in
+    let* () =
+      Node.Agent.run
+        ~env:yes_crypto_env
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
+        node
+        arguments
+    in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
        disconnected from real network (i.e. in a frozen state) you are likely to
-       be [stuck] (i.e. synchronised with peert but missing newer blocks) until
+       be [stuck] (i.e. synchronised with peer but missing newer blocks) until
        your bakers start to bake. *)
-    Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
+    synchronisation_waiter
 
-  let client ~node agent =
+  let client ~local ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
-    Client.Agent.create ~name ~endpoint:(Client.Node node) agent
-
-  let yes_wallet agent =
-    let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
-    Yes_wallet.Agent.create ~name agent
+    let endpoint =
+      if local then Client.Foreign_endpoint (Node.as_rpc_endpoint ~local node)
+      else Client.Node node
+    in
+    Client.Agent.create ~name ~endpoint agent
 
   (** Initialize the node,
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ~peers ~snapshot ~network ~migration_offset
-      (agent, node, name) =
+  let init_bootstrap_node ?stresstest ?dal_node_producers
+      ~ppx_profiling_verbosity ~ppx_profiling_backends ~peers ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_bootstrap_node_from_snapshot
         ~peers
-        (agent, node)
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
+        (agent, node, name)
         snapshot
         network
         migration_offset
     in
-    let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* client = client ~local:true ~node agent in
+    (* Build a temporary yes_wallet from the context to retrieve delegate keys.
+       The wallet is cleared afterwards. *)
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
+        ?rich_accounts:
+          (match (stresstest, dal_node_producers) with
+        | None, None -> None
+        | Some _, Some l -> Some (List.length l + 1, 1_000_000)
+        | Some _, None -> Some (1, 1_000_000)
+        | None, Some l -> Some (List.length l, 1_000_000))
+          (* If the stresstest argument is set we try to find an account with at least 1M tez *)
         ~node
         ~client
-        ~network:(Network.to_string network)
+        ~network:(Network.to_octez_network_options network)
         yes_wallet
     in
-    let* delegates =
-      Client.list_known_addresses client |> Lwt.map (List.map snd)
+    let* delegates, consensus_keys, companion_keys, rich_account_opt =
+      let* known_addresses = Client.list_known_addresses client in
+      let get_account alias = Client.show_address ~alias client in
+      let cons key value map =
+        String_map.update
+          key
+          (function
+            | None -> Some [value] | Some values -> Some (value :: values))
+          map
+      in
+      (Lwt_list.fold_left_s
+         (fun
+           ((delegates, consensus_keys, companion_keys, rich_accounts) as acc)
+           (alias, _pkh)
+         ->
+           if alias =~ rex "rich_" then
+             (* if the alias match "rich_n" *)
+             let* rich_account = get_account alias in
+             return
+               ( delegates,
+                 consensus_keys,
+                 companion_keys,
+                 rich_account :: rich_accounts )
+           else
+             match alias =~* rex "(\\w+)_consensus_key_[0-9]+" with
+             | Some consensus_key_alias ->
+                 (* if the alias match "baker_n_consensus_key" *)
+                 let* consensus_account = get_account alias in
+                 return
+                   ( delegates,
+                     cons consensus_key_alias consensus_account consensus_keys,
+                     companion_keys,
+                     rich_accounts )
+             | None -> (
+                 match alias =~* rex "(\\w+)_companion_key_[0-9]+" with
+                 | Some companion_key_alias ->
+                     (* if the alias match "baker_n_companion_key" *)
+                     let* consensus_account = get_account alias in
+                     return
+                       ( delegates,
+                         consensus_keys,
+                         cons
+                           companion_key_alias
+                           consensus_account
+                           companion_keys,
+                         rich_accounts )
+                 | None ->
+                     if alias =~ rex "^baker_[0-9]+$" then
+                       (* otherwise, if the alias match "baker_n" *)
+                       let* delegate_account = get_account alias in
+                       return
+                         ( String_map.add alias delegate_account delegates,
+                           consensus_keys,
+                           companion_keys,
+                           rich_accounts )
+                     else (
+                       toplog "Discarded unexpected yes_wallet alias: %s" alias ;
+                       return acc))))
+        (String_map.empty, String_map.empty, String_map.empty, [])
+        (List.rev known_addresses)
+    in
+    let baker_accounts =
+      String_map.mapi
+        (fun alias delegate ->
+          let consensus =
+            String_map.find_opt alias consensus_keys
+            |> Option.value ~default:[] |> List.cons delegate
+          in
+          let companion =
+            String_map.find_opt alias companion_keys |> Option.value ~default:[]
+          in
+          {delegate; consensus; companion})
+        delegates
     in
     let* () = Client.forget_all_keys client in
-    Lwt.return (client, delegates)
+    Lwt.return (client, baker_accounts, rich_account_opt)
 
   (** Initialize the node,
       create the associated client,
       create the yes-wallet.
     *)
-  let init_baker_node ?(delay = 0) ~accounts ~peers ~snapshot ~network
+  let init_node_with_wallet ?(delay = 0) ~accounts ~peers
+      ~ppx_profiling_verbosity ~ppx_profiling_backends ~snapshot ~network
       ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         ~snapshot
         ~network
         ~migration_offset
-        (agent, node)
+        (agent, node, name)
     in
-    let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    toplog "L1 node %s initialized" name ;
+    let* client =
+      (* [~local] is set to false since the client might be called from the localhost/orchestrator *)
+      client ~local:false ~node agent
+    in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
+      let client_import_pks =
+        Lwt_list.iter_s (fun (account : Account.key) ->
+            Client.import_public_key
+              ~alias:account.public_key_hash
+              ~public_key:account.public_key
+              client)
+      in
       Lwt_list.iter_s
-        (fun {pkh = alias; pk = public_key} ->
-          Client.import_public_key ~alias ~public_key client)
+        (fun account ->
+          let* () = client_import_pks account.consensus in
+          client_import_pks account.companion)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
     Lwt.return client
 
   (** Prerequisite: the chain is running (i.e. bakers are baking blocks) *)
-  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network
-      ~migration_offset ~tps (agent, node, name) =
+  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends ~snapshot ~network ~migration_offset ~tps
+      (agent, node, name) =
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         ~snapshot
         ~network
         ~migration_offset
-        (agent, node)
+        (agent, node, name)
     in
-    let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* client = client ~local:true ~node agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
     let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -313,163 +423,115 @@ module Node = struct
     Lwt.return (client, accounts)
 end
 
-(** Stresstest parameters
-    - [pkh]: public key hash of the account to use as a faucet
-    - [pk]: public key of the account to use as a faucet
-    - [tps]: targeted number of transactions per second
-    - [seed]: seed used for stresstest traffic generation
- *)
-type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
-
-(** Scenario configuration
-
-    - [snapshot]: local path or URL of the snapshot to use for the experiment.
-      local path implies to [scp] the snapshot to all the vms.
-
-    - [stake]: stake repartition between baking node, numbers are relatives.
-
-      e.g.: [2,1,1] runs 3 bakers, aggregate delegates from the network,
-      spreading them in 3 pools representing roughly 50%, 25% and 25% of the
-      total stake of the network. The same stake repartition using the same
-      snapshot will result in the same delegate repartition.
-
-      There is a special case using a single number instead of a list, which
-      must match the number of delegates. This scenario will launch one node
-      per delegate (i.e. more than 300 nodes if testing on mainnet).
-
-    - [maintenance_delay]: number of level which will be multiplied by the
-      position in the list of the bakers to define the store merge delay.
-      We want it to be the same for two runs with same parameters (not
-      random) and we want it not to occur at the same time on every baker.
-      Default value is 1.
-      Use 0 for disabling delay and have all the bakers to merge their
-      store at the beginning of cycles.
-
-    - [migration_offset]: offset that dictates after how many levels a protocol
-      upgrade will be performed via a UAU.
-
-    - [stresstest]: See the description of [stresstest_conf]
-  *)
-type configuration = {
-  stake : int list;
-  network : Network.t;
-  snapshot : string;
-  stresstest : stresstest_conf option;
-  maintenance_delay : int;
-  migration_offset : int option;
-}
-
-(** A version of the [configuration] partially defined. *)
-type partial_configuration = {
-  stake : int list option;
-  network : Network.t option;
-  snapshot : string option;
-  stresstest : stresstest_conf option;
-  maintenance_delay : int option;
-  migration_offset : int option;
-}
-
-let network_encoding =
-  Data_encoding.string_enum [("Mainnet", `Mainnet); ("Ghostnet", `Ghostnet)]
-
-let stresstest_encoding =
-  let open Data_encoding in
-  conv
-    (fun {pkh; pk; tps; seed} -> (pkh, pk, tps, seed))
-    (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-    (obj4
-       (req "pkh" string)
-       (req "pk" string)
-       (req "tps" int31)
-       (req "seed" int31))
-
-let configuration_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           stake;
-           network;
-           snapshot;
-           stresstest;
-           maintenance_delay;
-           migration_offset;
-         } ->
-      (stake, network, snapshot, stresstest, maintenance_delay, migration_offset))
-    (fun ( stake,
-           network,
-           snapshot,
-           stresstest,
-           maintenance_delay,
-           migration_offset ) ->
-      {
-        stake;
-        network;
-        snapshot;
-        stresstest;
-        maintenance_delay;
-        migration_offset;
-      })
-    (obj6
-       (opt "stake" @@ list int31)
-       (opt "network" network_encoding)
-       (opt "snapshot" string)
-       (opt "stresstest" stresstest_encoding)
-       (opt "maintenance_delay" int31)
-       (opt "migration_offset" int31))
-
 type bootstrap = {
   agent : Agent.t;
   node : Node.t;
   node_p2p_endpoint : string;
+  dal_node : Dal_node.t option;
+  dal_node_p2p_endpoint : string option;
   client : Client.t;
 }
 
 type baker = {
   agent : Agent.t;
   node : Node.t;
+  dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
-  accounts : string list;
+  accounts : baker_account list;
 }
 
 type stresstester = {
   agent : Agent.t;
   node : Node.t;
   client : Client.t;
-  accounts : string list;
+  accounts : Account.key list;
 }
 
 type 'network t = {
-  configuration : configuration;
+  configuration : Scenarios_configuration.LAYER1.t;
   cloud : Cloud.t;
   bootstrap : bootstrap;
   bakers : baker list;
+  producers : Dal_node_helpers.producer list;
   stresstesters : stresstester list;
 }
 
-let init_baker_i i (configuration : configuration) cloud ~peers
-    (accounts : baker_account list) (agent, node, name) =
+let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
+    ~peers dal_node_p2p_endpoint (accounts : baker_account list)
+    (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
     toplog "init_baker: Initialize node" ;
     let name = name ^ "-node" in
-    Node.init_baker_node
+    Node.init_node_with_wallet
       ~accounts
       ~delay
       ~peers
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
       (agent, node, name)
   in
+  let* dal_node =
+    if configuration.without_dal then Lwt.return_none
+    else (
+      toplog "init_baker: Initialize dal node" ;
+      let name = name ^ "-dal-node" in
+      let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
+      let attester_profiles =
+        List.map (fun {delegate; _} -> delegate.public_key_hash) accounts
+      in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:26.
+          ~attester_profiles
+          ~peers:[dal_node_p2p_endpoint |> Option.get]
+          dal_node
+      in
+      let* () =
+        Dal_node.Agent.run
+          ~event_level:`Notice
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          dal_node
+      in
+      Lwt.return_some dal_node)
+  in
   let* baker =
     toplog "init_baker: Initialize agnostic baker" ;
     let name = name ^ "-agnostic-baker" in
+    let open Signing_delay in
+    let env = yes_crypto_env in
+    let env =
+      match configuration.fixed_random_seed with
+      | None ->
+          Random.self_init () ;
+          env
+      | Some seed ->
+          Random.init (seed + i) ;
+          (* each baker will have a different seed *)
+          fixed_seed_env env
+    in
+    let env =
+      match configuration.signing_delay with
+      | None -> env
+      | Some (min, max) -> signing_delay_env min max env
+    in
+    let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     let* agnostic_baker =
       Agnostic_baker.Agent.init
-        ~env:yes_crypto_env
+        ~env
         ~name
-        ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
+        ~delegates:(List.concat_map baking_keys accounts)
+        ?dal_node_rpc_endpoint
+        ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+        ~ppx_profiling_backends:configuration.ppx_profiling_backends
         ~client
+        ~allow_fixed_random_seed:
+          (Option.is_some configuration.fixed_random_seed)
+        ~allow_signing_delay:(Option.is_some configuration.signing_delay)
         node
         cloud
         agent
@@ -478,13 +540,54 @@ let init_baker_i i (configuration : configuration) cloud ~peers
     toplog "init_baker: %s is ready!" name ;
     Lwt.return agnostic_baker
   in
+  Lwt.return {agent; node; dal_node; baker; accounts}
+
+let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
+    slot_index (account : Account.key) cloud ~peers dal_node_p2p_endpoint
+    (agent, node, name) =
+  let delay = i * configuration.maintenance_delay in
+  let () = toplog "Initializing the DAL producer %s" name in
+  let* client =
+    let name = name ^ "-node" in
+    Node.init_node_with_wallet
+      ~accounts:[]
+      ~delay
+      ~peers
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
+      ~snapshot:configuration.snapshot
+      ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
+      (agent, node, name)
+  in
+  let* () =
+    Client.import_public_key
+      ~alias:account.public_key_hash
+      ~public_key:account.public_key
+      client
+  in
+  let* dal_node =
+    let name = name ^ "-dal-node" in
+    let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
+    let* () =
+      Dal_node.init_config
+        ~expected_pow:26.
+        ~observer_profiles:[slot_index]
+        ~peers:[dal_node_p2p_endpoint |> Option.get]
+        dal_node
+    in
+    let* () =
+      Dal_node.Agent.run
+        ~event_level:`Notice
+        ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+        ~ppx_profiling_backends:configuration.ppx_profiling_backends
+        dal_node
+    in
+    Lwt.return dal_node
+  in
   Lwt.return
-    {
-      agent;
-      node;
-      baker;
-      accounts = List.map (fun ({pkh; _} : baker_account) -> pkh) accounts;
-    }
+    ({client; node; dal_node; account; is_ready = Lwt.return_unit; slot_index}
+      : Dal_node_helpers.producer)
 
 let fund_stresstest_accounts ~source client =
   Client.stresstest_fund_accounts_from_source
@@ -495,8 +598,8 @@ let fund_stresstest_accounts ~source client =
     ~initial_amount:(Tez.of_mutez_int64 1_000_000_000L)
     client
 
-let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
-    (agent, node, name) tps : stresstester Lwt.t =
+let init_stresstest_i i (configuration : Scenarios_configuration.LAYER1.t) ~pkh
+    ~pk ~peers (agent, node, name) tps : stresstester Lwt.t =
   let delay = i * configuration.maintenance_delay in
   let* client, accounts =
     toplog "init_stresstest: Initialize node" ;
@@ -505,25 +608,58 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
       ~pkh
       ~delay
       ~peers
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
       (agent, node, name)
       ~tps
   in
-  let accounts = List.map (fun a -> a.Account.public_key_hash) accounts in
   Lwt.return {agent; node; client; accounts}
 
-let init_network ~peers (configuration : configuration) cloud teztale
-    ((agent, node, _) as resources) =
+let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
+    teztale ((agent, node, _) as resources) =
   toplog "init_network: Initializing the bootstrap node" ;
-  let* client, delegates =
+  let* client, delegates, rich_account =
     Node.init_bootstrap_node
+      ?stresstest:configuration.stresstest
+      ?dal_node_producers:configuration.dal_node_producers
       ~peers
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
       resources
+  in
+  let* dal_node =
+    if configuration.without_dal then Lwt.return_none
+    else (
+      toplog "init_network: Initialize the bootstrap dal-node" ;
+      let disable_shard_validation = true in
+      let* dal_node =
+        Dal_node.Agent.create
+          ~name:"bootstrap-dal-node"
+          cloud
+          agent
+          ~node
+          ~disable_shard_validation
+      in
+      let* () =
+        Dal_node.init_config ~expected_pow:26. ~bootstrap_profile:true dal_node
+      in
+      let* () = Node.wait_for_ready node in
+      let* () =
+        Dal_node.Agent.run
+          ~wait_ready:false
+          ~event_level:`Notice
+          ~disable_shard_validation
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          dal_node
+      in
+      Lwt.return_some dal_node)
   in
   toplog "init_network: Add a Teztale archiver" ;
   let* () =
@@ -535,18 +671,25 @@ let init_network ~peers (configuration : configuration) cloud teztale
       ~node_port:(Node.rpc_port node)
   in
   let bootstrap =
-    {agent; node; node_p2p_endpoint = Node.point_str node; client}
+    {
+      agent;
+      node;
+      node_p2p_endpoint = Node.point_str node;
+      dal_node;
+      dal_node_p2p_endpoint = Option.map Dal_node.point_str dal_node;
+      client;
+    }
   in
-  Lwt.return (bootstrap, delegates)
+  Lwt.return (bootstrap, delegates, rich_account)
 
 (** Reserves resources for later usage. *)
-let agent_and_node next_agent cloud ~name =
-  let* agent = next_agent ~name in
+let create_node agent cloud =
+  let name = Agent.name agent in
   let* node = Node.Agent.create ~metadata_size_limit:false ~name cloud agent in
   Lwt.return (agent, node, name)
 
 (** Distribute the delegate accounts according to stake specification *)
-let distribute_delegates stake baker_accounts =
+let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   let sum list = List.fold_left ( + ) 0 list |> float_of_int in
   let baker_accounts =
     (* Order delegates from the most powerful to the least powerful *)
@@ -630,81 +773,63 @@ let distribute_delegates stake baker_accounts =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network cloud agent =
-  let* node =
-    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
-  in
-  let* snapshot = Node.ensure_snapshot agent snapshot in
-  let* () =
-    Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
-  in
-  let* () = Node.snapshot_import ~no_check:true node snapshot in
-  let* () = Node.Agent.run node (Node.isolated_args []) in
-  let* () = Node.wait_for_ready node in
-  let* client =
-    Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
-  in
-  let* n =
-    Client.(
-      rpc GET ["chains"; "main"; "blocks"; "head"; "context"; "delegates"])
-      client
-    |> Lwt.map (fun json -> JSON.(json |> as_list |> List.length))
-  in
-  let* () = Node.Agent.terminate node in
-  Lwt.return n
-
-let init ~(configuration : configuration) cloud next_agent =
+let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
+  let open Scenarios_configuration.LAYER1 in
   let () = toplog "Init" in
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
-  let* ((bootstrap_agent, bootstrap_node, _) as bootstrap) =
-    agent_and_node next_agent cloud ~name:"bootstrap"
-  in
-  let* stresstest_agents =
-    match configuration.stresstest with
-    | None -> Lwt.return_nil
-    | Some {tps; _} ->
-        List.init (nb_stresstester configuration.network tps) (fun i -> i)
-        |> Lwt_list.map_s @@ fun i ->
-           agent_and_node next_agent cloud ~name:(sf "stresstest-%d" i)
-  in
-  let* baker_agents =
-    let* n =
-      if configuration.stake = [] then
-        number_of_bakers
-          ~snapshot:configuration.snapshot
-          ~network:configuration.network
-          cloud
-          bootstrap_agent
-      else Lwt.return (List.length configuration.stake)
+  let* ((bootstrap_agent, bootstrap_node, bootstrap_name) as bootstrap) =
+    let agent =
+      List.find (fun a -> Agent.name a = name_of Bootstrap) (Cloud.agents cloud)
     in
-    let () = toplog "Preparing agents for bakers (%d)" n in
-    List.init n (fun i -> i)
-    |> Lwt_list.map_s @@ fun i ->
-       agent_and_node next_agent cloud ~name:(sf "baker-%d" i)
+    create_node agent cloud
   in
+  let create_nodes fmt =
+    Lwt_list.filter_map_p
+      (fun agent ->
+        if match_agent_name fmt agent then
+          create_node agent cloud |> Lwt.map Option.some
+        else Lwt.return_none)
+      (Cloud.agents cloud)
+  in
+  let* stresstest_agents = create_nodes Agent_kind.rex_stresstest_index in
+  let* baker_agents = create_nodes Agent_kind.rex_baker_index in
+  let* producers_agents = create_nodes Agent_kind.rex_producer_index in
   let* teztale = init_teztale cloud bootstrap_agent in
   let* () = init_explorus cloud bootstrap_node in
   let peers : string list =
     List.map
       (fun (_, node, _) -> Node.point_str node)
-      (stresstest_agents @ baker_agents)
+      (stresstest_agents @ baker_agents @ producers_agents)
   in
-  let* bootstrap, baker_accounts =
+  let* bootstrap, baker_accounts, rich_accounts =
     init_network ~peers configuration cloud teztale bootstrap
   in
-  let peers = Node.point_str bootstrap_node :: peers in
+  let stresstest_rich_account_opt, producer_accounts =
+    match configuration.stresstest with
+    | None -> (None, rich_accounts)
+    | Some _ -> (
+        match rich_accounts with a :: l -> (Some a, l) | _ -> assert false)
+  in
+  let peers =
+    [Node.point_str bootstrap_node]
+    (* :: peers *)
+  in
   let* bakers =
     toplog "Initializing bakers" ;
     let* distribution =
+      let baker_accounts =
+        String_map.fold (fun _alias a acc -> a :: acc) baker_accounts []
+      in
       match configuration.stake with
-      | [] -> List.map (fun a -> [a]) baker_accounts |> Lwt.return
-      | stake ->
+      | Auto -> Lwt.return (List.map (fun x -> [x]) baker_accounts)
+      | Manual [] -> Lwt.return_nil
+      | Manual stake ->
           let* accounts =
             toplog
               "init_network: Fetching baker accounts baking power from client" ;
             Lwt_list.map_s
-              (fun pkh ->
+              (fun (baker_account : baker_account) ->
                 let* power =
                   Client.(
                     rpc
@@ -716,57 +841,59 @@ let init ~(configuration : configuration) cloud next_agent =
                         "head";
                         "context";
                         "delegates";
-                        pkh;
+                        baker_account.delegate.public_key_hash;
                         "current_baking_power";
                       ]
                       bootstrap.client)
                 in
-                Lwt.return (pkh, power |> JSON.as_string |> int_of_string))
+                Lwt.return (baker_account, power |> JSON.as_int))
               baker_accounts
           in
-          distribute_delegates stake accounts |> Lwt.return
-    in
-    let* distribution =
-      toplog "init_network: Update consensus keys in use" ;
-      Lwt_list.map_s
-        (fun accounts ->
-          Lwt_list.fold_left_s
-            (fun acc pkh ->
-              (* FIXME: "pendings" keys if it exists *)
-              let* consensus_key =
-                Client.rpc
-                  RPC_core.GET
-                  [
-                    "chains";
-                    "main";
-                    "blocks";
-                    "head";
-                    "context";
-                    "delegates";
-                    pkh;
-                    "consensus_key";
-                  ]
-                  bootstrap.client
-              in
-              let active = JSON.(consensus_key |-> "active") in
-              let pkh' = JSON.(active |-> "pkh" |> as_string) in
-              let pk = JSON.(active |-> "pk" |> as_string) in
-              Lwt.return ({pk; pkh = pkh'} :: acc))
-            []
-            accounts)
-        distribution
+          distribute_delegates stake accounts |> return
     in
     Lwt_list.mapi_p
       (fun i accounts ->
         let ((_, node, _) as agent) = List.nth baker_agents i in
         let peers = List.filter (( <> ) (Node.point_str node)) peers in
-        init_baker_i i ~peers configuration cloud accounts agent)
+        init_baker_i
+          i
+          ~peers
+          configuration
+          cloud
+          bootstrap.dal_node_p2p_endpoint
+          accounts
+          agent)
       distribution
   in
+  let () =
+    toplog "Init: initializing %d DAL producers" (List.length producer_accounts)
+  in
+  let* producers =
+    Lwt_list.mapi_p
+      (fun i (((agent, _, _) as producer_info), account) ->
+        let slot_index =
+          extract_agent_index Agent_kind.rex_producer_index agent
+        in
+        init_producer_i
+          i
+          configuration
+          slot_index
+          account
+          cloud
+          ~peers
+          bootstrap.dal_node_p2p_endpoint
+          producer_info)
+      (List.combine producers_agents producer_accounts)
+  in
   let* stresstesters =
-    match configuration.stresstest with
-    | None -> Lwt.return_nil
-    | Some {pkh; pk; tps; seed} ->
+    match (configuration.stresstest, stresstest_rich_account_opt) with
+    | None, _ -> Lwt.return_nil
+    | Some _, None ->
+        Test.fail
+          "Stresstest argument was provided but no rich account was found in \
+           the yes wallet"
+    | ( Some {tps; seed},
+        Some ({public_key = pk; public_key_hash = pkh; _} : Account.key) ) ->
         let tps = tps / nb_stresstester configuration.network tps in
         let* stresstesters =
           (* init stresstest: init node and create accounts *)
@@ -788,7 +915,7 @@ let init ~(configuration : configuration) cloud next_agent =
           Lwt_list.iter_p
             (fun {client; accounts; node; _} ->
               Lwt_list.iter_s
-                (fun pkh ->
+                (fun ({public_key_hash = pkh; _} : Account.key) ->
                   (* For some reason, [try ... with ...] will make the scenario fail when a exception is raised  *)
                   let* need_reveal_operation =
                     RPC.get_chain_block_context_contract_manager_key ~id:pkh ()
@@ -811,7 +938,11 @@ let init ~(configuration : configuration) cloud next_agent =
                    copy it the the agent,
                    and pass the filename to stresstest invocation directly *)
                 let sources =
-                  `A (List.map (fun pkh -> `O [("pkh", `String pkh)]) accounts)
+                  `A
+                    (List.map
+                       (fun ({public_key_hash = pkh; _} : Account.key) ->
+                         `O [("pkh", `String pkh)])
+                       accounts)
                 in
                 (* As we run in parrallel, and as Temp.file does not return a unique file name,
                    we need a different base filename name for each stresstester *)
@@ -834,52 +965,26 @@ let init ~(configuration : configuration) cloud next_agent =
         in
         Lwt.return stresstesters
   in
-  let* () = add_prometheus_source bootstrap_node cloud bootstrap_agent in
+  let* () =
+    add_prometheus_source
+      ~node:bootstrap_node
+      cloud
+      bootstrap_agent
+      bootstrap_name
+  in
   let* () =
     Lwt_list.iter_s
-      (fun ({agent; node; _} : baker) -> add_prometheus_source node cloud agent)
+      (fun ({agent; node; _} : baker) ->
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       bakers
   in
   let* () =
     Lwt_list.iter_s
       (fun ({agent; node; _} : stresstester) ->
-        add_prometheus_source node cloud agent)
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       stresstesters
   in
-  Lwt.return {cloud; configuration; bootstrap; bakers; stresstesters}
-
-let on_new_level =
-  let push_level t level =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"level"
-      (float_of_int level)
-  in
-  let push_nb_ops t nb =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"nb_ops"
-      (float_of_int nb)
-  in
-  fun t level ->
-    let* _ = Node.wait_for_level t.bootstrap.node level in
-    let level = level - 2 in
-    toplog "Processing metrics for level %d" level ;
-    let* json =
-      Client.(rpc GET)
-        ["chains"; "main"; "blocks"; string_of_int level]
-        t.bootstrap.client
-    in
-    let level = JSON.(json |-> "header" |-> "level" |> as_int) in
-    let nops = JSON.(json |-> "operations" |> as_list |> List.length) in
-    push_level t level ;
-    push_nb_ops t nops ;
-    toplog "Done processing metrics for level %d" level ;
-    Lwt.return_unit
+  Lwt.return {cloud; configuration; bootstrap; bakers; producers; stresstesters}
 
 type docker_image = Agent.Configuration.docker_image =
   | Gcp of {alias : string}
@@ -891,7 +996,7 @@ let docker_image_encoding =
   let octez_release_tag = 1 and octez_release_encoding = string in
   matching
     (* optimised encoding function *)
-      (function
+    (function
       | Gcp {alias} -> matched gcp_tag gcp_encoding alias
       | Octez_release {tag} ->
           matched octez_release_tag octez_release_encoding tag)
@@ -936,17 +1041,21 @@ let vm_conf_encoding =
 type vms_conf = {
   bootstrap : vm_conf option;
   bakers : vm_conf list option;
+  producers : vm_conf list option;
   stresstester : vm_conf option;
 }
 
 let vms_conf_encoding =
   let open Data_encoding in
   conv
-    (fun {bootstrap; bakers; stresstester} -> (bootstrap, bakers, stresstester))
-    (fun (bootstrap, bakers, stresstester) -> {bootstrap; bakers; stresstester})
-    (obj3
+    (fun {bootstrap; bakers; producers; stresstester} ->
+      (bootstrap, bakers, producers, stresstester))
+    (fun (bootstrap, bakers, producers, stresstester) ->
+      {bootstrap; bakers; producers; stresstester})
+    (obj4
        (opt "bootstrap" vm_conf_encoding)
        (opt "bakers" @@ list vm_conf_encoding)
+       (opt "producers" @@ list vm_conf_encoding)
        (opt "stresstester" vm_conf_encoding))
 
 (** Copy/paste from teztale_server_main.ml *)
@@ -986,74 +1095,120 @@ let parse_conf encoding file =
 
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
-let register (module Cli : Scenarios_cli.Layer1) =
-  let configuration0 : partial_configuration =
-    let stake = Cli.stake in
-    let network = Cli.network in
-    let stresstest =
-      Option.map
-        (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-        Cli.stresstest
-    in
-    let maintenance_delay = Cli.maintenance_delay in
-    let snapshot = Cli.snapshot in
-    let migration_offset = Cli.migration_offset in
-    match Cli.config with
-    | Some filename ->
-        let conf = parse_conf configuration_encoding filename in
-        {
-          stake = (if stake <> None then stake else conf.stake);
-          network = (if network <> None then network else conf.network);
-          snapshot = (if snapshot <> None then snapshot else conf.snapshot);
-          stresstest =
-            (if stresstest <> None then stresstest else conf.stresstest);
-          maintenance_delay =
-            (if maintenance_delay <> None then maintenance_delay
-             else conf.maintenance_delay);
-          migration_offset =
-            (if migration_offset <> None then migration_offset
-             else conf.migration_offset);
-        }
+let local_snapshot =
+  let cache = Hashtbl.create 0 in
+  fun ~snapshot ~network ->
+    match Hashtbl.find_opt cache (snapshot, network) with
+    | Some path -> Lwt.return path
     | None ->
-        {
-          stake;
-          network;
-          stresstest;
-          maintenance_delay;
-          snapshot;
-          migration_offset;
-        }
+        let* path =
+          let open Snapshot_helpers in
+          match snapshot with
+          | Local_file path -> Lwt.return path
+          | Docker_embedded path ->
+              toplog "Using locally stored snapshot file: %s" path ;
+              Lwt.return path
+          | Url url ->
+              let path = Temp.file "snapshot_file" in
+              download_snapshot ~path ~url ~name:"host" ()
+          | No_snapshot ->
+              toplog
+                "No snapshot provided. Downloading one for network %s"
+                (Network.to_string network) ;
+              download_snapshot
+                ~url:(Network.snapshot_service @@ Network.to_public network)
+                ~name:"host"
+                ()
+        in
+        Hashtbl.add cache (snapshot, network) path ;
+        Lwt.return path
+
+let snapshot_timestamp ~snapshot ~(network : Network.t) =
+  let node = Node.create [] in
+  let* snapshot = local_snapshot ~snapshot ~network in
+  Snapshot_helpers.get_snapshot_info_timestamp node snapshot
+
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* snapshot = local_snapshot ~snapshot ~network in
+  let node =
+    let name = "tmp-node" in
+    let data_dir = Temp.dir name in
+    Node.create ~data_dir ~name []
   in
+  let* () =
+    Node.config_init
+      node
+      (Node_helpers.isolated_config
+         ~auto_synchronisation_threshold:true
+         ~auto_connections:true
+         ~no_bootstrap_peers:true
+         ~peers:[]
+         ~network
+         ~delay:0)
+  in
+  let* () =
+    Node.snapshot_import ~env:yes_crypto_env ~no_check:true node snapshot
+  in
+  let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
+  let* () = Node.wait_for_ready node in
+  let* n =
+    RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
+    |> RPC_core.call_json (Node.as_rpc_endpoint node)
+    |> Lwt.map (fun {RPC_core.body; _} -> JSON.(body |> as_list |> List.length))
+  in
+  let* () = Node.terminate node in
+  Lwt.return n
+
+let register (module Cli : Scenarios_cli.Layer1) =
+  let configuration : Scenarios_configuration.LAYER1.t =
+    {
+      stake = Cli.stake;
+      network = Cli.network;
+      snapshot = Cli.snapshot;
+      stresstest = Cli.stresstest;
+      without_dal = Cli.without_dal;
+      dal_node_producers = Cli.dal_producers_slot_indices;
+      maintenance_delay = Cli.maintenance_delay;
+      migration_offset = Cli.migration_offset;
+      ppx_profiling_verbosity = Cli.ppx_profiling_verbosity;
+      ppx_profiling_backends = Cli.ppx_profiling_backends;
+      signing_delay = Cli.signing_delay;
+      fixed_random_seed = Tezt.Cli.Options.seed;
+      octez_release = Cli.octez_release;
+      auto_faketime = Cli.auto_faketime;
+    }
+  in
+  let with_dal_producers =
+    match configuration.dal_node_producers with
+    | None | Some [] -> false
+    | _ -> true
+  in
+  if configuration.without_dal && with_dal_producers then
+    Test.fail
+      "Dal producer indices provided but DAL network disabled with \
+       `--without-dal`" ;
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
-  let vms =
-    `Bootstrap
-    ::
-    (match configuration0.stake with
-    | Some [n] -> List.init n (fun i -> `Baker i)
-    | Some stake -> List.mapi (fun i _ -> `Baker i) stake
-    | None -> [])
-    @
-    match configuration0.stresstest with
-    | None -> []
-    | Some {tps; _} ->
-        let n =
-          match configuration0.network with
-          | Some network -> nb_stresstester network tps
-          | None -> tps / stresstest_max_tps_pre_node
-        in
-        List.init n (fun i -> `Stresstest i)
-  in
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
-      Cli.octez_release
+      configuration.octez_release
   in
-  let default_vm_configuration ~name =
-    Agent.Configuration.make ?docker_image:default_docker_image ~name ()
+  let default_vm_configuration ?machine_type ~name () =
+    Agent.Configuration.make
+      ?machine_type
+      ?docker_image:default_docker_image
+      ~name
+      ()
   in
   let make_vm_conf ~name = function
-    | None -> default_vm_configuration ~name
+    | None ->
+        default_vm_configuration
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else None)
+          ~name
+          ()
     | Some {machine_type; docker_image; max_run_duration; binaries_path; os} ->
         let docker_image =
           match docker_image with
@@ -1062,7 +1217,9 @@ let register (module Cli : Scenarios_cli.Layer1) =
         in
         let os = Option.map Types.Os.of_string_exn os in
         Agent.Configuration.make
-          ?machine_type
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else machine_type)
           ?docker_image
           ~max_run_duration
           ?binaries_path
@@ -1070,66 +1227,146 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ~name
           ()
   in
-  let vms =
-    vms
-    |> List.map (fun kind ->
+  let vms () =
+    let* vms =
+      let init n = List.init n (fun i -> Baker i) in
+      let* bakers =
+        match configuration.stake with
+        | Stake_repartition.Layer1.Auto ->
+            Lwt.map
+              init
+              (number_of_bakers
+                 ~snapshot:configuration.snapshot
+                 ~network:configuration.network)
+        | Manual stake -> Lwt.return (init (List.length stake))
+      in
+      Lwt.return
+      @@ Bootstrap
+         :: (bakers
+            @ (match configuration.dal_node_producers with
+              | Some dal_node_producers ->
+                  List.map (fun i -> Producer i) dal_node_producers
+              | None -> [])
+            @
+            match configuration.stresstest with
+            | None -> []
+            | Some {tps; _} ->
+                let n = nb_stresstester configuration.network tps in
+                List.init n (fun i -> Stresstest i))
+    in
+    Lwt.return
+    @@ List.map
+         (fun kind ->
            match kind with
-           | `Bootstrap ->
-               make_vm_conf ~name:"bootstrap"
+           | Bootstrap ->
+               make_vm_conf ~name:(name_of Bootstrap)
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
-           | `Stresstest j ->
-               make_vm_conf ~name:(Format.sprintf "stresstest-%d" j)
+           | Stresstest j ->
+               make_vm_conf ~name:(name_of (Stresstest j))
                @@ Option.bind vms_conf (fun {stresstester; _} -> stresstester)
-           | `Baker i ->
-               make_vm_conf ~name:(Format.sprintf "baker-%d" i)
+           | Baker i ->
+               make_vm_conf ~name:(name_of (Baker i))
                @@ Option.bind vms_conf (function
-                      | {bakers = Some bakers; _} -> List.nth_opt bakers i
-                      | {bakers = None; _} -> None))
+                    | {bakers = Some bakers; _} -> List.nth_opt bakers i
+                    | {bakers = None; _} -> None)
+           | Producer i ->
+               make_vm_conf ~name:(name_of (Producer i))
+               @@ Option.bind vms_conf (function
+                    | {producers = Some producers; _} ->
+                        List.nth_opt producers i
+                    | {producers = None; _} -> None)
+           | _ -> assert false)
+         vms
   in
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries
      are modified locally. This way we always use the latest ones. *)
-    ~vms:(return vms)
+    ~vms
     ~proxy_files:
       ([yes_wallet_exe]
       @
-      match configuration0.snapshot with Some snapshot -> [snapshot] | _ -> [])
+      match configuration.snapshot with
+      | Local_file snapshot -> [snapshot]
+      | _ -> [])
     ~__FILE__
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
-  let configuration : configuration =
-    let stake = Option.get configuration0.stake in
-    let network = Option.get configuration0.network in
-    let snapshot = Option.get configuration0.snapshot in
-    let stresstest = configuration0.stresstest in
-    let maintenance_delay =
-      Option.value
-        ~default:Cli.default_maintenance_delay
-        configuration0.maintenance_delay
-    in
-    let migration_offset = configuration0.migration_offset in
-    if stake = [] then Test.fail "stake parameter can not be empty" ;
-    if snapshot = "" then Test.fail "snapshot parameter can not be empty" ;
-    {stake; network; snapshot; stresstest; maintenance_delay; migration_offset}
-  in
+  toplog "Prepare artifacts directory and export the full configuration" ;
+  Artifact_helpers.prepare_artifacts
+    ~scenario_config:
+      ( "LAYER1",
+        Data_encoding.Json.construct
+          Scenarios_configuration.LAYER1.encoding
+          configuration )
+    () ;
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;
-  (* We give to the [init] function a sequence of agents. We set their name
-     only if the number of agents is the computed one. Otherwise, the user
-     has mentioned explicitly a reduced number of agents and it is not
-     clear how to give them proper names. *)
-  let next_agent ~name =
-    List.find (fun agent -> Agent.name agent = name) agents |> Lwt.return
+  let* () =
+    if configuration.auto_faketime && Tezt_cloud_cli.faketime = None then
+      let* snapshot_timestamp =
+        snapshot_timestamp
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+      in
+      let timestamp, _, _ =
+        Result.get_ok (Ptime.of_rfc3339 snapshot_timestamp)
+      in
+      let now = Ptime_clock.now () in
+      let offset =
+        Ptime.(to_float_s timestamp -. to_float_s now) |> truncate |> sf "%+d"
+      in
+      Lwt_list.iter_s
+        (fun agent -> Tezt_cloud.Cloud.set_faketime agent offset)
+        agents
+    else Lwt.return_unit
   in
-  let* t = init ~configuration cloud next_agent in
+  let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
+  let produce_slot (t : 'network t) level =
+    Lwt_list.iter_p
+      (fun (producer : Dal_node_helpers.producer) ->
+        let index = producer.slot_index in
+        toplog "Producing DAL commitment for slot %d" index ;
+        let content =
+          Format.asprintf "%d:%d" level index
+          |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
+        in
+        let* _ = Node.wait_for_level producer.node level in
+        let fee = 800 in
+        let* _commitment =
+          (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+             - tz1: fees of 513µtz and 1333 gas consumed
+             - tz2: fees of 514µtz and 1318 gas consumed
+             - tz3: fees of 543µtz and 1607 gas consumed
+             - tz4: fees of 700µtz and 2837 gas consumed
+             We added a (quite small) margin to it. *)
+          Dal_common.Helpers.publish_and_store_slot
+            ~fee
+            ~gas_limit:3000
+            ~dont_wait:true
+            producer.client
+            producer.dal_node
+            producer.account
+            ~force:true
+            ~index
+            content
+        in
+        Lwt.return_unit)
+      t.producers
+  in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop level =
+    (let rec loop with_producers level =
        let level = succ level in
-       let* () = on_new_level t level in
-       loop level
+       toplog "Loop at level %d" level ;
+       let* () =
+         if with_producers then
+           let* _ = Node.wait_for_level t.bootstrap.node level in
+           Lwt.return_unit
+         else produce_slot t level
+       in
+       loop with_producers level
      in
-     loop)
+     loop (List.compare_length_with t.producers 0 = 0))

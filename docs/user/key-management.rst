@@ -10,7 +10,7 @@ Indeed, by default:
 
 - Private keys are stored in ``$OCTEZ_CLIENT_DIR/secret_keys``. Keys generated with ``octez-client`` are stored encrypted by default for Tezos ``mainnet``, whereas they are unencrypted by default for test networks.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
-- The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
+- The baker daemon uses these keys to automatically sign its blocks and operations (e.g. (pre-)attestations).
 - The baker's own key is used to sign consensus operations and :doc:`DAL <../shell/dal>` attestations.
 
 The solutions provided to strengthen the security of the default key management and signing are the following:
@@ -285,13 +285,17 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
-However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus
-key may sign a ``Drain_delegate`` operation to transfer the delegate's
-spendable balance to an arbitrary account. In :doc:`relevant
-RPCs<../api/openapi>` like
-``/chains/main/blocks/head/helpers/baking_rights``, both the
-delegate's manager and consensus keys are listed.
-As a consequence, the consensus key should be treated with equal care as the manager key.
+.. warning::
+
+   Note that the consensus key has also access to the delegate's spendable funds: indeed, the consensus
+   key may sign a ``Drain_delegate`` operation to transfer the delegate's
+   spendable balance to an arbitrary account. In :doc:`relevant
+   RPCs<../api/openapi>` like
+   ``/chains/main/blocks/head/helpers/baking_rights``, both the
+   delegate's manager and consensus keys are listed.
+   As a consequence, the consensus key should be treated with equal care as the manager key.
+
+Further possible options to counter the risk of fund draining by a compromised consensus key include: staking (nearly) all funds available on the baking key, leaving just a minimum to pay operation fees, and, rotating consensus key regularly, specially before unstaking tez. Note that the activation delay for new consensus key is one cycle shorter than the unstake finalization delay.
 
 Registering a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -324,17 +328,19 @@ possession. This is the signature of the consensus public key using the consensu
 ensures ownership of the key. This process is done automatically by the client, and the proof is included in
 the receipt of the update operation.
 
+.. _baking_consensus_key:
+
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In your baker's command, replace the delegate's manager key alias with the consensus key alias::
 
-   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
 While :ref:`transitioning from the delegate's manager key <consensus_key>`, it is possible to pass the alias for both delegate's manager key and consensus key.
 The delegate will seamlessly keep baking when the transition happens::
 
-   octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 
 Draining a Manager's Account With its Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,6 +397,10 @@ Alternatively, it is possible to register a companion key when registering as a 
 It is even possible to register both a consensus key and a companion key, with the following command::
 
    octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
+
+Please do (re)start the baker and provide the the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
+
+   octez-baker run with local node ~/.tezos-node <consensus_key> <companion_key> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 
 .. _activate_fundraiser_account:
 

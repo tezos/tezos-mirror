@@ -5,6 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 module Key_id = struct
   type t = Signature.Public_key_hash.t
 
@@ -22,8 +25,6 @@ module Key_id = struct
 end
 
 module Key = struct
-  (** A consensus key (aka, a validator) is identified by its alias name, its
-    public key, its public key hash, and its secret key. *)
   type t = {
     alias : string;
     id : Key_id.t;
@@ -122,6 +123,14 @@ module Delegate = struct
 
   let delegate_id t = Maybe_known_key.key_id t.manager_key
 
+  let consensus_key_is_manager_key t =
+    match t.manager_key with
+    | Known_key key -> Key_id.equal key.id t.consensus_key.id
+    | Id_only _ ->
+        (* The consensus key is always known. If the manager key is
+           unknown then they're not the same key. *)
+        false
+
   let encoding_for_logging__cannot_decode =
     let open Data_encoding in
     conv
@@ -134,36 +143,42 @@ module Delegate = struct
          (req "consensus_key" Key.encoding_for_logging__cannot_decode)
          (opt "companion_key" Key.encoding_for_logging__cannot_decode))
 
-  let pp_without_companion_key fmt
-      {manager_key; consensus_key; companion_key = _} =
-    Format.fprintf
-      fmt
-      "%a@ with@ consensus key@ %a"
-      Maybe_known_key.pp
-      manager_key
-      Key.pp
-      consensus_key
+  let pp_aux ~should_print_companion_key fmt
+      ({manager_key; consensus_key; companion_key} as t) =
+    Format.fprintf fmt "%a" Maybe_known_key.pp manager_key ;
+    let should_print_consensus_key = not (consensus_key_is_manager_key t) in
+    if should_print_consensus_key then
+      Format.fprintf fmt "@ with@ consensus key@ %a" Key.pp consensus_key ;
+    if should_print_companion_key then
+      match companion_key with
+      | None -> ()
+      | Some companion_key ->
+          Format.fprintf
+            fmt
+            "@ %s@ companion key@ %a"
+            (if should_print_consensus_key then "and" else "with")
+            Key.pp
+            companion_key
 
-  let pp fmt ({manager_key = _; consensus_key = _; companion_key} as t) =
-    pp_without_companion_key fmt t ;
-    match companion_key with
-    | None -> ()
-    | Some companion_key ->
-        Format.fprintf fmt "@ and@ companion key@ %a" Key.pp companion_key
+  let pp = pp_aux ~should_print_companion_key:true
 
-  let companion_key_is_not_in_wallet =
+  let pp_without_companion_key = pp_aux ~should_print_companion_key:false
+
+  let companion_key_not_provided_to_the_baker =
     let open Internal_event.Simple in
     declare_2
       ~section:[Protocol.name; "baker"; "delegates"]
-      ~name:"companion_key_is_not_in_wallet"
+      ~name:"companion_key_not_provided_to_the_baker"
       ~level:Error
       ~msg:
-        "Companion key {companion_key} for {delegate} is absent from the \
-         client wallet. The baker will only be able to issue attestations \
-         without DAL for this delegate, and the delegate will lose DAL \
-         rewards."
+        "Companion key {companion_key} for delegate {delegate} has not been \
+         provided to the baker. The baker will only be able to issue \
+         attestations without DAL content for this delegate, and the delegate \
+         will lose DAL rewards."
+      ("companion_key", Signature.Bls.Public_key_hash.encoding)
+      ~pp1:Signature.Bls.Public_key_hash.pp
       ("delegate", encoding_for_logging__cannot_decode)
-      ("companion_key", Environment.Bls.Public_key_hash.encoding)
+      ~pp2:pp
 
   let of_validator ~known_keys
       {
@@ -192,12 +207,50 @@ module Delegate = struct
                 then
                   Events.(
                     emit
-                      companion_key_is_not_in_wallet
-                      ( {manager_key; consensus_key; companion_key},
-                        companion_bls_pkh ))
+                      companion_key_not_provided_to_the_baker
+                      ( companion_bls_pkh,
+                        {manager_key; consensus_key; companion_key} ))
                 else return_unit
               in
               return companion_key
         in
         return_some {manager_key; consensus_key; companion_key}
 end
+
+type prequorum = {
+  level : int32;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+  preattestations : packed_operation list;
+}
+
+type block_info = {
+  hash : Block_hash.t;
+  shell : Block_header.shell_header;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round.t;
+  round : Round.t;
+  prequorum : prequorum option;
+  quorum : packed_operation list;
+  payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
+}
+
+type proposal = {block : block_info; predecessor : block_info}
+
+type delegate_info = {
+  delegate : Delegate.t;
+  attestation_slot : Slot.t;
+  attesting_power : int64;
+}
+
+type dal_attestable_slots =
+  (Delegate_id.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
+type delegate_slot = {
+  delegate : Delegate.t;
+  first_slot : Slot.t;
+  attesting_power : int;
+}

@@ -144,7 +144,7 @@ module P2p_connect_handler = struct
       ~section
       ~name:"disconnected"
       ~msg:"disconnected: {peer} ({point})"
-      ~level:Debug
+      ~level:Info
       ("peer", P2p_peer.Id.encoding)
       ~pp2:P2p_connection.Id.pp
       ("point", P2p_connection.Id.encoding)

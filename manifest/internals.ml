@@ -19,7 +19,7 @@ open Externals
 let tezt ~product ~opam ~path ?modes ?(deps = []) ?dep_globs ?dep_globs_rec
     ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
-    ?preprocessor_deps ?source l =
+    ?preprocessor_deps ?include_in_main_tezt_exe ?source l =
   Manifest.tezt
     ~product
     ~with_macos_security_framework
@@ -39,6 +39,7 @@ let tezt ~product ~opam ~path ?modes ?(deps = []) ?dep_globs ?dep_globs_rec
     ?dune
     ?preprocess
     ?preprocessor_deps
+    ?include_in_main_tezt_exe
     ?source
     l
 

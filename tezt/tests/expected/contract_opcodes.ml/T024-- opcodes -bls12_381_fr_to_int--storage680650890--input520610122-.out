@@ -1,0 +1,22 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/bls12_381_fr_to_int.tz on storage 0 and input 0xb9e8abf8dc324a010007addde986fe0f7c81fab16d26819d0534b7691c0b0719 --level 1 --trace-stack
+storage
+  11320265829256585830781521966149529460476767408210445238902869222031333517497
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 4.278)
+    [ (Pair 0xb9e8abf8dc324a010007addde986fe0f7c81fab16d26819d0534b7691c0b0719 0) ]
+  - location: 7 (just consumed gas: 0.010)
+    [ 0xb9e8abf8dc324a010007addde986fe0f7c81fab16d26819d0534b7691c0b0719 ]
+  - location: 8 (just consumed gas: 0.115)
+    [ 11320265829256585830781521966149529460476767408210445238902869222031333517497 ]
+  - location: 9 (just consumed gas: 0.010)
+    [ {}
+      11320265829256585830781521966149529460476767408210445238902869222031333517497 ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Pair {}
+            11320265829256585830781521966149529460476767408210445238902869222031333517497) ]
+

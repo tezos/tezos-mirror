@@ -278,10 +278,10 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   in
   let* blk_b = Block.bake ~policy:(By_account slashed_account) genesis in
   let* preattestation1 =
-    Op.raw_preattestation ~delegate:slashed_account blk_a
+    Op.raw_preattestation ~manager_pkh:slashed_account blk_a
   in
   let* preattestation2 =
-    Op.raw_preattestation ~delegate:slashed_account blk_b
+    Op.raw_preattestation ~manager_pkh:slashed_account blk_b
   in
   let preattestation1, preattestation2 =
     order_ops preattestation1 preattestation2
@@ -307,8 +307,8 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   in
   let* blk_a = Block.bake ~policy:(By_account slashed_account) ~operation b in
   let* blk_b = Block.bake ~policy:(By_account slashed_account) b in
-  let* attestation1 = Op.raw_attestation ~delegate:slashed_account blk_a in
-  let* attestation2 = Op.raw_attestation ~delegate:slashed_account blk_b in
+  let* attestation1 = Op.raw_attestation ~manager_pkh:slashed_account blk_a in
+  let* attestation2 = Op.raw_attestation ~manager_pkh:slashed_account blk_b in
   let attestation1, attestation2 = order_ops attestation1 attestation2 in
   let double_attestation_op =
     Op.double_attestation (B blk_a) attestation1 attestation2
@@ -326,8 +326,8 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Consensus.Forbidden_delegate _ -> true
-        | _ -> false)
+      | Validate_errors.Consensus.Forbidden_delegate _ -> true
+      | _ -> false)
   in
   let* b, metadata, _ =
     Block.bake_until_cycle_end_with_metadata ~policy:(By_account good_account) b
@@ -341,8 +341,8 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   let*! res = Block.bake ~policy:(By_account slashed_account) b in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Consensus.Forbidden_delegate _ -> true
-        | _ -> false)
+      | Validate_errors.Consensus.Forbidden_delegate _ -> true
+      | _ -> false)
   in
   let* b = Block.bake_until_n_cycle_end 2 ~policy:(By_account good_account) b in
   (* Check that [slashed_account] can bake since it's a new cycle and

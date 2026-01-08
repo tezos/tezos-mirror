@@ -282,8 +282,8 @@ end
     which is the crux for having it easily unit-testable. *)
 module Make_s
     (Proto : Protocol_plugin.T)
-    (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Proto.operation) :
+    (Prevalidation_t :
+      Prevalidation.T with type protocol_operation = Proto.operation) :
   S
     with type config = Prevalidation_t.config
      and type protocol_operation = Proto.operation
@@ -416,54 +416,54 @@ module Make_s
       | Medium -> "classify_operation : voting/anonymous"
       | Low _ -> "classify_operation : manager"
     in
-    (let to_replace =
-       List.filter_map
-         (fun (replaced_oph, new_classification) ->
-           reclassify_replaced_manager_op replaced_oph shell new_classification)
-         replacements
-     in
-     let to_handle = (op, classification) :: to_replace in
-     let validated_operation =
-       match classification with
-       | `Validated ->
-           let is_advertisable =
-             match
-               (status_and_priority.status, status_and_priority.priority)
-             with
-             | Fresh, _ ->
-                 true
-                 [@profiler.mark
-                   {verbosity = Debug} ["freshly validated operation"]]
-             | Reclassified, High ->
-                 true
-                 [@profiler.mark
-                   {verbosity = Debug} ["reclassified high priority operation"]]
-             | Reclassified, Medium ->
-                 false
-                 [@profiler.mark
-                   {verbosity = Debug}
-                     ["reclassified medium priority operation"]]
-             | Reclassified, Low _ ->
-                 (* Reclassified operations with medium and low priority are not
+    ((let to_replace =
+        List.filter_map
+          (fun (replaced_oph, new_classification) ->
+            reclassify_replaced_manager_op replaced_oph shell new_classification)
+          replacements
+      in
+      let to_handle = (op, classification) :: to_replace in
+      let validated_operation =
+        match classification with
+        | `Validated ->
+            let is_advertisable =
+              match
+                (status_and_priority.status, status_and_priority.priority)
+              with
+              | Fresh, _ ->
+                  true
+                  [@profiler.mark
+                    {verbosity = Debug} ["freshly validated operation"]]
+              | Reclassified, High ->
+                  true
+                  [@profiler.mark
+                    {verbosity = Debug} ["reclassified high priority operation"]]
+              | Reclassified, Medium ->
+                  false
+                  [@profiler.mark
+                    {verbosity = Debug}
+                      ["reclassified medium priority operation"]]
+              | Reclassified, Low _ ->
+                  (* Reclassified operations with medium and low priority are not
                     reclassified *)
-                 false
-                 [@profiler.mark
-                   {verbosity = Debug} ["reclassified low priority operation"]]
-           in
-           Some (op.hash, is_advertisable)
-       | `Branch_refused _ ->
-           None
-           [@profiler.mark {verbosity = Debug} ["branch_refused operation"]]
-       | `Branch_delayed _ ->
-           None
-           [@profiler.mark {verbosity = Debug} ["branch_delayed operation"]]
-       | `Refused _ ->
-           None [@profiler.mark {verbosity = Debug} ["refused operation"]]
-       | `Outdated _ ->
-           None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
-     in
-     (validated_operation, to_handle))
-    [@profiler.aggregate_f {verbosity = Info} section]
+                  false
+                  [@profiler.mark
+                    {verbosity = Debug} ["reclassified low priority operation"]]
+            in
+            Some (op.hash, is_advertisable)
+        | `Branch_refused _ ->
+            None
+            [@profiler.mark {verbosity = Debug} ["branch_refused operation"]]
+        | `Branch_delayed _ ->
+            None
+            [@profiler.mark {verbosity = Debug} ["branch_delayed operation"]]
+        | `Refused _ ->
+            None [@profiler.mark {verbosity = Debug} ["refused operation"]]
+        | `Outdated _ ->
+            None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
+      in
+      (validated_operation, to_handle))
+    [@profiler.aggregate_f {verbosity = Info} section])
 
   (** Determine the classification of a given operation in the current
       validation state, i.e. whether it could be included in a block on top of
@@ -566,7 +566,8 @@ module Make_s
              ( acc_validation_state,
                advertisable_mempool,
                validated_mempool,
-               limit ) ->
+               limit )
+           ->
           if limit <= 0 then
             (* Using Error as an early-return mechanism *)
             Lwt.return_error
@@ -918,6 +919,14 @@ module Make_s
       let open Lwt_syntax in
       pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
       if already_handled ~origin:Events.Arrived pv.shell oph then return_ok_unit
+      else if
+        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
+      then (
+        pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
+        let* () =
+          Events.(emit unknown_operation_branch) (op.Operation.shell.branch, oph)
+        in
+        return_ok_unit)
       else
         match Parser.parse oph op with
         | Error _ ->
@@ -942,24 +951,15 @@ module Make_s
             match v with
             | Drop -> return_ok_unit
             | Priority ((High | Medium | Low _) as priority) ->
-                if
-                  not
-                    (Block_hash.Set.mem
-                       op.Operation.shell.branch
-                       pv.shell.live_blocks)
-                then (
-                  pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
-                  return_ok_unit)
-                else (
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                      Should this have an influence on the peer's score ? *)
-                  (* The operation has never been handled by the prevalidator,
-                     we add it with a Fresh status in the pending
-                     data-strutcure to be handled with higher priority *)
-                  pv.shell.pending <-
-                    Pending_ops.(
-                      add parsed_op {status = Fresh; priority} pv.shell.pending) ;
-                  return_ok_unit))
+                (* The operation has never been handled by the prevalidator,
+                   we add it with a Fresh status in the pending
+                   data-strutcure to be handled with higher priority *)
+                pv.shell.pending <-
+                  Pending_ops.(
+                    add parsed_op {status = Fresh; priority} pv.shell.pending) ;
+                return_ok_unit)
 
     let on_inject (pv : types_state) ~force op =
       let open Lwt_result_syntax in
@@ -975,125 +975,126 @@ module Make_s
            Is this an error? *)
         return_unit
       else
-        match Parser.parse oph op with
-        | Error err ->
-            ()
-            [@profiler.overwrite
-              {driver_ids = [Opentelemetry]}
-                (Opentelemetry_profiler.add_event "parse_operation failed")] ;
-            failwith
-              "Invalid operation %a: %a"
-              Operation_hash.pp
-              oph
-              Error_monad.pp_print_trace
-              err
-        | Ok parsed_op -> (
-            ()
-            [@profiler.overwrite
-              {driver_ids = [Opentelemetry]}
-                (Opentelemetry_profiler.add_event "parse_operation succeeded")] ;
-            if force then (
+        let parse_op oph op =
+          match Parser.parse oph op with
+          | Error err ->
+              ()
+              [@profiler.overwrite
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_profiler.add_event "parse_operation failed")] ;
+              failwith
+                "Invalid operation %a: %a"
+                Operation_hash.pp
+                oph
+                Error_monad.pp_print_trace
+                err
+          | Ok parsed_op ->
+              ()
+              [@profiler.overwrite
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_profiler.add_event "parse_operation succeeded")] ;
+              return parsed_op
+        in
+        if force then (
+          let* parsed_op = parse_op oph op in
+          let*! () =
+            pv.shell.parameters.tools.chain_tools.inject_operation oph op
+          in
+          pv.shell.pending <-
+            Pending_ops.add parsed_op status_and_priority pv.shell.pending ;
+          let*! () = Events.(emit operation_injected) oph in
+          return_unit)
+        else if
+          not
+            (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
+        then
+          failwith
+            "Operation %a is branched on either:\n\
+            \ - a block %a which is too old (%d blocks in the past)\n\
+            \ - a predecessor block from an alternative branch which is now \
+             unknown"
+            Operation_hash.pp
+            oph
+            Block_hash.pp
+            op.Operation.shell.branch
+            (Block_hash.Set.cardinal pv.shell.live_blocks)
+        else
+          let* parsed_op = parse_op oph op in
+          let notifier = mk_notifier pv.operation_stream in
+          let*! validation_state, validated_operation, to_handle =
+            legacy_classify_operation
+              pv.shell
+              ~config:pv.config
+              ~validation_state:pv.validation_state
+              status_and_priority
+              parsed_op
+          in
+          let op_status =
+            (* to_handle contains the given operation and its classification, and
+               all operations whose classes are changed/impacted by this
+               classification (eg. in case of operation replacement). Here, we
+               retrieve the classification of our operation. *)
+            List.find_opt
+              (function
+                | ({hash; _} : protocol_operation operation), _ ->
+                    Operation_hash.equal hash oph)
+              to_handle
+          in
+          match op_status with
+          | Some (_h, `Validated) ->
+              ()
+              [@profiler.overwrite
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_profiler.add_event "operation validated")] ;
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
+                 We may want to only do the injection/replacement if a
+                 flag `replace` is set to true in the injection query. *)
               let*! () =
                 pv.shell.parameters.tools.chain_tools.inject_operation oph op
               in
-              pv.shell.pending <-
-                Pending_ops.add parsed_op status_and_priority pv.shell.pending ;
+              (* Call handle & update_advertised_mempool only if op is accepted *)
+              List.iter (handle_classification ~notifier pv.shell) to_handle ;
+              let*! () = Events.(emit operation_classified) oph in
+              pv.validation_state <- validation_state ;
+              (* Note that in this case, we may advertise an operation and bypass
+                 the prioritirization strategy. *)
+              let*! () =
+                match validated_operation with
+                | None -> Lwt.return_unit
+                | Some (oph, is_advertisable) ->
+                    update_advertised_mempool_fields
+                      pv.shell
+                      (if is_advertisable then
+                         Mempool.cons_valid oph Mempool.empty
+                       else Mempool.empty)
+                      (Mempool.cons_valid oph Mempool.empty)
+              in
               let*! () = Events.(emit operation_injected) oph in
-              return_unit)
-            else if
-              not
-                (Block_hash.Set.mem
-                   op.Operation.shell.branch
-                   pv.shell.live_blocks)
-            then
+              return_unit
+          | Some
+              ( _h,
+                ( `Branch_delayed e
+                | `Branch_refused e
+                | `Refused e
+                | `Outdated e ) ) ->
+              ()
+              [@profiler.overwrite
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_profiler.add_event "operation rejected")] ;
+              Lwt.return
+              @@ error_with
+                   "Error while validating injected operation %a:@ %a"
+                   Operation_hash.pp
+                   oph
+                   pp_print_trace
+                   e
+          | None ->
+              (* This case should not happen *)
               failwith
-                "Operation %a is branched on either:\n\
-                \ - a block %a which is too old (%d blocks in the past)\n\
-                \ - a predecessor block from an alternative branch which is \
-                 now unknown"
+                "Unexpected error while injecting operation %a. Operation not \
+                 found after classifying it."
                 Operation_hash.pp
                 oph
-                Block_hash.pp
-                op.Operation.shell.branch
-                (Block_hash.Set.cardinal pv.shell.live_blocks)
-            else
-              let notifier = mk_notifier pv.operation_stream in
-              let*! validation_state, validated_operation, to_handle =
-                legacy_classify_operation
-                  pv.shell
-                  ~config:pv.config
-                  ~validation_state:pv.validation_state
-                  status_and_priority
-                  parsed_op
-              in
-              let op_status =
-                (* to_handle contains the given operation and its classification, and
-                   all operations whose classes are changed/impacted by this
-                   classification (eg. in case of operation replacement). Here, we
-                   retrieve the classification of our operation. *)
-                List.find_opt
-                  (function
-                    | ({hash; _} : protocol_operation operation), _ ->
-                        Operation_hash.equal hash oph)
-                  to_handle
-              in
-              match op_status with
-              | Some (_h, `Validated) ->
-                  ()
-                  [@profiler.overwrite
-                    {driver_ids = [Opentelemetry]}
-                      (Opentelemetry_profiler.add_event "operation validated")] ;
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
-                     We may want to only do the injection/replacement if a
-                     flag `replace` is set to true in the injection query. *)
-                  let*! () =
-                    pv.shell.parameters.tools.chain_tools.inject_operation
-                      oph
-                      op
-                  in
-                  (* Call handle & update_advertised_mempool only if op is accepted *)
-                  List.iter (handle_classification ~notifier pv.shell) to_handle ;
-                  let*! () = Events.(emit operation_classified) oph in
-                  pv.validation_state <- validation_state ;
-                  (* Note that in this case, we may advertise an operation and bypass
-                     the prioritirization strategy. *)
-                  let*! () =
-                    match validated_operation with
-                    | None -> Lwt.return_unit
-                    | Some (oph, is_advertisable) ->
-                        update_advertised_mempool_fields
-                          pv.shell
-                          (if is_advertisable then
-                             Mempool.cons_valid oph Mempool.empty
-                           else Mempool.empty)
-                          (Mempool.cons_valid oph Mempool.empty)
-                  in
-                  let*! () = Events.(emit operation_injected) oph in
-                  return_unit
-              | Some
-                  ( _h,
-                    ( `Branch_delayed e
-                    | `Branch_refused e
-                    | `Refused e
-                    | `Outdated e ) ) ->
-                  ()
-                  [@profiler.overwrite
-                    {driver_ids = [Opentelemetry]}
-                      (Opentelemetry_profiler.add_event "operation rejected")] ;
-                  Lwt.return
-                  @@ error_with
-                       "Error while validating injected operation %a:@ %a"
-                       Operation_hash.pp
-                       oph
-                       pp_print_trace
-                       e
-              | None ->
-                  (* This case should not happen *)
-                  failwith
-                    "Unexpected error while injecting operation %a. Operation \
-                     not found after classifying it."
-                    Operation_hash.pp
-                    oph)
 
     let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
         =
@@ -1142,25 +1143,25 @@ module Make_s
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun oph op (pending, nb_pending) ->
-            (let v =
-               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
-             in
-             match v with
-             | Drop -> Lwt.return (pending, nb_pending)
-             | Priority ((High | Medium | Low _) as priority) ->
-                 (* Here, an operation injected in this node with High priority will
+            ((let v =
+                pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
+              in
+              match v with
+              | Drop -> Lwt.return (pending, nb_pending)
+              | Priority ((High | Medium | Low _) as priority) ->
+                  (* Here, an operation injected in this node with High priority will
                     now get its appropriate priority. *)
-                 let status =
-                   (* If the operation has not yet been classified we set its
+                  let status =
+                    (* If the operation has not yet been classified we set its
                       status to Fresh *)
-                   if Pending_ops.mem oph pv.shell.pending then
-                     Pending_ops.Fresh
-                   else Reclassified
-                 in
-                 Lwt.return
-                   ( Pending_ops.add op {status; priority} pending,
-                     nb_pending + 1 ))
-            [@profiler.aggregate_s {verbosity = Info} "flushed operations"])
+                    if Pending_ops.mem oph pv.shell.pending then
+                      Pending_ops.Fresh
+                    else Reclassified
+                  in
+                  Lwt.return
+                    ( Pending_ops.add op {status; priority} pending,
+                      nb_pending + 1 ))
+            [@profiler.aggregate_s {verbosity = Info} "flushed operations"]))
           new_pending_operations
           (Pending_ops.empty, 0)
       in
@@ -1254,9 +1255,10 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
 module Make
     (Proto : Protocol_plugin.T)
     (Arg : ARG)
-    (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Proto.operation
-                          and type chain_store = Store.chain_store) : T = struct
+    (Prevalidation_t :
+      Prevalidation.T
+        with type protocol_operation = Proto.operation
+         and type chain_store = Store.chain_store) : T = struct
   module S = Make_s (Proto) (Prevalidation_t)
   open S
 
@@ -1654,8 +1656,7 @@ module Make
   module Handlers = struct
     type self = worker
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =
@@ -2099,18 +2100,17 @@ let rpc_directory : t option Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
     (Block_services.mempool_path Tezos_rpc.Path.open_root)
     (function
-      | None ->
-          Lwt.return
-            (Tezos_rpc.Directory.map
-               (fun _ -> Lwt.return_unit)
-               empty_rpc_directory)
-      | Some t ->
-          let module Prevalidator : T = (val t : T) in
-          let w = Lazy.force Prevalidator.worker in
-          let pv = Prevalidator.Worker.state w in
-          let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
-          Lwt.return
-            (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+    | None ->
+        Lwt.return
+          (Tezos_rpc.Directory.map
+             (fun _ -> Lwt.return_unit)
+             empty_rpc_directory)
+    | Some t ->
+        let module Prevalidator : T = (val t : T) in
+        let w = Lazy.force Prevalidator.worker in
+        let pv = Prevalidator.Worker.state w in
+        let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
+        Lwt.return (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
 
 module Internal_for_tests = struct
   module Tools = Tools

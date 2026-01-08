@@ -13,7 +13,7 @@ let patch_da_fees evm_state =
 
 let patch_kernel ~kernel evm_state =
   let open Lwt_result_syntax in
-  let* content, binary = Wasm_debugger.read_kernel kernel in
+  let* content, binary = Pvm.Kernel.read_kernel kernel in
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
@@ -46,9 +46,10 @@ let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
-    ?upto config =
+let main ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile ?upto
+    config =
   let open Lwt_result_syntax in
+  let pool = Lwt_domain.setup_pool 1 in
   let* up_to_level =
     match upto with
     | None -> return number
@@ -58,12 +59,11 @@ let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
             "'upto' must be a level succeeding the initial replayed level"
         else return v
   in
-  let* ro_ctxt = Evm_ro_context.load ~data_dir config in
-  let* legacy_block_storage =
-    Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
-  in
-  if not legacy_block_storage then
-    Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
+  let* ro_ctxt = Evm_ro_context.load ~pool config in
+  Block_storage_setup.enable
+    ~keep_alive:config.keep_alive
+    ~timeout:config.rpc_timeout
+    ro_ctxt.store ;
   let alter_evm_state =
     alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity
   in

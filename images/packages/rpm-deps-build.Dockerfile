@@ -11,6 +11,9 @@ ENV TZ=Etc/UTC
 ENV BLST_PORTABLE=true
 ENV VENV_PATH=$HOME/venv
 
+ARG OPAM_VERSION
+ENV OPAM_VERSION=${OPAM_VERSION}
+
 #hadolint ignore=DL3041
 RUN dnf -y update &&\
     dnf install -y rpmdevtools &&\
@@ -21,7 +24,6 @@ COPY ./scripts/version.sh ./scripts/version.sh
 COPY scripts/ci/bin_packages_rpm_dependencies.sh \
   ./scripts/ci/bin_packages_rpm_dependencies.sh
 COPY images/scripts/install_sccache_static.sh \
-     images/scripts/install_datadog_static.sh \
      images/scripts/install_opam_static.sh \
      scripts/kiss-fetch.sh \
      scripts/kiss-logs.sh \
@@ -32,7 +34,6 @@ RUN scripts/ci/bin_packages_rpm_dependencies.sh
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 RUN /tmp/install_sccache_static.sh && \
-    /tmp/install_datadog_static.sh && \
     /tmp/install_opam_static.sh
 
 #hadolint ignore=SC2154
@@ -52,6 +53,7 @@ COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link scripts/version.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
+COPY --link opam/virtual/release-tools-deps.opam.locked /root/tezos/opam/virtual/
 COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos

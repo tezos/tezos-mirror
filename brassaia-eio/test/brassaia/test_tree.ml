@@ -109,13 +109,13 @@ let test_paginated_bindings () =
   let tree =
     Tree.of_concrete
       (`Tree
-        [
-          ("aa", c "0");
-          ("a", c "1");
-          ("bbb", c "3");
-          ("b", c "3");
-          ("aaa", c "2");
-        ])
+         [
+           ("aa", c "0");
+           ("a", c "1");
+           ("bbb", c "3");
+           ("b", c "3");
+           ("aaa", c "2");
+         ])
   in
   let check_sorted expected =
     Alcotest.(check (list string))
@@ -330,8 +330,8 @@ let test_update () =
        exception. *)
     let invalid_tree = invalid_tree () in
     Tree.update_tree abc1 [] (function
-        | Some _ -> Some invalid_tree
-        | None -> assert false)
+      | Some _ -> Some invalid_tree
+      | None -> assert false)
     |> ignore
   in
 
@@ -355,8 +355,8 @@ let test_update () =
   let () =
     let abc1' =
       Tree.update_tree abc1 ["a"; "b"] (function
-          | Some t -> Some t
-          | None -> assert false)
+        | Some t -> Some t
+        | None -> assert false)
     in
     Alcotest.assert_
       "Replacing a subtree node with a physically-equal one preserves physical \
@@ -377,8 +377,8 @@ let test_update () =
       "Removing a siblingless node causes newly-empty directories to be pruned"
       ~expected:(`Tree [unrelated_binding])
       (Tree.update_tree abc1 ["a"; "b"] (function
-          | Some _ -> None
-          | None -> assert false))
+        | Some _ -> None
+        | None -> assert false))
   in
 
   let () =
@@ -386,10 +386,10 @@ let test_update () =
       "Updating at a non-existent contents path adds a new directory entry."
       ~expected:
         (`Tree
-          [
-            ("a", `Tree [("b", `Tree [("c", c "1"); ("c'", c "new_value")])]);
-            unrelated_binding;
-          ])
+           [
+             ("a", `Tree [("b", `Tree [("c", c "1"); ("c'", c "new_value")])]);
+             unrelated_binding;
+           ])
       (Tree.update abc1 ["a"; "b"; "c'"] (None --> Some "new_value"))
   in
 
@@ -428,8 +428,8 @@ let test_update () =
   let () =
     let abc1' =
       Tree.update_tree abc1 ["a"; "b"; "d"] (function
-          | None -> Some (Tree.empty ())
-          | Some _ -> assert false)
+        | None -> Some (Tree.empty ())
+        | Some _ -> assert false)
     in
     Alcotest.assert_
       "Adding an empty tree at an empty location preserves physical equality"
@@ -560,11 +560,11 @@ let test_fold_force () =
   let create_sample_tree () =
     Tree.of_concrete
       (`Tree
-        [
-          ("a", `Tree [("aa", c "v-aa"); ("ab", c "v-ab"); ("ac", c "v-ac")]);
-          ("b", c "v-b");
-          ("c", c "v-c");
-        ])
+         [
+           ("a", `Tree [("aa", c "v-aa"); ("ab", c "v-ab"); ("ac", c "v-ac")]);
+           ("b", c "v-b");
+           ("c", c "v-c");
+         ])
   in
   let eager_stats =
     Tree.{nodes = 2; leafs = 5; skips = 0; depth = 2; width = 3}

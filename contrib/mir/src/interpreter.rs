@@ -1,34 +1,35 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Michelson interpreter definitions. Most functions are defined on
 //! [Instruction] and [ContractScript], see there for more.
 
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
-use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
 use std::cmp::min;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
-use tezos_crypto_rs::blake2b::digest as blake2bdigest;
+use tezos_crypto_rs::{
+    blake2b::digest as blake2bdigest,
+    hash::{ContractKt1Hash, HashTrait},
+    CryptoError, PublicKeySignatureVerifier, PublicKeyWithHash,
+};
 use typed_arena::Arena;
 
-use crate::ast::big_map::{BigMap, LazyStorageError};
-use crate::ast::michelson_address::entrypoint::Direction;
+use crate::ast::big_map::{dump_big_map_updates, BigMap, LazyStorageError};
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
-use crate::context::Ctx;
+use crate::context::{CtxTrait, TypecheckingCtx};
 use crate::gas::{interpret_cost, OutOfGas};
+use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
+use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
 
@@ -38,6 +39,9 @@ pub enum InterpretError<'a> {
     /// Interpreter ran out of gas.
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    /// Cryptographic error.
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
     /// When performing mutez arithmetic, an overflow occurred.
     #[error("mutez overflow")]
     MutezOverflow,
@@ -53,6 +57,21 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+    /// Error when decoding serialized data
+    #[error(transparent)]
+    DecodeError(#[from] DecodeError),
+    /// Error when typechecking unserialized data
+    #[error(transparent)]
+    TcError(#[from] TcError),
+}
+
+impl<'a> From<SigCostError> for InterpretError<'a> {
+    fn from(e: SigCostError) -> Self {
+        match e {
+            SigCostError::Crypto(err) => err.into(),
+            SigCostError::OutOfGas(err) => err.into(),
+        }
+    }
 }
 
 /// Errors possible when interpreting a full contract script.
@@ -65,6 +84,9 @@ pub enum ContractInterpretError<'a> {
     /// Failed during the interpretation of the script code.
     #[error("runtime failure while running the script: {0}")]
     InterpretError(InterpretError<'a>),
+    /// Failed during lazy storage manipulation
+    #[error(transparent)]
+    LazyStorageError(#[from] LazyStorageError),
 }
 
 impl<'a> From<InterpretError<'a>> for ContractInterpretError<'a> {
@@ -79,29 +101,57 @@ impl<'a> ContractScript<'a> {
     /// allows ensuring they satisfy the types expected by the script.
     pub fn interpret(
         &self,
-        ctx: &mut Ctx<'a>,
+        ctx: &mut impl CtxTrait<'a>,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
-        annotation: Option<FieldAnnotation<'a>>,
-        storage: Micheline<'a>,
+        entrypoint: &Entrypoint,
+        storage_in: &Micheline<'a>,
     ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
-        let wrapped_parameter = self.wrap_parameter(arena, parameter, annotation, ctx)?;
-        let storage = typecheck_value(&storage, ctx, &self.storage)?;
+        let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
+        let mut storage = self.typecheck_storage(ctx, storage_in)?;
+        let mut started_with_map_ids = vec![];
+        storage.view_big_map_ids(&mut started_with_map_ids);
+
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, arena, &mut stack)?;
+
         use TypedValue as V;
-        match stack.pop().expect("empty execution stack") {
-            V::Pair(p) => match *p {
-                (V::List(vec), storage) => Ok((
-                    vec.into_iter()
-                        .map(|x| (*irrefutable_match!(x; V::Operation))),
-                    storage,
-                )),
-                (v, _) => panic!("expected `list operation`, got {:?}", v),
-            },
-            v => panic!("expected `pair 'a 'b`, got {:?}", v),
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/8061
+        // Handle errors instead of panicking.
+        let result = stack.pop().expect("empty execution stack");
+        match result {
+            V::Pair(p) => {
+                let (mut operation_list, mut storage) = *p;
+                // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
+                let mut storage_big_maps = vec![];
+                storage.view_big_maps_mut(&mut storage_big_maps);
+                let lazy_storage = *ctx.lazy_storage();
+                dump_big_map_updates(
+                    lazy_storage,
+                    &started_with_map_ids,
+                    &mut storage_big_maps,
+                    false,
+                )?;
+                // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
+                // the internal operation to determine what to do with it
+                let mut operations_big_maps = vec![];
+                operation_list.view_big_maps_mut(&mut operations_big_maps);
+                dump_big_map_updates(lazy_storage, &[], &mut operations_big_maps, true)?;
+
+                match operation_list {
+                    V::List(vec) => Ok((
+                        vec.into_iter()
+                            .map(|x| (*irrefutable_match!(x; V::Operation))),
+                        storage,
+                    )),
+                    v => panic!("expected `list operation`, got {v:?}"),
+                }
+            }
+
+            v => panic!("expected `pair 'a 'b`, got {v:?}"),
         }
     }
 
@@ -110,18 +160,14 @@ impl<'a> ContractScript<'a> {
         &self,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
-        annotation: Option<FieldAnnotation<'a>>,
-        ctx: &mut Ctx<'a>,
+        entrypoint: &Entrypoint,
+        ctx: &mut impl CtxTrait<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
-        let parsed_annotation = match annotation {
-            None => FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
-            Some(ann) => ann,
-        };
+        let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
             typecheck_value(&parameter, ctx, annotation_type)?;
-            Entrypoint::try_from(parsed_annotation)?;
             let mut result = parameter;
-            for direction in annotation_path.into_iter().rev() {
+            for direction in annotation_path.iter().rev() {
                 match direction {
                     Direction::Left => {
                         result = Micheline::prim1(arena, Prim::Left, result);
@@ -133,10 +179,26 @@ impl<'a> ContractScript<'a> {
             }
             Ok(typecheck_value(&result, ctx, &self.parameter)?)
         } else {
-            Err(TcError::NoSuchEntrypoint(Entrypoint::try_from(
-                parsed_annotation,
-            )?))
+            Err(TcError::NoSuchEntrypoint(entrypoint.clone()))
         }
+    }
+
+    /// Typechecks the given storage value against the expected storage type of the contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context in which the typechecking is performed.
+    /// * `storage` - The storage value to be typechecked.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing the typechecked `TypedValue` if successful, or a `TcError` if the typechecking fails.
+    pub fn typecheck_storage(
+        &self,
+        ctx: &mut impl TypecheckingCtx<'a>,
+        storage: &Micheline<'a>,
+    ) -> Result<TypedValue<'a>, TcError> {
+        typecheck_value(storage, ctx, &self.storage)
     }
 }
 
@@ -150,7 +212,7 @@ impl<'a> Instruction<'a> {
     /// When the instruction can't be executed on the provided stack.
     pub fn interpret(
         &self,
-        ctx: &mut Ctx<'a>,
+        ctx: &mut impl CtxTrait<'a>,
         arena: &'a Arena<Micheline<'a>>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
@@ -160,14 +222,14 @@ impl<'a> Instruction<'a> {
 
 fn interpret<'a>(
     ast: &[Instruction<'a>],
-    ctx: &mut Ctx<'a>,
+    ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
     for i in ast {
         i.interpret(ctx, arena, stack)?;
     }
-    ctx.gas.consume(interpret_cost::INTERPRET_RET)?;
+    ctx.gas().consume(interpret_cost::INTERPRET_RET)?;
     Ok(())
 }
 
@@ -180,7 +242,7 @@ fn unreachable_state() -> ! {
 
 fn interpret_one<'a>(
     i: &Instruction<'a>,
-    ctx: &mut Ctx<'a>,
+    ctx: &mut impl CtxTrait<'a>,
     arena: &'a Arena<Micheline<'a>>,
     stack: &mut IStack<'a>,
 ) -> Result<(), InterpretError<'a>> {
@@ -214,35 +276,35 @@ fn interpret_one<'a>(
             overloads::Add::IntInt => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + o2;
                 stack.push(V::Nat(sum));
             }
             overloads::Add::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = o1 + BigInt::from(o2);
                 stack.push(V::Int(sum));
             }
             overloads::Add::NatInt => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 let sum = BigInt::from(o1) + o2;
                 stack.push(V::Int(sum));
             }
             overloads::Add::MutezMutez => {
                 let o1 = pop!(V::Mutez);
                 let o2 = pop!(V::Mutez);
-                ctx.gas.consume(interpret_cost::ADD_TEZ)?;
+                ctx.gas().consume(interpret_cost::ADD_TEZ)?;
                 let sum = o1.checked_add(o2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(sum));
             }
@@ -250,33 +312,33 @@ fn interpret_one<'a>(
             overloads::Add::Bls12381Fr => {
                 let o1 = pop!(V::Bls12381Fr);
                 let o2 = pop!(V::Bls12381Fr);
-                ctx.gas.consume(interpret_cost::ADD_BLS_FR)?;
+                ctx.gas().consume(interpret_cost::ADD_BLS_FR)?;
                 stack.push(V::Bls12381Fr(o1 + o2));
             }
             #[cfg(feature = "bls")]
             overloads::Add::Bls12381G1 => {
                 let o1 = pop!(V::Bls12381G1);
                 let o2 = pop!(V::Bls12381G1);
-                ctx.gas.consume(interpret_cost::ADD_BLS_G1)?;
+                ctx.gas().consume(interpret_cost::ADD_BLS_G1)?;
                 stack.push(V::new_bls12381_g1(o1.as_ref() + o2.as_ref()));
             }
             #[cfg(feature = "bls")]
             overloads::Add::Bls12381G2 => {
                 let o1 = pop!(V::Bls12381G2);
                 let o2 = pop!(V::Bls12381G2);
-                ctx.gas.consume(interpret_cost::ADD_BLS_G2)?;
+                ctx.gas().consume(interpret_cost::ADD_BLS_G2)?;
                 stack.push(V::new_bls12381_g2(o1.as_ref() + o2.as_ref()));
             }
             overloads::Add::IntTimestamp => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Timestamp);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 stack.push(V::Timestamp(o1 + o2));
             }
             overloads::Add::TimestampInt => {
                 let o1 = pop!(V::Timestamp);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::add_num(&o1, &o2)?)?;
                 stack.push(V::Timestamp(o1 + o2));
             }
         },
@@ -284,41 +346,41 @@ fn interpret_one<'a>(
             overloads::Sub::IntInt => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 let diff = o1 - o2;
                 stack.push(V::Int(diff));
             }
             overloads::Sub::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 let diff = BigInt::from(o1) - BigInt::from(o2);
                 stack.push(V::Int(diff));
             }
             overloads::Sub::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 let diff = o1 - BigInt::from(o2);
                 stack.push(V::Int(diff));
             }
             overloads::Sub::NatInt => {
                 let o1 = pop!(V::Nat);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 let diff = BigInt::from(o1) - o2;
                 stack.push(V::Int(diff));
             }
             overloads::Sub::TimestampInt => {
                 let o1 = pop!(V::Timestamp);
                 let o2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 stack.push(V::Timestamp(o1 - o2));
             }
             overloads::Sub::TimestampTimestamp => {
                 let o1 = pop!(V::Timestamp);
                 let o2 = pop!(V::Timestamp);
-                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::sub_num(&o1, &o2)?)?;
                 stack.push(V::Int(o1 - o2));
             }
         },
@@ -326,40 +388,40 @@ fn interpret_one<'a>(
             overloads::Mul::NatNat => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
                 let res = x1 * x2;
                 stack.push(V::Nat(res));
             }
             overloads::Mul::NatInt => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
                 let res = BigInt::from(x1) * x2;
                 stack.push(V::Int(res));
             }
             overloads::Mul::IntNat => {
                 let x1 = pop!(V::Int);
                 let x2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
                 let res = x1 * BigInt::from(x2);
                 stack.push(V::Int(res));
             }
             overloads::Mul::IntInt => {
                 let x1 = pop!(V::Int);
                 let x2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::mul_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::mul_int(&x1, &x2)?)?;
                 let res = x1 * x2;
                 stack.push(V::Int(res));
             }
             overloads::Mul::MutezNat => {
-                ctx.gas.consume(interpret_cost::MUL_TEZ_NAT)?;
+                ctx.gas().consume(interpret_cost::MUL_TEZ_NAT)?;
                 let x1 = pop!(V::Mutez);
                 let x2 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
                 let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
                 stack.push(V::Mutez(res));
             }
             overloads::Mul::NatMutez => {
-                ctx.gas.consume(interpret_cost::MUL_NAT_TEZ)?;
+                ctx.gas().consume(interpret_cost::MUL_NAT_TEZ)?;
                 let x1 = i64::try_from(pop!(V::Nat)).map_err(|_| InterpretError::Overflow)?;
                 let x2 = pop!(V::Mutez);
                 let res = x1.checked_mul(x2).ok_or(InterpretError::Overflow)?;
@@ -367,21 +429,21 @@ fn interpret_one<'a>(
             }
             #[cfg(feature = "bls")]
             overloads::Mul::Bls12381G1Bls12381Fr => {
-                ctx.gas.consume(interpret_cost::MUL_BLS_G1)?;
+                ctx.gas().consume(interpret_cost::MUL_BLS_G1)?;
                 let x1 = pop!(V::Bls12381G1);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::new_bls12381_g1(x1.as_ref() * x2));
             }
             #[cfg(feature = "bls")]
             overloads::Mul::Bls12381G2Bls12381Fr => {
-                ctx.gas.consume(interpret_cost::MUL_BLS_G2)?;
+                ctx.gas().consume(interpret_cost::MUL_BLS_G2)?;
                 let x1 = pop!(V::Bls12381G2);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::new_bls12381_g2(x1.as_ref() * x2));
             }
             #[cfg(feature = "bls")]
             overloads::Mul::Bls12381FrBls12381Fr => {
-                ctx.gas.consume(interpret_cost::MUL_BLS_FR)?;
+                ctx.gas().consume(interpret_cost::MUL_BLS_FR)?;
                 let x1 = pop!(V::Bls12381Fr);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
@@ -389,7 +451,8 @@ fn interpret_one<'a>(
             #[cfg(feature = "bls")]
             overloads::Mul::NatBls12381Fr => {
                 let nat = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                ctx.gas()
+                    .consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
                 let x1 = bls::Fr::from_big_int(&nat.into());
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
@@ -397,7 +460,8 @@ fn interpret_one<'a>(
             #[cfg(feature = "bls")]
             overloads::Mul::IntBls12381Fr => {
                 let int = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                ctx.gas()
+                    .consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
                 let x1 = bls::Fr::from_big_int(&int);
                 let x2 = pop!(V::Bls12381Fr);
                 stack.push(V::Bls12381Fr(x1 * x2));
@@ -406,7 +470,8 @@ fn interpret_one<'a>(
             overloads::Mul::Bls12381FrNat => {
                 let x1 = pop!(V::Bls12381Fr);
                 let nat = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
+                ctx.gas()
+                    .consume(interpret_cost::mul_bls_fr_big_int(&nat)?)?;
                 let x2 = bls::Fr::from_big_int(&nat.into());
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
@@ -414,7 +479,8 @@ fn interpret_one<'a>(
             overloads::Mul::Bls12381FrInt => {
                 let x1 = pop!(V::Bls12381Fr);
                 let int = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
+                ctx.gas()
+                    .consume(interpret_cost::mul_bls_fr_big_int(&int)?)?;
                 let x2 = bls::Fr::from_big_int(&int);
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
@@ -423,7 +489,7 @@ fn interpret_one<'a>(
             overloads::EDiv::NatNat => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::ediv_nat(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::ediv_nat(&x1, &x2)?)?;
                 if x2 == BigUint::zero() {
                     stack.push(V::Option(None));
                 } else {
@@ -437,11 +503,11 @@ fn interpret_one<'a>(
             overloads::EDiv::NatInt => {
                 let x1 = pop!(V::Nat);
                 let x2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::ediv_int(&x1, &x2)?)?;
                 if x2 == BigInt::zero() {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1, &x2.magnitude());
+                    let (quotient, remainder) = BigUint::div_rem(&x1, x2.magnitude());
                     if x2.sign() == Sign::Plus {
                         stack.push(V::new_option(Some(V::new_pair(
                             V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
@@ -458,11 +524,11 @@ fn interpret_one<'a>(
             overloads::EDiv::IntNat => {
                 let x1 = pop!(V::Int);
                 let x2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::ediv_int(&x1, &x2)?)?;
                 if x2 == BigUint::zero() {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2);
+                    let (quotient, remainder) = BigUint::div_rem(x1.magnitude(), &x2);
                     if x1.sign() != Sign::Minus {
                         stack.push(V::new_option(Some(V::new_pair(
                             V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
@@ -486,11 +552,11 @@ fn interpret_one<'a>(
             overloads::EDiv::IntInt => {
                 let x1 = pop!(V::Int);
                 let x2 = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                ctx.gas().consume(interpret_cost::ediv_int(&x1, &x2)?)?;
                 if x2.sign() == Sign::NoSign {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2.magnitude());
+                    let (quotient, remainder) = BigUint::div_rem(x1.magnitude(), x2.magnitude());
                     match (x1.sign(), x2.sign()) {
                         (Sign::Minus, Sign::Minus) => {
                             stack.push(V::new_option(Some(if remainder > BigUint::zero() {
@@ -537,7 +603,7 @@ fn interpret_one<'a>(
             overloads::EDiv::MutezNat => {
                 let x1 = pop!(V::Mutez);
                 let x2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::EDIV_TEZ_NAT)?;
+                ctx.gas().consume(interpret_cost::EDIV_TEZ_NAT)?;
                 if x2 == BigUint::zero() {
                     stack.push(V::Option(None));
                 } else {
@@ -559,7 +625,7 @@ fn interpret_one<'a>(
             overloads::EDiv::MutezMutez => {
                 let x1 = pop!(V::Mutez);
                 let x2 = pop!(V::Mutez);
-                ctx.gas.consume(interpret_cost::EDIV_TEZ_TEZ)?;
+                ctx.gas().consume(interpret_cost::EDIV_TEZ_TEZ)?;
                 if x2 == 0 {
                     stack.push(V::Option(None));
                 } else {
@@ -574,29 +640,29 @@ fn interpret_one<'a>(
         I::Neg(overload) => match overload {
             overloads::Neg::Nat => {
                 let v = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                ctx.gas().consume(interpret_cost::neg_int(&v)?)?;
                 stack.push(V::Int(BigInt::from_biguint(Sign::Minus, v)));
             }
             overloads::Neg::Int => {
                 let v = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::neg_int(&v)?)?;
+                ctx.gas().consume(interpret_cost::neg_int(&v)?)?;
                 stack.push(V::Int(-v));
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G1 => {
-                ctx.gas.consume(interpret_cost::NEG_G1)?;
+                ctx.gas().consume(interpret_cost::NEG_G1)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
                 *v = -(v as &bls::G1);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G2 => {
-                ctx.gas.consume(interpret_cost::NEG_G2)?;
+                ctx.gas().consume(interpret_cost::NEG_G2)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381G2).as_mut();
                 *v = -(v as &bls::G2);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381Fr => {
-                ctx.gas.consume(interpret_cost::NEG_FR)?;
+                ctx.gas().consume(interpret_cost::NEG_FR)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
             }
@@ -611,7 +677,7 @@ fn interpret_one<'a>(
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
-                ctx.gas.consume(interpret_cost::lsl_nat(&o1)?)?;
+                ctx.gas().consume(interpret_cost::lsl_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shl(o2_usize)));
             }
             overloads::Lsl::Bytes => {
@@ -623,7 +689,7 @@ fn interpret_one<'a>(
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
 
                 let byte_shifts = o2_usize / 8;
@@ -658,15 +724,15 @@ fn interpret_one<'a>(
                 }
 
                 let o2_usize = o2.to_usize().unwrap();
-                ctx.gas.consume(interpret_cost::lsr_nat(&o1)?)?;
+                ctx.gas().consume(interpret_cost::lsr_nat(&o1)?)?;
                 stack.push(V::Nat(o1.shr(o2_usize)));
             }
             overloads::Lsr::Bytes => {
                 let o1 = pop!(V::Bytes);
                 let o2 = pop!(V::Nat);
 
-                let o2_usize = o2.to_usize().unwrap();
-                ctx.gas
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
+                ctx.gas()
                     .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
 
                 let byte_shifts = min(o2_usize / 8, o1.len());
@@ -690,7 +756,7 @@ fn interpret_one<'a>(
             }
         },
         I::SubMutez => {
-            ctx.gas.consume(interpret_cost::SUB_MUTEZ)?;
+            ctx.gas().consume(interpret_cost::SUB_MUTEZ)?;
             let v1 = pop!(V::Mutez);
             let v2 = pop!(V::Mutez);
             if v1 >= v2 {
@@ -703,19 +769,19 @@ fn interpret_one<'a>(
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
-                ctx.gas.consume(interpret_cost::AND_BOOL)?;
+                ctx.gas().consume(interpret_cost::AND_BOOL)?;
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
-                ctx.gas.consume(interpret_cost::and_num(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
                 *o2 &= o1;
             }
             overloads::And::IntNat => {
                 let o1 = pop!(V::Int);
                 let o2 = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::and_num(&o1, &o2)?)?;
+                ctx.gas().consume(interpret_cost::and_num(&o1, &o2)?)?;
                 let res = BigUint::try_from(o1 & BigInt::from(o2))
                     // safe, `neg` & `pos` = `pos`
                     .unwrap();
@@ -724,7 +790,7 @@ fn interpret_one<'a>(
             overloads::And::Bytes => {
                 let mut o1 = pop!(V::Bytes);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
-                ctx.gas.consume(interpret_cost::and_bytes(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the smallest length among the
                 // operands, so to reuse memory we put the smallest vector to
@@ -741,19 +807,19 @@ fn interpret_one<'a>(
             overloads::Or::Bool => {
                 let o1 = pop!(V::Bool);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
-                ctx.gas.consume(interpret_cost::OR_BOOL)?;
+                ctx.gas().consume(interpret_cost::OR_BOOL)?;
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
                 let o1 = pop!(V::Nat);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
-                ctx.gas.consume(interpret_cost::or_num(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
                 *o2 |= o1;
             }
             overloads::Or::Bytes => {
                 let mut o1 = pop!(V::Bytes);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
-                ctx.gas.consume(interpret_cost::or_bytes(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the largest length among the
                 // operands, so to reuse memory we put the largest vector to
@@ -770,13 +836,13 @@ fn interpret_one<'a>(
             overloads::Xor::Bool => {
                 let o1 = pop!(V::Bool);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
-                ctx.gas.consume(interpret_cost::XOR_BOOL)?;
+                ctx.gas().consume(interpret_cost::XOR_BOOL)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
                 let o1 = pop!(V::Nat);
                 let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
-                ctx.gas.consume(interpret_cost::xor_nat(&o1, o2)?)?;
+                ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Bytes => {
@@ -797,91 +863,92 @@ fn interpret_one<'a>(
         I::Not(overload) => match overload {
             overloads::Not::Bool => {
                 let o = irrefutable_match!(&mut stack[0]; V::Bool);
-                ctx.gas.consume(interpret_cost::NOT_BOOL)?;
+                ctx.gas().consume(interpret_cost::NOT_BOOL)?;
                 *o = !*o;
             }
             overloads::Not::Int => {
                 let o = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::not_num(&o)?)?;
+                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
                 stack.push(V::Int(!o));
             }
             overloads::Not::Nat => {
                 let o = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::not_num(&o)?)?;
+                ctx.gas().consume(interpret_cost::not_num(&o)?)?;
                 stack.push(V::Int(!BigInt::from(o)))
             }
             overloads::Not::Bytes => {
                 let o = irrefutable_match!(&mut stack[0]; V::Bytes);
-                ctx.gas.consume(interpret_cost::not_bytes(o)?)?;
+                ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
                 for b in o.iter_mut() {
                     *b = !*b
                 }
             }
         },
         I::Dip(opt_height, nested) => {
-            ctx.gas.consume(interpret_cost::dip(*opt_height)?)?;
+            ctx.gas().consume(interpret_cost::dip(*opt_height)?)?;
             let protected_height: u16 = opt_height.unwrap_or(1);
             let mut protected = stack.split_off(protected_height as usize);
             interpret(nested, ctx, arena, stack)?;
-            ctx.gas.consume(interpret_cost::undip(protected_height)?)?;
+            ctx.gas()
+                .consume(interpret_cost::undip(protected_height)?)?;
             stack.append(&mut protected);
         }
         I::Drop(opt_height) => {
-            ctx.gas.consume(interpret_cost::drop(*opt_height)?)?;
+            ctx.gas().consume(interpret_cost::drop(*opt_height)?)?;
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
             stack.drop_top(drop_height);
         }
         I::Dup(opt_height) => {
-            ctx.gas.consume(interpret_cost::dup(*opt_height)?)?;
+            ctx.gas().consume(interpret_cost::dup(*opt_height)?)?;
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             stack.push(stack[dup_height - 1].clone());
         }
         I::Dig(dig_height) => {
-            ctx.gas.consume(interpret_cost::dig(*dig_height)?)?;
+            ctx.gas().consume(interpret_cost::dig(*dig_height)?)?;
             if *dig_height > 0 {
                 let e = stack.remove(*dig_height as usize);
                 stack.push(e);
             }
         }
         I::Dug(dug_height) => {
-            ctx.gas.consume(interpret_cost::dug(*dug_height)?)?;
+            ctx.gas().consume(interpret_cost::dug(*dug_height)?)?;
             if *dug_height > 0 {
                 let e = pop!();
                 stack.insert(*dug_height as usize, e);
             }
         }
         I::Gt => {
-            ctx.gas.consume(interpret_cost::GT)?;
+            ctx.gas().consume(interpret_cost::GT)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_positive()));
         }
         I::Ge => {
-            ctx.gas.consume(interpret_cost::GE)?;
+            ctx.gas().consume(interpret_cost::GE)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(!i.is_negative()));
         }
         I::Eq => {
-            ctx.gas.consume(interpret_cost::EQ)?;
+            ctx.gas().consume(interpret_cost::EQ)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_zero()));
         }
         I::Neq => {
-            ctx.gas.consume(interpret_cost::NEQ)?;
+            ctx.gas().consume(interpret_cost::NEQ)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(!i.is_zero()));
         }
         I::Le => {
-            ctx.gas.consume(interpret_cost::LE)?;
+            ctx.gas().consume(interpret_cost::LE)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(!i.is_positive()));
         }
         I::Lt => {
-            ctx.gas.consume(interpret_cost::LT)?;
+            ctx.gas().consume(interpret_cost::LT)?;
             let i = pop!(V::Int);
             stack.push(V::Bool(i.is_negative()));
         }
         I::If(nested_t, nested_f) => {
-            ctx.gas.consume(interpret_cost::IF)?;
+            ctx.gas().consume(interpret_cost::IF)?;
             if pop!(V::Bool) {
                 interpret(nested_t, ctx, arena, stack)?;
             } else {
@@ -889,7 +956,7 @@ fn interpret_one<'a>(
             }
         }
         I::IfNone(when_none, when_some) => {
-            ctx.gas.consume(interpret_cost::IF_NONE)?;
+            ctx.gas().consume(interpret_cost::IF_NONE)?;
             match pop!(V::Option) {
                 Some(x) => {
                     stack.push(*x);
@@ -899,7 +966,7 @@ fn interpret_one<'a>(
             }
         }
         I::IfCons(when_cons, when_nil) => {
-            ctx.gas.consume(interpret_cost::IF_CONS)?;
+            ctx.gas().consume(interpret_cost::IF_CONS)?;
             let lst = irrefutable_match!(&mut stack[0]; V::List);
             match lst.uncons() {
                 Some(x) => {
@@ -913,7 +980,7 @@ fn interpret_one<'a>(
             }
         }
         I::IfLeft(when_left, when_right) => {
-            ctx.gas.consume(interpret_cost::IF_LEFT)?;
+            ctx.gas().consume(interpret_cost::IF_LEFT)?;
             let or = *pop!(V::Or);
             match or {
                 Or::Left(x) => {
@@ -928,41 +995,41 @@ fn interpret_one<'a>(
         }
         I::Abs => {
             let i = pop!(V::Int);
-            ctx.gas.consume(interpret_cost::abs(&i)?)?;
+            ctx.gas().consume(interpret_cost::abs(&i)?)?;
             stack.push(V::Nat(i.into_parts().1));
         }
         I::IsNat => {
             let i = pop!(V::Int);
-            ctx.gas.consume(interpret_cost::ISNAT)?;
+            ctx.gas().consume(interpret_cost::ISNAT)?;
             stack.push(V::new_option(i.try_into().ok().map(V::Nat)));
         }
         I::Int(overload) => match overload {
             overloads::Int::Nat => {
                 let i = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::INT_NAT)?;
+                ctx.gas().consume(interpret_cost::INT_NAT)?;
                 stack.push(V::Int(i.into()));
             }
             #[cfg(feature = "bls")]
             overloads::Int::Bls12381Fr => {
                 let i = pop!(V::Bls12381Fr);
-                ctx.gas.consume(interpret_cost::INT_BLS_FR)?;
+                ctx.gas().consume(interpret_cost::INT_BLS_FR)?;
                 stack.push(V::Int(i.to_big_int()))
             }
             overloads::Int::Bytes => {
                 let i = pop!(V::Bytes);
-                ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+                ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
                 stack.push(V::Int(BigInt::from_signed_bytes_be(&i)))
             }
         },
         I::Nat => {
             let i = pop!(V::Bytes);
-            ctx.gas.consume(interpret_cost::int_bytes(i.len())?)?;
+            ctx.gas().consume(interpret_cost::int_bytes(i.len())?)?;
             stack.push(V::Nat(BigUint::from_bytes_be(&i)))
         }
         I::Bytes(overload) => match overload {
             overloads::Bytes::Nat => {
                 let i = pop!(V::Nat);
-                ctx.gas.consume(interpret_cost::bytes_nat(&i)?)?;
+                ctx.gas().consume(interpret_cost::bytes_nat(&i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
@@ -971,7 +1038,7 @@ fn interpret_one<'a>(
             }
             overloads::Bytes::Int => {
                 let i = pop!(V::Int);
-                ctx.gas.consume(interpret_cost::bytes_int(&i)?)?;
+                ctx.gas().consume(interpret_cost::bytes_int(&i)?)?;
                 stack.push(V::Bytes(if i.is_zero() {
                     Vec::new() // empty
                 } else {
@@ -980,21 +1047,21 @@ fn interpret_one<'a>(
             }
         },
         I::Loop(nested) => {
-            ctx.gas.consume(interpret_cost::LOOP_ENTER)?;
+            ctx.gas().consume(interpret_cost::LOOP_ENTER)?;
             loop {
-                ctx.gas.consume(interpret_cost::LOOP)?;
+                ctx.gas().consume(interpret_cost::LOOP)?;
                 if pop!(V::Bool) {
                     interpret(nested, ctx, arena, stack)?;
                 } else {
-                    ctx.gas.consume(interpret_cost::LOOP_EXIT)?;
+                    ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
                     break;
                 }
             }
         }
         I::LoopLeft(nested) => {
-            ctx.gas.consume(interpret_cost::LOOP_LEFT_ENTER)?;
+            ctx.gas().consume(interpret_cost::LOOP_LEFT_ENTER)?;
             loop {
-                ctx.gas.consume(interpret_cost::LOOP)?;
+                ctx.gas().consume(interpret_cost::LOOP)?;
                 match *pop!(V::Or) {
                     Or::Left(x) => {
                         stack.push(x);
@@ -1002,19 +1069,19 @@ fn interpret_one<'a>(
                     }
                     Or::Right(x) => {
                         stack.push(x);
-                        ctx.gas.consume(interpret_cost::LOOP_EXIT)?;
+                        ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
                         break;
                     }
                 }
             }
         }
         I::Iter(overload, nested) => {
-            ctx.gas.consume(interpret_cost::ITER)?;
+            ctx.gas().consume(interpret_cost::ITER)?;
             match overload {
                 overloads::Iter::List => {
                     let lst = pop!(V::List);
                     for i in lst {
-                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(i);
                         interpret(nested, ctx, arena, stack)?;
                     }
@@ -1022,7 +1089,7 @@ fn interpret_one<'a>(
                 overloads::Iter::Set => {
                     let set = pop!(V::Set);
                     for v in set {
-                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(v);
                         interpret(nested, ctx, arena, stack)?;
                     }
@@ -1030,7 +1097,7 @@ fn interpret_one<'a>(
                 overloads::Iter::Map => {
                     let map = pop!(V::Map);
                     for (k, v) in map {
-                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(V::new_pair(k, v));
                         interpret(nested, ctx, arena, stack)?;
                     }
@@ -1039,12 +1106,12 @@ fn interpret_one<'a>(
         }
         I::Map(overload, nested) => match overload {
             overloads::Map::List => {
-                ctx.gas.consume(interpret_cost::MAP_LIST)?;
+                ctx.gas().consume(interpret_cost::MAP_LIST)?;
                 let list = pop!(V::List);
                 let result = list
                     .into_iter()
                     .map(|elem| {
-                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(elem);
                         interpret(nested, ctx, arena, stack)?;
                         Ok(pop!())
@@ -1053,11 +1120,11 @@ fn interpret_one<'a>(
                 stack.push(V::List(result));
             }
             overloads::Map::Option => {
-                ctx.gas.consume(interpret_cost::MAP_OPTION)?;
+                ctx.gas().consume(interpret_cost::MAP_OPTION)?;
                 let option = pop!(V::Option);
                 let result = match option {
                     Some(elem) => {
-                        ctx.gas.consume(interpret_cost::PUSH)?;
+                        ctx.gas().consume(interpret_cost::PUSH)?;
                         stack.push(*elem);
                         interpret(nested, ctx, arena, stack)?;
                         Some(pop!())
@@ -1067,10 +1134,10 @@ fn interpret_one<'a>(
                 stack.push(V::new_option(result));
             }
             overloads::Map::Map => {
-                ctx.gas.consume(interpret_cost::MAP_MAP)?;
+                ctx.gas().consume(interpret_cost::MAP_MAP)?;
                 let mut map = pop!(V::Map);
                 for (key, val) in map.iter_mut() {
-                    ctx.gas.consume(interpret_cost::PUSH)?;
+                    ctx.gas().consume(interpret_cost::PUSH)?;
                     let val_temp = std::mem::replace(val, V::Unit);
                     stack.push(V::new_pair(key.clone(), val_temp));
                     interpret(nested, ctx, arena, stack)?;
@@ -1080,11 +1147,11 @@ fn interpret_one<'a>(
             }
         },
         I::Push(v) => {
-            ctx.gas.consume(interpret_cost::PUSH)?;
+            ctx.gas().consume(interpret_cost::PUSH)?;
             stack.push(v.clone());
         }
         I::Swap => {
-            ctx.gas.consume(interpret_cost::SWAP)?;
+            ctx.gas().consume(interpret_cost::SWAP)?;
             stack.swap(0, 1);
         }
         I::Failwith(ty) => {
@@ -1093,27 +1160,27 @@ fn interpret_one<'a>(
         }
         I::Never => unreachable_state(),
         I::Unit => {
-            ctx.gas.consume(interpret_cost::UNIT)?;
+            ctx.gas().consume(interpret_cost::UNIT)?;
             stack.push(V::Unit);
         }
         I::Car => {
-            ctx.gas.consume(interpret_cost::CAR)?;
+            ctx.gas().consume(interpret_cost::CAR)?;
             let (l, _) = *pop!(V::Pair);
             stack.push(l);
         }
         I::Cdr => {
-            ctx.gas.consume(interpret_cost::CDR)?;
+            ctx.gas().consume(interpret_cost::CDR)?;
             let (_, r) = *pop!(V::Pair);
             stack.push(r);
         }
         I::Pair => {
-            ctx.gas.consume(interpret_cost::PAIR)?;
+            ctx.gas().consume(interpret_cost::PAIR)?;
             let l = pop!();
             let r = pop!();
             stack.push(V::new_pair(l, r));
         }
         I::PairN(n) => {
-            ctx.gas.consume(interpret_cost::pair_n(*n as usize)?)?;
+            ctx.gas().consume(interpret_cost::pair_n(*n as usize)?)?;
             let res = stack
                 .drain_top(*n as usize)
                 .rev()
@@ -1122,13 +1189,13 @@ fn interpret_one<'a>(
             stack.push(res);
         }
         I::Unpair => {
-            ctx.gas.consume(interpret_cost::UNPAIR)?;
+            ctx.gas().consume(interpret_cost::UNPAIR)?;
             let (l, r) = *pop!(V::Pair);
             stack.push(r);
             stack.push(l);
         }
         I::UnpairN(n) => {
-            ctx.gas.consume(interpret_cost::unpair_n(*n as usize)?)?;
+            ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
             fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: TypedValue<'a>) {
                 if n == 0 {
                     stack.push(p);
@@ -1144,31 +1211,31 @@ fn interpret_one<'a>(
             fill(n - 1, stack, p);
         }
         I::ISome => {
-            ctx.gas.consume(interpret_cost::SOME)?;
+            ctx.gas().consume(interpret_cost::SOME)?;
             let v = pop!();
             stack.push(V::new_option(Some(v)));
         }
         I::None => {
-            ctx.gas.consume(interpret_cost::NONE)?;
+            ctx.gas().consume(interpret_cost::NONE)?;
             stack.push(V::new_option(None));
         }
         I::Compare => {
             let l = pop!();
             let r = pop!();
-            ctx.gas.consume(interpret_cost::compare(&l, &r)?)?;
+            ctx.gas().consume(interpret_cost::compare(&l, &r)?)?;
             let cmp = l.partial_cmp(&r).expect("comparison failed") as i8;
             stack.push(V::Int(cmp.into()));
         }
         I::Amount => {
-            ctx.gas.consume(interpret_cost::AMOUNT)?;
-            stack.push(V::Mutez(ctx.amount));
+            ctx.gas().consume(interpret_cost::AMOUNT)?;
+            stack.push(V::Mutez(ctx.amount()));
         }
         I::Nil => {
-            ctx.gas.consume(interpret_cost::NIL)?;
+            ctx.gas().consume(interpret_cost::NIL)?;
             stack.push(V::List(MichelsonList::new()));
         }
         I::Cons => {
-            ctx.gas.consume(interpret_cost::CONS)?;
+            ctx.gas().consume(interpret_cost::CONS)?;
             let elt = pop!();
             let mut lst = pop!(V::List);
             // NB: this is slightly better than lists on average, but needs to
@@ -1180,7 +1247,7 @@ fn interpret_one<'a>(
             overloads::Concat::TwoStrings => {
                 let mut s1 = pop!(V::String);
                 let s2 = pop!(V::String);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_string_pair(s1.len(), s2.len())?)?;
                 s1.push_str(&s2);
                 stack.push(V::String(s1));
@@ -1188,14 +1255,14 @@ fn interpret_one<'a>(
             overloads::Concat::TwoBytes => {
                 let mut bs1 = pop!(V::Bytes);
                 let bs2 = pop!(V::Bytes);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_bytes_pair(bs1.len(), bs2.len())?)?;
                 bs1.extend_from_slice(&bs2);
                 stack.push(V::Bytes(bs1))
             }
             overloads::Concat::ListOfStrings => {
                 let list = pop!(V::List);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
@@ -1203,7 +1270,7 @@ fn interpret_one<'a>(
                     let s = irrefutable_match!(val; V::String);
                     total_len += s.len()
                 }
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_string_list(total_len)?)?;
 
                 let mut result = String::with_capacity(total_len.ok_or(OutOfGas)?);
@@ -1215,7 +1282,7 @@ fn interpret_one<'a>(
             }
             overloads::Concat::ListOfBytes => {
                 let list = pop!(V::List);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_list_precheck(list.len())?)?;
 
                 let mut total_len = Checked::zero();
@@ -1223,7 +1290,7 @@ fn interpret_one<'a>(
                     let bs = irrefutable_match!(val; V::Bytes);
                     total_len += bs.len()
                 }
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::concat_bytes_list(total_len)?)?;
 
                 let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
@@ -1236,46 +1303,42 @@ fn interpret_one<'a>(
         },
         I::EmptySet => {
             use std::collections::BTreeSet;
-            ctx.gas.consume(interpret_cost::EMPTY_SET)?;
+            ctx.gas().consume(interpret_cost::EMPTY_SET)?;
             stack.push(V::Set(BTreeSet::new()))
         }
         I::EmptyMap => {
             use std::collections::BTreeMap;
-            ctx.gas.consume(interpret_cost::EMPTY_MAP)?;
+            ctx.gas().consume(interpret_cost::EMPTY_MAP)?;
             stack.push(V::Map(BTreeMap::new()))
         }
         I::EmptyBigMap(kty, vty) => {
-            use std::collections::BTreeMap;
-            ctx.gas.consume(interpret_cost::EMPTY_BIG_MAP)?;
-            stack.push(V::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::new(),
-                key_type: kty.clone(),
-                value_type: vty.clone(),
-            }))
+            ctx.gas().consume(interpret_cost::EMPTY_BIG_MAP)?;
+            stack.push(V::BigMap(BigMap::empty(kty.clone(), vty.clone())))
         }
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
                 let key = pop!();
                 let set = pop!(V::Set);
-                ctx.gas.consume(interpret_cost::set_mem(&key, set.len())?)?;
+                ctx.gas()
+                    .consume(interpret_cost::set_mem(&key, set.len())?)?;
                 let result = set.contains(&key);
                 stack.push(V::Bool(result));
             }
             overloads::Mem::Map => {
                 let key = pop!();
                 let map = pop!(V::Map);
-                ctx.gas.consume(interpret_cost::map_mem(&key, map.len())?)?;
+                ctx.gas()
+                    .consume(interpret_cost::map_mem(&key, map.len())?)?;
                 let result = map.contains_key(&key);
                 stack.push(V::Bool(result));
             }
             overloads::Mem::BigMap => {
                 let key = pop!();
                 let map = pop!(V::BigMap);
+                let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
-                ctx.gas
-                    .consume(interpret_cost::map_mem(&key, map.overlay.len())?)?;
-                let result = map.mem(&key, ctx.big_map_storage.as_ref())?;
+                ctx.gas().consume(interpret_cost::map_mem(&key, len)?)?;
+                let result = map.mem(&key, *ctx.lazy_storage())?;
                 stack.push(V::Bool(result));
             }
         },
@@ -1283,22 +1346,23 @@ fn interpret_one<'a>(
             overloads::Get::Map => {
                 let key = pop!();
                 let map = pop!(V::Map);
-                ctx.gas.consume(interpret_cost::map_get(&key, map.len())?)?;
+                ctx.gas()
+                    .consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
                 stack.push(V::new_option(result.cloned()));
             }
             overloads::Get::BigMap => {
                 let key = pop!();
                 let map = pop!(V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
-                ctx.gas
-                    .consume(interpret_cost::map_get(&key, map.overlay.len())?)?;
-                let result = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas().consume(interpret_cost::map_get(&key, len)?)?;
+                let result = map.get(arena, &key, *ctx.lazy_storage())?;
                 stack.push(V::new_option(result));
             }
         },
         I::GetN(n) => {
-            ctx.gas.consume(interpret_cost::get_n(*n as usize)?)?;
+            ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
             let res = get_nth_field_ref(*n, &mut stack[0]);
             // this is a bit hacky, but borrow rules leave few other options
             stack[0] = std::mem::replace(res, V::Unit);
@@ -1308,7 +1372,7 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let new_present = pop!(V::Bool);
                 let set = irrefutable_match!(&mut stack[0]; V::Set);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::set_update(&key, set.len())?)?;
                 if new_present {
                     set.insert(key)
@@ -1320,7 +1384,7 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::Map);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
                     None => map.remove(&key),
@@ -1331,9 +1395,9 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
-                ctx.gas
-                    .consume(interpret_cost::map_update(&key, map.overlay.len())?)?;
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
                 map.update(key, opt_new_val.map(|x| *x));
             }
         },
@@ -1342,7 +1406,7 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::Map);
-                ctx.gas
+                ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
                 let opt_old_val = match opt_new_val {
                     None => map.remove(&key),
@@ -1354,10 +1418,11 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
-                ctx.gas
-                    .consume(interpret_cost::map_get_and_update(&key, map.overlay.len())?)?;
-                let opt_old_val = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas()
+                    .consume(interpret_cost::map_get_and_update(&key, len)?)?;
+                let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
                 map.update(key, opt_new_val.map(|x| *x));
                 stack.push(V::new_option(opt_old_val));
             }
@@ -1366,7 +1431,7 @@ fn interpret_one<'a>(
             macro_rules! run_size {
                 ($ctor:tt, $gas:ident) => {{
                     let e = pop!(V::$ctor);
-                    ctx.gas.consume(interpret_cost::$gas)?;
+                    ctx.gas().consume(interpret_cost::$gas)?;
                     let res = e.len();
                     stack.push(V::Nat(res.into()));
                 }};
@@ -1380,37 +1445,38 @@ fn interpret_one<'a>(
             }
         }
         I::UpdateN(n) => {
-            ctx.gas.consume(interpret_cost::update_n(*n as usize)?)?;
+            ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop!();
             let field = get_nth_field_ref(*n, &mut stack[0]);
             *field = new_val;
         }
         I::ChainId => {
-            ctx.gas.consume(interpret_cost::CHAIN_ID)?;
-            stack.push(V::ChainId(ctx.chain_id.clone()));
+            ctx.gas().consume(interpret_cost::CHAIN_ID)?;
+            stack.push(V::ChainId(ctx.chain_id()));
         }
         I::ISelf(entrypoint) => {
-            ctx.gas.consume(interpret_cost::SELF)?;
+            ctx.gas().consume(interpret_cost::SELF)?;
             stack.push(V::Contract(Address {
-                hash: ctx.self_address.clone(),
+                hash: ctx.self_address(),
                 entrypoint: entrypoint.clone(),
             }));
         }
         I::Pack => {
-            ctx.gas.consume(interpret_cost::PACK)?;
+            ctx.gas().consume(interpret_cost::PACK)?;
             let v = pop!();
             let arena = Arena::new();
             // In the Tezos implementation they also charge gas for the pass
             // that strips locations. We don't have it.
             let mich = v.into_micheline_optimized_legacy(&arena);
-            ctx.gas
+            ctx.gas()
                 .consume(interpret_cost::micheline_encoding(&mich)?)?;
             let encoded = mich.encode_for_pack();
             stack.push(V::Bytes(encoded));
         }
         I::Unpack(ty) => {
             let bytes = pop!(V::Bytes);
-            ctx.gas.consume(interpret_cost::unpack(bytes.as_slice())?)?;
+            ctx.gas()
+                .consume(interpret_cost::unpack(bytes.as_slice())?)?;
             let mut try_unpack = || -> Option<TypedValue> {
                 let mich = Micheline::decode_packed(arena, &bytes).ok()?;
                 crate::interpreter::typecheck_value(&mich, ctx, ty).ok()
@@ -1421,16 +1487,16 @@ fn interpret_one<'a>(
             let key = pop!(V::Key);
             let sig = pop!(V::Signature);
             let msg = pop!(V::Bytes);
-            ctx.gas
+            ctx.gas()
                 .consume(interpret_cost::check_signature(&key, &msg)?)?;
-            stack.push(V::Bool(sig.check(&key, &msg)));
+            stack.push(V::Bool(key.verify_signature(&sig, &msg).unwrap_or(false)));
         }
         I::TransferTokens => {
             let param = pop!();
             let mutez_amount = pop!(V::Mutez);
             let contract_address = pop!(V::Contract);
             let counter = ctx.operation_counter();
-            ctx.gas.consume(interpret_cost::TRANSFER_TOKENS)?;
+            ctx.gas().consume(interpret_cost::TRANSFER_TOKENS)?;
             stack.push(V::new_operation(
                 Operation::TransferTokens(TransferTokens {
                     param,
@@ -1443,14 +1509,14 @@ fn interpret_one<'a>(
         I::SetDelegate => {
             let opt_keyhash = pop!(V::Option).map(|kh| irrefutable_match!(*kh; V::KeyHash));
             let counter: u128 = ctx.operation_counter();
-            ctx.gas.consume(interpret_cost::SET_DELEGATE)?;
+            ctx.gas().consume(interpret_cost::SET_DELEGATE)?;
             stack.push(V::new_operation(
                 Operation::SetDelegate(SetDelegate(opt_keyhash)),
                 counter,
             ))
         }
         I::Address => {
-            ctx.gas.consume(interpret_cost::ADDRESS)?;
+            ctx.gas().consume(interpret_cost::ADDRESS)?;
             let address = pop!(V::Contract);
             stack.push(V::Address(address));
         }
@@ -1483,7 +1549,7 @@ fn interpret_one<'a>(
                 overloads::Slice::String => {
                     let str = pop!(V::String);
 
-                    ctx.gas.consume(interpret_cost::slice(str.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice(str.len())?)?;
                     validate_bounds(offset, length, str.len())
                         .and_then(|range| str.get(range))
                         .map(|str| V::String(str.to_string()))
@@ -1491,7 +1557,7 @@ fn interpret_one<'a>(
                 overloads::Slice::Bytes => {
                     let bytes = pop!(V::Bytes);
 
-                    ctx.gas.consume(interpret_cost::slice(bytes.len())?)?;
+                    ctx.gas().consume(interpret_cost::slice(bytes.len())?)?;
                     validate_bounds(offset, length, bytes.len())
                         .and_then(|range| bytes.get(range))
                         .map(|bytes| V::Bytes(bytes.to_owned()))
@@ -1500,21 +1566,21 @@ fn interpret_one<'a>(
             stack.push(V::new_option(result));
         }
         I::Left => {
-            ctx.gas.consume(interpret_cost::LEFT)?;
+            ctx.gas().consume(interpret_cost::LEFT)?;
             let left = pop!();
             stack.push(V::new_or(Or::Left(left)));
         }
         I::Right => {
-            ctx.gas.consume(interpret_cost::RIGHT)?;
+            ctx.gas().consume(interpret_cost::RIGHT)?;
             let right = pop!();
             stack.push(V::new_or(Or::Right(right)));
         }
         I::Lambda(lam) => {
-            ctx.gas.consume(interpret_cost::LAMBDA)?;
+            ctx.gas().consume(interpret_cost::LAMBDA)?;
             stack.push(V::Lambda(Closure::Lambda(lam.clone())));
         }
         I::Exec => {
-            ctx.gas.consume(interpret_cost::EXEC)?;
+            ctx.gas().consume(interpret_cost::EXEC)?;
             let mut arg = pop!();
             let mut closure = pop!(V::Lambda);
             loop {
@@ -1543,7 +1609,7 @@ fn interpret_one<'a>(
                         closure: inner,
                         ..
                     } => {
-                        ctx.gas.consume(interpret_cost::PAIR)?; // reasonable estimation
+                        ctx.gas().consume(interpret_cost::PAIR)?; // reasonable estimation
                         arg = V::new_pair(*arg_val, arg);
                         closure = *inner;
                     }
@@ -1553,7 +1619,7 @@ fn interpret_one<'a>(
         I::Apply { arg_ty } => {
             let arg_val = pop!();
             let closure = pop!(V::Lambda);
-            ctx.gas.consume(interpret_cost::APPLY)?;
+            ctx.gas().consume(interpret_cost::APPLY)?;
             stack.push(V::Lambda(Closure::Apply {
                 arg_ty: arg_ty.clone(),
                 arg_val: Box::new(arg_val),
@@ -1561,21 +1627,22 @@ fn interpret_one<'a>(
             }))
         }
         I::HashKey => {
-            ctx.gas.consume(interpret_cost::HASH_KEY)?;
+            ctx.gas().consume(interpret_cost::HASH_KEY)?;
             let key = pop!(V::Key);
-            stack.push(TypedValue::KeyHash(key.hash()))
+            stack.push(TypedValue::KeyHash(key.pk_hash()))
         }
-        I::Ticket => {
+        I::Ticket(content_type) => {
             let content = pop!();
             let amount = pop!(V::Nat);
-            ctx.gas.consume(interpret_cost::TICKET)?;
+            ctx.gas().consume(interpret_cost::TICKET)?;
             if amount.is_zero() {
                 // If the amount is zero, then we push a None value
                 // as per the specified instruction behavior.
                 stack.push(V::new_option(None));
             } else {
                 let ticket = Ticket {
-                    ticketer: ctx.self_address.clone(),
+                    ticketer: ctx.self_address(),
+                    content_type: content_type.clone(),
                     content,
                     amount,
                 };
@@ -1583,7 +1650,7 @@ fn interpret_one<'a>(
             }
         }
         I::ReadTicket => {
-            ctx.gas.consume(interpret_cost::READ_TICKET)?;
+            ctx.gas().consume(interpret_cost::READ_TICKET)?;
             stack.push(unwrap_ticket(
                 irrefutable_match!(&stack[0]; V::Ticket).as_ref().clone(),
             ));
@@ -1594,7 +1661,7 @@ fn interpret_one<'a>(
             let amount_left = irrefutable_match!(amounts.0; V::Nat);
             let amount_right = irrefutable_match!(amounts.1; V::Nat);
 
-            ctx.gas
+            ctx.gas()
                 .consume(interpret_cost::split_ticket(&amount_left, &amount_right)?)?;
             if amount_left.clone() + amount_right.clone() == ticket.amount
                 && amount_left.gt(&BigUint::zero())
@@ -1618,7 +1685,7 @@ fn interpret_one<'a>(
             let tickets = pop!(V::Pair);
             let mut ticket_left = irrefutable_match!(tickets.0; V::Ticket);
             let ticket_right = irrefutable_match!(tickets.1; V::Ticket);
-            ctx.gas
+            ctx.gas()
                 .consume(interpret_cost::join_tickets(&ticket_left, &ticket_right)?)?;
             if ticket_left.content == ticket_right.content
                 && ticket_left.ticketer == ticket_right.ticketer
@@ -1631,35 +1698,35 @@ fn interpret_one<'a>(
         }
         I::Blake2b => {
             let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
-            ctx.gas.consume(interpret_cost::blake2b(msg)?)?;
+            ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
             *msg = blake2b_256(msg).to_vec();
         }
         I::Keccak => {
             let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
-            ctx.gas.consume(interpret_cost::keccak(msg)?)?;
+            ctx.gas().consume(interpret_cost::keccak(msg)?)?;
             *msg = keccak256(msg).to_vec();
         }
         I::Sha256 => {
             let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
-            ctx.gas.consume(interpret_cost::sha256(msg)?)?;
+            ctx.gas().consume(interpret_cost::sha256(msg)?)?;
             *msg = sha256(msg).to_vec();
         }
         I::Sha3 => {
             let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
-            ctx.gas.consume(interpret_cost::sha3(msg)?)?;
+            ctx.gas().consume(interpret_cost::sha3(msg)?)?;
             *msg = sha3_256(msg).to_vec();
         }
         I::Sha512 => {
             let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
-            ctx.gas.consume(interpret_cost::sha512(msg)?)?;
+            ctx.gas().consume(interpret_cost::sha512(msg)?)?;
             *msg = sha512(msg).to_vec();
         }
         I::Balance => {
-            ctx.gas.consume(interpret_cost::BALANCE)?;
-            stack.push(V::Mutez(ctx.balance));
+            ctx.gas().consume(interpret_cost::BALANCE)?;
+            stack.push(V::Mutez(ctx.balance()));
         }
         I::Contract(typ, ep) => {
-            ctx.gas.consume(interpret_cost::CONTRACT)?;
+            ctx.gas().consume(interpret_cost::CONTRACT)?;
             let address = pop!(V::Address);
             stack.push(TypedValue::new_option(
                 typecheck_contract_address(ctx, address, ep.clone(), typ)
@@ -1668,59 +1735,67 @@ fn interpret_one<'a>(
             ));
         }
         I::Level => {
-            ctx.gas.consume(interpret_cost::LEVEL)?;
-            stack.push(TypedValue::Nat(ctx.level.clone()));
+            ctx.gas().consume(interpret_cost::LEVEL)?;
+            stack.push(TypedValue::Nat(ctx.level()));
         }
         I::MinBlockTime => {
-            ctx.gas.consume(interpret_cost::MIN_BLOCK_TIME)?;
-            stack.push(TypedValue::Nat(ctx.min_block_time.clone()));
+            ctx.gas().consume(interpret_cost::MIN_BLOCK_TIME)?;
+            stack.push(TypedValue::Nat(ctx.min_block_time()));
         }
         I::SelfAddress => {
-            ctx.gas.consume(interpret_cost::SELF_ADDRESS)?;
+            ctx.gas().consume(interpret_cost::SELF_ADDRESS)?;
             stack.push(TypedValue::Address(Address {
-                hash: ctx.self_address.clone(),
+                hash: ctx.self_address(),
                 entrypoint: Entrypoint::default(),
             }));
         }
         I::Sender => {
-            ctx.gas.consume(interpret_cost::SENDER)?;
+            ctx.gas().consume(interpret_cost::SENDER)?;
             stack.push(TypedValue::Address(Address {
-                hash: ctx.sender.clone(),
+                hash: ctx.sender(),
                 entrypoint: Entrypoint::default(),
             }));
         }
         I::Source => {
-            ctx.gas.consume(interpret_cost::SOURCE)?;
+            ctx.gas().consume(interpret_cost::SOURCE)?;
             stack.push(TypedValue::Address(Address {
-                hash: ctx.source.clone(),
+                hash: ctx.source().into(),
                 entrypoint: Entrypoint::default(),
             }));
         }
         I::Now => {
-            ctx.gas.consume(interpret_cost::NOW)?;
-            stack.push(TypedValue::Timestamp(ctx.now.clone()));
+            ctx.gas().consume(interpret_cost::NOW)?;
+            stack.push(TypedValue::Timestamp(ctx.now()));
         }
         I::ImplicitAccount => {
-            ctx.gas.consume(interpret_cost::IMPLICIT_ACCOUNT)?;
+            ctx.gas().consume(interpret_cost::IMPLICIT_ACCOUNT)?;
             let keyhash = pop!(V::KeyHash);
             stack.push(TypedValue::Contract(Address {
                 hash: AddressHash::Implicit(keyhash),
                 entrypoint: Entrypoint::default(),
             }));
         }
+        I::IsImplicitAccount => {
+            ctx.gas().consume(interpret_cost::IS_IMPLICIT_ACCOUNT)?;
+            let addr = pop!(V::Address);
+            stack.push(TypedValue::new_option(match addr.hash {
+                AddressHash::Implicit(keyhash) => Some(TypedValue::KeyHash(keyhash)),
+                _ => None,
+            }));
+        }
         I::VotingPower => {
-            ctx.gas.consume(interpret_cost::VOTING_POWER)?;
+            ctx.gas().consume(interpret_cost::VOTING_POWER)?;
             let keyhash = pop!(V::KeyHash);
-            stack.push(TypedValue::Nat((ctx.voting_powers)(&keyhash)))
+            stack.push(TypedValue::Nat(ctx.voting_power(&keyhash)))
         }
         I::TotalVotingPower => {
-            ctx.gas.consume(interpret_cost::TOTAL_VOTING_POWER)?;
-            stack.push(TypedValue::Nat(ctx.total_voting_power.clone()))
+            ctx.gas().consume(interpret_cost::TOTAL_VOTING_POWER)?;
+            stack.push(TypedValue::Nat(ctx.total_voting_power()))
         }
         I::Emit { tag, arg_ty } => {
             let counter: u128 = ctx.operation_counter();
             let emit_val = pop!();
-            ctx.gas.consume(interpret_cost::EMIT)?;
+            ctx.gas().consume(interpret_cost::EMIT)?;
             stack.push(TypedValue::new_operation(
                 Operation::Emit(Emit {
                     tag: tag.clone(),
@@ -1733,7 +1808,7 @@ fn interpret_one<'a>(
         #[cfg(feature = "bls")]
         I::PairingCheck => {
             let list = pop!(V::List);
-            ctx.gas
+            ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
                 let (g1, g2) = irrefutable_match!(elt; V::Pair).as_ref();
@@ -1746,7 +1821,7 @@ fn interpret_one<'a>(
             stack.push(V::Bool(res));
         }
         I::CreateContract(cs, micheline) => {
-            ctx.gas.consume(interpret_cost::CREATE_CONTRACT)?;
+            ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter: u128 = ctx.operation_counter();
             let opt_keyhash = pop!(V::Option)
                 .as_ref()
@@ -1754,10 +1829,12 @@ fn interpret_one<'a>(
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
-            stack.push(TypedValue::Address(compute_contract_address(
-                &ctx.operation_group_hash,
-                origination_counter,
-            )));
+            let address =
+                compute_contract_address(&ctx.operation_group_hash(), origination_counter);
+            stack.push(TypedValue::Address(Address {
+                hash: AddressHash::Kt1(address.clone()),
+                entrypoint: Entrypoint::default(),
+            }));
             stack.push(TypedValue::new_operation(
                 Operation::CreateContract(CreateContract {
                     delegate: opt_keyhash,
@@ -1765,27 +1842,86 @@ fn interpret_one<'a>(
                     storage,
                     code: cs.clone(), // This clone is cheap since it is an Rc.
                     micheline_code: micheline,
+                    address,
                 }),
                 counter,
             ))
         }
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
+        I::IView {
+            name,
+            return_type: _,
+        } => {
+            let input = stack.pop().unwrap_or_else(|| unreachable_state());
+            let Address {
+                hash,
+                entrypoint: _,
+            } = pop!(V::Address);
+
+            ctx.gas().consume(interpret_cost::VIEW)?;
+
+            let kt1 = match hash {
+                AddressHash::Kt1(kt1) => kt1,
+                _ => {
+                    stack.push(V::Option(None));
+                    return Ok(());
+                }
+            };
+
+            let Some((view, (storage_ty, storage))) = ctx.lookup_view_and_storage(kt1, name, arena)
+            else {
+                stack.push(V::Option(None));
+                return Ok(());
+            };
+
+            let storage_ty = storage_ty.parse_ty(ctx.gas())?;
+
+            let storage = Micheline::decode_raw(arena, &storage)?
+                .typecheck_value(ctx, &storage_ty.into_micheline_optimized_legacy(arena))?;
+
+            let input_type = view.input_type.parse_ty(ctx.gas())?;
+            let output_type = view.output_type.parse_ty(ctx.gas())?;
+
+            if let Micheline::Seq(instrs) = view.code {
+                if let Ok(Lambda::Lambda { code, .. }) = crate::typechecker::typecheck_lambda(
+                    instrs,
+                    ctx.gas(),
+                    Type::Pair(Rc::new((input_type, storage_ty))),
+                    output_type,
+                    false,
+                ) {
+                    let mut stk = stk![TypedValue::new_pair(input, storage)];
+                    interpret(code.as_ref(), ctx, arena, &mut stk)?;
+                    let result = stk.pop().unwrap_or_else(|| unreachable_state());
+                    stack.push(V::new_option(Some(result)));
+                } else {
+                    stack.push(V::Option(None));
+                }
+            } else {
+                stack.push(V::Option(None));
+            }
+        }
     }
     Ok(())
 }
 
-fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Address {
-    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+/// Computes the contract address based on the operation group hash and an origination index.
+///
+/// # Arguments
+///
+/// * `operation_group_hash` - A 32-byte array representing the hash of the operation group.
+/// * `o_index` - A 32-bit unsigned integer representing the origination index.
+///
+/// # Returns
+///
+/// Returns a `ContractKt1Hash` struct containing the computed contract address.
+pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> ContractKt1Hash {
     let mut input: [u8; 36] = [0; 36];
     input[..32].copy_from_slice(operation_group_hash);
     // append bytes representing o_index
-    input[32..36].copy_from_slice(&o_index.to_le_bytes());
+    input[32..36].copy_from_slice(&o_index.to_be_bytes());
     let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
-
-    Address {
-        hash: AddressHash::Kt1(HashTrait::try_from_bytes(digest.as_slice()).unwrap()),
-        entrypoint: Entrypoint::default(),
-    }
+    HashTrait::try_from_bytes(digest.as_slice()).unwrap()
 }
 
 fn get_nth_field_ref<'a, 'b>(
@@ -1813,15 +1949,17 @@ mod interpreter_tests {
 
     use super::*;
     use super::{Lambda, Or};
-    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
+    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
     use crate::ast::or::Or::Left;
     #[cfg(feature = "bls")]
     use crate::bls;
+    use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
     use chrono::DateTime;
-    use entrypoint::DEFAULT_EP_NAME;
     use num_bigint::BigUint;
+    use tezos_crypto_rs::public_key::PublicKey;
+    use tezos_data_encoding::nom::NomReader;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
@@ -1833,7 +1971,7 @@ mod interpreter_tests {
 
     fn interpret<'a>(
         ast: &[Instruction<'a>],
-        ctx: &mut Ctx<'a>,
+        ctx: &mut impl CtxTrait<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -1842,7 +1980,7 @@ mod interpreter_tests {
 
     fn interpret_one<'a>(
         i: &Instruction<'a>,
-        ctx: &mut Ctx<'a>,
+        ctx: &mut impl CtxTrait<'a>,
         stack: &mut IStack<'a>,
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
@@ -1873,7 +2011,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Sub(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         macro_rules! test {
@@ -1989,7 +2127,7 @@ mod interpreter_tests {
         let mut stack = stk![V::Mutez(2i64.pow(62)), V::Mutez(20)];
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::MutezMutez), &mut ctx, &mut stack).is_ok());
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 20);
+        assert_eq!(ctx.gas().milligas(), Gas::default().milligas() - 20);
         assert_eq!(stack, stk![V::Mutez(2i64.pow(62) + 20)]);
         assert_eq!(
             interpret_one(
@@ -2406,7 +2544,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&instr, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
         }
 
         #[test]
@@ -2489,7 +2627,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&Abs, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
         }
         test(0, 0u32);
         test(10, 10u32);
@@ -2505,7 +2643,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             assert!(interpret_one(&IsNat, &mut ctx, &mut stack).is_ok());
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+            assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
         }
         test(0, Some(0u32));
         test(10, Some(10u32));
@@ -2854,7 +2992,7 @@ mod interpreter_tests {
             assert_eq!(input_stack, expected_stack);
 
             assert_eq!(
-                ctx.gas.milligas(),
+                ctx.gas().milligas(),
                 Gas::default().milligas()
                     - expected_map_gas_cost
                     - interpret_cost::PUSH * collection_length
@@ -3074,7 +3212,7 @@ mod interpreter_tests {
         assert!(interpret(&[Unit], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::Unit]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::UNIT - interpret_cost::INTERPRET_RET
         );
     }
@@ -3100,7 +3238,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
         );
     }
@@ -3117,7 +3255,7 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::new_option(Some(V::int(-5)))]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
         );
     }
@@ -3140,7 +3278,7 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::PUSH
                 - interpret_cost::CAR
@@ -3166,7 +3304,7 @@ mod interpreter_tests {
         .is_ok());
         assert_eq!(stack, stk![V::int(-5)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::PUSH
                 - interpret_cost::CDR
@@ -3193,7 +3331,7 @@ mod interpreter_tests {
                 V::new_pair(V::Bool(false), V::new_pair(V::nat(42), V::Unit))
             ]
         );
-        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
@@ -3208,7 +3346,7 @@ mod interpreter_tests {
                 V::new_pair(V::nat(42), V::new_pair(V::Unit, V::String("foo".into())))
             )]
         );
-        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
@@ -3234,7 +3372,7 @@ mod interpreter_tests {
                 V::Bool(false)
             ],
         );
-        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
@@ -3249,7 +3387,7 @@ mod interpreter_tests {
             stack,
             stk![V::String("foo".into()), V::Unit, V::nat(42), V::Bool(false)],
         );
-        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas())
+        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas())
     }
 
     #[test]
@@ -3275,7 +3413,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(42)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::IF_NONE - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -3289,7 +3427,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(5)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_NONE
                 - interpret_cost::PUSH
@@ -3305,7 +3443,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_CONS
                 - interpret_cost::SWAP
@@ -3322,7 +3460,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_CONS
                 - interpret_cost::PUSH
@@ -3338,7 +3476,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(1)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::IF_LEFT - interpret_cost::INTERPRET_RET * 2
         );
     }
@@ -3351,7 +3489,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::IF_LEFT
                 - interpret_cost::DROP
@@ -3367,7 +3505,7 @@ mod interpreter_tests {
         assert!(interpret(&[ISome], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_option(Some(V::int(5)))]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::SOME - interpret_cost::INTERPRET_RET
         );
     }
@@ -3379,7 +3517,7 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::None], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_option(None)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::NONE - interpret_cost::INTERPRET_RET
         );
     }
@@ -3394,7 +3532,7 @@ mod interpreter_tests {
                 let mut ctx = Ctx::default();
                 assert!(interpret(&[Compare], &mut ctx, &mut stack).is_ok());
                 assert_eq!(stack, stk!$res);
-                assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - expected_cost);
+                assert_eq!(ctx.gas().milligas(), Gas::default().milligas() - expected_cost);
             };
         }
         test!([V::int(5), V::int(6)], [V::int(1)]);
@@ -3423,7 +3561,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Amount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(100500)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::INTERPRET_RET - interpret_cost::AMOUNT,
         )
     }
@@ -3445,7 +3583,7 @@ mod interpreter_tests {
             stk![V::List(vec![V::int(1), V::int(2), V::int(3),].into())]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
         );
     }
@@ -3457,7 +3595,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Nil], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::List(vec![].into())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
         )
     }
@@ -3469,7 +3607,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Cons], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::List(vec![V::int(123), V::int(321)].into())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::CONS - interpret_cost::INTERPRET_RET,
         )
     }
@@ -3488,7 +3626,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Map(map)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::PUSH - interpret_cost::INTERPRET_RET
         );
     }
@@ -3510,7 +3648,7 @@ mod interpreter_tests {
             stk![V::new_option(Some(V::String("foo".to_owned())))]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_get(&V::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3522,10 +3660,10 @@ mod interpreter_tests {
         // overlay semantics are tested in big_map module, here we only check
         // the interpreter works
         let mut ctx = Ctx::default();
-        ctx.big_map_storage = Box::new(InMemoryLazyStorage::new());
+        ctx.big_map_storage = InMemoryLazyStorage::new();
         let big_map_id = ctx
             .big_map_storage
-            .big_map_new(&Type::Int, &Type::String)
+            .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
         ctx.big_map_storage
             .big_map_update(
@@ -3534,12 +3672,15 @@ mod interpreter_tests {
                 Some(TypedValue::String("foo".to_owned())),
             )
             .unwrap();
-        let big_map = BigMap {
-            id: Some(big_map_id),
+        let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
+            id: big_map_id,
             overlay: BTreeMap::from([(
                 TypedValue::int(2),
                 Some(TypedValue::String("bar".to_owned())),
             )]),
+        });
+        let big_map = BigMap {
+            content,
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -3555,7 +3696,7 @@ mod interpreter_tests {
             )))]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::map_get(&TypedValue::int(1), 1).unwrap()
         );
     }
@@ -3574,7 +3715,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Option(None)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_get(&V::int(100500), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3695,7 +3836,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3707,7 +3848,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let big_map_id = ctx
             .big_map_storage
-            .big_map_new(&Type::Int, &Type::String)
+            .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
         ctx.big_map_storage
             .big_map_bulk_update(
@@ -3724,9 +3865,12 @@ mod interpreter_tests {
                 ],
             )
             .unwrap();
-        let big_map = BigMap {
-            id: Some(big_map_id),
+        let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
+            id: big_map_id,
             overlay: BTreeMap::new(),
+        });
+        let big_map = BigMap {
+            content,
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -3737,7 +3881,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::map_mem(&TypedValue::int(1), 0).unwrap()
         );
     }
@@ -3768,7 +3912,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Bool(true)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::set_mem(&TypedValue::int(1), 2).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3794,7 +3938,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[EmptySet], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_SET - interpret_cost::INTERPRET_RET
         );
     }
@@ -3806,7 +3950,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[EmptyMap], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_MAP - interpret_cost::INTERPRET_RET
         );
     }
@@ -3821,15 +3965,10 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::new(),
-                key_type: Type::Int,
-                value_type: Type::Unit,
-            })]
+            stk![TypedValue::BigMap(BigMap::empty(Type::Int, Type::Unit))]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::EMPTY_BIG_MAP
         );
     }
@@ -3852,7 +3991,7 @@ mod interpreter_tests {
             stk![TypedValue::Set(BTreeSet::from([TypedValue::int(1)])),]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3874,7 +4013,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3896,7 +4035,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(set)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::set_update(&TypedValue::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3917,7 +4056,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::set_update(&TypedValue::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3945,7 +4084,7 @@ mod interpreter_tests {
             )])),]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_update(&V::int(1), 0).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3973,7 +4112,7 @@ mod interpreter_tests {
             )])),]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -3991,7 +4130,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![V::Map(BTreeMap::new())]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas()
                 - interpret_cost::map_update(&V::int(1), 1).unwrap()
                 - interpret_cost::INTERPRET_RET
@@ -4008,7 +4147,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::SIZE_STRING - interpret_cost::INTERPRET_RET
         );
     }
@@ -4035,7 +4174,7 @@ mod interpreter_tests {
         );
         assert_eq!(stack, stk![TypedValue::nat(3)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::SIZE_LIST - interpret_cost::INTERPRET_RET
         );
     }
@@ -4092,7 +4231,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 0).unwrap()
         );
     }
@@ -4122,7 +4261,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
         );
     }
@@ -4148,7 +4287,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::map_get_and_update(&V::int(1), 1).unwrap()
         );
     }
@@ -4164,14 +4303,17 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             let id = ctx
                 .big_map_storage
-                .big_map_new(&Type::Int, &Type::String)
+                .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)
                 .unwrap();
-            let big_map = BigMap {
-                id: Some(id.clone()),
+            let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                id: id.clone(),
                 overlay: overlay.into_iter().collect(),
+            });
+            let big_map = BigMap {
+                content,
                 key_type: Type::Int,
                 value_type: Type::String,
             };
@@ -4187,13 +4329,15 @@ mod interpreter_tests {
             assert_eq!(
                 stack,
                 stk![TypedValue::BigMap(BigMap {
-                    id: Some(id),
-                    overlay: result.into_iter().collect(),
+                    content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                        id,
+                        overlay: result.into_iter().collect()
+                    }),
                     key_type: Type::Int,
                     value_type: Type::String,
                 })]
             );
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(ctx.gas().milligas() < Gas::default().milligas());
         }
 
         // insert
@@ -4245,14 +4389,17 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             let id = ctx
                 .big_map_storage
-                .big_map_new(&Type::Int, &Type::String)
+                .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)
                 .unwrap();
-            let big_map = BigMap {
-                id: Some(id.clone()),
+            let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                id: id.clone(),
                 overlay: overlay.into_iter().collect(),
+            });
+            let big_map = BigMap {
+                content,
                 key_type: Type::Int,
                 value_type: Type::String,
             };
@@ -4273,15 +4420,17 @@ mod interpreter_tests {
                 stack,
                 stk![
                     TypedValue::BigMap(BigMap {
-                        id: Some(id),
-                        overlay: result.into_iter().collect(),
+                        content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
+                            id,
+                            overlay: result.into_iter().collect()
+                        }),
                         key_type: Type::Int,
                         value_type: Type::String,
                     }),
                     TypedValue::new_option(old_value),
                 ]
             );
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(ctx.gas().milligas() < Gas::default().milligas());
         }
 
         // insert
@@ -4540,12 +4689,12 @@ mod interpreter_tests {
         let chain_id = super::ChainId::from_base58_check("NetXynUjJNZm7wi").unwrap();
         let ctx = &mut Ctx::default();
         ctx.chain_id = chain_id.clone();
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         let stk = &mut stk![];
         assert_eq!(interpret(&[Instruction::ChainId], ctx, stk), Ok(()));
         assert_eq!(stk, &stk![V::ChainId(chain_id)]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
         );
     }
@@ -4589,14 +4738,14 @@ mod interpreter_tests {
         ];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[TransferTokens], ctx, stk), Ok(()));
         assert_eq!(
             stk,
             &stk![V::new_operation(Operation::TransferTokens(tt), 101)]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::TRANSFER_TOKENS + interpret_cost::INTERPRET_RET
         );
     }
@@ -4605,19 +4754,19 @@ mod interpreter_tests {
     fn set_delegate() {
         use Instruction as I;
         let sd = super::SetDelegate(Some(
-            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+            PublicKeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
         let stk = &mut stk![V::new_option(Some(V::KeyHash(sd.0.clone().unwrap())))];
         let ctx = &mut Ctx::default();
         ctx.set_operation_counter(100);
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[I::SetDelegate], ctx, stk), Ok(()));
         assert_eq!(
             stk,
             &stk![V::new_operation(Operation::SetDelegate(sd), 101)]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::SET_DELEGATE + interpret_cost::INTERPRET_RET
         );
     }
@@ -4629,7 +4778,7 @@ mod interpreter_tests {
         // as expected.
         use Instruction as I;
         let sd = super::SetDelegate(Some(
-            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+            PublicKeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
         let stk = &mut stk![
             V::new_option(Some(V::KeyHash(sd.0.clone().unwrap()))),
@@ -4669,9 +4818,101 @@ mod interpreter_tests {
         );
     }
 
+    // tuples of (key, message, signature, is_valid).
+    // signatures are produced via `octez-client sign bytes <msg> for <key>`
+    fn signature_fixtures() -> Vec<(PublicKey, &'static [u8], Signature, bool)> {
+        vec!
+          [ ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("BLsigBR1jcWq3w6yAFyDn2X6fxBGjB1E7YoywyUhpvHfisPpCgeMQfJHXoj2YW1BZoujsuZRXdU1BTQjWwqT3xAZRGVcsXovVAgEXbMuuaKLSYYbbMQM92gDDT1UCCRZ1RFvutdavYoumy").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("BLsigBR1jcWq3w6yAFyDn2X6fxBGjB1E7YoywyUhpvHfisPpCgeMQfJHXoj2YW1BZoujsuZRXdU1BTQjWwqT3xAZRGVcsXovVAgEXbMuuaKLSYYbbMQM92gDDT1UCCRZ1RFvutdavYoumy").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("edsigtrs8bK7vNfiR4Kd9dWasVa1bAWaQSu2ipnmLGZuwQa8ktCEMYVKqbWsbJ7zTS8dgYT9tiSUKorWCPFHosL5zPsiDwBQ6vb").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("edsigtrs8bK7vNfiR4Kd9dWasVa1bAWaQSu2ipnmLGZuwQa8ktCEMYVKqbWsbJ7zTS8dgYT9tiSUKorWCPFHosL5zPsiDwBQ6vb").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("spsig1Ng2bs4PXCbjaFGuojk9K5Pt3CkfbUZyHLLrBxHSmTqrUUxQggi4yJBit3Ljqnqr61UpdTewTLiu4schSCfZvaRwu412oZ").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("spsig1aP7D9oheiraNuM1NgziMPSPKS1F9kSWyFqkE8WigaeU5Uzb3LwY34F7Y7RsF6sY5ZfUda1NWdrC5V4KEfm9jeU1eniHmy").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("spsig1PJ9LG9ovbpVJ3CucFWL7iBaQZjqEWMvppgLjYiiSwzcxpuUqHr2BUVZDUwkmZKzMNDWJdgtyhYiicz197TbhS4LPpnxDY").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("p2pk66qfVMXhFJWhtFDCT6F3JUM3M1iQpfWe4nPZKWcsqsKQtXXHFkQ").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("p2sigv6HrN6xB5gQDnmKLC2P3ynwiPn4zfUj7CcZD1cepfFzX7xBDWFQu9uoKWbEzVgxCQxrE1J5X6FGYwF2dpoYcjpdPCBhuD").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("p2pk64bybDUtSjSQnsexpzhedhBo4vkoRX4tWfQQbBxKbA58wJqKkT2").unwrap()
+            , b"\x0A"
+            , Signature::from_base58_check("p2siggzjojhabur7zZvmNnhkhnU3nYA1ZUR9JSas57RVhNdAmQk6y3hns3F2zPBGsC964PFAE2HC3fbPkcqpVFbjoQQq9dFiZg").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("p2pk64bybDUtSjSQnsexpzhedhBo4vkoRX4tWfQQbBxKbA58wJqKkT2").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("p2siggzjojhabur7zZvmNnhkhnU3nYA1ZUR9JSas57RVhNdAmQk6y3hns3F2zPBGsC964PFAE2HC3fbPkcqpVFbjoQQq9dFiZg").unwrap()
+            , false
+            )
+            // binary representation
+            // edpk
+          , ( PublicKey::nom_read_exact(&hex::decode("00aad3f16293766169f7db278c5e0e9db4fb82ffe1cbcc35258059617dc0fec082").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("91ac1e7fd668854fc7a40feec4034e42c06c068cce10622c607fda232db34c8cf5d8da83098dd891cd4cb4299b3fa0352ae323ad99b24541e54b91888fdc8201").unwrap()).unwrap()
+            , true
+            )
+            // sppk
+          , ( PublicKey::nom_read_exact(&hex::decode("0103b524d0184276467c848ac13557fb0ff8bec5907960f72683f22af430503edfc1").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("80e4e72ffecf72953789625b1125e9f45f432c14e53a01ec68a1e1b77d60cfe96a97443733ba0f7f42db3a56d7a433df2b4fc0035c05ab92d062f33c5bab0244").unwrap()).unwrap()
+            , true
+            )
+            // p2pk
+          , ( PublicKey::nom_read_exact(&hex::decode("0202041e5cb7fb3d7bc6fb7b9e94790919a9e76ccc372e6cc9cae925027c08ff95f3").unwrap()).unwrap()
+            , b"\x0A"
+            , Signature::try_from(hex::decode("12d25210bb02998516bf6a776e1cd55a06c5fbe3c21afbeef29b99d96305e43263c75a4449906e0f2d79ecc973fff9ce7f8c43fee40b04d07c191f00ee176175").unwrap()).unwrap()
+            , true
+            )
+            // BLpk
+          , ( PublicKey::nom_read_exact(&hex::decode("03ade3c5ec9e1be3dd08eb355f6e23b8e162b90f563fa5cf0b0299fb9f3aa29218483ead20efa8b350559be88bd99cea6c").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("a065340a9c902829a4d77312c3327b558d310a37305049fc144021ea837325f994e270537a03acfdf9ef276530366b7c1629cb4d71a2b5967b582bfcfd280becb8c918463eb0e5dd0165702a2494b8856baee31e0e7b9f9e5ae5b4af980e88ee").unwrap()).unwrap()
+            , true
+            )
+          ]
+    }
+
     #[test]
     fn check_signature() {
-        for (key, msg, sig, res) in michelson_signature::tests::signature_fixtures() {
+        for (key, msg, sig, res) in signature_fixtures() {
             let mut stack = stk![V::Bytes(msg.to_vec()), V::Signature(sig), V::Key(key)];
             assert_eq!(
                 interpret_one(&CheckSignature, &mut Ctx::default(), &mut stack),
@@ -4692,7 +4933,7 @@ mod interpreter_tests {
         assert_eq!(interpret(&[Address], ctx, stk), Ok(()));
         assert_eq!(stk, &stk![V::Address(address)]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::ADDRESS - interpret_cost::INTERPRET_RET
         );
     }
@@ -4748,7 +4989,7 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::Left], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_or(or::Or::Left(V::nat(10)))]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::LEFT - interpret_cost::INTERPRET_RET
         );
     }
@@ -4760,7 +5001,7 @@ mod interpreter_tests {
         assert!(interpret(&[Instruction::Right], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_or(or::Or::Right(V::nat(10)))]);
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::RIGHT - interpret_cost::INTERPRET_RET
         );
     }
@@ -4772,14 +5013,18 @@ mod interpreter_tests {
         let expected_ticket = V::new_ticket(crate::ast::Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         });
 
-        let start_milligas = ctx.gas.milligas();
-        assert_eq!(interpret(&[Ticket], &mut ctx, &mut stack), Ok(()));
+        let start_milligas = ctx.gas().milligas();
+        assert_eq!(
+            interpret(&[Ticket(Type::Unit)], &mut ctx, &mut stack),
+            Ok(())
+        );
         assert_eq!(stack, stk![V::new_option(Some(expected_ticket))]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::TICKET + interpret_cost::INTERPRET_RET
         );
     }
@@ -4792,11 +5037,12 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         };
         let ticket_val = V::new_ticket(ticket.clone());
         let mut stack = stk![ticket_val.clone()];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[ReadTicket], &mut ctx, &mut stack), Ok(()));
         let ticketer_address = super::Address {
             hash: ticket.ticketer,
@@ -4813,7 +5059,7 @@ mod interpreter_tests {
             ]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::READ_TICKET + interpret_cost::INTERPRET_RET
         );
     }
@@ -4917,7 +5163,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            ctx.gas.milligas(),
+            ctx.gas().milligas(),
             Ctx::default().gas.milligas() - interpret_cost::HASH_KEY
         );
     }
@@ -5054,12 +5300,13 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         };
         let ticket_val = V::new_ticket(ticket.clone());
         let mut stack = stk![V::new_pair(V::nat(20), V::nat(80)), ticket_val.clone(),];
 
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[SplitTicket], &mut ctx, &mut stack), Ok(()));
 
         let ticket_exp_left = Ticket {
@@ -5079,7 +5326,7 @@ mod interpreter_tests {
             ))),]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::split_ticket(&ticket_exp_left.amount, &ticket_exp_right.amount)
                 .unwrap()
                 + interpret_cost::INTERPRET_RET
@@ -5110,6 +5357,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());
@@ -5119,10 +5367,10 @@ mod interpreter_tests {
         };
         let ticket_right = V::new_ticket(ticket_right_.clone());
         let mut stack = stk![V::new_pair(ticket_left, ticket_right),];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[JoinTickets], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::join_tickets(&ticket, &ticket_right_).unwrap()
                 + interpret_cost::INTERPRET_RET
         );
@@ -5142,6 +5390,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());
@@ -5160,6 +5409,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());
@@ -5226,11 +5476,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.balance = 70;
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Balance], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(70),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::BALANCE + interpret_cost::INTERPRET_RET
         );
     }
@@ -5249,7 +5499,7 @@ mod interpreter_tests {
             instr: Instruction<'a>,
             opt_exp_gas: Option<u32>,
         ) {
-            use crate::ast::michelson_address::entrypoint::Entrypoints;
+            use crate::ast::Entrypoints;
             let mut ctx = Ctx::default();
             if let Some(e) = opt_entrypoints {
                 ctx.set_known_contracts({
@@ -5259,11 +5509,11 @@ mod interpreter_tests {
                 })
             }
 
-            let start_milligas = ctx.gas.milligas();
+            let start_milligas = ctx.gas().milligas();
             assert_eq!(interpret(&[instr], &mut ctx, &mut start_stack), Ok(()));
             assert_eq!(start_stack, stack_expect);
             if let Some(exp_gas) = opt_exp_gas {
-                assert_eq!(start_milligas - ctx.gas.milligas(), exp_gas);
+                assert_eq!(start_milligas - ctx.gas().milligas(), exp_gas);
             }
         }
 
@@ -5469,11 +5719,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.level = 70u32.into();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Level], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::LEVEL + interpret_cost::INTERPRET_RET
         );
     }
@@ -5483,11 +5733,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.min_block_time = 70u32.into();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[MinBlockTime], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::MIN_BLOCK_TIME + interpret_cost::INTERPRET_RET
         );
     }
@@ -5498,11 +5748,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.self_address = addr.hash.clone();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[SelfAddress], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::SELF_ADDRESS + interpret_cost::INTERPRET_RET
         );
     }
@@ -5513,26 +5763,32 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.sender = addr.hash.clone();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Sender], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::SENDER + interpret_cost::INTERPRET_RET
         );
     }
 
     #[test]
     fn source() {
-        let addr = super::Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr = super::PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         let mut ctx = Ctx::default();
-        ctx.source = addr.hash.clone();
+        ctx.source = addr.clone();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Source], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Address(addr),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            stack,
+            stk![V::Address(super::Address {
+                hash: addr.into(),
+                entrypoint: Entrypoint::default()
+            })]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::SOURCE + interpret_cost::INTERPRET_RET
         );
     }
@@ -5542,11 +5798,11 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.now = 7000i32.into();
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Now], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::timestamp(7000),]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
         );
     }
@@ -5554,9 +5810,9 @@ mod interpreter_tests {
     #[test]
     fn implicit_account() {
         let mut ctx = Ctx::default();
-        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         let mut stack = stk![V::KeyHash(key_hash)];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[ImplicitAccount], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
             stack,
@@ -5565,16 +5821,16 @@ mod interpreter_tests {
             ),]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::NOW + interpret_cost::INTERPRET_RET
         );
     }
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
 
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([
@@ -5582,11 +5838,11 @@ mod interpreter_tests {
             (key_hash_2.clone(), 50u32.into()),
         ]);
         let mut stack = stk![TypedValue::KeyHash(key_hash_2.clone())];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(50)]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
         );
 
@@ -5594,27 +5850,27 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = stk![TypedValue::KeyHash(key_hash_3)];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[VotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(0)]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::VOTING_POWER + interpret_cost::INTERPRET_RET
         );
     }
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = stk![];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[TotalVotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(80)]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::TOTAL_VOTING_POWER + interpret_cost::INTERPRET_RET
         );
     }
@@ -5627,7 +5883,7 @@ mod interpreter_tests {
         ctx.set_operation_counter(100);
 
         let mut stack = stk![TypedValue::nat(20)];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(
             interpret(
                 &[Instruction::Emit {
@@ -5651,7 +5907,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::EMIT + interpret_cost::INTERPRET_RET
         );
 
@@ -5661,7 +5917,7 @@ mod interpreter_tests {
         use crate::parser::test_helpers::parse;
 
         let mut stack = stk![TypedValue::nat(20)];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         let emit_type_mich = parse("pair (int %f1) (int %f2)").unwrap();
         assert_eq!(
             interpret(
@@ -5686,7 +5942,7 @@ mod interpreter_tests {
             )]
         );
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::EMIT + interpret_cost::INTERPRET_RET
         );
     }
@@ -5707,7 +5963,7 @@ mod interpreter_tests {
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&PairingCheck, ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Bool(true)]);
-        assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
     }
 
     mod mul {
@@ -5725,7 +5981,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Mul(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         #[cfg(feature = "bls")]
@@ -5927,7 +6183,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&EDiv(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         macro_rules! test {
@@ -6263,7 +6519,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Neg(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         #[cfg(feature = "bls")]
@@ -6338,7 +6594,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsl(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         macro_rules! test {
@@ -6399,7 +6655,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&Lsr(overload), ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![output]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
 
         macro_rules! test {
@@ -6469,7 +6725,7 @@ mod interpreter_tests {
             assert_eq!(interpret_one(&SubMutez, ctx, &mut stack), Ok(()));
             assert_eq!(stack, stk![V::new_option(res.map(V::Mutez))]);
             // assert some gas is consumed, exact values are subject to change
-            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+            assert!(Ctx::default().gas.milligas() > ctx.gas().milligas());
         }
         test(0, 0, Some(0));
         test(0, 1, None);
@@ -6505,7 +6761,7 @@ mod interpreter_tests {
         let ctx = &mut Ctx::default();
         assert_eq!(interpret_one(&Unpack(Type::Int), ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::new_option(Some(V::int(-987654321)))]);
-        assert!(ctx.gas.milligas() < Ctx::default().gas.milligas());
+        assert!(ctx.gas().milligas() < Ctx::default().gas.milligas());
     }
 
     #[test]
@@ -6533,7 +6789,12 @@ mod interpreter_tests {
                 .unwrap();
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
+            .unwrap();
+        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
@@ -6541,18 +6802,16 @@ mod interpreter_tests {
                 storage: TypedValue::Unit,
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
+                address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
             101,
-        );
-        let expected_addr = TypedValue::Address(
-            addr::Address::try_from("KT1CvVk9uuEpf5t88frj41xMzHc5M6FHqxZw").unwrap(),
         );
         let mut stack = stk![
             TypedValue::Unit,
             TypedValue::Mutez(100),
             TypedValue::new_option(None)
         ];
-        let start_milligas = ctx.gas.milligas();
+        let start_milligas = ctx.gas().milligas();
         assert_eq!(
             interpret(
                 &[CreateContract(Rc::new(cs), &cs_mich)],
@@ -6561,9 +6820,15 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![expected_addr, expected_op]);
         assert_eq!(
-            start_milligas - ctx.gas.milligas(),
+            stack,
+            stk![
+                TypedValue::Address(addr::Address::try_from(expected_addr).unwrap()),
+                expected_op
+            ]
+        );
+        assert_eq!(
+            start_milligas - ctx.gas().milligas(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
         );
     }
@@ -6580,8 +6845,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let mut ctx = Ctx::default();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
 
         let expected_entrypoints = HashMap::from([
             (
@@ -6641,7 +6909,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -6664,16 +6932,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -6690,8 +6956,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let mut ctx = Ctx::default();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([
@@ -6780,7 +7049,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -6812,16 +7081,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -6838,8 +7105,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let mut ctx = Ctx::default();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([
@@ -6928,7 +7198,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -6960,16 +7230,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -6986,8 +7254,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let mut ctx = Ctx::default();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([
@@ -7020,7 +7291,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     vec![Direction::Right, Direction::Left, Direction::Left],
                     Type::Nat,
@@ -7055,16 +7326,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -7084,7 +7353,7 @@ mod interpreter_tests {
                 .unwrap(),
                 0
             ),
-            addr::Address::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
+            ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
         );
     }
 }

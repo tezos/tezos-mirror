@@ -1,0 +1,148 @@
+
+./octez-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
+[ "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client --mode proxy rpc get /chains/main/blocks/head/context/delegates
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+{ "deactivated": false, "is_forbidden": false,
+  "participation":
+    { "expected_cycle_activity": 409, "minimal_cycle_activity": 272,
+      "missed_slots": 0, "missed_levels": 0,
+      "remaining_allowed_missed_slots": 137,
+      "expected_attesting_rewards": "958287" },
+  "dal_participation":
+    { "expected_assigned_shards_per_slot": 409,
+      "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
+      "expected_dal_rewards": "212680", "sufficient_dal_participation": true,
+      "denounced": false }, "grace_period": 4,
+  "active_staking_parameters":
+    { "limit_of_staking_over_baking_millionth": 0,
+      "edge_of_baking_over_staking_billionth": 1000000000 },
+  "pending_staking_parameters": [], "baking_power": "1466666666666",
+  "total_staked": "200000000000", "total_delegated": "3800000000000",
+  "min_delegated_in_current_cycle":
+    { "amount": "3800000000000",
+      "level":
+        { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
+          "expected_commitment": false } },
+  "own_full_balance": "4000000000000", "own_staked": "200000000000",
+  "own_delegated": "3800000000000", "external_staked": "0",
+  "external_delegated": "0",
+  "total_unstaked_per_cycle": [ { "cycle": 0, "deposit": "0" } ],
+  "denunciations": [], "estimated_shared_pending_slashed_amount": "0",
+  "staking_denominator": "0", "current_voting_power": "4000000000000",
+  "voting_power": "4000000000000",
+  "voting_info":
+    { "voting_power": "4000000000000", "remaining_proposals": 20 },
+  "consensus_key":
+    { "active":
+        { "pkh": "[PUBLIC_KEY_HASH]",
+          "pk": "[PUBLIC_KEY]" } },
+  "companion_key": { "active": null },
+  "stakers":
+    [ { "staker": "[PUBLIC_KEY_HASH]",
+        "frozen_deposits": "200000000000" } ],
+  "delegators": [ "[PUBLIC_KEY_HASH]" ] }
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/full_balance'
+"4000000000000"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_deposits'
+"200000000000"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+false
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+"0"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+[ "[PUBLIC_KEY_HASH]" ]
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+4
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
+"4000000000000"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
+"4000000000000"
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/consensus_key'
+{ "active":
+    { "pkh": "[PUBLIC_KEY_HASH]",
+      "pk": "[PUBLIC_KEY]" } }
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/companion_key'
+{ "active": null }
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/full_balance'
+Fatal error:
+  Command failed: The implicit account ([PUBLIC_KEY_HASH]) whose balance was requested is not a registered delegate. To get the balance of this account you can use the ../context/contracts/[PUBLIC_KEY_HASH]/balance RPC.
+                  The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_deposits'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/consensus_key'
+Fatal error:
+  Command failed: Storage error:
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/consensus_key/active'.
+  
+
+./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/companion_key'
+Fatal error:
+  Command failed: Storage error:
+                    Missing key 'contracts/index/0000b443c2c85e0aeb6a4c0a37783f4d8251a956e8ad/consensus_key/active'.
+  

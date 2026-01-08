@@ -86,6 +86,11 @@ let json : Media_type.t =
     let x : Json_repr.ezjsonm = Json_encoding.construct enc v in
     to_string ~newline:true ~minify:true x
   in
+  let destruct enc body =
+    match from_string body with
+    | Error _ as err -> err
+    | Ok json -> Ok (Json_encoding.destruct enc json)
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "json");
     q = Some 1000;
@@ -102,11 +107,10 @@ let json : Media_type.t =
         | Ok json -> Json_repr.(pp (module Ezjsonm) ppf json));
     construct;
     construct_seq = (fun enc v -> seqing @@ construct enc v);
-    destruct =
+    destruct;
+    destruct_many =
       (fun enc body ->
-        match from_string body with
-        | Error _ as err -> err
-        | Ok json -> Ok (Json_encoding.destruct enc json));
+        match destruct enc body with Ok v -> ([v], "") | Error _ -> ([], body));
   }
 
 let media_types = [json]

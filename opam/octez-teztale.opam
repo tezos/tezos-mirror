@@ -15,10 +15,11 @@ depends: [
   "caqti-driver-postgresql" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" & < "2.2.0" }
   "caqti-lwt" { >= "2.0.1" }
-  "octez-libs"
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "ezgzip"
   "safepass"
   "octez-version"
+  "octez-libs"
   "lwt" { >= "5.7.0" & < "5.9.0" }
   "cmdliner" { >= "1.1.0" }
   "octez-rust-deps"
@@ -26,6 +27,7 @@ depends: [
   "tls-lwt" { >= "1.0.4" }
   "conduit-lwt-unix" { >= "7.1.0" }
   "x509" { >= "1.0.0" }
+  "cohttp-lwt" { = "5.3.1~octez" }
 ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"
@@ -51,10 +53,11 @@ depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-023-PtSeouLo-libs"
+  "octez-protocol-024-PtTALLiN-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

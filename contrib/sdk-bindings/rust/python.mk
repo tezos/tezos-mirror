@@ -13,3 +13,7 @@ clean:
 test:
 	@maturin develop
 	@pytest python-tests/ -v
+
+.PHONY: publish
+publish:
+	@maturin upload target/wheels/*

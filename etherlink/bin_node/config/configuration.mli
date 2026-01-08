@@ -9,7 +9,7 @@
 open Evm_node_lib_dev_encoding
 
 (** A list of network officially supported by the EVM node. *)
-type supported_network = Mainnet | Testnet
+type supported_network = Mainnet | Testnet | Shadownet
 
 val pp_supported_network : Format.formatter -> supported_network -> unit
 
@@ -33,7 +33,9 @@ type time_between_blocks =
 type native_execution_policy = Always | Rpcs_only | Never
 
 type kernel_execution_config = {
-  preimages : string;  (** Path to the preimages directory. *)
+  preimages : string option;
+      (** Path to the preimages directory. if none, it uses a default
+          path under the data_dir *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
   native_execution_policy : native_execution_policy;
@@ -126,8 +128,8 @@ type experimental_features = {
   rpc_server : rpc_server;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
+  preconfirmation_stream_enabled : bool;
 }
 
 type gcp_key = {
@@ -145,8 +147,9 @@ type sequencer = {
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  sequencer : sequencer_key option;  (** The key used to sign the blueprints. *)
+  sequencer : sequencer_key list;  (** The keys used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
+  sunset_sec : int64;
 }
 
 type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
@@ -202,7 +205,15 @@ type gcp_kms = {
   gcloud_path : string;
 }
 
+type performance_profile = Default | Performance
+
+type telemetry_config = {
+  config : Octez_telemetry.Opentelemetry_config.t;
+  trace_host_functions : bool;
+}
+
 type t = {
+  data_dir : string;
   public_rpc : rpc;
   private_rpc : rpc option;
   websockets : websockets_config option;
@@ -212,21 +223,19 @@ type t = {
   observer : observer option;
   proxy : proxy;
   gcp_kms : gcp_kms;
-  tx_pool_timeout_limit : int64;
-  tx_pool_addr_limit : int64;
-  tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
-  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  opentelemetry : telemetry_config;
+  tx_queue : tx_queue;
+  performance_profile : performance_profile;
 }
-
-val is_tx_queue_enabled : t -> bool
 
 (** [chain_family_from_l2_chains t] returns the chain_family in
   the experimental feature if there's only one chain.
@@ -243,31 +252,32 @@ val pp_history_mode_info : Format.formatter -> history_mode -> unit
 
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
 
+val performance_profile_encoding : performance_profile Data_encoding.t
+
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir].
 
     If [encoding] is passed, some default values are set according to the
     selected network, for a more straightforward UX. *)
-val encoding : ?network:supported_network -> string -> t Data_encoding.t
+val encoding : ?network:supported_network -> unit -> t Data_encoding.t
 
 (** Encoding for {!type-rpc_server}. *)
 val rpc_server_encoding : rpc_server Data_encoding.t
 
-(** [save ~force ~data_dir configuration config_file] writes the
-    [config_file] file. If [force] is [true], existing configurations are
+(** [save ~force configuration config_file] writes the [config_file]
+    file. If [force] is [true], existing configurations are
     overwritten. *)
-val save : force:bool -> data_dir:string -> t -> string -> unit tzresult Lwt.t
+val save : force:bool -> t -> string -> unit tzresult Lwt.t
 
-val load_file :
-  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
+val load_file : ?network:supported_network -> string -> t tzresult Lwt.t
 
-(** [load ~data_dir config_file] loads the configuration stored in
-    [config_file] with preimage directory relative to [data_dir]. *)
-val load :
-  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
+(** [load config_file] loads the configuration stored in
+    [config_file] with preimage directory relative to [data_dir] or
+    [config.data_dir]. *)
+val load : ?network:supported_network -> string -> t tzresult Lwt.t
 
-(** [sequencer_key config] returns the key the sequencer should use, or
+(** [sequencer_keys config] returns the keys the sequencer should use, or
     fails. *)
-val sequencer_key : t -> sequencer_key tzresult
+val sequencer_keys : t -> sequencer_key list tzresult
 
 val gcp_key_from_string_opt : string -> gcp_key option
 
@@ -294,18 +304,27 @@ val gc_param_from_retention_period : days:int -> garbage_collector_parameters
 
 val default_history_mode : history_mode
 
+val default_data_dir : string
+
+val get_data_dir : data_dir:string option -> string
+
+val config_filename :
+  data_dir:string option -> ?config_file:string -> unit -> string
+
+val preimages_path : t -> string
+
 module Cli : sig
   val create :
-    data_dir:string ->
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
@@ -317,7 +336,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -332,19 +351,22 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     unit ->
     t
 
   val patch_configuration_from_args :
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
@@ -356,7 +378,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -370,20 +392,22 @@ module Cli : sig
     ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
+    ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     t ->
     t
 
   val create_or_read_config :
-    data_dir:string ->
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
@@ -395,7 +419,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
@@ -410,6 +434,8 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     string ->
     t tzresult Lwt.t
 end
@@ -422,7 +448,7 @@ val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit
     standard output. *)
 val describe : unit -> unit
 
-val pp_print_json : data_dir:string -> Format.formatter -> t -> unit
+val pp_print_json : Format.formatter -> t -> unit
 
 val observer_evm_node_endpoint : supported_network -> string
 

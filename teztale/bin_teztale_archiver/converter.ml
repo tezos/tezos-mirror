@@ -20,7 +20,8 @@ let to_received_ops ctx endpoint auth level data =
   let received_ops =
     List.map
       (fun Data.Delegate_operations.
-             {delegate; first_slot; attesting_power; operations} ->
+             {delegate; first_slot; attesting_power; operations}
+         ->
         ( Consensus_ops.{address = delegate; first_slot; power = attesting_power},
           List.flatten
             (List.map
@@ -31,10 +32,12 @@ let to_received_ops ctx endpoint auth level data =
                         round;
                         mempool_inclusion;
                         block_inclusion = _;
-                      } ->
+                      }
+                  ->
                  List.map
                    (fun Data.Delegate_operations.
-                          {source = _; reception_time; errors} ->
+                          {source = _; reception_time; errors}
+                      ->
                      let maybe_faked_hash =
                        if Operation_hash.equal hash Operation_hash.zero then
                          fake_hash level round delegate kind
@@ -83,11 +86,13 @@ let included_ops_map level data =
   List.fold_left
     (fun acc
          Data.Delegate_operations.
-           {delegate; first_slot = _; attesting_power; operations} ->
+           {delegate; first_slot = _; attesting_power; operations}
+       ->
       List.fold_left
         (fun acc
              Data.Delegate_operations.
-               {hash; kind; round; mempool_inclusion = _; block_inclusion} ->
+               {hash; kind; round; mempool_inclusion = _; block_inclusion}
+           ->
           List.fold_left
             (fun acc block ->
               let maybe_faked_hash =

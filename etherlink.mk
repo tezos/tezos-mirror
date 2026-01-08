@@ -16,14 +16,15 @@ endif
 .PHONY: all
 all: build-dev-deps check test build
 
-.PHONY: evm-execution
-evm-execution:
-	@$(MAKE) -C ${KERNEL_DIR} build-evm-execution
-
 .PHONY: evm-evaluation-assessor
 evm-evaluation-assessor:
 	@$(MAKE) -C ${KERNEL_DIR} build-evm-evaluation
 	@cp ${KERNEL_DIR}/target/release/evm-evaluation $@
+
+.PHONY: revm-evaluation-assessor
+revm-evaluation-assessor:
+	@$(MAKE) -C ${KERNEL_DIR} build-revm-evaluation
+	@cp ${KERNEL_DIR}/target/release/revm-evaluation $@
 
 evm_kernel_debug.wasm::
 	@$(MAKE) -C ${KERNEL_DIR} build-debug
@@ -84,7 +85,7 @@ evm_installer_dev.wasm::
 	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm
 
 .PHONY: build
-build: ${KERNELS} evm-evaluation-assessor evm-execution kernel_sdk
+build: ${KERNELS} evm-evaluation-assessor kernel_sdk revm-evaluation-assessor
 
 .PHONY: clang-supports-wasm
 clang-supports-wasm:

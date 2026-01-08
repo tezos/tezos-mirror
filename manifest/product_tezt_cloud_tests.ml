@@ -24,6 +24,8 @@ let _main =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_cloud |> open_;
         tezt_etherlink;
+        tezt_benchmark_lib;
+        octez_stdlib_unix;
       ]
     ~release_status:Unreleased
     ~with_macos_security_framework:true

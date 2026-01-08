@@ -1,5 +1,8 @@
 # runtime + datadog client + basic utils
 
+ARG GCLOUD_VERSION=${GCLOUD_VERSION:-null}
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:$GCLOUD_VERSION-alpine as gcloud
+
 # hadolint ignore=DL3006
 FROM runtime as monitoring
 
@@ -7,13 +10,19 @@ LABEL org.opencontainers.image.title="monitoring"
 
 USER root
 
+# install gcloud to setup GOOGLE_APPLICATION_CREDENTIALS easily
+# hadolint ignore=DL3022
+COPY --from=gcloud /google-cloud-sdk/ /usr/local/gcloud/google-cloud-sdk/
+ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+
 # [jq] and [curl] are used in the job that parses Container Scanning
 # vulnerability report and sends a notification via a Slack Webhook.
 # These utilities are also used in other Docker images built from this one.
 
-# hadolint ignore=DL3018,DL3019
-RUN apk update && apk add --no-cache npm curl jq
+# python3 py3-crcmod are needed to run gcloud
 
+# hadolint ignore=DL3018,DL3019
+RUN apk update && apk add --no-cache npm curl jq python3 py3-crcmod
 
 # Set NPM registry
 # NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD

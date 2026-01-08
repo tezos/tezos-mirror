@@ -489,8 +489,8 @@ module P256 : SIGNATURE = struct
   let to_bytes : type a. a key -> Bytes.t =
    fun key -> to_bytes_with_compression ~compress:true key
 
-  let blit_to_bytes_with_compression :
-      type a. ?compress:bool -> a key -> ?pos:int -> Bytes.t -> unit =
+  let blit_to_bytes_with_compression : type a.
+      ?compress:bool -> a key -> ?pos:int -> Bytes.t -> unit =
    fun ?compress:(comp = true) key ?(pos = 0) buf ->
     match key with
     | Sk sk ->

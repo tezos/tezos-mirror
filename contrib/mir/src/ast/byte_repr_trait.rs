@@ -1,15 +1,13 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Trait for values representable by either raw bytes or base58check-derived
 //! strings and related types.
 
 use tezos_crypto_rs::base58::FromBase58CheckError;
 use tezos_crypto_rs::hash::FromBytesError;
+use tezos_protocol::entrypoint;
 
 /// Errors that can happen when working with [ByteReprTrait].
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -22,6 +20,9 @@ pub enum ByteReprError {
     /// the contained string.
     #[error("wrong format: {0}")]
     WrongFormat(String),
+    /// Error decoding
+    #[error("Decode error: {0}")]
+    DecodeError(String),
 }
 
 impl From<FromBase58CheckError> for ByteReprError {
@@ -33,6 +34,18 @@ impl From<FromBase58CheckError> for ByteReprError {
 impl From<FromBytesError> for ByteReprError {
     fn from(value: FromBytesError) -> Self {
         Self::WrongFormat(value.to_string())
+    }
+}
+
+impl From<tezos_data_encoding::nom::error::DecodeError<&[u8]>> for ByteReprError {
+    fn from(value: tezos_data_encoding::nom::error::DecodeError<&[u8]>) -> Self {
+        Self::DecodeError(format!("{value:?}"))
+    }
+}
+
+impl From<entrypoint::ByteReprError> for ByteReprError {
+    fn from(entrypoint::ByteReprError::WrongFormat(err): entrypoint::ByteReprError) -> Self {
+        Self::WrongFormat(err)
     }
 }
 

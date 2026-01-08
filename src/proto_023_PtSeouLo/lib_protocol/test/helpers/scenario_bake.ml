@@ -107,8 +107,8 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
           let u_rpc =
             List.map
               (fun ({cycle; deposit} :
-                     Plugin.Delegate_services.deposit_per_cycle) ->
-                (cycle, deposit))
+                     Plugin.Delegate_services.deposit_per_cycle)
+                 -> (cycle, deposit))
               u_rpc
           in
           let finalizable_cycle =
@@ -285,7 +285,14 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
-  let* block' = Block.bake ?policy ~adaptive_issuance_vote block in
+  let* block' =
+    Block.bake
+      ~baking_mode:Baking
+      ?policy
+      ~operations:state.pending_operations
+      ~adaptive_issuance_vote
+      block
+  in
   let* i =
     Incremental.begin_construction
       ?payload_round
@@ -350,12 +357,12 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let* () =
     List.iter_es
       (fun f -> f metadata (block, state))
-      state.check_finalized_block_perm
+      state.check_finalized_every_block
   in
   let* () =
     List.iter_es
       (fun f -> f metadata (block, state))
-      state.check_finalized_block_temp
+      state.check_finalized_current_block
   in
   (* Dawn of a new cycle: update finalizables *)
   (* Note: this is done after the checks, because it is not observable by RPCs by calling
@@ -373,7 +380,7 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let state =
     {
       state with
-      check_finalized_block_temp = [];
+      check_finalized_current_block = [];
       previous_metadata = Some metadata;
       grandparent = previous_block;
     }

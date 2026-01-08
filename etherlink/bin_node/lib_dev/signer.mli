@@ -7,9 +7,22 @@
 
 type t
 
+type map
+
 val wallet : #Client_context.wallet -> Client_keys.sk_uri -> t
 
-val gcp_kms : Gcp_kms.t -> t
+val of_sequencer_keys :
+  Configuration.t ->
+  #Client_context.wallet ->
+  Configuration.sequencer_key list ->
+  map tzresult Lwt.t
+
+(** Get the first lexicographic signer from the map.
+It's not very useful but it's used in the sandbox node to have
+a first signer. Shouldn't be used in production. *)
+val first_lexicographic_signer : map -> (Signature.public_key * t) tzresult
+
+val get_signer : map -> Signature.public_key -> t tzresult
 
 val of_sequencer_key :
   Configuration.t ->

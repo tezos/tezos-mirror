@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_agnostic_baker_024_PtTALLiN)
+ (public_name octez-protocol-024-PtTALLiN-libs.agnostic-baker)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-protocol-024-PtTALLiN-libs.client
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.baking
+  octez-protocol-024-PtTALLiN-libs.baking-commands
+  octez-baker-lib)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_baking_024_PtTALLiN
+  -open Tezos_baking_024_PtTALLiN_commands
+  -open Octez_agnostic_baker))

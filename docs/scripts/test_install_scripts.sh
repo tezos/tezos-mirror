@@ -18,8 +18,11 @@ UBUNTU_NOBLE=public.ecr.aws/lts/ubuntu:24.04_stable
 # Ubuntu Jammy 22.04 LTS:
 UBUNTU_JAMMY=public.ecr.aws/lts/ubuntu:22.04_stable
 
-# Debian stable
+# Debian oldstable
 DEBIAN_BOOKWORM=debian:bookworm
+
+# Debian stable
+DEBIAN_TRIXIE=debian:trixie
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 DOCS_DIR="$(dirname "$SCRIPT_DIR")"
@@ -34,9 +37,11 @@ where <test-name> can be:
 * install-bin-rc-noble
 * install-bin-rc-jammy
 * install-bin-bookworm
+* install-bin-trixie
 * install-bin-rc-bookworm
 * install-opam-scratch
 * install-opam-jammy
+* install-opam-noble
 * compile-release-sources-bookworm
 * compile-sources-bookworm
 * compile-sources-oracular
@@ -70,6 +75,9 @@ for test_case in "$@"; do
   "install-bin-bookworm")
     docker run --rm -i -e RELEASETYPE=Master -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm"
     ;;
+  "install-bin-trixie")
+    docker run --rm -i -e RELEASETYPE=Master -v "$DOCS_DIR/..":/Tezos "$DEBIAN_TRIXIE" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian trixie"
+    ;;
   "install-bin-rc-bookworm")
     docker run --rm -i -e RELEASETYPE=ReleaseCandidate -e GCP_LINUX_PACKAGES_BUCKET=tezos-linux-repo -v "$DOCS_DIR/..":/Tezos "$DEBIAN_BOOKWORM" /bin/sh -c "cd Tezos; ./docs/introduction/install-bin-deb.sh debian bookworm rc"
     ;;
@@ -78,6 +86,9 @@ for test_case in "$@"; do
     ;;
   "install-opam-jammy")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-22.04 /Scripts/install-opam.sh
+    ;;
+  "install-opam-noble")
+    docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-24.04 /Scripts/install-opam.sh
     ;;
   "compile-release-sources-bookworm")
     docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-12 /Scripts/compile-sources.sh tezos/tezos latest-release

@@ -17,6 +17,7 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+  fa_deposit : string;
 }
 
 type multichain_sequencer_setup = {
@@ -51,6 +52,12 @@ type sequencer_setup = {
   evm_version : Evm_version.t;
   enable_multichain : bool;
   l2_chains : Evm_node.l2_setup list;
+}
+
+type tx_queue_config = {
+  max_lifespan : int;
+  max_size : int;
+  tx_per_addr_limit : int;
 }
 
 let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
@@ -125,7 +132,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       ~prg:(admin_path ())
       ~burn_cap:Tez.one
       client
-    (* Originates the administrator contract. *)
+  (* Originates the administrator contract. *)
   and* sequencer_governance =
     Client.originate_contract
       ~alias:"evm-sequencer-admin"
@@ -137,8 +144,17 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
+  (* Originates the FA deposit contract. *)
+  let* fa_deposit =
+    Client.originate_contract
+      ~alias:"fa-deposit"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap3.public_key_hash
+      ~prg:(fa_deposit_path ())
+      ~burn_cap:Tez.one
+      client
   (* Originates the ticket router tester (FA bridge) contract. *)
-  let* ticket_router_tester =
+  and* ticket_router_tester =
     Client.originate_contract
       ~alias:"ticket-router-tester"
       ~amount:Tez.zero
@@ -159,6 +175,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       admin;
       sequencer_governance;
       ticket_router_tester;
+      fa_deposit;
     }
 
 let run_new_rpc_endpoint evm_node =
@@ -166,6 +183,7 @@ let run_new_rpc_endpoint evm_node =
     Evm_node.create
       ~data_dir:(Evm_node.data_dir evm_node)
       ~mode:(Rpc Evm_node.(mode evm_node))
+      ?config_file:Evm_node.(config_file evm_node)
       (Evm_node.endpoint evm_node)
   in
   let* () = Evm_node.run rpc_node in
@@ -176,8 +194,8 @@ let observer_counter =
   ref 0
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?enable_tx_queue
-    ?l2_chain evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?tx_queue ?l2_chain
+    evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
@@ -192,9 +210,9 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     else patch_config
   in
   let patch_config =
-    match (rpc_server, enable_tx_queue) with
-    | None, None -> patch_config
-    | _, _ ->
+    match rpc_server with
+    | None -> patch_config
+    | _ ->
         fun c ->
           Evm_node.patch_config_with_experimental_feature
             ?l2_chains:
@@ -202,7 +220,6 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
               | None -> None
               | Some l2_chain -> Some [l2_chain])
             ?rpc_server
-            ?enable_tx_queue
             ()
           @@ patch_config c
   in
@@ -212,7 +229,13 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
         initial_kernel;
         preimages_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
-        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        rollup_node_endpoint = Option.map Sc_rollup_node.endpoint sc_rollup_node;
+        tx_queue_max_lifespan =
+          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
+        tx_queue_max_size =
+          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
+        tx_queue_tx_per_addr_limit =
+          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
       }
   in
   let* observer =
@@ -230,12 +253,18 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ?evm_version ~sequencer ~preimages_dir ~kernel () =
+    ?evm_version ?with_runtimes ~sequencer ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
+  let tez_bootstrap_accounts =
+    (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
+    if not Tezosx_runtime.(mem Tezos with_runtimes) then []
+    else tez_bootstrap_accounts
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
       ?max_delayed_inbox_blueprint_length
@@ -259,10 +288,11 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
       ~eth_bootstrap_accounts
+      ~tez_bootstrap_accounts
       ~output:output_config
       ?evm_version
       ?enable_fa_bridge
-      ~enable_revm
+      ?with_runtimes
       ()
   in
   let* {output; _} =
@@ -323,7 +353,7 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
 let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
     ~sequencer ~preimages_dir ?evm_version ~kernel ~client () =
   let l2_chain_ids = List.map (fun l2 -> l2.Evm_node.l2_chain_id) l2_setups in
@@ -399,7 +429,6 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?eth_bootstrap_accounts
       ~output:rollup_config
       ?enable_fa_bridge
-      ~enable_revm
       ?evm_version
       ()
   in
@@ -415,8 +444,8 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ~sequencer
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
-    ~preimages_dir ~kernel ?evm_version ~client () =
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
+    ?evm_version ?with_runtimes ~client () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -438,9 +467,10 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts:chain_config.Evm_node.eth_bootstrap_accounts
+      ?tez_bootstrap_accounts:chain_config.Evm_node.tez_bootstrap_accounts
       ?enable_fa_bridge
-      ~enable_revm
       ?evm_version
+      ?with_runtimes
       ~preimages_dir
       ~kernel
       ())
@@ -456,7 +486,6 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?maximum_allowed_ticks
       ~enable_dal
       ?enable_fa_bridge
-      ~enable_revm
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
@@ -473,19 +502,64 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
-    ?(kernel = Constant.WASM.evm_kernel) ?evm_version ?preimages_dir
-    ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ~enable_revm ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?(additional_sequencer_keys = []) ?(kernel = Constant.WASM.evm_kernel)
+    ?evm_version ?preimages_dir ?maximum_allowed_ticks
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
+    ?history_mode ?spawn_rpc ?periodic_snapshot_path ?(signatory = false)
+    ?tx_queue ?(sequencer_sunset_sec = 0) ?with_runtimes protocol =
   let* node, client =
     setup_l1
       ?commitment_period
       ?challenge_window
       ?timestamp:genesis_timestamp
       protocol
+  in
+  let* remote_signer, client2 =
+    if not signatory then return (None, client)
+    else
+      let* signer =
+        Signatory.create
+        @@ List.map
+             (fun account ->
+               Signatory.
+                 {
+                   account;
+                   active = true;
+                   log_payloads = true;
+                   restrictions =
+                     [
+                       `Generic
+                         [
+                           `Smart_rollup_add_messages;
+                           `Smart_rollup_cement;
+                           `Smart_rollup_execute_outbox_message;
+                           `Smart_rollup_originate;
+                           `Smart_rollup_publish;
+                           `Smart_rollup_recover_bond;
+                           `Smart_rollup_refute;
+                           `Smart_rollup_timeout;
+                         ];
+                     ];
+                 })
+             Constant.all_secret_keys
+      in
+      let* () = Signatory.run signer in
+      let signer_port = Signatory.port signer in
+      let remote_signer =
+        Uri.of_string ("http://localhost:" ^ string_of_int signer_port)
+      in
+      let client = Client.create ~endpoint:(Node node) ~remote_signer () in
+      let* () =
+        Lwt_list.iter_s
+          (fun Account.{alias; public_key_hash; _} ->
+            Client.import_secret_key client (Remote public_key_hash) ~alias)
+          Constant.all_secret_keys
+      in
+      return (Some remote_signer, client)
   in
   let* dal_node =
     if enable_dal then
@@ -504,9 +578,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~default_operator:Constant.bootstrap1.public_key_hash
       Operator
       node
-      ~base_dir:(Client.base_dir client)
+      ~base_dir:(Client.base_dir client2)
       ?dal_node
       ?history_mode:rollup_history_mode
+      ?remote_signer
   in
   let preimages_dir =
     Option.value
@@ -532,7 +607,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?evm_version
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
-      ~enable_revm
+      ?with_runtimes
       ~preimages_dir
       ~kernel
       ~client
@@ -543,7 +618,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ output)
-      ~parameters_ty:Test_helpers.evm_type
+      ~parameters_ty:Rollup.evm_type
       client
   in
   let* () =
@@ -562,7 +637,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?spawn_rpc
-      ?enable_tx_queue
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -574,7 +648,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_tx_queue
       ?periodic_snapshot_path
       ()
   in
@@ -585,7 +658,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_tx_queue
       ?periodic_snapshot_path
       ()
   in
@@ -596,7 +668,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
         preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
-        sequencer = sequencer.alias;
+        sequencer_keys =
+          List.map
+            (fun (k : Account.key) -> k.alias)
+            (sequencer :: additional_sequencer_keys);
         genesis_timestamp;
         max_blueprints_lag;
         max_blueprints_ahead;
@@ -604,10 +679,14 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
         catchup_cooldown;
         max_number_of_chunks;
         wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_queue_max_lifespan =
+          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
+        tx_queue_max_size =
+          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
+        tx_queue_tx_per_addr_limit =
+          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
         dal_slots;
+        sequencer_sunset_sec = Some sequencer_sunset_sec;
       }
   in
   let* sequencer =
@@ -625,18 +704,18 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       (fun _l2 ->
         run_new_observer_node
           ~patch_config:obs_patch_config
-          ~sc_rollup_node
+          ~sc_rollup_node:(Some sc_rollup_node)
           ?rpc_server
           ?websockets
           ?history_mode
-          ?enable_tx_queue
+          ?tx_queue
           sequencer)
       l2_chains
   in
   (* Launching the sequencer made it produced the first blueprint, we
      need to bake a block to include it in the inbox, which will
      trigger the installation of the kernel in the rollup. *)
-  let* _lvl = Test_helpers.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* proxies =
     Lwt_list.map_s
       (fun _l2 ->
@@ -675,14 +754,14 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?commitment_period ?challenge_window
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ?kernel
+    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
-    ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_chains protocol =
+    ?websockets ?history_mode ?spawn_rpc ?periodic_snapshot_path ?signatory
+    ?l2_chains ?sequencer_sunset_sec ?with_runtimes protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
     Option.value
@@ -719,12 +798,12 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?delayed_inbox_min_levels
       ?max_number_of_chunks
       ?sequencer
+      ?additional_sequencer_keys
       ?kernel
       ?preimages_dir
       ?maximum_allowed_ticks
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
-      ~enable_revm
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?blueprints_publisher_order_enabled
@@ -737,9 +816,11 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~enable_multichain
       ~l2_chains
       ?rpc_server
-      ?enable_tx_queue
       ?spawn_rpc
       ?periodic_snapshot_path
+      ?signatory
+      ?sequencer_sunset_sec
+      ?with_runtimes
       protocol
   in
   return (multichain_setup_to_single ~setup:sequencer_setup)
@@ -751,16 +832,17 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?tez_bootstrap_contracts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ~enable_revm ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?commitment_period ?challenge_window
-    ?(uses = uses) ?(additional_uses = []) ?rollup_history_mode ~enable_dal
+    ?tez_bootstrap_contracts ?sequencer ?additional_sequencer_keys
+    ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?(uses = uses) ?(additional_uses = [])
+    ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
-    protocols =
+    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
+    ?sequencer_sunset_sec ?with_runtimes body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -810,12 +892,12 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?delayed_inbox_min_levels
         ?max_number_of_chunks
         ?sequencer
+        ?additional_sequencer_keys
         ~kernel:kernel_use
         ?preimages_dir
         ?maximum_allowed_ticks
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
-        ~enable_revm
         ?enable_fast_withdrawal
         ?enable_fast_fa_withdrawal
         ?rollup_history_mode
@@ -826,9 +908,12 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_multichain
         ~l2_chains
         ?rpc_server
-        ?enable_tx_queue
+        ?tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?signatory
+        ?sequencer_sunset_sec
+        ?with_runtimes
         protocol
     in
     body sequencer_setup protocol
@@ -836,30 +921,26 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
   let tags =
     (if enable_dal then ["dal"] else [])
     @ (if enable_multichain then ["multichain_enabled"] else [])
-    @ (if enable_revm then ["revm"] else [])
     @ tags
   in
   let title =
     sf
-      "%s (%s, %s, %s, %s)"
+      "%s (%s, %s, %s)"
       title
       kernel_tag
       (if enable_dal then "with dal" else "without dal")
       (if enable_multichain then "multichain" else "single chain")
-      (if enable_revm then "with revm" else "without revm")
   in
   if
     (* Only register DAL tests for supporting kernels *)
-    ((not enable_dal) || Kernel.supports_dal kernel)
-    && (* Only register REVM tests for supporting kernels *)
-    ((not enable_revm) || Kernel.supports_revm kernel)
+    (not enable_dal) || Kernel.supports_dal kernel
   then
     Protocol.register_test
       ~additional_tags:(function
         | Alpha -> []
         | _ ->
             (* There is no point in testing the multichain feature on non-alpha protocols *)
-            [(if enable_multichain then Tag.ci_disabled else Tag.extra)])
+            [Tag.ci_disabled])
       ~__FILE__
       ~uses:(fun protocol -> uses protocol @ additional_uses)
       body
@@ -875,14 +956,15 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
-    ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
-    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups body ~title
-    ~tags protocols =
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ~kernel
+    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?commitment_period ?challenge_window ?uses ?additional_uses
+    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes body ~title ~tags
+    protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -903,6 +985,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~eth_bootstrap_accounts
     ~tez_bootstrap_accounts
     ?sequencer
+    ?additional_sequencer_keys
     ?sequencer_pool_address
     ~kernel
     ?da_fee
@@ -912,7 +995,6 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge
-    ~enable_revm
     ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal
     ?commitment_period
@@ -926,10 +1008,13 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rpc_server
     ?websockets
     ?history_mode
-    ?enable_tx_queue
+    ?tx_queue
     ?spawn_rpc
     ?periodic_snapshot_path
+    ?signatory
     ~l2_setups
+    ?sequencer_sunset_sec
+    ?with_runtimes
     body
     ~title
     ~tags
@@ -942,14 +1027,15 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ~enable_revm ?rollup_history_mode ?commitment_period
-    ?challenge_window ?additional_uses ~enable_dal ?dal_slots ~enable_multichain
-    ?rpc_server ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
-    ~title ~tags body protocols =
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
+    ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
+    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode ?tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
+    ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -971,6 +1057,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~eth_bootstrap_accounts
         ~tez_bootstrap_accounts
         ?sequencer
+        ?additional_sequencer_keys
         ?sequencer_pool_address
         ~kernel
         ?da_fee
@@ -980,7 +1067,6 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?maximum_gas_per_transaction
         ?max_blueprint_lookahead_in_seconds
         ?enable_fa_bridge
-        ~enable_revm
         ?enable_fast_withdrawal
         ?enable_fast_fa_withdrawal
         ?additional_uses
@@ -991,10 +1077,12 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_dal
         ?dal_slots
         ~enable_multichain
-        ?enable_tx_queue
+        ?tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?signatory
         ?l2_setups
+        ?sequencer_sunset_sec
         ~title
         ~tags
         body
@@ -1012,21 +1100,14 @@ type feature_test_registration =
 
 let default_dal_registration =
   Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
+    {additional_tags_with = [Tag.ci_disabled]; additional_tags_without = []}
 
 let ci_enabled_dal_registration =
   Register_both {additional_tags_with = []; additional_tags_without = []}
 
 let default_multichain_registration =
   Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
-
-(* By default REVM is completely disabled. *)
-let default_revm_registration = Register_without_feature
-
-(* Use this value to register a specific test in the CI. *)
-let activate_revm_registration =
-  Register_both {additional_tags_with = []; additional_tags_without = []}
+    {additional_tags_with = [Tag.ci_disabled]; additional_tags_without = []}
 
 (* Register all variants of a test. *)
 let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
@@ -1034,16 +1115,17 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
+    ?tez_bootstrap_accounts ?sequencer ?additional_sequencer_keys
+    ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration)
-    ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
+    ?(use_multichain = default_multichain_registration) ?tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
+    ~tags body protocols =
   let register_cases = function
     | Register_both {additional_tags_with; additional_tags_without} ->
         [(false, additional_tags_without); (true, additional_tags_with)]
@@ -1052,68 +1134,66 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
   in
   let dal_cases = register_cases use_dal in
   let multichain_cases = register_cases use_multichain in
-  let revm_cases = register_cases use_revm in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
      Also register the tests with and without FA bridge feature flag. *)
   List.iter
     (fun (enable_dal, dal_tags) ->
       List.iter
         (fun (enable_multichain, multichain_tags) ->
-          List.iter
-            (fun (enable_revm, revm_tags) ->
-              (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
-                 we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
-              let spawn_rpc =
-                match spawn_rpc with
-                | None when enable_multichain -> Some (Port.fresh ())
-                | _ -> spawn_rpc
-              in
-              register_test_for_kernels
-                ~__FILE__
-                ?max_delayed_inbox_blueprint_length
-                ?sequencer_rpc_port
-                ?sequencer_private_rpc_port
-                ?commitment_period
-                ?challenge_window
-                ?genesis_timestamp
-                ?time_between_blocks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ?delayed_inbox_timeout
-                ?delayed_inbox_min_levels
-                ?max_number_of_chunks
-                ?eth_bootstrap_accounts
-                ?tez_bootstrap_accounts
-                ?sequencer
-                ?sequencer_pool_address
-                ~kernels
-                ?da_fee
-                ?minimum_base_fee_per_gas
-                ?preimages_dir
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?max_blueprint_lookahead_in_seconds
-                ?enable_fa_bridge
-                ~enable_revm
-                ?enable_fast_withdrawal
-                ?enable_fast_fa_withdrawal
-                ?additional_uses
-                ?rpc_server
-                ?websockets
-                ?history_mode
-                ?rollup_history_mode
-                ~enable_dal
-                ~enable_multichain
-                ?enable_tx_queue
-                ?spawn_rpc
-                ?periodic_snapshot_path
-                ?l2_setups
-                ~title
-                ~tags:(dal_tags @ multichain_tags @ revm_tags @ tags)
-                body
-                protocols)
-            revm_cases)
+          (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
+             we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
+          let spawn_rpc =
+            match spawn_rpc with
+            | None when enable_multichain -> Some (Port.fresh ())
+            | _ -> spawn_rpc
+          in
+          register_test_for_kernels
+            ~__FILE__
+            ?max_delayed_inbox_blueprint_length
+            ?sequencer_rpc_port
+            ?sequencer_private_rpc_port
+            ?commitment_period
+            ?challenge_window
+            ?genesis_timestamp
+            ?time_between_blocks
+            ?max_blueprints_lag
+            ?max_blueprints_ahead
+            ?max_blueprints_catchup
+            ?catchup_cooldown
+            ?delayed_inbox_timeout
+            ?delayed_inbox_min_levels
+            ?max_number_of_chunks
+            ?eth_bootstrap_accounts
+            ?tez_bootstrap_accounts
+            ?sequencer
+            ?additional_sequencer_keys
+            ?sequencer_pool_address
+            ~kernels
+            ?da_fee
+            ?minimum_base_fee_per_gas
+            ?preimages_dir
+            ?maximum_allowed_ticks
+            ?maximum_gas_per_transaction
+            ?max_blueprint_lookahead_in_seconds
+            ?enable_fa_bridge
+            ?enable_fast_withdrawal
+            ?enable_fast_fa_withdrawal
+            ?additional_uses
+            ?rpc_server
+            ?websockets
+            ?history_mode
+            ?rollup_history_mode
+            ~enable_dal
+            ~enable_multichain
+            ?tx_queue
+            ?spawn_rpc
+            ?periodic_snapshot_path
+            ?signatory
+            ?l2_setups
+            ?sequencer_sunset_sec
+            ~title
+            ~tags:(dal_tags @ multichain_tags @ tags)
+            body
+            protocols)
         multichain_cases)
     dal_cases

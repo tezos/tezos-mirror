@@ -67,7 +67,7 @@ module Q = struct
       You can review the result at
       [tezt/tests/expected/dal.ml/DAL Node- debug print store schemas.out].
     *)
-    let version = 2
+    let version = 1
 
     let all : Dal_node_migrations.migration list =
       Dal_node_migrations.migrations version
@@ -138,7 +138,9 @@ module Types = struct
 
   open Tezos_dal_node_services.Types
 
-  let attested_level : level Caqti_type.t = int32
+  let published_level : level Caqti_type.t = int32
+
+  let attestation_lag : int Caqti_type.t = int16
 
   let dal_slot_index : slot_index Caqti_type.t = int16
 
@@ -173,27 +175,46 @@ module Skip_list_cells = struct
       WHERE hash = $1
       |sql}
 
+    (* Returns the skip list cell together with its attestation_lag *)
     let find_by_slot_id_opt :
-        (level * slot_index, Skip_list_cell.t, [`One | `Zero]) t =
+        (level * slot_index, Skip_list_cell.t * int, [`One | `Zero]) t =
       let open Caqti_type.Std in
-      (t2 attested_level dal_slot_index ->? skip_list_cell)
+      (t2 published_level dal_slot_index ->? t2 skip_list_cell attestation_lag)
       @@ {sql|
-      SELECT cell
-      FROM skip_list_cells
-      WHERE hash = (
-        SELECT skip_list_cell_hash
-        FROM skip_list_slots
-        WHERE attested_level = $1 AND slot_index = $2
-      )|sql}
+       SELECT c.cell, s.attestation_lag
+       FROM skip_list_cells AS c
+       JOIN skip_list_slots AS s
+         ON s.skip_list_cell_hash = c.hash
+       WHERE s.published_level = $1 AND s.slot_index = $2
+       |sql}
+
+    let find_by_level :
+        ( level,
+          Skip_list_cell.t * Skip_list_hash.t * int,
+          [`Zero | `One | `Many] )
+        t =
+      let open Caqti_type.Std in
+      (published_level ->* t3 skip_list_cell skip_list_hash int)
+      @@ {sql|
+        SELECT c.cell, c.hash, s.slot_index
+        FROM skip_list_cells AS c
+        JOIN skip_list_slots AS s
+        ON s.skip_list_cell_hash = c.hash
+        WHERE s.published_level = $1
+        ORDER BY s.slot_index DESC
+      |sql}
 
     let insert_skip_list_slot :
-        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) t =
-      (t3 attested_level dal_slot_index skip_list_hash ->. unit)
+        (level * slot_index * int * Skip_list_hash.t, unit, [`Zero]) t =
+      (t4 published_level dal_slot_index attestation_lag skip_list_hash ->. unit)
       @@ {sql|
       INSERT INTO skip_list_slots
-      (attested_level, slot_index, skip_list_cell_hash)
-      VALUES ($1, $2, $3)
-      ON CONFLICT(attested_level, slot_index) DO UPDATE SET skip_list_cell_hash = $3
+      (published_level, slot_index, attestation_lag, skip_list_cell_hash)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT(published_level, slot_index)
+      DO UPDATE SET
+        attestation_lag = excluded.attestation_lag,
+        skip_list_cell_hash = excluded.skip_list_cell_hash
       |sql}
 
     let insert_skip_list_cell :
@@ -207,20 +228,20 @@ module Skip_list_cells = struct
       |sql}
 
     let delete_skip_list_cell : (level, unit, [`Zero]) t =
-      (attested_level ->. unit)
+      (published_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_cells
       WHERE hash IN (
         SELECT skip_list_cell_hash
         FROM skip_list_slots
-        WHERE attested_level = $1)
+        WHERE published_level = $1)
       |sql}
 
     let delete_skip_list_slot : (level, unit, [`Zero]) t =
-      (attested_level ->. unit)
+      (published_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_slots
-      WHERE attested_level = $1
+      WHERE published_level = $1
       |sql}
   end
 
@@ -228,27 +249,39 @@ module Skip_list_cells = struct
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.find_opt skip_list_hash
 
-  let find_by_slot_id_opt ?conn store ~attested_level ~slot_index =
+  let find_by_slot_id_opt ?conn store slot_id =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find_opt conn Q.find_by_slot_id_opt (attested_level, slot_index)
+    Sqlite.Db.find_opt
+      conn
+      Q.find_by_slot_id_opt
+      ( slot_id.Tezos_dal_node_services.Types.Slot_id.slot_level,
+        slot_id.slot_index )
 
-  let remove ?conn store ~attested_level =
+  let find_by_level ?conn store ~published_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.find_by_level published_level
+
+  let remove ?conn store ~published_level =
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
-    let* () = Sqlite.Db.exec conn Q.delete_skip_list_cell attested_level in
-    let* () = Sqlite.Db.exec conn Q.delete_skip_list_slot attested_level in
+    let* () = Sqlite.Db.exec conn Q.delete_skip_list_cell published_level in
+    let* () = Sqlite.Db.exec conn Q.delete_skip_list_slot published_level in
     return_unit
 
-  let insert ?conn store ~attested_level items =
+  let insert ?conn store ~attested_level items extract =
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
     List.iter_es
-      (fun (cell_hash, cell, slot_index) ->
+      (fun item ->
+        let cell_hash, cell, slot_index, attestation_lag = extract item in
+        let published_level =
+          Int32.(sub attested_level (of_int attestation_lag))
+        in
         let* () =
           Sqlite.Db.exec
             conn
             Q.insert_skip_list_slot
-            (attested_level, slot_index, cell_hash)
+            (published_level, slot_index, attestation_lag, cell_hash)
         in
         Sqlite.Db.exec conn Q.insert_skip_list_cell (cell_hash, cell))
       items

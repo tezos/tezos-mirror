@@ -5,8 +5,8 @@ if [ $# -eq 0 ]; then
   # No arguments are not provided. Assume we're running in a tag
   # pipeline and set package_name accordingly.
 
-  # shellcheck source=./scripts/ci/octez-release.sh
-  . ./scripts/ci/octez-release.sh
+  # shellcheck source=./scripts/releases/octez-release.sh
+  . ./scripts/releases/octez-release.sh
   package_name="${gitlab_octez_source_package_name}"
   commit="${CI_COMMIT_TAG}"
 else

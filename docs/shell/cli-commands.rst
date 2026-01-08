@@ -38,28 +38,6 @@ This is the manual page of the command line tool ``octez-signer``. See :ref:`sig
          :file: ../api/octez-signer.html
 
 
-.. _benchmark_tool_manual:
-
-Benchmark tool manual
-=====================
-
-This is the manual page of the command line tool ``octez-snoop``. See :doc:`../developer/snoop` for a general description of this tool.
-
-.. raw:: html
-         :file: ../api/octez-snoop.html
-
-
-.. _codec_manual:
-
-Codec manual
-============
-
-This is the manual page of the command line tool ``octez-codec``. See :ref:`octez-codec` for a general description of this tool.
-
-.. raw:: html
-         :file: ../api/octez-codec.html
-
-
 .. _node_manual:
 
 Node manual
@@ -94,6 +72,54 @@ This is the manual page of the :doc:`../shell/smart_rollup_node`.
 
 .. raw:: html
          :file: ../api/octez-smart-rollup-node.html
+
+.. _baker_manual:
+
+Baker manual
+============
+
+This is the manual page of the baker command line tool. See :ref:`baker_run` for a general description of this tool.
+
+.. note::
+	This unique baker executable is meant to replace the protocol-specific bakers for all the protocols it supports, such as ``octez-baker-PsRiotum`` and ``octez-baker-alpha``.
+
+.. raw:: html
+         :file: ../api/octez-baker.html
+
+.. _accuser_manual:
+
+Accuser manual
+==============
+
+This is the manual page of the accuser command line tool. See :ref:`accuser_run` for a general description of this tool.
+
+.. note::
+	This unique accuser executable is meant to replace the protocol-specific accusers for all the protocols it supports, such as ``octez-accuser-PsRiotum`` and ``octez-accuser-alpha``.
+
+.. raw:: html
+         :file: ../api/octez-accuser.html
+
+.. _benchmark_tool_manual:
+
+Benchmark tool manual
+=====================
+
+This is the manual page of the command line tool ``octez-snoop``. See :doc:`../developer/snoop` for a general description of this tool.
+
+.. raw:: html
+         :file: ../api/octez-snoop.html
+
+
+.. _codec_manual:
+
+Codec manual
+============
+
+This is the manual page of the command line tool ``octez-codec``. See :ref:`octez-codec` for a general description of this tool.
+
+.. raw:: html
+         :file: ../api/octez-codec.html
+
 
 Protocol-dependent tools
 ========================

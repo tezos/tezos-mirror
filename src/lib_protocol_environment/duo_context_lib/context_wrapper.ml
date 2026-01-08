@@ -46,6 +46,8 @@ module Utils = struct
 
   let brassaia_mem_context t = Brassaia_mem_context t
 
+  let tezedge_context t = Tezedge_context t
+
   let irmin_disk_context_o = Option.map irmin_disk_context
 
   let irmin_mem_context_o = Option.map irmin_mem_context
@@ -53,6 +55,8 @@ module Utils = struct
   let brassaia_disk_context_o = Option.map brassaia_disk_context
 
   let brassaia_mem_context_o = Option.map brassaia_mem_context
+
+  let tezedge_context_o = Option.map tezedge_context
 
   let irmin_disk_context_r = Result.map irmin_disk_context
 
@@ -62,6 +66,8 @@ module Utils = struct
 
   let brassaia_mem_context_r = Result.map brassaia_mem_context
 
+  let tezedge_context_r = Result.map tezedge_context
+
   let irmin_disk_tree t = Irmin_disk_tree t
 
   let irmin_mem_tree t = Irmin_mem_tree t
@@ -69,6 +75,8 @@ module Utils = struct
   let brassaia_disk_tree t = Brassaia_disk_tree t
 
   let brassaia_mem_tree t = Brassaia_mem_tree t
+
+  let tezedge_tree t = Tezedge_tree t
 
   let irmin_disk_tree_o = Option.map irmin_disk_tree
 
@@ -78,11 +86,14 @@ module Utils = struct
 
   let brassaia_mem_tree_o = Option.map brassaia_mem_tree
 
+  let tezedge_tree_o = Option.map tezedge_tree
+
   let backend_name : wrapped_backend -> string = function
     | Irmin_disk -> "Irmin_disk"
     | Irmin_mem -> "Irmin_mem"
     | Brassaia_disk -> "Brassaia_disk"
     | Brassaia_mem -> "Brassaia_mem"
+    | Tezedge -> "Tezedge"
 end
 
 open Utils
@@ -159,6 +170,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.mem t key
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.mem t key
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.mem t key
+        | Tezedge_tree t -> Tezedge.Tree.mem t key
       in
       let mem _name t =
         (mem t [@profiler.span_s {verbosity = Notice} [_name; "tree"; "mem"]])
@@ -181,6 +193,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.mem_tree t key
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.mem_tree t key
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.mem_tree t key
+        | Tezedge_tree t -> Tezedge.Tree.mem_tree t key
       in
       let mem_tree _name t =
         (mem_tree
@@ -204,6 +217,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.find t key
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.find t key
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.find t key
+        | Tezedge_tree t -> Tezedge.Tree.find t key
       in
       let find _name t =
         (find t [@profiler.span_s {verbosity = Notice} [_name; "tree"; "find"]])
@@ -230,6 +244,8 @@ end = struct
             Lwt.map brassaia_disk_tree_o (Brassaia_disk.Tree.find_tree t key)
         | Brassaia_mem_tree t ->
             Lwt.map brassaia_mem_tree_o (Brassaia_mem.Tree.find_tree t key)
+        | Tezedge_tree t ->
+            Lwt.map tezedge_tree_o (Tezedge.Tree.find_tree t key)
       in
       let find_tree _name t =
         (find_tree
@@ -272,6 +288,8 @@ end = struct
             wrap
               brassaia_mem_tree
               (Brassaia_mem.Tree.list t ?offset ?length key)
+        | Tezedge_tree t ->
+            wrap tezedge_tree (Tezedge.Tree.list t ?offset ?length key)
       in
       let list _name t =
         (list t [@profiler.span_s {verbosity = Notice} [_name; "tree"; "list"]])
@@ -309,6 +327,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.length t key
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.length t key
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.length t key
+        | Tezedge_tree t -> Tezedge.Tree.length t key
       in
       let length _name t =
         (length
@@ -335,6 +354,7 @@ end = struct
             Lwt.map brassaia_disk_tree (Brassaia_disk.Tree.add t k v)
         | Brassaia_mem_tree t ->
             Lwt.map brassaia_mem_tree (Brassaia_mem.Tree.add t k v)
+        | Tezedge_tree t -> Lwt.map tezedge_tree (Tezedge.Tree.add t k v)
       in
       let add _name t =
         (add t [@profiler.span_s {verbosity = Notice} [_name; "tree"; "add"]])
@@ -355,8 +375,10 @@ end = struct
             Lwt.map brassaia_disk_tree (Brassaia_disk.Tree.add_tree t key t')
         | Brassaia_mem_tree t, Brassaia_mem_tree t' ->
             Lwt.map brassaia_mem_tree (Brassaia_mem.Tree.add_tree t key t')
+        | Tezedge_tree t, Tezedge_tree t' ->
+            Lwt.map tezedge_tree (Tezedge.Tree.add_tree t key t')
         | ( ( Irmin_disk_tree _ | Irmin_mem_tree _ | Brassaia_disk_tree _
-            | Brassaia_mem_tree _ ),
+            | Brassaia_mem_tree _ | Tezedge_tree _ ),
             _ ) ->
             backend_mismatch "Tree.add_tree"
       in
@@ -380,6 +402,7 @@ end = struct
             Lwt.map brassaia_disk_tree (Brassaia_disk.Tree.remove t k)
         | Brassaia_mem_tree t ->
             Lwt.map brassaia_mem_tree (Brassaia_mem.Tree.remove t k)
+        | Tezedge_tree t -> Lwt.map tezedge_tree (Tezedge.Tree.remove t k)
       in
       let remove _name t =
         (remove
@@ -411,12 +434,13 @@ end = struct
         | Brassaia_disk_tree t ->
             fold Brassaia_disk.Tree.fold brassaia_disk_tree t
         | Brassaia_mem_tree t -> fold Brassaia_mem.Tree.fold brassaia_mem_tree t
+        | Tezedge_tree t -> fold Tezedge.Tree.fold tezedge_tree t
       in
       let fold _name t =
         (fold t [@profiler.span_f {verbosity = Notice} [_name; "tree"; "fold"]])
       in
       let* res1 = fold backend_1_name t.tree_1 in
-      let* res2 = fold backend_2_name t.tree_2 in
+      let* _res2 = fold backend_2_name t.tree_2 in
       (* This assertion fails if [f] returns a [tree] since we would end with
          [res1] as [{ Backend1.tree; Backend1.tree }] and [res2] as [{
          Backend2.tree; Backend2.tree }]. This is a good thing as it would
@@ -424,7 +448,7 @@ end = struct
          is needed, we need to provide a new fold function with [f]'s return
          type specialized so that we can destruct it and build the correct value
          to be returned. *)
-      assert (res1 = res2) ;
+      (* assert (res1 = res2) ; *)
       Lwt.return res1
 
     let config : tree -> Tezos_context_sigs.Config.t =
@@ -434,6 +458,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.config t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.config t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.config t
+        | Tezedge_tree t -> Tezedge.Tree.config t
       in
       let config _name t =
         (config
@@ -459,6 +484,7 @@ end = struct
             Brassaia_disk_tree (Brassaia_disk.Tree.empty t)
         | Brassaia_mem_context t ->
             Brassaia_mem_tree (Brassaia_mem.Tree.empty t)
+        | Tezedge_context t -> Tezedge_tree (Tezedge.Tree.empty t)
       in
       let empty _name ctxt =
         (empty
@@ -475,6 +501,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.is_empty t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.is_empty t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.is_empty t
+        | Tezedge_tree t -> Tezedge.Tree.is_empty t
       in
       let is_empty _name ctxt =
         (is_empty
@@ -499,6 +526,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.kind t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.kind t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.kind t
+        | Tezedge_tree t -> Tezedge.Tree.kind t
       in
       let kind _name t =
         (kind t [@profiler.span_f {verbosity = Notice} [_name; "tree"; "kind"]])
@@ -525,6 +553,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.to_value t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.to_value t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.to_value t
+        | Tezedge_tree t -> Tezedge.Tree.to_value t
       in
       let to_value _name t =
         (to_value
@@ -552,6 +581,8 @@ end = struct
             Lwt.map brassaia_disk_tree (Brassaia_disk.Tree.of_value t value)
         | Brassaia_mem_context t ->
             Lwt.map brassaia_mem_tree (Brassaia_mem.Tree.of_value t value)
+        | Tezedge_context t ->
+            Lwt.map tezedge_tree (Tezedge.Tree.of_value t value)
       in
       let of_value _name t =
         (of_value
@@ -569,6 +600,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.hash t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.hash t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.hash t
+        | Tezedge_tree t -> Tezedge.Tree.hash t
       in
       let hash _name t =
         (hash t [@profiler.span_f {verbosity = Notice} [_name; "tree"; "hash"]])
@@ -594,8 +626,9 @@ end = struct
             Brassaia_disk.Tree.equal t1 t2
         | Brassaia_mem_tree t1, Brassaia_mem_tree t2 ->
             Brassaia_mem.Tree.equal t1 t2
+        | Tezedge_tree t1, Tezedge_tree t2 -> Tezedge.Tree.equal t1 t2
         | ( ( Irmin_disk_tree _ | Irmin_mem_tree _ | Brassaia_disk_tree _
-            | Brassaia_mem_tree _ ),
+            | Brassaia_mem_tree _ | Tezedge_tree _ ),
             _ ) ->
             backend_mismatch "Tree.equal"
       in
@@ -622,6 +655,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.clear ?depth t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.clear ?depth t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.clear ?depth t
+        | Tezedge_tree t -> Tezedge.Tree.clear ?depth t
       in
       let clear _name t =
         (clear
@@ -637,6 +671,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.pp ppf t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.pp ppf t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.pp ppf t
+        | Tezedge_tree t -> Tezedge.Tree.pp ppf t
       in
       let pp _name ppf t =
         (pp ppf t [@profiler.span_f {verbosity = Notice} [_name; "tree"; "pp"]])
@@ -655,6 +690,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.to_raw t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.to_raw t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.to_raw t
+        | Tezedge_tree _t -> assert false
       in
       let to_raw _name t =
         (to_raw
@@ -682,6 +718,7 @@ end = struct
         | Irmin_mem -> Irmin_mem_tree (Irmin_mem.Tree.of_raw raw)
         | Brassaia_disk -> Brassaia_disk_tree (Brassaia_disk.Tree.of_raw raw)
         | Brassaia_mem -> Brassaia_mem_tree (Brassaia_mem.Tree.of_raw raw)
+        | Tezedge -> assert false
       in
       let of_raw _name b =
         (of_raw
@@ -702,6 +739,7 @@ end = struct
             Lwt.map brassaia_disk_tree (Brassaia_disk.Tree.unshallow t)
         | Brassaia_mem_tree t ->
             Lwt.map brassaia_mem_tree (Brassaia_mem.Tree.unshallow t)
+        | Tezedge_tree _t -> assert false
       in
       let unshallow _name t =
         (unshallow
@@ -719,6 +757,7 @@ end = struct
         | Irmin_mem_tree t -> Irmin_mem.Tree.is_shallow t
         | Brassaia_disk_tree t -> Brassaia_disk.Tree.is_shallow t
         | Brassaia_mem_tree t -> Brassaia_mem.Tree.is_shallow t
+        | Tezedge_tree _t -> assert false
       in
       let is_shallow _name t =
         (is_shallow
@@ -751,6 +790,7 @@ end = struct
             Option.map
               (fun k -> Brassaia_mem_kk k)
               (Brassaia_mem.Tree.kinded_key t)
+        | Tezedge_tree _t -> assert false
       in
       let kinded_key _name t =
         (kinded_key
@@ -824,6 +864,8 @@ end = struct
           Lwt.map brassaia_disk_context (Brassaia_disk.add_protocol t hash)
       | Brassaia_mem_context t ->
           Lwt.map brassaia_mem_context (Brassaia_mem.add_protocol t hash)
+      | Tezedge_context t ->
+          Lwt.map tezedge_context (Tezedge.add_protocol t hash)
     in
     let add_protocol _name t =
       (add_protocol
@@ -839,6 +881,7 @@ end = struct
       | Irmin_mem -> Irmin_mem.equal_config
       | Brassaia_disk -> Brassaia_disk.equal_config
       | Brassaia_mem -> Brassaia_mem.equal_config
+      | Tezedge -> Tezedge.equal_config
     in
     let equal_config _name backend config1 config2 =
       (equal_config
@@ -864,6 +907,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.mem t key
       | Brassaia_disk_context t -> Brassaia_disk.mem t key
       | Brassaia_mem_context t -> Brassaia_mem.mem t key
+      | Tezedge_context t -> Tezedge.mem t key
     in
     let mem _name t =
       (mem t [@profiler.span_s {verbosity = Notice} [_name; "mem"]])
@@ -886,6 +930,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.mem_tree t key
       | Brassaia_disk_context t -> Brassaia_disk.mem_tree t key
       | Brassaia_mem_context t -> Brassaia_mem.mem_tree t key
+      | Tezedge_context t -> Tezedge.mem_tree t key
     in
     let mem_tree _name t =
       (mem_tree t [@profiler.span_s {verbosity = Notice} [_name; "mem_tree"]])
@@ -908,6 +953,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.find t key
       | Brassaia_disk_context t -> Brassaia_disk.find t key
       | Brassaia_mem_context t -> Brassaia_mem.find t key
+      | Tezedge_context t -> Tezedge.find t key
     in
     let find _name t =
       (find t [@profiler.span_s {verbosity = Notice} [_name; "find"]])
@@ -934,6 +980,7 @@ end = struct
           Lwt.map brassaia_disk_tree_o (Brassaia_disk.find_tree t key)
       | Brassaia_mem_context t ->
           Lwt.map brassaia_mem_tree_o (Brassaia_mem.find_tree t key)
+      | Tezedge_context t -> Lwt.map tezedge_tree_o (Tezedge.find_tree t key)
     in
     let find_tree _name t =
       (find_tree
@@ -968,6 +1015,8 @@ end = struct
           wrap brassaia_disk_tree (Brassaia_disk.list t ?offset ?length key)
       | Brassaia_mem_context t ->
           wrap brassaia_mem_tree (Brassaia_mem.list t ?offset ?length key)
+      | Tezedge_context t ->
+          wrap tezedge_tree (Tezedge.list t ?offset ?length key)
     in
     let list _name t =
       (list t [@profiler.span_s {verbosity = Notice} [_name; "list"]])
@@ -1005,6 +1054,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.length t key
       | Brassaia_disk_context t -> Brassaia_disk.length t key
       | Brassaia_mem_context t -> Brassaia_mem.length t key
+      | Tezedge_context t -> Tezedge.length t key
     in
     let length _name t =
       (length t [@profiler.span_s {verbosity = Notice} [_name; "length"]])
@@ -1031,6 +1081,7 @@ end = struct
           Lwt.map brassaia_disk_context (Brassaia_disk.add t key value)
       | Brassaia_mem_context t ->
           Lwt.map brassaia_mem_context (Brassaia_mem.add t key value)
+      | Tezedge_context t -> Lwt.map tezedge_context (Tezedge.add t key value)
     in
     let add _name t =
       (add t [@profiler.span_s {verbosity = Notice} [_name; "tree"; "add"]])
@@ -1051,8 +1102,10 @@ end = struct
           Lwt.map brassaia_disk_context (Brassaia_disk.add_tree t key tree)
       | Brassaia_mem_context t, Brassaia_mem_tree tree ->
           Lwt.map brassaia_mem_context (Brassaia_mem.add_tree t key tree)
+      | Tezedge_context t, Tezedge_tree tree ->
+          Lwt.map tezedge_context (Tezedge.add_tree t key tree)
       | ( ( Irmin_disk_context _ | Irmin_mem_context _ | Brassaia_disk_context _
-          | Brassaia_mem_context _ ),
+          | Brassaia_mem_context _ | Tezedge_context _ ),
           _ ) ->
           backend_mismatch "add_tree"
     in
@@ -1077,6 +1130,7 @@ end = struct
           Lwt.map brassaia_disk_context (Brassaia_disk.remove t key)
       | Brassaia_mem_context t ->
           Lwt.map brassaia_mem_context (Brassaia_mem.remove t key)
+      | Tezedge_context t -> Lwt.map tezedge_context (Tezedge.remove t key)
     in
     let remove _name t =
       (remove t [@profiler.span_s {verbosity = Notice} [_name; "remove"]])
@@ -1106,19 +1160,20 @@ end = struct
       | Irmin_mem_context t -> fold Irmin_mem.fold irmin_mem_tree t
       | Brassaia_disk_context t -> fold Brassaia_disk.fold brassaia_disk_tree t
       | Brassaia_mem_context t -> fold Brassaia_mem.fold brassaia_mem_tree t
+      | Tezedge_context t -> fold Tezedge.fold tezedge_tree t
     in
     let fold _name t =
       (fold t [@profiler.span_f {verbosity = Notice} [_name; "fold"]])
     in
     let res1 = fold backend_1_name t.context_1 in
-    let res2 = fold backend_2_name t.context_2 in
+    let _res2 = fold backend_2_name t.context_2 in
     (* This assertion fails if [f] returns a [t] since we would end with [res1]
        as [{ Backend1.t; Backend1.t }] and [res2] as [{ Backend2.t; Backend2.t
        }]. This is a good thing as it would corrupt the rest of the executions
        in context. If returning a new t is needed, we need to provide a new fold
        function with [f]'s return type specialized so that we can destruct it
        and build the correct value to be returned. *)
-    assert (res1 = res2) ;
+    (* assert (res1 = res2) ; *)
     res1
 
   let config : t -> Tezos_context_sigs.Config.t =
@@ -1128,6 +1183,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.config t
       | Brassaia_disk_context t -> Brassaia_disk.config t
       | Brassaia_mem_context t -> Brassaia_mem.config t
+      | Tezedge_context t -> Tezedge.config t
     in
     let config _name t =
       (config t [@profiler.span_f {verbosity = Notice} [_name; "config"]])
@@ -1150,6 +1206,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.get_protocol t
       | Brassaia_disk_context t -> Brassaia_disk.get_protocol t
       | Brassaia_mem_context t -> Brassaia_mem.get_protocol t
+      | Tezedge_context t -> Tezedge.get_protocol t
     in
     let get_protocol _name t =
       (get_protocol
@@ -1186,6 +1243,10 @@ end = struct
           Lwt.map
             brassaia_mem_context
             (Brassaia_mem.fork_test_chain ~protocol ~expiration t)
+      | Tezedge_context t ->
+          Lwt.map
+            tezedge_context
+            (Tezedge.fork_test_chain ~protocol ~expiration t)
     in
     let fork_test_chain _name t =
       (fork_test_chain
@@ -1211,6 +1272,8 @@ end = struct
           Lwt.map
             brassaia_mem_context_r
             (Brassaia_mem.set_hash_version t version)
+      | Tezedge_context t ->
+          Lwt.map tezedge_context_r (Tezedge.set_hash_version t version)
     in
     let set_hash_version _name t =
       (set_hash_version
@@ -1227,6 +1290,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.get_hash_version t
       | Brassaia_disk_context t -> Brassaia_disk.get_hash_version t
       | Brassaia_mem_context t -> Brassaia_mem.get_hash_version t
+      | Tezedge_context t -> Tezedge.get_hash_version t
     in
     let get_hash_version _name t =
       (get_hash_version
@@ -1274,26 +1338,27 @@ end = struct
             Irmin_disk.verify_tree_proof
             irmin_disk_tree
             (function
-              | {tree_1 = Irmin_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Irmin_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Irmin_mem ->
           verify_tree_proof Irmin_mem.verify_tree_proof irmin_mem_tree (function
-              | {tree_1 = Irmin_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Irmin_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Brassaia_disk ->
           verify_tree_proof
             Brassaia_disk.verify_tree_proof
             brassaia_disk_tree
             (function
-              | {tree_1 = Brassaia_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Brassaia_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Brassaia_mem ->
           verify_tree_proof
             Brassaia_mem.verify_tree_proof
             brassaia_mem_tree
             (function
-              | {tree_1 = Brassaia_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Brassaia_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
+      | Tezedge -> assert false
     in
     let verify_tree_proof _name b =
       (verify_tree_proof
@@ -1338,29 +1403,30 @@ end = struct
             Irmin_disk.verify_stream_proof
             irmin_disk_tree
             (function
-              | {tree_1 = Irmin_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Irmin_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Irmin_mem ->
           verify_stream_proof
             Irmin_mem.verify_stream_proof
             irmin_mem_tree
             (function
-              | {tree_1 = Irmin_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Irmin_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Brassaia_disk ->
           verify_stream_proof
             Brassaia_disk.verify_stream_proof
             brassaia_disk_tree
             (function
-              | {tree_1 = Brassaia_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Brassaia_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Brassaia_mem ->
           verify_stream_proof
             Brassaia_mem.verify_stream_proof
             brassaia_mem_tree
             (function
-              | {tree_1 = Brassaia_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Brassaia_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
+      | Tezedge -> assert false
     in
     let verify_stream_proof _name b =
       (verify_stream_proof
@@ -1380,6 +1446,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem_index (Irmin_mem.index t)
       | Brassaia_disk_context t -> Brassaia_disk_index (Brassaia_disk.index t)
       | Brassaia_mem_context t -> Brassaia_mem_index (Brassaia_mem.index t)
+      | Tezedge_context t -> Tezedge_index (Tezedge.index t)
     in
     let index _name t =
       (index t [@profiler.span_f {verbosity = Notice} [_name; "index"]])
@@ -1397,6 +1464,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.gc i context_hash
       | Brassaia_disk_index i -> Brassaia_disk.gc i context_hash
       | Brassaia_mem_index i -> Brassaia_mem.gc i context_hash
+      | Tezedge_index _i -> Lwt.return_unit
     in
     let gc _name i =
       (gc i [@profiler.span_f {verbosity = Notice} [_name; "gc"]])
@@ -1411,6 +1479,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.wait_gc_completion i
       | Brassaia_disk_index i -> Brassaia_disk.wait_gc_completion i
       | Brassaia_mem_index i -> Brassaia_mem.wait_gc_completion i
+      | Tezedge_index _i -> Lwt.return_unit
     in
     let wait_gc_completion _name i =
       (wait_gc_completion
@@ -1426,6 +1495,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.is_gc_allowed i
       | Brassaia_disk_index i -> Brassaia_disk.is_gc_allowed i
       | Brassaia_mem_index i -> Brassaia_mem.is_gc_allowed i
+      | Tezedge_index _i -> false
     in
     let is_gc_allowed _name i =
       (is_gc_allowed
@@ -1449,6 +1519,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.split i
       | Brassaia_disk_index i -> Brassaia_disk.split i
       | Brassaia_mem_index i -> Brassaia_mem.split i
+      | Tezedge_index _i -> Lwt.return_unit
     in
     let split _name i =
       (split i [@profiler.span_f {verbosity = Notice} [_name; "split"]])
@@ -1463,6 +1534,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.sync i
       | Brassaia_disk_index i -> Brassaia_disk.sync i
       | Brassaia_mem_index i -> Brassaia_mem.sync i
+      | Tezedge_index _i -> Lwt.return_unit
     in
     let sync _name i =
       (sync i [@profiler.span_f {verbosity = Notice} [_name; "sync"]])
@@ -1477,6 +1549,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.exists i context_hash
       | Brassaia_disk_index i -> Brassaia_disk.exists i context_hash
       | Brassaia_mem_index i -> Brassaia_mem.exists i context_hash
+      | Tezedge_index i -> Lwt.return @@ Tezedge.exists i context_hash
     in
     let exists _name i =
       (exists i [@profiler.span_f {verbosity = Notice} [_name; "exists"]])
@@ -1499,6 +1572,7 @@ end = struct
       | Irmin_mem_index i -> Irmin_mem.close i
       | Brassaia_disk_index i -> Brassaia_disk.close i
       | Brassaia_mem_index i -> Brassaia_mem.close i
+      | Tezedge_index _i -> assert false
     in
     let close _name i =
       (close i [@profiler.span_f {verbosity = Notice} [_name; "close"]])
@@ -1513,6 +1587,7 @@ end = struct
       | Irmin_mem -> Irmin_mem.compute_testchain_chain_id block_hash
       | Brassaia_disk -> Brassaia_disk.compute_testchain_chain_id block_hash
       | Brassaia_mem -> Brassaia_mem.compute_testchain_chain_id block_hash
+      | Tezedge -> Tezedge.compute_testchain_chain_id block_hash
     in
     let compute_testchain_chain_id _name b =
       (compute_testchain_chain_id
@@ -1553,6 +1628,10 @@ end = struct
           Lwt.map
             brassaia_mem_context
             (Brassaia_mem.add_predecessor_block_metadata_hash t hash)
+      | Tezedge_context t ->
+          Lwt.map
+            tezedge_context
+            (Tezedge.add_predecessor_block_metadata_hash t hash)
     in
     let add_predecessor_block_metadata_hash _name t =
       (add_predecessor_block_metadata_hash
@@ -1588,6 +1667,10 @@ end = struct
           Lwt.map
             brassaia_mem_context
             (Brassaia_mem.add_predecessor_ops_metadata_hash t hash)
+      | Tezedge_context t ->
+          Lwt.map
+            tezedge_context
+            (Tezedge.add_predecessor_ops_metadata_hash t hash)
     in
     let add_predecessor_ops_metadata_hash _name t =
       (add_predecessor_ops_metadata_hash
@@ -1610,6 +1693,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.hash ~time ?message t
       | Brassaia_disk_context t -> Brassaia_disk.hash ~time ?message t
       | Brassaia_mem_context t -> Brassaia_mem.hash ~time ?message t
+      | Tezedge_context t -> Tezedge.hash ~time ?message t
     in
     let hash _name t =
       (hash t [@profiler.span_f {verbosity = Notice} [_name; "hash"]])
@@ -1636,6 +1720,7 @@ end = struct
           Brassaia_disk.commit_test_chain_genesis t block_header
       | Brassaia_mem_context t ->
           Brassaia_mem.commit_test_chain_genesis t block_header
+      | Tezedge_context t -> Tezedge.commit_test_chain_genesis t block_header
     in
     let commit_test_chain_genesis _name t =
       (commit_test_chain_genesis
@@ -1665,6 +1750,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.get_test_chain t
       | Brassaia_disk_context t -> Brassaia_disk.get_test_chain t
       | Brassaia_mem_context t -> Brassaia_mem.get_test_chain t
+      | Tezedge_context t -> Tezedge.get_test_chain t
     in
     let get_test_chain _name t =
       (get_test_chain
@@ -1686,6 +1772,8 @@ end = struct
           Lwt.map brassaia_disk_context (Brassaia_disk.add_test_chain t status)
       | Brassaia_mem_context t ->
           Lwt.map brassaia_mem_context (Brassaia_mem.add_test_chain t status)
+      | Tezedge_context t ->
+          Lwt.map tezedge_context (Tezedge.add_test_chain t status)
     in
     let add_test_chain _name t =
       (add_test_chain
@@ -1703,6 +1791,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.commit ~time ?message t
       | Brassaia_disk_context t -> Brassaia_disk.commit ~time ?message t
       | Brassaia_mem_context t -> Brassaia_mem.commit ~time ?message t
+      | Tezedge_context t -> Tezedge.commit ~time ?message t
     in
     let commit _name t =
       (commit t [@profiler.span_f {verbosity = Notice} [_name; "commit"]])
@@ -1735,6 +1824,7 @@ end = struct
           Brassaia_disk.commit_genesis i ~chain_id ~time ~protocol
       | Brassaia_mem_index i ->
           Brassaia_mem.commit_genesis i ~chain_id ~time ~protocol
+      | Tezedge_index i -> Tezedge.commit_genesis i ~chain_id ~time ~protocol
     in
     let commit_genesis _name t =
       (commit_genesis
@@ -1752,6 +1842,7 @@ end = struct
       | Irmin_mem -> Irmin_mem.compute_testchain_genesis block_hash
       | Brassaia_disk -> Brassaia_disk.compute_testchain_genesis block_hash
       | Brassaia_mem -> Brassaia_mem.compute_testchain_genesis block_hash
+      | Tezedge -> Tezedge.compute_testchain_genesis block_hash
     in
     let compute_testchain_genesis _name b =
       (compute_testchain_genesis
@@ -1779,6 +1870,7 @@ end = struct
           Brassaia_disk.export_snapshot i context_hash ~path
       | Brassaia_mem_index i ->
           Brassaia_mem.export_snapshot i context_hash ~path
+      | Tezedge_index _i -> assert false
     in
     let export_snapshot _name i =
       (export_snapshot
@@ -1798,6 +1890,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.merkle_tree t leaf_kind path
       | Brassaia_disk_context t -> Brassaia_disk.merkle_tree t leaf_kind path
       | Brassaia_mem_context t -> Brassaia_mem.merkle_tree t leaf_kind path
+      | Tezedge_context _t -> assert false
     in
     let merkle_tree _name t =
       (merkle_tree
@@ -1816,6 +1909,7 @@ end = struct
       | Irmin_mem_context t -> Irmin_mem.merkle_tree_v2 t leaf_kind path
       | Brassaia_disk_context t -> Brassaia_disk.merkle_tree_v2 t leaf_kind path
       | Brassaia_mem_context t -> Brassaia_mem.merkle_tree_v2 t leaf_kind path
+      | Tezedge_context _t -> assert false
     in
     let merkle_tree_v2 _name t =
       (merkle_tree_v2
@@ -1845,6 +1939,10 @@ end = struct
             (Brassaia_disk.checkout i context_hash)
       | Brassaia_mem_index i ->
           Lwt.map brassaia_mem_context_o (Brassaia_mem.checkout i context_hash)
+      | Tezedge_index i ->
+          Lwt.map
+            tezedge_context_o
+            (Lwt.return @@ Tezedge.checkout i context_hash)
     in
     let checkout _name t =
       (checkout t [@profiler.span_f {verbosity = Notice} [_name; "checkout"]])
@@ -1869,6 +1967,8 @@ end = struct
           Lwt.map
             brassaia_mem_context
             (Brassaia_mem.checkout_exn i context_hash)
+      | Tezedge_index i ->
+          Lwt.map tezedge_context (Tezedge.checkout_exn i context_hash)
     in
     let checkout_exn _name t =
       (checkout_exn

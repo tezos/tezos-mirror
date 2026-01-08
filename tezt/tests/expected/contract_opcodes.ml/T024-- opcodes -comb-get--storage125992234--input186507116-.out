@@ -1,0 +1,123 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/comb-get.tz on storage Unit and input '(Pair 1 4 2 Unit)' --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (just consumed gas: 42.680)
+    [ (Pair (Pair 1 4 2 Unit) Unit) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ 1
+      (Pair 1 4 2 Unit) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+  - location: 19 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+  - location: 20 (just consumed gas: 0.010)
+    [ True
+      (Pair 1 4 2 Unit) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 21 (just consumed gas: 0.025)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 27 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+  - location: 28 (just consumed gas: 0.020)
+    [ 1
+      (Pair 1 4 2 Unit) ]
+  - location: 30 (just consumed gas: 0.010)
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+  - location: 35 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+  - location: 36 (just consumed gas: 0.010)
+    [ True
+      (Pair 1 4 2 Unit) ]
+  - location: 37 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 37 (just consumed gas: 0.025)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+  - location: 44 (just consumed gas: 0.021)
+    [ 4
+      (Pair 1 4 2 Unit) ]
+  - location: 46 (just consumed gas: 0.010)
+    [ 4
+      4
+      (Pair 1 4 2 Unit) ]
+  - location: 51 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+  - location: 52 (just consumed gas: 0.010)
+    [ True
+      (Pair 1 4 2 Unit) ]
+  - location: 53 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 53 (just consumed gas: 0.025)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 59 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+  - location: 60 (just consumed gas: 0.022)
+    [ 2
+      (Pair 1 4 2 Unit) ]
+  - location: 62 (just consumed gas: 0.010)
+    [ 2
+      2
+      (Pair 1 4 2 Unit) ]
+  - location: 67 (just consumed gas: 0.035)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+  - location: 68 (just consumed gas: 0.010)
+    [ True
+      (Pair 1 4 2 Unit) ]
+  - location: 69 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 69 (just consumed gas: 0.025)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 75 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+  - location: 76 (just consumed gas: 0.023)
+    [ Unit
+      (Pair 1 4 2 Unit) ]
+  - location: 78 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair 1 4 2 Unit) ]
+  - location: 81 (just consumed gas: 0.010)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+  - location: 82 (just consumed gas: 0.010)
+    [ True
+      (Pair 1 4 2 Unit) ]
+  - location: 83 (just consumed gas: 0.010)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 83 (just consumed gas: 0.025)
+    [ (Pair 1 4 2 Unit) ]
+  - location: 89 (just consumed gas: 0.010)
+    [  ]
+  - location: 90 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 91 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 93 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

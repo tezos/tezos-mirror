@@ -12,5 +12,6 @@ val start :
   keep_alive:bool ->
   ?on_new_head:(unit -> unit tzresult Lwt.t) ->
   rollup_node_endpoint:Uri.t ->
+  rollup_node_endpoint_timeout:float ->
   unit ->
   unit

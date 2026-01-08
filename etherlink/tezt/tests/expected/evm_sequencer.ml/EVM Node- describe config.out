@@ -1,253 +1,238 @@
 
 ./octez-evm-node describe config
-{ "log_filter"?:
+{ "data_dir"?: $unistring /* The path to the EVM node data directory. */,
+  "log_filter"?:
     { "max_nb_blocks"?:
         integer ∈ [1, 2^30]
-        /* The maximum number of blocks that can be visited when executing a
-           `eth_getLogs` request. */,
+        /* The maximum number of blocks that can be visited when executing a `eth_getLogs`
+           request. */,
       "max_nb_logs"?:
         integer ∈ [1, 2^30]
-        /* The maximum number of logs that can be collected when executing a
-           `eth_getLogs` request. */,
+        /* The maximum number of logs that can be collected when executing a `eth_getLogs`
+           request. */,
       "chunk_size"?:
         integer ∈ [1, 2^30]
-        /* Number of blocks to be filter concurrently when executing a
-           `eth_getLogs` request. */ },
+        /* Number of blocks to be filter concurrently when executing a `eth_getLogs` request. */ },
   "sequencer"?:
     { "time_between_blocks"?:
         $time_between_blocks
-        /* The maximum number of seconds separating two consecutive blocks.
-           If the TX pool of the sequencer is empty after this duration, an
-           empty blueprint is produced. */,
+        /* The maximum number of seconds separating two consecutive blocks. If the TX pool of
+           the sequencer is empty after this duration, an empty blueprint is produced. */,
       "max_number_of_chunks"?:
         integer ∈ [1, 128]
-        /* Maximum number of chunks a blueprint can be divided into. The
-           sequencer will not produce blueprints unable to fit in this limit. */,
+        /* Maximum number of chunks a blueprint can be divided into. The sequencer will not
+           produce blueprints unable to fit in this limit. */,
       "sequencer"?:
-        /* Secret key URI of the sequencer. */
-        $unistring
-        /* Wallet */
-        || /* GCP Key */
+        /* List of (or single) Secret key URI of the sequencer. */
+        [ /* GCP Key */
+          $unistring
+          /* URI */
+          || { /* Full */
+               "project": $unistring /* GCP project hosting the key */,
+               "region": $unistring /* GCP region hosting the keyring */,
+               "keyring": $unistring /* Keyring owning the key */,
+               "key": $unistring /* Key name */,
+               "version": integer ∈ [-2^30, 2^30] /* Key version number */ }
+          || $unistring
+          /* Wallet */ ... ]
+        /* List */
+        || /* Single */
+        /* GCP Key */
         $unistring
         /* URI */
         || { /* Full */
              "project": $unistring /* GCP project hosting the key */,
+             "region": $unistring /* GCP region hosting the keyring */,
              "keyring": $unistring /* Keyring owning the key */,
              "key": $unistring /* Key name */,
-             "region": $unistring /* GCP region hosting the keyring */,
-             "version": integer ∈ [-2^30, 2^30] /* Key version number */ },
+             "version": integer ∈ [-2^30, 2^30] /* Key version number */ }
+        || $unistring
+        /* Wallet */,
       "blueprints_publisher_config"?:
         { "max_blueprints_lag"?:
             integer ∈ [1, 2^30]
-            /* The number of EVM blocks after which the sequencer considers
-               that something went wrong with the injection of a previous
-               blueprint. Once reached, the sequencer tries to send them a
-               second time. */,
+            /* The number of EVM blocks after which the sequencer considers that something
+               went wrong with the injection of a previous blueprint. Once reached, the
+               sequencer tries to send them a second time. */,
           "max_blueprints_ahead"?:
             integer ∈ [1, 2^30]
-            /* The maximum number of EVM blocks that the sequencer accepts to
-               create speculatively. If the difference between its head and
-               the head of its companion rollup node reaches this number, the
-               sequencer will stop creating new blueprints until the rollup
-               node has caught up. */,
+            /* The maximum number of EVM blocks that the sequencer accepts to create
+               speculatively. If the difference between its head and the head of its companion
+               rollup node reaches this number, the sequencer will stop creating new
+               blueprints until the rollup node has caught up. */,
           "max_blueprints_catchup"?:
             integer ∈ [1, 2^30]
-            /* The maximum number of blueprints the sequencer retries to send
-               at once whenever its companion rollup node is lagging behind. */,
+            /* The maximum number of blueprints the sequencer retries to send at once whenever
+               its companion rollup node is lagging behind. */,
           "catchup_cooldown"?:
             integer ∈ [1, 2^30]
-            /* The number of Layer 1 blocks the sequencer awaits before
-               sending another batch of blueprints, as part of its catchup
-               mechanism. */,
-          "dal_slots"?: [ integer ∈ [-128, 127] ... ] } },
+            /* The number of Layer 1 blocks the sequencer awaits before sending another batch
+               of blueprints, as part of its catchup mechanism. */,
+          "dal_slots"?: [ integer ∈ [-128, 127] ... ] },
+      "sunset_sec"?:
+        integer ∈ [0, 2^30]
+        /* Number of seconds prior to a sequencer operator upgrade before which the current
+           sequencer stops producing blocks */ },
   "observer"?:
     { "evm_node_endpoint":
         $unistring
-        /* Upstream EVM node endpoint used to fetch speculative blueprints
-           and forward incoming transactions. */,
+        /* Upstream EVM node endpoint used to fetch speculative blueprints and forward
+           incoming transactions. */,
       "rollup_node_tracking"?:
         boolean
-        /* Enable or disable monitoring a companion rollup node to verify the
-           correctness of the speculative history coming from the upstream
-           EVM node. */ },
+        /* Enable or disable monitoring a companion rollup node to verify the correctness of
+           the speculative history coming from the upstream EVM node. */ },
   "tx_pool_timeout_limit"?:
     $int64
-    /* Transaction timeout limit inside the transaction pool */,
+    /* Transaction timeout limit inside the transaction pool. DEPRECATED: You should use
+       "tx_pool.max_lifespan" instead. */,
   "tx_pool_addr_limit"?:
     $int64
-    /* Maximum allowed addresses inside the transaction pool. */,
+    /* Maximum allowed addresses inside the transaction pool. DEPRECATED: You should use
+       "tx_pool.max_size" instead. */,
   "tx_pool_tx_per_addr_limit"?:
     $int64
-    /* Maximum allowed transactions per user address inside the transaction
-       pool. */,
+    /* Maximum allowed transactions per user address inside the transaction pool. DEPRECATED:
+       You should use "tx_pool.tx_per_addr_limit" instead. */,
   "keep_alive"?:
     boolean
     /* Enable or disable if the EVM node retries HTTP requests on failure. */,
   "rollup_node_endpoint"?:
     $unistring
-    /* An endpoint to a companion rollup node. It is mainly used to keep
-       track of the state of the smart rollup powering the Layer 2 chain. In
-       sequencer mode, the blueprint created by the node are forwarded to the
-       rollup node to be injected in Layer 1 blocks. */,
+    /* An endpoint to a companion rollup node. It is mainly used to keep track of the state of
+       the smart rollup powering the Layer 2 chain. In sequencer mode, the blueprint created
+       by the node are forwarded to the rollup node to be injected in Layer 1 blocks. */,
+  "rpc_timeout"?: number /* Timeout in seconds for RPC calls made by the EVM node. */,
   "verbose"?: "info" | "debug" | "error" | "fatal" | "warning" | "notice",
   "experimental_features"?:
     { "drop_duplicate_on_injection"?:
         boolean
-        /* Request the rollup node to filter messages it has already
-           forwarded to the Layer 1 network. Require an unreleased version of
-           the Smart Rollup node. */,
+        /* Request the rollup node to filter messages it has already forwarded to the Layer 1
+           network. Require an unreleased version of the Smart Rollup node. */,
       "blueprints_publisher_order_enabled"?:
         boolean
-        /* Request the rollup node to prioritize messages by level when
-           publishing blueprints in the layer 1. */,
+        /* Request the rollup node to prioritize messages by level when publishing blueprints
+           in the layer 1. */,
       "enable_send_raw_transaction"?:
         boolean
-        /* Enable or disable the `eth_sendRawTransaction` method. DEPRECATED:
-            You should use "rpc.restricted_rpcs" instead. */,
+        /* Enable or disable the `eth_sendRawTransaction` method. DEPRECATED:  You should use
+           "rpc.restricted_rpcs" instead. */,
       "node_transaction_validation"?:
         boolean
-        /* DEPRECATED: You should remove this option from your configuration
-           file. */,
+        /* DEPRECATED: You should remove this option from your configuration file. */,
       "overwrite_simulation_tick_limit"?:
         boolean
-        /* When enabled, the eth_call method is not subject to the tick
-           limit. This can be useful to execute calls that will not be
-           injected in transactions (similarly to what the Uniswap V3
-           frontend does to prepare swaps). However, it can lead to confusing
-           UX for users, where eth_estimateGas fails when eth_call succeeded. */,
+        /* When enabled, the eth_call method is not subject to the tick limit. This can be
+           useful to execute calls that will not be injected in transactions (similarly to
+           what the Uniswap V3 frontend does to prepare swaps). However, it can lead to
+           confusing UX for users, where eth_estimateGas fails when eth_call succeeded. */,
       "next_wasm_runtime"?:
         boolean
-        /* Enable or disable the experimental WASM runtime that is expected
-           to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
-           should remove this option from your configuration file. */,
+        /* Enable or disable the experimental WASM runtime that is expected to replace the
+           Smart Rollup’s Fast Exec runtime. DEPRECATED: You should remove this option from
+           your configuration file. */,
       "rpc_server"?: "dream" | "resto",
       "spawn_rpc"?:
         /* Spawn a RPC node listening on the given port */
         { /* Some */
-          "protected_port": integer ∈ [1, 2^16-1] }
-        || null
-        /* None */,
+          "protected_port": integer ∈ [1, 2^16-1] } || null /* None */,
       "l2_chains"?:
         /* Configuration of l2_chains for multisequencing.
-                            If not set, the node will adopt a single chain
-           behaviour. */
+                            If not set, the node will adopt a single chain behaviour. */
         [ { "chain_id": $bignum /* The id of the l2 chain */,
             "chain_family": "Michelson" | "EVM" } ... ]
         /* Some */
         || null
         /* None */,
-      "enable_tx_queue"?:
-        /* Replace the observer tx pool by a tx queue */
-        /* tx queue configuration */
-        { /* Some */
-          "max_size"?: integer ∈ [-2^30, 2^30],
-          "max_transaction_batch_length"?:
-            integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
-          "max_lifespan"?: integer ∈ [-2^30, 2^30],
-          "tx_per_addr_limit"?: $int64 }
-        || null
-        /* None */
-        || boolean
-        /* tx queue enable */,
       "periodic_snapshot_path"?:
         /* Path to the periodic snapshot file */
-        $unistring /* Some */ || null /* None */ },
+        $unistring /* Some */ || null /* None */,
+      "preconfirmation_stream_enabled"?:
+        boolean
+        /* Activate or not the preconfirmation stream. This includes the sequencer as well as
+           the observer. */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
-        /* When enabled, the node only expose blocks that are finalized,
-           i.e., the `latest` block parameter becomes a synonym for
-           `finalized`. DEPRECATED: use the top level `finalized_view` option
-           instead. */,
+        /* When enabled, the node only expose blocks that are finalized, i.e., the `latest`
+           block parameter becomes a synonym for `finalized`. DEPRECATED: use the top level
+           `finalized_view` option instead. */,
       "evm_node_endpoint"?: $unistring,
       "ignore_block_param"?: boolean },
   "gcp_kms"?:
     { "connection_pool_size"?:
         integer ∈ [1, 2^30]
-        /* The number of TCP connections kept alive with the GCP KMS. A
-           number too low will make signing blueprints a bottleneck, while a
-           number unnecessarily high will consume file descriptors. Defaults
-           to 4 if absent. */,
+        /* The number of TCP connections kept alive with the GCP KMS. A number too low will
+           make signing blueprints a bottleneck, while a number unnecessarily high will
+           consume file descriptors. Defaults to 4 if absent. */,
       "authentication_method"?: "metadata_server" | "gcloud_auth",
       "authentication_retries"?:
         integer ∈ [1, 2^30]
-        /* Specify the number of retries the node does to get a new GCP token
-           before giving up and exiting. Defaults to `4` if absent. */,
+        /* Specify the number of retries the node does to get a new GCP token before giving up
+           and exiting. Defaults to `4` if absent. */,
       "authentication_frequency_min"?:
         integer ∈ [1, 2^30]
-        /* Specify the number of minutes before the node attempts to refresh
-           its current access token. Defaults to `30` if absent. */,
+        /* Specify the number of minutes before the node attempts to refresh its current
+           access token. Defaults to `30` if absent. */,
       "authentication_retry_backoff_sec"?:
         integer ∈ [1, 2^30]
-        /* Specify the number of seconds between two attemps at refreshing
-           the access token used to interact with GCP. Defaults to `120` if
-           absent. */,
+        /* Specify the number of seconds between two attemps at refreshing the access token
+           used to interact with GCP. Defaults to `120` if absent. */,
       "authentication_timeout_sec"?:
         integer ∈ [1, 2^30]
-        /* Specify the maximum number of seconds the selected authentication
-           method can used before considered having failed. Defaults to `5`
-           if absents. */,
+        /* Specify the maximum number of seconds the selected authentication method can used
+           before considered having failed. Defaults to `5` if absents. */,
       "gcloud_path"?:
         $unistring
-        /* Specify the path of the `gcloud` binary. Defaults to `gcloud` if
-           absent. */ },
+        /* Specify the path of the `gcloud` binary. Defaults to `gcloud` if absent. */ },
   "fee_history"?:
     { "max_count"?:
-        /* The maximum number of blocks whose fee history can be retrieved at
-           once */
+        /* The maximum number of blocks whose fee history can be retrieved at once */
         "unlimited"
         || integer ∈ [1, 2^30]
         /* limit
            Limit the number of block allowed to be queried. */,
       "max_past"?:
         integer ∈ [1, 2^30]
-        /* The maximum number of blocks in the past where the fee history is
-           available */ },
+        /* The maximum number of blocks in the past where the fee history is available */ },
   "kernel_execution"?:
     { "preimages"?:
         $unistring
-        /* Path to a directory containing the preimages the kernel can
-           reveal. */,
+        /* Path to a directory containing the preimages the kernel can reveal. */,
       "preimages_endpoint"?:
         $unistring
-        /* Endpoint for downloading the preimages that cannot be found in the
-           preimages directory. These preimages are downloaded by the node,
-           stored in the preimages directory and fed to the kernel. */,
+        /* Endpoint for downloading the preimages that cannot be found in the preimages
+           directory. These preimages are downloaded by the node, stored in the preimages
+           directory and fed to the kernel. */,
       "native_execution_policy"?:
         $native_execution_policy
-        /* Policy regarding when to use the native execution for supported
-           kernels. Native execution provides better performance, but
-           increases the complexity of the software stack of the node by
-           adding an additional layer between what is executed by the EVM
-           node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or
-           `always`. Default to `never`. */ },
+        /* Policy regarding when to use the native execution for supported kernels. Native
+           execution provides better performance, but increases the complexity of the software
+           stack of the node by adding an additional layer between what is executed by the EVM
+           node and the Smart Rollup nodes. Can be `never`, `rpcs_only` or `always`. Default
+           to `never`. */ },
   "public_rpc"?:
     { "port"?:
         integer ∈ [1, 2^16-1]
         /* The port used to bind the socket of the RPC server. */,
-      "addr"?:
-        $unistring
-        /* The address used to bind the socket of the RPC server. */,
+      "addr"?: $unistring /* The address used to bind the socket of the RPC server. */,
       "cors_origins"?:
         [ $unistring ... ]
-        /* Cross-Origin Resource Sharing (CORS) origin values. See the CORS
-           specification. */,
+        /* Cross-Origin Resource Sharing (CORS) origin values. See the CORS specification. */,
       "cors_headers"?:
         [ $unistring ... ]
-        /* Cross-Origin Resource Sharing (CORS) header values. See the CORS
-           specification. */,
+        /* Cross-Origin Resource Sharing (CORS) header values. See the CORS specification. */,
       "batch_limit"?:
         "unlimited"
         || integer ∈ [-2^30, 2^30]
         /* limited
-           Upper bound on the size of a JSON RPC API batch. For batches
-           larger than the limit, every request fails. */,
+           Upper bound on the size of a JSON RPC API batch. For batches larger than the limit,
+           every request fails. */,
       "restricted_rpcs"?:
         "unrestricted"
         || $unistring
         /* pattern
-           Disallow the JSON RPC API methods whose name match this Perl-like
-           regexp. */
+           Disallow the JSON RPC API methods whose name match this Perl-like regexp. */
         || { /* whitelist
                 The list of JSON RPC API methods allowed for this server. */
              "whitelist": [ $unistring ... ] }
@@ -259,29 +244,24 @@
     { "port"?:
         integer ∈ [1, 2^16-1]
         /* The port used to bind the socket of the RPC server. */,
-      "addr"?:
-        $unistring
-        /* The address used to bind the socket of the RPC server. */,
+      "addr"?: $unistring /* The address used to bind the socket of the RPC server. */,
       "cors_origins"?:
         [ $unistring ... ]
-        /* Cross-Origin Resource Sharing (CORS) origin values. See the CORS
-           specification. */,
+        /* Cross-Origin Resource Sharing (CORS) origin values. See the CORS specification. */,
       "cors_headers"?:
         [ $unistring ... ]
-        /* Cross-Origin Resource Sharing (CORS) header values. See the CORS
-           specification. */,
+        /* Cross-Origin Resource Sharing (CORS) header values. See the CORS specification. */,
       "batch_limit"?:
         "unlimited"
         || integer ∈ [-2^30, 2^30]
         /* limited
-           Upper bound on the size of a JSON RPC API batch. For batches
-           larger than the limit, every request fails. */,
+           Upper bound on the size of a JSON RPC API batch. For batches larger than the limit,
+           every request fails. */,
       "restricted_rpcs"?:
         "unrestricted"
         || $unistring
         /* pattern
-           Disallow the JSON RPC API methods whose name match this Perl-like
-           regexp. */
+           Disallow the JSON RPC API methods whose name match this Perl-like regexp. */
         || { /* whitelist
                 The list of JSON RPC API methods allowed for this server. */
              "whitelist": [ $unistring ... ] }
@@ -294,38 +274,35 @@
         integer ∈ [-2^30, 2^30]
         /* Maximum allowed length in bytes for a websocket message. */,
       "monitor_heartbeat"?:
-        /* Configuration for the websocket heartbeat mechanism. When enabled,
-           the server will periodically send ping frames to the client and
-           expect a pong response. */
+        /* Configuration for the websocket heartbeat mechanism. When enabled, the server will
+           periodically send ping frames to the client and expect a pong response. */
         "disabled"
         || { /* enabled */
              "ping_interval":
                number
-               /* Interval, in seconds, at which a ping will be sent to the
-                  client to monitor the websocket connection. */,
+               /* Interval, in seconds, at which a ping will be sent to the client to monitor
+                  the websocket connection. */,
              "ping_timeout":
                number
-               /* Timeout in seconds after which the connection will be
-                  considered dead and closed. */ },
+               /* Timeout in seconds after which the connection will be considered dead and
+                  closed. */ },
       "rate_limit"?:
-        { /* Rate limiting configuration for websocket connections. When
-             enabled, the server will limit the number of messages and/or
-             frames a client can send in a given time interval. */
+        { /* Rate limiting configuration for websocket connections. When enabled, the server
+             will limit the number of messages and/or frames a client can send in a given time
+             interval. */
           "max_frames"?:
             integer ∈ [-2^30, 2^30]
-            /* Max allowed websocket frames in the below interval (10x
-               max_messages when unspecified). */,
+            /* Max allowed websocket frames in the below interval (10x max_messages when
+               unspecified). */,
           "max_messages"?:
             integer ∈ [-2^30, 2^30]
             /* Max allowed websocket messages in the below interval. */,
-          "interval":
-            integer ∈ [-2^30, 2^30]
-            /* Interval in seconds for the rate limit. */,
+          "interval": integer ∈ [-2^30, 2^30] /* Interval in seconds for the rate limit. */,
           "strategy"?: "wait" | "error" | "close" } },
   "finalized_view"?:
     boolean
-    /* When enabled, the node only expose blocks that are finalized, i.e.,
-       the `latest` block parameter becomes a synonym for `finalized`. */,
+    /* When enabled, the node only expose blocks that are finalized, i.e., the `latest` block
+       parameter becomes a synonym for `finalized`. */,
   "history"?: $history_mode /* History mode of the EVM node */,
   "db"?:
     { /* Database connection configuration */
@@ -341,31 +318,97 @@
       "enable"?: boolean /* Enable opentelemetry profiling */,
       "instance_id"?:
         $unistring
-        /* Instance id to identify the node in Opentelemetry traces. Takes
-           precedence over <data_dir>/telemetry_id. */,
+        /* Instance id to identify the node in Opentelemetry traces. Takes precedence over
+           <data_dir>/telemetry_id. */,
+      "environment"?:
+        /* Deployment environment, used for Datadog tagging, will be extracted from env
+           variable DD_ENV if null. See
+           https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging. */
+        $unistring /* Some */ || null /* None */,
       "debug"?: boolean /* Enable debug mode */,
       "url_traces"?: $unistring /* URL to send traces */,
-      "headers"?:
-        [ [ $unistring, $unistring ] ... ]
-        /* API headers sent to the endpoint */,
+      "url_logs"?: $unistring /* URL to send logs */,
+      "headers"?: [ [ $unistring, $unistring ] ... ] /* API headers sent to the endpoint */,
       "batch_traces"?:
         /* Batch traces */
         integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+      "batch_logs"?: /* Batch logs */integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "batch_timeout_ms"?:
         integer ∈ [-2^30, 2^30]
-        /* Milliseconds after which we emit a batch, even incomplete */ }
+        /* Milliseconds after which we emit a batch, even incomplete */,
+      "gc_telemetry"?:
+        { /* Enable traces for GC events (costly) */
+          "enable"?: boolean,
+          "filter"?:
+            [ "finalise_update_last"
+              | "interrupt_remote"
+              | "minor_leave_barrier"
+              | "finalise_update_first"
+              | "major_gc_stw"
+              | "minor_remembered_set_promote"
+              | "explicit_gc_full_major"
+              | "minor_finalizers_oldify"
+              | "major"
+              | "minor_finalized"
+              | "major_slice"
+              | "minor_finalizers_admin"
+              | "minor_global_roots"
+              | "minor_local_roots"
+              | "stw_handler"
+              | "major_mark_roots"
+              | "major_finish_marking"
+              | "compaction_evacuate"
+              | "explicit_gc_stat"
+              | "major_finish_cycle"
+              | "major_gc_cycle_domains"
+              | "compaction_release"
+              | "compaction"
+              | "explicit_gc_compact"
+              | "explicit_gc_major"
+              | "explicit_gc_major_slice"
+              | "major_gc_phase_change"
+              | "major_ephe_sweep"
+              | "stw_api_barrier"
+              | "major_finish_sweeping"
+              | "minor_local_roots_promote"
+              | "major_mark"
+              | "major_mark_opportunistic"
+              | "explicit_gc_set"
+              | "minor"
+              | "compaction_forward"
+              | "minor_remembered_set"
+              | "major_sweep"
+              | "stw_leader"
+              | "minor_clear"
+              | "domain_resize_heap_reservation"
+              | "explicit_gc_minor"
+              | "major_ephe_mark" ... ]
+            /* Filter for which GC events to emit traces */,
+          "min_duration_ms"?:
+            /* Minimal span duration for a GC event to be emitted */
+            number /* Some */ || null /* None */ },
+      "trace_host_functions"?:
+        boolean
+        /* Activate tracing for kernel host functions. Only recommended for debug or profiling
+           as this will emit a lot of spans. */ }
     || boolean
     /* opentelemetry_boolean */
     || null
-    /* opentelemetry_null */ }
+    /* opentelemetry_null */,
+  "tx_pool"?:
+    { /* Configuration for the tx pool */
+      "max_size"?: integer ∈ [-2^30, 2^30],
+      "max_transaction_batch_length"?: integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+      "max_lifespan"?: integer ∈ [-2^30, 2^30],
+      "tx_per_addr_limit"?: $int64 },
+  "performance_profile"?: "performance" | "default" }
 $bignum:
   /* Big number
      Decimal representation of a big number */
   string
 $history_mode:
-  /* Compact notation for the history mode. Can either be `archive` and
-     `rolling:N` with `N` being the number of days to use as the retention
-     period */
+  /* Compact notation for the history mode. Can either be `archive` and `rolling:N` with `N`
+     being the number of days to use as the retention period */
   "archive" | "rolling:n"
 $int64:
   /* 64 bit integers
@@ -377,18 +420,16 @@ $max_active_rpc_connections:
   "unlimited"
   || integer ∈ [-2^30, 2^30]
   /* limited
-     The number of maximum RPC connections allowed is limited to the given
-     integer's value. */
+     The number of maximum RPC connections allowed is limited to the given integer's value. */
 $native_execution_policy:
   /* native_execution_policy
-     `never` means the native execution will never be used by the node.
-     `rpcs_only` will restrict the usage of the native execution to RPC
-     calls, leaving blueprint application to the WASM runtime. `always` will
-     always use native execution for supported kernels. */
+     `never` means the native execution will never be used by the node. `rpcs_only` will
+     restrict the usage of the native execution to RPC calls, leaving blueprint application to
+     the WASM runtime. `always` will always use native execution for supported kernels. */
   "rpcs_only" | "always" | "never"
 $time_between_blocks: number /* Some */ || null /* None */
 $unistring:
   /* Universal string representation
-     Either a plain UTF8 string, or a sequence of bytes for strings that
-     contain invalid byte sequences. */
+     Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte
+     sequences. */
   string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }

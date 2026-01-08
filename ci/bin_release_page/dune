@@ -1,0 +1,38 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name base_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  clap
+  tezt.json)
+ (modules base))
+
+(executable
+ (name release_page)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  clap
+  tezt.json
+  base_lib)
+ (flags
+  (:standard)
+  -open Base_lib)
+ (modules release_page))
+
+(executable
+ (name version_manager)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  clap
+  tezt.json
+  rss
+  base_lib)
+ (flags
+  (:standard)
+  -open Base_lib)
+ (modules version_manager))

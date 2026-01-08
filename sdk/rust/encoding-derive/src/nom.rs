@@ -144,10 +144,15 @@ fn generate_struct_one_field_nom_read(encoding: &StructEncoding) -> TokenStreamW
 
 fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let name = encoding.name;
-    let field1 = encoding.fields.iter().map(|field| field.name);
-    let field2 = field1.clone();
-    let field_name = encoding
+    let (fields, hash) = encoding
         .fields
+        .iter()
+        .partition::<Vec<_>, _>(|f| !matches!(f.kind, FieldKind::Hash));
+
+    let field1 = fields.iter().map(|field| field.name);
+
+    let field2 = field1.clone();
+    let field_name = fields
         .iter()
         .map(|field| format!("{}::{}", name, field.name));
     let mut constraints = Punctuated::new();
@@ -159,26 +164,48 @@ fn generate_struct_many_fields_nom_read(encoding: &StructEncoding) -> TokenStrea
         constraints.extend(field_constraints);
         stream
     });
+    let stream = if let Some(hash_field) = hash.first() {
+        let field3 = field1.clone();
+        let hash_name = hash_field.name;
+        quote_spanned! {
+            hash_field.name.span()=>
+                nom::combinator::map(
+                    tezos_data_encoding::nom::hashed(
+                        tezos_crypto_rs::hash::TezosHasher,
+                        nom::sequence::tuple((
+                            #(tezos_data_encoding::nom::field(#field_name, #field_nom_read)),*
+                        ))
+                    ),
+                    |((#(#field2),*), #hash_name)| {
+                        #name { #(#field3),*, #hash_name: #hash_name.into() }
+                    })
+        }
+    } else {
+        quote_spanned! {
+            encoding.name.span()=>
+                nom::combinator::map(
+                    nom::sequence::tuple((
+                        #(tezos_data_encoding::nom::field(#field_name, #field_nom_read)),*
+                    )),
+                    |(#(#field1),*)| #name { #(#field2),* }
+                )
+        }
+    };
     TokenStreamWithConstraints {
-        stream: quote_spanned! {
-        encoding.name.span()=>
-            nom::combinator::map(
-                nom::sequence::tuple((
-                    #(tezos_data_encoding::nom::field(#field_name, #field_nom_read)),*
-                )),
-                |(#(#field1),*)| #name { #(#field2),* }
-            )
-            },
+        stream,
         constraints,
     }
 }
 
 fn generate_struct_multi_fields_nom_read(encoding: &StructEncoding) -> TokenStreamWithConstraints {
     let name = encoding.name;
-    let field1 = encoding.fields.iter().map(|field| field.name);
-    let field2 = field1.clone();
-    let field_name = encoding
+    let (fields, hash) = encoding
         .fields
+        .iter()
+        .partition::<Vec<_>, _>(|f| !matches!(f.kind, FieldKind::Hash));
+    let field1 = fields.iter().map(|field| field.name);
+    let field2 = field1.clone();
+    let field_name = fields
         .iter()
         .map(|field| format!("{}::{}", name, field.name));
     let mut constraints = Punctuated::new();
@@ -190,14 +217,36 @@ fn generate_struct_multi_fields_nom_read(encoding: &StructEncoding) -> TokenStre
         constraints.extend(field_constraints);
         stream
     });
+    let stream = if let Some(hash_field) = hash.first() {
+        let field3 = field1.clone();
+        let field4 = field1.clone();
+        let hash_name = hash_field.name;
+        quote_spanned! {
+            hash_field.name.span()=>
+                nom::combinator::map(
+                    tezos_data_encoding::nom::hashed(
+                        tezos_crypto_rs::hash::TezosHasher,
+                        (|input| {
+                            #(let (input, #field1) = tezos_data_encoding::nom::field(#field_name, #field_nom_read)(input)?;)*
+                            Ok((input, (#(#field2),* )))
+                        })
+                    ),
+                    |((#(#field3),*), #hash_name)| {
+                        #name { #(#field4),*, #hash_name: #hash_name.into() }
+                    }
+                )
+        }
+    } else {
+        quote_spanned! {
+            encoding.name.span()=>
+                (|input| {
+                    #(let (input, #field1) = tezos_data_encoding::nom::field(#field_name, #field_nom_read)(input)?;)*
+                    Ok((input, #name { #(#field2),* }))
+                })
+        }
+    };
     TokenStreamWithConstraints {
-        stream: quote_spanned! {
-        encoding.name.span()=>
-            (|input| {
-                #(let (input, #field1) = tezos_data_encoding::nom::field(#field_name, #field_nom_read)(input)?;)*
-                Ok((input, #name { #(#field2),* }))
-            })
-            },
+        stream,
         constraints,
     }
 }
@@ -219,6 +268,7 @@ fn generate_struct_field_nom_read(field: &FieldEncoding) -> TokenStreamWithConst
             })
         }
         FieldKind::Skip => quote!(|input| Ok((input, Default::default()))).into(),
+        FieldKind::Hash => unreachable!(),
     }
 }
 

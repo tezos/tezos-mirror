@@ -180,7 +180,10 @@ let make_with_pp_short ?cols ~color ~tag_color ~advertise_levels ~level pp
         match tag_color with Some c -> (c, Color.reset) | None -> ("", "")
       in
       let l_str = string_of_level level in
-      let level_width = 8 (* NOTICE + 2 spaces *) in
+      let level_width =
+        8
+        (* NOTICE + 2 spaces *)
+      in
       let tab = String.make (level_width - String.length l_str - 1) ' ' in
       (String.concat "" [tab; color; l_str; reset; " "], level_width)
     else ("", 0)

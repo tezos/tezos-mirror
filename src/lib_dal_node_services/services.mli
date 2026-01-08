@@ -39,12 +39,33 @@ type 'rpc service =
     ; output : 'output >
 
 (* This RPC aims to be used by a user to check whether its DAL node
-   behaves as expected. It does not aim to provide a clear diagnostic,
-   this is left to another RPC (not implemented yet). *)
+   behaves as expected. *)
 val health :
   < meth : [`GET]
   ; input : unit
   ; output : Types.Health.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+(* This RPC reports the current synchronization status of the DAL node
+   with respect to the L1 node. *)
+val synchronized :
+  < meth : [`GET]
+  ; input : unit
+  ; output : L1_crawler_status.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+(* This RPC monitors the  synchronization statuses of the DAL node
+   with respect to the L1 node. *)
+val monitor_synchronized :
+  < meth : [`GET]
+  ; input : unit
+  ; output : L1_crawler_status.t
   ; prefix : unit
   ; params : unit
   ; query : unit >
@@ -105,8 +126,11 @@ val get_slot_page_proof :
   ; query : unit >
   service
 
-(** Return the accepted commitment associated to the given slot index and
-    published at the given level, if any. *)
+(** Return the commitment associated to the given slot index and published at
+    the given level, if any. The commitment is fetched from the skip-list
+    storage. Note that the commitment is not present in the storage immediately
+    after publication, but only when its attestation status is known and
+    final. *)
 val get_slot_commitment :
   < meth : [`GET]
   ; input : unit
@@ -116,7 +140,10 @@ val get_slot_commitment :
   ; query : unit >
   service
 
-(** Return the status for the given slot. *)
+(** Return the status of the given slot. It first looks for the status in its
+    cache, which is available only during the attestation window. If not found
+    in the cache, it fetches the status in the corresponding cell in the
+    skip-list store; this therefore works only on operator nodes. *)
 val get_slot_status :
   < meth : [`GET]
   ; input : unit
@@ -190,6 +217,20 @@ val get_attestable_slots :
   ; output : Types.attestable_slots
   ; prefix : unit
   ; params : (unit * Signature.public_key_hash) * Types.level
+  ; query : unit >
+  service
+
+(** Stream attestable slot_ids for the given public key hash [pkh].
+    A slot is attestable at level [L] if it was published at [L - attestation_lag]
+    and *all* shards assigned at level [L] to [pkh] are available in the DAL
+    node's store. Returns a "not in committee" message if that is the case
+    for [pkh] at level [L]. *)
+val monitor_attestable_slots :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.Attestable_event.t
+  ; prefix : unit
+  ; params : unit * Signature.public_key_hash
   ; query : unit >
   service
 

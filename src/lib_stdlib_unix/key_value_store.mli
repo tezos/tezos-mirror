@@ -108,28 +108,104 @@ val layout :
   unit ->
   ('key, 'value) layout
 
-(** An abstract representation of a file-based key-value store. *)
-type ('file, 'key, 'value) t
+module Read : sig
+  (** An abstract representation of a file-based key-value store. *)
+  type ('file, 'key, 'value) t
 
-(** [init ~lru_size ~root_dir] initialises a file-based key-value store. The
-    [root_dir] is created on disk if it doesn't exist. All the keys/values
-    associated to a file are stored in a single physical file.
+  (** [read_value t file_layout file key] reads the value associated to [key] in the
+      [file] in the store. Fails if no value were attached to this [key]. The
+      value read is the last one that was produced by a successful write. *)
+  val read_value :
+    ('file, 'key, 'value) t ->
+    ('file, 'key, 'value) file_layout ->
+    'file ->
+    'key ->
+    'value tzresult Lwt.t
 
-    [lru_size] is a parameter that represents maximum number of open files. It
-    is up to the user of this library to decide this number depending on the
-    sizes of the values.
+  (** [read_values t file_layout keys] produces a sequence of [values] associated to
+      the sequence of [keys]. This function is almost instantaneous since no reads
+      are performed. Reads are done when the caller consumes the values of the
+      sequence returned. *)
+  val read_values :
+    ('file, 'key, 'value) t ->
+    ('file, 'key, 'value) file_layout ->
+    ('file * 'key) Seq.t ->
+    ('file * 'key * 'value tzresult) Seq_s.t
 
-    Internally creates a lockfile and returns an error if a key value store in
-    the same [root_dir] is locked by another process. This lockfile does not
-    prevent concurrent opens by the same process and should be completed by a
-    mutex if necessary.
+  (** variant of read_values, but decodes the shards stored in the given bytes
+      using the given store's layout. *)
+  val read_values_from_bytes :
+    ('file, 'key, 'value) file_layout ->
+    bytes ->
+    ('file * 'key) Seq.t ->
+    ('file * 'key * 'value tzresult) Seq_s.t
+
+  (** Same as {!read_value} expect that this function returns whether the given
+      entry exists without reading it. *)
+  val value_exists :
+    ('file, 'key, 'value) t ->
+    ('file, 'key, 'value) file_layout ->
+    'file ->
+    'key ->
+    bool tzresult Lwt.t
+
+  (** Same as {!read_values} expect that this function returns whether the given
+      entries exist without reading them. *)
+  val values_exist :
+    ('file, 'key, 'value) t ->
+    ('file, 'key, 'value) file_layout ->
+    ('file * 'key) Seq.t ->
+    ('file * 'key * bool tzresult) Seq_s.t
+
+  (** This function returns the number of entries for a given file. *)
+  val count_values :
+    ('file, 'key, 'value) t ->
+    ('file, 'key, 'value) file_layout ->
+    'file ->
+    int tzresult Lwt.t
+
+  (** [init ?lockfile ~lru_size root_dir] initialises a read-only file-based
+      key-value store. The [root_dir] must exist on disk.
+
+      [lru_size] is the maximum number of open files kept in the LRU cache.
+      Choose this value based on your value sizes and available memory.
+
+      The implementation always uses a lockfile to coordinate access. If
+      [lockfile] is provided, that path is used; if the lockfile is already
+      held by another process, this function returns an error. If [lockfile] is
+      not provided, a unique, randomly generated lockfile path is used, allowing
+      concurrent opens even from different processes.
+
+      Note that lockfiles do not prevent concurrent opens by the same process;
+      use a mutex if needed for intra-process coordination.
+
+      This function is intended for scenarios where multiple processes need
+      read-only access to the same store. Since the returned store is read-only,
+      concurrent writes from different processes are not possible, avoiding disk
+      corruption. However, reads may be inconsistent if performed while another
+      process is writing to the underlying files.
+  *)
+  val init :
+    ?lockfile:string ->
+    lru_size:int ->
+    string ->
+    ('file, 'key, 'value) t tzresult Lwt.t
+
+  (** [close kvs] waits until all pending reads and writes are completed
+      and closes the key-value store. *)
+  val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
+end
+
+(** All functions from the Read module are available at the top level. *)
+include module type of Read
+
+(** [init ~lru_size ~root_dir] is the same as {!val:Read.init} but uses a fixed
+    lockfile path derived from [root_dir]. This prevents opening multiple
+    read-write stores on the same [root_dir] from different processes.
+    If [root_dir] is not present, it is created.
 *)
 val init :
   lru_size:int -> root_dir:string -> ('file, 'key, 'value) t tzresult Lwt.t
-
-(** [close kvs] waits until all pending reads and writes are completed
-    and closes the key-value store. *)
-val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
 
 (** [root_dir t] returns the [root_dir] directory used to create [t]. *)
 val root_dir : ('file, 'key, 'value) t -> string
@@ -158,43 +234,6 @@ val write_values :
   ('file * 'key * 'value) Seq.t ->
   unit tzresult Lwt.t
 
-(** [read_value t file_layout file key] reads the value associated to [key] in the
-    [file] in the store. Fails if no value were attached to this [key]. The
-    value read is the last one that was produced by a successful write. *)
-val read_value :
-  ('file, 'key, 'value) t ->
-  ('file, 'key, 'value) file_layout ->
-  'file ->
-  'key ->
-  'value tzresult Lwt.t
-
-(** [read_values t file_layout keys] produces a sequence of [values] associated to
-    the sequence of [keys]. This function is almost instantaneous since no reads
-    are performed. Reads are done when the caller consumes the values of the
-    sequence returned. *)
-val read_values :
-  ('file, 'key, 'value) t ->
-  ('file, 'key, 'value) file_layout ->
-  ('file * 'key) Seq.t ->
-  ('file * 'key * 'value tzresult) Seq_s.t
-
-(** Same as {!read_value} expect that this function returns whether the given
-    entry exists without reading it. *)
-val value_exists :
-  ('file, 'key, 'value) t ->
-  ('file, 'key, 'value) file_layout ->
-  'file ->
-  'key ->
-  bool tzresult Lwt.t
-
-(** Same as {!read_values} expect that this function returns whether the given
-    entries exist without reading them. *)
-val values_exist :
-  ('file, 'key, 'value) t ->
-  ('file, 'key, 'value) file_layout ->
-  ('file * 'key) Seq.t ->
-  ('file * 'key * bool tzresult) Seq_s.t
-
 (** [remove_file t file_layout] removes the corresponding physical file of
     [file] from the disk as well as the corresponding keys/values of
     the store. In case of concurrent read/write, this function should
@@ -207,13 +246,6 @@ val remove_file :
   ('file, 'key, 'value) file_layout ->
   'file ->
   unit tzresult Lwt.t
-
-(** This function returns the number of entries for a given file. *)
-val count_values :
-  ('file, 'key, 'value) t ->
-  ('file, 'key, 'value) file_layout ->
-  'file ->
-  int tzresult Lwt.t
 
 module View : sig
   (** Returns the number of files currently opened by the key value

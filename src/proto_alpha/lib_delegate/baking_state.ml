@@ -32,25 +32,6 @@ module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : Kind.preattestation operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : Kind.attestation operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
 }
@@ -59,15 +40,9 @@ let prequorum_encoding =
   let open Data_encoding in
   conv
     (fun {level; round; block_payload_hash; preattestations} ->
-      (level, round, block_payload_hash, List.map Operation.pack preattestations))
+      (level, round, block_payload_hash, preattestations))
     (fun (level, round, block_payload_hash, preattestations) ->
-      {
-        level;
-        round;
-        block_payload_hash;
-        preattestations =
-          List.filter_map Operation_pool.unpack_preattestation preattestations;
-      })
+      {level; round; block_payload_hash; preattestations})
     (obj4
        (req "level" int32)
        (req "round" Round.encoding)
@@ -87,14 +62,15 @@ let block_info_encoding =
            quorum;
            payload;
            grandparent;
-         } ->
+         }
+       ->
       ( hash,
         shell,
         payload_hash,
         payload_round,
         round,
         prequorum,
-        List.map Operation.pack quorum,
+        quorum,
         payload,
         grandparent ))
     (fun ( hash,
@@ -105,7 +81,8 @@ let block_info_encoding =
            prequorum,
            quorum,
            payload,
-           grandparent ) ->
+           grandparent )
+       ->
       {
         hash;
         shell;
@@ -114,7 +91,7 @@ let block_info_encoding =
         payload_round;
         round;
         prequorum;
-        quorum = List.filter_map Operation_pool.unpack_attestation quorum;
+        quorum;
         payload;
       })
     (obj9
@@ -130,24 +107,19 @@ let block_info_encoding =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
-type delegate_slot = {
-  delegate : Delegate.t;
-  first_slot : Slot.t;
-  attesting_power : int;
-}
+module RoundMap : Map.S with type key = Round.t = Map.Make (Round)
 
-module Delegate_slots = struct
-  (* Note that we also use the delegate slots as proposal slots. *)
+module Delegate_infos = struct
   type t = {
-    own_delegates : delegate_slot list;
-    own_delegate_slots : delegate_slot SlotMap.t;
-        (* This map cannot have as keys just the first slot of delegates,
+    own_delegates : delegate_info list;
+    own_delegate_rounds : delegate_info RoundMap.t;
+        (* This map cannot have as keys just the first round of delegates,
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
-    all_delegate_voting_power : int SlotMap.t;
-        (* This is a map having as keys the first slot of all delegates, and as
+    all_delegate_voting_power : int64 SlotMap.t;
+        (* This is a map having as keys the attestation slot of all delegates, and as
            values their attesting power.
-           This map contains just the first slot for a delegate, because it is
+           Without all bakers attest, this map contains just the first slot for a delegate, because it is
            only used in [slot_voting_power] which is about (pre)attestations,
            not proposals. Indeed, only (pre)attestations that use the delegate's
            first slot are valid for inclusion in a block and count toward the
@@ -155,36 +127,39 @@ module Delegate_slots = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
+    consensus_threshold : int64;
+    consensus_committee : int64;
   }
 
-  let own_delegates slots = slots.own_delegates
+  let own_delegates t = t.own_delegates
 
-  let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
+  let own_delegate_ids t =
+    List.map
+      (fun delegate_info ->
+        Baking_state_types.Delegate.delegate_id delegate_info.delegate)
+      t.own_delegates
 
-  let find_first_slot_from slots ~slot =
-    SlotMap.find_first (fun s -> Slot.(s >= slot)) slots.own_delegate_slots
-
-  let min_slot slots = SlotMap.min_binding slots.own_delegate_slots
-
-  let own_round_owner slots ~committee_size ~round =
+  let own_round_owner t ~committee_size ~round =
     let open Result_syntax in
-    let* slot =
-      Round.to_slot ~committee_size round |> Environment.wrap_tzresult
+    let* round_int = Round.to_int round |> Environment.wrap_tzresult in
+    let* round_rem =
+      Round.of_int (round_int mod committee_size) |> Environment.wrap_tzresult
     in
-    return @@ SlotMap.find slot slots.own_delegate_slots
+    return @@ RoundMap.find round_rem t.own_delegate_rounds
 
-  let voting_power slots ~slot =
-    SlotMap.find slot slots.all_delegate_voting_power
+  let find_first_round_from t ~round =
+    RoundMap.find_first (fun s -> Round.(s >= round)) t.own_delegate_rounds
+
+  let min_round t = RoundMap.min_binding t.own_delegate_rounds
+
+  let voting_power t ~slot = SlotMap.find slot t.all_delegate_voting_power
+
+  let consensus_threshold {consensus_threshold; _} = consensus_threshold
+
+  let consensus_committee {consensus_committee; _} = consensus_committee
 end
 
-type delegate_slots = Delegate_slots.t
-
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
-
-type proposal = {block : block_info; predecessor : block_info}
+type delegate_infos = Delegate_infos.t
 
 let proposal_encoding =
   let open Data_encoding in
@@ -239,11 +214,10 @@ type prepared_block = {
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
-(* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},
-   {next_level_latest_forge_request}, {dal_attestable_slots},
-   {next_level_dal_attestable_slots} are updated only when we receive a block at
-   a different level than {current_level}.  Note that this means that there is
-   always a {latest_proposal}, which may be our own baked block. *)
+(* The fields {current_level}, {delegate_infos}, {next_level_delegate_infos},
+   {next_level_latest_forge_request} are updated only when we receive a block at a different
+   level than {current_level}.  Note that this means that there is always a {latest_proposal},
+   which may be our own baked block. *)
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
@@ -255,11 +229,9 @@ type level_state = {
   attestable_payload : attestable_payload option;
   (* Block for which we've seen 2f+1 attestations and that we may bake onto *)
   elected_block : elected_block option;
-  delegate_slots : delegate_slots;
-  next_level_delegate_slots : delegate_slots;
+  delegate_infos : delegate_infos;
+  next_level_delegate_infos : delegate_infos;
   next_level_latest_forge_request : Round.t option;
-  dal_attestable_slots : dal_attestable_slots;
-  next_level_dal_attestable_slots : dal_attestable_slots;
 }
 
 type phase =
@@ -319,22 +291,8 @@ type block_to_bake = {
 type consensus_vote_kind = Attestation | Preattestation
 
 let consensus_vote_kind_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"preattestation"
-        unit
-        (function Preattestation -> Some () | _ -> None)
-        (fun () -> Preattestation);
-      case
-        (Tag 1)
-        ~title:"attestation"
-        unit
-        (function Attestation -> Some () | _ -> None)
-        (fun () -> Attestation);
-    ]
+  Data_encoding.string_enum
+    [("preattestation", Preattestation); ("attestation", Attestation)]
 
 let pp_consensus_vote_kind fmt = function
   | Attestation -> Format.fprintf fmt "attestation"
@@ -538,8 +496,10 @@ type global_state = {
   constants : Constants.t;
   (* round durations *)
   round_durations : Round.round_durations;
-  (* worker that monitor and aggregates new operations *)
+  (* worker that monitors and aggregates new operations *)
   operation_worker : Operation_worker.t;
+  (* worker that retrieves DAL attestable slots from the DAL node *)
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   (* hooks to the consensus and block forge worker *)
   mutable forge_worker_hooks : forge_worker_hooks;
   (* the validation mode used by the baker*)
@@ -600,40 +560,22 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
-let vote_kind_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"Preattestation"
-        unit
-        (function Preattestation -> Some () | _ -> None)
-        (fun () -> Preattestation);
-      case
-        (Tag 1)
-        ~title:"Attestation"
-        unit
-        (function Attestation -> Some () | _ -> None)
-        (fun () -> Attestation);
-    ]
+let dal_content_encoding =
+  Data_encoding.conv
+    (fun {attestation} -> attestation)
+    (fun attestation -> {attestation})
+    Dal.Attestation.encoding
 
 let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
-  let dal_content_encoding : dal_content encoding =
-    conv
-      (fun {attestation} -> attestation)
-      (fun attestation -> {attestation})
-      Dal.Attestation.encoding
-  in
   conv
     (fun {vote_kind; vote_consensus_content; delegate; dal_content} ->
       (vote_kind, vote_consensus_content, delegate, dal_content))
     (fun (vote_kind, vote_consensus_content, delegate, dal_content) ->
       {vote_kind; vote_consensus_content; delegate; dal_content})
     (obj4
-       (req "vote_kind" vote_kind_encoding)
-       (req "vote_consensus_content" consensus_content_encoding)
+       (req "operation_kind" consensus_vote_kind_encoding)
+       (req "consensus_content" consensus_content_encoding)
        (req "delegate" Delegate.encoding_for_logging__cannot_decode)
        (opt "dal_content" dal_content_encoding))
 
@@ -670,7 +612,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              operations;
              manager_operations_infos;
              baking_votes;
-           } ->
+           }
+         ->
         ( signed_block_header,
           round,
           delegate,
@@ -682,7 +625,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              delegate,
              operations,
              manager_operations_infos,
-             baking_votes ) ->
+             baking_votes )
+         ->
         {
           signed_block_header;
           round;
@@ -970,70 +914,88 @@ let may_load_attestable_data state =
 
 (* Helpers *)
 
-let delegate_slots attesting_rights delegates =
+let delegate_infos attesting_rights delegates =
   let open Lwt_syntax in
   let known_keys = Key.Set.of_list delegates in
-  let* own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
-    Lwt_list.fold_left_s
-      (fun (own_list, own_map, all_map) validator ->
-        let {Plugin.RPC.Validators.slots; _} = validator in
-        let first_slot = Stdlib.List.hd slots in
-        let attesting_power = List.length slots in
-        let all_map = SlotMap.add first_slot attesting_power all_map in
-        let* own_list, own_map =
-          let* delegate_opt = Delegate.of_validator ~known_keys validator in
-          match delegate_opt with
-          | None -> return (own_list, own_map)
-          | Some delegate ->
-              let attesting_slot = {delegate; first_slot; attesting_power} in
-              return
-                ( attesting_slot :: own_list,
-                  List.fold_left
-                    (fun own_map slot ->
-                      SlotMap.add slot attesting_slot own_map)
-                    own_map
-                    slots )
-        in
-        return (own_list, own_map, all_map))
-      ([], SlotMap.empty, SlotMap.empty)
-      attesting_rights
-  in
-  return
-    Delegate_slots.
-      {
-        own_delegates = own_delegate_first_slots;
-        own_delegate_slots;
-        all_delegate_voting_power;
-      }
+  match attesting_rights with
+  | [] | _ :: _ :: _ -> assert false
+  | [
+   {
+     Plugin.RPC.Validators.level = _;
+     consensus_threshold;
+     consensus_committee;
+     abaab_activation_flag = _;
+     delegates = attesting_rights;
+   };
+  ] ->
+      let* ( own_delegate_first_slots,
+             own_delegate_rounds,
+             all_delegate_voting_power ) =
+        Lwt_list.fold_left_s
+          (fun (own_list, own_map, all_map) validator ->
+            let {
+              Plugin.RPC.Validators.rounds;
+              attesting_power;
+              attestation_slot;
+              _;
+            } =
+              validator
+            in
+            let all_map =
+              SlotMap.add attestation_slot attesting_power all_map
+            in
+            let* own_list, own_map =
+              let* delegate_opt = Delegate.of_validator ~known_keys validator in
+              match delegate_opt with
+              | None -> return (own_list, own_map)
+              | Some delegate ->
+                  let attesting_slot =
+                    {delegate; attestation_slot; attesting_power}
+                  in
+                  return
+                    ( attesting_slot :: own_list,
+                      List.fold_left
+                        (fun own_map round ->
+                          RoundMap.add round attesting_slot own_map)
+                        own_map
+                        rounds )
+            in
+            return (own_list, own_map, all_map))
+          ([], RoundMap.empty, SlotMap.empty)
+          attesting_rights
+      in
+      return
+        {
+          Delegate_infos.own_delegates = own_delegate_first_slots;
+          own_delegate_rounds;
+          all_delegate_voting_power;
+          consensus_threshold;
+          consensus_committee;
+        }
 
-let compute_delegate_slots (cctxt : Protocol_client_context.full)
+let compute_delegate_infos (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    (Plugin.RPC.Validators.get
-       cctxt
-       (chain, block)
-       ~levels:[level]
-     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+    Node_rpc.get_validators cctxt ~chain ~block ~levels:[level] ()
   in
-  let*! delegate_slots =
-    (delegate_slots
+  let*! delegate_infos =
+    (delegate_infos
        attesting_rights
-       delegates [@profiler.record_f {verbosity = Debug} "delegate_slots"])
+       delegates [@profiler.record_f {verbosity = Debug} "delegate_infos"])
   in
-  return delegate_slots
+  return delegate_infos
 
 let round_proposer state ~level round =
   let slots =
     match level with
-    | `Current -> state.level_state.delegate_slots
-    | `Next -> state.level_state.next_level_delegate_slots
+    | `Current -> state.level_state.delegate_infos
+    | `Next -> state.level_state.next_level_delegate_infos
   in
   let committee_size =
     state.global_state.constants.parametric.consensus_committee_size
   in
-  match Delegate_slots.own_round_owner slots ~round ~committee_size with
+  match Delegate_infos.own_round_owner slots ~round ~committee_size with
   | Error _ -> None
   | Ok owner -> owner
 
@@ -1186,51 +1148,59 @@ let pp_elected_block fmt {proposal; attestation_qc} =
     proposal.block
     (List.length attestation_qc)
 
-let pp_delegate_slot fmt {delegate; first_slot; attesting_power} =
+let pp_delegate_info fmt {delegate; attestation_slot; attesting_power} =
   Format.fprintf
     fmt
-    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %d"
+    "slots: @[<h>attestation_slot: %a@],@ delegate: %a,@ attesting_power: %Ld"
     Slot.pp
-    first_slot
+    attestation_slot
     Delegate.pp
     delegate
     attesting_power
 
 (* this type is only used below for pretty-printing *)
-type delegate_slots_for_pp = {attester : Delegate.t; all_slots : Slot.t list}
+type delegate_infos_for_pp = {attester : Delegate.t; all_rounds : Round.t list}
 
-let delegate_slots_for_pp delegate_slot_map =
-  SlotMap.fold
-    (fun slot {delegate; first_slot; attesting_power = _} acc ->
-      match SlotMap.find first_slot acc with
+let delegate_infos_for_pp delegate_info_map =
+  RoundMap.fold
+    (fun round {delegate; attestation_slot; attesting_power = _} acc ->
+      match SlotMap.find attestation_slot acc with
       | None ->
-          SlotMap.add first_slot {attester = delegate; all_slots = [slot]} acc
-      | Some {attester; all_slots} ->
-          SlotMap.add first_slot {attester; all_slots = slot :: all_slots} acc)
-    delegate_slot_map
+          SlotMap.add
+            attestation_slot
+            {attester = delegate; all_rounds = [round]}
+            acc
+      | Some {attester; all_rounds} ->
+          SlotMap.add
+            attestation_slot
+            {attester; all_rounds = round :: all_rounds}
+            acc)
+    delegate_info_map
     SlotMap.empty
-  |> SlotMap.map (fun {attester; all_slots} ->
-         {attester; all_slots = List.rev all_slots})
+  |> SlotMap.map (fun {attester; all_rounds} ->
+         {attester; all_rounds = List.rev all_rounds})
 
-let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
+let pp_delegate_infos fmt (Delegate_infos.{own_delegate_rounds; _} as t) =
   Format.fprintf
     fmt
     "@[<v>%a@]"
     Format.(
       pp_print_list
         ~pp_sep:pp_print_cut
-        (fun fmt (_first_slot, {attester; all_slots}) ->
+        (fun fmt (first_slot, {attester; all_rounds}) ->
           Format.fprintf
             fmt
-            "attester: %a, power: %d, first 10 slots: %a"
+            "attester: %a, power: %Ld, first 10 slots: %a"
             Delegate.pp
             attester
-            (List.length all_slots)
+            (Option.value ~default:0L
+            @@ Delegate_infos.voting_power t ~slot:first_slot)
             (Format.pp_print_list
                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
-               Slot.pp)
-            (List.filteri (fun i _ -> i < 10) all_slots)))
-    (SlotMap.bindings (delegate_slots_for_pp own_delegate_slots))
+               pp_print_int)
+            (List.filteri (fun i _ -> i < 10) all_rounds
+            |> List.map (fun x -> Round.to_int32 x |> Int32.to_int))))
+    (SlotMap.bindings (delegate_infos_for_pp own_delegate_rounds))
 
 let pp_prepared_block fmt {signed_block_header; delegate; _} =
   Format.fprintf
@@ -1252,17 +1222,15 @@ let pp_level_state fmt
       locked_round;
       attestable_payload;
       elected_block;
-      delegate_slots;
-      next_level_delegate_slots;
+      delegate_infos;
+      next_level_delegate_infos;
       next_level_latest_forge_request;
-      dal_attestable_slots = _;
-      next_level_dal_attestable_slots = _;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
      %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
-     2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
+     2>own delegate infos:@ %a@]@ @[<v 2>next level own delegate infos:@ %a@]@ \
      next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
@@ -1274,10 +1242,10 @@ let pp_level_state fmt
     attestable_payload
     (pp_option pp_elected_block)
     elected_block
-    pp_delegate_slots
-    delegate_slots
-    pp_delegate_slots
-    next_level_delegate_slots
+    pp_delegate_infos
+    delegate_infos
+    pp_delegate_infos
+    next_level_delegate_infos
     (pp_option Round.pp)
     next_level_latest_forge_request
 
@@ -1328,6 +1296,101 @@ let pp_timeout_kind fmt = function
         "time to prepare next level block at round %a"
         Round.pp
         at_round
+
+let pp_dal_content fmt {attestation} =
+  Z.pp_print fmt (Environment.Bitset.to_z (attestation :> Environment.Bitset.t))
+
+let pp_kind_and_dal fmt {vote_kind; dal_content; _} =
+  match (vote_kind, dal_content) with
+  | Preattestation, _ -> Format.fprintf fmt "preattestation"
+  | Attestation, None -> Format.fprintf fmt "attestation (without DAL content)"
+  | Attestation, Some dal_attestation ->
+      Format.fprintf
+        fmt
+        "attestation (with DAL bitset %a)"
+        pp_dal_content
+        dal_attestation
+
+let pp_unsigned_consensus_vote fmt
+    ({
+       vote_kind;
+       vote_consensus_content = {level; round; _};
+       delegate;
+       dal_content;
+     } as t) =
+  let companion_key_is_relevant =
+    match (vote_kind, dal_content) with
+    | Attestation, Some _ -> Key.is_bls delegate.consensus_key
+    | Attestation, None | Preattestation, _ -> false
+  in
+  Format.fprintf
+    fmt
+    "%a@ for level %a, round %a@ for delegate@ %a"
+    pp_kind_and_dal
+    t
+    Protocol.Alpha_context.Raw_level.pp
+    level
+    Protocol.Alpha_context.Round.pp
+    round
+    (if companion_key_is_relevant then Delegate.pp
+     else Delegate.pp_without_companion_key)
+    delegate
+
+let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
+  pp_unsigned_consensus_vote fmt unsigned_consensus_vote
+
+let pp_forge_event fmt = function
+  | Block_ready {signed_block_header; round; delegate; _} ->
+      Format.fprintf
+        fmt
+        "block ready@ at level %ld, round %a@ for@ delegate@ %a "
+        signed_block_header.shell.level
+        Round.pp
+        round
+        Delegate.pp_without_companion_key
+        delegate
+  | Preattestation_ready signed_op | Attestation_ready signed_op ->
+      Format.fprintf
+        fmt
+        "operation ready:@ %a"
+        pp_signed_consensus_vote
+        signed_op
+
+let pp_event fmt = function
+  | New_valid_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new valid proposal received: %a"
+        pp_block_info
+        proposal.block
+  | New_head_proposal proposal ->
+      Format.fprintf
+        fmt
+        "new head proposal received: %a"
+        pp_block_info
+        proposal.block
+  | Prequorum_reached (candidate, preattestations) ->
+      Format.fprintf
+        fmt
+        "prequorum reached with %d preattestations for %a at round %a"
+        (List.length preattestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | Quorum_reached (candidate, attestations) ->
+      Format.fprintf
+        fmt
+        "quorum reached with %d attestations for %a at round %a"
+        (List.length attestations)
+        Block_hash.pp
+        candidate.Operation_worker.hash
+        Round.pp
+        candidate.round_watched
+  | New_forge_event forge_event ->
+      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
+  | Timeout kind ->
+      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
 
 let pp_short_event fmt =
   let open Format in

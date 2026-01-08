@@ -79,26 +79,26 @@ let contract_test () =
        contents =
          Single_result
            (Manager_operation_result
-             {
-               internal_operation_results =
-                 [
-                   Internal_operation_result
-                     ( {
-                         operation =
-                           Event {tag = tag1; payload = data1; ty = ty1};
-                         _;
-                       },
-                       Applied (IEvent_result _) );
-                   Internal_operation_result
-                     ( {
-                         operation =
-                           Event {tag = tag2; payload = data2; ty = ty2};
-                         _;
-                       },
-                       Applied (IEvent_result _) );
-                 ];
-               _;
-             });
+              {
+                internal_operation_results =
+                  [
+                    Internal_operation_result
+                      ( {
+                          operation =
+                            Event {tag = tag1; payload = data1; ty = ty1};
+                          _;
+                        },
+                        Applied (IEvent_result _) );
+                    Internal_operation_result
+                      ( {
+                          operation =
+                            Event {tag = tag2; payload = data2; ty = ty2};
+                          _;
+                        },
+                        Applied (IEvent_result _) );
+                  ];
+                _;
+              });
      };
   ] ->
       let open Micheline in

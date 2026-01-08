@@ -284,7 +284,8 @@ let commands_ro () =
       @@ stop)
       (fun (unparsing_mode, normalize_types)
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         get_script
           cctxt
           ~chain:cctxt#chain
@@ -335,7 +336,8 @@ let commands_ro () =
       (fun normalize_types
            entrypoint
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         Michelson_v1_entrypoints.contract_entrypoint_type
           cctxt
           ~chain:cctxt#chain

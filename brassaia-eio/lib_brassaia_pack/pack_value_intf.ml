@@ -130,9 +130,10 @@ module type Sigs = sig
   module Of_commit
       (Hash : Brassaia.Hash.S)
       (Key : Brassaia.Key.S with type hash = Hash.t)
-      (Commit : Brassaia.Commit.Generic_key.S
-                  with type node_key = Key.t
-                   and type commit_key = Key.t) : sig
+      (Commit :
+        Brassaia.Commit.Generic_key.S
+          with type node_key = Key.t
+           and type commit_key = Key.t) : sig
     include S with type t = Commit.t and type hash = Hash.t and type key = Key.t
 
     module Commit_direct : sig

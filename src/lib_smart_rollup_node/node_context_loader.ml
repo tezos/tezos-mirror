@@ -64,13 +64,16 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ?log_kernel_debug_file ?last_whitelist_update
-    ~(store_access : 'store Access_mode.t)
+    ?last_whitelist_update ~(store_access : 'store Access_mode.t)
     ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
     ~lpc kind current_protocol
     Configuration.(
-      {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
-      configuration) =
+      {
+        sc_rollup_address = rollup_address;
+        dal_node_endpoint;
+        log_kernel_debug_file;
+        _;
+      } as configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
   let metadata =
@@ -112,12 +115,15 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     else Lwt.return_unit
   in
   let*! kernel_debug_logger, kernel_debug_finaliser =
-    let open Lwt_syntax in
-    if configuration.log_kernel_debug then
-      make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
-    else return (Event.kernel_debug, fun () -> return_unit)
+    make_kernel_logger
+      ~enable_tracing:true
+      ?log_kernel_debug_file
+      ~logs_dir:data_dir
+      configuration
+      Event.kernel_debug
   in
   let global_block_watcher = Lwt_watcher.create_input () in
+  let finalized_block_watcher = Lwt_watcher.create_input () in
   let private_info =
     Option.map
       (fun (message_index, outbox_level) ->
@@ -163,6 +169,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       finaliser = kernel_debug_finaliser;
       current_protocol = Reference.new_ current_protocol;
       global_block_watcher;
+      finalized_block_watcher;
       sync;
     }
   in
@@ -239,7 +246,9 @@ module For_snapshots = struct
           index_buffer_size = Some index_buffer_size;
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
+          l1_monitor_finalized = false;
           log_kernel_debug = false;
+          log_kernel_debug_file = None;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
@@ -249,6 +258,8 @@ module For_snapshots = struct
           pre_images_endpoint = None;
           bail_on_disagree = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+          dal_slot_status_max_fetch_attempts =
+            Configuration.default_dal_slot_status_max_fetch_attempts;
         }
     in
     let*? l1_ctxt =
@@ -273,6 +284,7 @@ module For_snapshots = struct
       Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let finalized_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches =
       Pvm_patches.make
@@ -303,6 +315,7 @@ module For_snapshots = struct
         finaliser = Lwt.return;
         current_protocol = Reference.new_ current_protocol;
         global_block_watcher;
+        finalized_block_watcher;
         sync;
       }
 end
@@ -354,15 +367,19 @@ module Internal_for_tests = struct
           index_buffer_size = Some index_buffer_size;
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
+          l1_monitor_finalized = false;
           l1_rpc_timeout;
           loop_retry_delay = 10.;
           log_kernel_debug = false;
+          log_kernel_debug_file = None;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+          dal_slot_status_max_fetch_attempts =
+            Configuration.default_dal_slot_status_max_fetch_attempts;
         }
     in
     let* lockfile = lock ~data_dir in
@@ -395,6 +412,7 @@ module Internal_for_tests = struct
         ]
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let finalized_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches = Pvm_patches.make kind rollup_address [] in
     return
@@ -420,6 +438,7 @@ module Internal_for_tests = struct
         kernel_debug_logger = Event.kernel_debug;
         finaliser = (fun () -> Lwt.return_unit);
         global_block_watcher;
+        finalized_block_watcher;
         sync;
       }
 

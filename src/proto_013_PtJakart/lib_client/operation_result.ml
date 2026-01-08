@@ -501,14 +501,14 @@ let pp_manager_operation_contents_and_result ppf
 
   let pp_origination_result
       (Origination_result
-        {
-          lazy_storage_diff;
-          balance_updates;
-          consumed_gas;
-          originated_contracts;
-          storage_size;
-          paid_storage_size_diff;
-        }) =
+         {
+           lazy_storage_diff;
+           balance_updates;
+           consumed_gas;
+           originated_contracts;
+           storage_size;
+           paid_storage_size_diff;
+         }) =
     (match originated_contracts with
     | [] -> ()
     | contracts ->
@@ -530,7 +530,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_register_global_constant_result
       (Register_global_constant_result
-        {balance_updates; consumed_gas; size_of_constant; global_address}) =
+         {balance_updates; consumed_gas; size_of_constant; global_address}) =
     (match balance_updates with
     | [] ->
         (* Not possible - register global constant operation always returns
@@ -543,7 +543,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_tx_rollup_result
       (Tx_rollup_origination_result
-        {balance_updates; consumed_gas; originated_tx_rollup}) =
+         {balance_updates; consumed_gas; originated_tx_rollup}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
@@ -558,7 +558,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_tx_rollup_submit_batch_result
       (Tx_rollup_submit_batch_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
@@ -591,7 +591,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
-        {balance_updates; consumed_gas; level}) =
+         {balance_updates; consumed_gas; level}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
@@ -601,8 +601,8 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
-      (Tx_rollup_remove_commitment_result
-        {balance_updates; consumed_gas; level}) =
+      (Tx_rollup_remove_commitment_result {balance_updates; consumed_gas; level})
+      =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
@@ -622,7 +622,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_tx_rollup_dispatch_tickets_result
       (Tx_rollup_dispatch_tickets_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
         ppf
@@ -633,7 +633,7 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
         ppf
@@ -643,8 +643,8 @@ let pp_manager_operation_contents_and_result ppf
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_originate_result
-      (Sc_rollup_originate_result
-        {address; consumed_gas; size; balance_updates}) =
+      (Sc_rollup_originate_result {address; consumed_gas; size; balance_updates})
+      =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size) ;
     Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
@@ -927,8 +927,8 @@ let pp_manager_operation_contents_and_result ppf
         internal_operation_results) ;
   Format.fprintf ppf "@]"
 
-let rec pp_contents_and_result_list :
-    type kind. Format.formatter -> kind contents_and_result_list -> unit =
+let rec pp_contents_and_result_list : type kind.
+    Format.formatter -> kind contents_and_result_list -> unit =
  fun ppf -> function
   | Single_and_result
       (Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus)

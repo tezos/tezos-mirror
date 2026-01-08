@@ -121,7 +121,9 @@ let test_simple_slash =
           (* delegate can be forbidden in this case, so we set another baker *)
           --> exclude_bakers [first_slashed_delegate])
        --> next_block
-       --> (* only exclude "delegate" *) exclude_bakers [first_slashed_delegate]
+       -->
+       (* only exclude "delegate" *)
+       exclude_bakers [first_slashed_delegate]
        --> (Empty
            |+ Tag "another slash"
               --> any_slash second_slashed_delegate

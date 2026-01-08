@@ -221,25 +221,50 @@ module Make (X : PARAMETERS) = struct
     | None | Some ([] | _ :: _ :: _) -> None
     | Some [(name, value)] -> Some {name; value; timestamp}
 
-  let read_json_event daemon even_input =
-    let max_event_size = 1024 * 1024 (* 1MB *) in
+  let read_json_event daemon event_input =
+    let max_event_size =
+      1024 * 1024
+      (* 1MB *)
+    in
     let origin = "event from " ^ daemon.name in
     let buff = Buffer.create 256 in
     let rec loop () =
-      let* line = Lwt_io.read_line_opt even_input in
+      let* line = Lwt_io.read_line_opt event_input in
       match line with
-      | None -> return None
+      | None -> return []
       | Some line -> (
-          Buffer.add_string buff line ;
-          match JSON.parse_opt ~origin (Buffer.contents buff) with
-          | None when Buffer.length buff >= max_event_size ->
-              Format.ksprintf
-                failwith
-                "Could not parse daemon %s event after %d bytes."
-                daemon.name
-                max_event_size
-          | None -> loop ()
-          | Some json -> return (Some json))
+          (* If a line alone is a valid JSON, then it is not stacked in the
+              buffer and rather treated as an event.
+              This is great to get rid of concurrency issue due to a small event
+              being nested in a very big one, but it is not an ideal solution
+              since it suffers several drawbacks:
+              - It does not work if a several line event is nested into another one.
+              - Many subterms of a valid json are valid json, hence if we are
+                unlucky and cut a big json at unexpected position, we might parse
+                a subterm and not stake it, preventing definitely the whole term
+                to be seen as a valid json.
+          *)
+          match JSON.parse_opt ~origin line with
+          | Some json ->
+              if Buffer.length buff = 0 then return [json]
+              else
+                let* l = loop () in
+                return (json :: l)
+          | None -> (
+              Buffer.add_string buff line ;
+              match JSON.parse_opt ~origin (Buffer.contents buff) with
+              | None when Buffer.length buff >= max_event_size ->
+                  Format.ksprintf
+                    failwith
+                    "Could not parse daemon %s event after %d bytes.\n\
+                     buffer: %s\n\
+                     line:%s"
+                    daemon.name
+                    max_event_size
+                    (Buffer.contents buff)
+                    line
+              | None -> loop ()
+              | Some json -> return [json]))
     in
     loop ()
 
@@ -357,10 +382,10 @@ module Make (X : PARAMETERS) = struct
       let rec event_loop () =
         let* json = read_json_event daemon event_input in
         match json with
-        | Some json ->
-            handle_raw_event daemon json ;
+        | _ :: _ as json_list ->
+            List.iter (handle_raw_event daemon) json_list ;
             event_loop ()
-        | None -> (
+        | [] -> (
             match daemon.status with
             | Not_running -> (
                 match event_process with

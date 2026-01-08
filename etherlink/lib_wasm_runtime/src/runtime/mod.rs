@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 
 //! Abstraction layer hiding how a kernel is concretely executed.
 
 mod env;
 mod host_funcs;
 
+use std::{cell::RefCell, rc::Rc};
+
 pub use crate::host::{Host, InputsBuffer};
 use crate::{
     api::{Kernel, KernelsCache},
-    bindings,
+    bindings::{self, end_span, start_span},
     constants::KERNEL,
     host::RuntimeVersion,
     types::{ContextHash, EvmTree},
@@ -16,6 +19,8 @@ use crate::{
 pub use env::Env;
 use log::trace;
 use ocaml::Error;
+use runtime_ebisu::internal_runtime::InternalRuntime as EbisuInternalRuntime;
+use runtime_farfadet::internal_runtime::InternalRuntime as FarfadetInternalRuntime;
 use wasmer::{Engine, Function, FunctionEnv, Instance, Store};
 
 pub enum RunStatus {
@@ -39,7 +44,11 @@ pub trait Runtime {
         let _ = self.mut_host().reboot_requested()?;
 
         loop {
+            start_span("run")?;
+
             self.call()?;
+
+            end_span()?;
 
             if self.host().needs_kernel_reload() {
                 return Ok(RunStatus::PendingKernelUpgrade(
@@ -110,6 +119,9 @@ enum NativeKernel {
     Calypso,
     Calypso2,
     Dionysus,
+    DionysusR1,
+    Ebisu,
+    Farfadet,
 }
 
 impl NativeKernel {
@@ -119,6 +131,9 @@ impl NativeKernel {
             Self::Calypso => RuntimeVersion::V1,
             Self::Calypso2 => RuntimeVersion::V1,
             Self::Dionysus => RuntimeVersion::V1,
+            Self::DionysusR1 => RuntimeVersion::V1,
+            Self::Ebisu => RuntimeVersion::V1,
+            Self::Farfadet => RuntimeVersion::V1,
         }
     }
 }
@@ -131,6 +146,12 @@ const CALYPSO2_ROOT_HASH_HEX: &'static str =
     "7b42577597504d6a705cdd56e59c770125223a0ffda471d70b463a2dc2d5f84f";
 const DIONYSUS_ROOT_HASH_HEX: &'static str =
     "2214b77edf321b0ed41cc3a1028934299c4b94e0687b06e5239cc0b4eb31417f";
+const DIONYSUS_R1_ROOT_HASH_HEX: &'static str =
+    "1f533dbc6404cf6b05c8df6b6b879f96299fb0d6b661d26152ce3297bc22d550";
+const EBISU_ROOT_HASH_HEX: &'static str =
+    "8eb91f4b0955a02d394565b31cf806a3d281f1f1d7fed709f0b7af29c7b53996";
+const FARFADET_ROOT_HASH_HEX: &'static str =
+    "002ce9946e42dad48751bf81120f26d44bd86aa2e386e9015a0c2e8b0aefb89c";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -142,6 +163,9 @@ impl NativeKernel {
             CALYPSO_ROOT_HASH_HEX => Some(NativeKernel::Calypso),
             CALYPSO2_ROOT_HASH_HEX => Some(NativeKernel::Calypso2),
             DIONYSUS_ROOT_HASH_HEX => Some(NativeKernel::Dionysus),
+            DIONYSUS_R1_ROOT_HASH_HEX => Some(NativeKernel::DionysusR1),
+            EBISU_ROOT_HASH_HEX => Some(NativeKernel::Ebisu),
+            FARFADET_ROOT_HASH_HEX => Some(NativeKernel::Farfadet),
             _ => None,
         }
     }
@@ -204,6 +228,61 @@ impl Runtime for NativeRuntime {
                 kernel_dionysus::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
                 Ok(())
             }
+            ("kernel_run", NativeKernel::DionysusR1) => {
+                trace!("dionysus_r1::kernel_loop");
+                kernel_dionysus_r1::kernel_loop(self.mut_host());
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::DionysusR1) => {
+                trace!("dionysus_r1::populate_delayed_inbox");
+                kernel_dionysus_r1::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::Ebisu) => {
+                trace!("ebisu::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_ebisu::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Ebisu) => {
+                trace!("ebisu::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_ebisu::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::Farfadet) => {
+                trace!("farfadet::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_farfadet::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Farfadet) => {
+                trace!("farfadet::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("single_tx_execution", NativeKernel::Farfadet) => {
+                trace!("farfadet::single_tx_execution");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::single_tx_execution_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("assemble_block", NativeKernel::Farfadet) => {
+                trace!("farfadet::assemble_block");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::assemble_block_fn(self.mut_host(), hasher);
+                Ok(())
+            }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),
         }
     }
@@ -216,7 +295,7 @@ pub fn load_runtime(
     entrypoint: &str,
     native_execution: bool,
 ) -> Result<Box<dyn Runtime>, Error> {
-    let root_hash = bindings::store_get_hash(host.tree(), KERNEL)?;
+    let root_hash = bindings::store_get_hash(&host.tree(), KERNEL)?;
     match NativeKernel::of_root_hash(&root_hash) {
         Some(kernel) if native_execution => {
             host.version = kernel.runtime_version();
@@ -227,8 +306,8 @@ pub fn load_runtime(
             }))
         }
         Some(_) | None => {
-            let (kernel, _) = kernels_cache.load(&engine, host.tree())?;
-            let runtime = WasmRuntime::new(&engine, host, kernel, entrypoint)?;
+            let (kernel, _) = kernels_cache.load(&engine, &host.tree())?;
+            let runtime = WasmRuntime::new(&engine, host, &kernel, entrypoint)?;
             Ok(Box::new(runtime))
         }
     }

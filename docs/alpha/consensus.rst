@@ -237,7 +237,7 @@ The concrete values for rewards depend on the issuance which is dynamically adju
 For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
 the total amount of tez at stake on the chain.
 To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
-which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 8s``, this corresponds to a ``total_rewards`` per level of 10.67 tez.
+which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 6s``, this corresponds to a ``total_rewards`` per level of 8 tez.
 We define:
 
 - ``baking_reward_fixed_portion := baking_reward_ratio * total_rewards``
@@ -249,33 +249,33 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``baking_reward_fixed_portion = 2.67`` tez,
-(maximum) ``bonus = 2.67`` tez, and ``attesting_reward = 5.33`` tez.
+Thus, we obtain ``baking_reward_fixed_portion = 2`` tez,
+(maximum) ``bonus = 2`` tez, and ``attesting_reward = 4`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
 attestation slot are ``attesting_reward / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``2.67 / (7000 / 3) = 0.001143`` tez and an attesting
-rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
+``2 / (7000 / 3) = 0.0008571`` tez and an attesting
+rewards per slot of ``4 / 7000 = 0.000571`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
 A. Also, B includes attestations with attesting power ``5251``. Then A receives
-the fees and 10 tez (the ``baking_reward_fixed_portion``) as a reward for
+the fees and 2 tez (the ``baking_reward_fixed_portion``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
+Therefore B receives the bonus ``(5251 - 4667) * 0.0008571 = 0.5005464`` tez. (Note
 that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
 maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose baking power at some cycle is 1% of the total stake. Note that
 his expected number of validator slots for that cycle is
-``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 10800 * 7000 = 756,000``
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 14400 * 7000 = 1,008,000``
 slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``651,456`` slots. Given that this number is
-bigger than the minimum required (``756,000 * 2 / 3``), it receives an attesting
-reward of ``756,000 * 0.000761 = 575.316`` tez for that cycle.
+included during that cycle has been ``673,456`` slots. Given that this number is
+bigger than the minimum required (``1,008,000 * 2 / 3``), it receives an attesting
+reward of ``1,008,000 * 0.000571 = 575.568`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -304,14 +304,20 @@ The evidence for double signing at a given level can be collected by
 any :ref:`accuser<def_accuser_alpha>` and included as a *denunciation*
 operation in a block in the same cycle as the double signing or in the
 ``DENUNCIATION_PERIOD`` next cycles.
-
-As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking
-and attesting for at least 2 cycles.
-
 The actual slashing and denunciation rewarding happen at the end of
 cycle ``n + SLASHING_DELAY`` for a misbehavior that happened in cycle
 ``n``.
+
+As soon as a delegate is denounced for any double signing, it is immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking and attesting for at least 2 cycles.
+
+The baker stays forbidden from the denunciation time to the slashing itself, which is the remainder of the current cycle and least one full cycle.
+Then, the baker remains forbidden until its current stake matches the computed rights of the cycle.
+Because it has been slashed, its frozen stake is lower during the first cycle after slashing, so it remains forbidden for at least one more cycle.
+In this way, staking more tez can reduce the number of cycles in which it can't participate in consensus.
+
+Also note that while forbidden, a baker might become deactivated from inactivity, and might need to reactivate manually.
+
+For an example of the periods when a slashed baker can be unable to bake after slashing (limited to an event when the Rio protocol was active), see :download:`Forbidden periods for slashed bakers <https://octez.tezos.com/archive/SlashingIncidentExplanation.pdf>`.
 
 Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
@@ -380,11 +386,11 @@ Consensus related protocol parameters
    * - ``DENUNCIATION_PERIOD``
      - 1 cycle
    * - ``MINIMAL_BLOCK_DELAY``
-     - 8s
+     - 6s
    * - ``BLOCKS_PER_CYCLE``
-     - 10800
+     - 14400
    * - ``DELAY_INCREMENT_PER_ROUND``
-     - 4s
+     - 3s
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 2 cycles
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``

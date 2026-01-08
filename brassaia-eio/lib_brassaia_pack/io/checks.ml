@@ -50,7 +50,7 @@ let path =
   @@ pos 0 (some string) None
   @@ info ~doc:"Path to the Brassaia store on disk" ~docv:"PATH" []
 
-let deprecated_info = (Cmdliner.Term.info [@alert "-deprecated"])
+let deprecated_info = Cmdliner.Term.info [@alert "-deprecated"]
 
 let ppf_or_null = function
   | Some p -> p
@@ -390,10 +390,11 @@ end
 
 module Integrity_checks
     (XKey : Pack_key.S)
-    (X : Brassaia.Backend.S
-           with type Commit.key = XKey.t
-            and type Node.key = XKey.t
-            and type Schema.Hash.t = XKey.hash)
+    (X :
+      Brassaia.Backend.S
+        with type Commit.key = XKey.t
+         and type Node.key = XKey.t
+         and type Schema.Hash.t = XKey.hash)
     (Index : Pack_index.S) =
 struct
   module Object_counter = Utils.Object_counter (Io.Progress)

@@ -1,0 +1,25 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam" "Sudha Parimala"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "lwt" { >= "5.7.0" & < "5.9.0" }
+  "domainslib" { >= "0.5.2" }
+]
+conflicts: [
+  "lwt_domain"
+]
+build: [
+  ["rm" "-rf" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+available: os-family != "windows"
+synopsis: "Fork of lwt_domain (https://github.com/ocsigen/lwt_domain/)"

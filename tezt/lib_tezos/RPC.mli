@@ -799,6 +799,7 @@ val get_chain_block_helper_validators :
   ?chain:string ->
   ?block:string ->
   ?delegate:string ->
+  ?consensus_key:string ->
   ?level:int ->
   unit ->
   JSON.t t
@@ -1359,6 +1360,12 @@ val get_chain_block_context_issuance_expected_issuance :
 val get_chain_block_context_dal_commitments_history :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** Call RPC
+   /chains/[chain]/blocks/[block]/context/dal/skip_list_cells_of_level.
+   [chain] defaults to ["main"]. [block] defaults to ["head"]. *)
+val get_chain_block_context_dal_cells_of_level :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** Call RPC /chains/[chain]/blocks/[block]/context/raw/json.
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
@@ -1467,3 +1474,32 @@ type baker_with_power = {delegate : string; baking_power : int}
 
 val get_stake_distribution :
   ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_power_distribution_for_current_cycle]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_baking_power_distribution_for_current_cycle :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/tz4_baker_number_ratio?cycle=<cycle>]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [cycle] doesn't have to be specified (defaults to current cycle). *)
+val get_tz4_baker_number_ratio :
+  ?chain:string -> ?block:string -> ?cycle:int -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/all_bakers_attest_activation_level]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_abaab_activation_level :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/destination/<destination>/index]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_destination_index :
+  ?chain:string -> ?block:string -> string -> int option t

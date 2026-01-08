@@ -37,3 +37,5 @@ val bootstrap_accounts : t array
     tx's sender in
     tezt/tests/evm_kernel_inputs/100-inputs-for-proxy *)
 val lots_of_address : string list
+
+val accounts : int -> t array

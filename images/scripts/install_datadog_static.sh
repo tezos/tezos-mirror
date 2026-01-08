@@ -4,18 +4,18 @@
 
 set -euo pipefail
 
-DATAGOG_RELEASE="v3.4.0"
+DATAGOG_RELEASE="v4.1.0"
 
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
 x86_64)
   PLATFORM="x64"
-  EXPECTED_SHA256="94de024fe9826e7a4023cfa3ad60f3cf08310ffb2c061c2703a025bbb2532c5f"
+  EXPECTED_SHA256="0470252652ddd6bdbcedfd2e056baf9d43b9b798e1a6b5039e32b9a33e6ee257"
   ;;
 aarch64)
   PLATFORM="arm64"
-  EXPECTED_SHA256="b90082a9f0a363c17cb0945b4c26745c07d6756ff0239623b8074c5f35d65f45"
+  EXPECTED_SHA256="15d40b120bfeadb11322638277b28c4e345a0acb339c014177ebc7c701f79c1d"
   ;;
 *)
   echo "Unsupported architecture: $ARCH" >&2
@@ -31,7 +31,12 @@ TMP_FILE="$(mktemp)"
 URL="https://github.com/DataDog/datadog-ci/releases/download/$DATAGOG_RELEASE/datadog-ci_linux-$PLATFORM"
 echo "Downloading datadog-ci for $PLATFORM $URL..."
 
-curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+if command -v kiss-fetch.sh > /dev/null 2>&1; then
+  kiss-fetch.sh "$URL" -o "$TMP_FILE"
+else
+  echo "Warning: Kiss-fetch.sh missing"
+  curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+fi
 
 DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | cut -d ' ' -f1)
 if [[ "$DOWNLOADED_SHA256" != "$EXPECTED_SHA256" ]]; then

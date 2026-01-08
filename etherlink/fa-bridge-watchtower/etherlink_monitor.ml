@@ -16,6 +16,8 @@ type ctx = {
   gas_limit : Z.t;
   whitelist : Config.whitelist_item list option;
   mutable nonce : Ethereum_types.quantity;
+  block_timeout : float;
+  rpc_timeout : Websocket_client.timeout option;
 }
 
 module Craft = struct
@@ -68,9 +70,7 @@ module Tx_queue = struct
     let (Ethereum_types.Qty nonce as qnonce) = ctx.nonce in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
-    let hash = Ethereum_types.hash_raw_tx tx_raw in
-    let**? tx = Transaction.decode tx_raw in
-    let**? tx_object = Transaction.to_transaction_object ~hash tx in
+    let*? tx_object = Transaction_object.decode tx_raw in
     let+ res = Tx_container.add tx_object ~raw_tx:txn ~next_nonce:qnonce in
     match res with
     | Ok _hash ->
@@ -113,7 +113,7 @@ let addr_to_topic address =
   let padded_hex = String.make (64 - String.length addr_hex) '0' ^ addr_hex in
   Ethereum_types.Hash (Hex padded_hex)
 
-(** [mk_filter address selector whitelist] creates an Ethereum log filter for
+(** [mk_filter address selectors whitelist] creates an Ethereum log filter for
     events.
 
     This function builds a filter to match logs from a specific contract address
@@ -131,14 +131,14 @@ let addr_to_topic address =
       addresses
 
     @param address The contract address to filter logs from
-    @param selector The event selector (keccak hash of the event signature)
+    @param selectors The event selectors (keccak hashes of the events signatures)
     @param whitelist Optional list of whitelist items containing proxy
       addresses and ticket hashes
     @return A filter configuration for Ethereum log queries
 *)
-let mk_filter address selector whitelist =
+let mk_filter address selectors whitelist =
   (* First topic is always the event selector *)
-  let selector_topic = Some (Ethereum_types.Filter.One selector) in
+  let selector_topic = Some (Ethereum_types.Filter.Or selectors) in
   (* Construct topics array based on whitelist configuration *)
   let topics =
     match whitelist with
@@ -344,13 +344,12 @@ module Event = struct
       ~pp1:Format.pp_print_string
 
   let new_etherlink_head =
-    declare_2
+    declare_1
       ~section
       ~name:"new_etherlink_head"
-      ~msg:"New etherlink head {level} ({txs} txs)"
+      ~msg:"New etherlink head {level}"
       ~level:Notice
       ("level", Db.quantity_hum_encoding)
-      ("txs", Data_encoding.int31)
       ~pp1:Ethereum_types.pp_quantity
 
   let catch_up =
@@ -375,8 +374,27 @@ module Event = struct
       ~section
       ~name:"ws_reconnection"
       ~msg:"Disconnected from websocket, reconnecting in {delay}s."
-      ~level:Error
+      ~level:Warning
       ("delay", Data_encoding.float)
+
+  let monitor_heads_timeout =
+    declare_1
+      ~section
+      ~name:"monitor_heads_timeout"
+      ~msg:
+        "Timeout after {timeout}s while waiting for a new head. Disconnecting \
+         from websocket."
+      ~level:Warning
+      ("timeout", Data_encoding.float)
+
+  let monitor_error =
+    declare_1
+      ~section
+      ~name:"monitor_error"
+      ~msg:"Error in monitoring: {error}"
+      ~level:Error
+      ("error", trace_encoding)
+      ~pp1:pp_print_top_error_of_trace
 end
 
 type error +=
@@ -409,7 +427,23 @@ let () =
     (fun (block, limit) -> Too_many_deposits_in_one_block {block; limit})
 
 module Deposit = struct
-  (*
+  type data = Db.deposit = {
+    nonce : Ethereum_types.quantity;
+    proxy : Ethereum_types.Address.t;
+    ticket_hash : Ethereum_types.hash;
+    receiver : Ethereum_types.Address.t;
+    amount : Ethereum_types.quantity;
+  }
+
+  (* FA bridge address, see [kernel]/revm/src/precompiles/constants.rs *)
+  let fa_bridge_address_hex = "ff00000000000000000000000000000000000002"
+
+  let fa_bridge_address_0x = "0x" ^ fa_bridge_address_hex
+
+  let fa_bridge_address = Ethereum_types.Address (Hex fa_bridge_address_hex)
+
+  module Dionysus = struct
+    (*
     event QueuedEvent (
         uint256 nonce,
         address receiver,
@@ -421,25 +455,30 @@ module Deposit = struct
    topics  = keccak selector + ticket_hash + proxy
   *)
 
-  type data = Db.deposit = {
-    nonce : Ethereum_types.quantity;
-    proxy : Ethereum_types.Address.t;
-    ticket_hash : Ethereum_types.hash;
-    receiver : Ethereum_types.Address.t;
-    amount : Ethereum_types.quantity;
-  }
+    let topic =
+      kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
+  end
 
-  (* TODO: same precompile as withdrawals at first *)
-  let address_hex = "ff00000000000000000000000000000000000002"
+  module Ebisu = struct
+    (*
+      event QueuedDeposit(
+        uint256 indexed ticketHash,
+        address indexed proxy,
+        uint256 nonce,
+        address receiver,
+        uint256 amount,
+        uint256 inboxLevel,
+        uint256 inboxMsgId
+      );
+    *)
 
-  let address_0x = "0x" ^ address_hex
+    let topic =
+      kecack_topic
+        "QueuedDeposit(uint256,address,uint256,address,uint256,uint256,uint256)"
+  end
 
-  let address = Ethereum_types.Address (Hex address_hex)
-
-  let topic =
-    kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
-
-  let filter whitelist = mk_filter address topic whitelist
+  let filter whitelist =
+    mk_filter fa_bridge_address [Dionysus.topic; Ebisu.topic] whitelist
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
@@ -541,7 +580,7 @@ let parse_log whitelist (log : Ethereum_types.transaction_log) =
   let* deposit_data = Deposit.decode_event_data whitelist log in
   return (Option.map (parsed_log_to_db log) deposit_data)
 
-let precompiled_contract_address = Efunc_core.Private.a Deposit.address_hex
+let fa_bridge_address = Efunc_core.Private.a Deposit.fa_bridge_address_hex
 
 let claim ctx ~deposit_id =
   let open Lwt_result_syntax in
@@ -550,9 +589,7 @@ let claim ctx ~deposit_id =
   in
   let _ : unit Lwt.t =
     let open Lwt_syntax in
-    let* res =
-      Tx_queue.transfer ctx ~to_:precompiled_contract_address ~data ()
-    in
+    let* res = Tx_queue.transfer ctx ~to_:fa_bridge_address ~data () in
     match res with
     | Ok (Ok ()) -> return_unit
     | Error trace ->
@@ -586,15 +623,33 @@ let handle_one_log {ws_client; db; whitelist; _}
       in
       Db.Deposits.store db deposit.deposit deposit.log_info
 
-let lwt_stream_iter_es f stream =
-  let open Lwt_result_syntax in
+type lwt_stream_iter_with_timeout_ended = Closed | Timeout of float
+
+type 'a lwt_stream_get_result =
+  | Get_none
+  | Get_timeout of float
+  | Get_elt of 'a
+
+let lwt_stream_iter_es_with_timeout ~timeout f stream =
+  let open Lwt_syntax in
   let rec loop () =
-    let*! elt = Lwt_stream.get stream in
-    match elt with
-    | None -> return_unit
-    | Some elt ->
-        let* () = f elt in
-        loop ()
+    let get_promise =
+      let+ res = Lwt_stream.get stream in
+      match res with None -> Get_none | Some e -> Get_elt e
+    in
+    let timeout_promise =
+      let+ () = Lwt_unix.sleep timeout in
+      Get_timeout timeout
+    in
+    let* res = Lwt.pick [get_promise; timeout_promise] in
+    match res with
+    | Get_none -> return_ok Closed
+    | Get_timeout t -> return_ok (Timeout t)
+    | Get_elt elt -> (
+        let* res = protect @@ fun () -> f elt in
+        match res with
+        | Ok () -> (loop [@ocaml.tailcall]) ()
+        | Error trace -> return_error trace)
   in
   loop ()
 
@@ -612,6 +667,7 @@ let rec get_logs ?(n = 1) ctx ~block =
   let filter = Deposit.filter ctx.whitelist in
   let*! logs =
     Websocket_client.send_jsonrpc
+      ?timeout:ctx.rpc_timeout
       ctx.ws_client
       (Call
          ( (module Rpc_encodings.Get_logs),
@@ -619,7 +675,7 @@ let rec get_logs ?(n = 1) ctx ~block =
              {
                from_block = Some (Number block);
                to_block = Some (Number block);
-               address = Some (Single Deposit.address);
+               address = Some (Single Deposit.fa_bridge_address);
                topics = Some filter.topics;
                block_hash = None;
              } ))
@@ -628,9 +684,7 @@ let rec get_logs ?(n = 1) ctx ~block =
   | Ok logs ->
       (* Process each log in the range *)
       List.iter_es
-        (function
-          | Filter.Block_filter _ | Pending_transaction_filter _ -> return_unit
-          | Log log -> handle_one_log ctx log)
+        (fun log -> handle_one_log ctx (Ethereum_types.decode_pre log))
         logs
   | Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
       (* If we're querying a single block and it has too many logs, this is a
@@ -649,31 +703,26 @@ let claim_selector =
 
 let is_claim_input = String.starts_with ~prefix:claim_selector
 
-let handle_confirmed_txs {db; ws_client; _}
-    (b : Transaction_object.t Ethereum_types.block) =
+let handle_confirmed_txs {db; ws_client; rpc_timeout; _} number =
   let open Lwt_result_syntax in
+  let* b =
+    Websocket_client.send_jsonrpc
+      ?timeout:rpc_timeout
+      ws_client
+      (Call ((module Rpc_encodings.Get_block_by_number), (Number number, true)))
+  in
   let* txs =
     match b.transactions with
-    | TxFull [] | TxHash [] -> return_nil
+    | TxHash [] -> return []
+    | TxHash _ -> assert false
     | TxFull txs -> return txs
-    | TxHash _ -> (
-        let* block =
-          Websocket_client.send_jsonrpc
-            ws_client
-            (Call
-               ( (module Rpc_encodings.Get_block_by_number),
-                 (Number b.number, true) ))
-        in
-        match block.transactions with
-        | TxHash _ -> assert false
-        | TxFull txs -> return txs)
   in
   txs
   |> List.iteri_es @@ fun index tx ->
      let (Hex input) = Transaction_object.input tx in
      match Transaction_object.to_ tx with
      | Some to_
-       when Ethereum_types.Address.compare to_ Deposit.address = 0
+       when Ethereum_types.Address.compare to_ Deposit.fa_bridge_address = 0
             && is_claim_input input -> (
          let tx_hash = Transaction_object.hash tx in
          let input =
@@ -688,6 +737,7 @@ let handle_confirmed_txs {db; ws_client; _}
          in
          let* receipt =
            Websocket_client.send_jsonrpc
+             ?timeout:rpc_timeout
              ws_client
              (Call ((module Rpc_encodings.Get_transaction_receipt), tx_hash))
          in
@@ -736,6 +786,7 @@ let claim_deposits ctx =
       let*! () = Event.(emit unclaimed_deposits) (List.length deposits) in
       let* nonce =
         Websocket_client.send_jsonrpc
+          ?timeout:ctx.rpc_timeout
           ctx.ws_client
           (Call
              ( (module Rpc_encodings.Get_transaction_count),
@@ -752,20 +803,14 @@ let claim_deposits ctx =
           claim ctx ~deposit_id)
         deposits
 
-let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
+let on_new_block ctx ~catch_up number =
   let open Lwt_result_syntax in
-  let open Ethereum_types in
-  let nb_txs =
-    match b.transactions with
-    | TxHash l -> List.length l
-    | TxFull l -> List.length l
-  in
-  let*! () = Event.(emit new_etherlink_head) (b.number, nb_txs) in
+  let*! () = Event.(emit new_etherlink_head) number in
   (* Process logs for this block *)
-  let* () = get_logs ctx ~block:b.number in
+  let* () = get_logs ctx ~block:number in
   (* Notify tx queue and register claimed deposits in DB *)
-  let* () = handle_confirmed_txs ctx b in
-  let* () = Db.Pointers.L2_head.set ctx.db b.number in
+  let* () = handle_confirmed_txs ctx number in
+  let* () = Db.Pointers.L2_head.set ctx.db number in
   unless catch_up @@ fun () -> claim_deposits ctx
 
 let rec catch_up ctx ~from_block ~end_block =
@@ -775,41 +820,56 @@ let rec catch_up ctx ~from_block ~end_block =
   in
   if Z.gt from_ end_ then return_unit
   else
-    let* block =
-      Websocket_client.send_jsonrpc
-        ctx.ws_client
-        (Call
-           ( (module Rpc_encodings.Get_block_by_number),
-             (Number from_block, true) ))
-    in
-    let* () = on_new_block ctx block ~catch_up:true in
+    let* () = on_new_block ctx from_block ~catch_up:true in
     catch_up ctx ~from_block:(Ethereum_types.Qty.next from_block) ~end_block
 
 let monitor_heads ctx =
   let open Lwt_result_syntax in
   let* head =
     Websocket_client.send_jsonrpc
+      ?timeout:ctx.rpc_timeout
       ctx.ws_client
-      (Call ((module Rpc_encodings.Get_block_by_number), (Latest, true)))
-  and* heads_subscription = Websocket_client.subscribe_newHeads ctx.ws_client in
-  let* () =
-    lwt_stream_iter_es
-      (fun (b : Transaction_object.t Ethereum_types.block) ->
+      (Call ((module Rpc_encodings.Block_number), ()))
+  and* heads_subscription =
+    Websocket_client.subscribe_newHeadNumbers
+      ?timeout:ctx.rpc_timeout
+      ctx.ws_client
+  in
+  let* stopped =
+    lwt_stream_iter_es_with_timeout
+      ~timeout:ctx.block_timeout
+      (fun number ->
+        let*? number in
         let* last_l2_head = Db.Pointers.L2_head.get ctx.db in
         let expected_level = Ethereum_types.Qty.next last_l2_head in
         let* () =
-          unless Ethereum_types.Qty.(b.number = expected_level) @@ fun () ->
+          unless Ethereum_types.Qty.(number = expected_level) @@ fun () ->
+          let*! () =
+            Event.(emit catch_up)
+              (Z.sub
+                 (Ethereum_types.Qty.to_z number)
+                 (Ethereum_types.Qty.to_z expected_level))
+          in
           catch_up
             ctx
             ~from_block:expected_level
-            ~end_block:(Ethereum_types.Qty.pred b.number)
+            ~end_block:(Ethereum_types.Qty.pred number)
         in
-        on_new_block ctx b ~catch_up:false)
-      (Lwt_stream.append (Lwt_stream.return head) heads_subscription.stream)
+        on_new_block ctx number ~catch_up:false)
+      (Lwt_stream.append
+         (Lwt_stream.return (Ok head))
+         heads_subscription.stream)
   in
-  return_unit
+  match stopped with
+  | Closed -> return_unit
+  | Timeout timeout ->
+      (* We didn't receive a new head within ctx.block_timeout so we close the
+         connection (and will reconnect after). *)
+      let*! () = Event.(emit monitor_heads_timeout) timeout in
+      let*! () = Websocket_client.disconnect ctx.ws_client in
+      return_unit
 
-let init_db_pointers db ws_client ~first_block =
+let init_db_pointers db ws_client timeout ~first_block =
   let open Lwt_result_syntax in
   let* l2_head = Db.Pointers.L2_head.find db in
   let* () =
@@ -823,6 +883,7 @@ let init_db_pointers db ws_client ~first_block =
             (* TODO: log *)
             let* latest =
               Websocket_client.send_jsonrpc
+                ?timeout
                 ws_client
                 (Call
                    ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
@@ -833,8 +894,24 @@ let init_db_pointers db ws_client ~first_block =
 
 let reconnection_delay = 10.
 
-let get_chain_id ws_client =
+let is_connection_exception = function
+  | Unix.(Unix_error (ECONNREFUSED, _, _))
+  | Websocket_client.Connection_closed | Lwt_io.Channel_closed _ ->
+      true
+  | _ -> false
+
+let is_connection_error trace =
+  List.exists
+    (function
+      | Exn e -> is_connection_exception e
+      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+          true
+      | _ -> false)
+    trace
+
+let get_chain_id ?timeout ws_client =
   Websocket_client.send_jsonrpc
+    ?timeout
     ws_client
     (Call ((module Rpc_encodings.Chain_id), ()))
 
@@ -852,21 +929,60 @@ module Public_key = struct
     Ethereum_types.Address (Ethereum_types.hex_of_string addr)
 end
 
+let ws_uri uri =
+  match Uri.scheme uri with
+  | Some "ws" | Some "wss" ->
+      (* This is already a websocket URI which has the correct path so we leave
+         it as is. *)
+      uri
+  | None | Some "http" ->
+      let uri = Uri.with_scheme uri (Some "ws") in
+      Uri.with_path uri (Uri.path uri ^ "/ws")
+  | Some "https" ->
+      let uri = Uri.with_scheme uri (Some "wss") in
+      Uri.with_path uri (Uri.path uri ^ "/ws")
+  | _ -> uri
+
+let rpc_uri uri =
+  match Uri.scheme uri with
+  | None | Some "http" | Some "https" ->
+      (* This is already an RPC URI so we leave it as is. *)
+      uri
+  | Some "ws" -> (
+      let uri = Uri.with_scheme uri (Some "http") in
+      match String.remove_suffix ~suffix:"/ws" (Uri.path uri) with
+      | Some p -> Uri.with_path uri p
+      | None -> uri)
+  | Some "wss" -> (
+      let uri = Uri.with_scheme uri (Some "https") in
+      match String.remove_suffix ~suffix:"/ws" (Uri.path uri) with
+      | Some p -> Uri.with_path uri p
+      | None -> uri)
+  | _ -> uri
+
 let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
-  let tx_queue_endpoint = ref (Services_backend_sig.Rpc evm_node_endpoint) in
+  let tx_queue_endpoint =
+    ref (Services_backend_sig.Rpc (rpc_uri evm_node_endpoint))
+  in
+  let connected_once = ref false in
   let run () =
-    let*! ws_client =
-      Websocket_client.connect
+    let ws_client =
+      Websocket_client.create
         ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+        ~keep_alive:false
+          (* We want a connection drop to retrigger a reconnection and a new
+             head subscription. *)
         Media_type.json
-        (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
+        (ws_uri evm_node_endpoint)
     in
+    let* () = Websocket_client.connect ws_client in
+    connected_once := true ;
     tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
-    let* () = init_db_pointers db ws_client ~first_block in
-    let* chain_id = get_chain_id ws_client in
+    let* () = init_db_pointers db ws_client config.rpc_timeout ~first_block in
+    let* chain_id = get_chain_id ?timeout:config.rpc_timeout ws_client in
     (* We checked that it exists in main.ml *)
     let secret_key = Stdlib.Option.get config.Config.secret_key in
     let public_key = Public_key.(to_address (from_sk secret_key)) in
@@ -882,15 +998,21 @@ let start db ~config ~notify_ws_change ~first_block =
         whitelist =
           (if config.monitor_all_deposits then None else config.whitelist);
         nonce = Ethereum_types.Qty.zero;
+        block_timeout = config.block_timeout;
+        rpc_timeout = config.rpc_timeout;
       }
     in
     monitor_heads ctx
   in
-  let rec loop ?(first = false) () =
+  let rec loop () =
+    let*! stopped = protect run in
     let* () =
-      Lwt.catch run (function
-          | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
-          | e -> Lwt.reraise e)
+      match stopped with
+      | Error e ->
+          let*! () = Event.(emit monitor_error) e in
+          if is_connection_error e && !connected_once then return_unit
+          else fail e
+      | Ok () -> return_unit
     in
     let*! () = Event.(emit ws_reconnection) reconnection_delay in
     let*! () = Lwt_unix.sleep reconnection_delay in
@@ -913,6 +1035,9 @@ let start db ~config ~notify_ws_change ~first_block =
     tx_queue_beacon ()
   in
   let* () =
+    let timeout =
+      match config.rpc_timeout with Some t -> t.timeout | None -> 10.
+    in
     Tx_queue.start
       ~config:
         {
@@ -922,7 +1047,8 @@ let start db ~config ~notify_ws_change ~first_block =
           tx_per_addr_limit = 10000L;
         }
       ~keep_alive:true
+      ~timeout
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;
-  loop ~first:true ()
+  loop ()

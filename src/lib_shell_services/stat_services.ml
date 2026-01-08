@@ -45,7 +45,8 @@ let gc_stat_encoding =
            compactions;
            top_heap_words;
            stack_size;
-         } ->
+         }
+       ->
       ( ( minor_words,
           promoted_words,
           major_words,
@@ -71,7 +72,8 @@ let gc_stat_encoding =
                fragments,
                compactions,
                top_heap_words,
-               stack_size ) ) ) ->
+               stack_size ) ) )
+       ->
       {
         minor_words;
         promoted_words;

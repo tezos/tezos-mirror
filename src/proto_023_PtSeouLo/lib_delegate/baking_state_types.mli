@@ -5,9 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 Key type and functions}
+open Protocol
+open Alpha_context
 
-    Used for both consensus keys and companion keys. *)
+(** Unique identifier for a key. *)
 module Key_id : sig
   type t
 
@@ -29,6 +30,16 @@ module Key_id : sig
   end
 end
 
+(** A key that is fully known to the baker.
+
+    This means that the alias has both an associated public key and
+    secret key uri in the client wallet, and also that the key was
+    provided to the baker command line (or no keys were provided at
+    all, so that the baker defaulted to using all keys in the client
+    wallet).
+
+    May be used as a delegate's manager key, consensus key, and/or
+    companion key. *)
 module Key : sig
   type t = private {
     alias : string;
@@ -59,9 +70,24 @@ module Key : sig
   module Set : Set.S with type elt = t
 end
 
-(** {2 Delegates slots type and functions} *)
+(** Unique identifier for a delegate. *)
 module Delegate_id : module type of Key_id
 
+(** A delegate on behalf of which the baker should bake and attest.
+
+    The consensus key must be fully known.
+
+    The companion key may be [None] for multiple reasons:
+    - if the delegate has not registered any companion key
+    - if the companion key is not needed for the current cycle because
+      either aggregations are disabled or the consensus key is not a BLS
+      key
+    - if the companion key is not known to the client wallet or has
+      not been provided to the baker command line
+
+    The manager key may or may not be known to the baker; this does
+    not affect the baker's functionalities, but is tracked in the
+    [manager_key] type for logging purposes. *)
 module Delegate : sig
   type manager_key
 
@@ -81,14 +107,17 @@ module Delegate : sig
       always fail. *)
   val encoding_for_logging__cannot_decode : t Data_encoding.t
 
+  (** Prints the delegate's manager key (with its alias if known,
+      otherwise just the pkh), consensus key if it is different from
+      the manager key, and companion key if there is one. *)
   val pp : Format.formatter -> t -> unit
 
-  (** Prints the manager key and consensus key but not the companion
-      key. *)
+  (** Same as {!pp} except that the companion key is omitted even if
+      there is one. *)
   val pp_without_companion_key : Format.formatter -> t -> unit
 
   (** Builds a {!t} from an element of the output of
-      {!Plugin.RPC.Validators.get}, if the consensus key is present in
+      {!Node_rpc.get_validators}, if the consensus key is present in
       [known_keys]; otherwise, returns [None].
 
       If the consensus key is a known BLS key and the validator
@@ -98,3 +127,51 @@ module Delegate : sig
       be able to emit this event.) *)
   val of_validator : known_keys:Key.Set.t -> RPC.Validators.t -> t option Lwt.t
 end
+
+(** A prequorum consists of a level, a round, a block_payload_hash and the list
+    of preattestations that has a total voting power higher than the protocol
+    threshold. *)
+type prequorum = {
+  level : int32;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+  preattestations : packed_operation list;
+}
+
+type block_info = {
+  hash : Block_hash.t;
+  shell : Block_header.shell_header;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round.t;
+  round : Round.t;
+  prequorum : prequorum option;
+  quorum : packed_operation list;
+  payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
+}
+
+type proposal = {block : block_info; predecessor : block_info}
+
+(** A delegate slot consists of the delegate's consensus key, its public key
+    hash, its first slot, and its attesting power at some level. *)
+type delegate_info = {
+  delegate : Delegate.t;
+  attestation_slot : Slot.t;
+  attesting_power : int64;
+}
+
+(** An association list between delegates and promises for their DAL
+    attestations at some level (as obtained through the [get_attestable_slots]
+    RPC). See usage in {!level_state}. *)
+type dal_attestable_slots =
+  (Delegate_id.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
+(** A delegate slot consists of the delegate's consensus key, its public key
+    hash, its first slot, and its attesting power at some level. *)
+type delegate_slot = {
+  delegate : Delegate.t;
+  first_slot : Slot.t;
+  attesting_power : int;
+}

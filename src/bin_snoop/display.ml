@@ -103,7 +103,8 @@ let options_encoding =
            reduced_plot_verbosity;
            plot_raw_workload;
            empirical_plot;
-         } ->
+         }
+       ->
       ( save_directory,
         point_size,
         qt_target_pixel_size,
@@ -117,7 +118,8 @@ let options_encoding =
            pdf_target_cm_size,
            reduced_plot_verbosity,
            plot_raw_workload,
-           empirical_plot ) ->
+           empirical_plot )
+       ->
       {
         save_directory;
         point_size;
@@ -333,7 +335,8 @@ let empirical_data opts
       let columns = Array.to_list columns in
       let named_columns =
         List.combine ~when_different_lengths:() vars columns
-        |> (* [columns = Array.to_list (Array.init (List.length vars))] *)
+        |>
+        (* [columns = Array.to_list (Array.init (List.length vars))] *)
         WithExceptions.Result.get_ok ~loc:__LOC__
       in
       Ok (named_columns, timings)
@@ -357,7 +360,8 @@ let prune_problem input nmap : (Free_variable.t * Maths.vector) list =
         let name = Inference.NMap.nth_exn nmap c in
         let col = Maths.Matrix.col input c in
         (name, col))
-    |> (* column count cannot be negative *)
+    |>
+    (* column count cannot be negative *)
     WithExceptions.Result.get_ok ~loc:__LOC__
   in
   List.filter (fun (_, col) -> not (column_is_constant col)) named_columns

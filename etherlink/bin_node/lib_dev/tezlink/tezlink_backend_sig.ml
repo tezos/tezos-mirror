@@ -28,11 +28,23 @@ module type S = sig
     Tezos_types.Contract.t ->
     Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
 
+  val get_code :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+
+  val get_script :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Tezlink_imports.Alpha_context.Script.t option tzresult Lwt.t
+
   val manager_key :
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Signature.V1.Public_key.t option tzresult Lwt.t
+    Signature.Public_key.t option tzresult Lwt.t
 
   val counter :
     [`Main] -> block_param -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t
@@ -48,9 +60,19 @@ module type S = sig
   val monitor_heads :
     [> `Main] -> 'a -> L2_types.Tezos_block.t Lwt_stream.t * Lwt_watcher.stopper
 
-  val operations :
-    [`Main] ->
+  val bootstrap_accounts :
+    unit ->
+    (Tezlink_imports.Imported_protocol.Alpha_context.public_key_hash
+    * Tezos_types.Tez.t)
+    list
+    tzresult
+    Lwt.t
+
+  val simulate_operation :
     chain_id:Chain_id.t ->
+    skip_signature:bool ->
+    Tezlink_imports.Imported_protocol.operation ->
+    Operation_hash.t ->
     block_param ->
-    Tezos_services.Block_services.operation list tzresult Lwt.t
+    Tezlink_imports.Imported_protocol.operation_receipt tzresult Lwt.t
 end

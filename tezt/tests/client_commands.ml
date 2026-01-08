@@ -245,7 +245,7 @@ module Simulation = struct
     Process.check_error
       value
       ~exit_code:1
-      ~msg:(rex "--gas-limit option is required")
+      ~msg:(rex "--default-gas-limit option is required")
 
   let register protocol =
     successful protocol ;
@@ -1123,14 +1123,15 @@ module Gen_keys = struct
     let* () =
       match account.Account.secret_key with
       | Encrypted _ -> unit
-      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+      | Unencrypted _ | Remote _ ->
+          Test.fail "Secret key generated should be encrypted"
     in
     Log.info "Generating an unencrypted key (need to add --unencrypted)" ;
     let* alias = Client.gen_keys ~key_encryption:Forced_unencrypted client in
     let* account = Client.show_address ~alias client in
     match account.Account.secret_key with
     | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
-    | Unencrypted _ -> unit
+    | Unencrypted _ | Remote _ -> unit
 
   let test_gen_keys_testnet =
     Protocol.register_test
@@ -1152,13 +1153,15 @@ module Gen_keys = struct
     let* () =
       match account.Account.secret_key with
       | Encrypted _ -> unit
-      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+      | Unencrypted _ | Remote _ ->
+          Test.fail "Secret key generated should be encrypted"
     in
     Log.info "Generating an unencrypted key (default)" ;
     let* alias = Client.gen_keys client in
     let* account = Client.show_address ~alias client in
     match account.Account.secret_key with
-    | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
+    | Encrypted _ | Remote _ ->
+        Test.fail "Secret key generated should be unencrypted"
     | Unencrypted _ -> unit
 
   let register protocols =

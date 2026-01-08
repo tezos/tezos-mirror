@@ -91,7 +91,8 @@ let commands () =
            message
            (_, (key_locator, _))
            signature
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
         >>=? fun block ->
         check_message cctxt ~key_locator ~block ~quiet ~message ~signature

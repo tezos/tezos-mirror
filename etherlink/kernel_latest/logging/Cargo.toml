@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -12,9 +12,13 @@ license = "MIT"
 num-traits.workspace = true
 num-derive.workspace = true
 tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-host.workspace = true
+nop-macros.workspace = true
+tracing = { workspace = true, optional = true }
 
 [features]
 default = ["alloc"]
 alloc = []
 debug = []
 benchmark = []
+tracing = ["dep:tracing"]

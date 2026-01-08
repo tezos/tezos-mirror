@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = S023 | R022 | Alpha
+type t = T024 | S023 | Alpha
 
 val encoding : t Data_encoding.t
 
@@ -114,6 +114,15 @@ type bootstrap_contract = {
   hash : string option;
 }
 
+type bootstrap_parameters = {
+  balance : int option;
+  consensus_key : Account.key option;
+  delegate : Account.key option;
+}
+
+(** All fields are set to [None]. A [None] balance will resolve into [default_bootstrap_balance]. *)
+val default_bootstrap_parameters : bootstrap_parameters
+
 (** The value is the same as the one in src/proto_alpha/lib_parameters/default_parameters.ml. *)
 val default_bootstrap_balance : int
 
@@ -126,7 +135,7 @@ val default_bootstrap_balance : int
     the default parameters of the given protocol are the base parameters.
 
     Then, the base parameters are tweaked with:
-    - [bootstrap_accounts], when given these accounts are used instead of
+    - [overwrite_bootstrap_accounts], when given these accounts are used instead of
       [Account.Bootstrap.keys]
     - [parameters_overrides]
     - [additional_bootstrap_accounts] is a list of bootstrap accounts to
@@ -140,8 +149,10 @@ val default_bootstrap_balance : int
       a [Temp.file] temporary file "parameters.json" by default.
 *)
 val write_parameter_file :
-  ?bootstrap_accounts:(Account.key * int option) list ->
-  ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
+  ?overwrite_bootstrap_accounts:
+    (Account.key * bootstrap_parameters option) list option ->
+  ?additional_bootstrap_accounts:
+    (Account.key * bootstrap_parameters option * bool) list ->
   ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
   ?bootstrap_contracts:bootstrap_contract list ->
   ?output_file:string ->

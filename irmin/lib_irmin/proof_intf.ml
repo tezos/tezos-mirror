@@ -344,11 +344,12 @@ module type Proof = sig
 
   module Env
       (B : Backend.S)
-      (P : S
-             with type contents := B.Contents.Val.t
-              and type hash := B.Hash.t
-              and type step := B.Node.Val.step
-              and type metadata := B.Node.Val.metadata) :
+      (P :
+        S
+          with type contents := B.Contents.Val.t
+           and type hash := B.Hash.t
+           and type step := B.Node.Val.step
+           and type metadata := B.Node.Val.metadata) :
     Env
       with type hash := B.Hash.t
        and type contents := B.Contents.Val.t

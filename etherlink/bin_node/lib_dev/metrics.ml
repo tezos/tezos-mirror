@@ -362,9 +362,9 @@ let metrics =
   in
   {chain; block; simulation; health; l1_level}
 
-let init ~mode ~tx_pool_size_info ~smart_rollup_address =
+let init ~mode ?tx_pool_size_info ~smart_rollup_address () =
   Info.init ~mode ~smart_rollup_address ;
-  Tx_pool.register tx_pool_size_info
+  Option.iter Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 
@@ -419,7 +419,7 @@ let inc_confirm_gas_needed () =
 let record_blueprint_chunks_sent_on_dal chunks =
   Counter.inc
     Blueprint_chunk_sent.on_dal
-    (Float.of_int (List.length chunks))
+    (Float.of_int (Sequencer_blueprint.nb_chunks chunks))
     "record_blueprint_chunks_sent_on_dal"
 
 let record_blueprint_chunks_sent_on_inbox chunks =
@@ -447,12 +447,13 @@ module Performance_metrics_config = struct
 end
 
 module type PERFORMANCE = sig
-  val set_stats : data_dir:string -> unit Lwt.t
+  val set_stats : data_dir:string -> unit
 end
 
 let performance_metrics : (module PERFORMANCE) Lazy.t =
   lazy
-    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (let module M =
+       Octez_performance_metrics.Unix.Make (Performance_metrics_config) in
     (module M : PERFORMANCE))
 
 let listing () =

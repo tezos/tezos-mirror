@@ -1,0 +1,84 @@
+# rust dependencies
+#
+# This image includes
+# - rust dependencies
+#
+# This image is intended for
+# - building kernels, testing kernels and building the kernel SDK in the tezos/tezos CI
+# - building the EVM kernel distributed in the tezos/tezos Docker images.
+
+ARG IMAGE=invalid
+# the image with proper version is set as ARG
+#hadolint ignore=DL3006
+FROM ${IMAGE}
+
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+
+# Setup proxy
+ARG APT_PROXY
+ENV APT_PROXY=${APT_PROXY:-false}
+RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.debian.org \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::archive.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::ports.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy
+
+COPY scripts/kiss-fetch.sh /usr/local/bin/
+ENV PATH=/usr/local/bin:$PATH
+
+# install static binaries
+COPY images/scripts/install_datadog_static.sh \
+     images/scripts/install_sccache_static.sh \
+     images/scripts/install-gcloud-apt.sh  /tmp/
+
+#hadolint ignore=DL3008,DL3015
+RUN apt-get update && \
+  apt-get -y install curl jq gpg && \
+  /tmp/install_datadog_static.sh && \
+  /tmp/install_sccache_static.sh && \
+  /tmp/install-gcloud-apt.sh && \
+  rm /tmp/install_datadog_static.sh \
+     /tmp/install_sccache_static.sh \
+     /tmp/install-gcloud-apt.sh && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /root
+
+# common packages to build rust
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+    ca-certificates file \
+    build-essential \
+    git \
+    gcc \
+    tzdata \
+    pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
+    rustup \
+    musl-tools \
+    wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
+    ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc && \
+    ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# install rust toolchains and compilation targets
+# nightly-2025-01-30 is installed separately as it's only used for formatting
+# set the default to the last stable toolchain installed.
+RUN rustup update 1.66.0 1.68.2 1.73.0 1.76.0 1.83.0 1.88.0 && \
+    for tc in $(rustup toolchain list | awk '{print $1}'); do \
+        rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-linux-gnu; \
+        rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
+        rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
+    done && \
+    rustup update nightly-2025-01-30 && \
+    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
+    rustup default 1.88.0
+
+ENV PATH=/root/.cargo/bin:$PATH

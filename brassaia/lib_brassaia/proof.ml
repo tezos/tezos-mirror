@@ -27,7 +27,8 @@ module Make (C : Type.S) (H : Type.S) = struct
   let kinded_hash_t =
     let open Type in
     variant "kinded_hash" (fun c n -> function
-      | `Contents h -> c ((), h) | `Node h -> n h)
+      | `Contents h -> c ((), h)
+      | `Node h -> n h)
     |~ case1 "contents" (pair unit hash_t) (fun ((), h) -> `Contents h)
     |~ case1 "node" hash_t (fun h -> `Node h)
     |> sealv
@@ -58,7 +59,8 @@ module Make (C : Type.S) (H : Type.S) = struct
   let tree_t =
     let open Type in
     variant "tree"
-      (fun contents blinded_contents node blinded_node inode extender ->
+      (fun
+        contents blinded_contents node blinded_node inode extender ->
         function
       | Contents c -> contents (c, ())
       | Blinded_contents h -> blinded_contents (h, ())
@@ -119,9 +121,10 @@ let bad_stream_too_short_fmt s fmt =
 
 module Env
     (Backend : Backend.S)
-    (Proof : S
-               with type contents := Backend.Contents.Val.t
-                and type hash := Backend.Hash.t) =
+    (Proof :
+      S
+        with type contents := Backend.Contents.Val.t
+         and type hash := Backend.Hash.t) =
 struct
   module H = Backend.Hash
 
@@ -281,7 +284,9 @@ struct
     match !t with
     | Stream (Consume { stream; _ }) -> (
         (* Peek the sequence but do not advance the ref *)
-        match !stream () with Seq.Nil -> true | _ -> false)
+        match !stream () with
+        | Seq.Nil -> true
+        | _ -> false)
     | _ -> false
 
   let set_mode t (kind : kind) mode =

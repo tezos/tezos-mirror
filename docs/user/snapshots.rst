@@ -209,4 +209,4 @@ of their nodes on a regular basis (usually daily) and make them available for
 download. These include:
 
 * `Tzinit snapshots <https://snapshots.tzinit.org/>`_
-* `Lambs on acid <https://lambsonacid.nl/>`_
+* `Teztnets (Tezos Testnets) <https://teztnets.com/>`_

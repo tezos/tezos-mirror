@@ -297,6 +297,7 @@ pub struct Config {
 	pub has_mcopy: bool,
 	/// Has blob instructions.
 	pub has_blob_instructions: bool,
+	pub is_prague: bool,
 }
 
 impl Config {
@@ -355,6 +356,7 @@ impl Config {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -413,6 +415,7 @@ impl Config {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -441,6 +444,11 @@ impl Config {
 		Self::config_with_derived_values(DerivedConfigInputs::cancun())
 	}
 
+	/// Prague hard fork configuration.
+	pub const fn prague() -> Config {
+		Self::config_with_derived_values(DerivedConfigInputs::prague())
+	}
+
 	const fn config_with_derived_values(inputs: DerivedConfigInputs) -> Config {
 		let DerivedConfigInputs {
 			gas_storage_read_warm,
@@ -456,6 +464,7 @@ impl Config {
 			has_transient_storage,
 			has_mcopy,
 			has_blob_instructions,
+			is_prague,
 		} = inputs;
 
 		// See https://eips.ethereum.org/EIPS/eip-2929
@@ -523,6 +532,7 @@ impl Config {
 			has_transient_storage,
 			has_mcopy,
 			has_blob_instructions,
+			is_prague,
 		}
 	}
 }
@@ -543,6 +553,7 @@ struct DerivedConfigInputs {
 	has_transient_storage: bool,
 	has_mcopy: bool,
 	has_blob_instructions: bool,
+	is_prague: bool,
 }
 
 impl DerivedConfigInputs {
@@ -561,6 +572,7 @@ impl DerivedConfigInputs {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -579,6 +591,7 @@ impl DerivedConfigInputs {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -597,6 +610,7 @@ impl DerivedConfigInputs {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -616,6 +630,7 @@ impl DerivedConfigInputs {
 			has_transient_storage: false,
 			has_mcopy: false,
 			has_blob_instructions: false,
+			is_prague: false,
 		}
 	}
 
@@ -626,6 +641,14 @@ impl DerivedConfigInputs {
 			has_transient_storage: true,
 			has_mcopy: true,
 			has_blob_instructions: true,
+			..base
+		}
+	}
+
+	const fn prague() -> Self {
+		let base = Self::cancun();
+		Self {
+			is_prague: true,
 			..base
 		}
 	}

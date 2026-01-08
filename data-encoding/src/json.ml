@@ -158,7 +158,8 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
           let match_case x = match_case (proj x) in
           let lift
               (Case
-                {title; description; encoding; proj = proj'; inj = inj'; tag}) =
+                 {title; description; encoding; proj = proj'; inj = inj'; tag})
+              =
             Case
               {
                 encoding;
@@ -200,8 +201,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
   | Dynamic_size _ | Check_size _ | Delayed _ ->
       e
 
-and lift_union_in_pair :
-    type a b.
+and lift_union_in_pair : type a b.
     pair_builder ->
     Encoding.Kind.t ->
     a Encoding.t ->
@@ -450,12 +450,83 @@ let cannot_destruct fmt =
 
 type t = json
 
-let to_string ?(newline = false) ?minify j =
-  Format.asprintf
-    "%a%s"
-    Json_repr.(pp ?compact:minify (module Ezjsonm))
-    j
-    (if newline then "\n" else "")
+(* This function is an ad-hoc optimization for minified json printing. *)
+let json_to_string_minified ~newline json =
+  let repr_to_string json =
+    let escape_and_add_string b s =
+      Buffer.add_char b '"' ;
+      for i = 0 to String.length s - 1 do
+        match s.[i] with
+        | '\"' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b '"'
+        | '\n' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'n'
+        | '\r' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'r'
+        | '\b' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 'b'
+        | '\t' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b 't'
+        | '\\' ->
+            Buffer.add_char b '\\' ;
+            Buffer.add_char b '\\'
+        | '\x00' .. '\x1F' as c -> Printf.bprintf b "\\u%04x" (Char.code c)
+        | c -> Buffer.add_char b c
+      done ;
+      Buffer.add_char b '"'
+    in
+    let rec iter_sep b f = function
+      | [] -> ()
+      | [x] -> f x
+      | x :: t ->
+          f x ;
+          Buffer.add_char b ',' ;
+          (iter_sep [@tailcall]) b f t
+    in
+    let rec write b = function
+      | `Bool true -> Buffer.add_string b "true"
+      | `Bool false -> Buffer.add_string b "false"
+      | `Null -> Buffer.add_string b "null"
+      | `String s -> escape_and_add_string b s
+      | `Float f ->
+          let fract, intr = modf f in
+          if fract = 0.0 then Printf.bprintf b "%.0f" intr
+          else Printf.bprintf b "%g" f
+      | `O ol ->
+          Buffer.add_char b '{' ;
+          iter_sep
+            b
+            (fun (s, v) ->
+              escape_and_add_string b s ;
+              Buffer.add_char b ':' ;
+              write b v)
+            ol ;
+          Buffer.add_char b '}'
+      | `A l ->
+          Buffer.add_char b '[' ;
+          iter_sep b (fun v -> write b v) l ;
+          Buffer.add_char b ']'
+    in
+    let b = Buffer.create 4096 in
+    write b json ;
+    if newline then Buffer.add_char b '\n' ;
+    Buffer.contents b
+  in
+  repr_to_string json
+
+let to_string ?(newline = false) ?(minify = false) j =
+  if minify then json_to_string_minified ~newline j
+  else
+    Format.asprintf
+      "%a%s"
+      Json_repr.(pp ~compact:minify (module Ezjsonm))
+      j
+      (if newline then "\n" else "")
 
 let pp = Json_repr.(pp (module Ezjsonm))
 

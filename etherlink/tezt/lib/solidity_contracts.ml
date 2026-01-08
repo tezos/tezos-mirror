@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -57,7 +57,7 @@ let generate_json_string ~label ~contract ~path ~evm_version =
 
 let compile_contract ~source ~label ~contract evm_version =
   (* Construct the JSON input for solc *)
-  let evm_version = Evm_version.to_string evm_version in
+  let evm_version = Evm_version.to_solidity_evm_version evm_version in
   let input_json =
     generate_json_string ~label ~contract ~path:source ~evm_version
   in
@@ -391,8 +391,7 @@ let batcher =
 
 let reentrancy_test =
   compile_contract
-    ~source:
-      "etherlink/kernel_latest/evm_execution/tests/contracts/src/ReentrancyTester.sol"
+    ~source:"etherlink/kernel_latest/revm/contracts/tests/reentrancy_tester.sol"
     ~label:"reentrancy_tester"
     ~contract:"ReentrancyTester"
 
@@ -420,15 +419,9 @@ let delegatecall_delegated =
     ~label:"delegatecall_delegated"
     ~contract:"Delegated"
 
-let incrementor =
+let etherlink_fa_proxy_mock =
   compile_contract
-    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
-    ~label:"incrementor"
-    ~contract:"Incrementor"
-
-let incrementor_proxy =
-  compile_contract
-    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
+    ~source:(solidity_contracts_path ^ "/etherlink_fa_proxy_mock.sol")
     ~label:"proxy"
     ~contract:"Proxy"
 
@@ -438,8 +431,40 @@ let eip2930_storage_access =
     ~label:"storageaccess"
     ~contract:"StorageAccess"
 
+let eip7702 =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/eip7702.sol")
+    ~label:"eip7702contract"
+    ~contract:"EIP7702Contract"
+
+let nested_delegatecalls_A =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_A"
+    ~contract:"A"
+
+let nested_delegatecalls_B =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_B"
+    ~contract:"B"
+
+let nested_delegatecalls_C =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_C"
+    ~contract:"C"
+
+let nested_delegatecalls_D =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_D"
+    ~contract:"D"
+
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"
 
   let fa_withdrawal = "0xff00000000000000000000000000000000000002"
+
+  let sequencer_key_change = "0xff00000000000000000000000000000000000006"
 end

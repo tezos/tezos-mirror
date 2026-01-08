@@ -13,7 +13,8 @@ type t
 val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
-  ?vms:Agent.Configuration.t list Lwt.t ->
+  ?vms:(unit -> Agent.Configuration.t list Lwt.t) ->
+  ?dockerbuild_args:(string * string) list ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
@@ -22,6 +23,10 @@ val register :
   ?tasks:Chronos.task list ->
   (t -> unit Lwt.t) ->
   unit
+
+(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined. *)
+val set_faketime : Agent.t -> string -> unit Lwt.t
 
 (** Dynamically add an alert *)
 val add_alert : t -> alert:Alert_manager.alert -> unit Lwt.t
@@ -60,6 +65,7 @@ val service_register :
   name:string ->
   executable:string ->
   ?on_alive_callback:(alive:bool -> unit) ->
+  on_shutdown:(unit -> unit Lwt.t) list ->
   Agent.t ->
   unit
 

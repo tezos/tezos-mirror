@@ -10,14 +10,16 @@ type context
 external wasm_runtime_new_context : unit -> context = "wasm_runtime_new_context"
 
 val wasm_runtime_run :
+  scope:Wasm_runtime_callbacks.scope ->
+  trace_host_funs:bool ->
+  context:context ->
   preimages_dir:string ->
   ?preimages_endpoint:string ->
   native_execution:bool ->
   entrypoint:string ->
-  context ->
-  Irmin_context.tree ->
-  bytes ->
-  int32 ->
+  tree:Irmin_context.tree ->
+  rollup_address:bytes ->
+  level:int32 ->
   string list ->
   Irmin_context.tree
 

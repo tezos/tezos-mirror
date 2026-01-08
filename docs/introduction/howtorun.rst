@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 Running Octez
 =============
 
@@ -196,7 +194,8 @@ The baker is a daemon that executes Tezos' :doc:`consensus algorithm<../active/c
 The baker runs on behalf of one or more specified accounts or, if none is specified, on behalf of
 all accounts whose secret keys are known.
 
-A complete manual page of the baker executable is available :ref:`here <baker_manual>`.
+To learn more about how the Octez baker works see :doc:`../shell/baker`.
+Also, a complete manual page of the baker executable is available :ref:`here <baker_manual>`.
 
 During its run, the baker bakes blocks (by selecting transactions from
 the mempool and arranging them in a new block) and emits consensus
@@ -208,7 +207,7 @@ For its operation, the baker daemon needs to communicate with an Octez node usin
 Therefore, you must indicate a node endpoint whose RPC interface is available.
 The most common way is to :ref:`run a node locally <quickstart_node>`, ensuring its RPC port is open for local calls (e.g. ``--rpc-addr 127.0.0.1``).
 
-Bakers are also supposed to run a DAL node before running the baker daemon, to expand the amount of data that Tezos can distribute without causing congestion on layer 1.
+Bakers are also supposed to run a DAL node before running the baker daemon, to expand the amount of data that Tezos can distribute without causing congestion on Layer 1.
 Therefore, first :doc:`start a DAL node <../shell/dal_run>`.
 
 Typically, you run an attester DAL node as follows::
@@ -218,9 +217,12 @@ Typically, you run an attester DAL node as follows::
 Once the DAL node runs, we can launch the baker daemon pointing to the standard node directory and
 baking for user "mybaker"::
 
-   octez-baker-<PROTO_HASH> run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
+   octez-baker run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
 
-where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+.. note::
+	Previously, you had to run a specific baker for a given protocol, such as ``octez-baker-<PROTO_HASH>``,
+	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+	These protocol-specific bakers are still available for now, but will be deprecated.
 
 Note that:
 
@@ -241,7 +243,7 @@ Putting together all the above instructions, you may want to quickly start a bak
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
     octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=$BAKER_ADDRESS
-    octez-baker-PsRiotum run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
+    octez-baker run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
 
 .. warning::
@@ -250,14 +252,15 @@ Putting together all the above instructions, you may want to quickly start a bak
     If you are worried about the availability of your node when it is its turn to bake/attest, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
-However, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
+However, if you are using the deprecated protocol-suffixed executables, it is safe (and actually necessary) to temporarily run two bakers just before a protocol activation: the baker for the protocol being replaced and the baker for the protocol to be activated.
+This is no longer necessary with the unique ``octez-baker`` executable.
 
 
 .. note::
 
    It is possible to bake and attest using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
-The baker uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+The baker uses the same format of configuration file as the client, and the default configuration file for the baker is the same as the default configuration file for the client (see :ref:`client_conf_file`).
 
 .. warning::
 
@@ -300,7 +303,12 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 ::
 
-   octez-accuser-alpha run
+   octez-accuser run
+
+.. note::
+	Previously, you had to run a specific accuser for a given protocol, such as ``octez-accuser-<PROTO_HASH>``,
+	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
+	These protocol-specific accusers are still available for now, but will be deprecated.
 
 The accuser uses the same format of configuration file as the client (see :ref:`client_conf_file`).
 A complete manual page of the accuser is available :ref:`here <accuser_manual>`.
@@ -320,14 +328,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-PsQuebec``, you can
+For instance, if the name is ``mainnet_baker``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-PsQuebec
+    docker logs mainnet_baker
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-PsQuebec -f
+    docker logs mainnet_baker -f
 
 This allows you to know if you baked.
 You should see lines such as::

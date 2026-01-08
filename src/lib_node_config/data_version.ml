@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2019-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -101,7 +83,11 @@ end
  *  - 3.0     : change blocks' context hash semantics and introduce
                 context split (upgrade to irmin.3.5) -- v16.0
  *  - 3.1     : change encoding for block store status -- v21.0
- *  - 3.2     : update offset format for cemented files to 64-bit -- v22.0 *)
+ *  - 3.2     : update offset format for cemented files to 64-bit -- v22.0
+ *  - 3.3     : standardize context directories in `context`
+                introduce context metadata file
+                switch default context backend from irmin to brassaia -- v24.0
+ *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -110,7 +96,9 @@ let v_3_1 = Version.make ~major:3 ~minor:1
 
 let v_3_2 = Version.make ~major:3 ~minor:2
 
-let current_version = v_3_2
+let v_3_3 = Version.make ~major:3 ~minor:3
+
+let current_version = v_3_3
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -128,10 +116,16 @@ let upgradable_data_version =
     let store_dir = store_dir data_dir in
     Store.Upgrade.v_3_2_upgrade ~store_dir genesis
   in
+  let v_3_3_upgrade ~data_dir = Context_ops.Upgrade.v_3_3_upgrade ~data_dir in
   [
     ( v_3_1,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        v_3_2_upgrade ~data_dir genesis );
+        let open Lwt_result_syntax in
+        let* () = v_3_2_upgrade ~data_dir genesis in
+        v_3_3_upgrade ~data_dir );
+    ( v_3_2,
+      fun ~data_dir _genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_3_upgrade ~data_dir );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -322,7 +316,8 @@ let warning_clean_directory files =
       files
   in
   Format.sprintf
-    "Please provide a clean directory by removing the following files: %s"
+    "Please provide a clean directory by removing the following files: %s@.You \
+     can also use --force to automatically erase the above files."
     to_delete
 
 let clean_directory ~data_dir =
@@ -394,7 +389,9 @@ let ensure_data_dir ~mode data_dir =
               s <> "." && s <> ".." && s <> version_file_name
               && s <> default_identity_file_name
               && s <> default_config_file_name
-              && s <> default_peers_file_name)
+              && s <> default_peers_file_name
+              && (not (Filename.check_suffix s "rolling"))
+              && not (Filename.check_suffix s "full"))
             files
         in
         match (files, mode) with
@@ -439,9 +436,8 @@ let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
   let* o = ensure_data_dir ~mode data_dir in
   match o with
   | None -> return_unit
-  | Some (version, _) when false ->
-      (* Enable automatic upgrade to avoid users to manually upgrade.
-         This is disabled for the current version. *)
+  | Some (version, _) when version = v_3_2 ->
+      (* Enable automatic upgrade to avoid users to manually upgrade. *)
       let* () =
         upgrade_data_dir ~data_dir genesis ~chain_name:() ~sandbox_parameters:()
       in

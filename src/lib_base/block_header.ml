@@ -54,7 +54,8 @@ let shell_header_encoding =
               operations_hash;
               fitness;
               context;
-            } ->
+            }
+          ->
          ( level,
            proto_level,
            predecessor,
@@ -70,7 +71,8 @@ let shell_header_encoding =
               validation_passes,
               operations_hash,
               fitness,
-              context ) ->
+              context )
+          ->
          {
            level;
            proto_level;

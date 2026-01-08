@@ -36,7 +36,7 @@ OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES := $(shell cat script-inputs/octez-experimen
 OCTEZ_ONLY_EXECUTABLES := $(OCTEZ_ONLY_RELEASED_EXECUTABLES) $(OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES)
 
 #Define octez layer1 only executables by excluding the EVM-node and teztale tools.
-OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
 
 TEZTALE_EXECUTABLES := $(shell cat script-inputs/teztale-experimental-executables)
 
@@ -47,6 +47,10 @@ EVM_EXECUTABLES := $(shell cat script-inputs/etherlink-experimental-executables)
 # build the TPS evaluation tool, Octogram and the Tezt test suite in the
 # 'build_x86_64-dev-exp-misc' job.
 BUILD_EXTRA ?=
+
+# set a default parallelism of dune
+# to be instantiated in the CI to avoid OOMs (e.g. "-j 12")
+DUNE_BUILD_JOBS ?=
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -140,7 +144,7 @@ build-parameters:
 
 .PHONY: $(ALL_EXECUTABLES)
 $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
-	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
 # If slim mode is active, kaitai updates should fail, as some protocol encoding
@@ -245,7 +249,10 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
+# [dune.sh] is a wrapper around [dune] that does not change the core build logic
+# but enables cache monitoring when DUNE_CACHE_INFO=true.
+# Useful to compute dune cache hit ratio in the CI.
+	@./scripts/ci/dune.sh build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
 		@copy-parameters
@@ -504,6 +511,11 @@ build-octogram: all
 build-floodgate:
 	@dune build ./etherlink/bin_floodgate
 	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
+
+.PHONY: build-courier
+build-courier:
+	@dune build ./etherlink/bin_courier
+	@cp -f ./_build/default/etherlink/bin_courier/main.exe courier
 
 .PHONY: etherlink-outbox-monitor
 etherlink-outbox-monitor:

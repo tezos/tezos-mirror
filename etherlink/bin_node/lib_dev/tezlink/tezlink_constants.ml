@@ -19,6 +19,14 @@ let parametric_repr : Imported_protocol.Constants_parametric_repr.t =
   | Ok param -> param
   | Error _ -> assert false
 
+(* This is a small patch to trick tzkt into indexing asap. We can't do less
+   than 1sec though, as Period_repr is in seconds. *)
+let parametric_repr =
+  {
+    parametric_repr with
+    minimal_block_delay = Imported_protocol.Period_repr.one_second;
+  }
+
 let all_constants_repr : Imported_protocol.Constants_repr.t =
   Imported_protocol.Constants_repr.all_of_parametric parametric_repr
 

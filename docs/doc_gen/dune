@@ -17,11 +17,11 @@
   octez-libs.data-encoding
   re
   tezos-protocol-genesis.embedded-protocol
-  tezos-protocol-022-PsRiotum.embedded-protocol
   tezos-protocol-023-PtSeouLo.embedded-protocol
+  tezos-protocol-024-PtTALLiN.embedded-protocol
   tezos-protocol-alpha.embedded-protocol
-  octez-protocol-022-PsRiotum-libs.plugin-registerer
   octez-protocol-023-PtSeouLo-libs.plugin-registerer
+  octez-protocol-024-PtTALLiN-libs.plugin-registerer
   octez-protocol-alpha-libs.plugin-registerer)
  (link_flags
   (:standard)

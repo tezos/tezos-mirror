@@ -128,7 +128,8 @@ module Distributed_db_state = struct
              block_header_db;
              active_connections_length;
              active_peers_length;
-           } ->
+           }
+         ->
         ( p2p_readers_length,
           active_chains_length,
           operation_db,
@@ -142,7 +143,8 @@ module Distributed_db_state = struct
              operations_db,
              block_header_db,
              active_connections_length,
-             active_peers_length ) ->
+             active_peers_length )
+         ->
         {
           p2p_readers_length;
           active_chains_length;

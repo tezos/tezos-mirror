@@ -5,8 +5,14 @@
     flakeutils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flakeutils }:
-    flakeutils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flakeutils,
+    }:
+    flakeutils.lib.eachDefaultSystem (
+      system:
       let
         NAME = "wasmer";
         VERSION = "0.1";

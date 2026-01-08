@@ -19,9 +19,8 @@ module Maker (K : Brassaia.Hash.S) : sig
   type key = K.t
 
   module Make
-      (Val : Brassaia_pack.Pack_value.S
-               with type hash := K.t
-                and type key := K.t) : sig
+      (Val :
+        Brassaia_pack.Pack_value.S with type hash := K.t and type key := K.t) : sig
     include
       Brassaia_pack.Indexable.S
         with type hash = K.t

@@ -1,0 +1,9 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name cacio)
+ (libraries
+  gitlab_ci
+  tezos_ci
+  tezt.core))

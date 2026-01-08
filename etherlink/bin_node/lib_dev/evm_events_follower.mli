@@ -11,6 +11,7 @@ type parameters = {
   filter_event : Evm_events.t -> bool;
       (** Filter event the follower applies. *)
   keep_alive : bool;
+  rpc_timeout : float;
 }
 
 (** [start parameters] starts the events follower. *)

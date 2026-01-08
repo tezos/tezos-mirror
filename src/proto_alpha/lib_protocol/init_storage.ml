@@ -116,10 +116,12 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
       ~level
       ~predecessor_timestamp
       ~timestamp
-      ~adaptive_issuance_enable:false
+      ~all_bakers_attest_first_level:None
       ctxt
   in
-  let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
+  let* ctxt =
+    All_bakers_attest_activation_storage.set_all_bakers_attest_first_level ctxt
+  in
   Storage.Pending_migration.remove ctxt
 
 (* Start of code to remove at next automatic protocol snapshot *)
@@ -127,6 +129,36 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
 (* End of code to remove at next automatic protocol snapshot *)
+
+let initialize_accumulator_native_contract ctxt =
+  let open Lwt_result_syntax in
+  (* Please note that this is the same mecanism for originating the Liquidity
+     Baking contract. *)
+  let operation_hash =
+    Operation_hash.hash_string
+      (* A contract hash is generated from an origination nonce, which is itself
+         generated from the operation hash that contains its origination. As we
+         cannot originate it from an operation, we then must use a random seed.
+         This text is part of `Celestial Dew` description from Elden Ring: this
+         is a placeholder for now, let's maybe find something better (or that
+         produces a better KT1 hash). *)
+      [
+        "Once upon a time, the stars of the night sky guided fate, and this is \
+         a recollection of those times. ";
+      ]
+  in
+  let ctxt = Raw_context.init_origination_nonce ctxt operation_hash in
+  let*? ctxt, contract_hash =
+    Contract_storage.fresh_contract_from_current_nonce ctxt
+  in
+  let* ctxt =
+    Contract_storage.native_originate
+      ctxt
+      contract_hash
+      ~script:(Script_native_repr.CLST_contract.with_initial_storage, None)
+  in
+  let* ctxt = Storage.Contract.Native_contracts.CLST.init ctxt contract_hash in
+  return (Raw_context.unset_origination_nonce ctxt)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
@@ -140,10 +172,16 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   let* ctxt =
     match previous_proto_constants with
     | Some previous_proto_constants ->
-        Sc_rollup_storage.save_commitment_period
+        let* ctxt =
+          Sc_rollup_storage.save_commitment_period
+            ctxt
+            previous_proto_constants.sc_rollup.commitment_period_in_blocks
+            level
+        in
+        Dal_storage.save_parameters
           ctxt
-          previous_proto_constants.sc_rollup.commitment_period_in_blocks
-          level
+          previous_proto_constants.dal
+          ~next_protocol_activation:level
     | None -> return ctxt
   in
   let parametric = Raw_context.constants ctxt in
@@ -159,9 +197,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     match previous_protocol with
     | Genesis param ->
         (* This is the genesis protocol: initialise the state *)
-        let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.init ctxt level
-        in
+        let* ctxt = Storage.Protocol_activation_level.init ctxt level in
         let* ctxt = Forbidden_delegates_storage.init_for_genesis ctxt in
         let*! ctxt = Storage.Contract.Total_supply.add ctxt Tez_repr.zero in
         let* ctxt = Storage.Block_round.init ctxt Round_repr.zero in
@@ -194,6 +230,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             param.bootstrap_contracts
             param.bootstrap_smart_rollups
         in
+        let* ctxt = Adaptive_issuance_storage.init_from_genesis ctxt in
         let* ctxt = Delegate_cycles.init_first_cycles ctxt in
         let* ctxt =
           Vote_storage.init
@@ -213,13 +250,16 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
             operation_results
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
-        let* ctxt = Adaptive_issuance_storage.init_from_genesis ctxt in
+        let* ctxt = Address_registry_storage.init ctxt in
+        let* ctxt =
+          if parametric.native_contracts_enable then
+            initialize_accumulator_native_contract ctxt
+          else return ctxt
+        in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
-        let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.update ctxt level
-        in
+        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
@@ -227,9 +267,10 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | S023 ->
+    | T024 ->
         let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.update ctxt level
+          let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
+          Storage.Protocol_activation_level.init ctxt level
         in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =

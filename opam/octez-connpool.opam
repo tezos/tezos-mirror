@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "uri" { >= "3.1.0" }
   "opentelemetry-lwt"
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
@@ -18,7 +19,7 @@ depends: [
   "tezt-tezos" { with-test & = version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

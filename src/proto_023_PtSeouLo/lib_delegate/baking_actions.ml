@@ -199,20 +199,25 @@ let round_of_shell_header shell_header =
 let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
   let open Lwt_result_syntax in
   let*! result =
-    match timeout with
-    | None ->
-        let*! res = Client_keys.sign cctxt secret_key_uri ?watermark msg in
-        Lwt.return (`Signature_result res)
-    | Some timeout ->
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep timeout in
-             Lwt.return (`Signature_timeout timeout));
-            (let*! signature =
-               Client_keys.sign cctxt secret_key_uri ?watermark msg
-             in
-             Lwt.return (`Signature_result signature));
-          ]
+    let sign () =
+      match timeout with
+      | None ->
+          let*! res = Client_keys.sign cctxt secret_key_uri ?watermark msg in
+          Lwt.return (`Signature_result res)
+      | Some timeout ->
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep timeout in
+               Lwt.return (`Signature_timeout timeout));
+              (let*! signature =
+                 Client_keys.sign cctxt secret_key_uri ?watermark msg
+               in
+               Lwt.return (`Signature_result signature));
+            ]
+    in
+    Octez_baking_common.Signing_delay.sign_with_minimum_duration
+      (module Profiler)
+      sign
   in
   match result with
   | `Signature_timeout timeout ->
@@ -223,7 +228,8 @@ let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
       Lwt.return (Error errs)
   | `Signature_result (Ok res) -> Lwt.return (Ok res)
 
-let sign_block_header global_state proposer unsigned_block_header =
+let sign_block_header round_duration global_state proposer unsigned_block_header
+    =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
@@ -270,15 +276,23 @@ let sign_block_header global_state proposer unsigned_block_header =
   match result with
   | false -> tzfail (Block_previously_baked {level; round})
   | true ->
+      let delay_between_stall_events =
+        (* round_duration /. 2 is arbitrary and conservative *)
+        round_duration /. 2.
+      in
       let* signature =
-        (sign
-           ?timeout:global_state.config.remote_calls_timeout
-           ~signing_request:`Block_header
-           cctxt
-           proposer.secret_key_uri
-           ~watermark:Block_header.(to_watermark (Block_header chain_id))
-           unsigned_header
-         [@profiler.record_s {verbosity = Debug} "sign : block header"])
+        Utils.event_on_stalling_promise
+          ~initial_delay:delay_between_stall_events
+          ~event:(fun sum ->
+            Events.(emit stalling_signature (`Block_header, level, round, sum)))
+          (sign
+             ?timeout:global_state.config.remote_calls_timeout
+             ~signing_request:`Block_header
+             cctxt
+             proposer.secret_key_uri
+             ~watermark:Block_header.(to_watermark (Block_header chain_id))
+             unsigned_header
+           [@profiler.record_s {verbosity = Debug} "sign : block header"])
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
@@ -286,12 +300,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
-  let*! () =
-    Events.(
-      emit
-        prepare_forging_block
-        (Int32.succ predecessor.shell.level, round, delegate))
-  in
+  let level = Int32.succ predecessor.shell.level in
+  let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let simulation_mode = global_state.validation_mode in
@@ -329,16 +339,15 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           payload_round )
   in
   let*! () =
-    Events.(
-      emit
-        forging_block
-        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
+    Events.(emit forging_block (level, round, delegate, force_apply))
   in
   let* injection_level =
-    Plugin.RPC.current_level
+    Node_rpc.current_level
       cctxt
       ~offset:1l
-      (`Hash global_state.chain_id, `Hash (predecessor.hash, 0))
+      ~chain:(`Hash global_state.chain_id)
+      ~block:(`Hash (predecessor.hash, 0))
+      ()
   in
   let* seed_nonce_opt =
     (generate_seed_nonce_hash
@@ -351,11 +360,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
   let user_activated_upgrades = global_state.config.user_activated_upgrades in
   (* Set liquidity_baking_toggle_vote for this block *)
-  let {
-    Baking_configuration.vote_file;
-    liquidity_baking_vote;
-    adaptive_issuance_vote;
-  } =
+  let {Baking_configuration.vote_file; liquidity_baking_vote} =
     global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
@@ -378,19 +383,15 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     in
     let default =
       Protocol.Alpha_context.Per_block_votes.
-        {liquidity_baking_vote; adaptive_issuance_vote}
+        {liquidity_baking_vote; adaptive_issuance_vote = Per_block_vote_pass}
     in
     match vote_file with
     | Some per_block_vote_file ->
         let default =
           Octez_agnostic_baker.Per_block_votes.
-            {
-              liquidity_baking_vote = of_protocol liquidity_baking_vote;
-              adaptive_issuance_vote = of_protocol adaptive_issuance_vote;
-            }
+            {liquidity_baking_vote = of_protocol liquidity_baking_vote}
         in
-        let*! Octez_agnostic_baker.Per_block_votes.
-                {liquidity_baking_vote; adaptive_issuance_vote} =
+        let*! Octez_agnostic_baker.Per_block_votes.{liquidity_baking_vote} =
           (Per_block_vote_file.read_per_block_votes_no_fail
              ~default
              ~per_block_vote_file
@@ -400,7 +401,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           Protocol.Alpha_context.Per_block_votes.
             {
               liquidity_baking_vote = to_protocol liquidity_baking_vote;
-              adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
+              adaptive_issuance_vote = Per_block_vote_pass;
             }
     | None -> Lwt.return default
   in
@@ -411,18 +412,22 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
-    (Shell_services.Blocks.resulting_context_hash
+    (Node_rpc.block_resulting_context_hash
        cctxt
        ~chain
        ~block:pred_block
        () [@profiler.record_s {verbosity = Info} "pred resulting context hash"])
   in
   let* pred_live_blocks =
-    (Chain_services.Blocks.live_blocks
+    (Node_rpc.live_blocks
        cctxt
        ~chain
        ~block:pred_block
        () [@profiler.record_s {verbosity = Info} "live blocks"])
+  in
+  let round_duration =
+    Round.round_duration global_state.round_durations round
+    |> Period.to_seconds |> Int64.to_float
   in
   let* {unsigned_block_header; operations; manager_operations_infos} =
     (Block_forge.forge
@@ -447,6 +452,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   in
   let* signed_block_header =
     (sign_block_header
+       round_duration
        global_state
        delegate.consensus_key
        unsigned_block_header
@@ -518,7 +524,7 @@ let process_dal_rpc_result state delegate level round =
   function
   | `RPC_timeout ->
       let*! () =
-        Events.(emit failed_to_get_dal_attestations_in_time delegate)
+        Events.(emit failed_to_get_dal_attestations_in_time (delegate, level))
       in
       return_none
   | `RPC_result (Error errs) ->
@@ -544,16 +550,14 @@ let process_dal_rpc_result state delegate level round =
               Dal.Attestation.empty
               slots
           in
+          let dal_content = {attestation = dal_attestation} in
           let*! () =
-            let bitset_int =
-              Environment.Bitset.to_z (dal_attestation :> Environment.Bitset.t)
-            in
             Events.(
               emit
                 attach_dal_attestation
-                (delegate, bitset_int, published_level, level, round))
+                (delegate, dal_content, published_level, level, round))
           in
-          return_some {attestation = dal_attestation})
+          return_some dal_content)
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in
@@ -580,7 +584,7 @@ let may_get_dal_content state consensus_vote =
            wait for a bit for the DAL node to provide an answer. *)
         Lwt.pick
           [
-            (let*! () = Lwt_unix.sleep 0.5 in
+            (let*! () = Lwt_unix.sleep 0.75 in
              Lwt.return `RPC_timeout);
             (let*! tz_res = promise in
              Lwt.return (`RPC_result tz_res));
@@ -666,18 +670,15 @@ let authorized_consensus_votes global_state
   in
   let*! () =
     List.iter_s
-      (fun {vote_kind; delegate; _} ->
+      (fun unsigned_consensus_vote ->
         let error =
-          match vote_kind with
+          match unsigned_consensus_vote.vote_kind with
           | Preattestation ->
               Baking_highwatermarks.Block_previously_preattested {round; level}
           | Attestation ->
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.(
-          emit
-            skipping_consensus_vote
-            (vote_kind, delegate, level, round, [error])))
+        Events.(emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
       unauthorized_votes
   in
   return authorized_votes
@@ -687,7 +688,12 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let {vote_kind; vote_consensus_content; delegate; dal_content} =
+  let {
+    vote_kind;
+    vote_consensus_content = {level; round; _} as vote_consensus_content;
+    delegate;
+    dal_content;
+  } =
     unsigned_consensus_vote
   in
   let shell = {Tezos_base.Operation.branch} in
@@ -760,14 +766,29 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Attestation -> `Attestation
   in
   let sk_consensus_uri = delegate.consensus_key.secret_key_uri in
+  let delay_between_stall_events =
+    let round_duration =
+      Round.round_duration global_state.round_durations round
+      |> Period.to_seconds |> Int64.to_float
+    in
+    (* round_duration /. 3 is arbitrary and conservative *)
+    round_duration /. 3.
+  in
   let* consensus_sig =
-    sign
-      ?timeout:global_state.config.remote_calls_timeout
-      ~signing_request
-      cctxt
-      ~watermark
-      sk_consensus_uri
-      unsigned_operation_bytes
+    Utils.event_on_stalling_promise
+      ~initial_delay:delay_between_stall_events
+      ~event:(fun sum ->
+        Events.(
+          emit
+            stalling_signature
+            (signing_request, Raw_level.to_int32 level, round, sum)))
+    @@ sign
+         ?timeout:global_state.config.remote_calls_timeout
+         ~signing_request
+         cctxt
+         ~watermark
+         sk_consensus_uri
+         unsigned_operation_bytes
   in
   let* signature =
     match (dal_content, companion_key_opt) with
@@ -782,13 +803,20 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Some {attestation = dal_attestation}, Some companion_key -> (
         let sk_companion_uri = companion_key.secret_key_uri in
         let* companion_sig =
-          sign
-            ?timeout:global_state.config.remote_calls_timeout
-            ~signing_request
-            cctxt
-            ~watermark
-            sk_companion_uri
-            unsigned_operation_bytes
+          Utils.event_on_stalling_promise
+            ~initial_delay:delay_between_stall_events
+            ~event:(fun sum ->
+              Events.(
+                emit
+                  stalling_signature
+                  (signing_request, Raw_level.to_int32 level, round, sum)))
+          @@ sign
+               ?timeout:global_state.config.remote_calls_timeout
+               ~signing_request
+               cctxt
+               ~watermark
+               sk_companion_uri
+               unsigned_operation_bytes
         in
         match
           ( consensus_sig,
@@ -850,9 +878,8 @@ let sign_consensus_votes (global_state : global_state)
   in
   let* signed_consensus_votes =
     List.filter_map_es
-      (fun ({delegate; vote_kind; vote_consensus_content; _} as
-            unsigned_consensus_vote) ->
-        let*! () = Events.emit_signing_consensus_op unsigned_consensus_vote in
+      (fun unsigned_consensus_vote ->
+        let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
              global_state
@@ -863,15 +890,9 @@ let sign_consensus_votes (global_state : global_state)
         in
         match signed_consensus_vote_r with
         | Error err ->
-            let level, round =
-              ( Raw_level.to_int32 vote_consensus_content.level,
-                vote_consensus_content.round )
-            in
             let*! () =
               Events.(
-                emit
-                  skipping_consensus_vote
-                  (vote_kind, delegate, level, round, err))
+                emit skipping_consensus_vote (unsigned_consensus_vote, err))
             in
             return_none
         | Ok signed_consensus_vote -> return_some signed_consensus_vote)
@@ -891,15 +912,11 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
-  let delegate = unsigned_consensus_vote.delegate in
   protect
     ~on_error:(fun err ->
       let*! () =
         Events.(
-          emit
-            failed_to_inject_consensus_vote
-            (unsigned_consensus_vote.vote_kind, delegate, err))
+          emit failed_to_inject_consensus_vote (signed_consensus_vote, err))
       in
       return_unit)
     (fun () ->
@@ -912,12 +929,14 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
            {verbosity = Debug}
              (Format.sprintf
                 "injecting consensus vote: %s"
-                (match unsigned_consensus_vote.vote_kind with
+                (match
+                   signed_consensus_vote.unsigned_consensus_vote.vote_kind
+                 with
                 | Preattestation -> "preattestation"
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.emit_consensus_op_injected unsigned_consensus_vote oph
+        Events.(emit consensus_op_injected) (signed_consensus_vote, oph)
       in
       return_unit)
 
@@ -953,7 +972,6 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
                 {
                   state.global_state.config.per_block_votes with
                   liquidity_baking_vote = baking_votes.liquidity_baking_vote;
-                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
                 };
             };
         };
@@ -1076,7 +1094,7 @@ let start_waiting_for_attestation_quorum state =
 
 let compute_round (proposal : proposal) round_durations =
   let open Protocol in
-  let open Baking_state in
+  let open Baking_state_types in
   let timestamp = Time.System.now () |> Time.System.to_protocol in
   let predecessor_block = proposal.predecessor in
   Environment.wrap_tzresult

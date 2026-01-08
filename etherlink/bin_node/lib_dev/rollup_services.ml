@@ -19,22 +19,32 @@
 open Tezos_rpc
 open Path
 
-type error += Lost_connection
+type error += Connection_error of Uri.t | Timeout of float * Uri.t
 
 let () =
-  let description =
-    "The EVM node is no longer able to communicate with the rollup node, the \
-     communication was lost"
-  in
   register_error_kind
     `Temporary
     ~id:"evm_node_dev_lost_connection"
-    ~title:"Lost connection with rollup node"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function Lost_connection -> Some () | _ -> None)
-    (fun () -> Lost_connection)
+    ~title:"Lost connection with node"
+    ~description:"The EVM node cannot communicate with the node."
+    ~pp:(fun ppf url ->
+      Format.fprintf
+        ppf
+        "The EVM node cannot communicate with the node when calling %s"
+        url)
+    Data_encoding.(obj1 (req "url" string))
+    (function Connection_error url -> Some (Uri.to_string url) | _ -> None)
+    (fun url -> Connection_error (Uri.of_string url)) ;
+  register_error_kind
+    `Temporary
+    ~id:"evm_node_timeout"
+    ~title:"Timeout when calling an RPC"
+    ~description:"An RPC called by the EVM node timed out."
+    ~pp:(fun ppf (t, url) ->
+      Format.fprintf ppf "The RPC %s timed out after %fs" url t)
+    Data_encoding.(obj2 (req "timeout" float) (req "url" string))
+    (function Timeout (t, u) -> Some (t, Uri.to_string u) | _ -> None)
+    (fun (t, u) -> Timeout (t, Uri.of_string u))
 
 let is_connection_error trace =
   let open RPC_client_errors in
@@ -55,6 +65,7 @@ let is_connection_error trace =
             _;
           } ->
           true
+      | Timeout _ -> true
       | _ -> false)
     false
     trace
@@ -249,6 +260,14 @@ let global_block_watcher :
     ~output:Sc_rollup_block.encoding
     (open_root / "global" / "monitor_blocks")
 
+let finalized_block_watcher :
+    ([`GET], unit, unit, unit, unit, Sc_rollup_block.t) Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:"Monitor and streaming the finalized L2 blocks"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Sc_rollup_block.encoding
+    (open_root / "global" / "monitor_finalized_blocks")
+
 let global_current_tezos_level :
     ([`GET], unit, unit, unit, unit, int32 option) Service.service =
   Tezos_rpc.Service.get_service
@@ -256,8 +275,6 @@ let global_current_tezos_level :
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.(option int32)
     (open_root / "global" / "tezos_level")
-
-let rpc_timeout = 300.
 
 (** [retry_connection f] retries the connection using [f]. If an error
     happens in [f] and it has lost the connection, the rpc is
@@ -278,30 +295,48 @@ let retry_connection (f : Uri.t -> 'a tzresult Lwt.t) endpoint :
   in
   retry ~delay:1. ()
 
-let call_service ~base ?(media_types = Media_type.all_media_types) rpc b c input
-    =
+let uri_of_service base rpc b c =
+  let req = Tezos_rpc.Service.forge_request ~base rpc b c in
+  req.uri
+
+let with_timeout t base rpc b c f =
+  let open Lwt_result_syntax in
+  Lwt.pick
+    [
+      f ();
+      (let*! () = Lwt_unix.sleep t in
+       tzfail (Timeout (t, uri_of_service base rpc b c)));
+    ]
+
+let call_service ~base ?(media_types = Media_type.all_media_types) ~timeout rpc
+    b c input =
   let open Lwt_result_syntax in
   let*! res =
+    with_timeout timeout base rpc b c @@ fun () ->
     Octez_telemetry.HTTP_client.call_service media_types ~base rpc b c input
   in
   match res with
   | Ok res -> return res
-  | Error trace when is_connection_error trace -> fail (Lost_connection :: trace)
+  | Error trace when is_connection_error trace ->
+      fail
+      @@ TzTrace.cons (Connection_error (uri_of_service base rpc b c)) trace
   | Error trace -> fail trace
 
-let call_service ~keep_alive ~base ?media_types rpc b c input =
-  let f base = call_service ~base ?media_types rpc b c input in
+let call_service ~keep_alive ~base ?media_types ~timeout rpc b c input =
+  let f base = call_service ~base ?media_types ~timeout rpc b c input in
   if keep_alive then retry_connection f base else f base
 
-let make_streamed_call ~rollup_node_endpoint =
+let make_streamed_call ~timeout rollup_node_endpoint service =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
   let* spill_all =
+    with_timeout timeout rollup_node_endpoint global_block_watcher () ()
+    @@ fun () ->
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.json]
       ~base:rollup_node_endpoint
-      global_block_watcher
+      service
       ~on_chunk
       ~on_close
       ()
@@ -314,20 +349,44 @@ let make_streamed_call ~rollup_node_endpoint =
   in
   return (stream, close)
 
+let monitor_blocks rollup_node_endpoint =
+  make_streamed_call rollup_node_endpoint global_block_watcher
+
+let monitor_finalized_blocks rollup_node_endpoint =
+  make_streamed_call rollup_node_endpoint finalized_block_watcher
+
+let monitor_finalized_levels ~timeout rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let*! res = monitor_finalized_blocks ~timeout rollup_node_endpoint in
+  match res with
+  | Ok (stream, close) ->
+      return
+        ( Lwt_stream.map (fun (b : Sc_rollup_block.t) -> b.header.level) stream,
+          close )
+  | Error e ->
+      let*! () = Events.rpc_call_fallback "monitor_finalized_blocks" e in
+      let+ stream, close = monitor_blocks ~timeout rollup_node_endpoint in
+      ( Lwt_stream.map
+          (fun (b : Sc_rollup_block.t) -> Int32.sub b.header.level 2l)
+          stream,
+        close )
+
 let publish :
     ?drop_duplicate:bool ->
     ?order:Z.t ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
+    timeout:float ->
     [< `External of string] list ->
     unit tzresult Lwt.t =
- fun ?drop_duplicate ?order ~keep_alive ~rollup_node_endpoint inputs ->
+ fun ?drop_duplicate ?order ~keep_alive ~rollup_node_endpoint ~timeout inputs ->
   let open Lwt_result_syntax in
   let inputs = List.map (function `External s -> s) inputs in
   let* _answer =
     call_service
       ~keep_alive
       ~base:rollup_node_endpoint
+      ~timeout
       batcher_injection
       ()
       {drop_duplicate; order}
@@ -336,11 +395,15 @@ let publish :
   return_unit
 
 let publish_on_dal :
-    rollup_node_endpoint:Uri.t -> messages:string list -> unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ~messages ->
+    rollup_node_endpoint:Uri.t ->
+    timeout:float ->
+    messages:string list ->
+    unit tzresult Lwt.t =
+ fun ~rollup_node_endpoint ~timeout ~messages ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
+    ~timeout
     dal_batcher_injection
     ()
     ()
@@ -348,15 +411,17 @@ let publish_on_dal :
 
 let get_injected_dal_operations_statuses :
     rollup_node_endpoint:Uri.t ->
+    timeout:float ->
     (Tezos_crypto.Hashed.Injector_operations_hash.t
     * Rollup_node_services.message_status)
     list
     tzresult
     Lwt.t =
- fun ~rollup_node_endpoint ->
+ fun ~rollup_node_endpoint ~timeout ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
+    ~timeout
     dal_injected_operations_statuses
     ()
     ()
@@ -364,12 +429,14 @@ let get_injected_dal_operations_statuses :
 
 let set_dal_slot_indices :
     rollup_node_endpoint:Uri.t ->
+    timeout:float ->
     slot_indices:Tezos_dal_node_services.Types.slot_index list ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ~slot_indices ->
+ fun ~rollup_node_endpoint ~timeout ~slot_indices ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
+    ~timeout
     dal_slot_indices
     ()
     ()
@@ -377,12 +444,14 @@ let set_dal_slot_indices :
 
 let forget_dal_injection_id :
     rollup_node_endpoint:Uri.t ->
+    timeout:float ->
     Tezos_crypto.Hashed.Injector_operations_hash.t ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint id ->
+ fun ~rollup_node_endpoint ~timeout id ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
+    ~timeout
     forget_dal_injection_id
     ((), id)
     ()
@@ -424,11 +493,12 @@ let durable_state_values :
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)
-let smart_rollup_address ~keep_alive base =
+let smart_rollup_address ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let*! answer =
     call_service
       ~keep_alive
+      ~timeout
       ~base
       ~media_types:[Media_type.octet_stream]
       smart_rollup_address
@@ -440,11 +510,12 @@ let smart_rollup_address ~keep_alive base =
   | Ok address -> return (Bytes.to_string address)
   | Error trace -> fail trace
 
-let oldest_known_l1_level ~keep_alive base =
+let oldest_known_l1_level ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let+ level, () =
     call_service
       ~keep_alive
+      ~timeout
       ~base
       ~media_types:[Media_type.json]
         (* Only JSON, we just look at a single field to be compatible with all
@@ -458,11 +529,12 @@ let oldest_known_l1_level ~keep_alive base =
 
 (** [tezos_level base] asks for the smart rollup node's
     latest l1 level, using the endpoint [base]. *)
-let tezos_level ~keep_alive base =
+let tezos_level ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let* level_opt =
     call_service
       ~keep_alive
+      ~timeout
       ~base
       ~media_types:[Media_type.octet_stream]
       global_current_tezos_level

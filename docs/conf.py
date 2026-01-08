@@ -134,7 +134,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'rio',
+    'seoul',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -299,7 +299,6 @@ linkcheck_ignore = [
     r'^http(s)?://localhost:\d+/?',
     r'^https://grafana\.nomadic-labs\.cloud/',
     r'^https://github\.com/jsonnet-bundler/jsonnet-bundler/',
-    r'https://github\.com/thierry-martinez/stdcompat/issues/13',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',

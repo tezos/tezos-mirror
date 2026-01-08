@@ -18,7 +18,7 @@ use thiserror::Error;
 pub enum BinErrorKind {
     /// I/O Error.
     #[error("I/O error: {0}")]
-    IOError(std::io::Error),
+    IOError(#[from] std::io::Error),
     /// Boundary violation error, contains expected and actual sizes.
     #[error("Boundary violation: expected {0}, got {1}")]
     SizeError(usize, usize),
@@ -33,14 +33,25 @@ pub enum BinErrorKind {
     CustomError(String),
 }
 
-#[derive(Debug)]
-pub struct BinError(Vec<BinErrorKind>);
-
-impl std::error::Error for BinError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
+impl PartialEq for BinErrorKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (BinErrorKind::SizeError(e1, a1), BinErrorKind::SizeError(e2, a2)) => {
+                e1 == e2 && a1 == a2
+            }
+            (BinErrorKind::FieldError(n1), BinErrorKind::FieldError(n2)) => n1 == n2,
+            (BinErrorKind::VariantError(n1), BinErrorKind::VariantError(n2)) => n1 == n2,
+            (BinErrorKind::CustomError(m1), BinErrorKind::CustomError(m2)) => m1 == m2,
+            (BinErrorKind::IOError(e1), BinErrorKind::IOError(e2)) => e1.kind() == e2.kind(),
+            _ => false,
+        }
     }
 }
+
+impl Eq for BinErrorKind {}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct BinError(Vec<BinErrorKind>);
 
 impl From<BinErrorKind> for BinError {
     fn from(kind: BinErrorKind) -> Self {
@@ -83,12 +94,6 @@ impl fmt::Display for BinError {
             write!(f, "{}", kind)?;
         }
         Ok(())
-    }
-}
-
-impl From<std::io::Error> for BinError {
-    fn from(error: std::io::Error) -> Self {
-        BinErrorKind::IOError(error).into()
     }
 }
 

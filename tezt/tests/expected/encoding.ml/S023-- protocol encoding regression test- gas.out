@@ -1,18 +1,3 @@
-
-./octez-codec encode 023-PtSeouLo.gas from '"1238"'
-009613
-
-./octez-codec decode 023-PtSeouLo.gas from 009613
-"1238"
-
-./octez-codec encode 023-PtSeouLo.gas from '"unaccounted"'
-01
-
-./octez-codec decode 023-PtSeouLo.gas from 01
-"unaccounted"
-
-./octez-codec encode 023-PtSeouLo.gas from '"0"'
-0000
-
-./octez-codec decode 023-PtSeouLo.gas from 0000
-"0"
+gas-positive: 009613
+gas-unaccounted: 01
+gas-zero: 0000

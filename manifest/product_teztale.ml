@@ -60,7 +60,7 @@ let _teztale_server =
         caqti_postgresql;
         caqti_sqlite;
         caqti_lwt_unix;
-        Product_cohttp.cohttp_lwt_unix;
+        cohttp_lwt_unix;
         ezgzip;
         safepass;
         octez_version_value;
@@ -200,8 +200,8 @@ let _teztale_snitch =
         octez_base |> open_ ~m:"TzPervasives";
         octez_version_value;
         teztale_library_base |> open_;
-        Product_cohttp.cohttp_lwt;
-        Product_cohttp.cohttp_lwt_unix;
+        cohttp_lwt;
+        cohttp_lwt_unix;
         cmdliner;
       ]
     ~release_status

@@ -15,11 +15,21 @@ type worker =
       -> worker
 
 module WorkerTbl = struct
-  type t = worker String.Hashtbl.t
+  module Htbl = Saturn.Htbl
 
-  let create ~initial_size = String.Hashtbl.create initial_size
+  type t = (string, worker) Htbl.t
 
-  let find_opt tbl ~name = String.Hashtbl.find_opt tbl name
+  let create ~initial_size =
+    let min_buckets = max 1 initial_size in
+    Htbl.create ~hashed_type:(module String) ~min_buckets ()
+
+  let find_opt tbl ~name = Htbl.find_opt tbl name
+
+  let replace tbl ~name worker =
+    if Htbl.try_add tbl name worker then ()
+    else if Htbl.try_set tbl name worker then ()
+    else (* unreachable *)
+      assert false
 end
 
 type t = {
@@ -27,11 +37,19 @@ type t = {
   lwt_tasks_stream : (unit -> unit Lwt.t) Eio.Stream.t;
 }
 
+(* This arbitrary value aims to limit the number of elements that can be
+   accumulated in the [lwt_tasks_stream] closure buffer. The upper bound is not
+   expected to be reached but it is set to high value to avoid Eio.Stream.push
+   to be blocking if reached at some point. *)
+let tasks_stream_max_size = 16_384
+
 let hive =
   {
     workers = WorkerTbl.create ~initial_size:64;
-    lwt_tasks_stream = Eio.Stream.create max_int;
+    lwt_tasks_stream = Eio.Stream.create tasks_stream_max_size;
   }
+
+let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
 
 (* Initialize the [lwt_scheduler_loop] by running it in its own domain in the
    main Eio switch *)
@@ -48,8 +66,6 @@ let () =
   in
   Tezos_base_unix.Event_loop.on_main_run (fun _env switch ->
       Eio.Fiber.fork_daemon ~sw:switch lwt_scheduler_loop)
-
-let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
 
 exception Unknown_worker of string
 
@@ -71,6 +87,8 @@ let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
 
      The Event_loop's main switch is meant to be a switch available during
      the whole life of your main process, so you can use it by default.
+     This accessor must be called from the main domain; callers off-main should
+     schedule via [run_on_main] to avoid blocking on the main switch lookup.
   *)
   let switch =
     match switch with
@@ -81,9 +99,9 @@ let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
     Eio.Fiber.fork_daemon ~sw:switch (fun () ->
         Eio.Domain_manager.run env#domain_mgr (fun () -> worker_loop i worker))
   done ;
-  String.Hashtbl.add
+  WorkerTbl.replace
     workers
-    bee_name
+    ~name:bee_name
     (Worker
        {worker; launched = Time.System.now (); subdomains = domains; switch})
 
@@ -94,3 +112,42 @@ let get_error bee_name =
      to be called from within an existing worker loop. *)
   | None -> raise (Unknown_worker bee_name)
   | Some (Worker {switch; _}) -> Eio.Switch.get_error switch
+
+(* [main_job] encapsulates a closure to be executed on the main domain
+   and a resolver to return the result to the caller. *)
+type main_job =
+  | Job : {
+      run : unit -> 'a;
+      resolver : ('a, exn) result Eio.Promise.u;
+    }
+      -> main_job
+
+(* A stream of jobs to be executed on the main domain. *)
+let main_jobs = Eio.Stream.create max_int
+
+(* [run_main_jobs] is a daemon that consumes jobs from [main_jobs] and
+   executes them. It is started on the main domain by [Event_loop.on_main_run]. *)
+let () =
+  let rec run_main_jobs () : [`Stop_daemon] =
+    let (Job {run; resolver}) = Eio.Stream.take main_jobs in
+    let outcome =
+      match run () with value -> Ok value | exception exn -> Error exn
+    in
+    Eio.Promise.resolve resolver outcome ;
+    run_main_jobs ()
+  in
+  Tezos_base_unix.Event_loop.on_main_run (fun _env switch ->
+      Eio.Fiber.fork_daemon ~sw:switch run_main_jobs)
+
+let run_on_main f =
+  match Tezos_base_unix.Event_loop.main_switch () with
+  | None ->
+      invalid_arg
+        "Tezos_bees.Hive.run_on_main called before Event_loop main_run \
+         has          started"
+  | Some _ -> (
+      let promise, resolver = Eio.Promise.create () in
+      Eio.Stream.add main_jobs (Job {run = f; resolver}) ;
+      match Eio.Promise.await promise with
+      | Ok value -> value
+      | Error exn -> raise exn)

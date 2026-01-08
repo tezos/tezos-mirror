@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 module Events = Baking_events.Lib
 
 let sleep_until_block_timestamp prepared_block =
@@ -53,9 +54,9 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
-    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let*? round_durations =
     Round.Durations.create
@@ -521,8 +522,32 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
+let mk_prequorum state latest_proposal =
+  let open Lwt_result_syntax in
+  let* batch =
+    State_transitions.make_consensus_vote_batch
+      state
+      latest_proposal
+      Preattestation
+    |> Baking_actions.sign_consensus_votes state.global_state
+  in
+  let {level; round; block_payload_hash} : batch_content =
+    batch.batch_content
+  in
+  let preattestations =
+    List.map (fun op -> op.signed_operation) batch.signed_consensus_votes
+  in
+  return
+    {
+      level = Raw_level.to_int32 level;
+      round;
+      block_payload_hash;
+      preattestations;
+    }
+
 let repropose (cctxt : Protocol_client_context.full) ?(force = false)
-    ?force_round delegates =
+    ?force_round ?(minimal_timestamp = false) ?(force_reproposal = false)
+    delegates =
   let open Lwt_result_syntax in
   let open Baking_state in
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
@@ -535,11 +560,31 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
   let*? event = Baking_scheduling.compute_bootstrap_event state in
   let*! state, _action = State_transitions.step state event in
   let latest_proposal = state.level_state.latest_proposal in
+  let* state =
+    if force_reproposal then
+      (* We forge a prequorum including all available delegates
+         assuming they have enough consensus power to reach the
+         consensus threshold *)
+      let* prequorum = mk_prequorum state latest_proposal in
+      let attestable_payload = Some {proposal = latest_proposal; prequorum} in
+      return
+        {state with level_state = {state.level_state with attestable_payload}}
+    else return state
+  in
   let open State_transitions in
   let round =
-    match force_round with
-    | Some x -> x
-    | None -> state.round_state.current_round
+    match (force_round, minimal_timestamp) with
+    | Some round, _ -> round
+    | None, true -> (
+        let next_round = Round.succ latest_proposal.block.round in
+        match
+          Baking_scheduling.first_potential_round_at_current_level
+            ~earliest_round:next_round
+            state
+        with
+        | Some (round, _) -> round
+        | None -> next_round)
+    | None, false -> state.round_state.current_round
   in
   let*! proposal_validity =
     is_acceptable_proposal_for_current_level state latest_proposal
@@ -745,7 +790,7 @@ let rec baking_minimal_timestamp ~count state
         (fun proposal ->
           Lwt.return
             Compare.Int32.(
-              proposal.Baking_state.block.shell.level <> attestation_level))
+              proposal.Baking_state_types.block.shell.level <> attestation_level))
         block_stream
     in
     let*! next_level_proposal =

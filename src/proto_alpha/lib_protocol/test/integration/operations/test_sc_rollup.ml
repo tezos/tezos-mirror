@@ -85,8 +85,7 @@ let get_game_status_result incr =
               {
                 contents =
                   Single_result
-                    (Manager_operation_result
-                      {operation_result = Applied op; _});
+                    (Manager_operation_result {operation_result = Applied op; _});
               } -> (
               match op with
               | Sc_rollup_refute_result {game_status; _} ->
@@ -1900,8 +1899,7 @@ let test_number_of_parallel_games_bounded () =
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
-        (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached
-          xstaker)
+        (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached xstaker)
       :: _ ->
         assert (
           Signature.Public_key_hash.(
@@ -2912,7 +2910,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:112 Context.T3
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:150 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
@@ -3318,7 +3316,7 @@ let test_conflict_point_on_a_branch () =
 let test_agreeing_stakers_cannot_play () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1351 Context.T2
   in
   let pB_pkh = Account.pkh_of_contract_exn pB in
   (* pA stakes on a whole branch. *)
@@ -3350,7 +3348,7 @@ let test_agreeing_stakers_cannot_play () =
 let test_start_game_on_cemented_commitment () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1351 Context.T2
   in
   let* constants = Context.get_constants (B block) in
   let pA_pkh = Account.pkh_of_contract_exn pA in

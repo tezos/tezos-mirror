@@ -105,7 +105,7 @@ let create_state (cctxt : #Protocol_client_context.full) ~preserved_levels
     blocks_stream ops_stream ops_stream_stopper =
   let open Lwt_result_syntax in
   let* constants =
-    Plugin.Alpha_services.Constants.all cctxt (cctxt#chain, cctxt#block)
+    Node_rpc.constants cctxt ~chain:cctxt#chain ~block:cctxt#block
   in
   let clean_frequency = max 1 (preserved_levels / 10) in
   let validators_rights = Validators_cache.create (preserved_levels + 2) in
@@ -189,7 +189,12 @@ let get_validator_rights state cctxt level =
   match Validators_cache.find_opt state.validators_rights level with
   | None ->
       let* validators =
-        Plugin.RPC.Validators.get cctxt (cctxt#chain, `Head 0) ~levels:[level]
+        Node_rpc.get_validators
+          cctxt
+          ~chain:cctxt#chain
+          ~block:(`Head 0)
+          ~levels:[Raw_level.to_int32 level]
+          ()
       in
       let validators =
         List.fold_left
@@ -222,10 +227,11 @@ let process_consensus_op state cctxt chain_id slot (type a)
     (new_op : a Kind.consensus operation) =
   let open Lwt_result_syntax in
   let (Single
-        ( Preattestation {level; round; _}
-        | Attestation {consensus_content = {level; round; _}; _}
-        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
-        | Attestations_aggregate {consensus_content = {level; round; _}; _} )) =
+         ( Preattestation {level; round; _}
+         | Attestation {consensus_content = {level; round; _}; _}
+         | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+         | Attestations_aggregate {consensus_content = {level; round; _}; _} ))
+      =
     new_op.protocol_data.contents
   in
   let op_kind =
@@ -291,18 +297,16 @@ let process_consensus_op state cctxt chain_id slot (type a)
                  in {!Protocol.Validate}. *)
               let*! block = get_block_offset level in
               let chain = `Hash chain_id in
-              let* block_hash =
-                Alpha_block_services.hash cctxt ~chain ~block ()
-              in
+              let* block_hash = Node_rpc.block_hash cctxt ~chain ~block in
               let forge op1 op2 =
-                Plugin.RPC.Forge.double_consensus_operation_evidence
+                Node_rpc.forge_double_consensus_operation_evidence
                   cctxt
-                  (`Hash chain_id, block)
+                  ~chain:(`Hash chain_id)
+                  ~block
                   ~branch:block_hash
                   ~slot
                   ~op1
                   ~op2
-                  ()
               in
               let* bytes =
                 if Operation_hash.(new_op_hash < existing_op_hash) then
@@ -314,7 +318,7 @@ let process_consensus_op state cctxt chain_id slot (type a)
                 Events.(emit double_op_detected) (existing_op_hash, new_op_hash)
               in
               let* op_hash =
-                Shell_services.Injection.private_operation cctxt ~chain bytes
+                Node_rpc.inject_private_operation_bytes cctxt ~chain bytes
               in
               let*! () =
                 match previously_denounced_oph with
@@ -383,7 +387,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
 let context_block_header cctxt ~chain b_hash =
   let open Lwt_result_syntax in
   let* ({shell; protocol_data; _} : Alpha_block_services.block_header) =
-    Alpha_block_services.header cctxt ~chain ~block:(`Hash (b_hash, 0)) ()
+    Node_rpc.block_header cctxt ~chain ~block:(`Hash (b_hash, 0))
   in
   return {Alpha_context.Block_header.shell; protocol_data}
 
@@ -439,21 +443,19 @@ let process_block (cctxt : #Protocol_client_context.full) state
           in
           (* If the blocks are on different chains then skip it *)
           let*! block = get_block_offset level in
-          let* block_hash = Alpha_block_services.hash cctxt ~chain ~block () in
+          let* block_hash = Node_rpc.block_hash cctxt ~chain ~block in
           let* bytes =
-            Plugin.RPC.Forge.double_baking_evidence
+            Node_rpc.forge_double_baking_evidence
               cctxt
-              (chain, block)
+              ~chain
+              ~block
               ~branch:block_hash
               ~bh1
               ~bh2
-              ()
           in
           let bytes = Signature.concat bytes Signature.zero in
           let*! () = Events.(emit double_baking_detected) () in
-          let* op_hash =
-            Shell_services.Injection.operation cctxt ~chain bytes
-          in
+          let* op_hash = Node_rpc.inject_operation_bytes cctxt ~chain bytes in
           let*! () = Events.(emit double_baking_denounced) (op_hash, bytes) in
           return
           @@ HLevel.replace
@@ -506,7 +508,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
       Raw_level.max level state.highest_level_encountered ;
     (* Processing blocks *)
     let* () =
-      let*! block_info = Alpha_block_services.info cctxt ~chain ~block () in
+      let*! block_info = Node_rpc.block_info cctxt ~chain ~block in
       match block_info with
       | Ok block_info -> (
           let* () = process_block cctxt state block_info in
@@ -549,15 +551,7 @@ let log_errors_and_continue ~name p =
   | Error errs -> B_Events.(emit daemon_error) (name, errs)
 
 let start_ops_monitor cctxt =
-  Alpha_block_services.Mempool.monitor_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~validated:true
-    ~branch_delayed:true
-    ~branch_refused:false
-    ~refused:false
-    ~outdated:false
-    ()
+  Node_rpc.mempool_monitor_operations cctxt ~chain:cctxt#chain
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
     valid_blocks_stream =
@@ -602,7 +596,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
         t
     | Some t -> t
   in
-  let* chain_id = Chain_services.chain_id cctxt () in
+  let* chain_id = Node_rpc.chain_id ~chain:`Main cctxt in
   (* main loop *)
   (* Only allocate once the termination promise *)
   let terminated =

@@ -17,12 +17,12 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-libs.data-encoding
-  (select void_for_linking-octez_injector_PsRiotum from
-   (octez_injector_PsRiotum -> void_for_linking-octez_injector_PsRiotum.empty)
-   (-> void_for_linking-octez_injector_PsRiotum.empty))
   (select void_for_linking-octez_injector_PtSeouLo from
    (octez_injector_PtSeouLo -> void_for_linking-octez_injector_PtSeouLo.empty)
    (-> void_for_linking-octez_injector_PtSeouLo.empty))
+  (select void_for_linking-octez_injector_PtTALLiN from
+   (octez_injector_PtTALLiN -> void_for_linking-octez_injector_PtTALLiN.empty)
+   (-> void_for_linking-octez_injector_PtTALLiN.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -44,6 +44,6 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_injector_PsRiotum.empty "")
    (write-file void_for_linking-octez_injector_PtSeouLo.empty "")
+   (write-file void_for_linking-octez_injector_PtTALLiN.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

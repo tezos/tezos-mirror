@@ -124,29 +124,10 @@ let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
   let indexes = List.map fst outbox_messages in
   Node_context.register_outbox_messages node_ctxt ~outbox_level:level ~indexes
 
-let etherlink_current_block pvm_plugin node_ctxt ctxt =
-  let open Lwt_syntax in
-  if node_ctxt.Node_context.config.etherlink then
-    Etherlink_specific.current_level pvm_plugin ctxt
-  else return_none
-
-let emit_etherlink_telemetry_events scope start_block end_block =
-  match (start_block, end_block) with
-  | Some start_block, Some end_block when end_block > start_block ->
-      let first_block = start_block + 1 in
-      List.iter
-        (fun block ->
-          Opentelemetry.Scope.add_event scope @@ fun () ->
-          Opentelemetry_lwt.Event.make
-            ~attrs:[("etherlink.block.number", `Int block)]
-            "rollup_node.processed_etherlink_block")
-        (first_block -- end_block)
-  | _ -> ()
-
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
-    (head : Layer1.header) =
+    ~finalized (head : Layer1.header) =
   let open Lwt_result_syntax in
   let level = head.level in
   Octez_telemetry.Trace.with_tzresult "process_unseen_block" @@ fun scope ->
@@ -159,9 +140,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
-  let*! etherlink_start_block =
-    etherlink_current_block (module Plugin.Pvm) node_ctxt rollup_ctxt
-  in
   let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
@@ -190,13 +168,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (Layer1.head_of_header head)
       (inbox, messages)
   in
-  let*! etherlink_end_block =
-    etherlink_current_block (module Plugin.Pvm) node_ctxt ctxt
-  in
-  emit_etherlink_telemetry_events
-    scope
-    etherlink_start_block
-    etherlink_end_block ;
   let*! context_hash = Context.commit ctxt in
   let* commitment_hash =
     Publisher.process_head
@@ -232,28 +203,25 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let l2_block =
     Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
-  let* () =
-    assert (node_ctxt.block_finality_time = 2) ;
-    let finalized_level = Int32.pred predecessor.header.level in
-    let finalized_hash = predecessor.header.predecessor in
-    Node_context.set_finalized node_ctxt finalized_hash finalized_level
-  in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
+  let* () =
+    if finalized then
+      Node_context.set_finalized node_ctxt header.block_hash header.level
+    else (
+      assert (node_ctxt.block_finality_time = 2) ;
+      let finalized_level = Int32.pred predecessor.header.level in
+      let finalized_hash = predecessor.header.predecessor in
+      Node_context.set_finalized node_ctxt finalized_hash finalized_level)
+  in
   let end_timestamp = Time.System.now () in
   let total_time = Ptime.diff end_timestamp start_timestamp in
   let process_time = Ptime.diff end_timestamp fetch_timestamp in
-  let*! () =
-    Daemon_event.etherlink_blocks_processed
-      ~etherlink_start_block
-      ~etherlink_end_block
-      process_time
-  in
   Metrics.wrap (fun () ->
       Metrics.Inbox.set_process_time process_time ;
       Metrics.Inbox.set_total_time total_time) ;
   return l2_block
 
-let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
+let rec process_l1_block ({node_ctxt; _} as state) ~catching_up ~finalized
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   if is_before_origination node_ctxt head then return `Nothing
@@ -268,15 +236,20 @@ let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
         let*! () = Daemon_event.head_processing head.hash head.level in
         let* predecessor = Node_context.get_predecessor_header node_ctxt head in
         let* () =
-          update_l2_chain state ~catching_up:true ~recurse_pred:true predecessor
+          update_l2_chain
+            state
+            ~catching_up:true
+            ~recurse_pred:true
+            ~finalized
+            predecessor
         in
         let* l2_head =
-          process_unseen_head state ~catching_up ~predecessor head
+          process_unseen_head state ~catching_up ~predecessor ~finalized head
         in
         return (`New l2_head)
 
 and update_l2_chain ({node_ctxt; _} as state) ~catching_up
-    ?(recurse_pred = false) (head : Layer1.header) =
+    ?(recurse_pred = false) ~finalized (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* () =
@@ -284,7 +257,7 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       node_ctxt
       {Layer1.hash = head.hash; level = head.level}
   in
-  let* done_ = process_l1_block state ~catching_up head in
+  let* done_ = process_l1_block state ~catching_up ~finalized head in
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
@@ -317,12 +290,12 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let* () = Node_context.gc node_ctxt ~level:head.level in
       return_unit
 
-let update_l2_chain state ~catching_up head =
+let update_l2_chain state ~catching_up ~finalized head =
   Lwt_lock_file.with_lock
     ~when_locked:`Block
     ~filename:
       (Node_context.processing_lockfile_path ~data_dir:state.node_ctxt.data_dir)
-  @@ fun () -> update_l2_chain state ~catching_up head
+  @@ fun () -> update_l2_chain state ~catching_up ~finalized head
 
 let missing_data_error trace =
   TzTrace.fold
@@ -366,7 +339,8 @@ let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
-let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
+let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
+    =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult "on_layer1_head" @@ fun scope ->
   Opentelemetry.Scope.add_attrs scope (fun () ->
@@ -421,7 +395,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
           to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
-        update_l2_chain state ~catching_up header)
+        update_l2_chain state ~catching_up ~finalized header)
       new_chain_prefetching
   in
   notify_synchronization node_ctxt head.level ;
@@ -437,10 +411,19 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   return_unit
 
 let daemonize state =
-  Layer1.iter_heads
-    ~name:"daemon"
-    state.node_ctxt.l1_ctxt
-    (on_layer_1_head state)
+  if state.configuration.l1_monitor_finalized then
+    Layer1.iter_finalized_heads
+      ~name:"daemon"
+      state.node_ctxt.l1_ctxt
+      (on_layer_1_head ~finalized:true state)
+      ~prefetch:(fun l1_ctxt head ->
+        let module Plugin = (val state.plugin) in
+        Plugin.Layer1_helpers.prefetch_tezos_blocks l1_ctxt [head])
+  else
+    Layer1.iter_heads
+      ~name:"daemon"
+      state.node_ctxt.l1_ctxt
+      (on_layer_1_head ~finalized:false state)
 
 let simple_refutation_loop head =
   Refutation_coordinator.process (Layer1.head_of_header head)
@@ -489,10 +472,11 @@ let rec refutation_daemon ?(restart = false) state =
   in
   dont_wait (loop ~restart) on_error (fun e -> on_error [Exn e])
 
-let install_finalizer state =
+let install_finalizer state ~telemetry_cleanup =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = state.node_ctxt.Node_context.cctxt#message in
+  let* () = telemetry_cleanup () in
   let* () = message "Shutting down RPC server@." in
   let* () = Rpc_server.shutdown state.rpc_server in
   let* () = message "Shutting down Injector@." in
@@ -690,48 +674,54 @@ let rec process_daemon ({node_ctxt; _} as state) =
   in
   let loop () = daemonize state in
   protect loop ~on_error:(function
-      | ( Rollup_node_errors.(
-            ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-            | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
-            | Disagree_with_cemented _ | Disagree_with_commitment _
-            | Inconsistent_inbox _ ))
-        | Purpose.Missing_operators _ )
-        :: _ as e ->
-          fatal_error_exit e
-      | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
-          handle_preimage_not_found e
-      | Rollup_node_errors.Exit_bond_recovered_bailout_mode :: [] ->
-          let*! () = Daemon_event.exit_bailout_mode () in
-          let*! _ = Lwt_exit.exit_and_wait 0 in
-          return_unit
-      | e -> error_to_degraded_mode e)
+    | ( Rollup_node_errors.(
+          ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
+          | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
+          | Disagree_with_cemented _ | Disagree_with_commitment _
+          | Inconsistent_inbox _ ))
+      | Purpose.Missing_operators _ )
+      :: _ as e ->
+        fatal_error_exit e
+    | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
+        handle_preimage_not_found e
+    | Rollup_node_errors.Exit_bond_recovered_bailout_mode :: [] ->
+        let*! () = Daemon_event.exit_bailout_mode () in
+        let*! _ = Lwt_exit.exit_and_wait 0 in
+        return_unit
+    | e -> error_to_degraded_mode e)
+
+let initialize_metrics ({node_ctxt; configuration; _} as state)
+    (current_protocol : Node_context.current_protocol) history_mode =
+  let open Lwt_result_syntax in
+  (* Do not wrap active_metrics *)
+  Metrics.active_metrics configuration ;
+  let* () =
+    Metrics.wrap_lwt @@ fun () ->
+    Metrics.Info.init_rollup_node_info
+      configuration
+      ~genesis_level:node_ctxt.genesis_info.level
+      ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+      ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+      ~history_mode ;
+    Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
+    let* first_available_level = Node_context.first_available_level node_ctxt in
+    Metrics.GC.set_oldest_available_level first_available_level ;
+    let* head = Node_context.last_processed_head_opt node_ctxt in
+    Option.iter
+      (fun Sc_rollup_block.{header = {level; _}; _} ->
+        Metrics.Inbox.set_head_level level)
+      head ;
+    return_unit
+  in
+  let*! () = maybe_performance_metrics state in
+  return_unit
 
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
   let* history_mode = Node_context.get_history_mode node_ctxt in
-  (* Do not wrap active_metrics *)
-  Metrics.active_metrics configuration ;
-  Metrics.wrap (fun () ->
-      Metrics.Info.init_rollup_node_info
-        configuration
-        ~genesis_level:node_ctxt.genesis_info.level
-        ~genesis_hash:node_ctxt.genesis_info.commitment_hash
-        ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
-        ~history_mode ;
-      Metrics.Info.set_proto_info
-        current_protocol.hash
-        current_protocol.constants) ;
-  let* () =
-    Metrics.wrap_lwt (fun () ->
-        let* first_available_level =
-          Node_context.first_available_level node_ctxt
-        in
-        Metrics.GC.set_oldest_available_level first_available_level ;
-        return_unit)
-  in
-  let*! () = maybe_performance_metrics state in
+  let* () = initialize_metrics state current_protocol history_mode in
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
@@ -865,17 +855,19 @@ let setup_opentelemetry ~data_dir config =
     ~data_dir
     ~service_namespace:"rollup_node"
     ~service_name:"rollup_node"
+    ~version:
+      Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
     config.Configuration.opentelemetry
 
-let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
-    (configuration : Configuration.t) (cctxt : Client_context.full) =
+let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
+    (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let* () =
     Tezos_base_unix.Internal_event_unix.enable_default_daily_logs_at
       ~daily_logs_path:Filename.Infix.(data_dir // "daily_logs")
   in
-  let cctxt =
-    Layer_1.client_context_with_timeout cctxt configuration.l1_rpc_timeout
+  let* cctxt =
+    Layer_1.client_context cctxt ~timeout:configuration.l1_rpc_timeout
   in
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
@@ -896,7 +888,7 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
           operator_list)
       (Purpose.operators_bindings configuration.operators)
   in
-  let*! () = setup_opentelemetry ~data_dir configuration in
+  let* telemetry_cleanup = setup_opentelemetry ~data_dir configuration in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -956,7 +948,6 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
       cctxt
       ~data_dir
       ~irmin_cache_size
-      ?log_kernel_debug_file
       ~store_access:Read_write
       ~context_access:Read_write
       l1_ctxt
@@ -980,7 +971,9 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
   let state = {node_ctxt; rpc_server; configuration; plugin} in
   let* () = check_operator_balance state in
   let* () = Node_context.save_protocols_from_l1 node_ctxt in
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    install_finalizer state ~telemetry_cleanup
+  in
   run state
 
 module Replay = struct
@@ -1062,6 +1055,7 @@ module Replay = struct
         ~index_buffer_size:None
         ~irmin_cache_size:None
         ~log_kernel_debug:true
+        ~log_kernel_debug_file:None
         ~unsafe_disable_wasm_kernel_checks:false
         ~no_degraded:true
         ~gc_frequency:None
@@ -1072,21 +1066,29 @@ module Replay = struct
         ~bail_on_disagree:false
         ~profiling
         ~force_etherlink:false
+        ~l1_monitor_finalized:None
     in
-    let*! () = setup_opentelemetry ~data_dir configuration in
-    Node_context_loader.init
-      cctxt
-      ~data_dir
-      ~irmin_cache_size:10
-      ~store_access:Read_only
-      ~context_access:Read_only
-      l1_ctxt
-      metadata.genesis_info
-      ~lcc:{commitment = Commitment.Hash.zero; level = 0l}
-      ~lpc:None
-      metadata.kind
-      {hash = protocol.protocol; proto_level = protocol.proto_level; constants}
-      configuration
+    let* cleanup = setup_opentelemetry ~data_dir configuration in
+    let* node_ctxt =
+      Node_context_loader.init
+        cctxt
+        ~data_dir
+        ~irmin_cache_size:10
+        ~store_access:Read_only
+        ~context_access:Read_only
+        l1_ctxt
+        metadata.genesis_info
+        ~lcc:{commitment = Commitment.Hash.zero; level = 0l}
+        ~lpc:None
+        metadata.kind
+        {
+          hash = protocol.protocol;
+          proto_level = protocol.proto_level;
+          constants;
+        }
+        configuration
+    in
+    return (node_ctxt, cleanup)
 
   let process_time_treshold =
     Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
@@ -1245,24 +1247,29 @@ module Replay = struct
 
   let replay_block ~data_dir ?profiling cctxt block =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~profiling ~data_dir cctxt block in
-    replay_block_aux ~preload:true ~verbose:true node_ctxt block
+    let* node_ctxt, cleanup = mk_node_ctxt ~profiling ~data_dir cctxt block in
+    Lwt.finalize
+      (fun () -> replay_block_aux ~preload:true ~verbose:true node_ctxt block)
+      cleanup
 
   let replay_blocks ~data_dir ?profiling cctxt start_level end_level =
     let open Lwt_result_syntax in
-    let* node_ctxt =
+    let* node_ctxt, cleanup =
       mk_node_ctxt ~profiling ~data_dir cctxt (`Level start_level)
     in
-    let levels =
-      Stdlib.List.init
-        (Int32.sub end_level start_level |> Int32.to_int |> succ)
-        (fun x -> Int32.add (Int32.of_int x) start_level)
-    in
-    let first = ref true in
-    List.iter_es
-      (fun l ->
-        let preload = !first in
-        first := false ;
-        replay_block_aux ~preload node_ctxt (`Level l))
-      levels
+    Lwt.finalize
+      (fun () ->
+        let levels =
+          Stdlib.List.init
+            (Int32.sub end_level start_level |> Int32.to_int |> succ)
+            (fun x -> Int32.add (Int32.of_int x) start_level)
+        in
+        let first = ref true in
+        List.iter_es
+          (fun l ->
+            let preload = !first in
+            first := false ;
+            replay_block_aux ~preload node_ctxt (`Level l))
+          levels)
+      cleanup
 end

@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 (** [shards_store_lru_size] is the maximum shards store LRU size. See
-    {!Key_value_store.init} and {!Store.Shards.init}.
-*)
+    {!Key_value_store.init} and {!Store.Shards.init}. *)
 val shards_store_lru_size : int
 
 val slots_store_lru_size : int
@@ -35,21 +34,25 @@ val status_store_lru_size : int
 (** [committee_cache_size] is the size of the DAL committee cache. *)
 val committee_cache_size : int
 
-(** [cache_size] is the size (in number of slots) of the cache of
-    not-yet-published slots, shards, and shard proofs. *)
-val cache_size : int
+(** [not_yet_published_cache_size] is the size (in number of slots) of the cache
+    of not-yet-published slots, shards, and shard proofs. *)
+val not_yet_published_cache_size : int
 
 (** [slot_id_cache_size] is the size (in number of levels) of the cache to
     associate commitments with slot ids at a given level. *)
 val slot_id_cache_size : int
 
+(** [statuses_cache_size] is the size (in number of slots) of the cache
+    to associate slot ids to slot status. *)
+val statuses_cache_size : int
+
 (** The frequency at which we sample the time spent in shards crypto
     verification. *)
 val shards_verification_sampling_frequency : int
 
-(** During amplification, if the forked process takes more time than
-   this timeout to send the proved shards, then amplification attempt
-   is aborted to avoid keeping a pending promise forever. *)
+(** During amplification, if the forked process takes more time than this
+    timeout to send the proved shards, then amplification attempt is aborted to
+    avoid keeping a pending promise forever. *)
 val amplification_timeout : float
 
 (** Initial reconnection delay to L1 node from the DAL crawler in seconds. *)
@@ -64,17 +67,16 @@ val crawler_l1_blocks_cache_size : int
 val crawler_retries_on_disconnection : int
 
 (** Sleep delay before retrying processing a block in the L1 crawler in case a
-   disconnection error is encountered while retrieving data from L1 outside the
-   {!Layer1.iter_heads} callback. *)
+    disconnection error is encountered while retrieving data from L1 outside the
+    {!Layer1.iter_heads} callback. *)
 val crawler_re_processing_delay : float
 
-(* Sleep delay between refreshing the ips associated to bootstrap dns names *)
+(** Sleep delay between refreshing the ips associated to bootstrap dns names *)
 val bootstrap_dns_refresh_delay : float
 
-(** This size is being used for the store's traps cache. While
-    [proto_parameters.Dal_plugin.attestation_lag] should define the
-    minimum number of levels for which traps must be retained, we
-    maintain a larger cache capacity of 50 levels. This extended size
-    is acceptable since the cache is sparsely populated due to
-    [proto_parameters.traps_fraction]. *)
+(** The size of the node store's traps cache. *)
 val traps_cache_size : int
+
+(** The expected time, in seconds, sufficient to subscribe and connect to new
+    peers on a (new) topic. *)
+val time_to_join_new_topics : int

@@ -38,6 +38,9 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
  *)
 val wait_for_ready : t -> unit Lwt.t
 
+(* Wait for agnostic baker termination. *)
+val wait_for_termination : t -> unit Lwt.t
+
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
 
@@ -152,6 +155,8 @@ val create :
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
   Node.t ->
   Client.t ->
   t
@@ -192,6 +197,8 @@ val create_from_uris :
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
   unit ->
   t
 
@@ -252,6 +259,9 @@ val init :
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
+  ?extra_arguments:string list ->
   Node.t ->
   Client.t ->
   t Lwt.t

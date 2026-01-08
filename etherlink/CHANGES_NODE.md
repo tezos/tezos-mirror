@@ -8,13 +8,16 @@
 
 ### RPCs changes
 
-### Metrics changes
+- Fix issue when connecting to nodes behind a proxy that can rearrange
+  chunks. (!20057)
+
+### Monitoring changes
+
+### Command-line interface changes
 
 ### Execution changes
 
-- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
-  (b58-encoded public key, Tezos implicit account) information about a key
-  stored in a GCP KMS. (!18617)
+- Supports executing Farfadet natively. (!20065)
 
 ### Storage changes
 
@@ -26,6 +29,520 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.48 (2025-11-24)
+
+This release of the EVM node adds a new JSON-RPC method
+`eth_sendRawTransactionSync` as per
+[EIP-7966](https://eips.ethereum.org/EIPS/eip-7966) and adds the ground work for
+the future sub-block latency feature.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
+- Starting with kernel storage version 41, the proxy mode won't serve data of
+  blocks older than the last one. (!19677, !19744)
+
+### RPCs changes
+
+- Add new `eth_sendRawTransactionSync` endpoint to our JSON-RPC.
+  Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966). (!19797)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- A new flag `experimental_features.preconfirmation_stream_enabled` is added and
+  can be set to get sub-block latency for preconfirmations for
+  transactions. Note: This feature is only available with a development
+  kernel. (!19606)
+- Add an optional `block` parameter to `eth_sendRawTransactionSync`.
+  Supported values are: `latest` and `pending`. `latest` means waiting the
+  block execution while `pending` use the preconfirmation system.
+  Default value is `latest`. (!19837)
+- Add new `eth_subscribe` subscription named `tez_newIncludedTransactions` that
+  notifies transactions that have been chosen to be included in the next block
+  (only available with experimental feature
+  `preconfirmation_stream_enabled`). (!19810)
+- Add new `eth_subscribe` subscription named `tez_newPreconfirmedReceipts`
+  that notifies transactions preconfirmed receipts. (!19837)
+
+### Execution changes
+
+- Fix a regression introduced in v0.35 leading the EVM node to accumulate
+  unused data in its context. (!19988)
+
+## Version 0.47 (2025-10-31) 🎃
+
+This release improves robustness of the EVM node by protecting all network calls
+with a configurable timeout (also preventing transactions from getting stuck in
+the queue). It also improves compatibility of RPC `eth_estimateGas` by allowing
+state overrides and allows RPC nodes to receive notifications on websockets for
+`eth_subscribe`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Every RPC made by the EVM node is now protected by a timeout which can be set
+  in a new field `rpc_timeout` of the configuration file (default to
+  30s). (!19718)
+
+### RPCs changes
+
+- Prevent transactions from getting stuck when they are being sent to an
+  unresponsive node. (!19683, !19718)
+- Add support for state overrides in `eth_estimateGas` for EIP-7702, and
+  generalize block parameter of `eth_estimateGas` to support block
+  hashes. (!19737)
+- Websocket connections on an EVM node in RPC mode can now receive events
+  with `eth_subscribe`. (!19743)
+
+- Add new RPC endpoint eth_sendRawTransactionSync that
+  wait for transaction's execution before returning the
+  receipt (!19797). If you run an EVM node and
+  an RPC node you need to update both in the same time.
+
+### Monitoring changes
+
+- Websocket client now emits traces when profiling with Opentelemetry is
+  enabled. (!19763)
+
+### Command-line interface changes
+
+- New CLI option `--rpc-timeout <seconds>` to set the global timeout for RPCs
+  made by the EVM node. (!19718)
+
+### Execution changes
+
+- Use the rollup node RPC `/global/monitor_finalized_blocks` when
+  available. (!19569)
+
+### Storage changes
+
+- Shadownet snapshots available to use without warning. (!19726)
+
+## Version 0.46 (2025-10-21)
+
+This release is a hotfix release that addresses issues in the RPCs
+`debug_traceTransaction` and `debug_traceBlockByNumber`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Add a `data_dir` field to the config. The field can be overridden by
+  the command line or the environment variable `EVM_NODE_DATA_DIR`. (!19619)
+
+### RPCs changes
+
+- `debug_traceTransaction` and `debug_traceBlockByNumber` RPCs now correctly
+  use native execution when the node is configured with the `rpcs_only` policy
+  (which is the case by default). (!19665)
+- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `debug_traceCall` simulations in Ebisu. (!19669)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- New experimental snapshot format using
+  [desync](https://github.com/folbricht/desync) with support for incremental
+  snapshots and deduplication, available through commands `experimental snapshot
+  ...`. (!19395)
+
+## Version 0.45 (2025-10-17)
+
+This release is a bugfix release following the activation of the Ebisu kernel
+(Etherlink 5.0). The fixes are for regressions introduced in the RPCs
+`eth_call`, `eth_estimateGas` (_i.e._ simulations), and
+`debug_traceBlockByNumber` with `callTracer`. (This fix is applied only on the
+native kernel execution which is enabled by default for the RPC server.)
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### RPCs changes (Ebisu)
+
+- Disabled [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `eth_call` and `eth_estimateGas` simulations in Ebisu. (!19645)
+- Fixed `callTracer` in Ebisu not tracing all transactions in a block if a user
+  sent multiples transactions in that same block. (!19650)
+
+## Version 0.44 (2025-10-14)
+
+This release most notably adds support for the Ebisu kernel (Etherlink 5.0),
+which was successfully voted through a governance vote by the Tezos bakers. We
+strongly encourage node operators to upgrade to this version to maximize
+performances of their deployment when the new kernel activates on October 15,
+6:30 UTC.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- Add new GET `/mode` RPC endpoint to expose the current
+  operating mode of the EVM node. This enables external monitoring
+  tools to query and track node configuration. (!19486)
+- Outputs of `txpool_content` and inputs of `injectTransaction` RPCs no longer
+  downcast transactions to the legacy format; eip `2930`, `1559` and `7702` are
+  now available. (!19494)
+
+### Monitoring changes
+
+- Update opentelemetry library to 0.12 which should fix the issue where a log
+  protobuf encoding crashes the node when telemetry is activated. (!19516)
+
+### Command-line interface changes
+
+- The `download kernel` command now allows to download the upcoming kernel
+  Ebisu by its alias. (!19461)
+- Deprecates the `braeburn` network alias in favor of `shadownet`. (!19503)
+
+### Execution changes
+
+* Caps the number of native threads used by the node to prevent runtime errors.
+  (!19479)
+- Supports executing Ebisu natively. (!19563)
+- Relaxes the condition for completing the EVM node's bootstrap phase to be
+  more tolerant to network delays. (!19562)
+
+## Version 0.43 (2025-09-30)
+
+This release of the EVM node fixes an issue with the tx queue which introduced
+latency in user requests for `eth_sendRawTransaction`,
+`eth_getTransactionCount`, `eth_getTransactionByHash`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Use correct sequencer key from config (you can now define multiple and it will
+  adapt). (!19267)
+
+### RPCs changes
+
+- `eth_subscribe newPendingTransactions` is only for transaction that
+  are added to the tx_queue. (!19390)
+- Fixes high-latency responses in `eth_sendRawTransaction`,
+  `eth_getTransactionCount`, `eth_getTransactionByHash`. (!19433)
+
+
+### Command-line interface changes
+
+- Braeburn is now a supported network on the CLI command, through with argument
+`--network braeburn` where applicable.  (!19419)
+
+## Version 0.42 (2025-09-22)
+
+This release of the EVM node is a bug fix release which addresses a regression
+introduced by version 0.40 which accidentally removed support for state
+overrides on RPCs `eth_call` and `eth_estimateGas`. It also enriches
+Opentelemetry traces for better performance analysis.
+
+### Configuration changes
+
+- Add support for multiple sequencer keys in the CLI (only first lexicographic
+  one used for now) (!19280, !19302).
+
+### Monitoring changes
+
+- Opentelemetry traces for host function calls can be activated in configuration
+  with `"opentelemetry" : { "trace_host_functions" : true }` (!19099)
+- Opentelemetry traces for the OCaml garbage collector can be activated in
+  configuration with `"opentelemetry" : { "gc_telemetry" : { "enable" : true }
+  }` and configured to trace only certain events (!19003)
+
+### RPCs changes
+
+- Fix regression in `eth_call` and `eth_estimateGas` to restore support for
+  state overrides. (!19362)
+
+## Version 0.41 (2025-09-15)
+
+This release of the EVM node is a bug fix release which addresses a regression
+introduced by version 0.40 on the RPC `eth_getCode`.
+
+### Configuration changes
+
+- Add support for multiple sequencer keys in the configuration
+  (only one should be defined for now) (!19251).
+
+### RPCs changes
+
+- Fixes `eth_getCode` regression introduced in the previous version. (!19270)
+
+## Version 0.40 (2025-09-11)
+
+### RPCs changes
+
+- Fixes `eth_getTransactionByHash` always returning a transaction object for
+  transactions injected during a sequencer downtime. (!19247)
+
+### Monitoring changes
+
+- Adds two new attributes on every Opentelemetry spans: `service.version`
+  (specific to each release of the node) and `deployment.environment` (defined
+  in the configuration file or using the `DD_ENV` environment variable). See
+  [Datadog configuration][config] for the semantics of these fields.
+  (!19156)
+
+[config]: https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging
+
+### Execution changes
+
+- Prevents GCP KMS unresponsiveness to impact the block production of the
+  sequencer by adding a timeout of 2s. (!19246)
+
+## Version 0.39 (2025-09-02)
+
+This release of the EVM nodes introduces a new prevalidator which improves
+performances of the `eth_sendRawTransaction` RPC. It also offers a new
+configuration option to improve performance at the cost of memory consumption
+and removes the tx pool which has been replaced by the tx queue since version
+0.21.
+
+**There is a breaking change in the configuration file**, and node providers
+who have configured the tx queue using the field
+`experimental_features.enable_tx_queue` need to update their configuration.
+
+Here is an example of a configuration change to address the breaking change.
+
+```diff
+-  "tx_pool_timeout_limit": "10",
+-  "tx_pool_addr_limit": "10",
+-  "tx_pool_tx_per_addr_limit": "10",
+-  "experimental_features": {
+-    "enable_tx_queue": {
+-      "max_size": 100000,
+-      "max_lifespan": 10,
+-      "tx_per_addr_limit": "10000"
+-    }
++  "tx_pool": {
++    "max_size": 100000,
++    "max_lifespan": 10,
++    "tx_per_addr_limit": "10000"
+   },
+```
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- New field `"performance_profile"` which, when set to `"performance"`, changes
+  the GC parameters of the node to improve responsiveness and latency of the
+  node at the cost of a slight increase in memory consumption. (!19025)
+
+### RPCs changes
+
+- Improves performances of the `eth_sendRawTransaction` RPC, dividing the
+  average time to process these requests by up to 5 times. (!18989)
+- Delays broadcasting blueprints through the `/evm/messages` streamed RPC until
+  after the blueprints have been committed to disk. (!18989)
+- Remove fallback for `/evm/v2/blueprint/` and `/evm/v2/blueprints/range` making
+  version 0.30 deprecated.
+- The sequencer now performs full gas limit prevalidation in line with Ethereum
+  standards.
+  Transactions are rejected if the specified gas limit is insufficient to cover:
+    * calldata cost,
+    * potential access list cost, and
+    * authorization list cost.
+  Previously the prevalidation was only checking if the requirement to cover the
+  minimum da fees and base intrisic gas cost were covered which was not enough. (!19149)
+
+### Metrics changes
+
+- Fixes the metrics related to the tx pool. Now
+  if you activate `tx_queue` it show the size of the `tx_queue`. (!18996)
+- The EVM node now exports its logs to Opentelemetry when enabled in the
+  configuration file or with `--profiling true`. (!18910)
+
+### Command-line interface changes
+
+- Deprecates the fields `tx_pool_timeout_limit`, `tx_pool_addr_limit` and
+  `tx_pool_tx_per_addr_limit` in favor of a top-level `tx_pool`
+  top-level field. (!18994)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Removes the `tx_queue` configuration parameters. (!18994)
+
+## Version 0.38 (2025-08-13)
+
+This is a quality of life release, most notably improving the performances of
+the `eth_getLogs` and `eth_call` RPC requests. It also contains a bug fix for
+the sequencer, which will improve its reliability.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+## Breaking changes
+
+- Improves performances of `eth_getLogs`. The semantics of the
+  `log_filter.chunk_size` has changed in the process, and its default value has
+  been bumped from 10 to 1,000 and node operators are encouraged to configure
+  their nodes using a value of this order of magnitude. (!18950)
+
+- Changes the default snapshot provider URL. It still the same
+  provider but the snapshot is downloaded from another source.
+  (!18969)
+
+### RPCs changes
+
+- To stay aligned with Ethereum standards, the sequencer will now refuse
+  transactions with a gas limit below the intrinsic gas cost (21,000) plus the
+  inclusion fees. (!18923)
+- Adds support for type-4 transactions (see
+  [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)) for the Etherlink
+  networks with support for Prague. This is not the case for Mainnet and
+  Testnet yet. (!18851)
+- Encoding of responses for `eth_getLogs` are not blocking anymore, allowing the
+  node to continue to process blueprints and handle concurrent RPCs. (!18975)
+
+### Execution changes
+
+- Fixes a race condition in the block production component which could trigger
+  a crash of the sequencer. (!18924)
+- Parallelize executions of EVM kernel, improving performance of `eth_call`
+  RPC. (!18937)
+
+## Version 0.37 (2025-08-04)
+
+This is a bug fix release that improves system resilience and resource
+management. It makes the sequencer more robust against GCP KMS
+authentication issues and fixes a resource leak in the blueprint
+follower where network connections were not properly closed.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Execution changes
+
+- Makes the sequencer resilient to GCP KMS authentication tokens
+  invalidation. (!18901)
+- Fixes a connection leak in the blueprint follower where the
+  monitoring stream was not closed if an internal callback failed.
+  This prevents resource exhaustion over time and improves the node's
+  long-term stability. (!18908)
+
+## Version 0.36 (2025-07-28)
+
+This is a bug fix release that improves validation and reliability. It enforces
+stricter checks on JSON configuration files by returning an error for any
+extraneous content, fixes incorrect trace generation for HTTP requests to GCP
+KMS, and resolves issues with GCP KMS token refresh.
+
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
+- Enforces stricter validation for the JSON configuration file. Previously,
+  the parser would silently ignore any content that appeared after the first
+  valid JSON object. Now, any extraneous data will cause the function to return
+  an error. (!18745)
+
+### Metrics changes
+
+- Fixes the traces generated for HTTP requests performed to a GCP KMS. (!18771)
+
+### Execution changes
+
+- Fixes GCP KMS token refresh. (!18795)
+
+## Version 0.35 (2025-07-18)
+
+This is a bug fix release that addresses two known issues in the latest
+version.
+
+First, the node now correctly handles receiving duplicated sequencer upgrade
+events. There are several scenarios in which this can occur, so this fix is
+necessary to ensure smooth transitions for the sequencer operator. Second, the
+node will no longer format addresses in its RPC responses using the EIP-55
+checksum format. This change, introduced in the previous version, was not
+consistent with the behavior of Ethereum nodes and has therefore been reverted.
+
+We strongly recommend that node providers upgrade to this version.
+
+This release includes a single migration to the internal store (version 22),
+which means it is not possible to downgrade to the previous version.
+
+### Breaking changes
+
+- Revert outputting EIP-55 encoded addresses in the RPC responses. This was not
+  a standard behavior for nodes of EVM-compatible chains. (!18757)
+
+### Execution changes
+
+- Makes the node resilient to receiving a sequencer upgrade event twice.
+  (!18713)
+- Forces the installation of the full kernel on new data directory creation.
+  (!18709)
+- The sequencer now performs signing and applying the blueprints concurrently.
+  (!18711 !18712)
+
+## Version 0.34 (2025-07-15)
+
+This release of the EVM node notably adds support for executing natively the
+Etherlink 4.1 release (also known as Dionysus first revision). It is the
+recommended version to use for networks running this version of the Etherlink
+kernel, and we advise all node providers to upgrade ahead of Etherlink Mainnet
+and Etherlink Testnet upgrades.
+
+### RPCs changes
+
+- `GET /health_check` will now fail if the database connections used by the EVM
+  node are stalled. (!18667)
+- RPC responses now output [EIP-55 compliant addresses][eip-55]. (!18676)
+
+[eip-55]: https://eips.ethereum.org/EIPS/eip-55
+
+### Execution changes
+
+- Supports executing Dionysus R1 (Etherlink 4.1) natively. (!18683)
+
+## Version 0.33 (2025-07-10)
+
+This release of the EVM node fixes an issue with the configuration for sequencer
+keys on GCP KMS and makes the sequencer stop block production ahead of a
+sequencer update.
+
+This release will not apply any migration to the node’s store (version 21),
+meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Fix encodings for sequencer key when using a remote key on GCP KMS. (!18642)
+- Add a new configuration option for the sequencer to stop block production
+  ahead of a sequencer upgrade. See `describe config` or `man run sequencer`.
+  (!18605)
+
+### Execution changes
+
+- Add support for GCP KMS `EC_SIGN_SECP256K1_SHA256` keys. (!18618)
+- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
+  (b58-encoded public key, Tezos implicit account) and Ethereum-specific (EOA
+  address) information about a key stored in a GCP KMS. (!18617 !18618)
+- Halt blocks production five minutes before a planned upgrade of the sequencer
+  operator. (!18605)
 
 ## Version 0.32 (2025-07-08)
 

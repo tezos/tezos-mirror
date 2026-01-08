@@ -16,9 +16,10 @@ depends: [
   "octez-node-config" { = version }
   "tezos-dal-node-services" { = version }
   "tezos-dal-node-lib" { = version }
+  "octez-baking-common-lib" { = version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

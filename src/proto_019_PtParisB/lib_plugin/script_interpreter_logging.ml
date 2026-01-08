@@ -113,8 +113,7 @@ module Stack_utils = struct
         ('a, 's) stack_ty * ('a, 's, 'r, 'f) kinstr
         -> ('r, 'f) ex_init_stack_ty
 
-  let rec stack_prefix_preservation_witness_split_input :
-      type a s b t c u d v.
+  let rec stack_prefix_preservation_witness_split_input : type a s b t c u d v.
       (b, t, c, u, a, s, d, v) stack_prefix_preservation_witness ->
       (a, s) stack_ty ->
       (b, t) stack_ty =
@@ -124,8 +123,7 @@ module Stack_utils = struct
         stack_prefix_preservation_witness_split_input w s
     | KRest, s -> s
 
-  let rec stack_prefix_preservation_witness_split_output :
-      type a s b t c u d v.
+  let rec stack_prefix_preservation_witness_split_output : type a s b t c u d v.
       (b, t, c, u, a, s, d, v) stack_prefix_preservation_witness ->
       (c, u) stack_ty ->
       (d, v) stack_ty =
@@ -139,8 +137,7 @@ module Stack_utils = struct
      if functions from this module were called. Use with care. *)
   let assert_some = function None -> assert false | Some x -> x
 
-  let kinstr_split :
-      type a s r f.
+  let kinstr_split : type a s r f.
       (a, s) stack_ty ->
       (a, s, r, f) kinstr ->
       (a, s, r, f) ex_split_kinstr tzresult =
@@ -1560,8 +1557,7 @@ module Stack_utils = struct
                  reconstruct = (fun k -> IPairing_check_bls12_381 (loc, k));
                }
       | IComb (loc, n, p, k), s ->
-          let rec aux :
-              type a b s c d t.
+          let rec aux : type a b s c d t.
               (a, b * s) stack_ty ->
               (a, b, s, c, d, t) comb_gadt_witness ->
               (c, d * t) stack_ty tzresult =
@@ -1581,8 +1577,7 @@ module Stack_utils = struct
               reconstruct = (fun k -> IComb (loc, n, p, k));
             }
       | IUncomb (loc, n, p, k), s ->
-          let rec aux :
-              type a b s c d t.
+          let rec aux : type a b s c d t.
               (a, b * s) stack_ty ->
               (a, b, s, c, d, t) uncomb_gadt_witness ->
               (c, d * t) stack_ty =
@@ -1602,8 +1597,7 @@ module Stack_utils = struct
                  reconstruct = (fun k -> IUncomb (loc, n, p, k));
                }
       | IComb_get (loc, n, p, k), Item_t (c, s) ->
-          let rec aux :
-              type c cc a.
+          let rec aux : type c cc a.
               (c, cc) ty -> (c, a) comb_get_gadt_witness -> a ty_ex_c =
            fun c w ->
             match (w, c) with
@@ -1623,8 +1617,7 @@ module Stack_utils = struct
                  reconstruct = (fun k -> IComb_get (loc, n, p, k));
                }
       | IComb_set (loc, n, p, k), Item_t (a, Item_t (b, s)) ->
-          let rec aux :
-              type a b c ca cb.
+          let rec aux : type a b c ca cb.
               (a, ca) ty ->
               (b, cb) ty ->
               (a, b, c) comb_set_gadt_witness ->
@@ -1646,8 +1639,7 @@ module Stack_utils = struct
               reconstruct = (fun k -> IComb_set (loc, n, p, k));
             }
       | IDup_n (loc, n, p, k), s ->
-          let rec aux :
-              type a b s t.
+          let rec aux : type a b s t.
               (a, b * s) stack_ty ->
               (a, b, s, t) dup_n_gadt_witness ->
               t ty_ex_c =
@@ -1757,8 +1749,7 @@ module Stack_utils = struct
      [instr] has been executed, assuming [sty] is the type of the stack
      prior to execution. For the rare instructions which can return stacks
      of any type ([FAILWITH] and [NEVER]), this function returns [None]. *)
-  let rec kinstr_final_stack_type :
-      type a s r f.
+  let rec kinstr_final_stack_type : type a s r f.
       (a, s) stack_ty -> (a, s, r, f) kinstr -> (r, f) stack_ty option tzresult
       =
     let open Result_syntax in
@@ -1808,9 +1799,8 @@ module Stack_utils = struct
      possible execution branches. If the first instr ends with FAILWITH,
      it will try the next and so on. Note that all instructions must
      result in the same stack type. *)
-  let rec branched_final_stack_type :
-      type r f. (r, f) ex_init_stack_ty list -> (r, f) stack_ty option tzresult
-      =
+  let rec branched_final_stack_type : type r f.
+      (r, f) ex_init_stack_ty list -> (r, f) stack_ty option tzresult =
     let open Result_syntax in
     function
     | [] -> return_none
@@ -1820,8 +1810,7 @@ module Stack_utils = struct
         | Some _ as sty -> return sty
         | None -> branched_final_stack_type bs)
 
-  let kinstr_rewritek :
-      type a s r f.
+  let kinstr_rewritek : type a s r f.
       (a, s) stack_ty ->
       (a, s, r, f) kinstr ->
       kinstr_rewritek ->
@@ -1892,8 +1881,7 @@ module Stack_utils = struct
     continuations starting from the stack type described by [sty].
     Instrumentation consists in wrapping inner continuations in
     [KLog] continuation so that logging continues. *)
-  let instrument_cont :
-      type a b c d.
+  let instrument_cont : type a b c d.
       logger ->
       (a, b) stack_ty ->
       (a, b, c, d) continuation ->
@@ -1973,8 +1961,7 @@ module Logger (Base : Logger_base) = struct
     This instrumentation has a performance cost, but importantly, it
     is only ever paid when logging is enabled. Otherwise, the
     possibility to instrument the script is costless. *)
-  let log_next_continuation :
-      type a b c d.
+  let log_next_continuation : type a b c d.
       logger ->
       (a, b) stack_ty ->
       (a, b, c, d) continuation ->
@@ -2055,8 +2042,7 @@ module Logger (Base : Logger_base) = struct
      that starts the evaluation.
 
   *)
-  let ilog :
-      type a s b t r f.
+  let ilog : type a s b t r f.
       logger -> logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type
       =
     let open Lwt_result_syntax in
@@ -2325,8 +2311,7 @@ module Logger (Base : Logger_base) = struct
           | _ -> (step [@ocaml.tailcall]) g old_gas k ks accu stack)
   [@@inline]
 
-  let klog :
-      type a s r f.
+  let klog : type a s r f.
       logger ->
       outdated_context * step_constants ->
       local_gas_counter ->

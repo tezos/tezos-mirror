@@ -71,10 +71,10 @@ let dummy_script : Cache.cached_contract =
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged_tickets_in_storage:false
       ~allow_forged_lazy_storage_id_in_storage:false
-      script
+      (Script script)
     |> assert_ok_lwt
   in
-  (script, ex_script)
+  (Script script, ex_script)
 
 (** {2 Creating dummy cache value identifiers.} *)
 

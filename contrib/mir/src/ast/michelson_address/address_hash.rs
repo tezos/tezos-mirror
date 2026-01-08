@@ -1,21 +1,22 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Structures for [Tezos
 //! address](https://docs.tezos.com/smart-contracts/data-types/primitive-data-types#addresses)
 //! hash part, i.e. the part without the entrypoint.
 
-use crate::ast::michelson_key_hash::KeyHash;
-
 use super::{ByteReprError, ByteReprTrait};
-
-use tezos_crypto_rs::hash::{
-    ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, HashTrait,
-    SmartRollupHash,
+use tezos_crypto_rs::{
+    hash::{
+        ContractKt1Hash, ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash,
+        HashTrait, SmartRollupHash,
+    },
+    public_key_hash::PublicKeyHash,
+};
+use tezos_data_encoding::{
+    enc::BinWriter,
+    nom::{error::convert_error, NomReader},
 };
 
 macro_rules! address_hash_type_and_impls {
@@ -34,14 +35,6 @@ macro_rules! address_hash_type_and_impls {
             }
         })*
 
-        impl AsRef<[u8]> for AddressHash {
-            fn as_ref(&self) -> &[u8] {
-                match self {
-                    $(AddressHash::$con(h) => h.as_ref()),*
-                }
-            }
-        }
-
         impl From<AddressHash> for Vec<u8> {
             fn from(value: AddressHash) -> Self {
                 match value {
@@ -54,7 +47,7 @@ macro_rules! address_hash_type_and_impls {
 
 address_hash_type_and_impls! {
     /// Variant for implicit addresses, `tz1...`, `tz2...`, etc.
-    Implicit(KeyHash),
+    Implicit(PublicKeyHash),
     /// Variant for smart contract addresses, `KT1...`.
     Kt1(ContractKt1Hash),
     /// Variant for smart rollup addresses, `sr1...`.
@@ -63,25 +56,25 @@ address_hash_type_and_impls! {
 
 impl From<ContractTz1Hash> for AddressHash {
     fn from(x: ContractTz1Hash) -> Self {
-        Self::Implicit(x.into())
+        Self::Implicit(PublicKeyHash::Ed25519(x))
     }
 }
 
 impl From<ContractTz2Hash> for AddressHash {
     fn from(x: ContractTz2Hash) -> Self {
-        Self::Implicit(x.into())
+        Self::Implicit(PublicKeyHash::Secp256k1(x))
     }
 }
 
 impl From<ContractTz3Hash> for AddressHash {
     fn from(x: ContractTz3Hash) -> Self {
-        Self::Implicit(x.into())
+        Self::Implicit(PublicKeyHash::P256(x))
     }
 }
 
 impl From<ContractTz4Hash> for AddressHash {
     fn from(x: ContractTz4Hash) -> Self {
-        Self::Implicit(x.into())
+        Self::Implicit(PublicKeyHash::Bls(x))
     }
 }
 
@@ -137,7 +130,7 @@ impl ByteReprTrait for AddressHash {
             "KT1" => Kt1(HashTrait::from_b58check(data)?),
             "sr1" => Sr1(HashTrait::from_b58check(data)?),
             // tz1..tz4 are delegated to KeyHash
-            _ => Implicit(KeyHash::from_base58_check(data)?),
+            _ => Implicit(PublicKeyHash::from_b58check(data)?),
         })
     }
 
@@ -146,7 +139,7 @@ impl ByteReprTrait for AddressHash {
         match self {
             Kt1(hash) => hash.to_base58_check(),
             Sr1(hash) => hash.to_base58_check(),
-            Implicit(hash) => hash.to_base58_check(),
+            Implicit(hash) => hash.to_b58check(),
         }
     }
 
@@ -163,7 +156,14 @@ impl ByteReprTrait for AddressHash {
         };
         Ok(match bytes[0] {
             // implicit addresses
-            TAG_IMPLICIT => Implicit(KeyHash::from_bytes(&bytes[1..])?),
+            TAG_IMPLICIT => {
+                Implicit(PublicKeyHash::nom_read_exact(&bytes[1..]).map_err(|err| {
+                    ByteReprError::WrongFormat(format!(
+                        "public key hash : {0}",
+                        convert_error(&bytes[1..], err)
+                    ))
+                })?)
+            }
             TAG_KT1 => {
                 validate_padding_byte()?;
                 Kt1(HashTrait::try_from_bytes(&bytes[1..bytes.len() - 1])?)
@@ -192,7 +192,7 @@ impl ByteReprTrait for AddressHash {
         match self {
             Implicit(hash) => {
                 out.push(TAG_IMPLICIT);
-                hash.to_bytes(out);
+                hash.bin_write(out).unwrap();
             }
             Kt1(hash) => originated_account(out, TAG_KT1, hash),
             Sr1(hash) => originated_account(out, TAG_SR1, hash),

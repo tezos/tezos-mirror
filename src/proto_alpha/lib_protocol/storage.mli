@@ -272,6 +272,14 @@ module Contract : sig
        and type t := Raw_context.t
        and type local_context := local_context
 
+  (** Contracts are considered native if they have a `/native` value. They won't
+      have `/code` in that case. *)
+  module Native :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Contract_repr.t
+       and type value = Script_native_repr.t
+       and type t := Raw_context.t
+
   module Code :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Contract_repr.t
@@ -331,6 +339,27 @@ module Contract : sig
   (** Stores the amount of tokens currently present on chain *)
   module Total_supply :
     Single_data_storage with type value = Tez_repr.t and type t := Raw_context.t
+
+  module Address_registry : sig
+    module Next :
+      Single_data_storage with type value = Z.t and type t := Raw_context.t
+
+    module Registry :
+      Non_iterable_indexed_carbonated_data_storage
+        with type t := Raw_context.t
+         and type key = Destination_repr.t
+         and type value = Z.t
+  end
+
+  (** Associates known native contracts with their addresses, as they are
+      originated during protocol stitching and their can cannot be easily
+      retrieved. *)
+  module Native_contracts : sig
+    module CLST :
+      Single_data_storage
+        with type value = Contract_hash.t
+         and type t := Raw_context.t
+  end
 end
 
 module Big_map : sig
@@ -797,12 +826,6 @@ module Liquidity_baking : sig
 end
 
 module Adaptive_issuance : sig
-  (** Exponential moving average (ema) of votes set in the block header
-      protocol_data.contents. Once the feature is activated, it can no
-      longer be deactivated without a protocol amendment. **)
-  module Launch_ema :
-    Single_data_storage with type t := Raw_context.t and type value = Int32.t
-
   (** Cycle [Some c] from which adaptive issuance is (or will be)
      active, or [None] if the feature is not yet planned to activate. **)
   module Activation :
@@ -810,6 +833,11 @@ module Adaptive_issuance : sig
       with type t := Raw_context.t
        and type value = Cycle_repr.t option
 end
+
+(** Level from which all bakers attest is set to be active.
+    Not set if the feature is not yet planned to activate. **)
+module All_bakers_attest_activation :
+  Single_data_storage with type t := Raw_context.t and type value = Level_repr.t
 
 (** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).
     Values from this map can be incorporated by any contract via the primitive
@@ -844,11 +872,18 @@ module Ticket_balance : sig
     Single_data_storage with type t := Raw_context.t and type value = Z.t
 end
 
+(** [Protocol_activation_level] stores the level of the first block whose
+    application results in a context of this protocol. *)
+module Protocol_activation_level :
+  Single_data_storage
+    with type t := Raw_context.t
+     and type value = Raw_level_repr.t
+
 (** Tenderbake *)
 
 module Tenderbake : sig
-  (** [First_level_of_protocol] stores the level of the first block of
-      this protocol. *)
+  (* TODO: #8065: delete in V
+     Use {!Protocol_activation_level} instead. *)
   module First_level_of_protocol :
     Single_data_storage
       with type t := Raw_context.t
@@ -1075,7 +1110,9 @@ end
 
 module Dal : sig
   module Slot : sig
-    (** This is a temporary storage for slot headers proposed onto the L1. *)
+    (** This is a temporary storage for slot headers proposed onto the L1. The
+        size of the list is at most [number_of_slots] as declared
+        in the DAL parameters of the protocol. *)
     module Headers :
       Non_iterable_indexed_data_storage
         with type t = Raw_context.t
@@ -1090,7 +1127,8 @@ module Dal : sig
 
     (** This single entry stores the cells of the DAL skip list constructed
         during the block under validation. The list is expected to have exactly
-        [number_of_slots] elements. Its cells ordering is not specified (and not
+        [number_of_slots] elements, except at the migration from T to U, where
+        it is a few times longer. Its cells ordering is not specified (and not
         relevant). A cell's binary encoding is bounded (the only part that is
         evolving in size over time is the number of backpointers, which is
         bounded by 64). *)
@@ -1119,6 +1157,13 @@ module Dal : sig
       with type t := Raw_context.t
        and type key = Signature.Public_key_hash.t
        and type value = unit
+
+  (** This stores the value of Dal constants for each protocol.
+      Useful during protocol migration when the parameter's value changes. *)
+  module Past_parameters :
+    Single_data_storage
+      with type value = Constants_parametric_repr.past_dal_parameters list
+       and type t := Raw_context.t
 end
 
 module Zk_rollup : sig

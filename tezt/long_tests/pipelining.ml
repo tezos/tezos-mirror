@@ -191,7 +191,15 @@ let init_node_client_with_protocol number_of_additional_bootstrap protocol =
   in
   let additional_bootstrap_accounts =
     List.map
-      (fun x -> (x, Some 500_000_000, false))
+      (fun x ->
+        ( x,
+          Some
+            {
+              Protocol.balance = Some 500_000_000;
+              consensus_key = None;
+              delegate = None;
+            },
+          false ))
       additional_bootstrap_account
     (* Starting with Oxford, bootstrap delegates have part of their balance
        frozen. To avoid having account with none available balance we don't use

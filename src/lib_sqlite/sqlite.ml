@@ -394,8 +394,7 @@ let init ~path ~perm ?max_conn_reuse_count migration_code =
             name
             (fun scope -> f (Some scope))),
         fun f x -> function
-          | Some scope ->
-              Opentelemetry_lwt.Trace.add_attrs scope (fun () -> f x)
+          | Some scope -> Opentelemetry.Scope.add_attrs scope (fun () -> f x)
           | None -> () )
     else (no_trace, no_add_attrs)
   in

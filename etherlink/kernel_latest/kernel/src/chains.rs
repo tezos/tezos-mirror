@@ -7,39 +7,47 @@ use crate::{
     block_in_progress::EthBlockInProgress,
     blueprint::Blueprint,
     blueprint_storage::{
-        DelayedTransactionFetchingResult, EVMBlockHeader, TezBlockHeader,
+        read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
+        EVMBlockHeader, TezBlockHeader,
     },
+    bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     delayed_inbox::DelayedInbox,
     error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
     l2block::L2Block,
     simulation::start_simulation_mode,
     tick_model::constants::MAXIMUM_GAS_LIMIT,
-    transaction::Transactions::EthTxs,
+    transaction::{TransactionContent, Transactions::EthTxs},
     CHAIN_ID,
 };
 use anyhow::Context;
-use evm_execution::{
-    configuration::EVMVersion,
-    precompiles::{precompile_set, PrecompileBTreeMap},
-    trace::TracerInput,
-};
+use mir::ast::PublicKeyHash;
 use primitive_types::{H160, H256, U256};
-use rlp::{Decodable, Encodable};
+use revm::primitives::hardfork::SpecId;
+use revm_etherlink::inspectors::TracerInput;
+use rlp::{Decodable, DecoderError, Encodable};
 use std::{
     collections::VecDeque,
     fmt::{Debug, Display},
 };
+use tezos_crypto_rs::hash::{ChainId, UnknownSignature};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+use tezos_ethereum::{
+    rlp_helpers::{decode_field, decode_tx_hash, next},
+    transaction::TransactionHash,
+};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_execution::context;
+use tezos_execution::{context, mir_ctx::BlockCtx};
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
-    operation::Operation,
+    enc_wrappers::BlockNumber,
+    operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
-        OperationBatchWithMetadata, OperationDataAndMetadata, OperationWithMetadata,
+        OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+        OperationResult, OperationResultSum, OperationWithMetadata,
     },
 };
 
@@ -70,16 +78,38 @@ impl From<String> for ChainFamily {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ExperimentalFeatures {
+    enable_tezos_runtime: bool,
+}
+
+impl ExperimentalFeatures {
+    pub fn read_from_storage(host: &mut impl Runtime) -> Self {
+        let enable_tezos_runtime = crate::storage::enable_tezos_runtime(host);
+
+        ExperimentalFeatures {
+            enable_tezos_runtime,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct EvmChainConfig {
     chain_id: U256,
-    limits: EvmLimits,
-    evm_config: evm_execution::Config,
+    pub limits: EvmLimits,
+    pub spec_id: SpecId,
+    pub experimental_features: ExperimentalFeatures,
+}
+
+impl EvmChainConfig {
+    pub fn enable_tezos_runtime(&self) -> bool {
+        self.experimental_features.enable_tezos_runtime
+    }
 }
 
 #[derive(Debug)]
 pub struct MichelsonChainConfig {
-    chain_id: U256,
+    chain_id: ChainId,
 }
 
 pub trait BlockInProgressTrait {
@@ -93,16 +123,16 @@ impl BlockInProgressTrait for EthBlockInProgress {
 }
 
 pub struct TezBlockInProgress {
-    number: U256,
+    number: BlockNumber,
     timestamp: Timestamp,
     previous_hash: H256,
     applied: Vec<AppliedOperation>,
-    operations: VecDeque<Operation>,
+    operations: VecDeque<TezlinkOperation>,
 }
 
 impl BlockInProgressTrait for TezBlockInProgress {
     fn number(&self) -> U256 {
-        self.number
+        self.number.into()
     }
 }
 
@@ -128,8 +158,90 @@ impl TransactionsTrait for crate::transaction::Transactions {
     }
 }
 
+const TEZOS_OP_TAG: u8 = 1;
+const DEPOSIT_OP_TAG: u8 = 2;
+
 #[derive(Debug)]
-pub struct TezTransactions(pub Vec<Operation>);
+pub struct TezlinkOperation {
+    pub tx_hash: TransactionHash,
+    pub content: TezlinkContent,
+}
+
+impl Encodable for TezlinkOperation {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append_iter(self.tx_hash);
+        stream.append(&self.content);
+    }
+}
+
+impl Decodable for TezlinkOperation {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let tx_hash: TransactionHash = decode_tx_hash(next(&mut it)?)?;
+        let content: TezlinkContent =
+            decode_field(&next(&mut it)?, "Transaction content")?;
+        Ok(TezlinkOperation { tx_hash, content })
+    }
+}
+
+#[derive(Debug)]
+pub enum TezlinkContent {
+    Tezos(Operation),
+    Deposit(Deposit),
+}
+
+impl Encodable for TezlinkContent {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match &self {
+            Self::Tezos(tez) => {
+                stream.append(&TEZOS_OP_TAG);
+                // We don't want the kernel to panic if there's an error
+                // and we can't print a log as we don't have access to
+                // the host. So we just ignore the result.
+                let _ = tez.rlp_append(stream);
+            }
+            Self::Deposit(dep) => {
+                stream.append(&DEPOSIT_OP_TAG);
+                dep.rlp_append(stream)
+            }
+        }
+    }
+}
+
+impl Decodable for TezlinkContent {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let tag: u8 = decoder.at(0)?.as_val()?;
+        let tx = decoder.at(1)?;
+        match tag {
+            DEPOSIT_OP_TAG => {
+                let deposit = Deposit::decode(&tx)?;
+                Ok(Self::Deposit(deposit))
+            }
+            TEZOS_OP_TAG => {
+                let eth = Operation::decode(&tx)?;
+                Ok(Self::Tezos(eth))
+            }
+            _ => Err(DecoderError::Custom("Unknown operation tag.")),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TezTransactions(pub Vec<TezlinkOperation>);
 
 impl TransactionsTrait for TezTransactions {
     fn extend(&mut self, other: Self) {
@@ -149,10 +261,7 @@ impl Encodable for TezTransactions {
         let Self(operations) = self;
         stream.begin_list(operations.len());
         for op in operations {
-            // We don't want the kernel to panic if there's an error
-            // and we can't print a log as we don't have access to
-            // the host. So we just ignore the result.
-            let _ = op.rlp_append(stream);
+            op.rlp_append(stream);
         }
     }
 }
@@ -164,8 +273,8 @@ impl Decodable for TezTransactions {
         }
         let operations = decoder
             .iter()
-            .map(|rlp| Operation::decode(&rlp))
-            .collect::<Result<Vec<Operation>, rlp::DecoderError>>()?;
+            .map(|rlp| TezlinkOperation::decode(&rlp))
+            .collect::<Result<Vec<TezlinkOperation>, rlp::DecoderError>>()?;
         Ok(TezTransactions(operations))
     }
 }
@@ -216,7 +325,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
-        write!(f, "{{Chain family: {}, {:?}}}", chain_family, self)
+        write!(f, "{{Chain family: {chain_family}, {self:?}}}")
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -236,7 +345,7 @@ pub trait ChainConfigTrait: Debug {
         current_block_number: U256,
         previous_chain_header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress;
+    ) -> anyhow::Result<Self::BlockInProgress>;
 
     fn read_block_in_progress(
         host: &impl Runtime,
@@ -248,7 +357,6 @@ pub trait ChainConfigTrait: Debug {
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        precompiles: &PrecompileBTreeMap<Host>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         maximum_allowed_ticks: u64,
@@ -257,16 +365,7 @@ pub trait ChainConfigTrait: Debug {
         coinbase: H160,
     ) -> anyhow::Result<BlockComputationResult>;
 
-    fn start_simulation_mode(
-        &self,
-        host: &mut impl Runtime,
-        enable_fa_bridge: bool,
-    ) -> anyhow::Result<()>;
-
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host>;
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()>;
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -291,15 +390,15 @@ impl ChainConfigTrait for EvmChainConfig {
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress {
-        eth_bip_from_blueprint(
+    ) -> anyhow::Result<Self::BlockInProgress> {
+        Ok(eth_bip_from_blueprint(
             host,
             self,
             tick_counter,
             current_block_number,
             header,
             blueprint,
-        )
+        ))
     }
 
     fn transactions_from_bytes(
@@ -336,7 +435,6 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        precompiles: &PrecompileBTreeMap<Host>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -350,7 +448,6 @@ impl ChainConfigTrait for EvmChainConfig {
             host,
             outbox_queue,
             block_in_progress,
-            precompiles,
             tick_counter,
             sequencer_pool_address,
             &self.limits,
@@ -358,23 +455,12 @@ impl ChainConfigTrait for EvmChainConfig {
             self.chain_id,
             da_fee_per_byte,
             coinbase,
-            &self.evm_config,
+            &self.spec_id,
         )
     }
 
-    fn start_simulation_mode(
-        &self,
-        host: &mut impl Runtime,
-        enable_fa_bridge: bool,
-    ) -> anyhow::Result<()> {
-        start_simulation_mode(host, enable_fa_bridge, &self.evm_config)
-    }
-
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host> {
-        precompile_set::<Host>(enable_fa_bridge)
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
+        start_simulation_mode(host, &self.spec_id)
     }
 
     fn storage_root_path(&self) -> RefPath {
@@ -386,12 +472,14 @@ impl EvmChainConfig {
     pub fn create_config(
         chain_id: U256,
         limits: EvmLimits,
-        evm_config: evm_execution::Config,
+        spec_id: SpecId,
+        experimental_features: ExperimentalFeatures,
     ) -> Self {
         Self {
             chain_id,
             limits,
-            evm_config,
+            spec_id,
+            experimental_features,
         }
     }
 
@@ -403,10 +491,13 @@ impl EvmChainConfig {
         &mut self.limits
     }
 
-    pub fn get_evm_config(&self) -> &evm_execution::Config {
-        &self.evm_config
+    pub fn get_spec_id(&self) -> &SpecId {
+        &self.spec_id
     }
 }
+
+const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
+    RefPath::assert_from(b"/tezlink/simulation_result");
 
 impl ChainConfigTrait for MichelsonChainConfig {
     type Transactions = TezTransactions;
@@ -414,7 +505,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     type ChainHeader = TezBlockHeader;
 
     fn get_chain_id(&self) -> U256 {
-        self.chain_id
+        self.chain_id.as_ref().into()
     }
 
     fn get_chain_family(&self) -> ChainFamily {
@@ -428,27 +519,59 @@ impl ChainConfigTrait for MichelsonChainConfig {
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress {
+    ) -> anyhow::Result<Self::BlockInProgress> {
         let TezTransactions(operations) = blueprint.transactions;
-        TezBlockInProgress {
+        let current_block_number: BlockNumber = current_block_number.try_into()?;
+        Ok(TezBlockInProgress {
             number: current_block_number,
             timestamp: blueprint.timestamp,
             previous_hash: header.hash,
             applied: vec![],
             operations: VecDeque::from(operations),
-        }
+        })
     }
 
     fn fetch_hashes_from_delayed_inbox(
-        _host: &mut impl Runtime,
-        _delayed_hashes: Vec<crate::delayed_inbox::Hash>,
-        _delayed_inbox: &mut DelayedInbox,
+        host: &mut impl Runtime,
+        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
+        delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
     {
+        // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
+        // the logic to retrieve delayed_inbox items.
+        //
+        // However, it still needs to do the conversion as the returned items are EthTxs
+        let (delayed, total_size) =
+            crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
+                host,
+                delayed_hashes,
+                delayed_inbox,
+                current_blueprint_size,
+            )?;
         Ok((
-            DelayedTransactionFetchingResult::Ok(TezTransactions(vec![])),
-            current_blueprint_size,
+            match delayed {
+                DelayedTransactionFetchingResult::Ok(EthTxs(txs)) => {
+                    let mut ops = vec![];
+                    for tx in txs.into_iter() {
+                        if let TransactionContent::Deposit(deposit) = tx.content {
+                            let operation = TezlinkOperation {
+                                tx_hash: tx.tx_hash,
+                                content: TezlinkContent::Deposit(deposit),
+                            };
+                            ops.push(operation)
+                        }
+                    }
+                    DelayedTransactionFetchingResult::Ok(TezTransactions(ops))
+                }
+                DelayedTransactionFetchingResult::BlueprintTooLarge => {
+                    DelayedTransactionFetchingResult::BlueprintTooLarge
+                }
+                DelayedTransactionFetchingResult::DelayedHashMissing(hash) => {
+                    DelayedTransactionFetchingResult::DelayedHashMissing(hash)
+                }
+            },
+            total_size,
         ))
     }
 
@@ -458,11 +581,17 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let operations = bytes
             .iter()
             .map(|bytes| {
-                Operation::try_from_bytes(bytes).map_err(|decode_error| {
-                    error::Error::NomReadError(format!("{:?}", decode_error))
+                let operation =
+                    Operation::nom_read_exact(bytes).map_err(|decode_error| {
+                        error::Error::NomReadError(format!("{decode_error:?}"))
+                    })?;
+                let tx_hash = operation.hash()?.0 .0;
+                Ok(TezlinkOperation {
+                    tx_hash,
+                    content: TezlinkContent::Tezos(operation),
                 })
             })
-            .collect::<Result<Vec<Operation>, error::Error>>()?;
+            .collect::<Result<Vec<TezlinkOperation>, error::Error>>()?;
         Ok(TezTransactions(operations))
     }
 
@@ -477,7 +606,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
         host: &mut Host,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        _precompiles: &PrecompileBTreeMap<Host>,
         _tick_counter: &mut TickCounter,
         _sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -501,64 +629,211 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
         let context = context::Context::from(&self.storage_root_path())?;
 
+        let block_ctx = BlockCtx {
+            level: &number,
+            now: &timestamp,
+            chain_id: &self.chain_id,
+        };
+
+        let mut included_delayed_transactions = vec![];
         // Compute operations that are in the block in progress
         while !operations.is_empty() {
             // Retrieve the next operation in the VecDequeue
             let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
 
-            // Try to apply the operation with the tezos_execution crate, return a receipt
-            // on whether it failed or not
-            let receipt = tezos_execution::apply_operation(
-                host,
-                &context,
-                operation.content.clone().into(),
-            )?;
+            match operation.content {
+                TezlinkContent::Tezos(operation) => {
+                    // Compute the hash of the operation
+                    let hash = operation.hash()?;
 
-            // Compute the hash of the operation
-            let hash = operation.hash()?;
+                    let skip_signature_check = false;
 
-            // Add the applied operation in the block in progress
-            let applied_operation = AppliedOperation {
-                hash,
-                branch: operation.branch,
-                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                    OperationBatchWithMetadata {
-                        operations: vec![OperationWithMetadata {
-                            content: operation.content,
-                            receipt,
-                        }],
-                        signature: operation.signature,
-                    },
-                ),
+                    let branch = operation.branch.clone();
+                    let signature = operation.signature.clone();
+
+                    // Try to apply the operation with the tezos_execution crate, return a receipt
+                    // on whether it failed or not
+                    let processed_operations =
+                        match tezos_execution::validate_and_apply_operation(
+                            host,
+                            &context,
+                            hash.clone(),
+                            operation,
+                            &block_ctx,
+                            skip_signature_check,
+                        ) {
+                            Ok(receipt) => receipt,
+                            Err(OperationError::Validation(err)) => {
+                                log!(
+                                    host,
+                                    Error,
+                                    "Found an invalid operation, dropping it: {:?}",
+                                    err
+                                );
+                                continue;
+                            }
+                            Err(OperationError::RuntimeError(err)) => {
+                                return Err(err.into());
+                            }
+                        };
+
+                    // Add the applied operation in the block in progress
+                    let applied_operation = AppliedOperation {
+                        hash,
+                        branch,
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations: processed_operations,
+                                signature,
+                            },
+                        ),
+                    };
+                    applied.push(applied_operation);
+                }
+                TezlinkContent::Deposit(deposit) => {
+                    log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
+
+                    let deposit_result =
+                        execute_tezlink_deposit(host, &context, &deposit)?;
+
+                    let source =
+                        PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+
+                    let applied_operation = AppliedOperation {
+                        hash: H256::from_slice(&operation.tx_hash).into(),
+                        branch: block_in_progress.previous_hash.into(),
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations: vec![OperationWithMetadata {
+                                    content: ManagerOperationContent::Transfer(
+                                        ManagerOperation {
+                                            source,
+                                            fee: 0.into(),
+                                            counter: 0.into(),
+                                            gas_limit: 0.into(),
+                                            storage_limit: 0.into(),
+                                            operation: deposit_result.outcome.1,
+                                        },
+                                    ),
+                                    receipt: OperationResultSum::Transfer(
+                                        OperationResult {
+                                            balance_updates: vec![],
+                                            result: deposit_result.outcome.0,
+                                            internal_operation_results: vec![],
+                                        },
+                                    ),
+                                }],
+                                signature: UnknownSignature::nom_read_exact(&[0u8; 64])
+                                    .unwrap(),
+                            },
+                        ),
+                    };
+                    applied.push(applied_operation);
+                    included_delayed_transactions.push(operation.tx_hash);
+                }
             };
-            applied.push(applied_operation);
         }
 
-        // Create a Tezos block from the block in progess
+        // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(number, timestamp, previous_hash, applied)?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
         Ok(BlockComputationResult::Finished {
-            included_delayed_transactions: vec![],
+            included_delayed_transactions,
             block: new_block,
         })
     }
 
-    fn start_simulation_mode(
-        &self,
-        _host: &mut impl Runtime,
-        _enable_fa_bridge: bool,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
+        fn read_inbox_message(
+            host: &mut impl Runtime,
+        ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
+            match host.read_input()? {
+                Some(input) => Ok(input),
+                None => {
+                    Err(crate::error::TezlinkSimulationError::UnexpectedEndOfInbox.into())
+                }
+            }
+        }
 
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        _enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host> {
-        PrecompileBTreeMap::new()
+        // We expect the inbox to contain exactly two messages; the
+        // first message is a single byte indicating if signature must
+        // be checked (0x01) or not (0x00); the second message is the
+        // operation to simulate.
+        let skip_signature_check = {
+            let input = read_inbox_message(host)?;
+            match input.as_ref() {
+                &[0x00] => true,
+                &[0x01] => false,
+                input => {
+                    return Err(
+                        crate::error::TezlinkSimulationError::UnexpectedSkipSigTag(
+                            input.to_vec(),
+                        )
+                        .into(),
+                    );
+                }
+            }
+        };
+
+        let nb_chunks =
+            u16::from_le_bytes(read_inbox_message(host)?.as_ref().try_into()?);
+
+        let mut operation_bytes = vec![];
+        for _chunk in 0..nb_chunks {
+            operation_bytes.extend(read_inbox_message(host)?.as_ref())
+        }
+
+        let operation = {
+            Operation::nom_read_exact(&operation_bytes)
+                .map_err(|_| crate::error::Error::InvalidConversion)?
+        };
+        let hash = operation.hash()?;
+        log!(
+            host,
+            Debug,
+            "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
+            operation_bytes.len()
+        );
+        let context = context::Context::from(&self.storage_root_path())?;
+
+        let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
+        let block_ctx = BlockCtx {
+            level: &number.as_u32().into(),
+            now: &timestamp,
+            chain_id: &self.chain_id,
+        };
+        let branch = operation.branch.clone();
+        let signature = operation.signature.clone();
+        let operations = tezos_execution::validate_and_apply_operation(
+            host,
+            &context,
+            hash.clone(),
+            operation.clone(),
+            &block_ctx,
+            skip_signature_check,
+        )?;
+        let result = AppliedOperation {
+            hash,
+            branch,
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations,
+                    signature,
+                },
+            ),
+        };
+
+        log!(
+            host,
+            Debug,
+            "Tezlink simulation finished, result: {:?}",
+            result
+        );
+        host.store_write_all(&TEZLINK_SIMULATION_RESULT_PATH, &result.to_bytes()?)?;
+        Ok(())
     }
 
     fn storage_root_path(&self) -> RefPath {
@@ -567,7 +842,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 }
 
 impl MichelsonChainConfig {
-    pub fn create_config(chain_id: U256) -> Self {
+    pub fn create_config(chain_id: ChainId) -> Self {
         Self { chain_id }
     }
 }
@@ -576,14 +851,18 @@ impl ChainConfig {
     pub fn new_evm_config(
         chain_id: U256,
         limits: EvmLimits,
-        evm_config: evm_execution::Config,
+        spec_id: SpecId,
+        experimental_features: ExperimentalFeatures,
     ) -> Self {
         ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
-            chain_id, limits, evm_config,
+            chain_id,
+            limits,
+            spec_id,
+            experimental_features,
         )))
     }
 
-    pub fn new_michelson_config(chain_id: U256) -> Self {
+    pub fn new_michelson_config(chain_id: ChainId) -> Self {
         ChainConfig::Michelson(MichelsonChainConfig::create_config(chain_id))
     }
 
@@ -650,7 +929,8 @@ impl Default for EvmChainConfig {
         Self::create_config(
             U256::from(CHAIN_ID),
             EvmLimits::default(),
-            EVMVersion::to_config(&EVMVersion::default()),
+            SpecId::default(),
+            ExperimentalFeatures::default(),
         )
     }
 }
@@ -660,7 +940,8 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
     EvmChainConfig::create_config(
         U256::from(CHAIN_ID),
         EvmLimits::default(),
-        EVMVersion::current_test_config(),
+        SpecId::default(),
+        ExperimentalFeatures::default(),
     )
 }
 

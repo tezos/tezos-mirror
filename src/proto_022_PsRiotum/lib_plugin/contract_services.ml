@@ -659,7 +659,8 @@ let register () =
                    Entrypoint.Map.fold_e
                      (fun entry
                           (Script_typed_ir.Ex_ty ty, original_type_expr)
-                          (acc, ctxt) ->
+                          (acc, ctxt)
+                        ->
                        let* ty_expr, ctxt =
                          if normalize_types then
                            let* ty_node, ctxt =

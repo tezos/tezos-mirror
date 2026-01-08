@@ -506,8 +506,10 @@ let parse_log (log : Ethereum_types.transaction_log) =
                     (parsed_log_to_db log (Fast_FA_withdrawal withdraw_data))
               | None -> return_none)))
 
-let handle_one_log ws_client db (log : Ethereum_types.transaction_log) =
+let handle_one_log ws_client db (log : Ethereum_types.transaction_log tzresult)
+    =
   let open Lwt_result_syntax in
+  let*? log in
   let*! () = Event.(emit transaction_log) log in
   let withdrawal = parse_log log in
   match withdrawal with
@@ -607,10 +609,8 @@ let rec get_logs db ws_client ~from_block ~to_block =
     | Ok logs ->
         (* Process each log in the range *)
         List.iter_es
-          (function
-            | Filter.Block_filter _ | Pending_transaction_filter _ ->
-                return_unit
-            | Log log -> handle_one_log ws_client db log)
+          (fun log ->
+            handle_one_log ws_client db (Ok (Ethereum_types.decode_pre log)))
           logs
     | Error (Filter_helpers.Too_many_logs {limit} :: _ as e)
       when Z.equal from_z to_z ->
@@ -694,7 +694,8 @@ let monitor_heads db ws_client =
   let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
   let* () =
     lwt_stream_iter_es
-      (fun (b : _ Ethereum_types.block) ->
+      (fun (b : _ Ethereum_types.block tzresult) ->
+        let*? b in
         let*! () = Event.(emit new_etherlink_head) b.number in
         Db.Pointers.L2_head.set db b.number)
       heads_subscription.stream
@@ -714,8 +715,8 @@ let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_rpc
   in
   let* () =
     lwt_stream_iter_es
-      (fun ({l1_level; start_l2_level; end_l2_level} :
-             Ethereum_types.Subscription.l1_l2_levels_output) ->
+      (fun (l1l2 : Ethereum_types.Subscription.l1_l2_levels_output tzresult) ->
+        let*? {l1_level; start_l2_level; end_l2_level} = l1l2 in
         let*! () =
           if Ethereum_types.Qty.(start_l2_level = end_l2_level) then
             Event.(emit empty_l1_level) l1_level
@@ -808,12 +809,16 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
   let l1_node_rpc = L1_execution.make_ctxt l1_node_endpoint in
   let run () =
-    let*! ws_client =
-      Websocket_client.connect
+    let ws_client =
+      Websocket_client.create
         ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+        ~keep_alive:false
+          (* We want a connection drop to retrigger a reconnection and a new
+             head subscription. *)
         Media_type.json
         evm_node_endpoint
     in
+    let* () = Websocket_client.connect ws_client in
     let* () = init_db_pointers db ws_client rollup_node_rpc in
     let* last_l2_head = Db.Pointers.L2_head.get db in
     let* last_levels = Db.Levels.last db in
@@ -838,8 +843,8 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let rec loop ?(first = false) () =
     let* () =
       Lwt.catch run (function
-          | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
-          | e -> Lwt.reraise e)
+        | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
+        | e -> Lwt.reraise e)
     in
     let*! () = Event.(emit ws_reconnection) reconnection_delay in
     let*! () = Lwt_unix.sleep reconnection_delay in

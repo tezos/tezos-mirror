@@ -110,7 +110,7 @@ val get_script :
   unparsing_mode:Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
   Contract_hash.t ->
-  Script.t option tzresult Lwt.t
+  Script.michelson_with_storage option tzresult Lwt.t
 
 (** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.script_opt}. *)
 val get_script_hash :

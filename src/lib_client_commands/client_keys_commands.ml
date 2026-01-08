@@ -56,8 +56,16 @@ let sig_algo_arg =
     ~default:"ed25519"
     (algo_param ())
 
+let algo_to_prefix algo =
+  let open Signature in
+  match algo with
+  | Ed25519 -> "tz1"
+  | Secp256k1 -> "tz2"
+  | P256 -> "tz3"
+  | Bls -> "tz4"
+
 let gen_keys_containing ?(encrypted = false) ?(prefix = false)
-    ?(ignore_case = false) ?(force = false) ~containing ~name
+    ?(ignore_case = false) ?(force = false) ~algo ~containing ~name
     (cctxt : #Client_context.io_wallet) =
   let open Lwt_result_syntax in
   let unrepresentable =
@@ -131,13 +139,15 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
             in
             let matches =
               if prefix then
-                let containing_tz1 = List.map (( ^ ) "tz1") containing in
+                let tz_prefix =
+                  List.map (( ^ ) (algo_to_prefix algo)) containing
+                in
                 fun key ->
                   List.exists
                     (fun containing ->
                       String.sub (adjust_case key) 0 (String.length containing)
                       = containing)
-                    containing_tz1
+                    tz_prefix
               else
                 let re = Re.Str.regexp (String.concat "\\|" containing) in
                 fun key ->
@@ -148,7 +158,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false)
             in
             let rec loop attempts =
               let public_key_hash, public_key, secret_key =
-                Signature.generate_key ()
+                Signature.generate_key ~algo ()
               in
               let hash =
                 Signature.Public_key_hash.to_b58check
@@ -488,41 +498,6 @@ let commands network : Client_context.full Tezos_clic.command list =
         command
           ~group
           ~desc:"Generate keys including the given string."
-          (args3
-             (switch
-                ~long:"prefix"
-                ~short:'P'
-                ~doc:"the key must begin with tz1[word]"
-                ())
-             (switch
-                ~long:"ignore-case"
-                ~short:'I'
-                ~doc:"make the pattern case-insensitive"
-                ())
-             (force_switch ()))
-          (prefixes ["gen"; "vanity"; "keys"]
-          @@ Public_key_hash.fresh_alias_param @@ prefix "matching"
-          @@ seq_of_param
-          @@ string
-               ~name:"words"
-               ~desc:"string key must contain one of these words")
-          (fun (prefix, ignore_case, force)
-               name
-               containing
-               (cctxt : Client_context.full) ->
-            let* name = Public_key_hash.of_fresh cctxt force name in
-            gen_keys_containing
-              ~encrypted:true
-              ~force
-              ~prefix
-              ~ignore_case
-              ~containing
-              ~name
-              cctxt)
-    | Some `Testnet | None ->
-        command
-          ~group
-          ~desc:"Generate keys including the given string."
           (args4
              (switch
                 ~long:"prefix"
@@ -535,19 +510,60 @@ let commands network : Client_context.full Tezos_clic.command list =
                 ~doc:"make the pattern case-insensitive"
                 ())
              (force_switch ())
-             (encrypted_switch ()))
+             sig_algo_arg)
           (prefixes ["gen"; "vanity"; "keys"]
           @@ Public_key_hash.fresh_alias_param @@ prefix "matching"
           @@ seq_of_param
           @@ string
                ~name:"words"
                ~desc:"string key must contain one of these words")
-          (fun (prefix, ignore_case, force, encrypted)
+          (fun (prefix, ignore_case, force, algo)
                name
                containing
-               (cctxt : Client_context.full) ->
+               (cctxt : Client_context.full)
+             ->
             let* name = Public_key_hash.of_fresh cctxt force name in
             gen_keys_containing
+              ~algo
+              ~encrypted:true
+              ~force
+              ~prefix
+              ~ignore_case
+              ~containing
+              ~name
+              cctxt)
+    | Some `Testnet | None ->
+        command
+          ~group
+          ~desc:"Generate keys including the given string."
+          (args5
+             (switch
+                ~long:"prefix"
+                ~short:'P'
+                ~doc:"the key must begin with tz1[word]"
+                ())
+             (switch
+                ~long:"ignore-case"
+                ~short:'I'
+                ~doc:"make the pattern case-insensitive"
+                ())
+             (force_switch ())
+             (encrypted_switch ())
+             sig_algo_arg)
+          (prefixes ["gen"; "vanity"; "keys"]
+          @@ Public_key_hash.fresh_alias_param @@ prefix "matching"
+          @@ seq_of_param
+          @@ string
+               ~name:"words"
+               ~desc:"string key must contain one of these words")
+          (fun (prefix, ignore_case, force, encrypted, algo)
+               name
+               containing
+               (cctxt : Client_context.full)
+             ->
+            let* name = Public_key_hash.of_fresh cctxt force name in
+            gen_keys_containing
+              ~algo
               ~encrypted
               ~force
               ~prefix

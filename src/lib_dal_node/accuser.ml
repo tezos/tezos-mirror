@@ -8,12 +8,16 @@
 (* [get_attestation_map] retrieves DAL attestation operations from a
    block and transforms them into a map where delegates are mapped to
    their corresponding attestation operation and DAL attestation. *)
-let get_attestation_map attestations =
+let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
   List.fold_left
-    (fun map (tb_slot, delegate_opt, operation, dal_attestation) ->
-      match delegate_opt with
+    (fun map (tb_slot, operation, dal_attestation) ->
+      match
+        List.find
+          (fun (v, _) -> v = tb_slot_to_int tb_slot)
+          slot_to_committee_pkh
+      with
       | None -> map
-      | Some delegate ->
+      | Some (_, (delegate, _)) ->
           Signature.Public_key_hash.Map.add
             delegate
             (operation, dal_attestation, tb_slot)
@@ -62,17 +66,19 @@ let inject_entrapment_evidences
     (module Plugin : Dal_plugin.T
       with type attestation_operation = attestation_operation
        and type dal_attestation = dal_attestation
-       and type tb_slot = tb_slot) attestations node_ctxt rpc_ctxt
-    ~attested_level =
+       and type tb_slot = tb_slot) attestations slot_to_committee_pkh node_ctxt
+    rpc_ctxt ~attested_level tb_slot_to_int =
   let open Lwt_result_syntax in
   let*? proto_parameters =
     Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
   in
   when_ proto_parameters.incentives_enable (fun () ->
       let published_level =
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
-           Correctly compute [published_level] in case of protocol changes, in
-           particular a change of the value of [attestation_lag]. *)
+        (* In case a protocol changes the value of [attestation_lag], the
+           computed [published_level] is wrong just after the
+           migration. However, since no slots are considered protocol-attested
+           in this period, no entrapment would be injected ([Plugin.is_attested]
+           returns [false]). *)
         Int32.(sub attested_level (of_int proto_parameters.attestation_lag))
       in
       let store = Node_context.get_store node_ctxt in
@@ -81,12 +87,18 @@ let inject_entrapment_evidences
       match traps with
       | [] -> return_unit
       | traps ->
-          let attestation_map = get_attestation_map attestations in
+          let attestation_map =
+            get_attestation_map
+              attestations
+              slot_to_committee_pkh
+              tb_slot_to_int
+          in
           let traps_to_inject =
             filter_injectable_traps attestation_map traps
-            |> (* We do not emit two denunciations for the same level, delegate
-                  and slot index, even if 2 shards assigned to this delegate
-                  were traps *)
+            |>
+            (* We do not emit two denunciations for the same level, delegate and
+               slot index, even if 2 shards assigned to this delegate were
+               traps. *)
             List.sort_uniq
               (fun
                 (delegate1, slot_index1, _, _, _, _, _)
@@ -105,7 +117,8 @@ let inject_entrapment_evidences
                    dal_attestation,
                    shard,
                    shard_proof,
-                   tb_slot ) ->
+                   tb_slot )
+               ->
               if Plugin.is_attested dal_attestation slot_index then
                 let*! () =
                   Event.emit_trap_injection

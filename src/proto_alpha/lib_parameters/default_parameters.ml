@@ -63,7 +63,10 @@ let make_sc_rollup_parameter ~dal_activation_level
       WARNING: Changing this value impacts the storage charge for
       applying messages from the outbox. It also requires migration for
       remapping existing active outbox levels to new indices. *)
-  let max_active_outbox_levels = Int32.of_int challenge_window_in_blocks in
+  let max_active_outbox_levels =
+    let previous_block_time = 8 in
+    Int32.of_int (seconds_in_a_week * 2 / previous_block_time)
+  in
 
   (* The timeout period is about a week.  It suffers from the same
      risk of censorship as {!sc_rollup_challenge_windows_in_blocks} so
@@ -155,7 +158,7 @@ let default_dal =
       feature_enable = true;
       incentives_enable = true;
       number_of_slots = 32;
-      attestation_lag = 8;
+      attestation_lag = 5;
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
       minimal_participation_ratio = Q.(64 // 100);
@@ -182,7 +185,7 @@ let default_dal =
     }
 
 let constants_mainnet : Constants.Parametric.t =
-  let block_time = 8 in
+  let block_time = 6 in
   let consensus_committee_size = 7000 in
   let Constants.Generated.
         {
@@ -275,32 +278,30 @@ let constants_mainnet : Constants.Parametric.t =
        blocks. Multiply it by [minimal_block_delay] to get the minimal
        duration of a cycle in seconds.
 
-       [blocks_per_cycle = 10800l] has been chosen so that cycles last
+       [blocks_per_cycle = 14400l] has been chosen so that cycles last
        one day (24h) (plus drift from non-zero rounds) on mainnet
-       where [minimal_block_delay] is 8s, and half a day (12h) on
-       ghostnet where [minimal_block_delay] is 4s.
+       where [minimal_block_delay] is 6s.
 
-       Last updated in protocol R. *)
-    blocks_per_cycle = 10800l;
+       Last updated in protocol T. *)
+    blocks_per_cycle = 14400l;
     (* Each [blocks_per_commitment] blocks, the block producer has to commit on
        a nonce. Currently we target 128 nonces per cycle in order to ensure the
        nonces are produced by sufficiently many different bakers.
        (blocks_per_commitment = blocks_per_cycle / 128)
 
        Don't forget to update cycles-eras when updating this parameter.
-       Last updated in protocol S.
+       Last updated in protocol T.
     *)
-    blocks_per_commitment = 84l;
+    blocks_per_commitment = 112l;
     (* Duration in levels of the nonce revelation phase (which precedes the VDF
        phase).
-       Last updated in protocol S. *)
-    nonce_revelation_threshold = 300l;
+       Last updated in protocol T. *)
+    nonce_revelation_threshold = 400l;
     (* [cycles_per_voting_period] is the duration of any voting period.
-
        Last updated in protocol R. *)
     cycles_per_voting_period = 14l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
-    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_386_666);
+    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_040_000);
     (* When reducing blocks time, consider adapting this constant so
        the block production's overhead is not too important. *)
     proof_of_work_threshold = Int64.(sub (shift_left 1L 48) 1L);
@@ -308,12 +309,12 @@ let constants_mainnet : Constants.Parametric.t =
     minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 2400M = 2400 * 5 * 0.2M with
-          - 2400 ~= 300 * 8 that is nonce_revelation_threshold * block time
-          - 0.2M  ~= number of modular squaring per second on benchmark machine
+          - 2400 ~= 400 * 6 that is nonce_revelation_threshold * block time
+          - 0.2M ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
          clock rate and benchmark machine that is 9.12/2.8 ~= 3.
-       Last updated in protocol S. *)
+       Last updated in protocol T. *)
     vdf_difficulty = 2_400_000_000L;
     origination_size = 257;
     issuance_weights =
@@ -338,6 +339,10 @@ let constants_mainnet : Constants.Parametric.t =
     quorum_min = 20_00l;
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
+    (* [liquidity_baking_subsidy] is the amount to mint for the
+       constant product market making (CPMM) contract, in tez/minute.
+       Last updated in protocol P (it was then changed from tez/block
+       to tez/minute.)  *)
     liquidity_baking_subsidy = Tez.(mul_exn one 5);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
@@ -349,12 +354,12 @@ let constants_mainnet : Constants.Parametric.t =
 
        The unit for this value is a block.
     *)
-    max_operations_time_to_live = 450;
+    max_operations_time_to_live = 600;
     (* Round [k] lasts [minimal_block_delay + k * delay_increment_per_round]. *)
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     (* [delay_increment_per_round] must be strictly positive to ensure
        strictly increasing round durations, as required by Tenderbake. *)
-    delay_increment_per_round = Period.of_seconds_exn 4L;
+    delay_increment_per_round = Period.of_seconds_exn 3L;
     consensus_committee_size;
     consensus_threshold_size;
     (* 4667 slots *)
@@ -421,7 +426,12 @@ let constants_mainnet : Constants.Parametric.t =
     (* attestation aggregation feature flag *)
     aggregate_attestation = true;
     allow_tz4_delegate_enable = true;
-    all_bakers_attest_activation_level = None;
+    (* Portion of tz4 bakers required to activate all bakers attest (50%) *)
+    all_bakers_attest_activation_threshold =
+      Ratio.{numerator = 1; denominator = 2};
+    (* Native contracts feature flag *)
+    native_contracts_enable = false;
+    swrr_new_baker_lottery_enable = false;
   }
 
 let constants_sandbox =
@@ -459,6 +469,7 @@ let constants_sandbox =
     limit_of_delegation_over_baking = 19;
     max_operations_time_to_live = 8;
     allow_tz4_delegate_enable = true;
+    native_contracts_enable = true;
   }
 
 let constants_test =
@@ -500,6 +511,7 @@ let constants_test =
       (* Not 9 so that multiplication by a percentage and
          divisions by a limit do not easily get intermingled. *);
     max_operations_time_to_live = 8;
+    native_contracts_enable = true;
   }
 
 let test_commitments =

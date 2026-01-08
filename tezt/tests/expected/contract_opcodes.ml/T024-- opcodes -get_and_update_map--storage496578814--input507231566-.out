@@ -1,0 +1,34 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/get_and_update_map.tz on storage '(Pair (Some 5) { Elt "hello" 4 })' and input '"hi"' --level 1 --trace-stack
+storage
+  (Pair None { Elt "hello" 4 ; Elt "hi" 5 })
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (just consumed gas: 8.074)
+    [ (Pair "hi" (Some 5) { Elt "hello" 4 }) ]
+  - location: 13 (just consumed gas: 0.010)
+    [ "hi"
+      (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 14 (just consumed gas: 0.035)
+    [ "hi"
+      (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 17 (just consumed gas: 0.075)
+    [ None
+      { Elt "hello" 4 ; Elt "hi" 5 } ]
+  - location: 18 (just consumed gas: 0.010)
+    [ (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Pair None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} None { Elt "hello" 4 ; Elt "hi" 5 }) ]
+

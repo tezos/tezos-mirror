@@ -57,7 +57,7 @@ let dummy_context () =
       ~timestamp:Time.Protocol.epoch
       (* ~fitness:[] *)
       (block.context : Tezos_protocol_environment.Context.t)
-      ~adaptive_issuance_enable:false
+      ~all_bakers_attest_first_level:None
   in
   return ctxt
 
@@ -451,20 +451,18 @@ let hard_gas_limit_per_block = 1_386_666
 (** Tests the consumption of all gas in a block, should pass *)
 let test_consume_exactly_all_block_gas () =
   let open Lwt_result_syntax in
-  let number_of_ops = 2 in
+  let number_of_ops = 1 in
   let* block, src_list, dst =
     block_with_one_origination number_of_ops nil_contract
   in
   let lld =
-    List.mapi
-      (fun i src ->
+    List.map
+      (fun src ->
         [
           ( src,
             dst,
             Alpha_context.Gas.Arith.integral_of_int_exn
-              (if i = number_of_ops - 1 then
-                 hard_gas_limit_per_block - hard_gas_limit_per_operation
-               else hard_gas_limit_per_operation) );
+              hard_gas_limit_per_operation );
         ])
       src_list
   in

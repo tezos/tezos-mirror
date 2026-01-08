@@ -54,8 +54,8 @@ module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
       (fun RPC.
-             {level; level_position; cycle; cycle_position; expected_commitment} ->
-        (level, level_position, cycle, cycle_position, expected_commitment))
+             {level; level_position; cycle; cycle_position; expected_commitment}
+         -> (level, level_position, cycle, cycle_position, expected_commitment))
       Check.(tuple5 int int int int bool)
 
   let get_current_level client =
@@ -819,7 +819,7 @@ let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
 
 let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
     ~(delegate : Account.key) ~(consensus : Account.key)
-    ~(destination : Account.key) client =
+    ~(destination : Account.key) ~protocol client =
   let* () =
     update_consensus_key ~baker ~src:delegate ~consensus_key:consensus client
   in
@@ -854,6 +854,13 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
       ~baker:consensus.alias
         (* In case delegate = baker, use the consensus key updated above *)
       client
+  in
+  let* _ =
+    if Protocol.number protocol >= 024 then
+      Lwt.map ignore
+      @@ Client.RPC.call ~hooks client
+      @@ RPC.get_baking_power_distribution_for_current_cycle ()
+    else return ()
   in
   let* _ =
     Client.RPC.call ~hooks client
@@ -999,7 +1006,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus = destination)"
-      (fun _protocol client baker_0 _baker_1 account_0 _account_1 _account_2 ->
+      (fun protocol client baker_0 _baker_1 account_0 _account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -1008,13 +1015,14 @@ let register ~protocols =
           ~delegate
           ~consensus
           ~destination
+          ~protocol
           client)
       protocols
   in
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus <> destination)"
-      (fun _protocol client baker_0 _baker_1 account_0 account_1 _account_2 ->
+      (fun protocol client baker_0 _baker_1 account_0 account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
@@ -1023,13 +1031,14 @@ let register ~protocols =
           ~delegate
           ~consensus
           ~destination
+          ~protocol
           client)
       protocols
   in
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus = destination)"
-      (fun _protocol client baker_0 baker_1 account_0 _account_1 _account_2 ->
+      (fun protocol client baker_0 baker_1 account_0 _account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -1038,13 +1047,14 @@ let register ~protocols =
           ~delegate
           ~consensus
           ~destination
+          ~protocol
           client)
       protocols
   in
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus <> destination)"
-      (fun _protocol client baker_0 baker_1 account_0 account_1 _account_2 ->
+      (fun protocol client baker_0 baker_1 account_0 account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
@@ -1053,6 +1063,7 @@ let register ~protocols =
           ~delegate
           ~consensus
           ~destination
+          ~protocol
           client)
       protocols
   in

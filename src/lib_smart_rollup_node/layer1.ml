@@ -164,6 +164,8 @@ let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
 
 let shutdown {l1; _} = shutdown l1
 
+let get_chain_id {l1; _} = Layer_1.get_chain_id l1
+
 let cache_shell_header {headers_cache; _} hash header =
   Blocks_cache.put headers_cache hash (Lwt.return_ok header)
 
@@ -322,3 +324,26 @@ let prefetch_tezos_blocks fetch extract_header l1_ctxt = function
           in
           ())
         blocks
+
+let already_seen last last_parent hash =
+  Option.equal Block_hash.equal last (Some hash)
+  || Option.equal Block_hash.equal last_parent (Some hash)
+
+let iter_finalized_heads ?name ~prefetch l1_ctxt f =
+  let last = ref None in
+  let last_parent = ref None in
+  iter_heads ?name l1_ctxt @@ fun {hash; level; header; _} ->
+  unless (already_seen !last !last_parent hash) @@ fun () ->
+  last_parent := !last ;
+  last := Some hash ;
+  let open Lwt_result_syntax in
+  prefetch l1_ctxt {hash; level} ;
+  let* finalized_hash, finalized_level =
+    (* Should be in cache *)
+    get_predecessor l1_ctxt (header.predecessor, Int32.pred level)
+  in
+  let* finalized_header =
+    (* Should be in cache after start + 2 *)
+    fetch_tezos_shell_header l1_ctxt finalized_hash
+  in
+  f {hash = finalized_hash; level = finalized_level; header = finalized_header}

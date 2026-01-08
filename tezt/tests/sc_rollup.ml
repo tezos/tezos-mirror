@@ -2340,7 +2340,8 @@ let commitments_reorgs ~switch_l1_node ~kind _ sc_rollup_node sc_rollup node
          let snapshot_ticks = max_nb_ticks in
          snapshot_ticks * 4
          (* 1 snapshot for collecting messages, 3 snapshots for SOL,
-            Info_per_level and SOL *) * levels_to_commitment
+            Info_per_level and SOL *)
+         * levels_to_commitment
          (* Number of inbox that are actually processed process *)
      | _ -> assert false
    in
@@ -2492,7 +2493,8 @@ let attempt_withdraw_stake =
       ?(src = Constant.bootstrap1.public_key_hash)
       ?(staker = Constant.bootstrap1.public_key_hash)
       ?(keys = [Constant.bootstrap2.alias])
-      client ->
+      client
+    ->
     let recover_bond_fee = 1_000_000 in
     let inject_op () =
       Client.Sc_rollup.submit_recover_bond
@@ -3178,7 +3180,7 @@ let test_can_stake ~kind =
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ({allow_degraded; _} as scenario) =
+    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3204,11 +3206,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~rollup_node_name:"honest"
     ~allow_degraded
     {
-      tags;
+      tags = tags @ extra_tags;
       variant = Some variant;
       description = "refutation games winning strategies";
     }
-    (test_refutation_scenario_aux ~mode ~kind scenario)
+    (test_refutation_scenario_aux ?with_dal ~mode ~kind scenario)
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
@@ -3421,6 +3423,30 @@ let test_refutation protocols ~kind =
         inputs
         protocols)
     tests
+
+let test_invalid_dal_parameters protocols =
+  test_refutation_scenario
+    ~uses:(fun _protocol ->
+      [
+        Constant.WASM.echo_dal_reveal_parameters; Constant.smart_rollup_installer;
+      ])
+    ~kind:"wasm_2_0_0"
+    ~mode:Operator
+    ~challenge_window:10
+    ~timeout:160
+    ~commitment_period:10
+    ~variant:"invalid_dal_parameters"
+    ~boot_sector:
+      (read_kernel
+         ~base:""
+         ~suffix:""
+         (Uses.path Constant.WASM.echo_dal_reveal_parameters))
+    (refutation_scenario_parameters
+       ~loser_modes:["reveal_dal_parameters 6 6 6 6"]
+       (inputs_for 10)
+       ~final_level:160
+       ~priority:`Priority_honest)
+    protocols
 
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
@@ -3736,15 +3762,17 @@ let cement_commitments protocol client sc_rollup ?fail =
 *)
 let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
   test_forking_scenario ~variant:"publish, and cement on wrong commitment"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             level0
-             level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      level0
+      level1
+    ->
   let c1, c2, c31, c32, c311, _c321 = commits in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
@@ -3804,15 +3832,17 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
 *)
 let test_valid_dispute_dissection =
   test_forking_scenario ~variant:"valid dispute dissection"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             _level0
-             _level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      _level0
+      _level1
+    ->
   let c1, c2, c31, c32, _c311, _c321 = commits in
   let cement = cement_commitments protocol client sc_rollup in
   let* constants = get_sc_rollup_constants client in
@@ -3866,15 +3896,17 @@ let test_valid_dispute_dissection =
    to get to the point where we can timeout. *)
 let test_timeout =
   test_forking_scenario ~variant:"timeout"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             level0
-             level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      level0
+      level1
+    ->
   (* These are the commitments on the rollup. See [test_forking_scenario] to
        visualize the tree structure. *)
   let c1, c2, c31, c32, _c311, _c321 = commits in
@@ -5759,10 +5791,10 @@ let test_rollup_whitelist_update ~kind =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
+           ("kind", `String "whitelist_update");
+         ])
   in
   let send_whitelist_then_bake_until_exec encoded_whitelist_msgs =
     let* _res =
@@ -5897,24 +5929,24 @@ let test_rollup_whitelist_outdated_update ~kind =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
+           ("kind", `String "whitelist_update");
+         ])
   in
   let* payload2 =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ( "whitelist",
-            `A
-              [
-                `String Constant.bootstrap1.public_key_hash;
-                `String Constant.bootstrap2.public_key_hash;
-              ] );
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ( "whitelist",
+             `A
+               [
+                 `String Constant.bootstrap1.public_key_hash;
+                 `String Constant.bootstrap2.public_key_hash;
+               ] );
+           ("kind", `String "whitelist_update");
+         ])
   in
   (* Execute whitelist update with outdated message index. *)
   let* _hash, outbox_level, message_index =
@@ -7198,9 +7230,13 @@ let register_riscv_jstz ~protocols =
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
     ~inbox_file:inbox_file_uses ;
+  (* The refutation game scenario is too long to enable in merge pipelines and currently
+   * consumes too much memory to run as a regular slow test.
+   * It can be manually run as part of the `tezt-riscv-slow-sequential` job. *)
   test_refutation_scenario
     ~kind
     ~ci_disabled:true
+    ~extra_tags:["riscv_slow_sequential"]
     ~mode:Operator
     ~challenge_window:400
     ~timeout:400
@@ -7355,7 +7391,7 @@ let register ~protocols =
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
 
-  (* Specific riscv PVM tezt *)
+  (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
   register_riscv_jstz ~protocols:[Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
@@ -7392,6 +7428,7 @@ let register_protocol_independent () =
   test_reveals_fails_on_unknown_hash protocols ;
   test_injector_auto_discard protocols ;
   test_accuser protocols ;
+  test_invalid_dal_parameters protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;

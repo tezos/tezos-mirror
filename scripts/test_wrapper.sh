@@ -46,7 +46,7 @@ if [ -n "${CI_NODE_INDEX:-}" ] &&
 
 fi
 
-echo "Running test \"dune build ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets}\" ..."
+echo "Running test \"dune build ${DUNE_ARGS:-} ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets}\" ..."
 
 START=$(date +%s.%N)
 
@@ -58,7 +58,7 @@ exitcode_file=$(mktemp)
   # The same holds for ${group_target:-$all_targets} which may contain multiple targets
   # and must be word split.
   # shellcheck disable=SC2086
-  dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets} 2>&1 ||
+  dune build ${DUNE_ARGS:-} --error-reporting=twice ${COVERAGE_OPTIONS:-} ${group_target:-$all_targets} 2>&1 ||
     echo "$?" > "$exitcode_file"
 } | tee "test_results/$name.log"
 EXITCODE=$(cat "$exitcode_file")

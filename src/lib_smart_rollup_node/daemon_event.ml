@@ -53,20 +53,6 @@ module Simple = struct
       ("process_time", Time.System.Span.encoding)
       ~pp3:Ptime.Span.pp
 
-  let etherlink_blocks_processed =
-    declare_4
-      ~section
-      ~name:"smart_rollup_node_daemon_etherlink_blocks_processed"
-      ~msg:
-        "{nb_blocks} Etherlink blocks (from {first_block} to {last_block}) \
-         processed in {process_time}"
-      ~level:Notice
-      ("nb_blocks", Data_encoding.int31)
-      ("first_block", Data_encoding.int31)
-      ("last_block", Data_encoding.int31)
-      ("process_time", Time.System.Span.encoding)
-      ~pp4:Ptime.Span.pp
-
   let new_head_degraded =
     declare_2
       ~section
@@ -241,20 +227,6 @@ let head_processing hash level = Simple.(emit head_processing (hash, level))
 
 let new_head_processed hash level process_time =
   Simple.(emit new_head_processed (hash, level, process_time))
-
-let etherlink_blocks_processed ~etherlink_start_block ~etherlink_end_block
-    process_time =
-  match (etherlink_start_block, etherlink_end_block) with
-  | None, _ | _, None -> Lwt.return_unit
-  | Some start_block, Some end_block ->
-      let nb = end_block - start_block in
-      if nb <= 0 then Lwt.return_unit
-      else
-        let first_block = start_block + 1 in
-        Simple.(
-          emit
-            etherlink_blocks_processed
-            (nb, first_block, end_block, process_time))
 
 let new_head_degraded hash level = Simple.(emit new_head_degraded (hash, level))
 

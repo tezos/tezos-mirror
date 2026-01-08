@@ -2,7 +2,7 @@
 
 //! Types for values creating in the OCaml side, and passed to Rust code and back.
 
-use ocaml::{FromValue, Runtime, ToValue, Value};
+use ocaml::{FromValue, List, Runtime, ToValue, Value};
 
 #[derive(Clone)]
 pub struct EvmTree(Value);
@@ -103,5 +103,65 @@ unsafe impl ToValue for SmartRollupAddress {
 unsafe impl FromValue for SmartRollupAddress {
     fn from_value(value: Value) -> Self {
         SmartRollupAddress(FromValue::from_value(value))
+    }
+}
+
+#[derive(Clone)]
+pub struct OpenTelemetryScope(Value);
+
+unsafe impl ToValue for OpenTelemetryScope {
+    fn to_value(&self, _gc: &Runtime) -> Value {
+        self.0.clone()
+    }
+}
+
+unsafe impl FromValue for OpenTelemetryScope {
+    fn from_value(value: Value) -> Self {
+        OpenTelemetryScope(value)
+    }
+}
+
+pub enum OTelAttrValue {
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    String(String),
+}
+
+pub struct OCamlPairList(Vec<(String, OTelAttrValue)>);
+
+impl OCamlPairList {
+    pub fn new(str_pair_list: Vec<(String, OTelAttrValue)>) -> Self {
+        Self(str_pair_list)
+    }
+
+    pub fn to_value(&self, gc: &Runtime) -> List<Value> {
+        unsafe {
+            let mut ocaml_list = List::empty();
+
+            for (key, value) in self.0.iter() {
+                let key = Value::string(key);
+                let value = match value {
+                    OTelAttrValue::Bool(b) => {
+                        Value::hash_variant(gc, "Bool", Some(Value::bool(*b)))
+                    }
+                    OTelAttrValue::Int(i) => Value::hash_variant(gc, "Int", Some(Value::int32(*i))),
+                    OTelAttrValue::Float(f) => {
+                        Value::hash_variant(gc, "Float", Some(Value::double(*f)))
+                    }
+                    OTelAttrValue::String(s) => {
+                        Value::hash_variant(gc, "String", Some(Value::string(s)))
+                    }
+                };
+
+                let mut tuple = Value::alloc_tuple(2);
+                tuple.store_field(gc, 0, key);
+                tuple.store_field(gc, 1, value);
+
+                ocaml_list = ocaml_list.add(gc, &tuple);
+            }
+
+            ocaml_list
+        }
     }
 }

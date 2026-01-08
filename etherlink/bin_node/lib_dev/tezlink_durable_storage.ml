@@ -17,8 +17,12 @@ module Path = struct
     let (`Hex s) = Hex.of_bytes raw_key in
     s
 
+  let accounts_index = "/tezlink/context/contracts/index"
+
+  let big_map = "/tezlink/context/big_map"
+
   let account contract =
-    "/tezlink/context/contracts/index/" ^ to_path Contract.encoding contract
+    accounts_index ^ "/" ^ to_path Contract.encoding contract
 
   let balance contract = account contract ^ "/balance"
 
@@ -27,7 +31,11 @@ module Path = struct
   let counter contract = account contract ^ "/counter"
 
   let storage contract = account contract ^ "/data/storage"
+
+  let code contract = account contract ^ "/data/code"
 end
+
+let contract_of_path = Contract.of_hex
 
 let balance read c =
   Durable_storage.inspect_durable_and_decode_default
@@ -35,6 +43,11 @@ let balance read c =
     read
     (Path.balance c)
     (Data_encoding.Binary.of_bytes_exn Tez.encoding)
+
+let balance_z read c =
+  let open Lwt_result_syntax in
+  let* b = balance read c in
+  return @@ Tezos_types.Tez.to_mutez_z b
 
 let manager read c =
   Durable_storage.inspect_durable_and_decode_opt

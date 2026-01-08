@@ -51,8 +51,8 @@ module Profiler = struct
 end
 
 type loop_state = {
-  heads_stream : Baking_state.proposal Lwt_stream.t;
-  get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
+  heads_stream : proposal Lwt_stream.t;
+  get_valid_blocks_stream : proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
   forge_event_stream : forge_event Lwt_stream.t;
   future_block_stream :
@@ -288,13 +288,9 @@ let rec wait_next_event ~timeout loop_state =
       return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
-let first_potential_round_at_next_level state ~earliest_round =
+let first_potential_round ~committee_size ~owned_slots ~earliest_round =
   let open Option_syntax in
   let ( let*? ) res f = match res with Error _ -> None | Ok x -> f x in
-  let committee_size =
-    state.global_state.constants.Constants.parametric.consensus_committee_size
-  in
-  let owned_slots = state.level_state.next_level_delegate_slots in
   (* Rounds attribution cycles with a period of [committee_size].
      To find the next owned round, we translate [earliest_round] into a slot
      within the range [0 ... committee_size], look for the first subsequent slot
@@ -317,6 +313,20 @@ let first_potential_round_at_next_level state ~earliest_round =
         Round.of_int (slot + (committee_size * (1 + period_offset)))
       in
       Some (round, delegate.delegate)
+
+let first_potential_round_at_next_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.next_level_delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
+
+let first_potential_round_at_current_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 (** [current_round_at_next_level] converts the current system timestamp
     into the first non-expired round at the next level *)
@@ -608,17 +618,17 @@ let create_round_durations constants =
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker round_durations
-    ~(current_proposal : Baking_state.proposal) ?constants delegates =
+    config operation_worker round_durations ~(current_proposal : proposal)
+    ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
   let open Baking_state in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let* validation_mode =
     Baking_state.(
@@ -777,7 +787,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  () [@profiler.reset_block_section event] ;
+  () [@profiler.overwrite Profiler.reset_block_section (event, [])] ;
   (let*! state', action =
      (State_transitions.step
         state
@@ -900,7 +910,7 @@ let try_resolve_consensus_keys cctxt key =
   let levels_to_inspect = 50 in
   let pkh = Key_id.to_pkh key.Key.id in
   let* res =
-    Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
+    Node_rpc.delegate_deactivated cctxt ~chain:`Main ~block:(`Head 0) pkh
   in
   match res with
   | Ok _deactivated ->
@@ -915,10 +925,12 @@ let try_resolve_consensus_keys cctxt key =
           return pkh
         else
           let* attesting_rights =
-            Plugin.RPC.Validators.get
+            Node_rpc.get_validators
               cctxt
-              (`Main, `Head head_offset)
+              ~chain:`Main
+              ~block:(`Head head_offset)
               ~consensus_keys:[pkh]
+              ()
           in
           match attesting_rights with
           | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
@@ -977,12 +989,12 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     config delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
-  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
+  let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -1065,7 +1077,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
   let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
   () [@profiler.stop] ;
-  () [@profiler.reset_block_section profiler_section] ;
+  () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in

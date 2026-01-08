@@ -37,3 +37,13 @@ val call_service :
   'b ->
   'c ->
   'd tzresult Lwt.t
+
+(** HTTP client span attributes that follow
+    {{:https://opentelemetry.io/docs/specs/semconv/http/http-spans/#http-client-span}Opentelemetry
+    semantic conventions} *)
+val span_attributes :
+  Tezos_rpc_http.Media_type.t list ->
+  [< Resto.meth] ->
+  ?route:string ->
+  Uri.t ->
+  Opentelemetry.key_value list

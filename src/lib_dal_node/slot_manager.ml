@@ -174,12 +174,12 @@ let commit cryptobox polynomial =
 
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
-  | Ok p -> Lwt.return_ok p
+  | Ok p -> Ok p
   | Error
       ( `Not_enough_shards msg
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
-      Lwt.return_error (Errors.other [Merging_failed msg])
+      Error (Errors.other [Merging_failed msg])
 
 let get_slot_content_from_shards cryptobox store slot_id =
   let open Lwt_result_syntax in
@@ -201,7 +201,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
       | Error _ -> loop acc (shard_id + 1) remaining
   in
   let* shards = loop Seq.empty 0 minimal_number_of_shards in
-  let* polynomial = polynomial_from_shards cryptobox shards in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
   let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in
@@ -356,24 +356,25 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    skip list cell stored in the SQLite store.
 
    Steps:
-   - Fetch the skip list cell for the given [attested_level] and slot index from
-     the SQLite store.
+   - Fetch the skip list cell for the given [slot_id] from the SQLite store.
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
     Returns [None] if the cell is not found in the store. *)
-let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
-    ctxt ~attested_level slot_id =
+let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
     Store.Skip_list_cells.find_by_slot_id_opt
       (Node_context.get_store ctxt)
-      ~attested_level
-      ~slot_index:slot_id.Types.Slot_id.slot_index
+      slot_id
   in
   match cell_bytes_opt with
   | None -> return_none
-  | Some cell_bytes ->
+  | Some (cell_bytes, attestation_lag) ->
+      let*? (module Plugin : Dal_plugin.T) =
+        let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
+        Node_context.get_plugin_for_level ctxt ~level
+      in
       Dal_proto_types.Skip_list_cell.to_proto
         Plugin.Skip_list.cell_encoding
         cell_bytes
@@ -386,10 +387,21 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
    - Retrieve the skip list cells for [attested_level] using the plugin from L1.
    - Locate the one matching the [slot_index] of [slot_id].
    - Extract and return the slot header via the plugin. *)
-let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
-    ~dal_constants ~attested_level slot_id =
+let _try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
+  let*? (module Plugin : Dal_plugin.T), dal_constants =
+    Node_context.get_plugin_and_parameters_for_level ctxt ~level:slot_level
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
+     The attested level is wrong around migration!
+     Example: If [M] is the migration level, for [slot_level = M-2],
+     [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
+     [attested_level = M+6], but at this level skip-list cells for
+     [slot_level = M+1] are found in the L1 context.  *)
+  let attested_level =
+    Int32.(add slot_level (of_int dal_constants.Types.attestation_lag))
+  in
   let* cells_of_level =
     let pred_published_level = Int32.pred slot_level in
     Plugin.Skip_list.cells_of_level
@@ -405,10 +417,11 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
   in
   match
     List.find_all
-      (fun (_hash, _cell, cell_slot_index) -> cell_slot_index = slot_index)
+      (fun (_hash, _cell, cell_slot_index, _cell_attestation_lag) ->
+        cell_slot_index = slot_index)
       cells_of_level
   with
-  | [(_cell_hash, cell, _slot_index)] ->
+  | [(_cell_hash, cell, _slot_index, _cell_attestation_lag)] ->
       Plugin.Skip_list.slot_header_of_cell cell |> return
   | _ ->
       (* This should not happen (unless the slot index is not valid). In fact,
@@ -425,31 +438,15 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
 
    Retrieval order:
     1. Attempt to get the header from the local SQLite skip list.
-    2. If not found, fall back to fetching it from the L1 skip list context.
+    2. ~~If not found, fall back to fetching it from the L1 skip list context.~~
 
     Returns [Some commitment] if found and matches the [slot_id], [None]
     otherwise. Performs assertions to ensure the returned slot header matches
     the requested [slot_id]. *)
-let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
-    slot_id ~attested_level =
+let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
-    let*! from_sqlite =
-      try_get_slot_header_from_indexed_skip_list
-        dal_plugin
-        ctxt
-        ~attested_level
-        slot_id
-    in
-    match from_sqlite with
-    | Ok (Some _header as res) -> return res
-    | _ ->
-        try_get_slot_header_from_L1_skip_list
-          dal_plugin
-          ctxt
-          ~dal_constants
-          ~attested_level
-          slot_id
+    try_get_slot_header_from_indexed_skip_list ctxt slot_id
   in
   match published_slot_header_opt with
   | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
@@ -460,6 +457,11 @@ let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
   | Ok None ->
       (* The function(s) above succeeded, but nothing was found as "published". *)
       return_none
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
+     If the header was not found, or there was an error, then normally we would
+     try to get it from the L1 context, using
+     [_try_get_slot_header_from_L1_skip_list ctxt slot_id]. See the FIXME there
+     to see why we don't use it. *)
   | Error error -> tzfail error
 
 (* This function attempts to retrieve the commitment associated to a (published)
@@ -470,25 +472,7 @@ let get_commitment_from_slot_id ctxt slot_id =
   match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
   | Some res -> return res
   | None -> (
-      let published_level = slot_id.Types.Slot_id.slot_level in
-      let*? dal_plugin, dal_constants =
-        Node_context.get_plugin_and_parameters_for_level
-          ctxt
-          ~level:published_level
-      in
-      let attested_level =
-        Int32.add
-          published_level
-          (Int32.of_int dal_constants.Types.attestation_lag)
-      in
-      let*! res =
-        try_get_commitment_of_slot_id_from_skip_list
-          dal_plugin
-          ctxt
-          dal_constants
-          slot_id
-          ~attested_level
-      in
+      let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
       | Ok (Some res) -> return res
       | Ok None ->
@@ -573,6 +557,9 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
 
 (* Main functions *)
 
+(* Important: this function is in the scope of Eio runtime and prohibits the
+   usage of Lwt. Lwt calls must be wrapped in a proper way. See
+   https://gitlab.com/tezos/tezos/-/issues/8140. *)
 let maybe_register_trap traps_store ~traps_fraction message_id message =
   let delegate = message_id.Types.Message_id.pkh in
   let Types.Message.{share; shard_proof} = message in
@@ -582,11 +569,12 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
   | Ok true ->
       let slot_id = Types.Slot_id.{slot_index; slot_level = level} in
       let () =
-        Event.emit_dont_wait__register_trap
-          ~delegate
-          ~published_level:slot_id.slot_level
-          ~slot_index:slot_id.slot_index
-          ~shard_index
+        Tezos_bees.Hive.async_lwt (fun () ->
+            Event.emit_register_trap
+              ~delegate
+              ~published_level:slot_id.slot_level
+              ~slot_index:slot_id.slot_index
+              ~shard_index)
       in
       Store.Traps.add
         traps_store
@@ -597,31 +585,53 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
         ~shard_proof
   | Ok false -> ()
   | Error _ ->
-      Lwt.dont_wait
-        (fun () ->
+      Tezos_bees.Hive.async_lwt (fun () ->
           Event.emit_trap_check_failure
             ~delegate
             ~published_level:level
             ~slot_index
             ~shard_index)
-        (fun exc -> raise exc)
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =
   let open Lwt_result_syntax in
-  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  let shards =
+    (Cryptobox.shards_from_polynomial
+       cryptobox
+       polynomial
+     [@profiler.wrap_f
+       {driver_ids = [Opentelemetry]}
+         (Opentelemetry_helpers.trace_slot_no_commitment
+            ~attrs:[]
+            ~slot:(Bytes.to_string slot)
+            ~name:"shards_from_polynomial")])
+  in
   let*? precomputation =
     match shards_proofs_precomputation with
     | None -> Error (`Other [No_prover_SRS])
     | Some precomputation -> Ok precomputation
   in
   let shard_proofs =
-    Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+    (Cryptobox.prove_shards
+       cryptobox
+       ~polynomial
+       ~precomputation
+     [@profiler.wrap_f
+       {driver_ids = [Opentelemetry]}
+         (Opentelemetry_helpers.trace_slot_no_commitment
+            ~attrs:[]
+            ~slot:(Bytes.to_string slot)
+            ~name:"prove_shards")])
   in
   let shares =
-    Array.map (fun Cryptobox.{index = _; share} -> share) (Array.of_seq shards)
+    Array.of_seq @@ Seq.map (fun Cryptobox.{index = _; share} -> share) shards
   in
-  Store.cache_entry node_store commitment slot shares shard_proofs ;
+  Store.cache_not_yet_published_entry
+    node_store
+    commitment
+    slot
+    shares
+    shard_proofs ;
   return_unit
 
 let get_opt array i =
@@ -715,18 +725,21 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
 
 let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
-  (publish_proved_shards
-     ctxt
-     slot_id
-     ~level_committee
-     proto_parameters
-     commitment
-     shards
-     shard_proofs
-     gs_worker
-   [@profiler.wrap_f
-     {driver_ids = [Opentelemetry]}
-       (Opentelemetry_helpers.trace_slot ~name:"publish_shards" slot_id)])
+  publish_proved_shards
+    ctxt
+    slot_id
+    ~level_committee
+    proto_parameters
+    commitment
+    shards
+    shard_proofs
+    gs_worker
+  [@profiler.wrap_f
+    {driver_ids = [Opentelemetry]}
+      (Opentelemetry_helpers.trace_slot
+         ~name:"publish_shards"
+         ~slot_commitment:commitment
+         ~slot_id)]
 
 (** This function publishes the shards of a commitment that is waiting
     for attestation on L1 if this node has those shards and their proofs
@@ -735,7 +748,7 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
     proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
   let node_store = Node_context.get_store ctxt in
-  let cache = Store.cache node_store in
+  let cache = Store.not_yet_published_cache node_store in
   match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
       (* The commitment was likely published by a different node. It would be
@@ -750,6 +763,9 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
       let* () =
         Store.Shards.write_all (Store.shards node_store) slot_id shards
         |> Errors.to_tzresult
+      in
+      let* () =
+        Attestable_slots.may_notify_attestable_slot_or_trap ctxt ~slot_id
       in
       let* () =
         Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
@@ -768,19 +784,47 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
 let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
   Store.(add_slot_headers ~number_of_slots ~block_level slot_headers node_store)
 
-let update_selected_slot_headers_statuses ~block_level ~attestation_lag
-    ~number_of_slots attested_slots node_store =
-  let slot_header_statuses_store = Store.slot_header_statuses node_store in
-  Store.Statuses.update_selected_slot_headers_statuses
-    ~block_level
-    ~attestation_lag
-    ~number_of_slots
-    attested_slots
-    slot_header_statuses_store
+module Statuses = struct
+  let get_status_from_skip_list ctxt (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let* slot_cell =
+      Store.Skip_list_cells.find_by_slot_id_opt
+        (Node_context.get_store ctxt)
+        slot_id
+    in
+    match slot_cell with
+    | None -> return_none
+    | Some (cell, attestation_lag) ->
+        let*? (module Plugin : Dal_plugin.T) =
+          let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
+          Node_context.get_plugin_for_level ctxt ~level
+        in
+        Dal_proto_types.Skip_list_cell.to_proto
+          Plugin.Skip_list.cell_encoding
+          cell
+        |> Plugin.Skip_list.proto_attestation_status
+        |> Option.map (fun s -> (s :> Types.header_status))
+        |> return
 
-let get_slot_status ~slot_id node_store =
-  let slot_header_statuses_store = Store.slot_header_statuses node_store in
-  Store.Statuses.get_slot_status ~slot_id slot_header_statuses_store
+  let find_status ctxt (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let store = Node_context.get_store ctxt in
+    let statuses_cache = Store.statuses_cache store in
+    match Store.Statuses_cache.get_slot_status statuses_cache slot_id with
+    | Some status -> return status
+    | None -> (
+        let*! status = get_status_from_skip_list ctxt slot_id in
+        match status with
+        | Ok (Some res) -> return res
+        | Ok None -> fail `Not_found
+        | Error e -> fail (`Other e))
+end
+
+let update_slot_header_status node_store slot_id status =
+  let statuses_cache = Store.statuses_cache node_store in
+  Store.Statuses_cache.update_slot_header_status statuses_cache slot_id status
+
+let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read (Store.shards store) slot_id shard_index

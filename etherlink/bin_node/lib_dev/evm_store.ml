@@ -42,7 +42,8 @@ module Legacy_encodings = struct
              blobGasUsed = _;
              excessBlobGas = _;
              parentBeaconBlockRoot = _;
-           } ->
+           }
+         ->
         ( ( ( number,
               hash,
               parent,
@@ -84,7 +85,8 @@ module Legacy_encodings = struct
                  transactions,
                  uncles,
                  baseFeePerGas ) ),
-             prevRandao ) ->
+             prevRandao )
+         ->
         {
           number;
           hash;
@@ -207,8 +209,7 @@ module Q = struct
     custom
       ~encode:(fun hash ->
         Ok
-          (hash |> Irmin_context.context_hash_of_hash
-         |> Smart_rollup_context_hash.to_context_hash
+          (hash |> Smart_rollup_context_hash.to_context_hash
          |> Context_hash.to_b58check))
       ~decode:(fun bytes ->
         let open Result_syntax in
@@ -216,8 +217,7 @@ module Q = struct
           Option.to_result ~none:"Not a valid b58check encoded hash"
           @@ Context_hash.of_b58check_opt bytes
         in
-        hash |> Smart_rollup_context_hash.of_context_hash
-        |> Irmin_context.hash_of_context_hash)
+        hash |> Smart_rollup_context_hash.of_context_hash)
       string
 
   let root_hash =
@@ -437,7 +437,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 21
+    let version = 22
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -814,7 +814,22 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
+
+    let select_receipts_from_block_range =
+      (t2 level level
+      ->* t6
+            block_hash
+            quantity
+            root_hash
+            address
+            (option address)
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
+              WHERE ? <= block_number AND block_number < ?
+              ORDER BY block_number DESC, index_ DESC|eos}
 
     let select_object =
       (root_hash
@@ -1037,6 +1052,16 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
           let*! () = Evm_store_events.applied_migration M.name migration_time in
           return_unit)
         migrations
+    in
+    let* legacy_block_storage_mode =
+      with_connection conn @@ fun conn ->
+      Db.find conn Q.Block_storage_mode.legacy ()
+    in
+    let* () =
+      when_ legacy_block_storage_mode @@ fun () ->
+      failwith
+        "The EVM node is in legacy block storage mode which is no longer \
+         supported."
     in
     return_unit
   in
@@ -1468,7 +1493,8 @@ module Transactions = struct
                  type_;
                  status;
                  contract_address;
-               } ) ->
+               } )
+         ->
         Transaction_receipt.
           {
             transactionHash = hash;
@@ -1489,15 +1515,10 @@ module Transactions = struct
       receipt
 
   let receipts_of_block_number store level =
-    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let+ rows =
-      Db.collect_list
-        conn
-        Q.Transactions.select_receipts_from_block_number
-        level
-    in
-    List.map
+    Db.fold
+      conn
+      Q.Transactions.select_receipts_from_block_number
       (fun ( block_hash,
              index,
              hash,
@@ -1513,7 +1534,9 @@ module Transactions = struct
                  type_;
                  status;
                  contract_address;
-               } ) ->
+               } )
+           acc
+         ->
         Transaction_receipt.
           {
             transactionHash = hash;
@@ -1530,8 +1553,58 @@ module Transactions = struct
             type_;
             status;
             contractAddress = contract_address;
-          })
-      rows
+          }
+        :: acc)
+      level
+      []
+
+  let receipts_of_block_range store (Ethereum_types.Qty level) len =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ res =
+      Db.fold
+        conn
+        Q.Transactions.select_receipts_from_block_range
+        (fun ( block_hash,
+               index,
+               hash,
+               from,
+               to_,
+               Transaction_info.
+                 {
+                   cumulative_gas_used;
+                   effective_gas_price;
+                   gas_used;
+                   logs;
+                   logs_bloom;
+                   type_;
+                   status;
+                   contract_address;
+                 } )
+             acc
+           ->
+          Transaction_receipt.
+            {
+              transactionHash = hash;
+              transactionIndex = index;
+              blockHash = block_hash;
+              blockNumber = Qty level;
+              from;
+              to_;
+              cumulativeGasUsed = cumulative_gas_used;
+              effectiveGasPrice = effective_gas_price;
+              gasUsed = gas_used;
+              logs;
+              logsBloom = logs_bloom;
+              type_;
+              status;
+              contractAddress = contract_address;
+            }
+          :: acc)
+        (Qty level, Qty Z.(level + of_int len))
+        []
+    in
+    res
 
   let find_object store hash =
     let open Lwt_result_syntax in
@@ -1548,7 +1621,8 @@ module Transactions = struct
                from,
                to_,
                Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
-             ) ->
+             )
+           ->
           Ethereum_types.
             {
               blockHash = Some block_hash;
@@ -1646,7 +1720,8 @@ module Blocks = struct
                from,
                to_,
                Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
-             ) ->
+             )
+           ->
           Ethereum_types.
             {
               blockHash = Some block.hash;

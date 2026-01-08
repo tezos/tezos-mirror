@@ -19,6 +19,7 @@ pub fn eth_from_mutez(mutez: u64) -> Wei {
     U256::from(mutez) * U256::exp10(12)
 }
 
+#[derive(Debug)]
 pub enum ErrorMutezFromWei {
     AmountTooLarge,
     NonNullRemainder,

@@ -13,11 +13,11 @@ depends: [
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { = version }
   "jingoo"
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "octez-libs" { = version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

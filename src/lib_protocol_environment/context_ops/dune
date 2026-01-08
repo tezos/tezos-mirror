@@ -12,7 +12,9 @@
   octez-libs.tezos-context
   octez-libs.tezos-context-brassaia
   octez-shell-libs.shell-context
+  octez-libs.stdlib-unix
   octez-shell-libs.brassaia-context
+  octez-shell-libs.tezedge-context
   octez-shell-libs.duo-context-lib)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
@@ -23,5 +25,7 @@
   -open Tezos_context
   -open Tezos_context_brassaia
   -open Tezos_shell_context
+  -open Tezos_stdlib_unix
   -open Tezos_brassaia_context
+  -open Tezos_tezedge_context
   -open Tezos_duo_context_lib))

@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023-2025 TriliTech <contact@trili.tech>
-# SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+# SPDX-FileCopyrightText: 2023,2025 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
-RISCV_RUSTC_VERSION = 1.86.0
+RISCV_RUSTC_VERSION = 1.88.0
 
 .PHONY: all
 all: check test
@@ -39,7 +39,7 @@ check: check-fmt check-native check-wasm check-riscv
 .PHONY: test
 test:
 	cargo test
-   
+
 .PHONY: clean
 clean:
 	cargo clean

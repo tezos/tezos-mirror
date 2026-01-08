@@ -43,9 +43,9 @@ type block_info = {
 let raw_info cctxt ?(chain = `Main) hash shell_header =
   let open Lwt_result_syntax in
   let block = `Hash (hash, 0) in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* {current_protocol = protocol; next_protocol} =
-    Shell_services.Blocks.protocols cctxt ~chain ~block ()
+    Node_rpc.protocols cctxt ~chain ~block ()
   in
   let {
     Tezos_base.Block_header.predecessor;
@@ -77,10 +77,8 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
 
 let info cctxt ?(chain = `Main) block =
   let open Lwt_result_syntax in
-  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
-  let* shell_header =
-    Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  in
+  let* hash = Node_rpc.block_hash cctxt ~chain ~block in
+  let* shell_header = Node_rpc.shell_header cctxt ~chain ~block () in
   raw_info cctxt ~chain hash shell_header
 
 module Block_seen_event = struct
@@ -187,22 +185,16 @@ let monitor_heads cctxt ~next_protocols chain =
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   let open Lwt_result_syntax in
-  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
-  let* {level; _} =
-    Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  in
-  let*! result =
-    Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
-  in
+  let* hash = Node_rpc.block_hash cctxt ~chain ~block in
+  let* {level; _} = Node_rpc.shell_header cctxt ~chain ~block () in
+  let*! result = Node_rpc.levels_in_current_cycle cctxt ~offset ~chain ~block in
   match result with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
       let* head =
-        let* list =
-          Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-        in
+        let* list = Node_rpc.blocks cctxt ~chain ~heads:[hash] ~length in
         match list with
         | hd :: _ -> return hd
         | [] ->

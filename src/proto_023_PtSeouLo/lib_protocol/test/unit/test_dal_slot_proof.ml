@@ -94,8 +94,8 @@ struct
           ~mk_slot_index:(fun id -> id.H.index)
           ~check_result:(fun res ->
             Assert.proto_error ~loc:__LOC__ res (function
-                | Hist.Add_element_in_slots_skip_list_violates_ordering -> true
-                | _ -> false)))
+              | Hist.Add_element_in_slots_skip_list_violates_ordering -> true
+              | _ -> false)))
 
   (** This test attempts to add a slot on top of genesis cell zero which satisfies
       the ordering. *)

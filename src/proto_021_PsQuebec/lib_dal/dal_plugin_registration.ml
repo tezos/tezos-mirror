@@ -39,6 +39,8 @@ module Plugin = struct
 
   type tb_slot = int
 
+  let tb_slot_to_int tb_slot = tb_slot
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)
@@ -77,7 +79,7 @@ module Plugin = struct
         minimal_block_delay = Period.to_seconds parametric.minimal_block_delay;
       }
 
-  type error += DAL_accusation_not_available
+  type error += DAL_accusation_not_available | DAL_publication_not_available
 
   let () =
     register_error_kind
@@ -91,11 +93,32 @@ module Plugin = struct
       (function DAL_accusation_not_available -> Some () | _ -> None)
       (fun () -> DAL_accusation_not_available)
 
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_publications_not_available_quebec"
+      ~title:"DAL publication not available on Quebec"
+      ~description:
+        "Publication from DAL node is not implemented in protocol Quebec"
+      ~pp:(fun fmt () ->
+        Format.fprintf
+          fmt
+          "Publication from DAL node is not implemented in protocol Quebec")
+      Data_encoding.unit
+      (function DAL_publication_not_available -> Some () | _ -> None)
+      (fun () -> DAL_publication_not_available)
+
   let inject_entrapment_evidence _cctxt ~attested_level:_ _attestation
       ~slot_index:_ ~shard:_ ~proof:_ ~tb_slot:_ =
     let open Lwt_result_syntax in
     (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
     fail [DAL_accusation_not_available]
+
+  let publish _cctxt ~block_level:_ ~source:_ ~slot_index:_ ~commitment:_
+      ~commitment_proof:_ ~src_sk:_ () =
+    let open Lwt_result_syntax in
+    (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
+    fail [DAL_publication_not_available]
 
   let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -142,8 +165,8 @@ module Plugin = struct
     in
     Lwt_result.map
       (List.filter_map (function
-          | header, Dal_plugin.Succeeded -> Some header
-          | _, Dal_plugin.Failed -> None))
+        | header, Dal_plugin.Succeeded -> Some header
+        | _, Dal_plugin.Failed -> None))
       (Layer1_services.(
          process_manager_operations [] operations {apply; apply_internal})
       |> List.map_es (fun (slot_index, commitment, status) ->
@@ -161,7 +184,7 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
         cpctxt
         ~block:(`Level block_level)
-        ~metadata:`Always
+        ~metadata:`Never
         0
     in
     return
@@ -169,7 +192,7 @@ module Plugin = struct
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
-           | Single (Attestation attestation) -> (
+           | Single (Attestation attestation) ->
                let packed_operation : Kind.attestation Alpha_context.operation =
                  {
                    Alpha_context.shell = operation.shell;
@@ -182,27 +205,11 @@ module Plugin = struct
                    (fun x -> (x.attestation :> dal_attestation))
                    attestation.dal_content
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result (Attestation_result result) ->
-                       let delegate =
-                         Tezos_crypto.Signature.Of_V1.public_key_hash
-                           result.delegate
-                       in
-                       Some
-                         ( tb_slot,
-                           Some delegate,
-                           packed_operation,
-                           dal_attestation )
-                   | _ -> Some (tb_slot, None, packed_operation, dal_attestation)
-                   )
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Some (tb_slot, None, packed_operation, dal_attestation))
+               Some (tb_slot, packed_operation, dal_attestation)
            | _ -> None)
          consensus_ops
 
-  let get_committee ctxt ~level =
+  let get_committees ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let*? level = Raw_level.of_int32 level |> wrap in
@@ -212,7 +219,23 @@ module Plugin = struct
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
         let delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate in
-        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+        let tb_slot =
+          (* Associating delegate public key hash to Tenderbake attestation
+               slot can be done by matching the first DAL slot index of a given
+               attester as there is a DAL protocol invariant that enforces that
+               the first DAL slot index corresponds to the TB attestation slot
+               index of a give attester. *)
+          match List.hd indexes with
+          | Some slot -> slot
+          | None ->
+              (* We assume that the set indexes associated to a delegate is
+                   never empty. *)
+              assert false
+        in
+        Tezos_crypto.Signature.Public_key_hash.Map.add
+          delegate
+          (indexes, tb_slot)
+          acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
@@ -260,6 +283,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
+    (* The feature is not available for this protocol. *)
+    let back_pointer _cell ~index:_ = Error ()
+
     (*
       This function mimics what the protocol does in
       {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info at
@@ -288,11 +314,11 @@ module Plugin = struct
           ~block:(`Level attested_level)
           ~operations_metadata:`Never
       in
+      let attestation_lag =
+        dal_constants.Tezos_dal_node_services.Types.attestation_lag
+      in
       let published_level =
-        Int32.sub
-          attested_level
-          (Int32.of_int
-             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
+        Int32.sub attested_level (Int32.of_int attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -429,12 +455,14 @@ module Plugin = struct
                   (* This should never happen: all hashes from [ordered_hashes_by_insertion]
                      must exist in [last_cells_map]. *)
                   assert false
-              | Some cell -> (hash, cell, slot_index))
+              | Some cell -> (hash, cell, slot_index, attestation_lag))
             ordered_hashes_by_insertion
         in
         return last_cells_ordered_by_insertion
 
     let slot_header_of_cell _cell = (* Not implemented for Quebec *) None
+
+    let proto_attestation_status _cell = (* Not implemented for Quebec *) None
   end
 
   module RPC = struct

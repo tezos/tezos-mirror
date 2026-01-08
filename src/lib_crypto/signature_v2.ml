@@ -801,37 +801,20 @@ let check ?watermark public_key signature message =
       Bls.check ?watermark pk signature message
   | _ -> false
 
-let fake_sign_from_pk pk msg =
-  let pk_bytes = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
-  let size = Ed25519.size in
-  let msg = Blake2B.to_bytes @@ Blake2B.hash_bytes [msg] in
-  let half = size / 2 in
-  let tmp = Bytes.init size (fun _ -> '0') in
-  let all_or_half buf = Stdlib.min (Bytes.length buf) half in
-  Bytes.blit pk_bytes 0 tmp 0 (all_or_half pk_bytes) ;
-  Bytes.blit msg 0 tmp half (all_or_half msg) ;
-  of_bytes_exn tmp
-
 type algo = Ed25519 | Secp256k1 | P256 | Bls
 
-let fake_sign ?watermark:_ secret_key msg =
-  let pk = Secret_key.to_public_key secret_key in
-  fake_sign_from_pk pk msg
-
-let hardcoded_sk algo : secret_key =
-  match algo with
-  | Ed25519 ->
+let hardcoded_sk =
+  let ed, secp, p, bls =
+    ( Secret_key.of_b58check_exn
+        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh",
       Secret_key.of_b58check_exn
-        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
-  | Secp256k1 ->
+        "spsk2XJu4wuYsHeuDaCktD3ECnnpn574ceSWHEJVvXTt7JP6ztySCL",
       Secret_key.of_b58check_exn
-        "spsk2XJu4wuYsHeuDaCktD3ECnnpn574ceSWHEJVvXTt7JP6ztySCL"
-  | P256 ->
+        "p2sk2k6YAkNJ8CySZCS3vGA5Ht6Lj6LXG3yb8UrHvMKZy7Ab8JUtWh",
       Secret_key.of_b58check_exn
-        "p2sk2k6YAkNJ8CySZCS3vGA5Ht6Lj6LXG3yb8UrHvMKZy7Ab8JUtWh"
-  | Bls ->
-      Secret_key.of_b58check_exn
-        "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG"
+        "BLsk1hfuv6V8JJRaLDBJgPTRGLKusTZnTmWGrvSKYzUaMuzvPLmeGG" )
+  in
+  function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
 
 let hardcoded_pk =
   (* precompute signatures *)
@@ -855,78 +838,40 @@ let hardcoded_sig =
   in
   function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
 
-let algo_of_pk (pk : Public_key.t) =
-  match pk with
-  | Ed25519 _ -> Ed25519
-  | Secp256k1 _ -> Secp256k1
-  | P256 _ -> P256
-  | Bls _ -> Bls
-
-let fast_fake_sign ?watermark:_ sk _msg =
-  let pk = Secret_key.to_public_key sk in
-  hardcoded_sig (algo_of_pk pk)
-
-let check_harcoded_signature pk =
-  let algo = algo_of_pk pk in
-  check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg
-
-(* The following cache is a hack to work around a quadratic algorithm
-   in Tezos Mainnet protocols up to Edo. *)
-
-module type ENDORSEMENT_CACHE_MAKER = functor (H : Stdlib.Hashtbl.HashedType) ->
-  Aches.Vache.MAP with type key = H.t
-
-let make_endorsement_cache : (module ENDORSEMENT_CACHE_MAKER) =
-  match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
-  | Some _ -> (module Aches.Vache.EmptyMap)
-  | None ->
-      (module Aches.Vache.Map (Aches.Vache.FIFO_Sloppy) (Aches.Vache.Strong))
-
-module Endorsement_cache =
-  (val make_endorsement_cache)
-    (struct
-      type nonrec t = t
-
-      let equal = equal
-
-      let hash = Hashtbl.hash
-    end)
-
-let endorsement_cache = Endorsement_cache.create 300
-
-let check ?watermark public_key signature message =
-  match watermark with
-  | Some (Endorsement _) -> (
-      (* signature check cache only applies to endorsements *)
-      match Endorsement_cache.find_opt endorsement_cache signature with
-      | Some (key, msg) ->
-          (* we rely on this property : signature_1 = signature_2 => key_1 = key_2 /\ message_1 = message_2 *)
-          Public_key.equal public_key key && Bytes.equal msg message
-      | None ->
-          let res = check ?watermark public_key signature message in
-          if res then
-            Endorsement_cache.replace
-              endorsement_cache
-              signature
-              (public_key, message) ;
-          res)
-  | _ -> check ?watermark public_key signature message
-
-let fake_check ?watermark:_ pk _signature msg =
-  (* computing the fake signature do hash the message,
-     this operation is linear in the size of the message *)
-  ignore (fake_sign_from_pk pk msg) ;
-  (* checking a valid, harcoded signature, to do at least once the crypto maths *)
-  let _ = check_harcoded_signature pk in
-  true
+let fast_fake_sign ?watermark:_ (sk : Secret_key.t) _msg =
+  let algo =
+    match sk with
+    | Ed25519 _ -> Ed25519
+    | Secp256k1 _ -> Secp256k1
+    | P256 _ -> P256
+    | Bls _ -> Bls
+  in
+  hardcoded_sig algo
 
 (* Fast checking does not simulate computation and directly returns true*)
 let fast_fake_check ?watermark:_ _pk _signature _msg = true
 
+let fake_check ?watermark:_ (pk : Public_key.t) _signature _msg =
+  (* call a successfull [check] to simulate crypto costs *)
+  let algo =
+    match pk with
+    | Ed25519 _ -> Ed25519
+    | Secp256k1 _ -> Secp256k1
+    | P256 _ -> P256
+    | Bls _ -> Bls
+  in
+  ignore (check (hardcoded_pk algo) (hardcoded_sig algo) hardcoded_msg) ;
+  true
+
+(* yes_crypto semantics:
+   - Yes: use the normal [sign] and [check] functions to simulate crypto costs,
+     but [check] always returns true.
+   - Fast: return hardcoded signatures and skip any crypto costs.
+   In both modes, verification always succeeds. *)
 let sign =
   match Helpers.yes_crypto_kind with
   | Fast -> fast_fake_sign
-  | Yes -> fake_sign
+  | Yes -> sign
   | No -> sign
 
 let check =

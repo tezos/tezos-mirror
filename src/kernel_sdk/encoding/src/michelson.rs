@@ -15,13 +15,13 @@ use tezos_data_encoding::enc::{self, BinResult, BinWriter};
 use tezos_data_encoding::encoding::{Encoding, HasEncoding};
 use tezos_data_encoding::nom::{self as nom_read, NomReader, NomResult};
 use tezos_data_encoding::types::Zarith;
+use tezos_protocol::contract::Contract;
 
 mod micheline;
 #[cfg(feature = "alloc")]
 pub mod ticket;
 
 use self::micheline::Node;
-use super::contract::Contract;
 use micheline::{
     bin_write_micheline_bytes, bin_write_micheline_int, bin_write_micheline_string,
     bin_write_prim_1_arg_no_annots, bin_write_prim_2_args_no_annots,

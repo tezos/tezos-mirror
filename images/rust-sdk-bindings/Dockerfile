@@ -15,8 +15,6 @@ ENV LANG='C.UTF-8' LC_ALL='C.UTF-8' TZ='Etc/UTC'
 
 WORKDIR /root
 
-COPY ./scripts/install_datadog_static.sh /tmp/
-
 # common packages
 # hadolint ignore=DL3008
 RUN apt-get update && \
@@ -24,7 +22,8 @@ RUN apt-get update && \
     # Rust requirements
     ca-certificates curl \
     build-essential \
-    sccache \
+    jq \
+    gpg \
     # Python requirements
     python3 python3-venv \
     pipx \
@@ -44,9 +43,21 @@ RUN apt-get update && \
     pkg-config \
     tzdata \
     uuid-dev && \
-    rm -rf /var/lib/apt/lists/* && \
-    /tmp/install_datadog_static.sh && \
-    rm /tmp/install_datadog_static.sh
+    rm -rf /var/lib/apt/lists/*
+
+COPY scripts/kiss-fetch.sh /usr/local/bin/
+ENV PATH=/usr/local/bin:$PATH
+
+# install datadog static binary
+COPY scripts/install_datadog_static.sh \
+     scripts/install-gcloud-apt.sh \
+     scripts/install_sccache_static.sh /tmp/
+
+#hadolint ignore=DL3008,DL3015
+RUN /tmp/install_datadog_static.sh && \
+    /tmp/install_sccache_static.sh && \
+    /tmp/install-gcloud-apt.sh && \
+    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh /tmp/install-gcloud-apt.sh
 
 # install toolchain
 ARG RUST_VERSION=1.83.0
@@ -61,8 +72,7 @@ RUN python3 -m venv .venv && \
 
 # install maturin
 ARG MATURIN_VERSION=1.5.1
-RUN pipx ensurepath
-RUN pipx install maturin==${MATURIN_VERSION}
+RUN pipx ensurepath && pipx install maturin==${MATURIN_VERSION}
 
 ENV PATH="/root/.local/bin/:$PATH"
 

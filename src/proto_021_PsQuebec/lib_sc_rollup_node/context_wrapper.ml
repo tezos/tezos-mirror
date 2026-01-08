@@ -26,8 +26,7 @@ module type S = sig
 end
 
 (* Context *)
-let of_node_context :
-    type repo tree.
+let of_node_context : type repo tree.
     (repo, tree) equality_witness ->
     'a Context.t ->
     ('a, repo, tree) Context_sigs.t =
@@ -41,8 +40,7 @@ let of_node_context :
          pmv_context to the next one. *)
       assert false
 
-let to_node_context :
-    type repo tree.
+let to_node_context : type repo tree.
     (module Context_sigs.S with type tree = tree and type repo = repo) ->
     ('a, repo, tree) Context_sigs.t ->
     'a Context.t =
@@ -55,15 +53,14 @@ let to_node_context :
     ~impl_name:C.impl_name
 
 (* PVMState *)
-let of_node_pvmstate :
-    type repo tree. (repo, tree) equality_witness -> Context.pvmstate -> tree =
+let of_node_pvmstate : type repo tree.
+    (repo, tree) equality_witness -> Context.pvmstate -> tree =
  fun eqw (PVMState {equality_witness; pvmstate; _}) ->
   match Context.equiv equality_witness eqw with
   | Some Refl, Some Refl -> pvmstate
   | _ -> assert false
 
-let to_node_pvmstate :
-    type tree.
+let to_node_pvmstate : type tree.
     (module Context_sigs.S with type tree = tree) -> tree -> Context.pvmstate =
  fun (module C) pvmstate ->
   Context.make_pvmstate
@@ -73,7 +70,11 @@ let to_node_pvmstate :
     ~impl_name:C.impl_name
 
 module Irmin = struct
-  module I = Irmin_context
+  module I = struct
+    include Irmin_context
+
+    let load ~cache_size path = load ~cache_size path
+  end
 
   type repo = I.repo
 

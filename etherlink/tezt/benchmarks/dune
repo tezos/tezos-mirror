@@ -1,0 +1,27 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name etherlink-benchmark)
+ (package etherlink-benchmark)
+ (libraries
+  octez-evm-node-libs.evm_node_rust_deps
+  bls12-381.archive
+  octez-libs.test-helpers
+  octez-libs.tezt-wrapper
+  tezt-tezos
+  tezt_etherlink
+  floodgate_lib
+  etherlink_benchmark_lib)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_test_helpers
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_etherlink))

@@ -197,7 +197,8 @@ module Context_size_dependent_shared = struct
              key_card;
              commit_batch_size;
              temp_dir;
-           } ->
+           }
+         ->
         ( depth,
           storage_chunk_bytes,
           storage_chunks,
@@ -211,7 +212,8 @@ module Context_size_dependent_shared = struct
              insertions,
              key_card,
              commit_batch_size,
-             temp_dir ) ->
+             temp_dir )
+         ->
         {
           depth;
           storage_chunk_bytes;
@@ -254,8 +256,8 @@ module Context_size_dependent_shared = struct
   let workload_encoding =
     let open Data_encoding in
     conv
-      (fun (Random_context_random_access {depth; storage_bytes; context_size}) ->
-        (depth, storage_bytes, context_size))
+      (fun (Random_context_random_access {depth; storage_bytes; context_size})
+         -> (depth, storage_bytes, context_size))
       (fun (depth, storage_bytes, context_size) ->
         Random_context_random_access {depth; storage_bytes; context_size})
       (tup3 int31 int31 int31)
@@ -491,7 +493,8 @@ module Irmin_pack_shared = struct
              default_storage_bytes;
              commit_batch_size;
              temp_dir;
-           } ->
+           }
+         ->
         ( depth,
           insertions,
           key_card,
@@ -509,7 +512,8 @@ module Irmin_pack_shared = struct
              storage_chunks,
              default_storage_bytes,
              commit_batch_size,
-             temp_dir ) ->
+             temp_dir )
+         ->
         {
           depth;
           insertions;
@@ -658,8 +662,8 @@ module Irmin_pack_read_bench = struct
   let workload_encoding =
     let open Data_encoding in
     conv
-      (fun (Irmin_pack_read {depth; irmin_width; storage_bytes; context_size}) ->
-        (depth, irmin_width, storage_bytes, context_size))
+      (fun (Irmin_pack_read {depth; irmin_width; storage_bytes; context_size})
+         -> (depth, irmin_width, storage_bytes, context_size))
       (fun (depth, irmin_width, storage_bytes, context_size) ->
         Irmin_pack_read {depth; irmin_width; storage_bytes; context_size})
       (tup4 int31 int31 int31 int31)
@@ -804,8 +808,8 @@ module Irmin_pack_write_bench = struct
     let open Data_encoding in
     conv
       (fun (Irmin_pack_write
-             {keys_written; irmin_width; storage_bytes; context_size}) ->
-        (keys_written, irmin_width, storage_bytes, context_size))
+              {keys_written; irmin_width; storage_bytes; context_size})
+         -> (keys_written, irmin_width, storage_bytes, context_size))
       (fun (keys_written, irmin_width, storage_bytes, context_size) ->
         Irmin_pack_write
           {keys_written; irmin_width; storage_bytes; context_size})
@@ -1069,7 +1073,8 @@ module Write_random_keys_bench = struct
              max_written_keys;
              temp_dir;
              subdirectory;
-           } ->
+           }
+         ->
         ( existing_context,
           storage_chunk_bytes,
           storage_chunks,
@@ -1081,7 +1086,8 @@ module Write_random_keys_bench = struct
              storage_chunks,
              max_written_keys,
              temp_dir,
-             subdirectory ) ->
+             subdirectory )
+         ->
         {
           existing_context;
           storage_chunk_bytes;

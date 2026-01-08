@@ -77,7 +77,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
-        ~adaptive_issuance_enable:false
+        ~all_bakers_attest_first_level:None
     in
     let nonce = Operation_hash.hash_string ["nonce_hash"] in
     return (Raw_context.init_origination_nonce ctx nonce, contract)

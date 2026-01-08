@@ -77,8 +77,7 @@ module Helpers = struct
     in
     loop total []
 
-  let empirical_distribution :
-      type a.
+  let empirical_distribution : type a.
       (module Std with type t = a) ->
       nsamples:int ->
       (unit -> a) ->

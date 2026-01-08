@@ -1,0 +1,71 @@
+[
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "T024-: Testing DAL node (fetching slots from backup sources)",
+    "tags": [
+      "admin_client",
+      "backup",
+      "client",
+      "dal",
+      "dal_node",
+      "extra",
+      "http",
+      "memory_hungry",
+      "node",
+      "retrievability",
+      "t024",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "51233906",
+      "count": "1"
+    },
+    "peak_memory_usage": 7228243000
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "S023-: Testing DAL node (fetching slots from backup sources)",
+    "tags": [
+      "admin_client",
+      "backup",
+      "client",
+      "dal",
+      "dal_node",
+      "extra",
+      "http",
+      "memory_hungry",
+      "node",
+      "retrievability",
+      "s023",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "50913052",
+      "count": "1"
+    },
+    "peak_memory_usage": 7205270000
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (fetching slots from backup sources)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "backup",
+      "client",
+      "dal",
+      "dal_node",
+      "extra",
+      "http",
+      "memory_hungry",
+      "node",
+      "retrievability",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "50151578",
+      "count": "1"
+    },
+    "peak_memory_usage": 7275592000
+  }
+]

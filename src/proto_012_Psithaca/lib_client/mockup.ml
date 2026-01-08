@@ -147,7 +147,8 @@ module Protocol_constants_overrides = struct
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
                    chain_id,
-                   timestamp ) ) ) ) ->
+                   timestamp ) ) ) )
+         ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -804,7 +805,8 @@ module Protocol_parameters = struct
       (fun ( initial_timestamp,
              bootstrap_accounts,
              bootstrap_contracts,
-             constants ) ->
+             constants )
+         ->
         {initial_timestamp; bootstrap_accounts; bootstrap_contracts; constants})
       (obj4
          (req "initial_timestamp" Time.Protocol.encoding)

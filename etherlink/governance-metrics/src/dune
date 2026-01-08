@@ -13,8 +13,8 @@
   octez-version.value
   octez-libs.clic
   octez-libs.prometheus-app
-  octez-libs.cohttp-lwt-unix
-  octez-libs.cohttp-lwt
+  cohttp-lwt-unix
+  cohttp-lwt
   octez-libs.rpc-http
   octez-libs.rpc-http-client-unix)
  (link_flags

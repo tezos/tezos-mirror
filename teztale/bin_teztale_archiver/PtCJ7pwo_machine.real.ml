@@ -38,7 +38,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     return
     @@ List.map
-         (fun Protocol.Delegate_services.Endorsing_rights.{delegate; slots; _} ->
+         (fun Protocol.Delegate_services.Endorsing_rights.{delegate; slots; _}
+            ->
            Consensus_ops.
              {
                address = public_key_hash_of_v0 delegate;
@@ -180,12 +181,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           match receipt with
           | Receipt
               (Protocol.Apply_results.Operation_metadata
-                {
-                  contents =
-                    Single_result
-                      (Tezos_raw_protocol_001_PtCJ7pwo.Apply_results
-                       .Endorsement_result {delegate; slots; _});
-                }) ->
+                 {
+                   contents =
+                     Single_result
+                       (Tezos_raw_protocol_001_PtCJ7pwo.Apply_results
+                        .Endorsement_result
+                          {delegate; slots; _});
+                 }) ->
               Some
                 Consensus_ops.
                   {

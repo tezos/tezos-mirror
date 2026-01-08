@@ -97,7 +97,8 @@ module Info = struct
              last_established_connection;
              last_disconnection;
              _;
-           } ->
+           }
+         ->
         ( peer_id,
           created,
           trusted,
@@ -115,7 +116,8 @@ module Info = struct
              last_failed_connection,
              last_rejected_connection,
              last_established_connection,
-             last_disconnection ) ->
+             last_disconnection )
+         ->
         let events = Ringo.Ring.create log_size in
         Ringo.Ring.add_list events event_list ;
         {

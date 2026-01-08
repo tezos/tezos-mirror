@@ -51,8 +51,8 @@ module Profiler = struct
 end
 
 type loop_state = {
-  heads_stream : Baking_state.proposal Lwt_stream.t;
-  get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
+  heads_stream : proposal Lwt_stream.t;
+  get_valid_blocks_stream : proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
   forge_event_stream : forge_event Lwt_stream.t;
   future_block_stream :
@@ -296,21 +296,19 @@ let first_potential_round ~committee_size ~owned_slots ~earliest_round =
      within the range [0 ... committee_size], look for the first subsequent slot
      we own, and finally translate it back to a round by restoring the original
      offset. *)
-  (* TODO https://gitlab.com/tezos/tezos/-/issues/7931
-     The use of Round.to_slot should be avoided *)
-  let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
-  let*? earliest_round = Round.to_int earliest_round in
-  let period_offset = earliest_round / committee_size in
-  match Delegate_slots.find_first_slot_from owned_slots ~slot:earliest_slot with
-  | Some (slot, delegate) ->
-      let slot = Slot.to_int slot in
-      let*? round = Round.of_int (slot + (committee_size * period_offset)) in
+  let*? earliest_round_int = Round.to_int earliest_round in
+  let period_offset = earliest_round_int / committee_size in
+  let*? round_rem = Round.of_int (earliest_round_int mod committee_size) in
+  match Delegate_infos.find_first_round_from owned_slots ~round:round_rem with
+  | Some (round, delegate) ->
+      let*? round = Round.to_int round in
+      let*? round = Round.of_int (round + (committee_size * period_offset)) in
       Some (round, delegate.delegate)
   | None ->
-      let* slot, delegate = Delegate_slots.min_slot owned_slots in
-      let slot = Slot.to_int slot in
+      let* round, delegate = Delegate_infos.min_round owned_slots in
+      let*? round = Round.to_int round in
       let*? round =
-        Round.of_int (slot + (committee_size * (1 + period_offset)))
+        Round.of_int (round + (committee_size * (1 + period_offset)))
       in
       Some (round, delegate.delegate)
 
@@ -318,14 +316,14 @@ let first_potential_round_at_next_level state ~earliest_round =
   let committee_size =
     state.global_state.constants.Constants.parametric.consensus_committee_size
   in
-  let owned_slots = state.level_state.next_level_delegate_slots in
+  let owned_slots = state.level_state.next_level_delegate_infos in
   first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 let first_potential_round_at_current_level state ~earliest_round =
   let committee_size =
     state.global_state.constants.Constants.parametric.consensus_committee_size
   in
-  let owned_slots = state.level_state.delegate_slots in
+  let owned_slots = state.level_state.delegate_infos in
   first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 (** [current_round_at_next_level] converts the current system timestamp
@@ -618,19 +616,18 @@ let create_round_durations constants =
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker ~(current_proposal : Baking_state.proposal)
-    ?constants delegates =
+    config operation_worker dal_attestable_slots_worker round_durations
+    ~(current_proposal : proposal) ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
   let open Baking_state in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
-  let*? round_durations = create_round_durations constants in
   let* validation_mode =
     Baking_state.(
       match config.Baking_configuration.validation with
@@ -649,6 +646,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       constants;
       round_durations;
       operation_worker;
+      dal_attestable_slots_worker;
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
@@ -674,15 +672,15 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     } ;
   let chain = `Hash chain_id in
   let current_level = current_proposal.block.shell.level in
-  let* delegate_slots =
-    Baking_state.compute_delegate_slots
+  let* delegate_infos =
+    Baking_state.compute_delegate_infos
       cctxt
       delegates
       ~level:current_level
       ~chain
   in
-  let* next_level_delegate_slots =
-    Baking_state.compute_delegate_slots
+  let* next_level_delegate_infos =
+    Baking_state.compute_delegate_infos
       cctxt
       delegates
       ~level:(Int32.succ current_level)
@@ -696,26 +694,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     else None
   in
   let current_level = current_proposal.block.shell.level in
-  let dal_attestable_slots =
-    Option.fold
-      ~none:[]
-      ~some:(fun dal_node_rpc_ctxt ->
-        Node_rpc.dal_attestable_slots
-          dal_node_rpc_ctxt
-          ~attestation_level:current_level
-          (Delegate_slots.own_delegates delegate_slots))
-      dal_node_rpc_ctxt
-  in
-  let next_level_dal_attestable_slots =
-    Option.fold
-      ~none:[]
-      ~some:(fun dal_node_rpc_ctxt ->
-        Node_rpc.dal_attestable_slots
-          dal_node_rpc_ctxt
-          ~attestation_level:(Int32.succ current_level)
-          (Delegate_slots.own_delegates next_level_delegate_slots))
-      dal_node_rpc_ctxt
-  in
   let level_state =
     {
       current_level;
@@ -725,16 +703,13 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       locked_round = None;
       attestable_payload = None;
       elected_block;
-      delegate_slots;
-      next_level_delegate_slots;
+      delegate_infos;
+      next_level_delegate_infos;
       next_level_latest_forge_request = None;
-      dal_attestable_slots;
-      next_level_dal_attestable_slots;
     }
   in
   let* round_state =
     if synchronize then
-      let*? round_durations = create_round_durations constants in
       let*? current_round =
         Baking_actions.compute_round current_proposal round_durations
       in
@@ -789,7 +764,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  () [@profiler.reset_block_section event] ;
+  () [@profiler.overwrite Profiler.reset_block_section (event, [])] ;
   (let*! state', action =
      (State_transitions.step
         state
@@ -912,7 +887,7 @@ let try_resolve_consensus_keys cctxt key =
   let levels_to_inspect = 50 in
   let pkh = Key_id.to_pkh key.Key.id in
   let* res =
-    Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
+    Node_rpc.delegate_deactivated cctxt ~chain:`Main ~block:(`Head 0) pkh
   in
   match res with
   | Ok _deactivated ->
@@ -927,29 +902,42 @@ let try_resolve_consensus_keys cctxt key =
           return pkh
         else
           let* attesting_rights =
-            Plugin.RPC.Validators.get
+            Node_rpc.get_validators
               cctxt
-              (`Main, `Head head_offset)
+              ~chain:`Main
+              ~block:(`Head head_offset)
               ~consensus_keys:[pkh]
+              ()
           in
           match attesting_rights with
-          | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
+          | Error _ | Ok [Plugin.RPC.Validators.{delegates = []; _}] | Ok [] ->
+              try_find_delegate_key (head_offset - 1)
           | Ok
-              (Plugin.RPC.Validators.
-                 {
-                   delegate;
-                   level = _;
-                   consensus_key = _;
-                   companion_key = _;
-                   slots = _;
-                 }
-              :: _) ->
+              Plugin.RPC.Validators.
+                [
+                  {
+                    delegates =
+                      {
+                        delegate;
+                        consensus_key = _;
+                        companion_key = _;
+                        rounds = _;
+                        attesting_power = _;
+                        attestation_slot = _;
+                      }
+                      :: _;
+                    _;
+                  };
+                ] ->
               (* The primary registered key as delegate found. Return it. *)
               return delegate
+          | Ok (_ :: _ :: _) -> assert false
+        (* we query only one level, the returned list length must be 1 *)
       in
       try_find_delegate_key levels_to_inspect
 
-let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
+let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
+    delegates =
   let open Lwt_result_syntax in
   let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
   let register dal_ctxt =
@@ -969,7 +957,16 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
             warn ()
           else Lwt.return_unit
     in
-    Node_rpc.register_dal_profiles dal_ctxt delegates
+    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
+    let delegate_ids = List.map Delegate_id.of_pkh delegates in
+    let*! () =
+      (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)
+      Dal_attestable_slots_worker.update_streams_subscriptions
+        dal_attestable_slots_worker
+        dal_ctxt
+        ~delegate_ids
+    in
+    return_unit
   in
   Option.iter_es
     (fun dal_ctxt ->
@@ -989,12 +986,12 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     config delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
-  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
+  let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in
@@ -1007,11 +1004,21 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.run ~constants cctxt in
+  let*? round_durations = create_round_durations constants in
+  let*! operation_worker = Operation_worker.run ~round_durations cctxt in
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
           let*! _ = Operation_worker.shutdown_worker operation_worker in
+          let*! _ =
+            Dal_attestable_slots_worker.shutdown_worker
+              dal_attestable_slots_worker
+          in
           Lwt.return_unit))
     canceler ;
   let* initial_state =
@@ -1021,6 +1028,8 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
       ~chain
       config
       operation_worker
+      dal_attestable_slots_worker
+      round_durations
       ~current_proposal
       ~constants
       delegates
@@ -1029,6 +1038,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     register_dal_profiles
       cctxt
       initial_state.global_state.dal_node_rpc_ctxt
+      dal_attestable_slots_worker
       delegates
   in
   let cloned_block_stream = Lwt_stream.clone heads_stream in
@@ -1073,7 +1083,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
   let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
   () [@profiler.stop] ;
-  () [@profiler.reset_block_section profiler_section] ;
+  () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in

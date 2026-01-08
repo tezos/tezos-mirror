@@ -13,8 +13,7 @@ open Internals
 open Product_data_encoding
 open Product_prometheus
 open Product_resto
-open Product_cohttp
-open Product_opentelemetry
+open Product_lwt_domain
 
 include Product (struct
   let name = "octez"
@@ -42,9 +41,9 @@ include Product (struct
       "brassaia/";
       "brassaia-eio/";
       "rust-toolchain";
+      "lwt_domain/";
     ]
-    @ Product_data_encoding.product_source @ Product_cohttp.product_source
-    @ Product_opentelemetry.product_source @ Product_prometheus.product_source
+    @ Product_data_encoding.product_source @ Product_prometheus.product_source
     @ Product_resto.product_source
 end)
 
@@ -139,14 +138,6 @@ let () =
     registered_octez_libs
     ~target:"!module-Resto"
     ~text:"Resto"
-
-(* Back-register the cohttp library which is currently maintained as its
-   own product but still attached to octez-libs. *)
-let () =
-  Sub_lib.add_doc_link
-    registered_octez_libs
-    ~target:"!module-OpenTelemetry_client_cohttp_lwt"
-    ~text:"Opentelemetry_client_cohttp_lwt"
 
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs = Sub_lib.make_container ()
@@ -572,6 +563,7 @@ let octez_rust_deps, lib_wasmer_riscv =
                 [S "source_tree"; S "../rustzcash_deps"];
                 [S "source_tree"; S "wasmer-3.3.0"];
                 [S "source_tree"; S "rust_igd_next"];
+                [S "source_tree"; S "rust_tezos_context"];
                 [S "source_tree"; S "src"];
                 [S "source_tree"; S "../riscv"];
                 [S "source_tree"; S "../kernel_sdk"];
@@ -1533,6 +1525,7 @@ let octez_stdlib_unix =
         uri;
         progress;
         camlp_streams;
+        lwt_domain;
       ]
 
 let _octez_stdlib_unix_test =
@@ -1864,7 +1857,7 @@ let octez_base =
       V.(
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
            Should be in sync with scripts/version.sh *)
-        at_least "5.2.1" && less_than "5.3.0")
+        at_least "5.3.0" && less_than "5.4.0")
     ~license:"Apache-2.0"
 
 let octez_base_unix =
@@ -1894,12 +1887,32 @@ let octez_base_unix =
         lwt_exit;
         terminal;
         eio;
-        eio_main;
+        eio_posix;
         lwt_eio;
       ]
     ~inline_tests:ppx_expect
     ~inline_tests_libraries:[bls12_381_archive]
     ~inline_tests_link_flags:["-cclib"; "-lblst"]
+
+(* Alcotezt process isolation library - defined here after octez_base/octez_base_unix
+   to avoid dependency cycles. Tests that need process isolation with tzresult support
+   should depend on this library. *)
+let alcotezt_process =
+  octez_lib
+    "alcotezt-process"
+    ~path:"tezt/lib_alcotezt_process"
+    ~synopsis:
+      "Process-isolated test execution for Alcotezt with Tezos error monad \
+       support"
+    ~deps:
+      [
+        tezt_core_lib;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_error_monad |> open_;
+        lwt_unix;
+        lwt_eio;
+      ]
 
 let octez_lib_upnp =
   public_lib
@@ -2648,6 +2661,7 @@ let octez_bees =
         octez_stdlib_unix |> open_;
         octez_profiler_backends;
         octez_profiler_complex_backends;
+        saturn;
       ]
 
 let _octez_bees_tests =
@@ -2657,6 +2671,7 @@ let _octez_bees_tests =
       "test_bees_unit";
       "test_bees_unit_eio";
       "test_bees_task_worker";
+      "test_bees_lwt_async";
     ]
     ~path:"src/lib_bees/test"
     ~opam:"octez-libs"
@@ -2670,6 +2685,7 @@ let _octez_bees_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         alcotezt;
+        alcotezt_process;
       ]
 
 let octez_merkle_proof_encoding =
@@ -2789,6 +2805,7 @@ let tezt_tezos =
         octez_base;
         octez_base_unix;
         cohttp_lwt_unix;
+        yaml;
       ]
     ~cram:true
     ~release_status:Released
@@ -3212,6 +3229,7 @@ let _brassaia_data_tests =
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
+        vector;
       ]
 
 let _brassaia_eio_data_tests =
@@ -3229,6 +3247,7 @@ let _brassaia_eio_data_tests =
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
+        vector;
       ]
 
 let _irmin_generic_key_tests =
@@ -3281,7 +3300,7 @@ let _brassaia_eio_generic_key_tests =
         octez_base_unix;
         brassaia_eio_test_helpers |> open_;
         brassaia_eio_mem;
-        eio_main;
+        eio_posix;
         vector;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
@@ -3387,7 +3406,7 @@ let _brassaia_eio_mem_tests =
         brassaia_eio_mem;
         brassaia_eio_test_helpers;
         octez_test_helpers |> open_;
-        eio_main;
+        eio_posix;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
@@ -3560,7 +3579,7 @@ let _brassaia_eio_pack_tests =
         octez_test_helpers |> open_;
         alcotezt;
         fpath;
-        eio_main;
+        eio_posix;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
     ~preprocess:(pps ppx_brassaia_eio_internal)
@@ -3776,6 +3795,29 @@ let _octez_protocol_environment_tests =
         lwt_unix;
       ]
 
+let octez_rust_tezos_context =
+  public_lib
+    "octez-rust-tezos-context"
+    ~path:"src/rust_deps/rust_tezos_context/ocaml-api"
+    ~synopsis:"OCaml API to Tezedge context"
+    ~flags:
+      (Flags.standard
+         ~disable_warnings:[66]
+         (* We disable the warnings emitted by the files generated by [ocaml-rs]. *)
+         ())
+
+let octez_context_tezedge =
+  octez_lib
+    "tezos-context-tezedge"
+    ~path:"src/lib_context_tezedge"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
+        octez_context_sigs;
+        octez_rust_tezos_context;
+      ]
+
 let octez_context_ops =
   let octez_context_brassaia_disk =
     octez_lib
@@ -3840,6 +3882,18 @@ let octez_context_ops =
           octez_context;
         ]
   in
+  let octez_tezedge_context =
+    octez_shell_lib
+      "tezedge-context"
+      ~internal_name:"tezos_tezedge_context"
+      ~path:"src/lib_protocol_environment/tezedge_context"
+      ~deps:
+        [
+          octez_base |> open_ ~m:"TzPervasives";
+          octez_protocol_environment;
+          octez_context_tezedge;
+        ]
+  in
   let octez_duo_context_lib =
     let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
     octez_shell_lib
@@ -3854,6 +3908,7 @@ let octez_context_ops =
           octez_protocol_environment;
           octez_context_brassaia;
           octez_context;
+          octez_tezedge_context;
         ]
   in
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
@@ -3872,7 +3927,9 @@ let octez_context_ops =
         octez_context |> open_;
         octez_context_brassaia |> open_;
         octez_shell_context |> open_;
+        octez_stdlib_unix |> open_;
         octez_brassaia_context |> open_;
+        octez_tezedge_context |> open_;
         octez_duo_context_lib |> open_;
       ]
 
@@ -4528,7 +4585,7 @@ let octez_rpc_http_server =
       ]
     ~modules:["RPC_server"; "RPC_middleware"]
 
-let _octez_rpc_http_server_tests =
+let _octez_rpc_http_tests =
   tezt
     ["test_rpc_http"]
     ~path:"src/lib_rpc_http/test"
@@ -4542,6 +4599,7 @@ let _octez_rpc_http_server_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         octez_rpc_http_server |> open_;
+        resto_cohttp_client;
         qcheck_alcotest;
         alcotezt;
       ]
@@ -5135,7 +5193,7 @@ let _octez_embedded_protocol_packer =
 
 let _octez_riscv_pvm_test =
   tezt
-    ["test_main"; "test_backend"; "test_storage"; "utils"]
+    ["test_main"; "test_backend"; "test_storage"; "test_rust_bindings"; "utils"]
     ~path:"src/lib_riscv/pvm/test"
     ~opam:"octez-riscv-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"
@@ -5261,6 +5319,7 @@ let octez_dal_node_services =
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_rpc;
         octez_crypto_dal;
+        lwt_watcher;
       ]
     ~linkall:true
 
@@ -5346,6 +5405,7 @@ let octez_dal_node_lib =
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_bees;
         octez_dal_node_services |> open_;
         octez_dal_node_migrations;
         octez_protocol_updater |> open_;
@@ -5371,6 +5431,7 @@ let octez_dal_node_lib =
         octez_shell_services |> open_;
         opentelemetry;
         opentelemetry_client_cohttp_lwt;
+        octez_telemetry;
         prometheus_app;
         prometheus;
         octez_crawler |> open_;
@@ -5808,6 +5869,25 @@ let _octez_scoru_wasm_fast_tests =
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
+let octez_baking_common_lib =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  public_lib
+    "octez-baking-common-lib"
+    ~path:"src/lib_baking_common"
+    ~internal_name:"octez_baking_common"
+    ~synopsis:
+      "Common Library for protocol-dependent bakers and protocol-agnostic baker"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix |> open_;
+        octez_client_base_unix |> open_;
+        octez_profiler |> open_;
+      ]
+
 let octez_agnostic_baker_lib =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
@@ -5831,6 +5911,7 @@ let octez_agnostic_baker_lib =
         octez_shell_services |> open_;
         octez_dal_node_services;
         octez_dal_node_lib;
+        octez_baking_common_lib;
       ]
 
 (* PROTOCOL PACKAGES *)
@@ -5948,7 +6029,8 @@ end = struct
         not
           (String.for_all
              (function
-               | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' -> true | _ -> false)
+               | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' -> true
+               | _ -> false)
              name)
       then
         invalid_arg
@@ -5961,11 +6043,14 @@ end = struct
         | Dev | Other -> name
         | V number -> sf "%03d%c%s" number sep name
       in
-      let name_dash = make_full_name '-' name in
+      let short_hash = Str.replace_first (Str.regexp "^[0-9]+_") "" name in
+      let name_dash =
+        make_full_name '-' (String.map (function '_' -> '-' | c -> c) name)
+      in
       let name_underscore =
         make_full_name '_' (String.map (function '-' -> '_' | c -> c) name)
       in
-      {short_hash = name; number; name_dash; name_underscore}
+      {short_hash; number; name_dash; name_underscore}
 
     let v name number = make name (V number)
 
@@ -6175,6 +6260,7 @@ end = struct
           ("test_dal_entrapment", N.(number >= 022));
           ("test_companion_key", N.(number >= 023));
           ("test_scenario_attestation", N.(number >= 023));
+          ("test_all_bakers_attest", N.(number >= 024));
         ]
         |> conditional_list
       in
@@ -6363,6 +6449,7 @@ end = struct
             ("test_storage_functions", true);
             ("test_storage", true);
             ("test_token", true);
+            ("test_native_contracts", N.(number >= 025));
           ]
           |> conditional_list
         in
@@ -6392,7 +6479,7 @@ end = struct
           [
             ("liquidity_baking_pbt", true);
             ("saturation_fuzzing", true);
-            ("test_merkle_list", N.(number >= 013));
+            ("test_merkle_list", N.(number >= 013 && number <= 023));
             ("test_gas_properties", true);
             ("test_sampler", N.(number >= 012));
             ("test_script_comparison", true);
@@ -6457,7 +6544,7 @@ end = struct
             ("test_global_constants_storage", true);
             ("test_level_module", true);
             ("test_liquidity_baking_repr", true);
-            ("test_merkle_list", true);
+            ("test_merkle_list", N.(number <= 023));
             ("test_operation_repr", true);
             ("test_qty", true);
             ("test_receipt", true);
@@ -6476,13 +6563,20 @@ end = struct
             ("test_sc_rollup_wasm", N.(number >= 016));
             ("test_local_contexts", N.(number >= 016));
             ("test_dal_slot_proof", N.(number >= 016));
+            ("test_dal_past_parameters_storage", N.(number >= 025));
             ("test_adaptive_issuance", N.(number >= 018));
-            ("test_adaptive_issuance_ema", N.(number >= 018));
+            ("test_adaptive_issuance_ema", N.(number <= 023));
             ("test_percentage", N.(number >= 019));
             ("test_full_staking_balance_repr", N.(number >= 019));
             ("test_slashing_percentage", N.(number >= 019));
             ("test_staking_operations", N.(number >= 021));
             ("test_consecutive_round_zero", N.(number >= 022));
+            ("test_address_registry", N.(number >= 024));
+            ( "test_native_contracts",
+              N.(number >= 025)
+              (* This condition is temporary: as proto_024 is still in `dev`
+                 it doesn't have a number and it would be targeted as valid. *)
+            );
           ]
           |> conditional_list
         in
@@ -6597,9 +6691,10 @@ end = struct
         | Other | Dev -> []
         (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
         | V _ as number ->
-            if N.(number >= 014) then []
-            else if N.(number >= 011) then [51]
-            else [6; 7; 9; 16; 29; 32; 51; 68]
+            if N.(number >= 024) then []
+            else if N.(number >= 014) then [32; 34]
+            else if N.(number >= 011) then [32; 34; 51]
+            else [6; 7; 9; 16; 29; 32; 34; 51; 68]
       in
       let environment =
         tezos_protocol_sub_lib
@@ -6721,9 +6816,10 @@ module Protocol = Protocol
                       S "run";
                       S "%{bin:octez-protocol-compiler}";
                       (if
-                         String_set.mem
-                           tezos_protocol.Tezos_protocol.hash
-                           final_protocol_versions
+                         (match number with Dev -> false | _ -> true)
+                         && String_set.mem
+                              tezos_protocol.Tezos_protocol.hash
+                              final_protocol_versions
                        then E
                        else S "-no-hash-check");
                       (match disable_warnings with
@@ -7066,7 +7162,8 @@ let hash = Protocol.hash
             in
             of_list
               (List.map gen_json networks
-              @ (* TODO: why do we install these files? *)
+              @
+              (* TODO: why do we install these files? *)
               List.
                 [
                   install
@@ -7394,6 +7491,7 @@ let hash = Protocol.hash
             uri;
             memtrace;
             octez_agnostic_baker_lib |> open_;
+            octez_baking_common_lib;
           ]
         ~linkall:true
         ~all_modules_except:
@@ -8052,9 +8150,11 @@ let hash = Protocol.hash
 
   let _021_PsQuebec = frozen (Name.v "PsQuebec" 021)
 
-  let _022_PsRiotum = active (Name.v "PsRiotum" 022)
+  let _022_PsRiotum = frozen (Name.v "PsRiotum" 022)
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
+
+  let _024_PtTALLiN = active (Name.v "PtTALLiN" 024)
 
   let alpha = active (Name.dev "alpha")
 
@@ -9414,6 +9514,15 @@ let _tezt_vesting_contract_test =
         Protocol.(main alpha);
         ptime;
       ]
+
+let _tezt_stats =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"tezt/stats"
+    ~bisect_ppx:No
+    ~deps:[clap; tezt_core_lib]
+    ~release_status:Unreleased
 
 let _docs_doc_gen =
   private_exes

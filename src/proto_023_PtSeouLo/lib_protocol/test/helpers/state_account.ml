@@ -78,7 +78,8 @@ let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
         let unstaked_frozen =
           List.sort
             (fun (Unstaked_frozen.{cycle = cycle1; _} : Unstaked_frozen.r)
-                 {cycle = cycle2; _} -> Cycle.compare cycle2 cycle1)
+                 {cycle = cycle2; _}
+               -> Cycle.compare cycle2 cycle1)
             unstaked_frozen
         in
         let rec aux acc_unstakes rem_amount rem_unstakes =

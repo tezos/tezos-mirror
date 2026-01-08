@@ -7,23 +7,37 @@
 
 open Ethereum_types
 
-type on_new_blueprint_handler =
+type sbl_callbacks_activated = {sbl_callbacks_activated : bool}
+
+type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
-  [`Restart_from of quantity | `Continue] tzresult Lwt.t
+  [`Restart_from of quantity | `Continue of sbl_callbacks_activated] tzresult
+  Lwt.t
 
-type on_finalized_levels_handler =
+type finalized_levels_handler =
   l1_level:int32 ->
   start_l2_level:Ethereum_types.quantity ->
   end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
+type next_block_info_handler =
+  Time.Protocol.t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+type inclusion_handler =
+  Broadcast.transaction -> Ethereum_types.hash -> unit tzresult Lwt.t
+
+type dropped_handler = Ethereum_types.hash -> string -> unit tzresult Lwt.t
+
 type parameters = {
-  on_new_blueprint : on_new_blueprint_handler;
-  on_finalized_levels : on_finalized_levels_handler;
+  on_new_blueprint : new_blueprint_handler;
+  on_finalized_levels : finalized_levels_handler;
+  on_next_block_info : next_block_info_handler;
+  on_inclusion : inclusion_handler;
+  on_dropped : dropped_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
-  ping_tx_pool : bool;
+  rpc_timeout : float;
 }
 
 type error += Timeout
@@ -37,11 +51,22 @@ let timeout_from_tbb = function
       let*! _ = Lwt_unix.sleep (tbb +. 1.) in
       tzfail Timeout
 
-let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint
+let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint ~rpc_timeout
     (Qty next_blueprint_number) =
   let open Lwt_result_syntax in
   let open Rpc_encodings in
-  let is_too_old ~remote ~next = Z.Compare.(next <= remote) in
+  let is_too_old ~remote ~next =
+    (* We verify that we are close enough to the head of the remote node. 10 is
+       arbitrary. It is small enough to make sure that connecting to the
+       streamed RPC will not make the node hang. As a reminder, when the
+       difference is too big, the node spends too much time decoding blueprints
+       ahead of time.
+
+       Being too strict (e.g., forcing the node to be up-to-date with its
+       remote counterpart) means network lags can prevent the bootstrapping
+       mechanism to end if the sequencer produces blocks too often. *)
+    Z.(Compare.(next + ~$10 <= remote))
+  in
   let* (Qty remote_head_number) =
     match remote_head with
     | Some (Qty remote_head)
@@ -59,12 +84,14 @@ let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint
           Batch.call
             (module Generic_block_number)
             ~keep_alive:true
+            ~timeout:rpc_timeout
             ~evm_node_endpoint
             ()
         else
           Batch.call
             (module Block_number)
             ~keep_alive:true
+            ~timeout:rpc_timeout
             ~evm_node_endpoint
             ()
   in
@@ -92,7 +119,8 @@ module Blueprints_sequence = struct
         | `Continue acc -> (fold [@tailcall]) f acc seq
         | `Cut c -> return (`Cut c))
 
-  let make_legacy_rpc ~multichain ~next_blueprint_number evm_node_endpoint : t =
+  let make_legacy_rpc ~multichain ~next_blueprint_number ~rpc_timeout
+      evm_node_endpoint : t =
     let open Lwt_result_syntax in
     Seq_es.ES.unfold
       (fun (remote_head, next_blueprint_number) ->
@@ -101,6 +129,7 @@ module Blueprints_sequence = struct
             ?remote_head
             ~multichain
             ~evm_node_endpoint
+            ~rpc_timeout
             next_blueprint_number
         in
         if is_too_old then
@@ -109,6 +138,7 @@ module Blueprints_sequence = struct
             Evm_services.get_blueprint_with_events
               ~keep_alive:true
               ~evm_node_endpoint
+              ~timeout:rpc_timeout
               next_blueprint_number
           in
           return
@@ -119,7 +149,7 @@ module Blueprints_sequence = struct
       (None, next_blueprint_number)
 
   let rec make_with_chunks ?remote_head ~multichain ~next_blueprint_number
-      evm_node_endpoint : t =
+      ~rpc_timeout evm_node_endpoint : t =
    fun () ->
     let open Lwt_result_syntax in
     let* is_too_old, remote_head =
@@ -127,6 +157,7 @@ module Blueprints_sequence = struct
         ?remote_head
         ~multichain
         ~evm_node_endpoint
+        ~rpc_timeout
         next_blueprint_number
     in
     if is_too_old then
@@ -134,6 +165,7 @@ module Blueprints_sequence = struct
         (* See {Note keep_alive} *)
         Evm_services.get_blueprints_with_events
           ~keep_alive:true
+          ~timeout:rpc_timeout
           ~evm_node_endpoint
           ~count:500L
           next_blueprint_number
@@ -150,6 +182,7 @@ module Blueprints_sequence = struct
               ~multichain
               ~next_blueprint_number:
                 (quantity_add next_blueprint_number (List.length blueprints))
+              ~rpc_timeout
               evm_node_endpoint
           in
           Seq_es.append (Seq_es.of_seq (List.to_seq blueprints)) next_chunks
@@ -163,19 +196,30 @@ module Blueprints_sequence = struct
           make_legacy_rpc
             ~multichain
             ~next_blueprint_number
+            ~rpc_timeout
             evm_node_endpoint
             ()
       | Error err -> fail err
     else return Seq_es.Nil
 
-  let make ~multichain ~next_blueprint_number evm_node_endpoint : t =
+  let make ~multichain ~next_blueprint_number ~rpc_timeout evm_node_endpoint : t
+      =
     if !legacy_rpc_fallback then
-      make_legacy_rpc ~multichain ~next_blueprint_number evm_node_endpoint
-    else make_with_chunks ~multichain ~next_blueprint_number evm_node_endpoint
+      make_legacy_rpc
+        ~multichain
+        ~next_blueprint_number
+        ~rpc_timeout
+        evm_node_endpoint
+    else
+      make_with_chunks
+        ~multichain
+        ~next_blueprint_number
+        ~rpc_timeout
+        evm_node_endpoint
 end
 
-let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
-    Empty.t tzresult Lwt.t =
+let rec catchup ~multichain ~next_blueprint_number ~first_connection
+    ~sbl_callbacks_activated params : Empty.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
 
@@ -193,6 +237,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
     Blueprints_sequence.make
       ~multichain
       ~next_blueprint_number
+      ~rpc_timeout:params.rpc_timeout
       params.evm_node_endpoint
   in
 
@@ -202,42 +247,52 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
         let* result = params.on_new_blueprint next_blueprint_number blueprint in
         match result with
         | `Restart_from l -> return (`Cut l)
-        | `Continue -> return (`Continue (quantity_succ next_blueprint_number)))
+        | `Continue _ ->
+            return (`Continue (quantity_succ next_blueprint_number)))
       next_blueprint_number
       seq
   in
 
   match fold_result with
   | `Cut level ->
-      catchup ~multichain ~next_blueprint_number:level ~first_connection params
+      catchup
+        ~multichain
+        ~next_blueprint_number:level
+        ~first_connection
+        params
+        ~sbl_callbacks_activated
   | `Completed next_blueprint_number -> (
       let*! call_result =
         Evm_services.monitor_messages
           ~evm_node_endpoint:params.evm_node_endpoint
+          ~timeout:params.rpc_timeout
           next_blueprint_number
       in
 
       match call_result with
-      | Ok blueprints_stream ->
+      | Ok monitor ->
           (stream_loop [@tailcall])
             ~multichain
+            ~sbl_callbacks_activated
             next_blueprint_number
             params
-            blueprints_stream
+            monitor
       | Error _ ->
           (catchup [@tailcall])
             ~multichain
             ~next_blueprint_number
             ~first_connection:false
+            ~sbl_callbacks_activated
             params)
 
-and stream_loop ~multichain (Qty next_blueprint_number) params stream =
+and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
+    params monitor =
   let open Lwt_result_syntax in
   Metrics.stop_bootstrapping () ;
   let*! candidate =
     Lwt.pick
       [
-        (let*! res = Lwt_stream.get stream in
+        (let*! res = Evm_services.get_from_monitor monitor in
          return res);
         timeout_from_tbb params.time_between_blocks;
       ]
@@ -249,25 +304,25 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
       in
       (stream_loop [@tailcall])
         ~multichain
+        ~sbl_callbacks_activated
         (Qty next_blueprint_number)
         params
-        stream
+        monitor
   | Ok (Some (Blueprint blueprint)) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let* () =
-        when_ params.ping_tx_pool @@ fun () ->
-        Tx_pool.pop_and_inject_transactions ()
-      in
       match r with
-      | `Continue ->
+      | `Continue is_sub_block_activated ->
           (stream_loop [@tailcall])
             ~multichain
+            ~sbl_callbacks_activated:is_sub_block_activated
             (Qty (Z.succ next_blueprint_number))
             params
-            stream
+            monitor
       | `Restart_from level ->
+          Evm_services.close_monitor monitor ;
           (catchup [@tailcall])
             ~multichain
+            ~sbl_callbacks_activated
             ~next_blueprint_number:level
             ~first_connection:
               (* The connection was not interrupted, but we decided to restart
@@ -275,29 +330,80 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
                  no need to wait. *)
               true
             params)
+  | Ok (Some (Next_block_info {timestamp; number})) ->
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_next_block_info timestamp number
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
+      in
+      (stream_loop [@tailcall])
+        ~multichain
+        ~sbl_callbacks_activated
+        (Qty next_blueprint_number)
+        params
+        monitor
+  | Ok (Some (Included_transaction {tx; hash})) ->
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_inclusion tx hash
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
+      in
+      (stream_loop [@tailcall])
+        ~multichain
+        ~sbl_callbacks_activated
+        (Qty next_blueprint_number)
+        params
+        monitor
+  | Ok (Some (Dropped_transaction {hash; reason})) ->
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_dropped hash reason
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
+      in
+      (stream_loop [@tailcall])
+        ~multichain
+        ~sbl_callbacks_activated
+        (Qty next_blueprint_number)
+        params
+        monitor
   | Ok None | Error [Timeout] ->
+      Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
         ~multichain
+        ~sbl_callbacks_activated
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
-  | Error err -> fail err
+  | Error err ->
+      Evm_services.close_monitor monitor ;
+      fail err
 
-let start ?(ping_tx_pool = true) ~multichain ~time_between_blocks
-    ~evm_node_endpoint ~next_blueprint_number ~on_new_blueprint
-    ~on_finalized_levels () =
+let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
+    ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
+    ~on_next_block_info ~on_inclusion ~on_dropped () =
   let open Lwt_result_syntax in
+  let sbl_callbacks_activated = {sbl_callbacks_activated = false} in
   let*! res =
     catchup
       ~multichain
       ~next_blueprint_number
       ~first_connection:true
+      ~sbl_callbacks_activated
       {
         time_between_blocks;
         evm_node_endpoint;
+        rpc_timeout;
         on_new_blueprint;
         on_finalized_levels;
-        ping_tx_pool;
+        on_next_block_info;
+        on_inclusion;
+        on_dropped;
       }
   in
   (* The blueprint follower should never fail. If it does, we better exit with

@@ -5,6 +5,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let dns_set_subdomain agent domain =
+  let agent_ip = Agent.point agent |> Option.get |> fst in
+  Gcloud.DNS.set_subdomain ~agent_ip ~domain
+
+let merge_dockerbuild_args global_dockerbuild_args vm_configuration =
+  let args = vm_configuration.Agent.Configuration.dockerbuild_args in
+  let global_args =
+    List.filter
+      (fun (arg, _) -> not (List.mem_assoc arg args))
+      global_dockerbuild_args
+  in
+  global_args @ args
+
 (* Infrastructure to deploy on Google Cloud *)
 module Remote = struct
   type point_info = {workspace_name : string; gcp_name : string}
@@ -63,18 +76,28 @@ module Remote = struct
       Agent.Configuration.uri_of_docker_image
         vm_configuration.Agent.Configuration.docker_image
     in
-    let machine_type = vm_configuration.machine_type in
-    let max_run_duration = vm_configuration.max_run_duration in
+    let {
+      Agent.Configuration.machine_type;
+      disk_type;
+      disk_size_gb;
+      max_run_duration;
+      os;
+      _;
+    } =
+      vm_configuration
+    in
     let ports_per_vm = Env.ports_per_vm in
     let base_port = Env.vm_base_port in
-    let os = vm_configuration.os in
     let auto_approve = Env.auto_approve in
     let prometheus_port = Env.prometheus_port in
+    let artifacts_dir = Env.artifacts_dir in
     let* () =
       Terraform.VM.deploy
         ~auto_approve
         ~max_run_duration
         ~machine_type
+        ~disk_type
+        ~disk_size_gb
         ~base_port
         ~ports_per_vm
         ~number_of_vms
@@ -123,6 +146,7 @@ module Remote = struct
         ~next_available_port
         ~vm_name:(Some vm_name)
         ~process_monitor
+        ~artifacts_dir
         ()
       |> Lwt.return
     in
@@ -162,41 +186,11 @@ module Remote = struct
     in
     match agents with [agent] -> Lwt.return agent | _ -> assert false
 
-  (* Register the specified domain in an appropriate GCP zone *)
-  let dns_add_record agent domain =
-    let* res = Gcloud.DNS.find_zone_for_subdomain domain in
-    match res with
-    | None ->
-        let () =
-          Log.report
-            ~color:Log.Color.FG.yellow
-            "The domain '%s' is not a subdomain of an authorized GCP zone. \
-             Skipping."
-            domain
-        in
-        Lwt.return_unit
-    | Some (zone, _) ->
-        let* ip = Gcloud.DNS.get_value ~zone ~domain in
-        let* () =
-          match ip with
-          | None -> Lwt.return_unit
-          | Some ip -> Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip
-        in
-        let ip = Agent.point agent |> Option.get |> fst in
-        let* () = Gcloud.DNS.add_subdomain ~zone ~name:domain ~value:ip in
-        let () =
-          Log.report
-            ~color:Log.Color.FG.green
-            "DNS registered successfully: '%s'"
-            domain
-        in
-        Lwt.return_unit
-
   (*
       Deployment requires to create new VMs and organizing them per group of
       configuration. Each configuration leads to one terraform workspace.
     *)
-  let deploy ~proxy ~configurations =
+  let deploy ~dockerbuild_args ~proxy ~configurations =
     let agents_info = Hashtbl.create 11 in
     let workspaces_info =
       (* VMs are grouped per group of configuration. Each group leads to one workspace. *)
@@ -212,8 +206,8 @@ module Remote = struct
                (vm_configuration, List.of_seq seq, Seq.length seq) ))
     in
     let* () = Terraform.Docker_registry.init () in
-    let* () = Terraform.VM.Workspace.select "default" in
     let* () = Terraform.VM.init () in
+    let* () = Terraform.VM.Workspace.select "default" in
     let workspaces_names = workspaces_info |> Seq.map fst |> List.of_seq in
     let tezt_cloud = Env.tezt_cloud in
     let* () = Terraform.VM.Workspace.init ~tezt_cloud workspaces_names in
@@ -224,9 +218,13 @@ module Remote = struct
              (workspace_name, (vm_configuration, configurations, number_of_vms))
            ->
              let* ssh_public_key = Ssh.public_key () in
+             let args =
+               merge_dockerbuild_args dockerbuild_args vm_configuration
+             in
              let* () =
                Jobs.docker_build
                  ~docker_image:vm_configuration.Agent.Configuration.docker_image
+                 ~args
                  ~push:Env.push_docker
                  ~ssh_public_key
                  ()
@@ -264,7 +262,7 @@ module Remote = struct
         let* domains = Env.dns_domains () in
         let* () =
           Lwt_list.iter_s
-            (fun domainname -> dns_add_record agent domainname)
+            (fun domainname -> dns_set_subdomain agent domainname)
             domains
         in
         Lwt.return {agents = agent :: agents}
@@ -324,6 +322,7 @@ module Ssh_host = struct
          logging in as root are careful. This allows to not be embarrassed with sudo *)
       if user = "root" then Lwt.return_unit
       else
+        (* TODO? might check with ssh-add that the provided key is loaded in agent *)
         let* _ =
           Process.spawn
             ~runner
@@ -508,12 +507,26 @@ module Ssh_host = struct
         ("/tmp/otel", "/tmp/otel");
       ]
     in
+    let* registry_uri_opt =
+      Agent.Configuration.registry_uri_of_docker_image
+        configuration.vm.docker_image
+    in
+    let image_name =
+      Agent.Configuration.docker_image_name configuration.vm.docker_image
+    in
+    let* () =
+      match registry_uri_opt with
+      | Some registry_uri ->
+          Docker.pull ~runner ~image_name ~registry_uri () |> Process.check
+      | None -> return ()
+    in
     let* () =
       Docker.run
         ~runner
         ~rm:true
         ~detach:true
         ~network:"host"
+        ~custom_docker_options:["--ulimit"; "nofile=65535:65535"]
         ~volumes
         ~publish_ports
         ~name
@@ -529,11 +542,12 @@ module Ssh_host = struct
         ~point:(Runner.address (Some runner), ssh_listening_port)
         ~ssh_id:(Env.ssh_private_key_filename ())
         ~process_monitor:None
+        ~artifacts_dir:Env.artifacts_dir
         ()
     in
     Lwt.return agent
 
-  let deploy ~user ?ssh_id ~host ~port
+  let deploy ~user ?ssh_id ~host ~port ~dockerbuild_args
       ~(configurations : Agent.Configuration.t list) () =
     let* () = initial_host_provisionning user ?ssh_id host port in
     (* At this time, we only support deploying with root user.
@@ -541,7 +555,12 @@ module Ssh_host = struct
        TODO: support deploying using sudo and remove the "root" user requirement *)
     let user = "root" in
     let proxy_runner =
-      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+      Runner.create
+        ~ssh_user:user
+        ~ssh_port:port
+        ~address:host
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ()
     in
     (* Deploys the proxy *)
     let* proxy = deploy_proxy proxy_runner in
@@ -553,18 +572,44 @@ module Ssh_host = struct
             Agent.Configuration.uri_of_docker_image
               configuration.vm.docker_image
           in
+          let build_args =
+            merge_dockerbuild_args dockerbuild_args configuration.vm
+            |> List.map (fun (k, v) ->
+                   ["--build-arg"; Format.asprintf "%s=%s" k v])
+            |> List.concat
+          in
           let ssh_port = Agent.next_available_port proxy in
           (* FIXME move this constants elsewhere *)
           let base_port = 30_050 in
           let range = 50 in
           let runner =
-            Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+            Runner.create
+              ~ssh_user:user
+              ~ssh_port:port
+              ~address:host
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
           in
           let publish_ports =
             ( string_of_int (base_port + (i * range)),
               string_of_int (base_port + ((i + 1) * range) - 1),
               string_of_int (base_port + (i * range)),
               string_of_int (base_port + ((i + 1) * range) - 1) )
+          in
+
+          let* registry_uri_opt =
+            Agent.Configuration.registry_uri_of_docker_image
+              configuration.vm.docker_image
+          in
+          let image_name =
+            Agent.Configuration.docker_image_name configuration.vm.docker_image
+          in
+          let* () =
+            match registry_uri_opt with
+            | Some registry_uri ->
+                Docker.pull ~runner ~image_name ~registry_uri ()
+                |> Process.check
+            | None -> return ()
           in
           let* () =
             Docker.run
@@ -574,7 +619,7 @@ module Ssh_host = struct
               ~network:"host"
               ~name:configuration.name
               docker_image
-              ["-D"; "-p"; string_of_int ssh_port]
+              (["-D"; "-p"; string_of_int ssh_port] @ build_args)
             |> Process.check
           in
           let () =
@@ -596,10 +641,17 @@ module Ssh_host = struct
               ~process_monitor:None
               ~point:(host, ssh_port)
               ~ssh_id:(Env.ssh_private_key_filename ())
+              ~artifacts_dir:Env.artifacts_dir
               ()
           in
           Lwt.return agent)
         configurations
+    in
+    let* domains = Env.dns_domains () in
+    let* () =
+      Lwt_list.iter_s
+        (fun domainname -> dns_set_subdomain proxy domainname)
+        domains
     in
     let agents = proxy :: agents in
     Lwt.return {point = (user, host, port); agents}
@@ -612,7 +664,13 @@ module Ssh_host = struct
       Lwt_list.iter_p
         (fun agent ->
           let name = Agent.name agent in
-          let runner = Runner.create ~ssh_port:port ~address:host () in
+          let runner =
+            Runner.create
+              ~ssh_port:port
+              ~address:host
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
+          in
           let* _ = Docker.rm ~runner name |> Process.check in
           Lwt.return_unit)
         agents
@@ -636,7 +694,7 @@ module Localhost = struct
       Env.tezt_cloud
       configuration.Agent.Configuration.name
 
-  let deploy ~configurations () =
+  let deploy ~configurations ~dockerbuild_args () =
     let number_of_vms = List.length configurations in
     let base_port = Env.vm_base_port in
     let ports_per_vm = Env.ports_per_vm in
@@ -659,9 +717,15 @@ module Localhost = struct
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
              in
              let publish_ports = (start, stop, start, stop) in
+             let args =
+               merge_dockerbuild_args
+                 dockerbuild_args
+                 configuration.Agent.Configuration.vm
+             in
              let* () =
                Jobs.docker_build
                  ~docker_image:configuration.Agent.Configuration.vm.docker_image
+                 ~args
                  ~push:false
                  ~ssh_public_key
                  ()
@@ -740,6 +804,7 @@ module Localhost = struct
                ~next_available_port:(fun () -> next_port point)
                ~vm_name:None
                ~process_monitor
+               ~artifacts_dir:Env.artifacts_dir
                ())
     in
     Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}
@@ -777,20 +842,34 @@ type t =
   | Ssh_host of Ssh_host.t
   | Localhost of Localhost.t
 
-let deploy ~configurations =
+let deploy ?(dockerbuild_args = []) ~configurations () =
   match Env.mode with
   | `Local_orchestrator_local_agents ->
-      let* localhost = Localhost.deploy ~configurations () in
+      let* localhost = Localhost.deploy ~dockerbuild_args ~configurations () in
       Lwt.return (Localhost localhost)
   | `Local_orchestrator_remote_agents ->
-      let* remote = Remote.deploy ~proxy:false ~configurations in
+      let* remote =
+        Remote.deploy ~proxy:false ~dockerbuild_args ~configurations
+      in
       Lwt.return (Remote remote)
   | `Remote_orchestrator_remote_agents ->
-      let* remote = Remote.deploy ~proxy:true ~configurations in
+      let* remote =
+        Remote.deploy ~proxy:true ~dockerbuild_args ~configurations
+      in
       Lwt.return (Remote remote)
   | `Remote_orchestrator_local_agents -> assert false
   | `Ssh_host (user, host, port) ->
-      let* host = Ssh_host.deploy ~user ~host ~port ~configurations () in
+      let ssh_id = Env.ssh_private_key_filename () in
+      let* host =
+        Ssh_host.deploy
+          ~user
+          ~ssh_id
+          ~host
+          ~port
+          ~dockerbuild_args
+          ~configurations
+          ()
+      in
       Lwt.return (Ssh_host host)
 
 let agents t =

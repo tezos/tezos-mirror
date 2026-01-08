@@ -103,18 +103,22 @@ module JubjubEdwards (L : LIB) = struct
   let inputs =
     let open Vectors in
     (* 0 + 0 = 0 *)
-    (id, id) :: (* 0 + g = g *)
-                (id, g) :: (* g + g = g2 *)
-                           (g, g)
+    (id, id)
+    :: (* 0 + g = g *)
+       (id, g)
+    :: (* g + g = g2 *)
+       (g, g)
     :: (* p + q = r *)
        List.map (fun (p, q) -> (point_of_mec p, point_of_mec q)) test_vectors
 
   let expected =
     let open Vectors in
     (* 0 + 0 = 0 *)
-    id :: (* 0 + g = g *)
-          g :: (* g + g = g2 *)
-               g2
+    id
+    :: (* 0 + g = g *)
+       g
+    :: (* g + g = g2 *)
+       g2
     :: (* p + q = r *)
        List.map
          (fun (input1, input2) ->
@@ -187,8 +191,9 @@ module JubjubEdwards (L : LIB) = struct
   let inputs =
     let open Vectors in
     (* g^0 = 0 *)
-    (g, [false]) :: (* g^1 = g *)
-                    (g, [true])
+    (g, [false])
+    :: (* g^1 = g *)
+       (g, [true])
     :: (* g^2 = g2 *)
        (g, [false; true])
     :: (* p + q = r *)
@@ -199,9 +204,11 @@ module JubjubEdwards (L : LIB) = struct
   let expected =
     let open Vectors in
     (* g^0 = 0 *)
-    id :: (* g^1 = g *)
-          g :: (* g^2 = g2 *)
-               g2
+    id
+    :: (* g^1 = g *)
+       g
+    :: (* g^2 = g2 *)
+       g2
     :: (* p + q = r *)
        List.map
          (fun (input_p, input_b) ->

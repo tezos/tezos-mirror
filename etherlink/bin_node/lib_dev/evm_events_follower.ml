@@ -9,6 +9,7 @@ type parameters = {
   rollup_node_endpoint : Uri.t;
   filter_event : Evm_events.t -> bool;
   keep_alive : bool;
+  rpc_timeout : float;
 }
 
 module StringSet = Set.Make (String)
@@ -18,6 +19,7 @@ module Types = struct
     rollup_node_endpoint : Uri.t;
     filter_event : Evm_events.t -> bool;
     keep_alive : bool;
+    rpc_timeout : float;
     mutable last_l1_level : int32 option;
   }
 
@@ -53,12 +55,18 @@ let read_from_rollup_node ~keep_alive path level rollup_node_endpoint =
     {key = path}
     ()
 
-let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
+let fetch_event
+    ({rollup_node_endpoint; keep_alive; rpc_timeout; _} : Types.state)
     rollup_block_lvl event_index =
   let open Lwt_result_syntax in
   let path = Durable_storage_path.Evm_events.nth_event event_index in
   let* bytes_opt =
-    read_from_rollup_node ~keep_alive path rollup_block_lvl rollup_node_endpoint
+    read_from_rollup_node
+      ~keep_alive
+      ~timeout:rpc_timeout
+      path
+      rollup_block_lvl
+      rollup_node_endpoint
   in
   let*! event_opt =
     match bytes_opt with
@@ -74,12 +82,13 @@ let fetch_event ({rollup_node_endpoint; keep_alive; _} : Types.state)
   return event_opt
 
 let fetch_events_one_by_one
-    ({rollup_node_endpoint; keep_alive; filter_event; _} as state : Types.state)
-    rollup_block_lvl =
+    ({rollup_node_endpoint; keep_alive; rpc_timeout; filter_event; _} as state :
+      Types.state) rollup_block_lvl =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
     read_from_rollup_node
       ~keep_alive
+      ~timeout:rpc_timeout
       Durable_storage_path.Evm_events.length
       rollup_block_lvl
       rollup_node_endpoint
@@ -106,14 +115,15 @@ let fetch_events_one_by_one
         events
 
 let fetch_events_at_once
-    ({rollup_node_endpoint; keep_alive; filter_event; _} : Types.state)
-    rollup_block_lvl =
+    ({rollup_node_endpoint; keep_alive; rpc_timeout; filter_event; _} :
+      Types.state) rollup_block_lvl =
   let open Lwt_result_syntax in
   let path = Durable_storage_path.Evm_events.events in
   let* bindings =
     let open Rollup_services in
     call_service
       ~keep_alive
+      ~timeout:rpc_timeout
       ~base:rollup_node_endpoint
       durable_state_values
       ((), Block_id.Level rollup_block_lvl)
@@ -260,8 +270,7 @@ module Handlers = struct
 
   type self = worker
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun worker request ->
@@ -274,16 +283,22 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w ()
-      ({rollup_node_endpoint; filter_event; keep_alive} : Types.parameters) =
+      ({rollup_node_endpoint; filter_event; keep_alive; rpc_timeout} :
+        Types.parameters) =
     let open Lwt_result_syntax in
     let* last_l1_level = Evm_context.last_known_l1_level () in
     let state : Types.state =
-      {rollup_node_endpoint; filter_event; keep_alive; last_l1_level}
+      {
+        rollup_node_endpoint;
+        filter_event;
+        keep_alive;
+        rpc_timeout;
+        last_l1_level;
+      }
     in
     return state
 
-  let on_error :
-      type r request_error.
+  let on_error : type r request_error.
       worker ->
       Tezos_base.Worker_types.request_status ->
       (r, request_error) Request.t ->

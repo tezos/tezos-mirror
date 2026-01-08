@@ -977,6 +977,10 @@ end
     [true], the [-ccopt "-framework Security"]flag is added at link time for
     macOS system.
 
+    If [include_in_main_tezt_exe] is [true] (which is the default),
+    [PACKAGE_tezt_lib] is passed to the [make_tezt_exe] argument of {!generate}.
+    In other words, the tests are included in the main Tezt executable.
+
     The function returns a target that is the local library created by tezt
     to register all tests. This can be reused locally in the same module
     to share code with other targets. *)
@@ -997,6 +1001,7 @@ val tezt :
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor ->
   ?preprocessor_deps:preprocessor_dep list ->
+  ?include_in_main_tezt_exe:bool ->
   ?source:string list ->
   product:string ->
   string list ->

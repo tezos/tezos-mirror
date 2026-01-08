@@ -102,11 +102,12 @@ let assert_merkelized_payload_proof_error ~__LOC__ expected_msg result =
   let open Result_wrap_syntax in
   let@ result in
   Assert.error ~loc:__LOC__ result (function
-      | Environment.Ecoproto_error
-          (Sc_rollup_inbox_merkelized_payload_hashes_repr
-           .Merkelized_payload_hashes_proof_error msg) ->
-          expected_msg = msg
-      | _ -> false)
+    | Environment.Ecoproto_error
+        (Sc_rollup_inbox_merkelized_payload_hashes_repr
+         .Merkelized_payload_hashes_proof_error
+           msg) ->
+        expected_msg = msg
+    | _ -> false)
 
 let verify_merkelized_payload_proof_fails ~__LOC__ expected_msg proof =
   assert_merkelized_payload_proof_error ~__LOC__ expected_msg
@@ -125,10 +126,9 @@ let assert_inbox_proof_error ~__LOC__ expected_msg result =
   let open Result_wrap_syntax in
   let@ result in
   Assert.error ~loc:__LOC__ result (function
-      | Environment.Ecoproto_error (Sc_rollup_inbox_repr.Inbox_proof_error msg)
-        ->
-          expected_msg = msg
-      | _ -> false)
+    | Environment.Ecoproto_error (Sc_rollup_inbox_repr.Inbox_proof_error msg) ->
+        expected_msg = msg
+    | _ -> false)
 
 let verify_payloads_proof_fails ~__LOC__ expected_msg proof head_cell_hash
     message_counter =

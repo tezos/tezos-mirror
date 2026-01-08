@@ -1,0 +1,27 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name etherlink_benchmark_lib)
+ (package tezt-etherlink)
+ (libraries
+  bls12-381.archive
+  octez-libs.test-helpers
+  octez-libs.tezt-wrapper
+  tezt-tezos
+  tezt_etherlink
+  floodgate_lib)
+ (flags
+  (:standard)
+  -open Tezos_test_helpers
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_etherlink))
+
+(rule
+ (target static_contracts.ml)
+ (deps (glob_files_rec contracts/**.{abi,bin,json}))
+ (action
+  (run ocaml-crunch -e bin -e abi -e json -m plain -o %{target} -s contracts)))

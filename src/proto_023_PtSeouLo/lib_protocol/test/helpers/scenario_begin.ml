@@ -53,7 +53,8 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
     ?delegate_parameters_activation_delay () =
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   start ~constants:default
-  --> (* default for tests: 12 *)
+  -->
+  (* default for tests: 12 *)
   set_opt S.blocks_per_cycle blocks_per_cycle
   --> set_opt
         S.delegate_parameters_activation_delay
@@ -80,24 +81,35 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
       (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
   else Empty
 
-(** Initialize the test, given some initial parameters *)
-let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
-    ?(force_preattest_all = false) ?(check_finalized_block_perm = [])
-    ?(disable_default_checks = false) delegates_name_list :
-    (constants, t) scenarios =
+(** Initialize the test, given some initial parameters.
+    [algo] defines the algorithm used for the [delegates_name_list].
+    If not set, a random algorithm is selected for each.
+    To use a different algorithm for each delegate, use [delegates_with_algo] *)
+let begin_test ?(delegates_with_algo = []) ?algo ?(burn_rewards = false)
+    ?(force_attest_all = false) ?(force_preattest_all = false)
+    ?(check_finalized_every_block = []) ?(disable_default_checks = false)
+    delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
-      assert (not @@ List.is_empty delegates_name_list) ;
+      let delegates_name_algo =
+        List.map (fun x -> (x, algo)) delegates_name_list
+        @ List.map (fun (x, algo) -> (x, Some algo)) delegates_with_algo
+      in
+      assert (not @@ List.is_empty delegates_name_algo) ;
+      let delegates_name_list, delegates_algo_list =
+        List.split delegates_name_algo
+      in
       (* Do not disable default checks, unless for a good reason *)
-      let check_finalized_block_perm =
-        if disable_default_checks then check_finalized_block_perm
+      let check_finalized_every_block =
+        if disable_default_checks then check_finalized_every_block
         else
           [check_all_balances; check_misc; check_issuance_rpc]
-          @ check_finalized_block_perm
+          @ check_finalized_every_block
       in
       (* Override threshold value if activate *)
-      let n = List.length delegates_name_list in
-      let* block, delegates = Context.init_with_constants_n ?algo constants n in
+      let* block, delegates =
+        Context.init_with_constants_algo_list constants delegates_algo_list
+      in
       let*? init_level = Context.get_level (B block) in
       let*? account_map =
         List.fold_left2
@@ -161,8 +173,8 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             double_signings = [];
             force_attest_all;
             force_preattest_all;
-            check_finalized_block_perm;
-            check_finalized_block_temp = [];
+            check_finalized_every_block;
+            check_finalized_current_block = [];
             previous_metadata = None;
             operation_mode = Bake;
             (* The grandparent is only used to get the consensus key, so it is

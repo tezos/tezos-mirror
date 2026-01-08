@@ -35,5 +35,13 @@ val get_error : string -> exn option
     If the closure raises an exception, it will break the internal lwt loop
     and prevent any subsequent asynchronous call to be executed. It's
     consequently advised to handle exceptions directly in the closure and return
-    a [result]. *)
+    a [result].
+
+    Warning: Promises added to this loop are expected to perform only very short
+    computations (typically just sending events). Longer computations may
+    congest promise scheduling and cause blocking [async_lwt] calls.*)
 val async_lwt : (unit -> unit Lwt.t) -> unit
+
+(** Schedule [f] to run on the Event_loop main switch and return its result.
+    Callers can invoke this from any domain to ensure main-domain execution. *)
+val run_on_main : (unit -> 'a) -> 'a

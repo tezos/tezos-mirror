@@ -11,26 +11,36 @@ module Brassaia_disk = Tezos_context_brassaia.Tezos_context.Context
 
 module Brassaia_mem = Tezos_context_brassaia_memory.Tezos_context_memory.Context
 
+module Tezedge = Tezos_context_tezedge.Context
+
 module Internal = struct
-  type wrapped_backend = Irmin_disk | Irmin_mem | Brassaia_disk | Brassaia_mem
+  type wrapped_backend =
+    | Irmin_disk
+    | Irmin_mem
+    | Brassaia_disk
+    | Brassaia_mem
+    | Tezedge
 
   type wrapped_index =
     | Irmin_disk_index of Irmin_disk.index
     | Brassaia_disk_index of Brassaia_disk.index
     | Irmin_mem_index of Irmin_mem.index
     | Brassaia_mem_index of Brassaia_mem.index
+    | Tezedge_index of Tezedge.index
 
   type wrapped_context =
     | Irmin_disk_context of Irmin_disk.t
     | Irmin_mem_context of Irmin_mem.t
     | Brassaia_disk_context of Brassaia_disk.t
     | Brassaia_mem_context of Brassaia_mem.t
+    | Tezedge_context of Tezedge.t
 
   type wrapped_tree =
     | Irmin_disk_tree of Irmin_disk.tree
     | Irmin_mem_tree of Irmin_mem.tree
     | Brassaia_disk_tree of Brassaia_disk.tree
     | Brassaia_mem_tree of Brassaia_mem.tree
+    | Tezedge_tree of Tezedge.tree
 
   type index = {index_1 : wrapped_index; index_2 : wrapped_index}
 

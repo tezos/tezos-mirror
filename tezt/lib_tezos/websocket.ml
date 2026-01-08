@@ -12,6 +12,8 @@ exception Could_not_connect
 
 exception Connection_closed
 
+exception Timeout of {timeout : float; origin : string}
+
 let get_unique_name =
   let name_counts = ref String_map.empty in
   fun name ->
@@ -42,7 +44,10 @@ let send_raw {stdin; _} msg =
   unit
 
 let read_json ~origin {process; _} =
-  let max_size = 10 * 1024 * 1024 (* 10MB *) in
+  let max_size =
+    10 * 1024 * 1024
+    (* 10MB *)
+  in
   let ch = Process.stdout process in
   let buff = Buffer.create 256 in
   let rec loop () =
@@ -61,6 +66,17 @@ let read_json ~origin {process; _} =
         | Some json -> return json)
   in
   loop ()
+
+let read_json ~origin ?timeout ws =
+  match timeout with
+  | None -> read_json ~origin ws
+  | Some timeout ->
+      Lwt.pick
+        [
+          read_json ~origin ws;
+          (let* () = Lwt_unix.sleep timeout in
+           raise (Timeout {timeout; origin}));
+        ]
 
 let close ws =
   let* () = Lwt_io.close ws.stdin in
@@ -83,14 +99,14 @@ let send =
 
 let recv =
   let cpt = ref 0 in
-  fun ws ->
+  fun ?timeout ws ->
     incr cpt ;
     let origin = Format.sprintf "%s(%d)" (Process.name ws.process) !cpt in
-    read_json ~origin ws
+    read_json ~origin ?timeout ws
 
-let send_recv ws json =
+let send_recv ?timeout ws json =
   let* () = send ws json in
-  recv ws
+  recv ?timeout ws
 
 let pause ws = Unix.kill (Process.pid ws.process) Sys.sigstop
 

@@ -1,1 +1,2 @@
 7655cb4123007e77d2593aef3119382acb0f979665f2f25d00723f3591dcecde  src/lib_dal_node/migrations/000_initial.sql
+f056656620e911f4f550059ac92ef1d97b9e62136156e9e04bb73fe1c448e68a  src/lib_dal_node/migrations/001_add_attestation_lag_to_skip_list_slots.sql

@@ -101,3 +101,21 @@ module Duo_memory_context = Make (struct
       index_2 = Brassaia_mem_index brassaia_index;
     }
 end)
+
+module Duo_irmin_tezedge_context = struct
+  include Make (struct
+    let backend_1 = Internal.Irmin_disk
+
+    let backend_2 = Internal.Tezedge
+
+    type index_1 = Tezos_context_disk.Context.index
+
+    type index_2 = Tezos_tezedge_context.Tezedge_context.C.index
+
+    let make_index irmin_index tezedge_index : Internal.index =
+      {
+        index_1 = Irmin_disk_index irmin_index;
+        index_2 = Tezedge_index tezedge_index;
+      }
+  end)
+end

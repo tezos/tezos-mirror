@@ -11,27 +11,23 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 ocaml-build = { version = "1.*", features = ["dune"] }
 
-[dependencies.wasmer-c-api]
-package = "wasmer-c-api"
-path = "../../src/rust_deps/wasmer-3.3.0/lib/c-api"
-default-features = false
-features = ["singlepass", "cranelift", "wat", "middlewares"]
-
 [dependencies]
 hex = "*"
-ocaml = { version = "1.1.0" }
+ocaml = { version = "1.2.1" }
 wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = [
-    "cranelift",
-    "jit",
+  "cranelift",
+  "jit",
 ] }
 wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
-tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-features = false }
+tezos_crypto_rs = { version = "0.6", git = "https://gitlab.com/tezos/tezos.git", rev = "c0e4170342cc7c62ced920ecc25af36745447f22", default-features = false }
 log = "0.4"
 env_logger = "0.11"
 octez-riscv-api = { path = "../../src/riscv/api" }
 librustzcash = { path = "../../src/rustzcash_deps" }
-tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
-tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
+tezos-smart-rollup-core-v1 = { package = "tezos-smart-rollup-core", git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-host-v1 = { package = "tezos-smart-rollup-host", git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-core-v2 = { package = "tezos-smart-rollup-core", git = "https://gitlab.com/tezos/tezos.git", rev = "c0e4170342cc7c62ced920ecc25af36745447f22" }
+tezos-smart-rollup-host-v2 = { package = "tezos-smart-rollup-host", git = "https://gitlab.com/tezos/tezos.git", rev = "c0e4170342cc7c62ced920ecc25af36745447f22" }
 # Bifrost kernel
 kernel-bifrost = { package = "evm_kernel_bifrost", path = "../kernel_bifrost/kernel", default-features = false }
 runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bifrost/runtime", default-features = false }
@@ -44,3 +40,15 @@ runtime-calypso2 = { package = "tezos-evm-runtime-calypso2", path = "../kernel_c
 # Dionysus
 kernel-dionysus = { package = "evm_kernel_dionysus", path = "../kernel_dionysus/kernel", default-features = false }
 runtime-dionysus = { package = "tezos-evm-runtime-dionysus", path = "../kernel_dionysus/runtime", default-features = false }
+
+# Dionysus R1
+kernel-dionysus-r1 = { package = "evm_kernel_dionysus_r1", path = "../kernel_dionysus_r1/kernel", default-features = false }
+runtime-dionysus-r1 = { package = "tezos-evm-runtime-dionysus-r1", path = "../kernel_dionysus_r1/runtime", default-features = false }
+
+# Ebisu
+kernel-ebisu = { package = "evm_kernel_ebisu", path = "../kernel_ebisu/kernel", default-features = false }
+runtime-ebisu = { package = "tezos-evm-runtime-ebisu", path = "../kernel_ebisu/runtime", default-features = false }
+
+# Farfadet
+kernel-farfadet = { package = "evm_kernel_farfadet", path = "../kernel_farfadet/kernel", default-features = false }
+runtime-farfadet = { package = "tezos-evm-runtime-farfadet", path = "../kernel_farfadet/runtime", default-features = false }

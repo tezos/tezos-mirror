@@ -34,7 +34,9 @@ depends: [
   "clap" { >= "0.3.0" }
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
-  "cohttp" { >= "5.3.1" }
+  "cohttp" { = "5.3.1~octez" }
+  "cohttp-lwt" { = "5.3.1~octez" }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "conduit-lwt" { >= "7.1.0" }
   "conduit-lwt-unix" { >= "7.1.0" }
   "conf-libev"
@@ -45,10 +47,11 @@ depends: [
   "ctypes-foreign" { >= "0.18.0" }
   "digestif" { >= "0.9.0" }
   "dmap"
-  "dream" { >= "1.0.0~alpha7" }
+  "domainslib" { >= "0.5.2" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "dune-configurator"
   "eio"
-  "eio_main"
+  "eio_posix"
   "eqaf"
   "ezgzip"
   "ezjsonm" { >= "1.3.0" }
@@ -73,18 +76,17 @@ depends: [
   "lwt-watcher" { = "0.2" }
   "lwt_eio"
   "lwt_log"
-  "lwt_ppx"
-  "magic-mime" { >= "1.3.1" }
   "memtrace"
   "mirage-crypto-rng" { >= "1.0.0" }
   "mtime" { >= "2.0.0" }
   "num"
-  "ocamlformat" { = "0.26.2" }
+  "ocamlformat" { = "0.27.0" }
   "ocamlgraph"
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
   "opam-file-format" { >= "2.1.6" }
-  "opentelemetry"
+  "opentelemetry" { >= "0.12" }
+  "opentelemetry-client-cohttp-lwt"
   "opentelemetry-lwt"
   "optint"
   "ppx_deriving"
@@ -109,6 +111,7 @@ depends: [
   "rope" { >= "0.6.2" }
   "rusage"
   "safepass"
+  "saturn" { >= "0.5.0" }
   "secp256k1-internal" { >= "0.4.0" }
   "semaphore-compat" { >= "1.0.1" }
   "seqes" { >= "0.2" }
@@ -131,14 +134,12 @@ depends: [
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
-  "cohttp-lwt"
-  "cohttp-lwt-unix"
   "data-encoding"
   "hacl_x25519"
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
-  "opentelemetry-client-cohttp-lwt"
+  "lwt_domain"
   "prometheus"
   "prometheus-app"
   "resto"

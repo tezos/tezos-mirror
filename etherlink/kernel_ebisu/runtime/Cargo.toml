@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-evm-runtime-ebisu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos-evm-logging.workspace = true
+sha3.workspace = true
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+
+[features]
+default = []
+dummy-store-get-hash = []
+tracing = ["dep:tracing", "tezos-evm-logging/tracing"]

@@ -1,7 +1,7 @@
 # This file redirects pages on the S3 bucket using a CloudFront server.
 # All redirections are relative to the docs/ folder.
 # Update this one at each MAJOR release of Octez:
-/releases/latest.html /releases/version-22.html 302
+/releases/latest.html /releases/version-23.html 302
 # These are inherited from the past, don't change:
 /whitedoc/micheline.html /shell/micheline.html 301
 /whitedoc/michelson.html /active/michelson.html 301
@@ -23,6 +23,7 @@
 /oxford/* /active/:splat 301
 /paris/* /active/:splat 301
 /quebec/* /active/:splat 301
+/rio/* /active/:splat 301
 /api/cli-commands.html /shell/cli-commands.html 301
 /api/rpc.html /shell/rpc.html 301
 /developer/protocol_environment.html /shell/protocol_environment.html 301

@@ -140,8 +140,7 @@ let post_global_block_simulate ?(block = "head") ?(reveal_pages = [])
   in
   let data =
     Data
-      (`O
-        ((("messages", messages_json) :: reveal_json) @ insight_requests_json))
+      (`O ((("messages", messages_json) :: reveal_json) @ insight_requests_json))
   in
   make POST ["global"; "block"; block; "simulate"] ~data (fun obj ->
       JSON.

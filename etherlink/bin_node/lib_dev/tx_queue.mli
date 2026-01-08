@@ -33,6 +33,7 @@ val tx_container :
   chain_family:'f L2_types.chain_family ->
   (config:Configuration.tx_queue ->
   keep_alive:bool ->
+  timeout:float ->
   unit ->
   unit tzresult Lwt.t)
   * 'f Services_backend_sig.tx_container
@@ -40,38 +41,30 @@ val tx_container :
 (**/*)
 
 module Internal_for_tests : sig
-  module Nonce_bitset : sig
-    type t = {next_nonce : Z.t; bitset : Tezos_base.Bitset.t}
-
-    val create : next_nonce:Z.t -> t
-
-    val offset : nonce1:Z.t -> nonce2:Z.t -> int tzresult
-
-    val add : t -> nonce:Z.t -> t tzresult
-
-    val remove : t -> nonce:Z.t -> t tzresult
-
-    val shift : t -> nonce:Z.t -> t tzresult
-
-    val is_empty : t -> bool
-
-    val next_gap : t -> Z.t
-
-    val shift_then_next_gap : t -> shift_nonce:Z.t -> Z.t tzresult
-  end
-
   module Address_nonce : sig
     type t
 
     val empty : start_size:int -> t
 
-    val add : t -> addr:string -> next_nonce:Z.t -> nonce:Z.t -> unit tzresult
+    val add :
+      t ->
+      addr:string ->
+      next_nonce:Z.t ->
+      nonce:'a ->
+      add:(Nonce_bitset.t -> 'a -> Nonce_bitset.t tzresult) ->
+      unit tzresult
 
     val find : t -> addr:string -> Nonce_bitset.t option
 
-    val confirm_nonce : t -> addr:string -> nonce:Z.t -> unit tzresult
+    val confirm_nonce :
+      t -> addr:string -> nonce:'a -> next:('a -> Z.t) -> unit tzresult
 
-    val remove : t -> addr:string -> nonce:Z.t -> unit tzresult
+    val remove :
+      t ->
+      addr:string ->
+      nonce:'a ->
+      rm:(Nonce_bitset.t -> 'a -> Nonce_bitset.t tzresult) ->
+      unit tzresult
 
     val next_gap : t -> addr:string -> next_nonce:Z.t -> Z.t tzresult
   end

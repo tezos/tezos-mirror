@@ -66,6 +66,9 @@ val create :
     exit. *)
 val shutdown : t -> unit Lwt.t
 
+(** [get_chain_id t] retreives the chain id of the chain [t] is connected to. *)
+val get_chain_id : t -> Chain_id.t tzresult Lwt.t
+
 (** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection),
@@ -134,12 +137,13 @@ val get_tezos_reorg_for_new_head :
   Block_hash.t * int32 ->
   (Block_hash.t * int32) Reorg.t tzresult Lwt.t
 
-(** [client_context_with_timeout ctxt timeout] creates a client context where
+(** [client_context ctxt ~timeout] creates a client context where
     RPCs will be made with timeout [timeout] seconds. Calls that timeout will
     resolve with an error [RPC_timeout] which will trigger a reconnection in
-    {!iter_heads}.  *)
-val client_context_with_timeout :
-  #Client_context.full -> float -> Client_context.full
+    {!iter_heads}. It also replaces the [chain] method with one that always
+    returns the hash in order to limit RPCs. *)
+val client_context :
+  #Client_context.full -> timeout:float -> Client_context.full tzresult Lwt.t
 
 (** Returns true iff a connection error is present in the given error trace. *)
 val is_connection_error : error trace -> bool

@@ -110,8 +110,7 @@ let apply_model : 'arg -> 'arg model -> applied =
 
     type t = X.size X.repr
 
-    let rec apply :
-        type a b c.
+    let rec apply : type a b c.
         (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
      fun conv arity f arg ->
       match arity with
@@ -136,8 +135,7 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
   include M
   include Def (X)
 
-  let rec apply :
-      type a b c.
+  let rec apply : type a b c.
       (int -> c X.repr) -> (c, a, b) arity -> a X.repr -> b -> c X.repr =
    fun conv arity f arg ->
     match arity with
@@ -911,8 +909,7 @@ module Synthesize
 
     let arity = X.arity
 
-    let rec synthesize :
-        type a args_model x_model y_model.
+    let rec synthesize : type a args_model x_model y_model.
         (Costlang.Arg_names.size, args_model, a) arity ->
         args_model Costlang.Arg_names.repr ->
         (C.size, x_model, a) arity ->

@@ -129,7 +129,8 @@ let test_vectors_griffin_4 () =
   in
   List.iter
     (fun ( (x1_s, x2_s, x3_s, x4_s),
-           (exp_res1_s, exp_res2_s, exp_res3_s, exp_res4_s) ) ->
+           (exp_res1_s, exp_res2_s, exp_res3_s, exp_res4_s) )
+       ->
       let x1 = Bls12_381.Fr.of_string x1_s in
       let x2 = Bls12_381.Fr.of_string x2_s in
       let x3 = Bls12_381.Fr.of_string x3_s in

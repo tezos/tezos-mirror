@@ -16,6 +16,16 @@ use zeroize::Zeroize;
 
 mod encoding;
 
+use tezos_data_encoding::nom::Hasher;
+
+pub struct TezosHasher;
+
+impl Hasher for TezosHasher {
+    fn hash(&self, input: &[u8]) -> Vec<u8> {
+        self::blake2b::digest_256(input)
+    }
+}
+
 const CRYPTO_KEY_SIZE: usize = 32;
 
 mod prefix_bytes {
@@ -683,7 +693,7 @@ impl PublicKeySignatureVerifier for PublicKeyEd25519 {
         let payload = crate::blake2b::digest_256(bytes);
 
         pk.verify_strict(&payload, &signature)
-            .map_err(CryptoError::Ed25519)?;
+            .map_err(|e: ed25519_dalek::ed25519::Error| CryptoError::Ed25519(e.into()))?;
 
         Ok(true)
     }

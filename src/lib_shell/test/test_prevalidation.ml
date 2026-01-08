@@ -50,7 +50,7 @@ module Init = struct
       unit tzresult Lwt.t =
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun data_dir ->
         let open Lwt_result_syntax in
-        let*! idx = Context_ops.init ~kind:`Disk ~data_dir () in
+        let* idx = Context_ops.init ~kind:`Disk ~data_dir () in
         let* genesis =
           Context_ops.commit_genesis
             idx

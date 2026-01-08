@@ -127,7 +127,8 @@ let mk_trust_slots_backup_uris flag =
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
+    ?batching_time_interval dal_node =
   spawn_command dal_node @@ ["config"]
   @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
   @ [
@@ -162,6 +163,10 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun s -> ["--batching-time-interval"; s])
+      batching_time_interval
   @ mk_backup_uris_args slots_backup_uris
   @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
@@ -174,7 +179,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
 let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
+    ?batching_time_interval dal_node =
   spawn_command dal_node
   @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
@@ -193,6 +199,10 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun s -> ["--batching-time-interval"; s])
+      batching_time_interval
   @ mk_backup_uris_args slots_backup_uris
   @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
@@ -214,7 +224,7 @@ end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
-    ?trust_slots_backup_uris dal_node =
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_init
       ?expected_pow
@@ -226,13 +236,14 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       ?slots_backup_uris
       ?trust_slots_backup_uris
+      ?batching_time_interval
       dal_node
   in
   Process.check process
 
 let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
-    ?trust_slots_backup_uris dal_node =
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_update
       ?expected_pow
@@ -244,6 +255,7 @@ let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       ?slots_backup_uris
       ?trust_slots_backup_uris
+      ?batching_time_interval
       dal_node
   in
   Process.check process
@@ -379,6 +391,9 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
     ~node () =
+  let l1_node_endpoint =
+    Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
+  in
   create_from_endpoint
     ?runner
     ?path
@@ -394,7 +409,7 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?disable_shard_validation
     ?disable_amplification
     ?ignore_pkhs
-    ~l1_node_endpoint:(Node.as_rpc_endpoint node)
+    ~l1_node_endpoint
     ()
 
 let make_arguments node =
@@ -427,7 +442,7 @@ let make_arguments node =
       ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
       node.persistent_state.ignore_pkhs
 
-let do_runlike_command ?env ?(event_level = `Debug) node arguments =
+let do_runlike_command ?env ?(event_level = `Info) node arguments =
   if node.status <> Not_running then
     Test.fail "DAL node %s is already running" node.name ;
   let on_terminate _status =
@@ -527,13 +542,14 @@ let debug_print_store_schemas ?path ?hooks () =
   Process.check process
 
 module Proxy = struct
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
 
   type route = {
     path : Re.Str.regexp;
     callback :
       path:string ->
       fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      fetch_stream:(unit -> (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t) ->
       answer option Lwt.t;
   }
 
@@ -553,6 +569,194 @@ module Proxy = struct
   let find_mocked_action t ~path =
     List.find_opt (fun act -> Re.Str.string_match act.path path 0) t.routes
 
+  (** [rewrite_attestable_stream_line ~number_of_slots ~published_level line]
+      rewrites a single JSON line from [/profiles/<FAULTY_TZ>/monitor/attestable_slots].
+      The goal is to make the faulty delegate appear to have all slots attestable for
+      [~published_level]. To do this, we need to add the missing slot indices for each level
+      in the [Backfill] element that is always the first one sent in the monitoring stream.
+      Note: this function heavily depends on the types of elements that are in the returned RPC
+      stream, information which can be found at {!Tezos_dal_node_services.Types.Attestable_event.t}. *)
+  let rewrite_attestable_stream_line ~number_of_slots ~published_level line =
+    let open Ezjsonm in
+    let make_slot_id slot_level slot_index =
+      dict [("slot_level", int slot_level); ("slot_index", int slot_index)]
+    in
+    let parse_slot_id v =
+      let slot_level = find v ["slot_level"] |> get_int in
+      let slot_index = find v ["slot_index"] |> get_int in
+      (slot_level, slot_index)
+    in
+
+    let rewrite_backfill v =
+      let payload = find v ["backfill_payload"] in
+      let slot_ids =
+        match find_opt payload ["slot_ids"] with
+        | None -> []
+        | Some arr -> get_list parse_slot_id arr
+      in
+      (* Find which indices at published_level are already present *)
+      let existing_indices =
+        List.filter_map
+          (fun (slot_level, slot_index) ->
+            if slot_level = published_level then Some slot_index else None)
+          slot_ids
+      in
+      (* Generate missing indices *)
+      let all_indices = List.init number_of_slots Fun.id in
+      let missing_indices =
+        List.filter (fun i -> not (List.mem i existing_indices)) all_indices
+      in
+      (* Append missing slot_ids *)
+      let new_slot_ids =
+        slot_ids @ List.map (fun i -> (published_level, i)) missing_indices
+      in
+      (* Build updated JSON *)
+      let new_slot_ids_json =
+        list
+          (fun (slot_level, slot_index) -> make_slot_id slot_level slot_index)
+          new_slot_ids
+      in
+      update v ["backfill_payload"; "slot_ids"] (Some new_slot_ids_json)
+      |> value_to_string
+    in
+    let result =
+      try
+        let v = from_string line in
+        match find_opt v ["kind"] |> Option.map get_string with
+        | Some "backfill" -> rewrite_backfill v
+        | _ -> line
+      with _ -> line
+    in
+    result ^ "\n"
+
+  let json_backfill ~published_level ~number_of_slots =
+    let open Ezjsonm in
+    let slot_id_to_json (level, index) =
+      dict [("slot_level", int level); ("slot_index", int index)]
+    in
+    let slot_ids = List.init number_of_slots (fun i -> (published_level, i)) in
+    let backfill =
+      dict
+        [
+          ("kind", string "backfill");
+          ( "backfill_payload",
+            dict
+              [
+                ("slot_ids", list slot_id_to_json slot_ids);
+                ("trap_slot_ids", list slot_id_to_json []);
+                ("no_shards_attestation_levels", list int []);
+              ] );
+        ]
+    in
+    Ezjsonm.value_to_string backfill ^ "\n"
+
+  let routes ~attestation_lag ~number_of_slots ~faulty_delegate
+      ~target_attested_level =
+    let open Ezjsonm in
+    (* Converts a Cohttp body into an JSON line stream *)
+    let json_lines_of_body body =
+      let chunks = Cohttp_lwt.Body.to_stream body in
+      let buf = Buffer.create 2048 in
+
+      let chop s =
+        let n = String.length s in
+        if n > 0 && s.[n - 1] = '\r' then String.sub s 0 (n - 1) else s
+      in
+
+      let rec produce_line () =
+        let contents = Buffer.contents buf in
+        match String.index_opt contents '\n' with
+        | Some idx ->
+            (* We have a complete line *)
+            let line = String.sub contents 0 idx in
+            let rest =
+              String.sub contents (idx + 1) (String.length contents - idx - 1)
+            in
+            Buffer.clear buf ;
+            Buffer.add_string buf rest ;
+            Lwt.return_some (chop line)
+        | None -> (
+            (* Need more data from the stream *)
+            let* next_chunk = Lwt_stream.get chunks in
+            match next_chunk with
+            | None ->
+                (* Stream ended - emit final partial line if any *)
+                if Buffer.length buf = 0 then Lwt.return_none
+                else
+                  let line = Buffer.contents buf in
+                  Buffer.clear buf ;
+                  Lwt.return_some (chop line)
+            | Some chunk ->
+                Buffer.add_string buf chunk ;
+                produce_line ())
+      in
+
+      Lwt_stream.from produce_line
+    in
+    [
+      (let path =
+         Re.Str.regexp
+         @@ Format.sprintf
+              "/profiles/%s/monitor/attestable_slots"
+              faulty_delegate
+       in
+       route ~path ~callback:(fun ~path:_ ~fetch_answer:_ ~fetch_stream ->
+           let published_level = target_attested_level - attestation_lag in
+           let backfill_stream =
+             let line = json_backfill ~published_level ~number_of_slots in
+             Lwt_stream.of_list [line]
+           in
+           let* _resp, body = fetch_stream () in
+           let lines = json_lines_of_body body in
+           let rewritten_lines =
+             Lwt_stream.map
+               (rewrite_attestable_stream_line
+                  ~number_of_slots
+                  ~published_level)
+               lines
+           in
+           let rewritten_stream =
+             Lwt_stream.append backfill_stream rewritten_lines
+           in
+           let rewritten_body = Cohttp_lwt.Body.of_stream rewritten_stream in
+           return (Some (`Stream rewritten_body))));
+      (let path =
+         Re.Str.regexp
+         @@ Format.sprintf
+              "/profiles/%s/attested_levels/%d/attestable_slots"
+              faulty_delegate
+              target_attested_level
+       in
+       route ~path ~callback:(fun ~path:_ ~fetch_answer ~fetch_stream:_ ->
+           let* dal_node_answer = fetch_answer () in
+           let v = value dal_node_answer in
+           let kind = find v ["kind"] |> get_string in
+           let new_v =
+             if String.equal kind "attestable_slots_set" then
+               let attestable_slots_set =
+                 (* Declare each slot attestable. *)
+                 find v ["attestable_slots_set"]
+                 |> get_list get_bool
+                 |> List.map (fun _ -> true)
+                 |> list bool
+               in
+               update v ["attestable_slots_set"] (Some attestable_slots_set)
+             else v
+           in
+           return (Some (`Response (value_to_string new_v)))));
+    ]
+
+  let make ~name ~attestation_lag ~number_of_slots ~faulty_delegate
+      ~target_attested_level =
+    let routes =
+      routes
+        ~attestation_lag
+        ~number_of_slots
+        ~faulty_delegate
+        ~target_attested_level
+    in
+    make ~name ~routes
+
   let run t ~honest_dal_node ~faulty_dal_node =
     let dal_uri uri =
       Uri.make
@@ -570,27 +774,32 @@ module Proxy = struct
       let path = Uri.path uri in
       match find_mocked_action t ~path with
       | Some action -> (
-          Log.info "[%s] mocking data for request: '%s'" t.name uri_str ;
-          let* res =
-            action.callback ~path ~fetch_answer:(fun () ->
-                let headers = Cohttp.Request.headers req in
-                let* _resp, body =
-                  Cohttp_lwt_unix.Client.call
-                    ~headers
-                    ~body
-                    method_
-                    (dal_uri uri)
-                in
-                let* body_str = Cohttp_lwt.Body.to_string body in
-                return (Ezjsonm.from_string body_str))
+          Log.debug "[%s] mocking data for request: '%s'" t.name uri_str ;
+          let headers = Cohttp.Request.headers req in
+          let fetch_answer () =
+            let* _resp, body =
+              Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
+            in
+            let* body_str = Cohttp_lwt.Body.to_string body in
+            return (Ezjsonm.from_string body_str)
           in
+          let fetch_stream () =
+            Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
+          in
+          let* res = action.callback ~path ~fetch_answer ~fetch_stream in
           match res with
           | None -> Cohttp_lwt_unix.Server.respond_not_found ()
           | Some (`Response body) ->
-              Log.info "[%s] mocking with custom answer '%s'" t.name body ;
-              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+              Log.debug
+                "[%s] mocking with custom response answer '%s'"
+                t.name
+                body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
+          | Some (`Stream stream_body) ->
+              Log.debug "[%s] mocking with custom stream answer" t.name ;
+              Cohttp_lwt_unix.Server.respond ~status:`OK ~body:stream_body ())
       | None ->
-          Log.info
+          Log.debug
             "[%s] forwarding the following request to the honest dal node: '%s'"
             t.name
             uri_str ;
@@ -598,15 +807,10 @@ module Proxy = struct
           let* resp, body =
             Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
           in
-          let* body_str = Cohttp_lwt.Body.to_string body in
-          Log.info
-            "[%s] mocking with honest dal node answer: '%s'"
-            t.name
-            body_str ;
-          Cohttp_lwt_unix.Server.respond_string
+          Cohttp_lwt_unix.Server.respond
             ~status:(Cohttp.Response.status resp)
             ~headers:(Cohttp.Response.headers resp)
-            ~body:body_str
+            ~body
             ()
     in
     let start () =
@@ -621,7 +825,7 @@ module Proxy = struct
 end
 
 module Mockup = struct
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of string Lwt_stream.t]
 
   type route = {
     path_pattern : Re.Pcre.regexp;
@@ -660,7 +864,13 @@ module Mockup = struct
           | None -> Cohttp_lwt_unix.Server.respond_not_found ()
           | Some (`Response body) ->
               Log.debug "[%s] responding with mock: '%s'" t.name body ;
-              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
+          | Some (`Stream stream) ->
+              let headers =
+                Cohttp.Header.init_with "content-type" "application/json"
+              in
+              let body = Cohttp_lwt.Body.of_stream stream in
+              Cohttp_lwt_unix.Server.respond ~headers ~status:`OK ~body ())
       | None ->
           Log.warn "[%s] no mock route for: '%s', failing." t.name uri_str ;
           Cohttp_lwt_unix.Server.respond_error
@@ -682,8 +892,48 @@ end
 module Mockup_for_baker = struct
   type t = Mockup.t
 
+  let json_backfill_event ~slot_ids =
+    let open Ezjsonm in
+    let slot_id_to_json (level, index) =
+      dict [("slot_level", int level); ("slot_index", int index)]
+    in
+    value_to_string
+      (dict
+         [
+           ("kind", string "backfill");
+           ( "backfill_payload",
+             dict
+               [
+                 ("slot_ids", list slot_id_to_json slot_ids);
+                 ("trap_slot_ids", list slot_id_to_json []);
+                 ("no_shards_attestation_levels", list int []);
+               ] );
+         ])
+
+  (* Emit a single [Backfill] line that covers a range of published levels on
+     slot_index=0 so the baker’s cache contains the bit we need for the test's
+     attested_level. *)
+  let monitor_route ~published_levels =
+    let path_pattern =
+      "^/profiles/(tz[1234][A-Za-z0-9]+)/monitor/attestable_slots/?$"
+    in
+    Mockup.route ~path_pattern ~callback:(fun ~path ->
+        let re = Re.Pcre.regexp path_pattern in
+        let _attester =
+          match Re.exec_opt re path with
+          | Some groups -> Re.Group.get groups 1
+          | None -> Test.fail "failed to extract pkh from %s" path
+        in
+        let slot_ids = List.init published_levels (fun i -> (i + 1, 0)) in
+        let body_line = json_backfill_event ~slot_ids ^ "\n" in
+        let stream = Lwt_stream.of_list [body_line] in
+        Lwt.return_some (`Stream stream))
+
   let routes ~attestation_lag ~attesters ~attestable_slots =
     [
+      (* Mirrors the DAL node’s backfill window on subscribe, where (attestation_lag + 1)
+         published levels are included. *)
+      monitor_route ~published_levels:(attestation_lag + 1);
       (let path_pattern =
          Format.sprintf
            "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
@@ -694,7 +944,7 @@ module Mockup_for_baker = struct
            let attester =
              match Re.exec_opt re path with
              | Some groups -> Re.Group.get groups 1
-             | None -> Test.fail "failed to extract attested_level from %s" path
+             | None -> Test.fail "failed to extract pkh from %s" path
            in
            let attested_level =
              match Re.exec_opt re path with

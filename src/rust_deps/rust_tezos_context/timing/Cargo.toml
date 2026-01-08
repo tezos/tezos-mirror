@@ -1,0 +1,16 @@
+[package]
+name = "tezos_timing"
+version = "3.1.1"
+authors = ["Sebastien Chapuis <sebastien@chapu.is>"]
+edition = "2021"
+rust-version = "1.58"
+
+[dependencies]
+tezos_crypto_rs = { path = "../../../../sdk/rust/crypto/", default-features = false, features = [
+  "std",
+] }
+serde = { version = "1.0", features = ["derive"] }
+rusqlite = { version = "0.25.1", features = ["bundled"] }
+static_assertions = "1.1"
+tezos_spsc = { path = "../spsc" }
+# tinyvec = { version = "1", features = ["alloc"] }

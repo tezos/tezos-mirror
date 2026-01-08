@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Baking_state
+open Baking_state_types
 open Protocol.Alpha_context
 
 (** {2 Scheduler state type}  *)
@@ -50,6 +51,9 @@ val retry :
   ('a -> 'b tzresult Lwt.t) ->
   'a ->
   'b tzresult Lwt.t
+
+val try_resolve_consensus_keys :
+  #Protocol_client_context.rpc_context -> Key.t -> public_key_hash Lwt.t
 
 (** [run context ?canceler ?stop_on_event ?on_error ?constants chain
     baking_configuration consensus_keys] is the entry point of the baker
@@ -131,8 +135,8 @@ val create_loop_state :
   loop_state
 
 (** [create_initial_state context ?synchronize chain baking_configuration
-    operation_worker current_proposal ?constants consensus_keys] creates an
-    initial {!Baking_state.t} by initializing a
+    operation_worker dal_attestable_slots_worker current_proposal ?constants consensus_keys]
+    creates an initial {!Baking_state.t} by initializing a
     {!type-Baking_state.global_state}, a {!type-Baking_state.level_state}
     and a {!type-Baking_state.round_state}.
 
@@ -154,6 +158,8 @@ val create_initial_state :
   chain:Chain_services.chain ->
   Baking_configuration.t ->
   Operation_worker.t ->
+  Dal_attestable_slots_worker.t ->
+  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

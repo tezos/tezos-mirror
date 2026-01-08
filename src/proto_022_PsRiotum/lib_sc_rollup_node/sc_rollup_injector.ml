@@ -85,8 +85,7 @@ let injector_operation_to_manager :
              commitment_proof;
            })
 
-let injector_operation_of_manager :
-    type kind.
+let injector_operation_of_manager : type kind.
     kind Protocol.Alpha_context.manager_operation -> L1_operation.t option =
   function
   | Sc_rollup_add_messages {messages} -> Some (Add_messages {messages})
@@ -224,15 +223,15 @@ module Proto_client = struct
   let operation_contents_status (type kind)
       (contents : kind Apply_results.contents_result_list) ~index :
       operation_status tzresult =
-    let rec rec_status :
-        type kind. int -> kind Apply_results.contents_result_list -> _ =
+    let rec rec_status : type kind.
+        int -> kind Apply_results.contents_result_list -> _ =
      fun n -> function
-      | Apply_results.Single_result _ when n <> 0 ->
-          error_with "No operation with index %d" index
-      | Single_result result -> Ok (operation_result_status result)
-      | Cons_result (result, _rest) when n = 0 ->
-          Ok (operation_result_status result)
-      | Cons_result (_result, rest) -> rec_status (n - 1) rest
+       | Apply_results.Single_result _ when n <> 0 ->
+           error_with "No operation with index %d" index
+       | Single_result result -> Ok (operation_result_status result)
+       | Cons_result (result, _rest) when n = 0 ->
+           Ok (operation_result_status result)
+       | Cons_result (_result, rest) -> rec_status (n - 1) rest
     in
     rec_status index contents
 
@@ -455,6 +454,14 @@ module Proto_client = struct
           (to_string mempool_default)
       else Ok ()
     in
+    (* Copied from removed Rio's mempool module *)
+    let default_minimal_fees =
+      match Tez.of_mutez 100L with None -> assert false | Some t -> t
+    in
+    (* Copied from removed Rio’s mempool module *)
+    let default_minimal_nanotez_per_gas_unit = Q.of_int 100 in
+    (* Copied from removed Rio’s mempool module *)
+    let default_minimal_nanotez_per_byte = Q.of_int 1000 in
     let check purpose
         {
           minimal_fees;
@@ -471,8 +478,7 @@ module Proto_client = struct
           "minimal_fees"
           Int64.compare
           Int64.to_string
-          (Protocol.Alpha_context.Tez.to_mutez
-             Plugin.Mempool.default_minimal_fees)
+          (Protocol.Alpha_context.Tez.to_mutez default_minimal_fees)
           minimal_fees.mutez
       and+ () =
         check_value
@@ -480,7 +486,7 @@ module Proto_client = struct
           "minimal_nanotez_per_byte"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_byte
+          default_minimal_nanotez_per_byte
           minimal_nanotez_per_byte
       and+ () =
         check_value
@@ -488,7 +494,7 @@ module Proto_client = struct
           "minimal_nanotez_per_gas_unit"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+          default_minimal_nanotez_per_gas_unit
           minimal_nanotez_per_gas_unit
       in
       ()

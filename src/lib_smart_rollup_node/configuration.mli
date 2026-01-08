@@ -131,13 +131,19 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_monitor_finalized : bool;
   l1_rpc_timeout : float;
   loop_retry_delay : float;
       (** Delay in seconds to retry the main loop and the refutation loop after
           an error. *)
+  dal_slot_status_max_fetch_attempts : int;
+      (** Maximum number of attempts to fetch a finalized DAL slot status
+          (i.e. not [Unknown] or awaiting attestation) before giving up.
+          Attempts are spaced by 1 second each. Default value is 15. *)
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
@@ -219,6 +225,9 @@ val default_history_mode : history_mode
 (** Default filter for executing outbox messages is only whitelist updates.  *)
 val default_execute_outbox_filter : outbox_message_filter list
 
+(** Default maximum number of attempts to fetch a finalized DAL slot status. *)
+val default_dal_slot_status_max_fetch_attempts : int
+
 val history_mode_encoding : history_mode Data_encoding.t
 
 (** [max_injector_retention_period] is the maximum allowed value for
@@ -274,6 +283,9 @@ val default_irmin_cache_size : int
    details such as a timestamp, message content, severity level, etc. *)
 val default_index_buffer_size : int
 
+(** Default setting for monitoring finalized heads of L1 node. *)
+val default_l1_monitor_finalized : bool
+
 (** Encoding for configuration. *)
 val encoding : t Data_encoding.t
 
@@ -312,6 +324,7 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    log_kernel_debug_file:string option ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
@@ -322,6 +335,7 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
+    l1_monitor_finalized:bool option ->
     t tzresult Lwt.t
 
   val create_or_read_config :
@@ -348,6 +362,7 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    log_kernel_debug_file:string option ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
@@ -358,5 +373,6 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
+    l1_monitor_finalized:bool option ->
     t tzresult Lwt.t
 end

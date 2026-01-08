@@ -106,6 +106,8 @@ RPC parameters allow to customize the :doc:`JSON/RPC interface
 to node's network interfaces) to listen for RPC requests on, or a
 certificate/key file necessary when TLS is used.
 
+.. _node_access_control:
+
 Access Control Lists
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -285,22 +287,22 @@ HTTP Caching Headers
 It is possible to enable http caching headers in the RPC responses with the
 ``--enable-http-cache-headers`` option. This feature is disabled by default.
 
-When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#response_directives>`_ 
-header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related 
-queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths 
+When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#response_directives>`_
+header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related
+queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths
 that are relative to ``head`` such as ``head-n`` and ``head~n``. The response is cacheable throughout the ``<duration>``
 of the head block's consensus round where ``<duration>`` is the remaining time until the :ref:`estimated end time<time_between_blocks>`
-of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers. 
+of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers.
 
 The RPC server will also support the conditional request header `If-None-Match <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match>`_
-and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query 
+and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query
 is related to. If the client sends a request with ``If-None-Match: <comma-separated list of ETag values>`` header and the block hash
 is included in the list of etag values, the RPC server will respond with a ``304 Not Modified`` status code with an empty body.
 
 This feature is useful when running the RPC server behind a reverse proxy that supports automatic
-content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that 
-enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query 
-as the RPC server needs to perform additional checks and calculations. Consequently, it is advised to enable thie feature 
+content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that
+enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query
+as the RPC server needs to perform additional checks and calculations. Consequently, it is advised to enable thie feature
 only when operating the RPC server behind appropriate caching infrastructure.
 
 .. _configure_p2p:
@@ -351,7 +353,7 @@ specify an advertised port, but not an IP address.
     port forwarding can be initiated by the internal host without any manual
     modification on the router. This is not possible for corporate networks with
     UPnP disabled, but is typically handy for home routers, or other networks
-    where this option is available.
+    where this option is available. See :ref:`Mapping ports with UPnP<mapping_upnp>`.
 
 Private node
 ~~~~~~~~~~~~

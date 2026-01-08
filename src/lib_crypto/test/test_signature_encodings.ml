@@ -48,8 +48,8 @@ module Make_tests
       val key_encoding_vectors : (string * string * string * string) list
     end) =
 struct
-  let test_b58check_roundtrip :
-      type t. (module B58CHECK with type t = t) -> string -> t -> unit =
+  let test_b58check_roundtrip : type t.
+      (module B58CHECK with type t = t) -> string -> t -> unit =
    fun m msg input ->
     let module M = (val m) in
     let testable =

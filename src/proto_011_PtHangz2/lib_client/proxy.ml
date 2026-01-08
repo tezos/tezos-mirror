@@ -66,8 +66,8 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       ~chain
       ~block
       key
-    >>=? fun (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context)
-      ->
+    >>=?
+    fun (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context) ->
     Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
     @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
     >>= fun () -> return raw_context

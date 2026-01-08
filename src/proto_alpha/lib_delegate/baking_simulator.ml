@@ -11,7 +11,7 @@ open Alpha_context
 open Baking_errors
 
 type incremental = {
-  predecessor : Baking_state.block_info;
+  predecessor : Baking_state_types.block_info;
   context : Tezos_protocol_environment.Context.t;
   state : Protocol.validation_state * Protocol.application_state option;
   rev_operations : Operation.packed list;
@@ -21,7 +21,7 @@ type incremental = {
 let load_context ~data_dir =
   let open Lwt_result_syntax in
   protect (fun () ->
-      let*! index = Context_ops.init ~kind:`Disk ~readonly:true ~data_dir () in
+      let* index = Context_ops.init ~kind:`Disk ~readonly:true ~data_dir () in
       return (Abstract_context_index.abstract index))
 
 let check_context_consistency (abstract_index : Abstract_context_index.t)
@@ -44,7 +44,9 @@ let begin_construction ~timestamp ~protocol_data ~force_apply
     pred_block chain_id =
   let open Lwt_result_syntax in
   protect (fun () ->
-      let {Baking_state.shell = pred_shell; hash = pred_hash; _} = pred_block in
+      let {Baking_state_types.shell = pred_shell; hash = pred_hash; _} =
+        pred_block
+      in
       let*! context_opt =
         abstract_index.checkout_fun pred_resulting_context_hash
       in

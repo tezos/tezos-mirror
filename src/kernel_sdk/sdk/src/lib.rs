@@ -71,9 +71,7 @@ pub mod prelude {
 #[cfg(feature = "alloc")]
 pub mod types {
     //! Types used/returned elsewhere in the SDK.
-
     pub use tezos_smart_rollup_encoding::{
-        contract::Contract,
         entrypoint::{Entrypoint, EntrypointError},
         public_key::PublicKey,
         public_key_hash::PublicKeyHash,
@@ -84,6 +82,8 @@ pub mod types {
     pub use tezos_smart_rollup_host::metadata::RollupMetadata;
 
     pub use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
+
+    pub use tezos_protocol::contract::Contract;
 }
 
 #[doc(inline)]

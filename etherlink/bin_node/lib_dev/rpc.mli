@@ -10,9 +10,8 @@
     sequencer or observer mode. If [evm_node_private_endpoint] is provided transactions
     are sent forward to the private endpoint of its conjunct node. *)
 val main :
-  data_dir:string ->
   evm_node_endpoint:Uri.t ->
-  ?evm_node_private_endpoint:Uri.t ->
+  evm_node_private_endpoint:Uri.t ->
   config:Configuration.t ->
   unit ->
   unit tzresult Lwt.t
@@ -26,4 +25,4 @@ val spawn_main :
   ?private_endpoint:Uri.t ->
   data_dir:string ->
   unit ->
-  Rpc_server.finalizer
+  Rpc_server.finalizer Lwt.t

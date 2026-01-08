@@ -29,6 +29,9 @@
 (** EVM node server state. *)
 type t
 
+(** Same as [Daemon.event] *)
+type event = {name : string; value : JSON.t; timestamp : float}
+
 type tez_contract = {address : string; path : string; initial_storage : string}
 
 type l2_setup = {
@@ -59,10 +62,14 @@ type time_between_blocks =
 (** EVM node mode. *)
 type mode =
   | Observer of {
-      initial_kernel : string;
+      initial_kernel : string option;
       preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
-      rollup_node_endpoint : string;
+      rollup_node_endpoint : string option;
+          (*when None add `--dont-track-rollup-node` *)
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -73,7 +80,8 @@ type mode =
       time_between_blocks : time_between_blocks option;
           (** See {!time_between_blocks}, if the value is not
               provided, the sequencer uses it default value. *)
-      sequencer : string;  (** Secret key used to sign the blueprints. *)
+      sequencer_keys : string list;
+          (** Secret keys used to sign the blueprints. *)
       genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
@@ -81,27 +89,43 @@ type mode =
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_pool_timeout_limit : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
-      tx_pool_addr_limit : int option;
-          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
-              the pool. *)
-      tx_pool_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
-              simultaneously inside the pool. *)
+      tx_queue_max_lifespan : int option;
+          (** --tx-pool-timeout-limit: transaction timeout inside the queue. *)
+      tx_queue_max_size : int option;
+          (** --tx-pool-max-txs: maximum number of transactions in the queue. *)
+      tx_queue_tx_per_addr_limit : int option;
+          (** --tx-pool-tx-per-addr-limit: maximum number of transactions per address in the queue. *)
       dal_slots : int list option;
+      sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string;
+      initial_kernel : string option;
+      network : string option;
+      funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
       genesis_timestamp : Client.timestamp option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
+      sequencer_keys : string list;
+    }
+  | Tezlink_sandbox of {
+      initial_kernel : string;
+      funded_addresses : string list;
+      preimage_dir : string option;
+      private_rpc_port : int option;
+      time_between_blocks : time_between_blocks option;
+      genesis_timestamp : Client.timestamp option;
+      max_number_of_chunks : int option;
+      wallet_dir : string option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
+      verbose : bool;
     }
   | Proxy
   | Rpc of mode
@@ -113,6 +137,8 @@ type history_mode =
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
+
+val can_apply_blueprint : t -> bool
 
 (** Returns the name of the EVM node. *)
 val name : t -> string
@@ -160,7 +186,7 @@ val create :
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
     EVM state. Fails if [node] is a proxy node. *)
-val initial_kernel : t -> string
+val initial_kernel : t -> string option
 
 (** [run ?wait ?extra_arguments evm_node] launches the EVM node server with
     the arguments given during {!create}, additional arguments can be
@@ -225,6 +251,9 @@ val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
 
+val wait_for_pending_sequencer_upgrade :
+  ?timeout:float -> t -> (string * string * string) Lwt.t
+
 val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
@@ -261,6 +290,10 @@ val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
 val wait_for_blueprint_injection_failure :
   ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
+val wait_for_next_block_timestamp : ?timeout:float -> t -> string Lwt.t
+
+val wait_for_inclusion : ?timeout:float -> t -> string Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
@@ -282,12 +315,12 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-(** [spawn_init_config_minimal ~data_dir ?path ?extra_arguments ()] creates a
+(** [spawn_init_config_minimal ?data_dir ?path ?extra_arguments ()] creates a
     minimal config with no cli argument populated as [spawn_init_config].
 
     Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
 val spawn_init_config_minimal :
-  data_dir:string ->
+  ?data_dir:string ->
   ?config_file:string ->
   ?path:string ->
   ?extra_arguments:string list ->
@@ -295,10 +328,6 @@ val spawn_init_config_minimal :
   Process.t
 
 type rpc_server = Resto | Dream
-
-type tx_queue_config =
-  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
-  | Enable of bool
 
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
@@ -310,10 +339,10 @@ val patch_config_with_experimental_feature :
   ?blueprints_publisher_order_enabled:bool ->
   ?next_wasm_runtime:bool ->
   ?rpc_server:rpc_server ->
-  ?enable_tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->
+  ?preconfirmation_stream_enabled:bool ->
   unit ->
   JSON.t ->
   JSON.t
@@ -371,6 +400,9 @@ val resolve_or_timeout :
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
+(** Install a events handler. *)
+val on_event : t -> (event -> unit) -> unit
+
 type delayed_transaction_kind = Deposit | Transaction | FaDeposit
 
 type 'a evm_event_kind =
@@ -408,11 +440,6 @@ val wait_for_missing_blueprint : t -> (int * string) Lwt.t
     [evm_events_follower_rollup_node_ahead.v0] using {!wait_for} and returns the
     missing blueprint level. *)
 val wait_for_rollup_node_ahead : t -> int Lwt.t
-
-(** [wait_for_tx_pool_add_transaction ?timeout evm_node] waits for the event
-    [tx_pool_add_transaction.v0] using {!wait_for} and returns the transaction
-    hash. *)
-val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
 
 (** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
     [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
@@ -592,19 +619,26 @@ val patch_kernel : t -> string -> unit Lwt.t
     by writing [value] at [key]. *)
 val patch_state : t -> key:string -> value:string -> unit Lwt.t
 
-(** [export_snapshot evm_node] exports a snapshot of the evm node in a temporary
-    directory. It returns the path for the produced snapshot file. *)
+(** [export_snapshot ~desync evm_node] exports a snapshot of the evm node in a
+    temporary directory. It returns the path for the produced snapshot file. If
+    [desync=true] it uses the desync format. *)
 val export_snapshot :
-  ?compress_on_the_fly:bool -> t -> (Process.t, string) runnable
+  ?compress_on_the_fly:bool -> desync:bool -> t -> (Process.t, string) runnable
 
-(** [import_snapshot ?force evm_node ~snapshot_file] imports the snapshot
-    [snapshot_file] in the evm node.  *)
+(** [import_snapshot ?force ~desync evm_node ~snapshot_file] imports the
+    snapshot [snapshot_file] in the evm node. If [desync=true] it uses the
+    desync format.  *)
 val import_snapshot :
-  ?force:bool -> t -> snapshot_file:string -> (Process.t, unit) runnable
+  ?force:bool ->
+  desync:bool ->
+  t ->
+  snapshot_file:string ->
+  (Process.t, unit) runnable
 
 (** Run [snapshot info] command and return output containing information about
     the snapshot file. *)
-val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
+val snapshot_info :
+  desync:bool -> snapshot_file:string -> (Process.t, string) runnable
 
 val wait_termination : t -> unit Lwt.t
 
@@ -639,6 +673,8 @@ val make_kernel_installer_config :
   ?chain_id:int ->
   ?eth_bootstrap_balance:Wei.t ->
   ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_balance:Tez.t ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?ticketer:string ->
@@ -663,6 +699,7 @@ val make_kernel_installer_config :
   ?enable_fast_fa_withdrawal:bool ->
   ?enable_multichain:bool ->
   ?evm_version:Evm_version.t ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t
@@ -689,3 +726,7 @@ val list_events :
 val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
 
 val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t
+
+val daemon_default_colors : Log.Color.t array
+
+val pid : t -> int option

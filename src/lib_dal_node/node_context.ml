@@ -26,6 +26,7 @@
 
 type t = {
   config : Configuration_file.t;
+  identity : P2p_identity.t;
   network_name : Distributed_db_version.Name.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
@@ -43,16 +44,20 @@ type t = {
   (* the highest finalized level the DAL node is aware of (except at start-up, where
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
+  l1_crawler_status_input : L1_crawler_status.t Lwt_watcher.input;
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
+  mutable last_migration_level : int32;
+  mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
 }
 
-let init config ~network_name profile_ctxt cryptobox
+let init config ~identity ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
     cctxt ~last_finalized_level ?(disable_shard_validation = false) ~ignore_pkhs
     () =
   {
     config;
+    identity;
     network_name;
     cryptobox;
     shards_proofs_precomputation;
@@ -68,15 +73,26 @@ let init config ~network_name profile_ctxt cryptobox
     profile_ctxt;
     last_finalized_level;
     l1_crawler_status = Unknown;
+    l1_crawler_status_input = Lwt_watcher.create_input ();
     disable_shard_validation;
     ignore_pkhs;
+    last_migration_level = 0l;
+    attestable_slots_watcher_table =
+      Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
-let set_l1_crawler_status ctxt status = ctxt.l1_crawler_status <- status
+let get_identity ctxt = ctxt.identity
+
+let set_l1_crawler_status ctxt status =
+  if ctxt.l1_crawler_status <> status then (
+    ctxt.l1_crawler_status <- status ;
+    Lwt_watcher.notify ctxt.l1_crawler_status_input status)
 
 let get_l1_crawler_status ctxt = ctxt.l1_crawler_status
+
+let get_l1_crawler_status_input ctxt = ctxt.l1_crawler_status_input
 
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in
@@ -98,14 +114,22 @@ let may_reconstruct ~reconstruct slot_id t =
 
 let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
-  let* proto_plugins =
+  let old_proto_plugins = ctxt.proto_plugins in
+  let* new_proto_plugins =
     Proto_plugins.may_add
       cctxt
-      ctxt.proto_plugins
+      old_proto_plugins
       ~first_level:block_level
       ~proto_level
   in
-  ctxt.proto_plugins <- proto_plugins ;
+  if
+    not
+    @@ Option.equal
+         Int.equal
+         (Proto_plugins.current_proto_level old_proto_plugins)
+         (Proto_plugins.current_proto_level new_proto_plugins)
+  then ctxt.last_migration_level <- block_level ;
+  ctxt.proto_plugins <- new_proto_plugins ;
   return_unit
 
 let get_plugin_and_parameters_for_level ctxt ~level =
@@ -143,11 +167,20 @@ let storage_period ctxt proto_parameters =
       `Finite n
 
 let level_to_gc ctxt proto_parameters ~current_level =
+  let open Lwt_result_syntax in
   match storage_period ctxt proto_parameters with
-  | `Always -> None
-  | `Finite n ->
+  | `Always -> return_none
+  | `Finite n -> (
       let level = Int32.(sub current_level (of_int n)) in
-      if level < 1l then None else Some level
+      if level < 1l then return_none
+      else
+        let* first_seen_level_opt =
+          Store.First_seen_level.load (Store.first_seen_level ctxt.store)
+        in
+        match first_seen_level_opt with
+        | None -> return_none
+        | Some first_seen_level ->
+            if level < first_seen_level then return_none else return_some level)
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
@@ -193,29 +226,30 @@ let set_ongoing_amplifications ctxt ongoing_amplifications =
 
 let get_ignore_pkhs ctxt = ctxt.ignore_pkhs
 
-let fetch_committee ctxt ~level =
+let fetch_committees ctxt ~level =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
       let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-      let+ committee = Plugin.get_committee cctxt ~level in
-      Committee_cache.add cache ~level ~committee ;
-      committee
+      let+ committees = Plugin.get_committees cctxt ~level in
+      Committee_cache.add cache ~level ~committee:committees ;
+      committees
 
 let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
-  let+ committee = fetch_committee ctxt ~level in
-  match Signature.Public_key_hash.Map.find pkh committee with
+  let+ committees = fetch_committees ctxt ~level in
+  match Signature.Public_key_hash.Map.find pkh committees with
   | None -> []
-  | Some indexes -> indexes
+  | Some (indexes, _) -> indexes
 
 let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
   Option.map
-    (fun committee ->
-      Signature.Public_key_hash.Map.find_opt pkh committee
-      |> Option.value ~default:[])
+    (fun committees ->
+      Signature.Public_key_hash.Map.find_opt pkh committees |> function
+      | None -> []
+      | Some (dal_committee, _tb_committee) -> dal_committee)
     (Committee_cache.find ctxt.committee_cache ~level)
 
 let version {network_name; _} =
@@ -245,6 +279,16 @@ let warn_if_attesters_not_delegates ctxt controller_profiles =
       pkh_set
 
 let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
+
+let get_last_migration_level ctxt = ctxt.last_migration_level
+
+let get_attestable_slots_watcher_table ctxt =
+  ctxt.attestable_slots_watcher_table
+
+let get_attestation_lag ctxt ~level =
+  let open Result_syntax in
+  let+ params = get_proto_parameters ctxt ~level:(`Level level) in
+  Int32.of_int params.attestation_lag
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

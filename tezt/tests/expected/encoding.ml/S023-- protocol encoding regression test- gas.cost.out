@@ -1,12 +1,2 @@
-
-./octez-codec encode 023-PtSeouLo.gas.cost from '"8920392083423078"'
-a6fd9d9694c3d81f
-
-./octez-codec decode 023-PtSeouLo.gas.cost from a6fd9d9694c3d81f
-"8920392083423078"
-
-./octez-codec encode 023-PtSeouLo.gas.cost from '"0"'
-00
-
-./octez-codec decode 023-PtSeouLo.gas.cost from 00
-"0"
+gas.cost-positive: a6fd9d9694c3d81f
+gas.cost-zero: 00

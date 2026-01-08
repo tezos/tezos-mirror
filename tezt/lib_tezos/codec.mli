@@ -50,6 +50,12 @@ val dump_encodings : ?path:string -> unit -> JSON.t Lwt.t
 (** Same as [dump_encodings], but do not wait for the process to exit. *)
 val spawn_dump_encodings : ?path:string -> unit -> Process.t
 
+(** Run [octez-codec dump encoding]. *)
+val dump_encoding : ?path:string -> id:string -> unit -> JSON.t Lwt.t
+
+(** Same as [dump_encoding], but do not wait for the process to exit. *)
+val spawn_dump_encoding : ?path:string -> id:string -> unit -> Process.t
+
 val describe_binary_schema : ?path:string -> id:string -> unit -> string Lwt.t
 
 val describe_json_schema : ?path:string -> id:string -> unit -> string Lwt.t

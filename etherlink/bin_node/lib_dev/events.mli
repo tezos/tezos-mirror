@@ -63,6 +63,10 @@ val ignored_kernel_arg : unit -> unit Lwt.t
     since it was started in Archive mode. *)
 val ignored_periodic_snapshot : unit -> unit Lwt.t
 
+(** [ignored_periodic_snapshot_arg ()] advertises that the EVM node will
+    be ignoring the all the incoming preconfirmation data. *)
+val ignored_preconfirmations : unit -> unit Lwt.t
+
 (** [catching_up_evm_event ~from ~to_] advertises that the sequencer
     is catching up on event produced by the evm kernel in the rollup
     node from L1 level [from] to [to_]. *)
@@ -76,9 +80,6 @@ val is_ready :
   websockets:bool ->
   backend:Configuration.rpc_server ->
   unit Lwt.t
-
-(** [legacy_mode ()] advertises the EVM node is using the legacy block storage. *)
-val legacy_mode : unit -> unit Lwt.t
 
 (** [spawn_rpc_is_ready ()] advertises that the RPC spawned with experimental
     feature [spawn_rpc] has made its public endpoint available. *)
@@ -203,3 +204,15 @@ val import_snapshot_archive_in_progress :
 (** [replicate_transaction_dropped hash reason] advertises that the transaction
     [hash] was dropped because it is now invalid in the sandbox. *)
 val replicate_transaction_dropped : Ethereum_types.hash -> string -> unit Lwt.t
+
+(** [replicate_operation_dropped hash reason] advertises that the operation
+    [hash] was dropped because it is now invalid in the sandbox. *)
+val replicate_operation_dropped : Operation_hash.t -> string -> unit Lwt.t
+
+val next_block_timestamp : Time.Protocol.t -> unit Lwt.t
+
+val inclusion : Ethereum_types.hash -> unit Lwt.t
+
+(** [patched_sequencer_key pk] advertises that the sequencer key in
+    state was patched with [pk] . *)
+val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t

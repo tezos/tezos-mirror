@@ -14,19 +14,19 @@ depends: [
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" {with-test}
   "octez-libs" {with-test}
-  "tezos-protocol-022-PsRiotum" {with-test}
-  "octez-protocol-022-PsRiotum-libs" {with-test}
-  "octez-smart-rollup-node-PsRiotum" {with-test}
-  "octez-alcotezt" {with-test}
   "tezos-protocol-023-PtSeouLo" {with-test}
   "octez-protocol-023-PtSeouLo-libs" {with-test}
   "octez-smart-rollup-node-PtSeouLo" {with-test}
+  "octez-alcotezt" {with-test}
+  "tezos-protocol-024-PtTALLiN" {with-test}
+  "octez-protocol-024-PtTALLiN-libs" {with-test}
+  "octez-smart-rollup-node-PtTALLiN" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

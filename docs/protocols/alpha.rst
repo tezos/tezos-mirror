@@ -2,9 +2,9 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to S023 (see :ref:`naming_convention`).
+to Tallinn (see :ref:`naming_convention`).
 
-For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
+For changes brought by Tallinn with respect to Seoul, see :doc:`./023_seoul`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
@@ -37,12 +37,19 @@ RPC Changes
 Operation receipts
 ------------------
 
+
 Errors
 ------
 
 
 Protocol parameters
 -------------------
+
+Feature flags
+^^^^^^^^^^^^^
+
+- Added ``native_contracts_enable``, that enables enshrined contracts in the
+  protocol. The flag is disabled by default on the mainnet. (MR :gl:`!19709`)
 
 
 

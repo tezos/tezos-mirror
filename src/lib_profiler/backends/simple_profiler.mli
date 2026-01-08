@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val time : unit -> Profiler.time
+val time : cpu:bool option -> unit -> Profiler.time
 
 type state
 
@@ -49,21 +49,30 @@ module Base (P : sig
 
   val output_report : (t -> Profiler.report -> unit) option
 end) : sig
-  val time : P.t -> Profiler.time
+  val time : cpu:bool option -> P.t -> Profiler.time
 
-  val record : P.t -> Profiler.verbosity -> Profiler.id -> unit
+  val record :
+    cpu:bool option -> P.t -> Profiler.verbosity -> Profiler.id -> unit
 
-  val aggregate : P.t -> Profiler.verbosity -> Profiler.id -> unit
+  val aggregate :
+    cpu:bool option -> P.t -> Profiler.verbosity -> Profiler.id -> unit
 
-  val report : P.t -> Profiler.report option
+  val report : cpu:bool option -> P.t -> Profiler.report option
 
-  val stamp : P.t -> Profiler.verbosity -> Profiler.id -> unit
+  val stamp :
+    cpu:bool option -> P.t -> Profiler.verbosity -> Profiler.id -> unit
 
   val inc : P.t -> Profiler.report -> unit
 
   val mark : P.t -> Profiler.verbosity -> Profiler.ids -> unit
 
-  val span : P.t -> Profiler.verbosity -> Profiler.span -> Profiler.ids -> unit
+  val span :
+    cpu:bool option ->
+    P.t ->
+    Profiler.verbosity ->
+    Profiler.span ->
+    Profiler.ids ->
+    unit
 
   val stop : P.t -> unit
 end

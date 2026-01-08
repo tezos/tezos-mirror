@@ -1074,6 +1074,36 @@ let test_is_implicit =
         "None" );
     ]
 
+let test_index_address =
+  register_opcode_tests
+    ~supports:(Protocol.From_protocol 24)
+    [
+      (* Test INDEX_ADDRESS instruction *)
+      ( "index_address",
+        "None",
+        {|"tz1burnburnburnburnburnburnburjAYjjX"|},
+        "(Some 1)" );
+      ( "index_address",
+        "None",
+        {|"tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"|},
+        "(Some 0)" );
+    ]
+
+let test_get_address_index =
+  register_opcode_tests
+    ~supports:(Protocol.From_protocol 24)
+    [
+      (* Test INDEX_ADDRESS instruction *)
+      ( "get_address_index",
+        "None",
+        {|"tz1burnburnburnburnburnburnburjAYjjX"|},
+        "None" );
+      ( "get_address_index",
+        "None",
+        {|"tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"|},
+        "(Some 0)" );
+    ]
+
 let iter l f = Lwt_list.iter_s f l
 
 let run_script_and_check ?(trace_stack = true) ?balance ?now ?level ~storage
@@ -1154,7 +1184,8 @@ let test_level protocol client =
 (* Test big map io: adding, removing, and updating values *)
 let test_big_map_contract_io protocol client =
   Lwt_list.iter_s
-    (fun (script_name, storage, input, expected_storage, expected_big_map_diff) ->
+    (fun (script_name, storage, input, expected_storage, expected_big_map_diff)
+       ->
       run_script_and_check
         ~storage
         ~input
@@ -1512,6 +1543,8 @@ let register ~protocols =
   test_protocol_independent protocols ;
   test_bitwise protocols ;
   test_is_implicit protocols ;
+  test_index_address protocols ;
+  test_get_address_index protocols ;
   List.iter
     (fun (test_opcode_name, test_function) ->
       Protocol.register_regression_test

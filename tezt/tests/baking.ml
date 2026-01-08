@@ -91,7 +91,8 @@ let operation_content_encoding : operation_content Data_encoding.t =
            storage_limit;
            amount;
            destination;
-         } ->
+         }
+       ->
       (kind, source, fee, counter, gas_limit, storage_limit, amount, destination))
     (fun ( kind,
            source,
@@ -100,7 +101,8 @@ let operation_content_encoding : operation_content Data_encoding.t =
            gas_limit,
            storage_limit,
            amount,
-           destination ) ->
+           destination )
+       ->
       {
         kind;
         source;

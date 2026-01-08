@@ -83,6 +83,8 @@ module Pvm_state_generator = struct
 
     let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
+    let cast_read_only proof = Context.Proof.{proof with after = proof.before}
+
     let proof_encoding =
       let module Proof_encoding =
         Tezos_context_merkle_proof_encoding.Merkle_proof_encoding
@@ -319,7 +321,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
              nb_transactions;
              tree_depth;
              tree_branching_factor;
-           } ->
+           }
+         ->
         ( nb_inbox_messages,
           input_payload_size,
           nb_output_buffer_levels,
@@ -333,7 +336,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
              output_buffer_size,
              nb_transactions,
              tree_depth,
-             tree_branching_factor ) ->
+             tree_branching_factor )
+         ->
         {
           nb_inbox_messages : int;
           input_payload_size : int;
@@ -525,7 +529,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
              output_buffer_size;
              nb_transactions;
              tree_depth;
-           } ->
+           }
+         ->
         ( nb_output_buffer_levels,
           output_buffer_size,
           nb_transactions,
@@ -533,7 +538,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
       (fun ( nb_output_buffer_levels,
              output_buffer_size,
              nb_transactions,
-             tree_depth ) ->
+             tree_depth )
+         ->
         {
           nb_output_buffer_levels;
           output_buffer_size;

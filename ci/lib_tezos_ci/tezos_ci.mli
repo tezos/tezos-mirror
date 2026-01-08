@@ -8,7 +8,8 @@
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
 
-module Rules : module type of Rules
+module Rules = Rules
+module Runner = Runner
 
 (** The name of a {!tezos_job} as given to [~name] of {!job}.
 
@@ -83,14 +84,25 @@ end
 
 (** A facility for registering pipelines. *)
 module Pipeline : sig
+  (** Default pipeline configuration.
+
+      It is included in [.gitlab-ci.yml] and thus all pipelines inherit it,
+      with the exception of child pipelines. You can specify different defaults
+      for child pipelines, with the default defaults being [default_config]. *)
+  val default_config : Gitlab_ci.Types.default
+
   (** Register a pipeline.
 
-      [register ~description ?variables name rule] will register a pipeline [name]
+      [register ~description ?variables ?default name rule] will register a pipeline [name]
       that runs when [rule] is true.
 
       If [variables] is set, then these variables will be added to the
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
       Similarly, an [auto_cancel] clause can be specified.
+
+      If [default] is specified, it will be written to the pipeline's YAML
+      as a [default:] section, providing default job configurations for all
+      jobs in the pipeline (such as retry policies, interruptible settings, etc).
 
       The [description] is printed in {!list_pipelines}.
 
@@ -116,7 +128,7 @@ module Pipeline : sig
 
       The [jobs] of the pipeline are generated to the file
       [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. See
-      {!register} for info on [auto_cancel].
+      {!register} for info on [auto_cancel] and [default].
 
       The [description] is printed in {!list_pipelines}.
 
@@ -125,6 +137,7 @@ module Pipeline : sig
   val register_child :
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
     ?inherit_:Gitlab_ci.Types.inherit_ ->
+    ?default:Gitlab_ci.Types.default ->
     description:string ->
     jobs:tezos_job list ->
     string ->
@@ -170,7 +183,36 @@ module Pipeline : sig
   val describe_pipeline : string -> unit
 end
 
-(** Add variable enabling sccache.
+module Cache : sig
+  (** Add variable enabling dune cache.
+
+    This function can be applied to jobs that run dune.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_dune_cache"], and this function also sets the
+    environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
+    there.
+
+    - [cache_size] sets the maximum size of the cache.
+
+   - [copy_mode], if [true] (default is [false]) sets
+    {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
+    Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
+    used, which is typically more performant but requires that the
+    build and cache folder be on the same volume. *)
+  val enable_dune_cache :
+    ?key:string ->
+    ?path:string ->
+    ?cache_size:string ->
+    ?copy_mode:bool ->
+    ?policy:Gitlab_ci.Types.cache_policy ->
+    tezos_job ->
+    tezos_job
+
+  (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
     which has a configured sccache Gitlab CI cache.
@@ -190,37 +232,34 @@ end
     variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
     [SCCACHE_LOG] respectively. See the sccache documentation for more
     information on these variables. *)
-val enable_sccache :
-  ?key:string ->
-  ?error_log:string ->
-  ?idle_timeout:string ->
-  ?log:string ->
-  ?path:string ->
-  ?cache_size:string ->
-  tezos_job ->
-  tezos_job
+  val enable_sccache :
+    ?key:string ->
+    ?error_log:string ->
+    ?idle_timeout:string ->
+    ?log:string ->
+    ?path:string ->
+    ?cache_size:string ->
+    tezos_job ->
+    tezos_job
 
-(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+  (** Value of [CARGO_HOME] *)
+  val cargo_home : string
+
+  (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
     This function should only be applied to jobs that have a GitLab CI
     cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
     function calls this function, so there is no need to apply both).
     Exceptions can be made for jobs that must have CARGO_HOME set to
     something different than {!cargo_home}. *)
-val enable_networked_cargo : tezos_job -> tezos_job
+  val enable_networked_cargo : tezos_job -> tezos_job
 
-(** Adds a GitLab CI cache for the CARGO_HOME folder.
+  (** Adds a GitLab CI cache for the CARGO_HOME folder.
 
     More precisely, we only cache the non-SCM dependencies in the
     sub-directory [registry/cache]. *)
-val enable_cargo_cache : tezos_job -> tezos_job
-
-(** Enable caching of Cargo's target folder which stores files which
-    can speed up subsequent compilation passes.
-
-    All folders are stored in a single cacheable directory to work
-    around GitLab's restriction on the number caches a job may have. *)
-val enable_cargo_target_caches : ?key:string -> tezos_job -> tezos_job
+  val enable_cargo_cache : tezos_job -> tezos_job
+end
 
 (** A facility for registering images for [image:] keywords.
 
@@ -284,54 +323,6 @@ module Changeset : sig
   val ( @ ) : t -> t -> t
 end
 
-(** Represents architectures. *)
-type arch = Amd64 | Arm64
-
-(** String representation of architectures ([Amd64] is ["x86_64"]) *)
-val arch_to_string : arch -> string
-
-(** Alternative string representation of architectures ([Amd64] is ["amd64"]) *)
-val arch_to_string_alt : arch -> string
-
-(** The list of available runner tags. *)
-type tag =
-  | Gcp  (** GCP prod AMD64 runner, general purpose. *)
-  | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
-  | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
-  | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
-  | Gcp_tezt
-      (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
-  | Gcp_tezt_dev
-      (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
-  | Gcp_high_cpu
-      (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
-  | Gcp_high_cpu_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing high CPU. *)
-  | Gcp_very_high_cpu
-      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
-  | Gcp_very_high_cpu_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
-  | Gcp_very_high_cpu_ramfs
-      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
-  | Gcp_very_high_cpu_ramfs_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
-  | Aws_specific
-      (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
-  | Dynamic
-      (** The runner is dynamically set through the CI variable {!dynamic_tag_var}. *)
-
-(** The variable to set enabling dynamic runner selection.
-
-    To dynamically set the runner of a job through a CI/CD variable,
-    assign to this variable using [variables:] or [parallel:matrix:]. *)
-val dynamic_tag_var : Gitlab_ci.Var.t
-
-(** The architecture of the runner associated to a tag if statically known. *)
-val arch_of_tag : tag -> arch option
-
-(** The string representation of a tag. *)
-val string_of_tag : tag -> string
-
 (** A job dependency.
 
     - A job that depends on [Job j] will not start until [j] finishes.
@@ -387,30 +378,14 @@ type git_strategy =
     CI/CD YAML variable [GIT_STRATEGY]. *)
 val enc_git_strategy : git_strategy -> string
 
-type cpu =
-  | Normal  (** Target default Gitlab runner pool. *)
-  | High  (** Target GCP high runner pool. *)
-  | Very_high  (** Target GCP very high runner pool. *)
-
-type storage =
-  | Network  (** Target default storage runner pool. *)
-  | Ramfs  (** Target ramfs storage runner pool. *)
-
 (** Define a job.
 
-    This smart constructor for {!Gitlab_ci.Types.job} additionally:
+    This is a smart constructor for {!Gitlab_ci.Types.job}.
+
+    This function handles dependencies as follows.
 
     - Translates each {!dependency} to [needs:] and [dependencies:]
-    keywords as detailed in the documentation of {!dependency}.
-    - Adds [tag:] based on [arch] and [tag]:
-
-      - If only [tag] is set, then it is passed as is to the job's [tags:]
-        field. The runners of the tezos/tezos CI all use singleton tags,
-        hence we only allow one tag per job.
-      - Setting both [arch] and [tag] throws an error.
-      - Omitting both [arch] and [tag] is equivalent to setting
-        [~tag:Gcp] or, equivalently, omitting tag and setting
-        [~arch:Amd64].
+      keywords as detailed in the documentation of {!dependency}.
 
     - [image_dependencies] is a list of internal !{Image.t}s that this
       job uses indirectly, i.e. not in it's [image:] field. For
@@ -419,24 +394,41 @@ type storage =
       if this list includes an external image.
 
     - If both a [template] and an [image] are provided, then a
-    run-time error is raised to prevent overriding the image defined
-    in the GitLab template.
+      run-time error is raised to prevent overriding the image defined
+      in the GitLab template.
 
     - If the [image] used is {!Internal} and [tag] is set to
-    {!Dynamic} then a run-time error is generated as the required
-    architecture for the internal image cannot be statically
-    deduced.
+      {!Dynamic} then a run-time error is generated as the required
+      architecture for the internal image cannot be statically
+      deduced.
 
-    - The [cpu] parameter specifies the CPU allocation for the job,
-      allowing it to run on a GCP GitLab runner with normal, high,
-      or very high CPU capacity.
+    This function accepts the following arguments to specify requirements
+    on the runners that are to run the job.
 
-    - The [dev_infra] parameter allows to run the job on the dev infrastructure.
-      This parameter is used for tests only and should not be merged in
-      production.*)
+    - [dev_infra] specifies the cloud provider account to use.
+      [false] is [GCP] or [AWS], [true] is [GCP_dev].
+      If omitted, any account may be used.
 
+    - [arch] specifies a required CPU architecture.
+      If omitted, any architecture may be used.
+
+    - [cpu] specifies the required CPU power.
+      If omitted, any CPU may be used.
+
+    - [storage] specifies the required storage method.
+      If omitted, any storage method may be used.
+
+    - [interruptible_runner] specifies whether it is acceptable that the runner
+      may be interrupted, for instance because of the spot instance mechanism.
+      If omitted, either interruptible and non-interruptible runners may be used.
+
+    From these requirements, the function selects a runner tag, using {!Runner.Tag.choose}.
+    This takes the first tag that is compatible with your requirements,
+    from a list of tags ordered in a priority list located in [runner.ml].
+    You may also specify the runner [tag] explicitly instead,
+    in which case the function simply checks that your requirements are compatible. *)
 val job :
-  ?arch:arch ->
+  ?arch:Runner.Arch.t ->
   ?after_script:string list ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?artifacts:Gitlab_ci.Types.artifacts ->
@@ -450,9 +442,10 @@ val job :
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
-  ?tag:tag ->
-  ?cpu:cpu ->
-  ?storage:storage ->
+  ?tag:Runner.Tag.t ->
+  ?cpu:Runner.CPU.t ->
+  ?storage:Runner.Storage.t ->
+  ?interruptible_runner:bool ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
@@ -462,6 +455,7 @@ val job :
   __POS__:string * int * int * int ->
   ?image:Image.t ->
   ?template:Gitlab_ci.Types.template ->
+  ?datadog:bool ->
   stage:Stage.t ->
   name:string ->
   string list ->
@@ -469,13 +463,19 @@ val job :
 
 (** Define a trigger job for a child pipeline.
 
-    The trigger job will be named [trigger:CHILD_PIPELINE_NAME]. *)
+    The trigger job will be named [trigger:CHILD_PIPELINE_NAME].
+
+    We may provide the [parent_pipeline_name] to include it in the
+    PIPELINE_TYPE variable. This helps observability of pipelines
+    containing child pipelines. *)
 val trigger_job :
   ?dependencies:dependencies ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?description:string ->
+  ?variables:(string * string) list ->
   __POS__:string * int * int * int ->
   stage:Stage.t ->
+  ?parent_pipeline_name:string ->
   Pipeline.child_pipeline ->
   tezos_job
 
@@ -543,6 +543,20 @@ val append_after_script : string list -> tezos_job -> tezos_job
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
 
+(** A [script:] that executes a given command and propagates its exit code.
+
+    This might seem like a noop but is in fact necessary to please his majesty GitLab.
+
+    For more info, see:
+     - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
+     - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
+     - https://gitlab.com/groups/gitlab-org/-/epics/6074
+
+   TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
+   {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
+   Runner feature flags}. *)
+val script_propagate_exit_code : string -> string list
+
 val job_docker_authenticated :
   ?skip_docker_initialization:bool ->
   ?ci_docker_hub:bool ->
@@ -551,9 +565,9 @@ val job_docker_authenticated :
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?dependencies:dependencies ->
   ?image_dependencies:Image.t list ->
-  ?arch:arch ->
-  ?storage:storage ->
-  ?tag:tag ->
+  ?arch:Runner.Arch.t ->
+  ?storage:Runner.Storage.t ->
+  ?tag:Runner.Tag.t ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?timeout:Gitlab_ci.Types.time_interval ->
@@ -595,26 +609,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val debian_bookworm : Image.t
-
-  val ubuntu_noble : Image.t
-
-  val ubuntu_jammy : Image.t
-
-  val ubuntu_oracular : Image.t
-
-  val fedora_37 : Image.t
-
-  val fedora_39 : Image.t
-
-  val rockylinux_93 : Image.t
-
-  val opam_ubuntu_oracular : Image.t
-
-  val opam_ubuntu_noble : Image.t
-
-  val opam_debian_bookworm : Image.t
-
   val ci_release : Image.t
 
   val hadolint : Image.t
@@ -629,33 +623,13 @@ module Images : sig
 
   val datadog_ci : Image.t
 
-  val debian_bookworm : Image.t
-
-  val ubuntu_noble : Image.t
-
-  val ubuntu_jammy : Image.t
-
-  val ubuntu_oracular : Image.t
-
-  val fedora_37 : Image.t
-
-  val fedora_39 : Image.t
-
-  val rockylinux_93 : Image.t
-
-  val opam_ubuntu_oracular : Image.t
-
-  val opam_ubuntu_noble : Image.t
-
-  val opam_debian_bookworm : Image.t
-
   val ci_release : Image.t
 
   val hadolint : Image.t
 
   val semgrep_agent : Image.t
 
-  val macosx_14 : Image.t
+  val macosx_15 : Image.t
 
   val client_libs_dependencies : Image.t
 
@@ -672,7 +646,8 @@ module Images : sig
   val jsonnet_master : Image.t
 
   module CI : sig
-    val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
+    val job_docker_ci :
+      Runner.Arch.t -> ?storage:Runner.Storage.t -> unit -> tezos_job
 
     val runtime : Image.t
 
@@ -691,30 +666,105 @@ module Images : sig
     val test_master : Image.t
 
     val e2etest : Image.t
+
+    val release_page : Image.t
+  end
+
+  module Base_images : sig
+    (** The prefix of the path of the base images. *)
+    val path_prefix : string
+
+    val debian_unstable : Image.t
+
+    val debian_bookworm : Image.t
+
+    val debian_trixie : Image.t
+
+    val ubuntu_noble : Image.t
+
+    val ubuntu_jammy : Image.t
+
+    val ubuntu_plucky : Image.t
+
+    val rockylinux_9_3 : Image.t
+
+    val rockylinux_9_6 : Image.t
+
+    val rockylinux_10_0 : Image.t
+
+    val fedora_39 : Image.t
+
+    val fedora_41 : Image.t
+
+    val fedora_42 : Image.t
+
+    val homebrew : Image.t
+
+    val rust_toolchain_trixie : Image.t
   end
 end
 
 (* OIDC tokens to be generated by GitLab *)
 val id_tokens : Gitlab_ci.Types.id_tokens
 
-module Hooks : sig
-  (** Hooks for other libraries.
+val job_datadog_pipeline_trace : tezos_job
 
-      Hooks allow to extend CIAO from outside of CIAO.
-      This makes it possible for components to define their CI locally
-      and can result in better separation of concerns. *)
+module Coverage : sig
+  (** Coverage-related helpers. *)
 
-  (** Jobs to add to [before_merging] and [merge_train] pipelines. *)
-  val before_merging : tezos_job list ref
+  (** Add the [COVERAGE_OPTIONS] variable to enable [bisect_ppx].
 
-  (** Jobs to add to [master] branch pipelines. *)
-  val master : tezos_job list ref
+      This function should be applied in jobs that build executables such that:
+      - at least part of the code is in OCaml;
+      - at least one of these executables is used in test jobs;
+      - we want coverage reports for those tests.
 
-  (** Regular expressions that match release tags.
+      Note that this includes not only build jobs but also some test jobs
+      in which we both build and run tests. *)
+  val enable_instrumentation : tezos_job -> tezos_job
 
-      Used by [ci/bin/main.ml] to define the [non_release_tag]
-      and [non_release_tag_test] pipelines. *)
-  val release_tags : string list ref
+  (** Add the [BISECT_FILE] variable to specify the location of the coverage trace.
+
+      This function should be applied to jobs that produce or consume coverage traces.
+      This includes test jobs and jobs like [unified_coverage].
+      This also enables coverage trace output for instrumented executables. *)
+  val enable_location : tezos_job -> tezos_job
+
+  (** Add the coverage report artifact and the [SLACK_COVERAGE_CHANNEL] variable.
+
+      This is meant to be used in [unified_coverage] jobs. *)
+  val enable_report : tezos_job -> tezos_job
+
+  (** Declare that a job produces coverage traces.
+
+      This has the following effects:
+      - add the coverage trace artifact;
+      - append [merge_coverage.sh];
+      - applies {!enable_location};
+      - registers the job so that it is used by {!close}.
+
+      This function should be applied to test jobs that produce coverage traces. *)
+  val enable_output_artifact :
+    ?expire_in:Gitlab_ci.Types.expiration -> tezos_job -> tezos_job
+
+  (** Generate the [unified_coverage] job.
+
+      After this, {!enable_output_artifact} cannot be called anymore,
+      except on jobs with the same name as a job on which {!enable_output_artifact}
+      was already applied.
+
+      The first time this is called, this creates the job
+      and generates [script-inputs/ci-coverage-producing-jobs].
+      After that, [close] just returns the already-computed [unified_coverage] job.
+
+      The argument is the changeset to use to trigger the [unified_coverage] job.
+      It is supposed to be [changeset_octez], which is unfortunately not defined
+      in [Tezos_ci] but in [ci/bin]. *)
+  val close : Changeset.t -> tezos_job
 end
 
-val job_datadog_pipeline_trace : tezos_job
+(** Add common variables used by jobs compiling kernels *)
+val enable_kernels : tezos_job -> tezos_job
+
+(** Get the number of times the [job] function was called. *)
+val get_number_of_declared_jobs : unit -> int

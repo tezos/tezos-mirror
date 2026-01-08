@@ -13,6 +13,7 @@ thiserror.workspace = true
 anyhow.workspace = true
 
 primitive-types.workspace = true
+num-bigint.workspace = true
 
 rlp.workspace = true
 hex.workspace = true

@@ -24,14 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [activate gs_worker transport_layer ~app_messages_handler ~verbose] connects the
-    given [gs_worker] and [transport_layer]. (Dis)connections and messages of
-    the transport layer are forwarded to the GS worker. P2P output messages and
-    (dis)connection requests are forwarded from the GS worker to the transport
-    layer.
+(** [activate gs_worker transport_layer ~app_out_callback ~app_in_callback ~verbose]
+    connects the given [gs_worker] and [transport_layer].
+    (Dis)connections and messages of the transport layer are forwarded to the GS
+    worker. P2P output messages and (dis)connection requests are forwarded from
+    the GS worker to the transport layer.
 
-    The [app_messages_handler] is invoked when some application messages are put
+    The [app_out_callback] is invoked when some application messages are put
     by the Gossipsub worker in the application output stream.
+
+    The [app_in_callback] is invoked when p2p messages received via Octez p2p
+    are forwarded to the input stream of the Gossipsub worker.
 
     The [verbose] flag controls the amount of events produced for some frequent
     GS messages like the notification of messages to the application layer. *)
@@ -41,7 +44,8 @@ val activate :
     Types.P2P.Metadata.Peer.t,
     Types.P2P.Metadata.Connection.t )
   P2p.t ->
-  app_messages_callback:
+  app_out_callback:
     (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+  app_in_callback:(Types.Message_id.t -> Types.Peer.t -> unit tzresult Lwt.t) ->
   verbose:bool ->
   unit Lwt.t

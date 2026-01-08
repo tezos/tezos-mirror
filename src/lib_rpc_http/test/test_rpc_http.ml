@@ -127,6 +127,21 @@ module Generator = struct
       oneofl [p; RPC_server.Acl.put_policy (searched_for, searched_acl) p]
     in
     pure {policy; searched_for; added_entry}
+
+  let gen_string_with_nl =
+    let open Gen in
+    let nl = pure '\n' in
+    let char = frequency [(5, char); (1, nl)] in
+    string_small_of char
+
+  let gen_value =
+    let open Gen in
+    oneof
+      [
+        map (fun i -> `Int i) small_int;
+        map (fun i -> `Z (Z.of_int i)) int;
+        map (fun s -> `String s) gen_string_with_nl;
+      ]
 end
 
 let resolve_domain_name =
@@ -259,7 +274,7 @@ let check_acl_search (description : string) (policy : RPC_server.Acl.policy)
     (RPC_server.Acl.find_policy policy addr)
 
 let test_finding_policy =
-  Alcotest.test_case "policy matching rules" `Quick (fun () ->
+  Alcotest_lwt.test_case_sync "policy matching rules" `Quick (fun () ->
       check_acl_search
         "An exact match is when address and port match exactly."
         example_policy
@@ -323,7 +338,7 @@ let ensure_unsafe_rpcs_blocked =
       (`POST, ["injection"; "protocol"]);
     ]
   in
-  Alcotest.test_case
+  Alcotest_lwt.test_case_sync
     "make sure the default policy blocks known particularly unsafe RPCs"
     `Quick
     (fun () ->
@@ -347,7 +362,7 @@ let test_matching_with_name_resolving =
       ("::1", Some 8732, Some (`Whitelist, ["/chains/**"]));
     ]
   in
-  Alcotest.test_case
+  Alcotest_lwt.test_case_sync
     "make sure addresses match well with domain name resolving"
     `Quick
     (fun () ->
@@ -372,7 +387,10 @@ let test_media_type_pp_parse =
     | Json -> "Json"
     | Binary -> "Binary"
   in
-  Alcotest.test_case "Media_type.Command_line.pp/parse" `Quick (fun () ->
+  Alcotest_lwt.test_case_sync
+    "Media_type.Command_line.pp/parse"
+    `Quick
+    (fun () ->
       List.iter
         (fun m ->
           let s = Format.asprintf "%a" pp_parameter m in
@@ -394,18 +412,160 @@ let test_media_type_pp_parse =
           | Some mm -> assert (m = mm))
         inputs)
 
+let pp_value fmt v =
+  Format.fprintf
+    fmt
+    "%s"
+    (match v with
+    | `Int i -> string_of_int i
+    | `Z z -> Z.to_string z ^ "z"
+    | `String s -> "\"" ^ s ^ "\"")
+
+let eq_value x y =
+  match (x, y) with
+  | `Int x, `Int y -> x = y
+  | `Z x, `Z y -> Z.equal x y
+  | `String x, `String y -> x = y
+  | _, _ -> false
+
+let value_enc =
+  let open Data_encoding in
+  union
+    [
+      (* Use an encoding which can potentially overlap when concatenated *)
+      case
+        (Tag 0)
+        ~title:"int"
+        Data_encoding.int31
+        (function `Int i -> Some i | _ -> None)
+        (fun i -> `Int i);
+      (* Use a simple variable size data encoding *)
+      case
+        (Tag 1)
+        ~title:"z"
+        Data_encoding.(obj1 (req "z" z))
+        (function `Z z -> Some z | _ -> None)
+        (fun z -> `Z z);
+      (* This encoding can have \n in json, they should be escaped *)
+      case
+        (Tag 2)
+        ~title:"string"
+        Data_encoding.string
+        (function `String s -> Some s | _ -> None)
+        (fun s -> `String s);
+    ]
+
+module Client =
+  Resto_cohttp_client.Client.Make
+    (Tezos_rpc.Encoding)
+    (Resto_cohttp_client.Client.OfCohttp (Cohttp_lwt_unix.Client))
+
+let test_media_types_chunks =
+  let open QCheck2 in
+  let open Tezos_rpc_http.Media_type in
+  let open Lwt_syntax in
+  Qcheck2_helpers.qcheck_make_lwt
+    ~name:"Can destruct chunks with multiple values"
+    ~count:5_000
+    ~print:(fun (media_type, values) ->
+      Format.asprintf
+        "@[<hov 4>%s -> [@,%a@,]@]"
+        (match media_type with
+        | `Json -> "json"
+        | `Bson -> "bson"
+        | `Octet_stream -> "octet-stream")
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+           (fun fmt (v, split) ->
+             Format.fprintf
+               fmt
+               "%a%s"
+               pp_value
+               v
+               (if split then "/split" else "")))
+        values)
+    ~extract:Lwt_main.run
+    ~gen:
+      (* TODO: support bson *)
+      Gen.(
+        pair
+          (oneofl [`Json; `Octet_stream; `Bson])
+          (small_list (pair Generator.gen_value bool)))
+  @@ fun (media_type, values) ->
+  let media_type =
+    match media_type with
+    | `Json -> json
+    | `Bson -> bson
+    | `Octet_stream -> octet_stream
+  in
+  let buf = Buffer.create 100 in
+  let rchunks = ref [] in
+  List.iter
+    (fun (i, split) ->
+      let chunk = media_type.construct value_enc i in
+      if split then (
+        (* The test input says this value should be split over two chunks *)
+        let mid = String.length chunk / 2 in
+        let chunk0 = String.sub chunk 0 mid in
+        let chunk1 = String.sub chunk mid (String.length chunk - mid) in
+        (* First half in current chunk *)
+        Buffer.add_string buf chunk0 ;
+        (* Finish chunk0 *)
+        rchunks := Buffer.contents buf :: !rchunks ;
+        (* Start new chunk *)
+        Buffer.reset buf ;
+        (* Second half in next chunk *)
+        Buffer.add_string buf chunk1)
+      else Buffer.add_string buf chunk)
+    values ;
+  if Buffer.length buf > 0 then
+    (* Finish current chunk *)
+    rchunks := Buffer.contents buf :: !rchunks ;
+  Buffer.reset buf ;
+  let chunks = List.rev !rchunks in
+  let stream = Lwt_stream.of_list chunks in
+  let reconstructed = ref [] in
+  let+ () =
+    Client.Internal_for_tests.parse_stream
+      media_type
+      value_enc
+      ~log_raw_chunk:(fun _ -> return_unit)
+      ~on_chunk:(fun e -> reconstructed := e :: !reconstructed)
+      ~on_close:ignore
+      stream
+  in
+  let reconstructed = List.rev !reconstructed in
+  let original = List.map fst values in
+  Qcheck2_helpers.qcheck_eq
+    ~eq:(List.equal eq_value)
+    ~pp:(fun fmt ->
+      Format.fprintf
+        fmt
+        "@[<hov>[@,%a@,]@]"
+        Format.(
+          pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ",@ ") pp_value))
+    ~__LOC__
+    original
+    reconstructed
+
 let () =
   let open Qcheck2_helpers in
-  Alcotest.run
-    ~__FILE__
-    "tezos-rpc-http"
-    [
-      ( "qcheck",
-        qcheck_wrap
-          [test_codec_identity; check_find_policy; ensure_default_policy_parses]
-      );
-      ("find_policy_matching_rules", [test_finding_policy]);
-      ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
-      ("test_matching_with_name_resolving", [test_matching_with_name_resolving]);
-      ("test_media_type_pp_parse", [test_media_type_pp_parse]);
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~__FILE__
+       "tezos-rpc-http"
+       [
+         ( "qcheck",
+           qcheck_wrap_lwt
+             [
+               test_codec_identity;
+               check_find_policy;
+               ensure_default_policy_parses;
+             ] );
+         ("find_policy_matching_rules", [test_finding_policy]);
+         ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
+         ( "test_matching_with_name_resolving",
+           [test_matching_with_name_resolving] );
+         ("test_media_type_pp_parse", [test_media_type_pp_parse]);
+         ("test_media_types_chunks", qcheck_wrap_lwt [test_media_types_chunks]);
+       ]

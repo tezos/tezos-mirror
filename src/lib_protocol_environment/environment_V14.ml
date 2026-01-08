@@ -346,20 +346,20 @@ struct
     include Tezos_crypto.Signature.V1
 
     let check ?watermark pk s bytes =
-      (check
-         ?watermark
-         pk
-         s
-         bytes
-       [@profiler.span_f
-         {verbosity = Notice}
-           [
-             (match (pk : public_key) with
-             | Ed25519 _ -> "check_signature_ed25519"
-             | Secp256k1 _ -> "check_signature_secp256k1"
-             | P256 _ -> "check_signature_p256"
-             | Bls _ -> "check_signature_bls");
-           ]])
+      check
+        ?watermark
+        pk
+        s
+        bytes
+      [@profiler.span_f
+        {verbosity = Notice}
+          [
+            (match (pk : public_key) with
+            | Ed25519 _ -> "check_signature_ed25519"
+            | Secp256k1 _ -> "check_signature_secp256k1"
+            | P256 _ -> "check_signature_p256"
+            | Bls _ -> "check_signature_bls");
+          ]]
   end
 
   module Timelock = Tezos_crypto.Timelock
@@ -1290,43 +1290,43 @@ struct
       in
       let*? f = wrap_tzresult r in
       return (fun x ->
-          (let*! r = f x in
-           Lwt.return (wrap_tzresult r))
+          ((let*! r = f x in
+            Lwt.return (wrap_tzresult r))
           [@profiler.record_s
             {verbosity = Debug}
               (Format.asprintf
                  "load_key(%s)"
-                 (Context.Cache.identifier_of_key x))])
+                 (Context.Cache.identifier_of_key x))]))
 
     (** Ensure that the cache is correctly loaded in memory
         before running any operations. *)
     let load_predecessor_cache predecessor_context chain_id mode
         (predecessor_header : Block_header.shell_header) cache =
       let open Lwt_result_syntax in
-      (let predecessor_hash, timestamp =
-         match mode with
-         | Application block_header | Partial_validation block_header ->
-             (block_header.shell.predecessor, block_header.shell.timestamp)
-         | Construction {predecessor_hash; timestamp; _}
-         | Partial_construction {predecessor_hash; timestamp} ->
-             (predecessor_hash, timestamp)
-       in
-       let* value_of_key =
-         value_of_key
-           ~chain_id
-           ~predecessor_context
-           ~predecessor_timestamp:predecessor_header.timestamp
-           ~predecessor_level:predecessor_header.level
-           ~predecessor_fitness:predecessor_header.fitness
-           ~predecessor:predecessor_hash
-           ~timestamp
-       in
-       Context.load_cache
-         predecessor_hash
-         predecessor_context
-         cache
-         value_of_key)
-      [@profiler.record_s {verbosity = Debug} "load_predecessor_cache"]
+      ((let predecessor_hash, timestamp =
+          match mode with
+          | Application block_header | Partial_validation block_header ->
+              (block_header.shell.predecessor, block_header.shell.timestamp)
+          | Construction {predecessor_hash; timestamp; _}
+          | Partial_construction {predecessor_hash; timestamp} ->
+              (predecessor_hash, timestamp)
+        in
+        let* value_of_key =
+          value_of_key
+            ~chain_id
+            ~predecessor_context
+            ~predecessor_timestamp:predecessor_header.timestamp
+            ~predecessor_level:predecessor_header.level
+            ~predecessor_fitness:predecessor_header.fitness
+            ~predecessor:predecessor_hash
+            ~timestamp
+        in
+        Context.load_cache
+          predecessor_hash
+          predecessor_context
+          cache
+          value_of_key)
+      [@profiler.record_s {verbosity = Debug} "load_predecessor_cache"])
 
     let begin_validation ctxt chain_id mode ~predecessor ~cache =
       let open Lwt_result_syntax in
@@ -1435,79 +1435,79 @@ struct
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.Context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
     object
-      method call_proto_service0
-          : 'm 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              RPC_context.t,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'chain * 'block ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service0 :
+          'm 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            RPC_context.t,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'chain * 'block ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s (chain, block) q i ->
           let s = RPC_service.subst0 s in
           let s = RPC_service.prefix prefix s in
           t#call_service s (((), chain), block) q i
 
-      method call_proto_service1
-          : 'm 'a 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              RPC_context.t * 'a,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'chain * 'block ->
-            'a ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service1 :
+          'm 'a 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            RPC_context.t * 'a,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'chain * 'block ->
+          'a ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s (chain, block) a1 q i ->
           let s = RPC_service.subst1 s in
           let s = RPC_service.prefix prefix s in
           t#call_service s ((((), chain), block), a1) q i
 
-      method call_proto_service2
-          : 'm 'a 'b 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              (RPC_context.t * 'a) * 'b,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'chain * 'block ->
-            'a ->
-            'b ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service2 :
+          'm 'a 'b 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            (RPC_context.t * 'a) * 'b,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'chain * 'block ->
+          'a ->
+          'b ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s (chain, block) a1 a2 q i ->
           let s = RPC_service.subst2 s in
           let s = RPC_service.prefix prefix s in
           t#call_service s (((((), chain), block), a1), a2) q i
 
-      method call_proto_service3
-          : 'm 'a 'b 'c 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              ((RPC_context.t * 'a) * 'b) * 'c,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'chain * 'block ->
-            'a ->
-            'b ->
-            'c ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service3 :
+          'm 'a 'b 'c 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            ((RPC_context.t * 'a) * 'b) * 'c,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'chain * 'block ->
+          'a ->
+          'b ->
+          'c ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s (chain, block) a1 a2 a3 q i ->
           let s = RPC_service.subst3 s in
           let s = RPC_service.prefix prefix s in
@@ -1518,76 +1518,76 @@ struct
     ['block] RPC_context.simple =
     let lookup = new Tezos_rpc.Context.of_directory dir in
     object
-      method call_proto_service0
-          : 'm 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              RPC_context.t,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'block ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service0 :
+          'm 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            RPC_context.t,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'block ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s block q i ->
           let rpc_context = conv block in
           lookup#call_service s rpc_context q i
 
-      method call_proto_service1
-          : 'm 'a 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              RPC_context.t * 'a,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'block ->
-            'a ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service1 :
+          'm 'a 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            RPC_context.t * 'a,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'block ->
+          'a ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s block a1 q i ->
           let rpc_context = conv block in
           lookup#call_service s (rpc_context, a1) q i
 
-      method call_proto_service2
-          : 'm 'a 'b 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              (RPC_context.t * 'a) * 'b,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'block ->
-            'a ->
-            'b ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service2 :
+          'm 'a 'b 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            (RPC_context.t * 'a) * 'b,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'block ->
+          'a ->
+          'b ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s block a1 a2 q i ->
           let rpc_context = conv block in
           lookup#call_service s ((rpc_context, a1), a2) q i
 
-      method call_proto_service3
-          : 'm 'a 'b 'c 'q 'i 'o.
-            ( ([< RPC_service.meth] as 'm),
-              RPC_context.t,
-              ((RPC_context.t * 'a) * 'b) * 'c,
-              'q,
-              'i,
-              'o )
-            RPC_service.t ->
-            'block ->
-            'a ->
-            'b ->
-            'c ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_proto_service3 :
+          'm 'a 'b 'c 'q 'i 'o.
+          ( ([< RPC_service.meth] as 'm),
+            RPC_context.t,
+            ((RPC_context.t * 'a) * 'b) * 'c,
+            'q,
+            'i,
+            'o )
+          RPC_service.t ->
+          'block ->
+          'a ->
+          'b ->
+          'c ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun s block a1 a2 a3 q i ->
           let rpc_context = conv block in
           lookup#call_service s (((rpc_context, a1), a2), a3) q i

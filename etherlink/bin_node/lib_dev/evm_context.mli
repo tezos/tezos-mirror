@@ -8,6 +8,8 @@
 
 type init_status = Loaded | Created
 
+type snapshot_source = Url_legacy of string
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -28,9 +30,6 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     [kernel_path] can be provided to cover the case where the context does not
     exist yet, and is ignored otherwise.
 
-    [data_dir] is the path to the data-dir of the node, notably containing the
-    SQLite store and the Irmin context.
-
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
@@ -39,30 +38,27 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
 
-    [snapshot_url] can be provided to automatically fetch and import the
-    snapshot if the [data_dir] was not initialized before. *)
+    [snapshot_source] can be provided to automatically fetch and import the
+    snapshot from a URL if the [data_dir] was not initialized before. *)
 val start :
   configuration:Configuration.t ->
-  ?kernel_path:Wasm_debugger.kernel ->
-  data_dir:string ->
+  ?kernel_path:Pvm_types.kernel ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
-  ?signer:Signer.t ->
-  ?snapshot_url:string ->
+  ?signer:Signer.map ->
+  ?snapshot_source:snapshot_source ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
-(** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir ()]
-    initialises the irmin context and metadata of the evm using the
-    latest known evm state of the given rollup node. if
-    [omit_delayed_tx_events] dont populate the delayed tx event from
-    the state into the db. *)
+(** [init_from_rollup_node ~omit_delayed_tx_events
+    ~rollup_node_data_dir ()] initialises the irmin context and
+    metadata of the evm using the latest known evm state of the given
+    rollup node. if [omit_delayed_tx_events] dont populate the delayed
+    tx event from the state into the db. *)
 val init_from_rollup_node :
   configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
-  data_dir:string ->
   rollup_node_data_dir:string ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->
@@ -82,6 +78,10 @@ val reset :
 val apply_evm_events :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
+(** Same as {!apply_evm_events}, but wait for the result of the request *)
+val apply_evm_events' :
+  ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
+
 (** [apply_blueprint ?events timestamp payload delayed_transactions]
     applies [payload] in the freshest EVM state stored under [ctxt] at
     timestamp [timestamp], forwards the
@@ -94,6 +94,21 @@ val apply_blueprint :
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
   Ethereum_types.hash Seq.t tzresult Lwt.t
+
+(** [apply_chunks ~signer chunks delayed_transactions] works similarly to
+    {!apply_blueprint}, with the notable difference that it allows to start
+    applying the [chunks] of a blueprint {e before} their signatures (computed
+    by [signer]) are ready. *)
+val apply_chunks :
+  signer:Signer.map ->
+  Time.Protocol.t ->
+  Sequencer_blueprint.unsigned_chunked_blueprint ->
+  Evm_events.Delayed_transaction.t list ->
+  (Sequencer_blueprint.chunked_blueprint
+  * Blueprint_types.payload
+  * Ethereum_types.hash Seq.t)
+  tzresult
+  Lwt.t
 
 (** [apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level]
     stores the finalization relationship between L1 level [l1_level]
@@ -122,15 +137,12 @@ val last_known_l1_level : unit -> int32 option tzresult Lwt.t
 
 val shutdown : unit -> unit tzresult Lwt.t
 
-(** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
-val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
-
 (** [patch_kernel ?block_number kernel] modifies the state of the
     [block_number] (defaults to current head) of the EVM node to replace its
     kernel with the provided [kernel]. *)
 val patch_kernel :
   ?block_number:Ethereum_types.quantity ->
-  Wasm_debugger.kernel ->
+  Pvm_types.kernel ->
   unit tzresult Lwt.t
 
 (** [provision_balance address value] modifies the state of the current head of
@@ -170,9 +182,28 @@ val potential_observer_reorg :
   Blueprint_types.with_events ->
   Ethereum_types.quantity option tzresult Lwt.t
 
+(** Update the EVM context using the latest next block information
+    received from the stream (timestamp + block number), and start a new
+    internal state based on it for single transaction execution. *)
+val next_block_info :
+  Time.Protocol.t -> Ethereum_types.quantity -> (unit, tztrace) result Lwt.t
+
+(** [execute_single_transaction evm_state transaction time number tx_index] executes
+    a single Ethereum transaction within the current future block state.
+    Returns the execution outcome as [Transaction_receipt.t].
+    Can be None if single execution was locked by a divergence or stream startup.
+    Hash is exclusively used by OTel tracing, we take it as input to avoid recomputing. *)
+val execute_single_transaction :
+  Broadcast.transaction ->
+  Ethereum_types.hash ->
+  (Transaction_receipt.t option, tztrace) result Lwt.t
+
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :
-  Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input
+  ( Transaction_object.t,
+    Transaction_receipt.t )
+  Ethereum_types.Subscription.output
+  Lwt_watcher.input
 
 (** Watcher that gets notified each time a new receipt is produced. *)
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input

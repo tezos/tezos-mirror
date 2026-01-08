@@ -489,8 +489,8 @@ module Loops (Archiver : Archiver.S) = struct
                         ~chain:cctx#chain
                         ~block:
                           (`Level
-                            (Int32.pred
-                               header.Block_header.shell.Block_header.level))
+                             (Int32.pred
+                                header.Block_header.shell.Block_header.level))
                         ()
                     in
                     match proto_result with

@@ -30,10 +30,15 @@ Available services:
         at least the blueprint for) a given level 
   - GET /health_check
       Assess the health of the RPC server 
+  - GET /mode
+      Expose the operating mode of the EVM node 
   + tezlink/
-    - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
-    - GET /tezlink/chains/<chain_id>/chain_id
-        The chain unique identifier. 
+    + chains/<chain_id>/
+      - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
+      - GET /tezlink/chains/<chain_id>/chain_id
+          The chain unique identifier. 
+      - GET /tezlink/chains/<chain_id>/is_bootstrapped
+          The bootstrap status of a chain 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
     - POST /tezlink/injection/operation
@@ -92,9 +97,12 @@ Warning:
 
 Available services:
   
-  - /chains/<chain_id>/blocks/<block_id> <dynamic>
-  - GET /chains/<chain_id>/chain_id
-      The chain unique identifier. 
+  + chains/<chain_id>/
+    - /chains/<chain_id>/blocks/<block_id> <dynamic>
+    - GET /chains/<chain_id>/chain_id
+        The chain unique identifier. 
+    - GET /chains/<chain_id>/is_bootstrapped
+        The bootstrap status of a chain 
   - POST /injection/operation
       Inject an operation in node and broadcast it. Returns the ID of the
       operation. The `signedOperationContents` should be constructed using
@@ -155,6 +163,8 @@ Available services:
             Identical to the 'spendable' RPC. 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/counter
             Access the counter of a contract, if any. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/entrypoints
+            Return the list of entrypoints of the contract 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/manager_key
             Access the manager of an implicit contract. 
         - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
@@ -178,6 +188,8 @@ Available services:
           Returns the level of the interrogated block, or the one of a block
           located `offset` blocks after it in the chain. For instance, the
           next block if `offset` is 1. The offset cannot be negative. 
+      - POST /chains/main/blocks/head/helpers/forge/operations
+          Forge an operation 
       - POST /chains/main/blocks/head/helpers/preapply/operations
           Simulate the application of the operations with the context of the
           given block and return the result of each operation application. 
@@ -191,6 +203,8 @@ Available services:
           using some heuristics. 
     - GET /chains/main/blocks/head/operation_hashes
         The hashes of all the operations included in the block. 
+    - GET /chains/main/blocks/head/operations
+        All the operations included in the block. 
     - GET /chains/main/blocks/head/operations/<list_offset>/<operation_offset>
         The `m-th` operation in the `n-th` validation pass of the block. 
     - GET /chains/main/blocks/head/protocols

@@ -1,14 +1,11 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Only parse the script once, save a few cycles on subsequent runs.
 
 use mir::ast::*;
-use mir::context::Ctx;
+use mir::context::{Ctx, TypecheckingCtx};
 use mir::parser::Parser;
 use std::sync::OnceLock;
 
@@ -38,10 +35,20 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
     // The contract is only lazily parsed once.
     let contract_micheline = contract();
     let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+    let contract_typechecked = contract_micheline
+        .split_script()
+        .unwrap()
+        .typecheck_script(ctx.gas(), true, true)
+        .unwrap();
 
     let (_, new_storage) = contract_typechecked
-        .interpret(&mut ctx, &parser.arena, parameter, None, storage)
+        .interpret(
+            &mut ctx,
+            &parser.arena,
+            parameter,
+            &Entrypoint::default(),
+            &storage,
+        )
         .unwrap();
     let TypedValue::Nat(storage_nat) = &new_storage else {
         unreachable!()

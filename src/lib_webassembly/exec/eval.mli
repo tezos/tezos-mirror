@@ -172,13 +172,10 @@ type create_global_kont = Types.global_type * eval_const_kont
 type (_, _, _) init_section =
   | Func : ((Ast.func, func_inst) Either.t, Ast.func, func_inst) init_section
   | Global : (create_global_kont, Ast.global, global_inst) init_section
-  | Table
-      : ((Ast.table, table_inst) Either.t, Ast.table, table_inst) init_section
-  | Memory
-      : ( (Ast.memory, memory_inst) Either.t,
-          Ast.memory,
-          memory_inst )
-        init_section
+  | Table :
+      ((Ast.table, table_inst) Either.t, Ast.table, table_inst) init_section
+  | Memory :
+      ((Ast.memory, memory_inst) Either.t, Ast.memory, memory_inst) init_section
 
 type 'b join_kont =
   | J_Init of 'b Vector.t Vector.t

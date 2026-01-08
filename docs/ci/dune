@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name documentation_ci)
+ (libraries
+  gitlab_ci
+  tezos_ci
+  cacio
+  tezos_ci_jobs)
+ (flags
+  (:standard)
+  -open Gitlab_ci.Base))

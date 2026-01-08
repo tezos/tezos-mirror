@@ -253,8 +253,8 @@ module Raw = struct
    evaluation is logged.
 
  *)
-  let rec kmap_exit :
-      type a b c e f m n o. (a, b, c, e, f, m, n, o) kmap_exit_type =
+  let rec kmap_exit : type a b c e f m n o.
+      (a, b, c, e, f, m, n, o) kmap_exit_type =
    fun instrument g gas body xs ty ys yk ks accu stack ->
     let ys = Script_map.update yk (Some accu) ys in
     let ks = instrument @@ KMap_enter_body (body, xs, ys, ty, ks) in
@@ -262,8 +262,8 @@ module Raw = struct
     (next [@ocaml.tailcall]) g gas ks accu stack
   [@@inline]
 
-  and kmap_enter :
-      type a b c d f i j k. (a, b, c, d, f, i, j, k) kmap_enter_type =
+  and kmap_enter : type a b c d f i j k.
+      (a, b, c, d, f, i, j, k) kmap_enter_type =
    fun instrument g gas body xs ty ys ks accu stack ->
     match xs with
     | [] -> (next [@ocaml.tailcall]) g gas ks ys (accu, stack)
@@ -293,8 +293,8 @@ module Raw = struct
         (step [@ocaml.tailcall]) g gas body ks x (accu, stack)
   [@@inline]
 
-  and kloop_in_left :
-      type a b c d e f g. (a, b, c, d, e, f, g) kloop_in_left_type =
+  and kloop_in_left : type a b c d e f g.
+      (a, b, c, d, e, f, g) kloop_in_left_type =
    fun g gas ks0 ki ks' accu stack ->
     match accu with
     | L v -> (step [@ocaml.tailcall]) g gas ki ks0 v stack
@@ -317,8 +317,7 @@ module Raw = struct
         (step [@ocaml.tailcall]) g gas body ks x (accu, stack)
   [@@inline]
 
-  and next :
-      type a s r f.
+  and next : type a s r f.
       outdated_context * step_constants ->
       local_gas_counter ->
       (a, s, r, f) continuation ->
@@ -402,8 +401,8 @@ module Raw = struct
    instructions.
 
 *)
-  and ilist_map :
-      type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) ilist_map_type =
+  and ilist_map : type a b c d e f g h i.
+      (a, b, c, d, e, f, g, h, i) ilist_map_type =
    fun instrument g gas body k ks ty accu stack ->
     let xs = accu.elements in
     let ys = Script_list.empty in
@@ -415,8 +414,8 @@ module Raw = struct
     (next [@ocaml.tailcall]) g gas ks accu stack
   [@@inline]
 
-  and ilist_iter :
-      type a b c d e f g cmp. (a, b, c, d, e, f, g, cmp) ilist_iter_type =
+  and ilist_iter : type a b c d e f g cmp.
+      (a, b, c, d, e, f, g, cmp) ilist_iter_type =
    fun instrument g gas body ty k ks accu stack ->
     let xs = accu.elements in
     let ks = instrument @@ KIter (body, ty, xs, KCons (k, ks)) in
@@ -433,8 +432,8 @@ module Raw = struct
     (next [@ocaml.tailcall]) g gas ks accu stack
   [@@inline]
 
-  and imap_map :
-      type a b c d e f g h i j. (a, b, c, d, e, f, g, h, i, j) imap_map_type =
+  and imap_map : type a b c d e f g h i j.
+      (a, b, c, d, e, f, g, h, i, j) imap_map_type =
    fun instrument g gas body k ks ty accu stack ->
     let map = accu in
     let xs = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
@@ -444,8 +443,8 @@ module Raw = struct
     (next [@ocaml.tailcall]) g gas ks accu stack
   [@@inline]
 
-  and imap_iter :
-      type a b c d e f g h cmp. (a, b, c, d, e, f, g, h, cmp) imap_iter_type =
+  and imap_iter : type a b c d e f g h cmp.
+      (a, b, c, d, e, f, g, h, cmp) imap_iter_type =
    fun instrument g gas body ty k ks accu stack ->
     let map = accu in
     let l = List.rev (Script_map.fold (fun k v a -> (k, v) :: a) map []) in
@@ -554,7 +553,8 @@ module Raw = struct
         k
         ks
         accu
-        stack ->
+        stack
+      ->
       let input = accu in
       let addr, stack = stack in
       let ctxt = update_context gas ctxt in
@@ -1278,6 +1278,20 @@ module Raw = struct
                 | _ -> None
               in
               (step [@ocaml.tailcall]) g gas k ks res stack
+          | IIndex_address (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                Script_address_registry.index ctxt address.destination
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+          | IGet_address_index (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                Script_address_registry.get ctxt address.destination
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id
@@ -1403,8 +1417,7 @@ module Raw = struct
               (step [@ocaml.tailcall]) g gas b ks accu stack
           | IDropn (_, _n, n', k) ->
               let stack =
-                let rec aux :
-                    type a s b t.
+                let rec aux : type a s b t.
                     (b, t, b, t, a, s, a, s) stack_prefix_preservation_witness ->
                     a ->
                     s ->
@@ -1543,8 +1556,7 @@ module Raw = struct
               let check = Script_bls.pairing_check pairs.elements in
               (step [@ocaml.tailcall]) g gas k ks check stack
           | IComb (_, _, witness, k) ->
-              let rec aux :
-                  type a b s c d t.
+              let rec aux : type a b s c d t.
                   (a, b, s, c, d, t) comb_gadt_witness ->
                   a * (b * s) ->
                   c * (d * t) =
@@ -1559,8 +1571,7 @@ module Raw = struct
               let accu, stack = stack in
               (step [@ocaml.tailcall]) g gas k ks accu stack
           | IUncomb (_, _, witness, k) ->
-              let rec aux :
-                  type a b s c d t.
+              let rec aux : type a b s c d t.
                   (a, b, s, c, d, t) uncomb_gadt_witness ->
                   a * (b * s) ->
                   c * (d * t) =
@@ -1574,8 +1585,7 @@ module Raw = struct
               (step [@ocaml.tailcall]) g gas k ks accu stack
           | IComb_get (_, _, witness, k) ->
               let comb = accu in
-              let rec aux :
-                  type before after.
+              let rec aux : type before after.
                   (before, after) comb_get_gadt_witness -> before -> after =
                fun witness comb ->
                 match (witness, comb) with
@@ -1587,8 +1597,7 @@ module Raw = struct
               (step [@ocaml.tailcall]) g gas k ks accu stack
           | IComb_set (_, _, witness, k) ->
               let value = accu and comb, stack = stack in
-              let rec aux :
-                  type value before after.
+              let rec aux : type value before after.
                   (value, before, after) comb_set_gadt_witness ->
                   value ->
                   before ->
@@ -1603,8 +1612,7 @@ module Raw = struct
               let accu = aux witness value comb in
               (step [@ocaml.tailcall]) g gas k ks accu stack
           | IDup_n (_, _, witness, k) ->
-              let rec aux :
-                  type a b before after.
+              let rec aux : type a b before after.
                   (a, b, before, after) dup_n_gadt_witness ->
                   a * (b * before) ->
                   after =
@@ -1806,6 +1814,7 @@ type execution_result = {
   operations : packed_internal_operation list;
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
+  address_registry_diff : Address_registry.diff list;
 }
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -1819,15 +1828,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   in
   let* ( Ex_script
            (Script
-             {
-               code_size;
-               code;
-               arg_type;
-               storage = old_storage;
-               storage_type;
-               entrypoints;
-               views;
-             }),
+              {
+                code_size;
+                implementation;
+                arg_type;
+                storage = old_storage;
+                storage_type;
+                entrypoints;
+                views;
+              }),
          ctxt ) =
     match cached_script with
     | None ->
@@ -1864,9 +1873,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   in
   let* (ops, new_storage), ctxt =
-    trace
-      (Runtime_contract_error step_constants.self)
-      (interp logger (ctxt, step_constants) code (arg, old_storage))
+    match implementation with
+    | Lambda {code} ->
+        trace
+          (Runtime_contract_error step_constants.self)
+          (interp logger (ctxt, step_constants) code (arg, old_storage))
+    | Native {kind} ->
+        trace
+          (Runtime_contract_error step_constants.self)
+          (Script_native.execute (ctxt, step_constants) kind arg old_storage)
   in
   let* storage, lazy_storage_diff, ctxt =
     Script_ir_translator.extract_lazy_storage_diff
@@ -1896,7 +1911,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   let script =
     Ex_script
       (Script
-         {code_size; code; arg_type; storage; storage_type; entrypoints; views})
+         {
+           code_size;
+           implementation;
+           arg_type;
+           storage;
+           storage_type;
+           entrypoints;
+           views;
+         })
   in
   let*? arg_type_has_tickets, ctxt =
     Ticket_scanner.type_has_tickets ctxt arg_type
@@ -1922,6 +1945,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      in [unparse_data]. *)
   let size, cost = Script_ir_translator.script_size script in
   let*? ctxt = Gas.consume ctxt cost in
+  let address_registry_diff = Alpha_context.Address_registry.get_diffs ctxt in
   return
     ( {
         script;
@@ -1931,6 +1955,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         operations;
         ticket_diffs;
         ticket_receipt;
+        address_registry_diff;
       },
       ctxt )
 

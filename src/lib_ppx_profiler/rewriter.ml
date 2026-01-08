@@ -14,7 +14,6 @@ type action =
   | Record
   | Record_f
   | Record_s
-  | Reset_block_section
   | Span
   | Span_f
   | Span_s
@@ -60,11 +59,6 @@ let record_f key location =
 let record_s key location =
   match Key.content key with
   | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s
-  | _ -> Error.error location (Error.Invalid_record key)
-
-let reset_block_section key location =
-  match Key.content key with
-  | Key.Apply _ | Key.Ident _ | Key.String _ -> Reset_block_section
   | _ -> Error.error location (Error.Invalid_record key)
 
 let span key location =
@@ -114,7 +108,6 @@ let to_constant {action; _} =
   | Record -> Constants.record_constant
   | Record_f -> Constants.record_f_constant
   | Record_s -> Constants.record_s_constant
-  | Reset_block_section -> Constants.record_s_constant
   | Span -> Constants.span_constant
   | Span_f -> Constants.span_f_constant
   | Span_s -> Constants.span_s_constant
@@ -138,7 +131,6 @@ let association_constant_action_maker =
     (Constants.record_constant, record);
     (Constants.record_f_constant, record_f);
     (Constants.record_s_constant, record_s);
-    (Constants.reset_block_section_constant, reset_block_section);
     (Constants.span_constant, span);
     (Constants.span_f_constant, span_f);
     (Constants.span_s_constant, span_s);
@@ -177,7 +169,6 @@ let to_fully_qualified_lident_expr t loc =
         | Record -> "record"
         | Record_f -> "record_f"
         | Record_s -> "record_s"
-        | Reset_block_section -> "reset_block_section"
         | Span -> "span"
         | Span_f -> "span_f"
         | Span_s -> "span_s"
@@ -248,8 +239,22 @@ let extract_enum_from_record loc record string =
       Some ident
   | field -> Error.error loc Error.(Improper_field field)
 
+(** [extract_bool_from_record _ record field] checks that [field] exists
+      and that the associated value is a boolean.
+      If [field] is not present, returns [None] *)
+let extract_bool_from_record loc record string =
+  Option.bind (extract_field_from_record record string) @@ function
+  | (_, Ppxlib.{pexp_desc = Pexp_construct ({txt = Lident ident; _}, None); _})
+    as field -> (
+      match bool_of_string ident with
+      | b -> Some b
+      | exception Invalid_argument _ ->
+          Error.error loc Error.(Invalid_type ("bool", string, field)))
+  | field -> Error.error loc Error.(Invalid_type ("bool", string, field))
+
 let extract_from_record loc record =
   let verbosity = extract_enum_from_record loc record "verbosity" in
+  let cpu_profiling = extract_bool_from_record loc record "cpu_profiling" in
   let profiler_module = extract_enum_from_record loc record "profiler_module" in
   let metadata =
     (* Metadata can be any valid expression so we return the
@@ -276,7 +281,7 @@ let extract_from_record loc record =
           expr_list)
     |> Handled_drivers.of_list
   in
-  (verbosity, profiler_module, metadata, driver_ids)
+  (verbosity, cpu_profiling, profiler_module, metadata, driver_ids)
 
 let extract_key_from_payload loc payload =
   match payload with
@@ -293,7 +298,7 @@ let extract_key_from_payload loc payload =
       match item_list with
       | [(Nolabel, structure)] ->
           (* [@ppx {<other infos>} ...] *)
-          let verbosity, profiler_module, metadata, driver_ids =
+          let verbosity, cpu_profiling, profiler_module, metadata, driver_ids =
             extract_from_record loc record
           in
           (match (verbosity, profiler_module, metadata) with
@@ -303,6 +308,7 @@ let extract_key_from_payload loc payload =
           Key.
             {
               verbosity;
+              cpu_profiling;
               profiler_module;
               metadata;
               driver_ids;
@@ -314,6 +320,7 @@ let extract_key_from_payload loc payload =
       Key.
         {
           verbosity = None;
+          cpu_profiling = None;
           profiler_module = None;
           metadata = None;
           driver_ids = Handled_drivers.empty;
@@ -324,6 +331,7 @@ let extract_key_from_payload loc payload =
       Key.
         {
           verbosity = None;
+          cpu_profiling = None;
           profiler_module = None;
           metadata = None;
           driver_ids = Handled_drivers.empty;

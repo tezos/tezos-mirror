@@ -68,7 +68,8 @@ let encoding =
            with_transaction;
            with_metrics;
            verbosity;
-         } ->
+         }
+       ->
       ( db_uri,
         network_interfaces,
         public_directory,
@@ -86,7 +87,8 @@ let encoding =
            max_batch_size,
            with_transaction,
            with_metrics,
-           verbosity ) ->
+           verbosity )
+       ->
       let with_transaction =
         (* FULL mode used by default with SQLite backend.
            caqti-driver-sqlite3 handles URIs starting with "sqlite3://" *)

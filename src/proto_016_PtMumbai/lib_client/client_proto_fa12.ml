@@ -817,7 +817,8 @@ let token_transfer_encoding =
            fee;
            gas_limit;
            storage_limit;
-         } ->
+         }
+       ->
       ( token_contract,
         destination,
         amount,
@@ -831,7 +832,8 @@ let token_transfer_encoding =
            tez_amount,
            fee,
            gas_limit,
-           storage_limit ) ->
+           storage_limit )
+       ->
       {
         token_contract;
         destination;

@@ -127,6 +127,8 @@ type 'a t = {
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
       (** Watcher for the L2 chain, which enables RPC services to access
           a stream of L2 blocks. *)
+  finalized_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
+      (** Watcher for the finalized L2 blocks. *)
   sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
   constraint 'a = < store : 'store ; context : 'context >
@@ -633,18 +635,6 @@ val get_last_context_split_level : _ t -> int32 option tzresult Lwt.t
 
 val save_context_split_level : _ rw_store -> int32 -> unit tzresult Lwt.t
 
-(** {2 Helpers} *)
-
-(** [make_kernel_logger event ?log_kernel_debug_file logs_dir] returns two
-    functions [kernel_debug_logger] and [finaliser], to be used in the node
-    context. [kernel_debug_logger] writes kernel logs to
-    [logs_dir/log_kernel_debug_file] and emits them with the [event]. *)
-val make_kernel_logger :
-  (string -> unit Lwt.t) ->
-  ?log_kernel_debug_file:string ->
-  string ->
-  ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
-
 (** {2 Synchronization tracking} *)
 
 (** [is_synchronized node_ctxt] returns [true] iff the rollup node has processed
@@ -655,6 +645,27 @@ val is_synchronized : _ t -> bool
     node whose state is [node_ctxt] is synchronized with L1. If the node is
     already synchronized, it resolves immediately. *)
 val wait_synchronized : _ t -> unit Lwt.t
+
+(** {2 Kernel tracing} *)
+
+(** Reset the kernel tracing with the current time and provided scope. Call this
+    function before executing the PVM/kernel. *)
+val reset_kernel_tracing : Opentelemetry.Scope.t -> unit
+
+(** [make_kernel_logger ~enable_tracing ?log_kernel_debug_file ~logs_dir config
+    event] returns two functions [kernel_debug_logger] and [finaliser], to be
+    used in the node context. [kernel_debug_logger] writes kernel logs to
+    [logs_dir/log_kernel_debug_file] and emits them with the [event]
+    function. In addition if [enable_tracing = true] then information is
+    extracted from the kernel logs to emit Opentelemetry traces for
+    Etherlink. *)
+val make_kernel_logger :
+  enable_tracing:bool ->
+  ?log_kernel_debug_file:string ->
+  logs_dir:string ->
+  Configuration.t ->
+  (string -> unit Lwt.t) ->
+  ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
 
 module Internal_for_tests : sig
   val write_protocols_in_store :

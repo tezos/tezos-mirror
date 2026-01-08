@@ -98,6 +98,9 @@ let _octez_baker_rio =
 let _octez_baker_seoul =
   Uses.make ~tag:"baker_ptseoulo" ~path:"./octez-baker-PtSeouLo" ()
 
+let _octez_baker_tallinn =
+  Uses.make ~tag:"baker_psd5wvtj" ~path:"./octez-baker-PtTALLiN" ()
+
 let _octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
 
@@ -109,6 +112,9 @@ let _octez_accuser_rio =
 
 let _octez_accuser_seoul =
   Uses.make ~tag:"accuser_ptseoulo" ~path:"./octez-accuser-PtSeouLo" ()
+
+let _octez_accuser_tallinn =
+  Uses.make ~tag:"accuser_tallinn" ~path:"./octez-accuser-PtTALLiN" ()
 
 let _octez_accuser_alpha =
   Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
@@ -146,6 +152,12 @@ module WASM = struct
         "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm"
       ()
 
+  let echo_dal_reveal_parameters =
+    Uses.make
+      ~tag:"echo_dal_reveal_parameters"
+      ~path:"tezt/tests/kernels/echo_dal_reveal_parameters.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"
@@ -166,7 +178,7 @@ module WASM = struct
       ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let mainnet_commit = "1f47de061681a9bc4a07b2ddfecc6f4932b5ae9d"
+  let mainnet_commit = "7a62d6a155cc17f5d3b9f8d34b2eb0d68c6f95cc"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 

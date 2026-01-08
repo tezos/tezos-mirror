@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 #
 # SPDX-License-Identifier: MIT
 
@@ -22,7 +23,7 @@ endif
 
 RISCV_OPTS = --target riscv64gc-unknown-linux-musl --no-default-features
 RISCV_OPTS_ALPHA = $(RISCV_OPTS) --features proto-alpha
-RISCV_RUSTC_VERSION = 1.86.0
+RISCV_RUSTC_VERSION = 1.88.0
 
 SDK_VERSION := "0.2.2"
 

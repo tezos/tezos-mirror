@@ -6,7 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {config : Configuration.tx_queue; keep_alive : bool}
+type parameters = {
+  config : Configuration.tx_queue;
+  keep_alive : bool;
+  timeout : float;
+}
 
 type queue_variant = [`Accepted | `Refused]
 
@@ -36,118 +40,6 @@ type pending_request = {
 
 type callback = all_variant variant_callback
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Services_backend_sig.endpoint =
-  | Rpc of Uri.t
-  | Websocket of Websocket_client.t
-
-(** [Nonce_bitset] registers known nonces from transactions that went
-    through the tx_queue from a specific sender address. With this
-    structure it's easy to do bookkeeping of address' nonce without
-    going through all the transactions of the queue.
-
-    The invariants are that for any nonce_bitset [nb]:
-
-    - When creating [nb], [nb.next_nonce] is the next valid nonce for
-    the state.
-
-    - When adding a nonce [n] to [nb], [n] must be superior or equal
-    to [nb.next_nonce]. This is enforced by the validation in
-    {!Validate.is_tx_valid}.
-
-    - [nb.next_nonce] can only increase over time. This is enforced by
-    [shift] and [offset].
- *)
-module Nonce_bitset = struct
-  module Bitset = Tezos_base.Bitset
-
-  (** [t] allows to register for a given address all nonces that are
-      currently used by transaction in the tx_queue. *)
-  type t = {
-    next_nonce : Z.t;
-        (** [next_nonce] is the base value for any position found in
-            {!field:bitset}. It’s set to be the next expected nonce
-            for a given address, which is the nonce found in the
-            backend. *)
-    bitset : Bitset.t;
-  }
-
-  (** [create ~next_nonce] creates a {!t} struct with empty [bitset]. *)
-  let create ~next_nonce = {next_nonce; bitset = Bitset.empty}
-
-  (** [offset ~nonce1 ~nonce2] computes the difference between
-      [nonce1] and [nonce2].
-
-      Fails if [nonce2 > nonce1] or if the difference between the two is
-      more than {!Int.max_int}. *)
-  let offset ~nonce1 ~nonce2 =
-    let open Result_syntax in
-    if Z.gt nonce2 nonce1 then
-      error_with
-        "Internal: invalid nonce diff. nonce2 %a must be inferior or equal to \
-         nonce1 %a."
-        Z.pp_print
-        nonce2
-        Z.pp_print
-        nonce1
-    else
-      let offset = Z.(nonce1 - nonce2) in
-      if Z.fits_int offset then return (Z.to_int offset)
-      else
-        error_with
-          "Internal: invalid nonce offset, it's too large to fit in an integer."
-
-  (** [add bitset_nonce ~nonce] adds the nonce [nonce] to [bitset_nonce]. *)
-  let add {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
-    let* bitset = Bitset.add bitset offset_position in
-    return {next_nonce; bitset}
-
-  (** [remove bitset_nonce ~nonce] removes the nonce [nonce] from
-      [bitset_nonce].
-
-      If [nonce] is strictly inferior to [bitset_nonce.next_nonce] then
-      it's a no-op because nonce can't exist in the bitset. *)
-  let remove {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    if Z.lt nonce next_nonce then
-      (* no need to remove a nonce that can't exist in the bitset *)
-      return {next_nonce; bitset}
-    else
-      let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
-      let* bitset = Bitset.remove bitset offset_position in
-      return {next_nonce; bitset}
-
-  (** [shift bitset_nonce ~nonce] shifts the bitset of [bitset_nonce]
-      so the next_nonce is now [nonce]. Shifting the bitset means
-      that nonces that are inferior to [nonce] are dropped.
-
-      Fails if [nonce] is strictly inferior to
-      [bitset_nonce.next_nonce]. *)
-  let shift {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    let* offset = offset ~nonce1:nonce ~nonce2:next_nonce in
-    let* bitset = Bitset.shift_right bitset ~offset in
-    return {next_nonce = nonce; bitset}
-
-  (** [is_empty bitset_nonce] checks if the bitset is empty, i.e. no
-      position is at 1. *)
-  let is_empty {bitset; _} = Bitset.is_empty bitset
-
-  (** [next_gap bitset_nonce] returns the next available nonce. *)
-  let next_gap {next_nonce; bitset} =
-    let offset_position = Z.(trailing_zeros @@ lognot @@ Bitset.to_z bitset) in
-    Z.(next_nonce + of_int offset_position)
-
-  (** [shift_then_next_gap bitset_nonce ~shift_nonce] calls {!shift
-      ~nonce:shift_nonce} then {!next_gap bitset_nonce}. *)
-  let shift_then_next_gap bitset_nonce ~shift_nonce =
-    let open Result_syntax in
-    let* bitset_nonce = shift bitset_nonce ~nonce:shift_nonce in
-    return @@ next_gap bitset_nonce
-end
-
 module Address_nonce = struct
   module S = String.Hashtbl
 
@@ -166,7 +58,7 @@ module Address_nonce = struct
     if Nonce_bitset.is_empty nonce_bitset then S.remove nonces addr
     else S.replace nonces addr nonce_bitset
 
-  let add nonces ~addr ~next_nonce ~nonce =
+  let add nonces ~addr ~next_nonce ~nonce ~add =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     let* nonce_bitset =
@@ -192,9 +84,10 @@ module Address_nonce = struct
       | None -> return @@ Nonce_bitset.create ~next_nonce
     in
     let* nonce_bitset =
-      (* Only adds [nonce] if [bitset_nonce.next_nonce] is inferior or
-         equal. If [nonce_bitset.next_nonce > nonce] then there is no
-         need to add because [nonce] is already in the past.
+      (* [add] should take care of only adding [nonce] if
+         [bitset_nonce.next_nonce] is inferior or equal. If
+         [nonce_bitset.next_nonce > nonce] then there is no need to
+         add because [nonce] is already in the past.
 
          This is follow-up to the previous comment where we are in a
          rare ce condition of the transaction is being validated while
@@ -202,19 +95,17 @@ module Address_nonce = struct
          such case we simply don't register the nonce, and the
          transaction will be dropped by the upstream node when
          receiving it. *)
-      if Z.gt nonce_bitset.Nonce_bitset.next_nonce nonce then
-        return nonce_bitset
-      else Nonce_bitset.add nonce_bitset ~nonce
+      add nonce_bitset nonce
     in
     let () = S.replace nonces addr nonce_bitset in
     return_unit
 
-  let confirm_nonce nonces ~addr ~nonce =
+  let confirm_nonce nonces ~addr ~nonce ~next =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let next_nonce = Z.succ nonce in
+        let next_nonce = next nonce in
         if Z.gt nonce_bitset.Nonce_bitset.next_nonce next_nonce then
           (* A tx with a superior nonce was already confirmed, nothing
              to confirm.
@@ -230,12 +121,12 @@ module Address_nonce = struct
           return_unit
     | None -> return_unit
 
-  let remove nonces ~addr ~nonce =
+  let remove nonces ~addr ~nonce ~rm =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let* nonce_bitset = Nonce_bitset.remove nonce_bitset ~nonce in
+        let* nonce_bitset = rm nonce_bitset nonce in
         update nonces addr nonce_bitset ;
         return_unit
     | None -> return_unit
@@ -259,7 +150,7 @@ struct
     open Ethereum_types
     module S = String.Hashtbl
 
-    type t = Tx.legacy S.t
+    type t = Tx.t S.t
 
     let empty ~start_size = S.create start_size
 
@@ -274,6 +165,8 @@ struct
     let find htbl (Hash (Hex hash)) = S.find htbl hash
 
     let remove htbl (Hash (Hex hash)) = S.remove htbl hash
+
+    let length s = S.length s
   end
 
   module Pending_transactions = struct
@@ -340,10 +233,27 @@ struct
       match current with
       | Some i -> add s address (Int64.succ i)
       | None -> add s address 1L
+
+    let length s = S.length s
+  end
+
+  module Inflight_transactions = struct
+    include Map.Make (String)
+
+    let of_seq s =
+      Seq.map (fun (h, txn) -> (Ethereum_types.hash_to_bytes h, txn)) s
+      |> of_seq
+
+    let find_opt h = find_opt (Ethereum_types.hash_to_bytes h)
+
+    let remove h = remove (Ethereum_types.hash_to_bytes h)
+
+    let merge = merge (fun _k before after -> Option.either after before)
   end
 
   type state = {
     mutable queue : queue_request Queue.t;
+    mutable waiting_injection : queue_request Inflight_transactions.t;
     pending : Pending_transactions.t;
     tx_object : Transaction_objects.t;
     tx_per_address : Transactions_per_addr.t;
@@ -351,6 +261,7 @@ struct
     config : Configuration.tx_queue;
     keep_alive : bool;
     mutable locked : bool;
+    timeout : float;
   }
 
   module Types = struct
@@ -375,36 +286,50 @@ struct
     type request = {
       next_nonce : Ethereum_types.quantity;
       payload : Ethereum_types.hex;
-      tx_object : Tx.legacy;
+      tx_object : Tx.t;
       callback : callback;
     }
 
     type ('a, 'b) t =
       | Inject : request -> ((unit, string) result, tztrace) t
-      | Find : {txn_hash : Ethereum_types.hash} -> (Tx.legacy option, tztrace) t
+      | Find : {txn_hash : Ethereum_types.hash} -> (Tx.t option, tztrace) t
       | Nonce : {
           next_nonce : Ethereum_types.quantity;
           address : Tx.address;
         }
           -> (Ethereum_types.quantity, tztrace) t
-      | Tick : {evm_node_endpoint : endpoint} -> (unit, tztrace) t
+      | Tick : {
+          evm_node_endpoint : Services_backend_sig.endpoint;
+        }
+          -> (unit, tztrace) t
+      | Injection_confirmation : {
+          txn_hash : Ethereum_types.hash;
+          status : [`Accepted | `Refused];
+        }
+          -> (unit, tztrace) t
       | Clear : (unit, tztrace) t
       | Lock_transactions : (unit, tztrace) t
       | Unlock_transactions : (unit, tztrace) t
       | Is_locked : (bool, tztrace) t
-      | Content : (Ethereum_types.txpool, tztrace) t
+      | Content : (Transaction_object.txqueue_content, tztrace) t
+      | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
       | Pop_transactions : {
           validation_state : 'a;
           validate_tx :
             'a ->
             string ->
-            Tx.legacy ->
-            [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
+            Tx.t ->
+            [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t;
         }
-          -> ((string * Tx.legacy) list, tztrace) t
+          -> ((string * Tx.t) list, tztrace) t
       | Confirm_transactions : {
           confirmed_txs : Ethereum_types.hash Seq.t;
           clear_pending_queue_after : bool;
+        }
+          -> (unit, tztrace) t
+      | Dropped_transaction : {
+          dropped_tx : Ethereum_types.hash;
+          reason : string;
         }
           -> (unit, tztrace) t
 
@@ -414,13 +339,16 @@ struct
       | Find _ -> "Find"
       | Nonce _ -> "Nonce"
       | Tick _ -> "Tick"
+      | Injection_confirmation _ -> "Injection_confirmation"
       | Clear -> "Clear"
       | Lock_transactions -> "Lock_transactions"
       | Unlock_transactions -> "Unlock_transactions"
       | Is_locked -> "Is_locked"
       | Content -> "Content"
+      | Size_info -> "Size_info"
       | Pop_transactions _ -> "Pop_transactions"
       | Confirm_transactions _ -> "Confirm_transactions"
+      | Dropped_transaction _ -> "Dropped_transaction"
 
     type view = View : _ t -> view
 
@@ -429,7 +357,10 @@ struct
     let endpoint_encoding =
       let open Data_encoding in
       conv
-        (function Rpc uri -> Uri.to_string uri | Websocket _ -> "[websocket]")
+        (function
+          | Services_backend_sig.Rpc uri -> Uri.to_string uri
+          | Websocket _ -> "[websocket]"
+          | Block_producer -> "[block_producer]")
         (fun _ -> assert false)
         string
 
@@ -455,6 +386,20 @@ struct
                (req "evm_node_endpoint" endpoint_encoding))
             (function
               | View (Tick {evm_node_endpoint}) -> Some ((), evm_node_endpoint)
+              | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Injection_confirmation"
+            (obj3
+               (req "request" (constant "injection_confirmation"))
+               (req "hash" Ethereum_types.hash_encoding)
+               (req
+                  "status"
+                  (string_enum [("accepted", `Accepted); ("refused", `Refused)])))
+            (function
+              | View (Injection_confirmation {txn_hash; status}) ->
+                  Some ((), txn_hash, status)
               | _ -> None)
             (fun _ -> assert false);
           case
@@ -510,6 +455,12 @@ struct
             (fun _ -> assert false);
           case
             Json_only
+            ~title:"Size_info"
+            (obj1 (req "request" (constant "size_info")))
+            (function View Size_info -> Some () | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
             ~title:"Pop_transactions"
             (obj1 (req "request" (constant "pop_transactions")))
             (function
@@ -528,8 +479,20 @@ struct
             (function
               | View
                   (Confirm_transactions
-                    {confirmed_txs; clear_pending_queue_after}) ->
+                     {confirmed_txs; clear_pending_queue_after}) ->
                   Some ((), List.of_seq confirmed_txs, clear_pending_queue_after)
+              | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Dropped_transaction"
+            (obj3
+               (req "request" (constant "dropped_transaction"))
+               (req "dropped_tx" Ethereum_types.hash_encoding)
+               (req "reason" string))
+            (function
+              | View (Dropped_transaction {dropped_tx; reason}) ->
+                  Some ((), dropped_tx, reason)
               | _ -> None)
             (fun _ -> assert false);
         ]
@@ -540,6 +503,15 @@ struct
       | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
       | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
       | Tick _ -> fprintf fmt "Tick"
+      | Injection_confirmation {txn_hash; status} ->
+          fprintf
+            fmt
+            "Confirm %a was %s"
+            Ethereum_types.pp_hash
+            txn_hash
+            (match status with
+            | `Accepted -> "accepted"
+            | `Refused -> "refused")
       | Clear -> fprintf fmt "Clear"
       | Nonce {next_nonce = _; address} ->
           fprintf fmt "Nonce %s" (Tx.address_to_string address)
@@ -547,9 +519,11 @@ struct
       | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
       | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
       | Content -> fprintf fmt "Content"
+      | Size_info -> fprintf fmt "Size_info"
       | Pop_transactions {validation_state = _; validate_tx = _} ->
           fprintf fmt "Popping transactions with validation function"
       | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
+      | Dropped_transaction _ -> fprintf fmt "Dropping transaction"
   end
 
   module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
@@ -568,92 +542,163 @@ struct
 
     let uuid_seed = Random.get_state ()
 
-    let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
+    let build_batch transactions =
+      let module M = Map.Make (String) in
+      let module Srt = Rpc_encodings.Send_raw_transaction in
+      let rev_batch, hashes =
+        Seq.fold_left
+          (fun (rev_batch, hashes) {hash; payload; _} ->
+            Octez_telemetry.Trace.add_event (fun () ->
+                tx_queue_event
+                  ~attrs:Telemetry.Attributes.[Transaction.hash hash]
+                  "selected_transaction") ;
+            let req_id =
+              Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
+            in
+            let txn =
+              Rpc_encodings.JSONRPC.
+                {
+                  method_ = Srt.method_;
+                  parameters =
+                    Some
+                      (Data_encoding.Json.construct Srt.input_encoding payload);
+                  id = Some (Id_string req_id);
+                }
+            in
+
+            (txn :: rev_batch, M.add req_id hash hashes))
+          ([], M.empty)
+          transactions
+      in
+      (List.rev rev_batch, hashes)
+
+    let check_missed_transactions ~self ~hashes ~responses =
+      let open Lwt_result_syntax in
+      let module M = Map.Make (String) in
+      let* missed_transactions =
+        List.fold_left_es
+          (fun hashes (response : Rpc_encodings.JSONRPC.response) ->
+            match response with
+            | {id = Some (Id_string req); value} -> (
+                match (value, M.find_opt req hashes) with
+                | value, Some txn_hash ->
+                    let* () =
+                      match value with
+                      | Ok _hash_encoded ->
+                          let*! (_pushed : bool) =
+                            Worker.Queue.push_request
+                              self
+                              (Injection_confirmation
+                                 {txn_hash; status = `Accepted})
+                          in
+                          return_unit
+                      | Error error ->
+                          let*! () = Tx_queue_events.rpc_error error in
+                          let*! (_pushed : bool) =
+                            Worker.Queue.push_request
+                              self
+                              (Injection_confirmation
+                                 {txn_hash; status = `Refused})
+                          in
+                          return_unit
+                    in
+                    return (M.remove req hashes)
+                | _ -> return hashes)
+            | _ -> failwith "Inconsistent response from the server")
+          hashes
+          responses
+      in
+      assert (M.is_empty missed_transactions) ;
+      return_unit
+
+    let build_sequencer_batch ~(state : Types.state) (seq : queue_request Seq.t)
+        =
+      let open Lwt_result_syntax in
+      let rec select rev_selected rev_callbacks seq =
+        match seq () with
+        | Seq.Nil -> return (rev_selected, rev_callbacks)
+        | Seq.Cons ({hash; payload; queue_callback}, rest) -> (
+            let raw_tx = Ethereum_types.hex_to_bytes payload in
+            match Transaction_objects.find state.tx_object hash with
+            | None ->
+                let*! () = Tx_queue_events.missing_tx_object hash in
+                let*! () = queue_callback `Refused in
+                select rev_selected rev_callbacks rest
+            | Some tx_object ->
+                select
+                  ((raw_tx, Tx.to_transaction_object_t tx_object)
+                  :: rev_selected)
+                  ((hash, queue_callback) :: rev_callbacks)
+                  rest)
+      in
+      let* rev_selected, rev_callbacks = select [] [] seq in
+      return (List.rev rev_selected, rev_callbacks)
+
+    let send_transactions_batch ~evm_node_endpoint ~timeout ~keep_alive ~state
+        self transactions =
       let open Lwt_result_syntax in
       let module M = Map.Make (String) in
       let module Srt = Rpc_encodings.Send_raw_transaction in
       if Seq.is_empty transactions then return_unit
       else
-        let rev_batch, callbacks =
-          Seq.fold_left
-            (fun (rev_batch, callbacks) {hash; payload; queue_callback} ->
-              Octez_telemetry.Trace.add_event (fun () ->
-                  tx_queue_event
-                    ~attrs:Telemetry.Attributes.[Transaction.hash hash]
-                    "selected_transaction") ;
-              let req_id =
-                Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
-              in
-              let txn =
-                Rpc_encodings.JSONRPC.
-                  {
-                    method_ = Srt.method_;
-                    parameters =
-                      Some
-                        (Data_encoding.Json.construct
-                           Srt.input_encoding
-                           payload);
-                    id = Some (Id_string req_id);
-                  }
-              in
-
-              (txn :: rev_batch, M.add req_id queue_callback callbacks))
-            ([], M.empty)
-            transactions
-        in
-        let batch = List.rev rev_batch in
-
-        let*! () = Tx_queue_events.injecting_transactions (List.length batch) in
-
-        let* responses =
-          match evm_node_endpoint with
-          | Rpc base ->
-              let* batch_response =
-                Rollup_services.call_service
-                  ~keep_alive
-                  ~base
-                  (Batch.dispatch_batch_service ~path:Resto.Path.root)
-                  ()
-                  ()
-                  (Batch batch)
-              in
-              return
-                (match batch_response with
-                | Singleton r -> [r]
-                | Batch rs -> rs)
-          | Websocket ws_client ->
+        match evm_node_endpoint with
+        | Services_backend_sig.Rpc base ->
+            let batch, hashes = build_batch transactions in
+            let*! () =
+              Tx_queue_events.injecting_transactions (List.length batch)
+            in
+            let* batch_response =
+              Rollup_services.call_service
+                ~keep_alive
+                ~base
+                ~timeout
+                (Batch.dispatch_batch_service ~path:Resto.Path.root)
+                ()
+                ()
+                (Batch batch)
+            in
+            let responses =
+              match batch_response with Singleton r -> [r] | Batch rs -> rs
+            in
+            check_missed_transactions ~self ~hashes ~responses
+        | Websocket ws_client ->
+            let timeout =
+              Websocket_client.
+                {
+                  timeout;
+                  on_timeout = (if keep_alive then `Retry_forever else `Fail);
+                }
+            in
+            let batch, hashes = build_batch transactions in
+            let*! () =
+              Tx_queue_events.injecting_transactions (List.length batch)
+            in
+            let* responses =
               List.map_ep
                 (fun req ->
                   let*! response =
-                    Websocket_client.send_jsonrpc_request ws_client req
+                    Websocket_client.send_jsonrpc_request ~timeout ws_client req
                   in
                   return Rpc_encodings.JSONRPC.{value = response; id = req.id})
                 batch
-        in
-
-        let* missed_callbacks =
-          List.fold_left_es
-            (fun callbacks (response : Rpc_encodings.JSONRPC.response) ->
-              match response with
-              | {id = Some (Id_string req); value} -> (
-                  match (value, M.find_opt req callbacks) with
-                  | value, Some callback ->
-                      let* () =
-                        match value with
-                        | Ok _hash_encoded -> Lwt_result.ok (callback `Accepted)
-                        | Error error ->
-                            let*! () = Tx_queue_events.rpc_error error in
-                            Lwt_result.ok (callback `Refused)
-                      in
-                      return (M.remove req callbacks)
-                  | _ -> return callbacks)
-              | _ -> failwith "Inconsistent response from the server")
-            callbacks
-            responses
-        in
-
-        assert (M.is_empty missed_callbacks) ;
-        return_unit
+            in
+            check_missed_transactions ~self ~hashes ~responses
+        | Block_producer ->
+            let* batch, rev_callbacks =
+              build_sequencer_batch ~state transactions
+            in
+            let* hashes =
+              Block_producer.preconfirm_transactions ~transactions:batch
+            in
+            let*! () =
+              List.iter_s
+                (fun (hash, callback) ->
+                  if List.exists (Ethereum_types.equal_hash hash) hashes then
+                    callback `Accepted
+                  else callback `Refused)
+                rev_callbacks
+            in
+            return_unit
 
     (** clear values and keep the allocated space *)
     let clear
@@ -666,7 +711,9 @@ struct
            config = _;
            keep_alive = _;
            locked = _;
-         } :
+           waiting_injection = _;
+           timeout = _;
+         } as state :
           state) =
       (* full matching so when a new element is added to the state it's not
          forgotten to clear it. *)
@@ -675,6 +722,7 @@ struct
       String.Hashtbl.clear tx_per_address ;
       String.Hashtbl.clear address_nonce ;
       Queue.clear queue ;
+      state.waiting_injection <- Inflight_transactions.empty ;
       ()
 
     let lock_transactions state = state.locked <- true
@@ -706,7 +754,7 @@ struct
                 (* `Stop means that we don't pop transaction anymore. We
                    don't remove the last peek tx because it could be valid
                    for another call. *)
-                | `Drop ->
+                | `Drop _ ->
                     (* `Drop, the current tx was evaluated and was refused
                        by the caller. *)
                     let _ = Queue.take state.queue in
@@ -722,8 +770,166 @@ struct
       let* rev_selected = aux validation_state [] in
       return @@ List.rev rev_selected
 
-    let on_request :
-        type r request_error.
+    let pending_callback state ~tx_nonce ~addr ~tx_object ~caller_callback =
+     fun (reason : pending_variant) ->
+      let open Lwt_syntax in
+      let* res =
+        match reason with
+        | `Dropped ->
+            let* () =
+              Tx_queue_events.transaction_dropped
+                (Tx.hash_of_tx_object tx_object)
+            in
+            return
+            @@ Address_nonce.remove
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~rm:Tx.bitset_remove_nonce
+        | `Confirmed ->
+            let* () =
+              Tx_queue_events.transaction_confirmed
+                (Tx.hash_of_tx_object tx_object)
+            in
+            return
+            @@ Address_nonce.confirm_nonce
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~next:Tx.next_nonce
+      in
+      let* () =
+        match res with
+        | Ok () -> return_unit
+        | Error errs -> Tx_queue_events.callback_error errs
+      in
+      Transactions_per_addr.decrement
+        state.tx_per_address
+        (Tx.from_address_of_tx_object tx_object) ;
+      Transaction_objects.remove
+        state.tx_object
+        (Tx.hash_of_tx_object tx_object) ;
+      Lwt.dont_wait
+        (fun () -> caller_callback (reason :> all_variant))
+        (fun exn ->
+          Tx_queue_events.callback_error__dont_wait__use_with_care
+            [Error_monad.error_of_exn exn]) ;
+      Lwt.return_unit
+
+    let queue_callback state ~tx_nonce ~addr ~tx_object ~pending_callback
+        ~caller_callback =
+     fun (reason : queue_variant) ->
+      let open Lwt_syntax in
+      let* res =
+        match reason with
+        | `Accepted ->
+            Pending_transactions.add
+              state.pending
+              (Tx.hash_of_tx_object tx_object)
+              pending_callback ;
+            return_ok_unit
+        | `Refused ->
+            Transactions_per_addr.decrement
+              state.tx_per_address
+              (Tx.from_address_of_tx_object tx_object) ;
+            Transaction_objects.remove
+              state.tx_object
+              (Tx.hash_of_tx_object tx_object) ;
+            return
+            @@ Address_nonce.remove
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~rm:Tx.bitset_remove_nonce
+      in
+      let* () =
+        match res with
+        | Ok () -> return_unit
+        | Error errs -> Tx_queue_events.callback_error errs
+      in
+      Lwt.dont_wait
+        (fun () -> caller_callback (reason :> all_variant))
+        (fun exn ->
+          Tx_queue_events.callback_error__dont_wait__use_with_care
+            [Error_monad.error_of_exn exn]) ;
+      Lwt.return_unit
+
+    let add_tx_to_queue state
+        {next_nonce; payload; tx_object; callback = caller_callback} =
+      let open Lwt_result_syntax in
+      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
+      let addr =
+        Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
+      in
+      let tx_nonce = Tx.nonce_of_tx_object tx_object in
+      let pending_callback =
+        pending_callback state ~tx_nonce ~addr ~tx_object ~caller_callback
+      in
+      let queue_callback =
+        queue_callback
+          state
+          ~tx_nonce
+          ~addr
+          ~tx_object
+          ~pending_callback
+          ~caller_callback
+      in
+      let*! () =
+        Tx_queue_events.add_transaction (Tx.hash_of_tx_object tx_object)
+      in
+      Transactions_per_addr.increment
+        state.tx_per_address
+        (Tx.from_address_of_tx_object tx_object) ;
+      Transaction_objects.add state.tx_object tx_object ;
+      let (Qty next_nonce) = next_nonce in
+      let*? () =
+        Address_nonce.add
+          state.address_nonce
+          ~addr
+          ~next_nonce
+          ~nonce:tx_nonce
+          ~add:Tx.bitset_add_nonce
+      in
+      Queue.add
+        {hash = Tx.hash_of_tx_object tx_object; payload; queue_callback}
+        state.queue ;
+      return_unit
+
+    let inject state
+        {next_nonce; payload; tx_object; callback = caller_callback} =
+      let open Lwt_result_syntax in
+      if Compare.Int.(Queue.length state.queue < state.config.max_size) then
+        (* Check number of txs by user in tx_queue. *)
+        let nb_txs_in_queue =
+          Transactions_per_addr.find
+            state.tx_per_address
+            (Tx.from_address_of_tx_object tx_object)
+        in
+        match nb_txs_in_queue with
+        | Some i when i >= state.config.tx_per_addr_limit ->
+            let*! () =
+              Tx_pool_events.txs_per_user_threshold_reached
+                ~address:
+                  (Ethereum_types.hex_to_string
+                     (Ethereum_types.Hex
+                        (Tx.address_to_string
+                           (Tx.from_address_of_tx_object tx_object))))
+            in
+            return
+              (Error
+                 "Limit of transaction for a user was reached. Transaction is \
+                  rejected.")
+        | Some _ | None ->
+            let* () =
+              add_tx_to_queue
+                state
+                {next_nonce; payload; tx_object; callback = caller_callback}
+            in
+            return (Ok ())
+      else
+        return (Error "Transaction limit was reached. Transaction is rejected.")
+
+    let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =
@@ -731,140 +937,7 @@ struct
       let open Lwt_result_syntax in
       let state = Worker.state self in
       match request with
-      | Inject {next_nonce; payload; tx_object; callback} ->
-          protect @@ fun () ->
-          Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
-          let addr =
-            Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
-          in
-          let (Qty tx_nonce) = Tx.nonce_of_tx_object tx_object in
-          let pending_callback (reason : pending_variant) =
-            let open Lwt_syntax in
-            let* res =
-              match reason with
-              | `Dropped ->
-                  let* () =
-                    Tx_queue_events.transaction_dropped
-                      (Tx.hash_of_tx_object tx_object)
-                  in
-                  return
-                  @@ Address_nonce.remove
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-              | `Confirmed ->
-                  let* () =
-                    Tx_queue_events.transaction_confirmed
-                      (Tx.hash_of_tx_object tx_object)
-                  in
-                  return
-                  @@ Address_nonce.confirm_nonce
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-            in
-            let* () =
-              match res with
-              | Ok () -> return_unit
-              | Error errs -> Tx_queue_events.callback_error errs
-            in
-            Transactions_per_addr.decrement
-              state.tx_per_address
-              (Tx.from_address_of_tx_object tx_object) ;
-            Transaction_objects.remove
-              state.tx_object
-              (Tx.hash_of_tx_object tx_object) ;
-            Lwt.dont_wait
-              (fun () -> callback (reason :> all_variant))
-              (fun exn ->
-                Tx_queue_events.callback_error__dont_wait__use_with_care
-                  [Error_monad.error_of_exn exn]) ;
-            Lwt.return_unit
-          in
-          let queue_callback reason =
-            let open Lwt_syntax in
-            let* res =
-              match reason with
-              | `Accepted ->
-                  Pending_transactions.add
-                    state.pending
-                    (Tx.hash_of_tx_object tx_object)
-                    pending_callback ;
-                  return_ok_unit
-              | `Refused ->
-                  Transactions_per_addr.decrement
-                    state.tx_per_address
-                    (Tx.from_address_of_tx_object tx_object) ;
-                  Transaction_objects.remove
-                    state.tx_object
-                    (Tx.hash_of_tx_object tx_object) ;
-                  return
-                  @@ Address_nonce.remove
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-            in
-            let* () =
-              match res with
-              | Ok () -> return_unit
-              | Error errs -> Tx_queue_events.callback_error errs
-            in
-            Lwt.dont_wait
-              (fun () -> callback (reason :> all_variant))
-              (fun exn ->
-                Tx_queue_events.callback_error__dont_wait__use_with_care
-                  [Error_monad.error_of_exn exn]) ;
-            Lwt.return_unit
-          in
-          if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
-            (* Check number of txs by user in tx_queue. *)
-            let nb_txs_in_queue =
-              Transactions_per_addr.find
-                state.tx_per_address
-                (Tx.from_address_of_tx_object tx_object)
-            in
-            match nb_txs_in_queue with
-            | Some i when i >= state.config.tx_per_addr_limit ->
-                let*! () =
-                  Tx_pool_events.txs_per_user_threshold_reached
-                    ~address:
-                      (Ethereum_types.hex_to_string
-                         (Ethereum_types.Hex
-                            (Tx.address_to_string
-                               (Tx.from_address_of_tx_object tx_object))))
-                in
-                return
-                  (Error
-                     "Limit of transaction for a user was reached. Transaction \
-                      is rejected.")
-            | Some _ | None ->
-                let*! () =
-                  Tx_queue_events.add_transaction
-                    (Tx.hash_of_tx_object tx_object)
-                in
-                Transactions_per_addr.increment
-                  state.tx_per_address
-                  (Tx.from_address_of_tx_object tx_object) ;
-                Transaction_objects.add state.tx_object tx_object ;
-                let Ethereum_types.(Qty next_nonce) = next_nonce in
-                let*? () =
-                  Address_nonce.add
-                    state.address_nonce
-                    ~addr
-                    ~next_nonce
-                    ~nonce:tx_nonce
-                in
-                Queue.add
-                  {
-                    hash = Tx.hash_of_tx_object tx_object;
-                    payload;
-                    queue_callback;
-                  }
-                  state.queue ;
-                return (Ok ()))
-          else
-            return
-              (Error "Transaction limit was reached. Transaction is rejected.")
+      | Inject tx_info -> protect @@ fun () -> inject state tx_info
       | Find {txn_hash} ->
           protect @@ fun () ->
           return @@ Transaction_objects.find state.tx_object txn_hash
@@ -893,15 +966,15 @@ struct
                 in
                 return (transactions_to_inject, remaining_transactions)
           in
+
+          state.waiting_injection <-
+            Inflight_transactions.merge
+              state.waiting_injection
+              (Inflight_transactions.of_seq
+                 (Seq.map
+                    (fun ({hash; _} as txn : queue_request) -> (hash, txn))
+                    transactions_to_inject)) ;
           state.queue <- Queue.of_seq remaining_transactions ;
-
-          let* () =
-            send_transactions_batch
-              ~keep_alive:state.keep_alive
-              ~evm_node_endpoint
-              transactions_to_inject
-          in
-
           let txns =
             Pending_transactions.drop
               ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
@@ -912,7 +985,59 @@ struct
               (fun {pending_callback; _} -> pending_callback `Dropped)
               txns
           in
+
+          Lwt.dont_wait
+            (fun () ->
+              let open Lwt_syntax in
+              let* send_result =
+                protect @@ fun () ->
+                send_transactions_batch
+                  ~keep_alive:state.keep_alive
+                  ~timeout:state.timeout
+                  ~evm_node_endpoint
+                  ~state
+                  self
+                  transactions_to_inject
+              in
+              match send_result with
+              | Ok () -> return_unit
+              | Error error ->
+                  let* () =
+                    Tx_queue_events.injecting_transactions_failed error
+                  in
+                  (* Something went wrong, we confirm all transactions as refused *)
+                  Seq.S.iter
+                    (fun {hash; _} ->
+                      let* _pushed =
+                        Worker.Queue.push_request
+                          self
+                          (Injection_confirmation
+                             {txn_hash = hash; status = `Refused})
+                      in
+                      return_unit)
+                    transactions_to_inject)
+            ignore ;
+
           return_unit
+      | Injection_confirmation {txn_hash; status} -> (
+          match
+            Inflight_transactions.find_opt txn_hash state.waiting_injection
+          with
+          | Some {queue_callback; _} ->
+              state.waiting_injection <-
+                Inflight_transactions.remove txn_hash state.waiting_injection ;
+              Lwt_result.ok (queue_callback status)
+          | None -> return_unit)
+      | Size_info ->
+          protect @@ fun () ->
+          return
+            Metrics.Tx_pool.
+              {
+                number_of_transactions =
+                  Transaction_objects.length state.tx_object;
+                number_of_addresses =
+                  Transactions_per_addr.length state.tx_per_address;
+              }
       | Clear ->
           protect @@ fun () ->
           clear state ;
@@ -920,7 +1045,7 @@ struct
           return_unit
       | Nonce {next_nonce; address} ->
           protect @@ fun () ->
-          let Ethereum_types.(Qty next_nonce) = next_nonce in
+          let (Qty next_nonce) = next_nonce in
           let*? next_gap =
             Address_nonce.next_gap
               state.address_nonce
@@ -935,23 +1060,28 @@ struct
       | Is_locked -> protect @@ fun () -> return (is_locked state)
       | Content ->
           protect @@ fun () ->
-          let open Ethereum_types in
           let process_transactions tx_map lookup_fn acc =
             String.Hashtbl.fold
               (fun hash value acc ->
                 match lookup_fn hash value with
-                | Some (obj : Tx.legacy) ->
+                | Some (obj : Tx.t) ->
                     let existing_nonce_map =
                       Tx.AddressMap.find_opt
                         (Tx.from_address_of_tx_object obj)
                         acc
                       |> Option.value ~default:Ethereum_types.NonceMap.empty
                     in
+                    let tx_nonce_opt =
+                      Tx.nonce_of_tx_object obj |> Tx.nonce_to_z_opt
+                    in
                     let updated_nonce_map =
-                      Ethereum_types.NonceMap.add
-                        (Qty.to_z (Tx.nonce_of_tx_object obj))
-                        obj
-                        existing_nonce_map
+                      match tx_nonce_opt with
+                      | Some tx_nonce ->
+                          Ethereum_types.NonceMap.add
+                            tx_nonce
+                            obj
+                            existing_nonce_map
+                      | None -> existing_nonce_map
                     in
                     Tx.AddressMap.add
                       (Tx.from_address_of_tx_object obj)
@@ -1009,14 +1139,24 @@ struct
             Pending_transactions.clear state.pending ;
             return_unit)
           else return_unit
+      | Dropped_transaction {dropped_tx; reason = _} ->
+          protect @@ fun () ->
+          let callback = Pending_transactions.pop state.pending dropped_tx in
+          let*! () =
+            match callback with
+            | Some {pending_callback; _} -> pending_callback `Dropped
+            | None -> Lwt.return_unit
+          in
+          return_unit
 
     type launch_error = tztrace
 
-    let on_launch _self () ({config; keep_alive} : parameters) =
+    let on_launch _self () ({config; keep_alive; timeout} : parameters) =
       let open Lwt_result_syntax in
       return
         {
           queue = Queue.create ();
+          waiting_injection = Inflight_transactions.empty;
           pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
           (* start with /4 and let it grow if necessary to not allocate
              too much at start. *)
@@ -1031,6 +1171,7 @@ struct
           config;
           keep_alive;
           locked = false;
+          timeout;
         }
 
     let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -1045,8 +1186,6 @@ struct
   end
 
   type address = Tx.address
-
-  type legacy_transaction_object = Tx.legacy
 
   type transaction_object = Tx.t
 
@@ -1115,29 +1254,57 @@ struct
       (Inject {next_nonce; payload = txn; tx_object; callback})
     |> handle_request_error
 
-  let add ~next_nonce tx_object ~raw_tx =
+  let add ?(wait_confirmation = false) ~next_nonce tx_object ~raw_tx =
     let open Lwt_result_syntax in
-    let* res = inject ~next_nonce tx_object raw_tx in
-    match res with
-    | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
-    | Error errs -> return (Error errs)
+    let callback, return_hash =
+      let return_hash = function
+        | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
+        | Error errs -> return (Error errs)
+      in
+      if wait_confirmation then
+        let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
+        let callback =
+         fun status ->
+          match status with
+          | `Accepted -> Lwt.return_unit
+          | `Confirmed ->
+              Lwt.wakeup wait_confirmation_wakener (Ok ()) ;
+              Lwt.return_unit
+          | `Dropped ->
+              Lwt.wakeup wait_confirmation_wakener (Error "Transaction dropped") ;
+              Lwt.return_unit
+          | `Refused ->
+              Lwt.wakeup wait_confirmation_wakener (Error "Transaction refused") ;
+              Lwt.return_unit
+        in
+        let wait_confirmation injection_res =
+          match injection_res with
+          | Ok () ->
+              let*! res = wait_confirmation in
+              return_hash res
+          | Error errs -> return (Error errs)
+        in
+        (Some callback, wait_confirmation)
+      else (None, return_hash)
+    in
+    let* injection_res = inject ?callback ~next_nonce tx_object raw_tx in
+    return_hash injection_res
 
   let find txn_hash =
     let open Lwt_result_syntax in
-    let* legacy_tx_object =
-      let*? w = Lazy.force worker in
-      Worker.Queue.push_request_and_wait w (Find {txn_hash})
-      |> handle_request_error
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
-       We should instrument the TX queue to return the real
-       transaction objects. *)
-    return (Option.map Tx.transaction_object_from_legacy legacy_tx_object)
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w (Find {txn_hash})
+    |> handle_request_error
 
   let content () =
     let open Lwt_result_syntax in
     let*? w = Lazy.force worker in
     Worker.Queue.push_request_and_wait w Content |> handle_request_error
+
+  let size_info () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w Size_info |> handle_request_error
 
   let shutdown () =
     let open Lwt_result_syntax in
@@ -1171,6 +1338,11 @@ struct
       (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
     |> handle_request_error
 
+  let dropped_transaction ~dropped_tx ~reason =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    push_request w (Dropped_transaction {dropped_tx; reason})
+
   let lock_transactions () =
     bind_worker @@ fun w -> push_request w Lock_transactions
 
@@ -1192,10 +1364,11 @@ struct
          {validate_tx; validation_state = initial_validation_state})
     |> handle_request_error
 
-  let start ~config ~keep_alive () =
+  let start ~config ~keep_alive ~timeout () =
     let open Lwt_result_syntax in
+    let timeout = min timeout 5. in
     let* worker =
-      Worker.launch table () {config; keep_alive} (module Handlers)
+      Worker.launch table () {config; keep_alive; timeout} (module Handlers)
     in
     Lwt.wakeup worker_waker worker ;
     let*! () = Tx_queue_events.is_ready () in

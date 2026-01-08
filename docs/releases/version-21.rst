@@ -142,7 +142,9 @@ For instance:
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout octez-v21.4

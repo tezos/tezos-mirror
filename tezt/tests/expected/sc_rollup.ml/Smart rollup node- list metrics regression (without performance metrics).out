@@ -42,6 +42,8 @@
 #TYPE octez_sc_rollup_node_gc_oldest_available_level gauge
 #HELP octez_sc_rollup_node_gc_process_time GC processing time
 #TYPE octez_sc_rollup_node_gc_process_time gauge
+#HELP octez_sc_rollup_node_genesis_level Rollup genesis level
+#TYPE octez_sc_rollup_node_genesis_level gauge
 #HELP [OPERATION_HASH] Number of external messages in inbox
 #TYPE [OPERATION_HASH] gauge
 #HELP octez_sc_rollup_node_inbox_fetch_time The time the rollup node spent fetching the inbox

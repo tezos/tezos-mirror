@@ -279,17 +279,45 @@ module History : sig
        confirmed slot headers. *)
   type t
 
+  (** Starting with the first protocol (P) with this refactoring, the
+      attestation lag changes, and future protocols may even make it dynamic. We
+      want to store the attestation-lag information in skip-list cells without
+      breaking the hashes of cells produced before P.  To do so, we use the type
+      below to either use the legacy (implicit) lag or an explicit value carried
+      by new cells.
+
+    - [Legacy]: cell predates protocol P; the lag wasn't serialized, so we
+      infer it from history and DO NOT include it in the cell's encoding.
+    - [Dynamic n]: cell created at/after P; the lag is serialized and thus
+      committed in the cell's hash. *)
+  type attestation_lag_kind = Legacy | Dynamic of int
+
+  (** Returns the value of attestation_lag parameter based on the given
+      attestation_lag_kind. *)
+  val attestation_lag_value : attestation_lag_kind -> int
+
+  (** Value of the attestation lag used by protocols prior to T. It's the same
+      on all the networks we upgrade (e.g., mainnet, ghostnet and shadownet). *)
+  val legacy_attestation_lag : int
+
+  (** Identify a cell not only by its published_level + slot_index (Header.id),
+      but also by the attestation lag that applied when it was attested. *)
+  type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
+
   (** The content of a cell in the DAL skip list. We have [number_of_slots] new
       cells per level (one per slot index). For a given slot index in
       [0..number_of_slots-1], the commitment is either [Unpublished] or
       [Published]. In this second case, we attach extra information in addition
       to the id such as the commitment, the publisher, the number of attested
       shards and whether the commitment is attested from the point of view of
-      the protocol. *)
+      the protocol. In both cases, the content carries the attestation lag used
+      to push the cell into the skip list (as attested, unattested or
+      unpublished ). *)
   type cell_content = private
-    | Unpublished of Header.id
+    | Unpublished of cell_id
     | Published of {
         header : Header.t;
+        attestation_lag : attestation_lag_kind;
         publisher : Contract_repr.t;
         is_proto_attested : bool;
         attested_shards : int;
@@ -301,8 +329,9 @@ module History : sig
 
   val pp_content : Format.formatter -> cell_content -> unit
 
-  (** Returns the slot id of the cell whose content is given. *)
-  val content_id : cell_content -> Header.id
+  (** Returns the slot id and the attestation lag of the cell whose content is
+      given. *)
+  val content_id : cell_content -> cell_id
 
   module Pointer_hash : S.HASH
 
@@ -311,6 +340,14 @@ module History : sig
 
   (** Encoding of the datatype. *)
   val encoding : t Data_encoding.t
+
+  (** [back_pointer cell ~index:i] returns [Some hash] if [hash] is the [i]-th
+      back pointer of [cell]. Returns [None] if the cell contains less than
+      [i + 1] back pointers.
+
+      [back_pointer cell ~index:0] returns the {!hash} of the previous cell, if
+      any. *)
+  val back_pointer : t -> index:int -> hash option
 
   (** The genesis skip list that contains one dummy cell. This cell has
       {!Raw_level_repr.root} as published level and no attested slots. Since Dal
@@ -362,6 +399,7 @@ module History : sig
     History_cache.t ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
+    attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
@@ -374,6 +412,7 @@ module History : sig
     t ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
+    attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
@@ -460,7 +499,11 @@ module History : sig
       attestation threshold of the commitment is used instead of the Protocol's
       flag to decide if the page's slot is attested. Furthermore, in case some
       publishers are provided in [restricted_commitments_publishers], we also
-      check if the commitment's publisher is whitelisted in that list. *)
+      check if the commitment's publisher is whitelisted in that list.
+
+      The returned result also contains the attestation lag used for the target
+      cell in the skip list so that refutation games use the correct value,
+      in particular across protocol migrations that decrease the lag. *)
   val produce_proof :
     parameters ->
     attestation_threshold_percent:int option ->
@@ -469,7 +512,7 @@ module History : sig
     page_info:(Page.content * Page.proof) option ->
     get_history:(hash -> t option Lwt.t) ->
     t ->
-    (proof * Page.content option) tzresult Lwt.t
+    (proof * Page.content option * attestation_lag_kind) tzresult Lwt.t
 
   (** [verify_proof dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
@@ -481,8 +524,16 @@ module History : sig
       that could contain the page identified by [page_id].
 
       [dal_parameters] is used when verifying that/if the page is part of
-      the candidate slot (if any). *)
-  val verify_proof : parameters -> Page.t -> t -> proof -> bytes option tzresult
+      the candidate slot (if any).
+
+      In both cases, the attestation lag used for the target cell in the skip
+      list is returned, alongside the page's bytes if the slot is attested. *)
+  val verify_proof :
+    parameters ->
+    Page.t ->
+    t ->
+    proof ->
+    (bytes option * attestation_lag_kind) tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored

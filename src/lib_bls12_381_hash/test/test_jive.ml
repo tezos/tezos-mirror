@@ -45,7 +45,8 @@ let test_fail_input_size_and_parameters_do_not_match () =
   in
   List.iter
     (fun ( (module P : Bls12_381_hash.PERMUTATION with type parameters = 'p),
-           (security_param : 'p) ) ->
+           (security_param : 'p) )
+       ->
       let input_size = 3 + Random.int 10 in
       let input = Array.init input_size (fun _ -> Bls12_381.Fr.random ()) in
       let msg =
@@ -77,7 +78,8 @@ let test_fail_b_does_not_divide_input_size () =
   in
   List.iter
     (fun ( (module P : Bls12_381_hash.PERMUTATION with type parameters = 'p),
-           (security_param : 'p) ) ->
+           (security_param : 'p) )
+       ->
       let input_size = 2 in
       let input = Array.init input_size (fun _ -> Bls12_381.Fr.random ()) in
       let msg = "b must divide the state size" in

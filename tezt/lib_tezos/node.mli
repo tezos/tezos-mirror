@@ -383,10 +383,6 @@ module Config_file : sig
       (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
   val ghostnet_network_config : JSON.u
 
-  (** Basic network configuration for rionet
-      (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
-  val rionet_network_config : JSON.u
-
   (** Basic network configuration for mainnet
       (genesis, chain_name and sandboxed_chain_name *)
   val mainnet_network_config : JSON.u
@@ -442,16 +438,28 @@ module Config_file : sig
   val set_ghostnet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
+  (** Set the network config to a Shadownet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_shadownet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
   (** Set the network config to a sandbox with the same chain_id than Ghostnet.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_ghostnet_sandbox_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
-  (** Set the network config to a Rionet network.
+  (** Set the network config to a Seoulnet network.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
-  val set_rionet_network :
+  val set_seoulnet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Tallinnnet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_tallinnnet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 end
 
@@ -497,6 +505,7 @@ val spawn_snapshot_info : ?json:bool -> t -> string -> Process.t
 
 (** Run [octez-node snapshot import]. *)
 val snapshot_import :
+  ?env:string String_map.t ->
   ?force:bool ->
   ?no_check:bool ->
   ?reconstruct:bool ->
@@ -506,7 +515,13 @@ val snapshot_import :
 
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
 val spawn_snapshot_import :
-  ?force:bool -> ?no_check:bool -> ?reconstruct:bool -> t -> string -> Process.t
+  ?env:string String_map.t ->
+  ?force:bool ->
+  ?no_check:bool ->
+  ?reconstruct:bool ->
+  t ->
+  string ->
+  Process.t
 
 (** Run [octez-node reconstruct]. *)
 val reconstruct : t -> unit Lwt.t

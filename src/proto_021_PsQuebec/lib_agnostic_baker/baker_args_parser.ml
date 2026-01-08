@@ -15,11 +15,11 @@ let parse_minimal_fees = Tez.of_mutez_exn
     specific [Per_block_votes] values. *)
 let parse_per_block_vote =
   Option.map (function
-      | "on" -> Per_block_votes.Per_block_vote_on
-      | "off" -> Per_block_vote_off
-      | "pass" -> Per_block_vote_pass
-      (* This is unreachable because any other value would fail in CLI configuration parsing *)
-      | _ -> assert false)
+    | "on" -> Per_block_votes.Per_block_vote_on
+    | "off" -> Per_block_vote_off
+    | "pass" -> Per_block_vote_pass
+    (* This is unreachable because any other value would fail in CLI configuration parsing *)
+    | _ -> assert false)
 
 (** [parse_operations] parses uri's to either [Remote] or [Local] operations sources. *)
 let parse_operations =

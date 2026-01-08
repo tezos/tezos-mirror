@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Michelson lexer. The main lexer entrypoint is defined on the [Tok] type,
 //! specifically, `Tok::lexer`. See [Logos::lexer]. Generally, you don't need to
@@ -74,9 +71,7 @@ macro_rules! defprim {
 // For the correct order, see
 // `src/proto_alpha/lib_protocol/michelson_v1_primitives.ml` file in this
 // repository, `prim_encoding` function.
-// TODO: https://gitlab.com/tezos/tezos/-/issues/6632
 // Add a test on ordering
-#[cfg(not(feature = "bls"))]
 defprim! {
     /// Micheline primitives.
     Prim;
@@ -104,59 +99,19 @@ defprim! {
     CHAIN_ID, LEVEL, SELF_ADDRESS, never, NEVER,
     UNPAIR, VOTING_POWER, TOTAL_VOTING_POWER, KECCAK,
     SHA3,
-    sapling_state, sapling_transaction_deprecated,
-    SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
-    TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
-    JOIN_TICKETS, GET_AND_UPDATE, chest, chest_key,
-    OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
-    tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
-    EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
-    NAT,
-    // Unstable primitives (they are not part of a released protocol)
-    Transfer_tokens, Set_delegate, Create_contract, Emit,
-    // If you add anything here, see the note about the order above.
-}
-
-#[cfg(feature = "bls")]
-defprim! {
-    /// Micheline primitives.
-    Prim;
-    parameter, storage, code, False, Elt, Left,
-    None, Pair, Right, Some, True, Unit,
-    PACK, UNPACK, BLAKE2B, SHA256, SHA512, ABS,
-    ADD, AMOUNT, AND, BALANCE, CAR, CDR,
-    CHECK_SIGNATURE, COMPARE, CONCAT, CONS,
-    CREATE_ACCOUNT, CREATE_CONTRACT, IMPLICIT_ACCOUNT, DIP,
-    DROP, DUP, EDIV, EMPTY_MAP, EMPTY_SET, EQ,
-    EXEC, FAILWITH, GE, GET, GT, HASH_KEY,
-    IF, IF_CONS, IF_LEFT, IF_NONE, INT, LAMBDA,
-    LE, LEFT, LOOP, LSL, LSR, LT, MAP,
-    MEM, MUL, NEG, NEQ, NIL, NONE, NOT,
-    NOW, OR, PAIR, PUSH, RIGHT, SIZE,
-    SOME, SOURCE, SENDER, SELF, STEPS_TO_QUOTA,
-    SUB, SWAP, TRANSFER_TOKENS, SET_DELEGATE, UNIT,
-    UPDATE, XOR, ITER, LOOP_LEFT, ADDRESS,
-    CONTRACT, ISNAT, CAST, RENAME, bool,
-    contract, int, key, key_hash, lambda, list,
-    map, big_map, nat, option, or, pair,
-    set, signature, string, bytes, mutez,
-    timestamp, unit, operation, address, SLICE,
-    DIG, DUG, EMPTY_BIG_MAP, APPLY, chain_id,
-    CHAIN_ID, LEVEL, SELF_ADDRESS, never, NEVER,
-    UNPAIR, VOTING_POWER, TOTAL_VOTING_POWER, KECCAK,
-    SHA3,
-    sapling_state, sapling_transaction_deprecated,
-    SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
-    TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
-    JOIN_TICKETS, GET_AND_UPDATE, chest, chest_key,
-    OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
-    tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
-    EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
-    NAT,
-    // Unstable primitives (they are not part of a released protocol)
-    Transfer_tokens, Set_delegate, Create_contract, Emit,
     // BLS primitivies
     PAIRING_CHECK, bls12_381_g1, bls12_381_g2, bls12_381_fr,
+    sapling_state, sapling_transaction_deprecated,
+    SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
+    TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
+    JOIN_TICKETS, GET_AND_UPDATE, chest, chest_key,
+    OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
+    tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
+    EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
+    NAT, Ticket, IS_IMPLICIT_ACCOUNT, INDEX_ADDRESS,
+    GET_ADDRESS_INDEX,
+    // Unstable primitives (they are not part of a released protocol)
+    Transfer_tokens, Set_delegate, Create_contract, Emit,
     // If you add anything here, see the note about the order above.
 }
 
@@ -196,6 +151,11 @@ defprim! {
     sender,
     big_maps,
     Big_map,
+    storages,
+    Storage,
+    views,
+    Views,
+    View,
 }
 
 /// Either a Micheline primitive, TZT primitive, or a macro lexeme.
@@ -244,7 +204,7 @@ pub enum Tok<'a> {
 
     /// An annotation, see [Annotation].
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
-    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
+    #[regex(r"@%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
     Annotation(Annotation<'a>),
 
     /// Left parenthesis `(`.
@@ -298,7 +258,7 @@ fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
     let mut inner = Macro::lexer(slice);
     let next = inner.next().ok_or_else(|| PrimError(slice.to_string()))?;
     // check if lexed token is at EOF
-    if matches!(inner.next(), Some(_)) {
+    if inner.next().is_some() {
         return Err(PrimError(slice.to_string()));
     }
     next.map_err(|_| PrimError(slice.to_string()))

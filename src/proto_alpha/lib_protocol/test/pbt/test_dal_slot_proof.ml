@@ -118,12 +118,14 @@ struct
           slots_headers
       in
       let*?@ cell, cache =
-        Dal_slot_repr.History.update_skip_list
-          ~number_of_slots:Parameters.dal_parameters.number_of_slots
-          cell
-          cache
-          ~published_level
-          slots_headers
+        Dal_slot_repr.History.(
+          update_skip_list
+            ~number_of_slots:Parameters.dal_parameters.number_of_slots
+            cell
+            cache
+            ~published_level
+            slots_headers
+            ~attestation_lag:Legacy)
       in
       let slots_info =
         List.fold_left

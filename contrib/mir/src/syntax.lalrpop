@@ -1,9 +1,6 @@
-//****************************************************************************//
-//                                                                            //
-// SPDX-License-Identifier: MIT                                               //
-// Copyright (c) [2023] Serokell <hi@serokell.io>                             //
-//                                                                            //
-//****************************************************************************//
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>                            
+//
+// SPDX-License-Identifier: MIT                                               
 
 #![allow(dead_code, unused_imports)]
 #![allow(clippy::all)]
@@ -47,9 +44,14 @@ extern {
         "other_contracts" => Tok::Noun(TztPrim(TzP::other_contracts)),
         "big_map" => Tok::Noun(TztPrim(TzP::Big_map)),
         "big_maps" => Tok::Noun(TztPrim(TzP::big_maps)),
+        "storages" => Tok::Noun(TztPrim(TzP::storages)),
+        "Storage" => Tok::Noun(TztPrim(TzP::Storage)),
         "now" => Tok::Noun(TztPrim(TzP::now)),
         "source" => Tok::Noun(TztPrim(TzP::source)),
         "sender" => Tok::Noun(TztPrim(TzP::sender)),
+        "views" => Tok::Noun(TztPrim(TzP::views)),
+        "Views" => Tok::Noun(TztPrim(TzP::Views)),
+        "View" => Tok::Noun(TztPrim(TzP::View)),
         number => Tok::Number(<BigInt>),
         string => Tok::String(<String>),
         bytes => Tok::Bytes(<Vec<u8>>),
@@ -150,6 +152,17 @@ otherContracts : Vec<(Micheline<'a>, Micheline<'a>)> = {
   "{" <s:otherContractsSeq> "}" => s
 }
 
+storageDef : (Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
+  "Storage" <addr:Micheline> <ty:Micheline> <value:Micheline> => (addr, ty, value)
+}
+
+storageList :
+  Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)> =
+{
+  "{" <s:semicolonSepSeq<storageDef>> "}" => s
+}
+
+
 bigMapsIndexed : (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
   "big_map" <i:Micheline> <kty:Micheline> <vty:Micheline> <elts:Micheline>  => (i, kty, vty, elts)
 }
@@ -157,6 +170,26 @@ bigMapsIndexed : (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>) = 
 bigMaps : Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)> = {
   "{" <s:semicolonSepSeq<bigMapsIndexed>> "}" => s
 }
+
+viewDef : (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
+  "View" <name:Micheline> <arg_ty:Micheline> <ret_ty:Micheline> <code:Micheline> => (name, arg_ty, ret_ty, code)
+}
+
+viewDefSeq = semicolonSepSeq<viewDef>;
+
+contractViewsIndexed :
+  (Micheline<'a>, Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>) =
+{
+  "Views" <addr:Micheline>
+  "{" <defs:viewDefSeq> "}" => (addr, defs)
+}
+
+viewsList :
+  Vec<(Micheline<'a>, Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>)> =
+{
+  "{" <s:semicolonSepSeq<contractViewsIndexed>> "}" => s
+}
+
 
 tztStackEltSeq = semicolonSepSeq<tztStackElt>;
 
@@ -207,6 +240,8 @@ tztEntity : TztEntity<'a> = {
   "source" <Micheline> => TztEntity::Source(<>),
   "sender" <Micheline> => TztEntity::SenderAddr(<>),
   "big_maps" <bigMaps> => TztEntity::BigMaps(<>),
+  "storages" <storageList> => TztEntity::Storages(<>),
+  "views" <viewsList> => TztEntity::Views(<>),
 }
 
 pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;

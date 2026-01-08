@@ -39,7 +39,7 @@ enum_dispatch = { version = "0.3.13" }
 # serialization
 hex = "0.4"
 hex-literal = "0.4.1"
-tezos_data_encoding = { version = "0.6", path = "../../sdk/rust/encoding" }
+tezos_data_encoding = { version = "0.6", git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
 const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 nom = { version = "7.1", default-features = false }
@@ -54,7 +54,7 @@ sha2 = { version = "0.10.6", default-features = false }
 sha3 = { version = "0.10.6", default-features = false }
 ripemd = { version = "0.1.3", default-features = false }
 # TODO (SDK-45): bump to `0.6.1` from crates.io as soon as it is released.
-tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-features = false }
+tezos_crypto_rs = { version = "0.6", git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false, features = [
   "static-context",
   "hmac",
@@ -72,20 +72,28 @@ tezos-storage = { package = "tezos-storage-dionysus", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
-tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "testing"]  }
-tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
-tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
-tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
-tezos-smart-rollup-entrypoint = { path = "../../src/kernel_sdk/entrypoint" }
-tezos-smart-rollup-debug = { path = "../../src/kernel_sdk/debug" }
-tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-features = false, features = [
+tezos-smart-rollup = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2", default-features = false, features = [
+  "std",
+  "crypto",
+  "dlmalloc",
+  "panic-hook",
+  "data-encoding",
+  "storage",
+  "testing",
+] }
+tezos-smart-rollup-core = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-host = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-panic-hook = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-entrypoint = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-debug = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-encoding = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2", default-features = false, features = [
   "alloc",
   "tezos-encoding",
   "crypto",
 ] }
-tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
-tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
-tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+tezos-smart-rollup-installer-config = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-mock = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
+tezos-smart-rollup-storage = { git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2" }
 
 # property based testing
 rand = { version = "0.8" }

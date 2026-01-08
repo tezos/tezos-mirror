@@ -86,8 +86,7 @@ let hash : type tree. tree backend -> tree -> Context_hash.t =
 let length : type tree. tree backend -> tree -> key -> int Lwt.t =
  fun (module T) tree key -> T.length tree key
 
-let list :
-    type tree.
+let list : type tree.
     tree backend ->
     tree ->
     ?offset:int ->

@@ -182,8 +182,7 @@ let pp_stats : Format.formatter -> workloads_stats -> unit =
 (* ------------------------------------------------------------------------- *)
 (* Saving/loading workload data *)
 
-let save :
-    type c t.
+let save : type c t.
     filename:string ->
     options:options ->
     bench:(c, t) Benchmark.poly ->
@@ -275,8 +274,7 @@ let load : filename:string -> packed_measurement =
           | Ok m -> Measurement (bench, m)))
   | Error err -> cant_load err
 
-let to_csv :
-    type c t.
+let to_csv : type c t.
     filename:string ->
     bench:(c, t) Benchmark.poly ->
     workload_data:t workload_data ->

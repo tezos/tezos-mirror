@@ -64,6 +64,8 @@ module Request = struct
 
   let eth_blockNumber = {method_ = "eth_blockNumber"; parameters = `A []}
 
+  let generic_blockNumber = {method_ = "tez_blockNumber"; parameters = `A []}
+
   let eth_getBlockByNumber ~block ~full_tx_objects =
     {
       method_ = "eth_getBlockByNumber";
@@ -114,6 +116,13 @@ module Request = struct
 
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
+
+  let eth_sendRawTransactionSync ~raw_tx ~timeout ~block =
+    {
+      method_ = "eth_sendRawTransactionSync";
+      parameters =
+        `A [`String raw_tx; `String timeout; block_param_to_json block];
+    }
 
   let eth_getTransactionReceipt ~tx_hash =
     {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
@@ -284,6 +293,8 @@ module Request = struct
     | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
+    | NewPreconfirmedReceipts
 
   let param_of_sub_kind = function
     | NewHeads -> `A [`String "newHeads"]
@@ -295,6 +306,8 @@ module Request = struct
     | Logs None -> `A [`String "logs"]
     | NewPendingTransactions -> `A [`String "newPendingTransactions"]
     | Syncing -> `A [`String "syncing"]
+    | NewIncludedTransactions -> `A [`String "tez_newIncludedTransactions"]
+    | NewPreconfirmedReceipts -> `A [`String "tez_newPreconfirmedReceipts"]
 
   let eth_subscribe ~kind =
     {method_ = "eth_subscribe"; parameters = param_of_sub_kind kind}
@@ -405,6 +418,22 @@ let block_number ?websocket evm_node =
 
 let block_number_opt ?websocket evm_node =
   let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_blockNumber in
+  return
+    (decode_or_error
+       (fun json -> JSON.(json |-> "result" |> as_opt |> Option.map as_int32))
+       json)
+
+let generic_block_number ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node Request.generic_blockNumber
+  in
+  return
+    (decode_or_error (fun json -> JSON.(json |-> "result" |> as_int32)) json)
+
+let generic_block_number_opt ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node Request.generic_blockNumber
+  in
   return
     (decode_or_error
        (fun json -> JSON.(json |-> "result" |> as_opt |> Option.map as_int32))
@@ -545,6 +574,24 @@ let send_raw_transaction ?websocket ~raw_tx evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let eth_send_raw_transaction_sync ?websocket ~raw_tx ?(timeout = 0)
+    ?(block = Latest) evm_node =
+  let* response =
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.eth_sendRawTransactionSync
+         ~raw_tx
+         ~timeout:(string_of_int timeout)
+         ~block)
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response
+         |> Transaction.transaction_receipt_of_json)
        response
 
 let get_transaction_receipt ?websocket ~tx_hash evm_node =

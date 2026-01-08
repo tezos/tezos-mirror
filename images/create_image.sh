@@ -48,4 +48,4 @@ cd "$src_dir"
 set -x
 cd "images/" &&
   tar -cvh . |
-  docker build -f "${name}/Dockerfile" -t "${image_name}" "$@" -
+  docker buildx build -f "${name}/Dockerfile" -t "${image_name}" "$@" -

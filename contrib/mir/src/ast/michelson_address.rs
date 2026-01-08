@@ -1,17 +1,13 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Representation for typed Michelson `address` values.
 
 pub mod address_hash;
-pub mod entrypoint;
 
 pub use self::address_hash::AddressHash;
-pub use self::entrypoint::Entrypoint;
+pub use tezos_protocol::entrypoint::Entrypoint;
 
 use address_hash::check_size;
 
@@ -138,7 +134,10 @@ mod tests {
             dbg!(Address::from_bytes(
                 &hex::decode("00ff7b09f782e0bcd67739510afa819d85976119d5ef").unwrap()
             )),
-            Err(ByteReprError::UnknownPrefix("0xff".to_owned())),
+            Err(ByteReprError::WrongFormat(
+                "public key hash : Error decoding bytes [1..21] caused by invalid tag `0xFF`"
+                    .into()
+            )),
         );
 
         // unknown tag

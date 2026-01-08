@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 module Events = Baking_events.Lib
 
 let sleep_until_block_timestamp prepared_block =
@@ -53,23 +54,62 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
-    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
+  in
+  let*? round_durations =
+    Round.Durations.create
+      ~first_round_duration:constants.parametric.minimal_block_delay
+      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
+    |> Environment.wrap_tzresult
   in
   let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~constants cctxt
+    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
   in
-  Baking_scheduling.create_initial_state
-    cctxt
-    ?dal_node_rpc_ctxt
-    ?synchronize
-    ~chain
-    config
-    operation_worker
-    ~current_proposal
-    ~constants
-    delegates
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
+  let* state =
+    Baking_scheduling.create_initial_state
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?synchronize
+      ~chain
+      config
+      operation_worker
+      dal_attestable_slots_worker
+      round_durations
+      ~current_proposal
+      ~constants
+      delegates
+  in
+  let* () =
+    Baking_actions.only_if_dal_feature_enabled
+      state
+      ~default_value:()
+      (fun dal_node_rpc_ctxt ->
+        let*! delegates =
+          List.map_s
+            (Baking_scheduling.try_resolve_consensus_keys cctxt)
+            delegates
+        in
+        let delegate_ids =
+          List.map Baking_state_types.Delegate_id.of_pkh delegates
+        in
+        (* Ensures the DAL attestable slots cache is populated in time for the
+           first block’s attestation. *)
+        let*! () =
+          Dal_attestable_slots_worker.update_streams_subscriptions
+            state.global_state.dal_attestable_slots_worker
+            dal_node_rpc_ctxt
+            ~delegate_ids
+        in
+        return_unit)
+  in
+  return state
 
 let get_current_proposal cctxt ?cache () =
   let open Lwt_result_syntax in
@@ -235,16 +275,16 @@ let first_automaton_event state =
 let attestations_attesting_power state attestations =
   let get_attestation_voting_power {slot; _} =
     match
-      Delegate_slots.voting_power state.level_state.delegate_slots ~slot
+      Delegate_infos.voting_power state.level_state.delegate_infos ~slot
     with
-    | None -> 0 (* cannot happen *)
+    | None -> 0L (* cannot happen *)
     | Some attesting_power -> attesting_power
   in
   List.sort_uniq compare attestations
   |> List.fold_left
        (fun power attestation ->
-         power + get_attestation_voting_power attestation)
-       0
+         Int64.add power (get_attestation_voting_power attestation))
+       0L
 
 let generic_attesting_power (filter : packed_operation list -> 'a list)
     (extract : 'a -> consensus_content) state =
@@ -348,10 +388,10 @@ let propose_at_next_level ~minimal_timestamp state =
 
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
-  if
-    Compare.Int.(
-      power >= state.global_state.constants.parametric.consensus_threshold_size)
-  then Some (power, attestations)
+  let consensus_threshold =
+    Delegate_infos.consensus_threshold state.level_state.delegate_infos
+  in
+  if Compare.Int64.(power >= consensus_threshold) then Some (power, attestations)
   else None
 
 (* Here's the sketch of the algorithm:
@@ -522,20 +562,8 @@ let mk_prequorum state latest_proposal =
   let {level; round; block_payload_hash} : batch_content =
     batch.batch_content
   in
-  let preattestations : Kind.preattestation operation list =
-    List.filter_map
-      (fun op ->
-        let (Operation_data protocol_data) =
-          op.signed_operation.protocol_data
-        in
-        match protocol_data.contents with
-        | Single (Preattestation _) ->
-            let op : Kind.preattestation operation =
-              {shell = {branch = batch.batch_branch}; protocol_data}
-            in
-            Some op
-        | _ -> assert false)
-      batch.signed_consensus_votes
+  let preattestations =
+    List.map (fun op -> op.signed_operation) batch.signed_consensus_votes
   in
   return
     {
@@ -721,13 +749,13 @@ let rec baking_minimal_timestamp ~count state
     |> attestations_attesting_power state
   in
   let consensus_threshold =
-    state.global_state.constants.parametric.consensus_threshold_size
+    Delegate_infos.consensus_threshold state.level_state.delegate_infos
   in
   let* () =
-    if Compare.Int.(total_voting_power < consensus_threshold) then
+    if Compare.Int64.(total_voting_power < consensus_threshold) then
       cctxt#error
-        "Delegates do not have enough voting power. Only %d is available while \
-         %d is required."
+        "Delegates do not have enough voting power. Only %Ld is available \
+         while %Ld is required."
         total_voting_power
         consensus_threshold
     else return_unit
@@ -790,7 +818,7 @@ let rec baking_minimal_timestamp ~count state
         (fun proposal ->
           Lwt.return
             Compare.Int32.(
-              proposal.Baking_state.block.shell.level <> attestation_level))
+              proposal.Baking_state_types.block.shell.level <> attestation_level))
         block_stream
     in
     let*! next_level_proposal =

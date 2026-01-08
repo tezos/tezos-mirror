@@ -6,47 +6,66 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Layer 1 test scenario goal is to run experiments in a mainnet or ghostnet
-    context.
+(** LAYER1 tezt-cloud scenario
+    --------------------------
 
-    [dune exec tezt/tests/cloud/main.exe -- cloud l1 --help]
+    This scenario runs a small private network derived from Mainnet or Ghostnet
+    (using a rolling snapshot), with yes‑crypto enabled, and does the following:
 
-    The different steps of this scenario are:
-    - Bootstrap a node using real network so that we have at least one node
-      with the latest block metadata
-    - Disconnect the node from this network
-    - From here, every node will be ran with --private-mode and a known list
-      of peers (i.e. the full set of nodes involved in the experiment)
-    - Start bakers
-    - Wait for the nodes to sync
-    - Launch some nodes and clients and use them for stresstesting the network
-    - The experiment won't stop by itself unless some tezt-cloud timeout is
-      reached or a failure occurs.
+    1. Bootstrapping
+      - Starts one node that first synchronises with the real network to pull in
+        full metadata.
+      - Shuts it down, then reconfigures it for private mode with yes‑crypto
+        enabled and a predetermined list of peers (all the nodes we will spawn).
+    2. Peers calculation
+      - Collects ahead of time the P2P endpoint of every baker and stresstester
+        node so that each one can be launched in private mode knowing exactly which
+        peers to connect to.
+    3. Bakers
+      - Each baker gets its own node process and client, imports its public keys,
+        converts its yes‑wallet, and then runs an agnostic baker over that node.
+    4. Stresstest nodes
+      - Potentially launch one or more stresstest nodes that generate transactions at
+        the target TPS against the private network.
+    5. Metrics & Monitoring
+      - Every node (bootstrap, bakers, stresstesters) is registered as a Prometheus
+        scrape target if `--prometheus` is set.
+      - Teztale archiver is configured automatically to record chain data.
+      - Metrics on block levels and operation counts are regularly pushed.
+    6. Finishing
+      - The scenario itself never exits; your test runs until you kill it
+        or a Cloud level timeout or an error is reached.
+
+    For full documentation on the CLI options of the scenario, use:
+
+    [dune exec tezt/tests/cloud/main.exe -- LAYER1 --help]
 
     Running an experiment on a fresh snapshot could look like this:
 
     {[
+       # fetch a rolling snapshot:
        wget -O ghostnet.snapshot https://snapshots.tzinit.org/ghostnet/rolling
-       dune exec tezt/tests/cloud/main.exe -- cloud l1 -v --log-file /tmp/log \
-         --l1-stake 1,1 \
+       dune exec tezt/tests/cloud/main.exe -- LAYER1 -v --log-file /tmp/log \
+         --stake 1,1 \
          --network ghostnet \
-         --l1-stresstest tz1KhnTgwoRRALBX6vRHRnydDGSBFsWtcJxc/edpkuFRauFAdhipQu9s4xmfNJWmtLxPKpoaoG41gYGq5AgUA43Vxqx/100/1 \
+         --stresstest 100/1 \
          --faketime "-$(($(date --utc +%s) - $(date --date $(./octez-node snapshot info --json ./ghostnet.snapshot | jq -r .snapshot_header.timestamp) +%s)))" \
          --tezt-cloud $USER \
          --dockerfile-alias debian \
          --prometheus \
          --grafana \
          --website \
-         --snapshot ./ghostnet.snapshot
+         --snapshot file:./ghostnet.snapshot
     ]}
 
-    As you can read using the help of [--help], [--l1-stresstest] is:
+    As you can read using the help of [--help], [--stresstest] is:
 
     {v
-      --l1-stresstest pkh/pk/TPS[/seed]
-          Public key hash / public key of an account used to fund fresh accounts
-          for reaching TPS stresstest traffic generation. A seed for stresstest
-          initialization can also be specified.
+      --stresstest TPS[/seed]
+          A Public key hash and its public key are automatically retrieved from \
+          the yes wallet to fund fresh accounts for reaching TPS stresstest \
+          traffic generation. A seed for stresstest initialization can also be \
+          specified.
     v}
 
     On ghostnet, the goto account to use is the faucet account (the one used above).

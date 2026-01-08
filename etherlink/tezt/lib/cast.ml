@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -27,7 +27,7 @@ let spawn_command_and_read_string ?expect_failure arguments =
 let version () = spawn_command_and_read_string ["--version"]
 
 let cast_transaction ?expect_failure ~source_private_key ?endpoint ?chain_id
-    ?nonce ?value ?gas ?gas_price ?priority_fee ?access_list tx =
+    ?nonce ?value ?gas ?gas_price ?priority_fee ?access_list ?authorization tx =
   let arguments =
     match tx with
     | CallTo {signature; arguments; address} ->
@@ -60,12 +60,14 @@ let cast_transaction ?expect_failure ~source_private_key ?endpoint ?chain_id
         (fun al ->
           Ezjsonm.value_to_string ~minify:true (access_list_to_json al))
         access_list
+    @ Cli_arg.optional_arg "auth" Fun.id authorization
     @ arguments
   in
   spawn_command_and_read_string ?expect_failure ("mktx" :: options)
 
 let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
-    ?(legacy = true) ?access_list ~address ?signature ?(arguments = []) () =
+    ?(legacy = true) ?access_list ?authorization ~address ?signature
+    ?(arguments = []) () =
   let priority_fee = if legacy then None else Some 1 in
   let tx = CallTo {signature; arguments; address} in
   let* encoded_tx =
@@ -78,12 +80,13 @@ let craft_tx ~source_private_key ~chain_id ~nonce ~value ~gas ~gas_price
       ~gas_price
       ?priority_fee
       ?access_list
+      ?authorization
       tx
   in
   return (String.sub encoded_tx 2 (String.length encoded_tx - 2))
 
 let craft_deploy_tx ~source_private_key ~chain_id ~nonce ?value ~gas ~gas_price
-    ?(legacy = true) ?access_list ~data () =
+    ?(legacy = true) ?access_list ?authorization ~data () =
   let priority_fee = if legacy then None else Some 1 in
   let tx = Create {data} in
   let* encoded_tx =
@@ -96,6 +99,7 @@ let craft_deploy_tx ~source_private_key ~chain_id ~nonce ?value ~gas ~gas_price
       ~gas_price
       ?priority_fee
       ?access_list
+      ?authorization
       tx
   in
   return (String.sub encoded_tx 2 (String.length encoded_tx - 2))
@@ -127,3 +131,19 @@ let calldata ?(args = []) signature =
 let call ?(args = []) signature ~endpoint ~address =
   spawn_command_and_read_string
     (("call" :: address :: signature :: args) @ ["--rpc-url"; endpoint])
+
+let wallet_sign_auth ?nonce ~authorization ~private_key ~endpoint () =
+  spawn_command_and_read_string
+    ([
+       "wallet";
+       "sign-auth";
+       authorization;
+       "--private-key";
+       private_key;
+       "--rpc-url";
+       endpoint;
+     ]
+    @ Cli_arg.optional_arg "nonce" Int.to_string nonce)
+
+let raw_call ~endpoint ~address ~arg =
+  spawn_command_and_read_string ["call"; address; arg; "--rpc-url"; endpoint]

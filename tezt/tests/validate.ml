@@ -235,10 +235,10 @@ let propagate_validateable_bad_block =
   let injection_json : RPC_core.data =
     Data
       (`O
-        [
-          ("data", `String signed_bad_block_header_hex);
-          ("operations", `A (List.init 4 (fun _ -> `A [])));
-        ])
+         [
+           ("data", `String signed_bad_block_header_hex);
+           ("operations", `A (List.init 4 (fun _ -> `A [])));
+         ])
   in
   (* Wait all nodes to validate the block but fail on validation *)
   let expect_validate_failure node =
@@ -356,10 +356,10 @@ let propagate_validateable_bad_block_payload =
   let injection_json : RPC_core.data =
     Data
       (`O
-        [
-          ("data", `String signed_bad_block_header_hex);
-          ("operations", `A (List.init 4 (fun _ -> `A [])));
-        ])
+         [
+           ("data", `String signed_bad_block_header_hex);
+           ("operations", `A (List.init 4 (fun _ -> `A [])));
+         ])
   in
   let expect_validate_failure node =
     Node.wait_for node "validation_failure.v0" (fun _ -> Some ())

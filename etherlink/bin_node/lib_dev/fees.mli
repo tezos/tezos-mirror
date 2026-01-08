@@ -12,7 +12,7 @@
 val gas_used_for_da_fees :
   da_fee_per_byte:Ethereum_types.quantity ->
   base_fee_per_gas:Z.t ->
-  ?access_list:Transaction.access_list_item list ->
+  ?access_list:Transaction_object.access list ->
   bytes ->
   Z.t
 
@@ -23,7 +23,7 @@ val gas_used_for_da_fees :
 val da_fees_gas_limit_overhead :
   da_fee_per_byte:Ethereum_types.quantity ->
   minimum_base_fee_per_gas:Z.t ->
-  ?access_list:Transaction.access_list_item list ->
+  ?access_list:Transaction_object.access list ->
   bytes ->
   Z.t
 
@@ -33,7 +33,7 @@ val da_fees_gas_limit_overhead :
 val execution_gas_limit :
   da_fee_per_byte:Ethereum_types.quantity ->
   minimum_base_fee_per_gas:Z.t ->
-  ?access_list:Transaction.access_list_item list ->
+  ?access_list:Transaction_object.access list ->
   gas_limit:Z.t ->
   bytes ->
   (Z.t, string) result

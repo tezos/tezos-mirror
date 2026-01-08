@@ -4,6 +4,7 @@ This is a package containing some libraries used by the Octez project.
 
 It contains the following libraries:
 
+- {{!module-Alcotezt_process}Alcotezt_process}: Process-isolated test execution for Alcotezt with Tezos error monad support
 - {{!module-Aplonk}Aplonk}
 - {{!module-Bls12_381_hash}Bls12_381_hash}
 - {{!module-Bls12_381_signature}Bls12_381_signature}
@@ -35,6 +36,7 @@ It contains the following libraries:
 - {{!module-Tezos_clic}Tezos_clic}
 - {{!module-Tezos_context}Tezos_context}: On-disk context abstraction for [octez-node]
 - {{!module-Tezos_context_brassaia}Tezos_context_brassaia}: On-disk context abstraction for [octez-node] (brassaia)
+- {{!module-Tezos_context_tezedge}Tezos_context_tezedge}
 - {{!module-Tezos_crypto}Tezos_crypto}: Library with all the cryptographic primitives used by Tezos
 - {{!module-Tezos_crypto_dal}Tezos_crypto_dal}: DAL cryptographic primitives
 - {{!module-Tezos_error_monad}Tezos_error_monad}: Error monad
@@ -66,6 +68,5 @@ It contains the following libraries:
 - {{!module-Tezt_wrapper}Tezt_wrapper}
 - {{!module-Cohttp}Cohttp}
 - {{!module-Data_encoding}Data_encoding}
-- {{!module-OpenTelemetry_client_cohttp_lwt}Opentelemetry_client_cohttp_lwt}
 - {{!module-Prometheus}Prometheus}
 - {{!module-Resto}Resto}

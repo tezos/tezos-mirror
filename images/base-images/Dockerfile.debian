@@ -9,13 +9,24 @@ ENV TZ=Etc/UTC
 # Setup proxy
 ARG APT_PROXY
 ENV APT_PROXY=${APT_PROXY:-false}
-RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
+RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.debian.org \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::archive.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::ports.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy
 
-# install datadog static binary
-COPY images/scripts/install_datadog_static.sh /tmp
+COPY scripts/kiss-fetch.sh /usr/local/bin/
+# install datadog and gcloud static binary
+COPY images/scripts/install_datadog_static.sh \
+     images/scripts/install-gcloud-apt.sh /tmp/
+
+ENV PATH=/usr/local/bin:$PATH
+
 #hadolint ignore=DL3008,DL3015
 RUN apt-get update && \
-  apt-get -y install curl && \
+  apt-get -y install curl jq gpg && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
-  /tmp/install_datadog_static.sh
+  /tmp/install-gcloud-apt.sh && \
+  /tmp/install_datadog_static.sh && \
+  rm /tmp/install_datadog_static.sh /tmp/install-gcloud-apt.sh

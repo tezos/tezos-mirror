@@ -82,26 +82,26 @@ type 'accu operation_processor = {
 }
 
 let process_manager_operations operations accu f =
-  let rec on_operation_and_result :
-      type kind. _ -> kind Apply_results.contents_and_result_list -> _ =
+  let rec on_operation_and_result : type kind.
+      _ -> kind Apply_results.contents_and_result_list -> _ =
    fun accu -> function
-    | Single_and_result
-        ( Manager_operation {operation; source; _},
-          Manager_operation_result
-            {operation_result; internal_operation_results; _} ) ->
-        let accu = f.apply accu ~source operation operation_result in
-        on_internal_operations accu source internal_operation_results
-    | Single_and_result (_, _) -> accu
-    | Cons_and_result
-        ( Manager_operation {operation; source; _},
-          Manager_operation_result
-            {operation_result; internal_operation_results; _},
-          rest ) ->
-        let accu = f.apply accu ~source operation operation_result in
-        let accu =
-          on_internal_operations accu source internal_operation_results
-        in
-        on_operation_and_result accu rest
+     | Single_and_result
+         ( Manager_operation {operation; source; _},
+           Manager_operation_result
+             {operation_result; internal_operation_results; _} ) ->
+         let accu = f.apply accu ~source operation operation_result in
+         on_internal_operations accu source internal_operation_results
+     | Single_and_result (_, _) -> accu
+     | Cons_and_result
+         ( Manager_operation {operation; source; _},
+           Manager_operation_result
+             {operation_result; internal_operation_results; _},
+           rest ) ->
+         let accu = f.apply accu ~source operation operation_result in
+         let accu =
+           on_internal_operations accu source internal_operation_results
+         in
+         on_operation_and_result accu rest
   and on_internal_operations accu source internal_operation_results =
     let open Apply_internal_results in
     List.fold_left

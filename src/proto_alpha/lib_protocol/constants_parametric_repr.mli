@@ -84,7 +84,14 @@ type dal = {
   traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+}
+
 val dal_encoding : dal Data_encoding.t
+
+val past_dal_parameters_encoding : past_dal_parameters Data_encoding.t
 
 type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
 
@@ -261,7 +268,12 @@ type t = {
   (* attestation aggregation feature flag *)
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
-  all_bakers_attest_activation_level : Raw_level_repr.t option;
+  (* Portion of tz4 bakers required to activate all bakers attest *)
+  all_bakers_attest_activation_threshold : Ratio_repr.t;
+  (* Native contracts feature flag *)
+  native_contracts_enable : bool;
+  (* SWRR new baker lottery feature flag *)
+  swrr_new_baker_lottery_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding
@@ -275,6 +287,8 @@ val encoding : t Data_encoding.encoding
     instance, if the block time is multiplied by 4/5, then the constant should
     be multiplied by 5/4. *)
 val update_sc_rollup_parameter : (int32 -> int32) -> sc_rollup -> sc_rollup
+
+val update_sc_rollup_parameter_with_block_time : int -> sc_rollup -> sc_rollup
 
 module Internal_for_tests : sig
   val sc_rollup_encoding : sc_rollup Data_encoding.t

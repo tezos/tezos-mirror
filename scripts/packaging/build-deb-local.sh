@@ -19,13 +19,19 @@ packages() {
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
     if [ -f "$ex" ]; then
-      cp -f "$ex" scripts/packaging/octez/binaries/
+      mv -f "$ex" scripts/packaging/octez/binaries/
     fi
   done
 
+  # on the CI cleanup everything before building the packages
+  if [ -z "${CI:-}" ]; then
+    make clean
+  fi
+
   # Build the debian packages
   cd scripts/packaging/octez/
-  DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -tc -b --no-sign -sa
+  DEB_BUILD_OPTIONS=parallel=6 DEB_BUILD_OPTIONS=noautodbgsym \
+    dpkg-buildpackage -tc -b --no-sign -sa
   cd -
 }
 
@@ -83,7 +89,7 @@ gitlab_release_no_v=
 . scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
-ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBeta)
   DEBVERSION=$VERSION
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
   EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"

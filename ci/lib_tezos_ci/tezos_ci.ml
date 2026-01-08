@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Rules = Rules
+module Runner = Runner
 open Gitlab_ci.Util
 
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
@@ -176,6 +177,7 @@ module Pipeline = struct
     description : string;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
     inherit_ : Gitlab_ci.Types.inherit_ option;
+    default : Gitlab_ci.Types.default;
     jobs : tezos_job list;
   }
 
@@ -191,6 +193,20 @@ module Pipeline = struct
   let jobs = function
     | Child_pipeline {jobs; _} -> jobs
     | Pipeline {jobs; _} -> jobs
+
+  let default_config =
+    Gitlab_ci.Types.
+      {
+        image = None;
+        interruptible = Some true;
+        retry =
+          Some
+            {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]};
+      }
+
+  let default = function
+    | Pipeline _ -> default_config
+    | Child_pipeline {default; _} -> default
 
   let set_jobs jobs = function
     | Child_pipeline pl -> Child_pipeline {pl with jobs}
@@ -211,8 +227,11 @@ module Pipeline = struct
     register_raw
       (Pipeline {variables; if_; name; jobs; auto_cancel; description})
 
-  let register_child ?auto_cancel ?inherit_ ~description ~jobs name =
-    let child_pipeline = {name; inherit_; jobs; auto_cancel; description} in
+  let register_child ?auto_cancel ?inherit_ ?(default = default_config)
+      ~description ~jobs name =
+    let child_pipeline =
+      {name; inherit_; jobs; auto_cancel; default; description}
+    in
     register_raw (Child_pipeline child_pipeline) ;
     child_pipeline
 
@@ -393,8 +412,8 @@ module Pipeline = struct
     let pipelines =
       all ()
       |> List.filter_map (function
-             | Pipeline pipeline -> Some pipeline
-             | Child_pipeline _ -> None)
+           | Pipeline pipeline -> Some pipeline
+           | Child_pipeline _ -> None)
     in
     let workflow =
       let rules = List.map workflow_rule_of_pipeline pipelines in
@@ -457,6 +476,9 @@ module Pipeline = struct
       templates_to_config (templates pipeline)
       @ (match pipeline with
         | Pipeline _ -> []
+        | Child_pipeline _ -> [Gitlab_ci.Types.Default (default pipeline)])
+      @ (match pipeline with
+        | Pipeline _ -> []
         | Child_pipeline _ ->
             Gitlab_ci.Types.
               [
@@ -476,35 +498,6 @@ module Pipeline = struct
 
   let write_top_level_pipeline ?default ?variables ~filename () =
     let workflow, includes = workflow_includes () in
-    (* temporary manual addition *)
-    (* ci docker *)
-    let ci_docker_branch = "ci-docker-latest-release" in
-    let ci_docker_if_expr =
-      Gitlab_ci.If.(
-        var "CI_PROJECT_NAMESPACE" == str "tezos"
-        && var "CI_PIPELINE_SOURCE" == str "push"
-        && var "CI_COMMIT_BRANCH" == str ci_docker_branch)
-    in
-    let ci_docker_workflow_rule : Gitlab_ci.Types.workflow_rule =
-      {
-        changes = None;
-        if_ = Some ci_docker_if_expr;
-        variables = Some [("PIPELINE_TYPE", "ci_docker_release")];
-        when_ = Always;
-        auto_cancel = None;
-      }
-    in
-    let ci_docker_include_rule : Gitlab_ci.Types.include_ =
-      {
-        subkey = Local "images_base/ci-docker/.gitlab-ci.yml";
-        rules = [{changes = None; if_ = Some ci_docker_if_expr; when_ = Always}];
-      }
-    in
-    let workflow =
-      {workflow with rules = ci_docker_workflow_rule :: workflow.rules}
-    in
-    let includes = ci_docker_include_rule :: includes in
-    (* end of temporary manual addition *)
     let config =
       let open Gitlab_ci.Types in
       (* Dummy job.
@@ -717,55 +710,6 @@ module Changeset = struct
   let ( @ ) = union
 end
 
-type arch = Amd64 | Arm64
-
-let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"
-
-let arch_to_string_alt = function Amd64 -> "amd64" | Arm64 -> "arm64"
-
-let dynamic_tag_var = Gitlab_ci.Var.make "TAGS"
-
-type tag =
-  | Gcp
-  | Gcp_arm64
-  | Gcp_dev
-  | Gcp_dev_arm64
-  | Gcp_tezt
-  | Gcp_tezt_dev
-  | Gcp_high_cpu
-  | Gcp_high_cpu_dev
-  | Gcp_very_high_cpu
-  | Gcp_very_high_cpu_dev
-  | Gcp_very_high_cpu_ramfs
-  | Gcp_very_high_cpu_ramfs_dev
-  | Aws_specific
-  | Dynamic
-
-let string_of_tag = function
-  | Gcp -> "gcp"
-  | Gcp_arm64 -> "gcp_arm64"
-  | Gcp_dev -> "gcp_dev"
-  | Gcp_dev_arm64 -> "gcp_dev_arm64"
-  | Gcp_tezt -> "gcp_tezt"
-  | Gcp_tezt_dev -> "gcp_tezt_dev"
-  | Gcp_high_cpu -> "gcp_high_cpu"
-  | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
-  | Gcp_very_high_cpu -> "gcp_very_high_cpu"
-  | Gcp_very_high_cpu_dev -> "gcp_very_high_cpu_dev"
-  | Gcp_very_high_cpu_ramfs -> "gcp_very_high_cpu_ramfs"
-  | Gcp_very_high_cpu_ramfs_dev -> "gcp_very_high_cpu_ramfs_dev"
-  | Aws_specific -> "aws_specific"
-  | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
-
-(** The architecture of the runner associated to a tag . *)
-let arch_of_tag = function
-  | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
-  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
-  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
-  | Gcp_very_high_cpu_ramfs_dev | Aws_specific ->
-      Some Amd64
-  | Dynamic -> None
-
 type dependency =
   | Job of tezos_job
   | Optional of tezos_job
@@ -818,85 +762,107 @@ let resolve_dependencies job_name dependencies =
 
 type git_strategy = Fetch | Clone | No_strategy
 
-(** The list of available CPU profiling tags for runners. *)
-type cpu =
-  | Normal  (** Target default Gitlab runner pool. *)
-  | High  (** Target GCP high runner pool. *)
-  | Very_high  (** Target GCP very high runner pool. *)
-
-(** The list of storage profiling tags for runners. *)
-type storage =
-  | Network  (** Target default storage runner pool. *)
-  | Ramfs  (** Target ramfs storage runner pool. *)
-
 let enc_git_strategy = function
   | Fetch -> "fetch"
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
-    ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
-    ?(image_dependencies = []) ?services ?variables ?rules
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal)
-    ?(storage = Network) ?git_strategy ?coverage ?retry ?parallel ?description
-    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
-    tezos_job =
+let number_of_declared_jobs = ref 0
+
+let get_number_of_declared_jobs () = !number_of_declared_jobs
+
+let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
+    ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
+    ?(dependencies = Dependent []) ?(image_dependencies = []) ?services
+    ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
+    ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
+    ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
+    ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
+    ~name script : tezos_job =
+  incr number_of_declared_jobs ;
   (* The tezos/tezos CI uses singleton tags for its runners. *)
-  let tag =
-    match (arch, tag, cpu, storage) with
-    | Some Arm64, _, (High | Very_high), _ ->
-        failwith
-          "[job] cannot specify both [arch=Arm64] and [cpu=High] or \
-           [cpu=Very_high] in job '%s'."
-          name
-    | Some Arm64, _, _, Network ->
-        failwith
-          "[job] cannot specify both [arch=Arm64] and [storage=Network] in job \
-           '%s'."
-          name
-    | None, None, Normal, Ramfs ->
-        failwith
-          "[job] cannot specify both [cpu=Normal] and [storage=Ramfs] in job \
-           '%s'."
-          name
-    | None, _, High, Ramfs | Some _, _, High, Ramfs ->
-        failwith
-          "[job] cannot specify both [cpu=High] and [storage=Ramfs] in job \
-           '%s'."
-          name
-    | Some _, Some _, High, Network
-    | None, Some _, High, Network
-    | Some _, None, High, Network
-    | None, None, High, Network ->
-        if dev_infra then Gcp_high_cpu_dev else Gcp_high_cpu
-    | Some _, Some _, Very_high, Network
-    | None, Some _, Very_high, Network
-    | Some _, None, Very_high, Network
-    | None, None, Very_high, Network ->
-        if dev_infra then Gcp_very_high_cpu_dev else Gcp_very_high_cpu
-    | Some _, Some _, Very_high, Ramfs
-    | None, Some _, Very_high, Ramfs
-    | Some _, None, Very_high, Ramfs
-    | None, None, Very_high, Ramfs ->
-        if dev_infra then Gcp_very_high_cpu_ramfs_dev
-        else Gcp_very_high_cpu_ramfs
-    | Some arch, None, Normal, _ -> (
-        match arch with
-        | Amd64 -> if dev_infra then Gcp_dev else Gcp
-        | Arm64 -> Gcp_arm64)
-    | None, Some tag, _, _ -> tag
-    | None, None, Normal, Network ->
-        (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
-        Gcp
-    | Some _, Some _, Normal, _ ->
-        failwith
-          "[job] cannot specify both [arch] and [tags] at the same time in job \
-           '%s'."
-          name
+  let tag : Runner.Tag.t =
+    let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
+    let show show_fun = function
+      | None -> "(unspecified)"
+      | Some x -> show_fun x
+    in
+    let provider_string = Runner.Provider.show provider in
+    let arch_string = show Runner.Arch.show_uniform arch in
+    let cpu_string = show Runner.CPU.show cpu in
+    let storage_string = show Runner.Storage.show storage in
+    let interruptible_runner_string =
+      show string_of_bool interruptible_runner
+    in
+    match tag with
+    | None -> (
+        match
+          Runner.Tag.choose
+            ~provider
+            ?arch
+            ?cpu
+            ?storage
+            ?interruptible:interruptible_runner
+            ()
+        with
+        | None ->
+            failwith
+              "job %S: no suitable runner tag found for provider = %s, arch = \
+               %s, cpu = %s, storage = %s, interruptible_runner = %s"
+              name
+              provider_string
+              arch_string
+              cpu_string
+              storage_string
+              interruptible_runner_string
+        | Some tag -> tag)
+    | Some Dynamic ->
+        (* Cannot check, assume the user knows what they are doing. *)
+        Dynamic
+    | Some tag ->
+        if
+          not
+            (Runner.Tag.has
+               ~provider
+               ?arch
+               ?cpu
+               ?storage
+               ?interruptible:interruptible_runner
+               tag)
+        then
+          failwith
+            "job %S: requested tag %s is not compatible with provider = %s, \
+             arch = %s, cpu = %s, storage = %s, interruptible_runner = %s"
+            name
+            (Runner.Tag.show tag)
+            provider_string
+            arch_string
+            cpu_string
+            storage_string
+            interruptible_runner_string ;
+        tag
   in
-  if rules == Some [] then
-    failwith "The job '%s' cannot have empty [rules]." name ;
-  let arch = if Option.is_some arch then arch else arch_of_tag tag in
+  (* Check [rules]. *)
+  (match rules with
+  | None -> ()
+  | Some [] ->
+      failwith
+        "In job '%s', ~rules is the empty list. Either specify a non-empty \
+         list, or do not specify ~rules."
+        name
+  | Some rules ->
+      Fun.flip List.iter rules @@ fun {changes; _} ->
+      let changes_count =
+        match changes with None -> 0 | Some list -> List.length list
+      in
+      if changes_count >= 50 then
+        (* See https://docs.gitlab.com/ci/yaml/#ruleschanges *)
+        failwith
+          "In job '%s', one of the ~rules has more than 50 entries in its \
+           changeset. This is not allowed by GitLab."
+          name) ;
+  let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
   (match (image, arch) with
   | Some (Internal {image = Image image_path; _}), None ->
       failwith
@@ -904,10 +870,10 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
          known cannot use the image '%s' since it is Internal. Set a static \
          tag or use an external image."
         name
-        (string_of_tag tag)
+        (Runner.Tag.show tag)
         image_path
   | _ -> ()) ;
-  let tags = Some [string_of_tag tag] in
+  let tags = Some [Runner.Tag.show tag] in
   (match (parallel : Gitlab_ci.Types.parallel option) with
   | Some (Vector n) when n < 2 ->
       failwith
@@ -934,14 +900,14 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
         name
   | None, _ | _, None -> ()) ;
   let dependencies, image_builders =
-    (Fun.flip List.iter image_dependencies @@ function
-     | External (Image image_path) ->
-         failwith
-           "It doesn't make any sense for job %s to depend on the external \
-            image %s"
-           name
-           image_path
-     | Internal _ -> ()) ;
+    ( Fun.flip List.iter image_dependencies @@ function
+      | External (Image image_path) ->
+          failwith
+            "It doesn't make any sense for job %s to depend on the external \
+             image %s"
+            name
+            image_path
+      | Internal _ -> () ) ;
     let add_builder (dependencies, image_builders) = function
       | External _ -> (dependencies, image_builders)
       | Internal {builder_amd64; builder_arm64; _} ->
@@ -984,7 +950,10 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
   (match
      (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
    with
-  | Some "nomadic-margebot", (Gcp_dev | Gcp_dev_arm64) ->
+  | ( Some "nomadic-margebot",
+      ( Gcp_dev | Gcp_dev_arm64 | Gcp_not_interruptible_dev | Gcp_tezt_dev
+      | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs_dev
+        ) ) ->
       failwith
         "[job] Attempting to merge a CI configuration using development \
          runners (job: %s)"
@@ -993,12 +962,20 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
   let job : Gitlab_ci.Types.job =
     {
       name;
-      after_script;
+      after_script =
+        Some
+          (". ./scripts/ci/datadog_send_job_cache_info.sh 'after'"
+         :: after_script);
       allow_failure;
       artifacts;
       (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
       before_script =
-        Some (". ./scripts/ci/datadog_send_job_info.sh" :: before_script);
+        Some
+          (if datadog then
+             "SCRIPT_STEP_BEGIN=$(date +%s)"
+             :: ". ./scripts/ci/datadog_send_job_info.sh" :: before_script
+             @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]
+           else before_script);
       cache;
       id_tokens;
       image = Option.map Image.image image;
@@ -1010,7 +987,8 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
          fetch all the dependencies of the preceding jobs. *)
       dependencies = Some dependencies;
       rules;
-      script;
+      script =
+        script @ [". ./scripts/ci/datadog_send_job_script_step_time.sh || true"];
       services;
       stage = Some (Stage.name stage);
       variables;
@@ -1031,7 +1009,17 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
     template;
   }
 
-let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
+(* helper function to merge two list of variables, giving the precedence
+   to the values in [variables] over the [default_variables] *)
+let merge_variables ~default_variables variables =
+  let module StringMap = Map.Make (String) in
+  let m1 = List.to_seq default_variables |> StringMap.of_seq in
+  let m2 = List.to_seq variables |> StringMap.of_seq in
+  StringMap.union (fun _ _ v2 -> Some v2) m1 m2
+  |> StringMap.to_seq |> List.of_seq |> List.rev
+
+let trigger_job ?(dependencies = Staged []) ?rules ?description
+    ?(variables = []) ~__POS__ ~stage ?parent_pipeline_name
     Pipeline.
       {
         name = child_pipeline_name;
@@ -1039,6 +1027,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
         jobs = _;
         auto_cancel = _;
         description = _;
+        default = _;
       } : tezos_job =
   let job_name = "trigger:" ^ child_pipeline_name in
   let needs, dependencies = resolve_dependencies job_name dependencies in
@@ -1047,13 +1036,25 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       "[trigger_job] trigger job '%s' has artifact-dependencies, which is not \
        allowed by GitLab CI."
       job_name ;
+  let pipeline_type =
+    match parent_pipeline_name with
+    | None -> child_pipeline_name
+    | Some parent_name -> parent_name ^ "-" ^ child_pipeline_name
+  in
   let trigger_job =
     Gitlab_ci.Util.trigger_job
       ?needs
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
-      ~variables:[("PIPELINE_TYPE", child_pipeline_name)]
+      ~variables:
+        (merge_variables
+           ~default_variables:
+             [
+               ("PIPELINE_TYPE", pipeline_type);
+               ("DOCKER_FORCE_BUILD", "$DOCKER_FORCE_BUILD");
+             ]
+           variables)
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
@@ -1303,6 +1304,8 @@ let with_interruptible value tezos_job =
   map_non_trigger_job tezos_job @@ fun job ->
   {job with interruptible = Some value}
 
+let script_propagate_exit_code script = [script ^ " || exit $?"]
+
 (* Define [stages:]
 
    The "manual" stage exists to fix a UI problem that occurs when mixing
@@ -1356,33 +1359,7 @@ module Images_external = struct
      The [datadog-ci] version should be consistent across all CI
      images that use it. At the moment it is installed in the
      external image below and the internal image [e2etest]. *)
-  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
-
-  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
-
-  let ubuntu_noble =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
-
-  let ubuntu_jammy =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
-
-  let ubuntu_oracular =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.10_stable"
-
-  let fedora_37 = Image.mk_external ~image_path:"fedora:37"
-
-  let fedora_39 = Image.mk_external ~image_path:"fedora:39"
-
-  let rockylinux_93 = Image.mk_external ~image_path:"rockylinux:9.3"
-
-  let opam_ubuntu_oracular =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.10"
-
-  let opam_ubuntu_noble =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.04"
-
-  let opam_debian_bookworm =
-    Image.mk_external ~image_path:"ocaml/opam:debian-12"
+  let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v4.1.0"
 
   let ci_release =
     Image.mk_external
@@ -1403,8 +1380,8 @@ module Images_external = struct
 
   (* Image provided by GitLab. More details in the doc:
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
-     - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-14-xcode-15/ *)
-  let macosx_14 = Image.mk_external ~image_path:"macos-14-xcode-15"
+     - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-15-xcode-16/ *)
+  let macosx_15 = Image.mk_external ~image_path:"macos-15-xcode-16"
 
   (* Image used in [schedule_security_scans] pipeline. Trivy scans
      Docker images and codebase for CVEs and SBOMs. *)
@@ -1427,13 +1404,14 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     authenticate with Docker Hub provided the environment variable
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
-    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?storage ?tag ?allow_failure ?parallel ?timeout
-    ?retry ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
+    ?ci_docker_hub ?artifacts ?(variables = []) ?rules
+    ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
+    ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
+    ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
-    ?dependencies
+    ~dependencies
     ?image_dependencies
     ?artifacts
     ?arch
@@ -1461,61 +1439,63 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     script
 
 (** {2 Caches} *)
+module Cache = struct
+  let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
+      ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
+    let key =
+      Option.value
+        ~default:
+          ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+        key
+    in
+    job
+    |> append_variables
+         [
+           ("DUNE_CACHE", "enabled");
+           ("DUNE_CACHE_STORAGE_MODE", if copy_mode then "copy" else "hardlink");
+           ("DUNE_CACHE_ROOT", path);
+         ]
+    |> append_cache (cache ?policy ~key [path])
+    |> append_after_script
+         ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
-let enable_sccache ?key ?error_log ?idle_timeout ?log
-    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
-  let key =
-    Option.value
-      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  job
-  |> append_variables
-       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
-       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
-       @ opt_var "SCCACHE_LOG" Fun.id log)
-  |> append_cache (cache ~key [path])
-  (* Starts sccache and sets [RUSTC_WRAPPER] *)
-  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-  |> append_after_script ["./scripts/ci/sccache-stop.sh"]
+  let enable_sccache ?key ?error_log ?idle_timeout ?log
+      ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
+    let key =
+      Option.value
+        ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+        key
+    in
+    job
+    |> append_variables
+         ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
+         @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
+         @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
+         @ opt_var "SCCACHE_LOG" Fun.id log)
+    |> append_cache (cache ~key [path])
+    (* Starts sccache and sets [RUSTC_WRAPPER] *)
+    |> append_before_script [". ./scripts/ci/sccache-start.sh"]
+    |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
-let cargo_home =
-  (* Note:
-     - We want [CARGO_HOME] to be in a sub-folder of
-       {!ci_project_dir} to enable GitLab CI caching.
-     - We want [CARGO_HOME] to be hidden from dune
-       (thus the dot-prefix). *)
-  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
+  let cargo_home =
+    (* Note:
+       - We want [CARGO_HOME] to be in a sub-folder of
+         {!ci_project_dir} to enable GitLab CI caching.
+       - We want [CARGO_HOME] to be hidden from dune
+         (thus the dot-prefix). *)
+    Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
 
-let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
+  let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
 
-let enable_cargo_cache job =
-  job
-  |> append_cache
-       (cache
-          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-          [cargo_home // "registry/cache"])
-  (* Allow Cargo to access the network *)
-  |> enable_networked_cargo
-
-let enable_cargo_target_caches ?key job =
-  let key =
-    Option.value
-      ~default:
-        ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  let cache_dir = "$CI_PROJECT_DIR" // "_target" in
-  job
-  |> append_variables
-       [
-         ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
-         ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
-         ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
-           cache_dir // "etherlink_wasm_runtime" );
-       ]
-  |> append_cache (cache ~key [cache_dir])
+  let enable_cargo_cache job =
+    job
+    |> append_cache
+         (cache
+            ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+            [cargo_home // "registry/cache"])
+    (* Allow Cargo to access the network *)
+    |> enable_networked_cargo
+end
 
 (** A set of internally and externally built images.
 
@@ -1532,6 +1512,41 @@ let enable_cargo_target_caches ?key job =
 module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
+
+  module Base_images = struct
+    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+
+    let make_img distro =
+      Image.mk_external ~image_path:(sf "%s/%s" path_prefix distro)
+
+    let debian_bookworm = make_img "debian:bookworm"
+
+    let debian_trixie = make_img "debian:trixie"
+
+    let debian_unstable = make_img "debian:unstable"
+
+    let ubuntu_noble = make_img "ubuntu:noble"
+
+    let ubuntu_jammy = make_img "ubuntu:jammy"
+
+    let ubuntu_plucky = make_img "ubuntu:plucky"
+
+    let rockylinux_9_3 = make_img "rockylinux:9.3"
+
+    let rockylinux_9_6 = make_img "rockylinux:9.6"
+
+    let rockylinux_10_0 = make_img "rockylinux:10.0"
+
+    let fedora_39 = make_img "fedora:39"
+
+    let fedora_41 = make_img "fedora:41"
+
+    let fedora_42 = make_img "fedora:42"
+
+    let homebrew = make_img "debian-homebrew:trixie"
+
+    let rust_toolchain_trixie = make_img "debian-rust:trixie"
+  end
 
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
@@ -1570,10 +1585,13 @@ module Images = struct
         ?storage
         ~skip_docker_initialization:true
         ~stage
-        ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:rust-toolchain:" ^ Runner.Arch.show_uniform arch)
         ~description:
-          ("Build internal rust-toolchain images for " ^ arch_to_string_alt arch)
+          ("Build internal rust-toolchain images for "
+          ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
+        ~variables:
+          [("IMAGE", Base_images.path_prefix ^ "/debian-rust:unstable")]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
@@ -1604,10 +1622,10 @@ module Images = struct
         ~arch
         ?storage
         ~stage
-        ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:rust-sdk-bindings:" ^ Runner.Arch.show_uniform arch)
         ~description:
           ("Build internal rust-sdk-bindings images for "
-         ^ arch_to_string_alt arch)
+          ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts
@@ -1631,7 +1649,7 @@ module Images = struct
         ~__POS__
         ~arch
         ~stage
-        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:jsonnet:" ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
@@ -1649,7 +1667,13 @@ module Images = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
     let job_docker_ci arch ?storage () =
-      let variables = Some [("ARCH", arch_to_string_alt arch)] in
+      let variables =
+        Some
+          [
+            ("ARCH", Runner.Arch.show_uniform arch);
+            ("GCLOUD_VERSION", "543.0.0");
+          ]
+      in
       let retry =
         match arch with
         | Amd64 -> None
@@ -1666,8 +1690,9 @@ module Images = struct
         ~skip_docker_initialization:true
         ~stage
         ~timeout:(Minutes 90)
-        ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
-        ~description:("Build internal CI images for " ^ arch_to_string_alt arch)
+        ~name:("oc.docker:ci:" ^ Runner.Arch.show_uniform arch)
+        ~description:
+          ("Build internal CI images for " ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])
@@ -1706,6 +1731,9 @@ module Images = struct
     let e2etest =
       mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
 
+    let release_page =
+      mk_ci_image ~image_path:"${ci_image_name}/release-page:${ci_image_tag}"
+
     (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
     let prebuild_master = mk_ci_image_master "prebuild"
 
@@ -1727,14 +1755,6 @@ let id_tokens =
     );
   ]
 
-module Hooks = struct
-  let before_merging = ref []
-
-  let master = ref []
-
-  let release_tags = ref []
-end
-
 let job_datadog_pipeline_trace : tezos_job =
   job
     ~__POS__
@@ -1747,3 +1767,112 @@ let job_datadog_pipeline_trace : tezos_job =
       "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
+
+module Coverage = struct
+  let enable_instrumentation : tezos_job -> tezos_job =
+    append_variables [("COVERAGE_OPTIONS", "--instrument-with bisect_ppx")]
+
+  let enable_location : tezos_job -> tezos_job =
+    append_variables [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
+
+  let enable_report job : tezos_job =
+    job
+    |> add_artifacts
+         ~expose_as:"Coverage report"
+         ~reports:
+           (reports
+              ~coverage_report:
+                {
+                  coverage_format = Cobertura;
+                  path = "_coverage_report/cobertura.xml";
+                }
+              ())
+         ~expire_in:(Duration (Days 15))
+         ~when_:Always
+         ["_coverage_report/"; "$BISECT_FILE"]
+    |> append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
+
+  let unified_coverage_job : tezos_job option ref = ref None
+
+  (* Collect coverage trace-producing jobs. *)
+  let jobs_with_coverage_output = ref []
+
+  let enable_output_artifact ?(expire_in = Gitlab_ci.Types.Duration (Days 1))
+      tezos_job : tezos_job =
+    (* If another job with the same name was already registered:
+       - don't register it again;
+       - allow to apply this function even after [close].
+       This is a hack to allow both [Before_merging] and [Merge_train]
+       in [code_verification.ml] to register the jobs and then call [close]. *)
+    if
+      Fun.flip List.for_all !jobs_with_coverage_output @@ fun previous_job ->
+      name_of_tezos_job previous_job <> name_of_tezos_job tezos_job
+    then (
+      if !unified_coverage_job <> None then
+        failwith
+          "it is too late to apply enable_output_artifact to job %s because \
+           Coverage.close was already called"
+          (name_of_tezos_job tezos_job) ;
+      jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output) ;
+    tezos_job |> enable_location
+    |> append_script ["./scripts/ci/merge_coverage.sh"]
+    |> add_artifacts
+         ~expire_in
+         ~name:"coverage-files-$CI_JOB_ID"
+         ~when_:On_success
+         (* Store merged .coverage files or [.corrupt.json] files. *)
+         ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
+
+  let close changeset =
+    match !unified_coverage_job with
+    | Some job -> job
+    | None ->
+        (* Write the name of each job that produces coverage as input for other scripts.
+           Only includes the stem of the name: parallel jobs only appear once.
+           E.g. as [tezt], not [tezt X/Y]. *)
+        write_file
+          "script-inputs/ci-coverage-producing-jobs"
+          ~contents:
+            (String.concat
+               "\n"
+               (List.map name_of_tezos_job !jobs_with_coverage_output)
+            ^ "\n") ;
+        (* This job fetches coverage files by precedent test stage. It creates
+           the html, summary and cobertura reports. It also provide a coverage %
+           for the merge request. *)
+        let dependencies = List.rev !jobs_with_coverage_output in
+        let job =
+          job
+            ~__POS__
+            ~image:Images.CI.e2etest
+            ~name:"oc.unified_coverage"
+            ~stage:Stages.test_coverage
+            ~coverage:"/Coverage: ([^%]+%)/"
+            ~rules:
+              [
+                job_rule ~if_:Rules.is_final_pipeline ~when_:Never ();
+                job_rule
+                  ~changes:(Changeset.encode changeset)
+                  ~when_:On_success
+                  ();
+              ]
+            ~variables:
+              [
+                (* This inhibits the Makefile's opam version check, which
+                 this job's opam-less image ([e2etest]) cannot pass. *)
+                ("TEZOS_WITHOUT_OPAM", "true");
+              ]
+            ~dependencies:(Staged dependencies)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+             We propagate the exit code to temporarily allow corrupted coverage files. *)
+            ["./scripts/ci/report_coverage.sh || exit $?"]
+            ~allow_failure:(With_exit_codes [64])
+          |> enable_location |> enable_report
+        in
+        unified_coverage_job := Some job ;
+        job
+end
+
+let enable_kernels =
+  append_variables
+    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]

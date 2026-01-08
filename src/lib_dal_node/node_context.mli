@@ -31,6 +31,7 @@ type t
 (** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
+  identity:P2p_identity.t ->
   network_name:Distributed_db_version.Name.t ->
   Profile_manager.t ->
   Cryptobox.t ->
@@ -101,9 +102,22 @@ val may_reconstruct :
   t ->
   (bytes, Errors.other) result Lwt.t
 
+(** Returns the identity of the node. *)
+val get_identity : t -> P2p_identity.t
+
 (** Returns the status of the L1 crawler currently stored in the node
     context. *)
 val get_l1_crawler_status : t -> L1_crawler_status.t
+
+(** [get_l1_crawler_status_input ctxt] returns the watcher input used to
+    broadcast L1 crawler status updates.
+
+    This input can be used with [Lwt_watcher.notify] to push new
+    [L1_crawler_status.t] values to all subscribers (e.g., RPC clients
+    monitoring synchronization status). Each call to the monitoring RPC
+    creates a new stream from this watcher, and receives updates pushed
+    through this input. *)
+val get_l1_crawler_status_input : t -> L1_crawler_status.t Lwt_watcher.input
 
 (** Updates the status of the L1 crawler with the given value. *)
 val set_l1_crawler_status : t -> L1_crawler_status.t -> unit
@@ -170,11 +184,15 @@ val storage_period : t -> Types.proto_parameters -> [`Always | `Finite of int]
 (** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
     that should have attested data (like shards and slots, skip list cells)
     stored; during [current_level], such data for commitments published at the
-    returned level will be removed. The returned level is non-negative. In case
+    returned level will be removed. The returned level is non-negative and will
+    not be inferior to the [first_seen_level] stored in the store. In case
     no removal is needed (either because the node is thus configured, or the
     current_level is not big enough), the function returns [None]. *)
 val level_to_gc :
-  t -> Types.proto_parameters -> current_level:int32 -> int32 option
+  t ->
+  Types.proto_parameters ->
+  current_level:int32 ->
+  int32 option tzresult Lwt.t
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL
@@ -194,10 +212,10 @@ val get_fetched_assigned_shard_indices :
   pkh:Signature.public_key_hash ->
   Committee_cache.shard_indexes option
 
-(** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
-    to all attesters at [level].  It internally caches the DAL committee with
+(** [fetch_committees ctxt ~level] fetches from L1 the shard indices assigned to
+    all attesters at [level]. It internally caches the DAL committee with
     [level] as the key with FIFO strategy. *)
-val fetch_committee :
+val fetch_committees :
   t -> level:int32 -> Committee_cache.committee tzresult Lwt.t
 
 (** [version ctxt] returns the current version of the node *)
@@ -211,6 +229,19 @@ val warn_if_attesters_not_delegates :
 (** [get_disable_shard_validation ctxt] returns whether we should disable shard
     validation in the DAL node. *)
 val get_disable_shard_validation : t -> bool
+
+(** [get_last_migration_level ctxt] returns the first block with a new [proto_level],
+    which is the last block of the old protocol. See
+    [Proto_plugins.get_plugin_and_parameters_for_level] for more clarifications. *)
+val get_last_migration_level : t -> int32
+
+(** [get_attestable_slots_watcher_table ctxt] return the table of streams containing
+    attestable slots per pkh. *)
+val get_attestable_slots_watcher_table : t -> Attestable_slots_watcher_table.t
+
+(** [get_attestation_lag ctxt ~level] returns the attestation lag found at [~level]
+    using protocol parameters obtained using [ctxt]. *)
+val get_attestation_lag : t -> level:int32 -> int32 tzresult
 
 (** Module for P2P-related accessors.  *)
 module P2P : sig

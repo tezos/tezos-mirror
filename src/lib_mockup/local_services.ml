@@ -483,7 +483,8 @@ module Make (E : MENV) = struct
                  let* validation_passes, proto_state, preapply_results =
                    List.fold_left_es
                      (fun (validation_passes, proto_state, validation_result)
-                          operations ->
+                          operations
+                        ->
                        let* state, result =
                          List.fold_left_es
                            simulate_operation
@@ -605,7 +606,8 @@ module Make (E : MENV) = struct
     Block_hash.equal
       a_shell_header.Operation.branch
       b_shell_header.Operation.branch
-    && (* FIXME: the protocol should export equality/comparison functions for
+    &&
+    (* FIXME: the protocol should export equality/comparison functions for
           its abstract types such as operation_data.  WARNING: the following
           expression causes an exception to be raised, complaining about
           functional values Stdlib.( = ) a_operation_data b_operation_data *)
@@ -973,7 +975,7 @@ module Make (E : MENV) = struct
       (E.Block_services.S.Mempool.monitor_operations
       @@ Block_services.mempool_path Block_services.chain_path)
       (* FIXME: Return real operations from the mempool *)
-        (fun (_, chain) o () ->
+      (fun (_, chain) o () ->
         with_chain ~caller_name:"monitor operations" chain (fun () ->
             let on b msg =
               if b then L.(S.emit (warn msg)) () else Lwt.return_unit

@@ -42,7 +42,7 @@ module Proto = struct
              ~level
              ~predecessor_timestamp
              ~timestamp
-             ~adaptive_issuance_enable:false
+             ~all_bakers_attest_first_level:None
              ctxt
       in
       Raw_context.set_gas_limit
@@ -101,8 +101,9 @@ module Proto = struct
         =
       (code_size :> int)
 
-    let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
-      8 * Obj.(reachable_words @@ repr code)
+    let actual_code_size
+        Script_ir_translator.(Ex_code (Code {implementation; _})) =
+      8 * Obj.(reachable_words @@ repr implementation)
 
     let parse_ty (raw_ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
         ~allow_contract ~allow_ticket script =
@@ -231,8 +232,8 @@ module Proto = struct
       match node with
       | Ex_lambda (_, Lam (_, node)) | Ex_lambda (_, LamRec (_, node)) -> node
 
-    let rec find_lambda_tys :
-        type a c. (a, c) Script_typed_ir.ty -> (a -> ex_lambda list) list =
+    let rec find_lambda_tys : type a c.
+        (a, c) Script_typed_ir.ty -> (a -> ex_lambda list) list =
      fun ty ->
       let open Script_typed_ir in
       match ty with
@@ -267,8 +268,7 @@ module Proto = struct
           @@ find_lambda_tys t
       | Map_t (_, tv, _) -> find_lambda_tys_map tv
 
-    and find_lambda_tys_map :
-        type tk tv c.
+    and find_lambda_tys_map : type tk tv c.
         (tv, c) Script_typed_ir.ty ->
         ((tk, tv) Script_typed_ir.map -> ex_lambda list) list =
      fun tv ->

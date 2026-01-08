@@ -81,19 +81,14 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
   | Error errs ->
       let* () = Events.(emit per_block_vote_file_fail) errs in
       return default
-  | Ok
-      {
-        liquidity_baking_toggle_vote;
-        adaptive_issuance_vote_opt = Some adaptive_issuance_vote;
-      } ->
+  | Ok {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt} ->
+      let* () =
+        if Option.is_some adaptive_issuance_vote_opt then
+          Events.(emit deprecated_adaptive_issuance_vote_field ())
+        else Lwt.return_unit
+      in
       return
-        Per_block_votes.
-          {
-            liquidity_baking_vote = liquidity_baking_toggle_vote;
-            adaptive_issuance_vote;
-          }
-  | Ok {liquidity_baking_toggle_vote; adaptive_issuance_vote_opt = None} ->
-      return {default with liquidity_baking_vote = liquidity_baking_toggle_vote}
+        Per_block_votes.{liquidity_baking_vote = liquidity_baking_toggle_vote}
 
 let load_per_block_votes_config ~default_liquidity_baking_vote
     ~per_block_vote_file : Configuration.per_block_votes_config tzresult Lwt.t =
@@ -104,12 +99,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
     match (per_block_vote_file, default_liquidity_baking_vote) with
     | None, None -> tzfail Missing_vote_on_startup
     | None, Some liquidity_baking_vote ->
-        return
-          {
-            Configuration.vote_file = None;
-            liquidity_baking_vote;
-            adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
-          }
+        return {Configuration.vote_file = None; liquidity_baking_vote}
     | Some per_block_vote_file, _ -> (
         let*! (res : _ tzresult) = read_per_block_votes ~per_block_vote_file in
         match res with
@@ -120,14 +110,13 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
             } ->
             let*! () =
               if Option.is_some adaptive_issuance_vote_opt then
-                Events.(emit unused_config_adaptive_issuance_vote ())
+                Events.(emit deprecated_adaptive_issuance_vote_field ())
               else Lwt.return_unit
             in
             return
               {
                 Configuration.vote_file = Some per_block_vote_file;
                 liquidity_baking_vote;
-                adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
               }
         | Error errs ->
             let*! () = Events.(emit per_block_vote_file_fail) errs in

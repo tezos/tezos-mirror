@@ -53,6 +53,15 @@ let shutdown ?exn t =
       Lwt.return_unit)
     else Lwt.return_unit
   in
+  (* Shutdown the service managers before alert_manager *)
+  let* () =
+    Lwt_list.iter_s
+      (fun agent ->
+        match Agent.service_manager agent with
+        | None -> Lwt.return_unit
+        | Some sm -> Service_manager.shutdown sm)
+      t.agents
+  in
   Log.info "Shutting down processes..." ;
   let* () =
     Lwt.catch
@@ -114,13 +123,6 @@ let shutdown ?exn t =
           (Printexc.to_string exn) ;
         Lwt.return_unit)
   in
-  (* Shutdown the service managers before alert_manager *)
-  let () =
-    List.iter
-      (fun agent ->
-        Option.iter Service_manager.shutdown (Agent.service_manager agent))
-      t.agents
-  in
   let* () =
     if Option.is_some t.alert_manager then Alert_manager.shutdown ()
     else Lwt.return_unit
@@ -158,7 +160,7 @@ let wait_ssh_server_running agent =
               runner
               (Runner.Shell.cmd [] "echo" ["-n"; "check"])
           in
-          Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+          Process.spawn cmd (runner.options @ args)
         in
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
@@ -328,8 +330,7 @@ let attach agent =
         (Runner.Shell.cmd [] "screen" ["-S"; "tezt-cloud"; "-X"; "stuff"; "^C"])
     in
     let* () =
-      Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-      |> Process.check
+      Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
     in
     let cmd, args =
       Runner.wrap_with_ssh
@@ -337,8 +338,7 @@ let attach agent =
         (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
     in
     let _p =
-      Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-      |> Process.check
+      Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
     in
     let* _ = Input.eof in
     let* () =
@@ -388,8 +388,7 @@ let attach agent =
     Lwt.catch
       (fun () ->
         let* () =
-          Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-          |> Process.check
+          Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
         in
         Lwt.return_unit)
       (fun exn ->
@@ -484,6 +483,10 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
       let rec filter_ssh acc args =
         match args with
         | [] -> List.rev acc
+        (* We need to remove the private key argument. This permanent key
+           is only used to connect to the proxy. The key that is generated
+           and uploaded to the proxy allow to connect to the containers. *)
+        | "--ssh-private-key" :: _priv :: args -> filter_ssh acc args
         (* FIXME: remove proxy-localhost when agent name bug is fixed *)
         | "--ssh-host" :: _host :: args ->
             filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args
@@ -525,9 +528,7 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
-(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
-   defined if [Env.faketime] is defined. *)
-let set_faketime faketime agent =
+let set_faketime agent faketime =
   match Agent.runner agent with
   | None -> Lwt.return_unit (* ? *)
   | Some runner ->
@@ -547,7 +548,7 @@ let set_faketime faketime agent =
       in
       let* contents =
         (* Read the environment file content
-           and append FAKETIME definition to the result *)
+               and append FAKETIME definition to the result *)
         let process, stdin =
           Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
         in
@@ -560,16 +561,62 @@ let set_faketime faketime agent =
       let cmd, args = Runner.wrap_with_ssh runner cmd in
       Process.run cmd args
 
-let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
-    ?tasks f =
+(** Optionally add some latency and jitter to network connection *)
+let adjust_traffic_control i agent =
+  match (Env.tc_delay, Env.tc_jitter) with
+  | None, None -> Lwt.return_unit
+  | tc_delay, tc_jitter ->
+      let () =
+        Option.iter (fun seed -> Random.init (seed + i)) Tezt.Cli.Options.seed
+      in
+      let rand = function
+        | Some (min, max) -> min +. Random.float (max -. min)
+        | None -> 0.
+      in
+      let delay = rand tc_delay in
+      let jitter = rand tc_jitter in
+      (* Get the interface name in the docker container (among other infos) *)
+      let* ip_output =
+        Agent.docker_run_command agent "ip" ["route"; "show"; "default"]
+        |> Process.check_and_read_stdout
+      in
+      (* Parse the ip output in order to retrieve the interface name *)
+      let iface_name =
+        let rec loop = function
+          | [] ->
+              Test.fail
+                "Failed to retrieve interface name (%s)"
+                (Agent.name agent)
+          | "dev" :: name :: _ -> name
+          | _ :: tl -> loop tl
+        in
+        loop (String.split_on_char ' ' ip_output)
+      in
+      (* Run [tc] on this interface *)
+      Agent.docker_run_command
+        agent
+        "tc"
+        [
+          "qdisc";
+          "add";
+          "dev";
+          iface_name;
+          "root";
+          "netem";
+          "delay";
+          Printf.sprintf "%.3fs" delay;
+          Printf.sprintf "%.3fs" jitter;
+        ]
+      |> Process.check
+
+let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
+    ~tags ?seed ?alerts ?tasks f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let* vms =
     match vms with
     | None -> Lwt.return_none
-    | Some vms ->
-        let* vms in
-        Lwt.return_some vms
+    | Some vms -> Lwt.map Option.some (vms ())
   in
   let vms =
     match (vms, Env.vms) with
@@ -607,7 +654,9 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   match vms with
   | None ->
       let default_agent =
-        let configuration = Agent.Configuration.make ~name:"default" () in
+        let configuration =
+          Agent.Configuration.make ~name:"default" ?dockerbuild_args ()
+        in
         let next_available_port =
           let cpt = ref 30_000 in
           fun () ->
@@ -624,6 +673,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           ~next_available_port
           ~vm_name:None
           ~process_monitor
+          ~artifacts_dir:Env.artifacts_dir
           ()
       in
       f
@@ -653,17 +703,18 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
       else
         let tezt_cloud = Env.tezt_cloud in
         let ensure_ready =
-          let wait_and_faketime =
-            match Env.faketime with
-            | None -> wait_ssh_server_running
-            | Some faketime ->
-                fun agent ->
-                  let* () = wait_ssh_server_running agent in
-                  set_faketime faketime agent
+          let ensure_ready i agent =
+            let* () = wait_ssh_server_running agent in
+            let* () = adjust_traffic_control i agent in
+            let* () =
+              match Env.faketime with
+              | None -> Lwt.return_unit
+              | Some faketime -> set_faketime agent faketime
+            in
+            Lwt.return_unit
           in
           fun deployement ->
-            Deployement.agents deployement
-            |> List.map wait_and_faketime |> Lwt.join
+            Deployement.agents deployement |> List.mapi ensure_ready |> Lwt.join
         in
         match Env.mode with
         | `Remote_orchestrator_local_agents ->
@@ -684,17 +735,31 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             orchestrator ?alerts ?tasks deployement f
         | `Local_orchestrator_local_agents ->
             (* The scenario is executed locally and the VM are on the host machine. *)
-            let* () = Jobs.docker_build ~push:false ~ssh_public_key () in
-            let* deployement = Deployement.deploy ~configurations in
+            let* () =
+              Jobs.docker_build
+                ?args:dockerbuild_args
+                ~push:false
+                ~ssh_public_key
+                ()
+            in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Local_orchestrator_remote_agents ->
             (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
             let* () =
-              Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+              Jobs.docker_build
+                ?args:dockerbuild_args
+                ~push:Env.push_docker
+                ~ssh_public_key
+                ()
             in
-            let* deployement = Deployement.deploy ~configurations in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Remote_orchestrator_remote_agents | `Ssh_host _ ->
@@ -703,9 +768,15 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             if not proxy_running then
               let* () = Jobs.deploy_docker_registry () in
               let* () =
-                Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+                Jobs.docker_build
+                  ?args:dockerbuild_args
+                  ~push:Env.push_docker
+                  ~ssh_public_key
+                  ()
               in
-              let* deployement = Deployement.deploy ~configurations in
+              let* deployement =
+                Deployement.deploy ?dockerbuild_args ~configurations ()
+              in
               let* () = ensure_ready deployement in
               init_proxy ?proxy_files ?proxy_args deployement
             else Lwt.return_unit)
@@ -738,6 +809,7 @@ let agents t =
               ~next_available_port
               ~vm_name:(Some (Format.asprintf "%s-orchestrator" Env.tezt_cloud))
               ~process_monitor
+              ~artifacts_dir:Env.artifacts_dir
               ()
           in
           [default_agent]
@@ -810,7 +882,7 @@ let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
               in
               let app_name =
                 Format.asprintf
-                  "%s-prometheus-process-exporter"
+                  "%s:prometheus-process-exporter"
                   (Agent.name agent)
               in
               let target =
@@ -841,7 +913,7 @@ let agents_by_service_name = Hashtbl.create 10
 
 let service_name agent name = Format.asprintf "%s-%s" (Agent.name agent) name
 
-let service_register ~name ~executable ?on_alive_callback agent =
+let service_register ~name ~executable ?on_alive_callback ~on_shutdown agent =
   match Agent.service_manager agent with
   | None -> ()
   | Some service_manager ->
@@ -851,6 +923,7 @@ let service_register ~name ~executable ?on_alive_callback agent =
         ~name
         ~executable
         ?on_alive_callback
+        ~on_shutdown
         service_manager
 
 let notify_service_start ~name ~pid =

@@ -47,6 +47,10 @@ type t =
 
 include Compare.S with type t := t
 
+type originated_kind =
+  | Script of Script_repr.t
+  | Native of Script_native_repr.with_storage
+
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 (** {2 Originated contracts} *)

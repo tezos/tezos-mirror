@@ -39,6 +39,10 @@ include Compare.Make (struct
     | Originated _, Implicit _ -> 1
 end)
 
+type originated_kind =
+  | Script of Script_repr.t
+  | Native of Script_native_repr.with_storage
+
 let in_memory_size =
   let open Cache_memory_helpers in
   function

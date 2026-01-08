@@ -99,16 +99,20 @@ pub fn entry(host: &mut impl Runtime) {
     match host.read_input() {
         Ok(Some(message)) => {
             let level = message.level;
-            let published_level = (level as i32) - (attestation_lag as i32);
-            let num_pages = (slot_size / page_size) as usize;
-            for slot_index in slot_indexes {
-                process_slot(
-                    host,
-                    published_level,
-                    num_pages,
-                    page_size as usize,
-                    slot_index,
-                );
+            // Before importing a slot, we wait 2 blocks for finality + 1 block for DAL node processing
+            let import_extra_delay = 3;
+            let published_level = (level as i32) - (attestation_lag as i32) - import_extra_delay;
+            if published_level > 0 {
+                let num_pages = (slot_size / page_size) as usize;
+                for slot_index in slot_indexes {
+                    process_slot(
+                        host,
+                        published_level,
+                        num_pages,
+                        page_size as usize,
+                        slot_index,
+                    );
+                }
             }
         }
         Ok(None) => {

@@ -1,18 +1,33 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 
 //! Module containing the types and functions exposed to OCaml.
 
 use crate::{
-    bindings,
+    bindings::{self, end_span, init_spans},
     host::Host,
     runtime::{self, InputsBuffer, RunStatus},
-    types::{ContextHash, EvmTree, OCamlString, SmartRollupAddress},
+    types::{ContextHash, EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
 };
 use log::trace;
 use ocaml::{Error, List, Pointer, Value};
-use std::collections::BTreeMap;
+use std::sync::OnceLock;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock, RwLockReadGuard},
+};
 use wasmer::{Engine, Features, Module, NativeEngineExt, Store, Target};
 use wasmer_compiler_cranelift::Cranelift;
+
+static TRACE_HOST_FUNS: OnceLock<bool> = OnceLock::new();
+
+fn set_host_tracing(trace_host_funs: bool) {
+    TRACE_HOST_FUNS.set(trace_host_funs);
+}
+
+pub fn trace_host_funs_enabled() -> bool {
+    *(TRACE_HOST_FUNS.get().unwrap_or(&false))
+}
 
 pub struct Kernel(Module);
 
@@ -28,25 +43,33 @@ impl Kernel {
     }
 }
 
-pub struct KernelsCache(BTreeMap<[u8; 32], Kernel>);
+pub struct KernelsCache(Arc<RwLock<BTreeMap<[u8; 32], Arc<Kernel>>>>);
 
 impl KernelsCache {
     pub fn new() -> Self {
-        KernelsCache(BTreeMap::new())
+        KernelsCache(Arc::new(RwLock::new(BTreeMap::new())))
     }
 
     pub fn miss(&self, hash: &ContextHash) -> bool {
-        !self.0.contains_key(hash.as_bytes())
+        !self.0.read().unwrap().contains_key(hash.as_bytes())
     }
 
-    pub fn get(&self, hash: &ContextHash) -> &Kernel {
-        self.0.get(hash.as_bytes()).unwrap()
+    pub fn get<'a>(&'a self, hash: &ContextHash) -> Arc<Kernel> {
+        self.0.read().unwrap().get(hash.as_bytes()).unwrap().clone()
     }
+
     pub fn insert(&mut self, hash: &ContextHash, kernel: Kernel) {
-        self.0.insert(hash.as_bytes().to_owned(), kernel);
+        self.0
+            .write()
+            .unwrap()
+            .insert(hash.as_bytes().to_owned(), Arc::new(kernel));
     }
 
-    pub fn load(&mut self, engine: &Engine, evm_tree: &EvmTree) -> Result<(&Kernel, bool), Error> {
+    pub fn load(
+        &mut self,
+        engine: &Engine,
+        evm_tree: &EvmTree,
+    ) -> Result<(Arc<Kernel>, bool), Error> {
         const KERNEL_PATH: &'static str = "/kernel/boot.wasm";
         let hash = bindings::store_get_hash(evm_tree, &KERNEL_PATH)?;
 
@@ -109,7 +132,7 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string option -> bool -> string -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
+    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> bool -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
@@ -117,6 +140,8 @@ pub fn wasm_runtime_run(
     preimages_endpoint: Option<OCamlString>,
     native_execution: bool,
     entrypoint: OCamlString,
+    otel_scope: OpenTelemetryScope,
+    trace_host_funs: bool,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
     level: u32,
@@ -124,7 +149,8 @@ pub fn wasm_runtime_run(
 ) -> Result<EvmTree, Error> {
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
-
+    set_host_tracing(trace_host_funs);
+    init_spans(&otel_scope, "wasm_runtime_run")?;
     loop {
         let host = Host::new(
             &tree,
@@ -142,7 +168,10 @@ pub fn wasm_runtime_run(
         )?;
 
         match runtime.run()? {
-            RunStatus::Done(evm_tree) => return Ok(evm_tree),
+            RunStatus::Done(evm_tree) => {
+                end_span()?;
+                return Ok(evm_tree);
+            }
             RunStatus::PendingKernelUpgrade(new_tree, remaining_inputs) => {
                 tree = new_tree;
                 inputs_buffer = remaining_inputs;

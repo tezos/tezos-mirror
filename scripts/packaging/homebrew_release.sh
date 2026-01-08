@@ -31,6 +31,9 @@ case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
   TARGETDIR="public/homebrew/RC/Formula"
   ;;
+Beta | TestBeta)
+  TARGETDIR="public/homebrew/BETA/Formula"
+  ;;
 Release | TestRelease)
   TARGETDIR="public/homebrew/Formula"
   ;;

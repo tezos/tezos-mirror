@@ -889,6 +889,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIs_implicit_account :
       Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
       -> (address, 'S, 'r, 'F) kinstr
+  | IIndex_address :
+      Script.location * (n num, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
+  | IGet_address_index :
+      Script.location * (n num option, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;
@@ -1565,8 +1571,8 @@ and ('before, 'after) comb_get_gadt_witness =
 
 and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_zero : ('value, _, 'value) comb_set_gadt_witness
-  | Comb_set_one
-      : ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
+  | Comb_set_one :
+      ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, ('a, 'before) pair, ('a, 'after) pair) comb_set_gadt_witness
@@ -1674,20 +1680,13 @@ and operation = {
   lazy_storage_diff : Lazy_storage.diffs option;
 }
 
-type ('arg, 'storage) script =
-  | Script : {
-      code :
-        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
-      arg_type : ('arg, _) ty;
-      storage : 'storage;
-      storage_type : ('storage, _) ty;
-      views : view_map;
-      entrypoints : 'arg entrypoints;
-      code_size : Cache_memory_helpers.sint;
-    }
-      -> ('arg, 'storage) script
-
 type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
+
+type ('arg, 'arg_dep, 'storage, 'storage_dep) types = {
+  arg_type : ('arg, 'arg_dep) ty;
+  storage_type : ('storage, 'storage_dep) ty;
+  entrypoints : 'arg entrypoints;
+}
 
 val manager_kind : 'kind internal_operation_contents -> 'kind Kind.manager
 

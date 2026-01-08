@@ -291,7 +291,7 @@ mod owned {
     ///
     /// Useful when a new path is being constructed at runtime, which is not a sub-path of an
     /// already existing path (in which case you may use [RefPath]).
-    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct OwnedPath {
         inner: String,
     }

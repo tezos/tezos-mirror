@@ -55,7 +55,9 @@ The use of this flag is *optional*, and defaults to **Pass** if not present.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v18.1
@@ -80,7 +82,7 @@ You can also install Octez using Opam by running ``opam install octez``.
      - :package-api:`octez-libs <octez-libs/index.html>`: Contains the base libraries for Octez.
      - :package-api:`octez-shell <octez-shell-libs/index.html>`: Contains the Octez shell related libraries.
      - :package-api:`octez-proto-shell <octez-proto-libs/index.html>`: Contains the Tezos protocol dependent libraries.
-     - :package-api:`octez-l2-libs <octez-l2-libs/index.html>`: Contains the layer 2 related libraries.
+     - :package-api:`octez-l2-libs <octez-l2-libs/index.html>`: Contains the Layer 2 related libraries.
      - For each protocol ``P``
          - :package-api:`octez-protocol-P-libs <octez-protocol-alpha-libs/index.html>`: The protocol ``P`` dependent libraries.
 	 - ``tezos-protocol-P``: The Tezos protocol ``P`` itself.

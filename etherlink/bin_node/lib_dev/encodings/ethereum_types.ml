@@ -129,6 +129,20 @@ let block_hash_of_bytes s = Block_hash (hex_of_bytes s)
 
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
+type 'a pre_encoded = {
+  encoding : 'a Data_encoding.t;
+  json : Data_encoding.Json.t;
+}
+
+let pre_encode encoding v =
+  {encoding; json = Data_encoding.Json.construct encoding v}
+
+let decode_pre {encoding; json} = Data_encoding.Json.destruct encoding json
+
+let pre_encoded_encoding encoding =
+  let open Data_encoding in
+  conv (fun {json; _} -> json) (fun json -> {encoding; json}) Data_encoding.json
+
 module Block_parameter = struct
   type t = Number of quantity | Earliest | Latest | Pending | Finalized
 
@@ -259,6 +273,8 @@ let decode_number_be bytes = Helpers.decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
+let encode_hash (Hash hash) = encode_hex hash
+
 let pad_to_n_bytes_le bytes length =
   let current_length = Bytes.length bytes in
   if current_length >= length then bytes
@@ -273,7 +289,7 @@ let encode_u256_le (Qty n) =
 
 let encode_u64_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
-  pad_to_n_bytes_le bits 4
+  pad_to_n_bytes_le bits 8
 
 type transaction_log = {
   address : address;
@@ -315,7 +331,8 @@ let transaction_log_encoding =
            blockHash;
            logIndex;
            removed;
-         } ->
+         }
+       ->
       ( address,
         topics,
         data,
@@ -333,7 +350,8 @@ let transaction_log_encoding =
            transactionIndex,
            blockHash,
            logIndex,
-           removed ) ->
+           removed )
+       ->
       {
         address;
         topics;
@@ -455,7 +473,8 @@ let legacy_transaction_object_encoding =
            v;
            r;
            s;
-         } ->
+         }
+       ->
       ( ( blockHash,
           blockNumber,
           from,
@@ -477,7 +496,8 @@ let legacy_transaction_object_encoding =
              nonce,
              to_,
              transactionIndex ),
-           (value, v, r, s) ) ->
+           (value, v, r, s) )
+       ->
       {
         blockHash;
         blockNumber;
@@ -581,21 +601,21 @@ let block_from_rlp_v0 bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
-        [
-          Value number;
-          Value hash;
-          Value parent_hash;
-          Value logsBloom;
-          Value transactionRoot;
-          Value stateRoot;
-          Value receiptRoot;
-          Value miner;
-          Value extraData;
-          Value gasLimit;
-          List transactions;
-          Value gasUsed;
-          Value timestamp;
-        ]) ->
+         [
+           Value number;
+           Value hash;
+           Value parent_hash;
+           Value logsBloom;
+           Value transactionRoot;
+           Value stateRoot;
+           Value receiptRoot;
+           Value miner;
+           Value extraData;
+           Value gasLimit;
+           List transactions;
+           Value gasUsed;
+           Value timestamp;
+         ]) ->
       let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
@@ -679,23 +699,23 @@ let block_from_rlp_v1 bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
-        [
-          Value number;
-          Value hash;
-          Value parent_hash;
-          Value logsBloom;
-          Value transactionRoot;
-          Value stateRoot;
-          Value receiptRoot;
-          Value miner;
-          Value extraData;
-          Value gasLimit;
-          List transactions;
-          Value gasUsed;
-          Value timestamp;
-          Value baseFeePerGas;
-          Value prevRandao;
-        ]) ->
+         [
+           Value number;
+           Value hash;
+           Value parent_hash;
+           Value logsBloom;
+           Value transactionRoot;
+           Value stateRoot;
+           Value receiptRoot;
+           Value miner;
+           Value extraData;
+           Value gasLimit;
+           List transactions;
+           Value gasUsed;
+           Value timestamp;
+           Value baseFeePerGas;
+           Value prevRandao;
+         ]) ->
       let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
@@ -835,7 +855,8 @@ let block_encoding transaction_object_encoding =
            blobGasUsed;
            excessBlobGas;
            parentBeaconBlockRoot;
-         } ->
+         }
+       ->
       ( ( ( number,
             hash,
             parent,
@@ -887,7 +908,8 @@ let block_encoding transaction_object_encoding =
              withdrawalsRoot,
              blobGasUsed,
              excessBlobGas,
-             parentBeaconBlockRoot ) ) ->
+             parentBeaconBlockRoot ) )
+       ->
       {
         number;
         hash;
@@ -1079,6 +1101,28 @@ module Address = struct
   let to_string = address_to_string
 
   let of_string = address_of_string
+
+  let to_eip55_string (Address (Hex address)) =
+    (* Implementation compliant with EIP-55
+       See https://eips.ethereum.org/EIPS/eip-55 *)
+    let hexchar_to_int c =
+      if '0' <= c && c <= '9' then Char.code c - Char.code '0'
+      else if 'A' <= c && c <= 'F' then Char.code c - Char.code 'A' + 10
+      else if 'a' <= c && c <= 'f' then Char.code c - Char.code 'a' + 10
+      else raise (Invalid_argument "address_to_string: not a valid address")
+    in
+
+    let hash = Digestif.KECCAK_256.(to_hex @@ digest_string address) in
+    let address = Bytes.of_string address in
+
+    Bytes.iteri
+      (fun i c ->
+        if 'a' <= c && c <= 'f' then
+          let hash_nibble = hexchar_to_int (String.get hash i) in
+          if hash_nibble >= 8 then Bytes.set address i (Char.uppercase_ascii c))
+      address ;
+
+    "0x" ^ Bytes.to_string address
 end
 
 module AddressMap = MapMake (Address)
@@ -1325,6 +1369,8 @@ module Subscription = struct
     | Logs of logs
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
+    | NewPreconfirmedReceipts
     | Etherlink of etherlink_extension
 
   let etherlink_extension_encoding =
@@ -1392,6 +1438,18 @@ module Subscription = struct
           (function Syncing -> Some () | _ -> None)
           (fun () -> Syncing);
         case
+          ~title:"tez_newPreconfirmedReceipts"
+          (Tag 0xfd)
+          (tup1 (constant "tez_newPreconfirmedReceipts"))
+          (function NewPreconfirmedReceipts -> Some () | _ -> None)
+          (fun () -> NewPreconfirmedReceipts);
+        case
+          ~title:"tez_newIncludedTransactions"
+          (Tag 0xfe)
+          (tup1 (constant "tez_newIncludedTransactions"))
+          (function NewIncludedTransactions -> Some () | _ -> None)
+          (fun () -> NewIncludedTransactions);
+        case
           ~title:"etherlink_extension"
           (Tag 0xff)
           etherlink_extension_encoding
@@ -1427,9 +1485,11 @@ module Subscription = struct
              highestBlock;
              pulledStates;
              knownStates;
-           } ->
+           }
+         ->
         (startingBlock, currentBlock, highestBlock, pulledStates, knownStates))
-      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates) ->
+      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates)
+         ->
         {startingBlock; currentBlock; highestBlock; pulledStates; knownStates})
       (obj5
          (req "startingBlock" quantity_encoding)
@@ -1467,14 +1527,16 @@ module Subscription = struct
 
   type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
 
-  type 'transaction_object output =
+  type ('transaction_object, 'receipt) output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | NewIncludedTransactions of 'transaction_object
+    | NewPreconfirmedReceipts of 'receipt
     | Etherlink of etherlink_extension_output
 
-  let output_encoding transaction_object_encoding =
+  let output_encoding transaction_object_encoding receipt_encoding =
     let open Data_encoding in
     union
       [
@@ -1508,5 +1570,17 @@ module Subscription = struct
           l1_l2_levels_output_encoding
           (function Etherlink (L1_l2_levels l) -> Some l | _ -> None)
           (fun l -> Etherlink (L1_l2_levels l));
+        case
+          ~title:"tez_newIncludedTransactions"
+          (Tag 5)
+          transaction_object_encoding
+          (function NewIncludedTransactions tx -> Some tx | _ -> None)
+          (fun tx -> NewIncludedTransactions tx);
+        case
+          ~title:"tez_newPreconfirmedReceipts"
+          (Tag 6)
+          receipt_encoding
+          (function NewPreconfirmedReceipts r -> Some r | _ -> None)
+          (fun r -> NewPreconfirmedReceipts r);
       ]
 end

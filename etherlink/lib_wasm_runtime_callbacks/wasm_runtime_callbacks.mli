@@ -2,8 +2,13 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type scope
+
+val root_scope : Opentelemetry.Scope.t option -> scope
 
 val register : unit -> unit
 

@@ -34,11 +34,11 @@ let enum =
 
 let pp =
   Fmt.of_to_string (function
-      | `V1 -> "v1"
-      | `V2 -> "v2"
-      | `V3 -> "v3"
-      | `V4 -> "v4"
-      | `V5 -> "v5")
+    | `V1 -> "v1"
+    | `V2 -> "v2"
+    | `V3 -> "v3"
+    | `V4 -> "v4"
+    | `V5 -> "v5")
 
 let to_bin v = List.assoc v enum
 
@@ -82,13 +82,13 @@ exception Invalid of {expected : t; found : t}
 
 let () =
   Printexc.register_printer (function
-      | Invalid {expected; found} ->
-          Some
-            (Fmt.str
-               "%s.Invalid { expected = %a; found = %a }"
-               __MODULE__
-               pp
-               expected
-               pp
-               found)
-      | _ -> None)
+    | Invalid {expected; found} ->
+        Some
+          (Fmt.str
+             "%s.Invalid { expected = %a; found = %a }"
+             __MODULE__
+             pp
+             expected
+             pp
+             found)
+    | _ -> None)

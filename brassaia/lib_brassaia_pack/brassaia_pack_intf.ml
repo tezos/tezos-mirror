@@ -79,6 +79,7 @@ module type Sigs = sig
     ?suffix_auto_flush_threshold:int ->
     ?no_migrate:bool ->
     ?lower_root:string option ->
+    ?async_domain:bool ->
     string ->
     Brassaia.config
   (** Configuration options for stores. See {!Brassaia_pack.Conf} for more details. *)

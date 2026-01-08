@@ -3,7 +3,6 @@
 
 pub use octez_riscv_api::*;
 pub use rustzcash::*;
-pub use wasmer_c_api::*;
 
 pub mod api;
 mod bindings;
@@ -11,5 +10,6 @@ mod constants;
 mod host;
 mod reveal;
 mod runtime;
+mod sdk_runtime;
 mod types;
 mod write_debug;

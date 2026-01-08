@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Utilities and types for representing a stack.
 
@@ -447,7 +444,7 @@ mod tests {
     fn drain_top_0() {
         let mut stk = stk![1, 2, 3, 4];
         let drained = stk.drain_top(0);
-        assert_eq!(drained.collect::<Vec<_>>(), vec![]);
+        assert!(drained.collect::<Vec<_>>().is_empty());
         assert_eq!(stk, stk![1, 2, 3, 4]);
     }
 

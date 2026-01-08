@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 open Baking_actions
 module Events = Baking_events.State_transitions
 
@@ -36,7 +37,7 @@ let do_nothing state = Lwt.return (state, Do_nothing)
 type proposal_acceptance = Invalid | Outdated_proposal | Valid_proposal
 
 let is_acceptable_proposal_for_current_level state
-    (proposal : Baking_state.proposal) =
+    (proposal : Baking_state_types.proposal) =
   let open Lwt_syntax in
   let current_round = state.round_state.current_round in
   if Round.(current_round < proposal.block.round) then
@@ -93,9 +94,9 @@ let make_consensus_vote_batch state proposal kind =
   let batch_content = {level; round; block_payload_hash} in
   let delegates_and_slots =
     List.map
-      (fun (delegate_slot : delegate_slot) ->
-        (delegate_slot.delegate, delegate_slot.first_slot))
-      (Delegate_slots.own_delegates state.level_state.delegate_slots)
+      (fun (delegate_info : delegate_info) ->
+        (delegate_info.delegate, delegate_info.attestation_slot))
+      (Delegate_infos.own_delegates state.level_state.delegate_infos)
   in
   (* The branch is the latest finalized block. *)
   let batch_branch =
@@ -197,32 +198,38 @@ let prepare_consensus_votes state proposal =
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
   | None -> None
-  | Some pqc ->
-      let add_voting_power acc (op : Kind.preattestation Operation.t) =
-        let open Protocol.Alpha_context.Operation in
-        let {
-          shell = _;
-          protocol_data = {contents = Single (Preattestation {slot; _}); _};
-          _;
-        } =
-          op
-        in
-        match
-          Delegate_slots.voting_power state.level_state.delegate_slots ~slot
-        with
-        | None ->
-            (* cannot happen if the map is correctly populated *)
-            acc
-        | Some attesting_power -> acc + attesting_power
-      in
+  | Some prequorum ->
       let voting_power =
-        List.fold_left add_voting_power 0 pqc.preattestations
+        let voting_power_of_slot slot =
+          match
+            Delegate_infos.voting_power state.level_state.delegate_infos ~slot
+          with
+          | Some attesting_power -> attesting_power
+          | None -> 0L
+        in
+        List.fold_left
+          (fun voting_power op ->
+            let (Operation_data operation_data) = op.protocol_data in
+            match operation_data.contents with
+            | Single (Preattestation {slot; _}) ->
+                Int64.add (voting_power_of_slot slot) voting_power
+            | Single (Preattestations_aggregate {committee; _}) ->
+                List.fold_left
+                  (fun aggregated_voting_power slot ->
+                    Int64.add
+                      (voting_power_of_slot slot)
+                      aggregated_voting_power)
+                  0L
+                  committee
+            | _ -> voting_power)
+          0L
+          prequorum.preattestations
       in
       let consensus_threshold =
-        state.global_state.constants.parametric.consensus_threshold_size
+        Delegate_infos.consensus_threshold state.level_state.delegate_infos
       in
-      if Compare.Int.(voting_power >= consensus_threshold) then
-        Some (pqc.preattestations, pqc.round)
+      if Compare.Int64.(voting_power >= consensus_threshold) then
+        Some (prequorum.preattestations, prequorum.round)
       else None
 
 let may_update_attestable_payload_with_internal_pqc state
@@ -419,9 +426,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
          This is where we update our [level_state] (and our [round_state]) *)
     let* () = Events.(emit new_head_with_increasing_level ()) in
     let new_level = new_proposal.block.shell.level in
-    let compute_new_state ~current_round ~delegate_slots
-        ~next_level_delegate_slots ~dal_attestable_slots
-        ~next_level_dal_attestable_slots =
+    let compute_new_state ~current_round ~delegate_infos
+        ~next_level_delegate_infos =
       let round_state =
         {
           current_round;
@@ -440,11 +446,9 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           locked_round = None;
           attestable_payload = None;
           elected_block = None;
-          delegate_slots;
-          next_level_delegate_slots;
+          delegate_infos;
+          next_level_delegate_infos;
           next_level_latest_forge_request = None;
-          dal_attestable_slots;
-          next_level_dal_attestable_slots;
         }
       in
       (* recursive call with the up-to-date state to handle the new
@@ -572,9 +576,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
     in
     (* 3. Add the additional given [attestations].
          N.b. this is a set: there won't be duplicates *)
-    Operation_pool.add_operations
-      filtered_mempool
-      (List.map Operation.pack attestations)
+    Operation_pool.add_operations filtered_mempool attestations
   in
   let kind = Fresh operation_pool in
   let* () = Events.(emit preparing_fresh_block (delegate, round)) in
@@ -652,8 +654,7 @@ let propose_block_action state delegate round ~last_proposal =
           List.fold_left
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
-            (List.map Operation.pack proposal.block.quorum
-            @ List.map Operation.pack prequorum.preattestations)
+            (proposal.block.quorum @ prequorum.preattestations)
         in
         let attestation_filter =
           {
@@ -781,7 +782,7 @@ let time_to_prepare_next_level_block state at_round =
          triggered when we have a slot and an elected block *)
       assert false
   | Some elected_block, Some {delegate; _} ->
-      let attestations = elected_block.attestation_qc in
+      let attestations = List.map Operation.pack elected_block.attestation_qc in
       let new_level_state =
         {state.level_state with next_level_latest_forge_request = Some at_round}
       in
@@ -813,44 +814,25 @@ let prepare_attest_action state proposal =
 let may_inject_attestations state ~first_signed_attestation
     ~other_signed_attestations =
   let open Lwt_syntax in
-  let emit_discarding_unexpected_attestation_event
-      ?(payload : attestable_payload option) attestation =
-    let {
-      vote_consensus_content = {level; round = att_round; block_payload_hash; _};
-      delegate;
-      _;
-    } =
-      attestation.unsigned_consensus_vote
-    in
-    let att_level = Raw_level.to_int32 level in
-    match payload with
-    | None ->
-        Events.(
-          emit
-            discarding_unexpected_attestation_without_prequorum_payload
-            (delegate, att_level, att_round))
-    | Some payload ->
-        Events.(
-          emit
-            discarding_unexpected_attestation_with_different_prequorum_payload
-            ( delegate,
-              block_payload_hash,
-              att_level,
-              att_round,
-              payload.proposal.block.payload_hash ))
-  in
   let check_payload state attestation do_action =
     match state.level_state.attestable_payload with
     | None ->
         (* No attestable payload, either the prequorum has not been reached yet,
            or an other issue occurred, we cannot inject the attestations. *)
-        let* () = emit_discarding_unexpected_attestation_event attestation in
+        let* () =
+          Events.emit_discarding_unexpected_attestation_not_matching_prequorum
+            attestation
+            ~attestable_payload_hash_opt:None
+        in
         do_nothing state
-    | Some payload ->
+    | Some attestable_payload ->
+        let attestable_payload_hash =
+          attestable_payload.proposal.block.payload_hash
+        in
         if
           not
             Block_payload_hash.(
-              payload.proposal.block.payload_hash
+              attestable_payload_hash
               = attestation.unsigned_consensus_vote.vote_consensus_content
                   .block_payload_hash)
         then
@@ -858,7 +840,9 @@ let may_inject_attestations state ~first_signed_attestation
              one in the attestation operation, we cannot inject the
              attestation. *)
           let* () =
-            emit_discarding_unexpected_attestation_event ~payload attestation
+            Events.emit_discarding_unexpected_attestation_not_matching_prequorum
+              attestation
+              ~attestable_payload_hash_opt:(Some attestable_payload_hash)
           in
           do_nothing state
         else do_action
@@ -931,8 +915,9 @@ let prequorum_reached_when_awaiting_preattestations state candidate
         level = latest_proposal.block.shell.level;
         round = latest_proposal.block.round;
         block_payload_hash = latest_proposal.block.payload_hash;
-        preattestations
-        (* preattestations may be nil when [consensus_threshold] is 0 *);
+        preattestations =
+          List.map Operation.pack preattestations
+          (* preattestations may be nil when [consensus_threshold] is 0 *);
       }
     in
     let new_attestable_payload = {proposal = latest_proposal; prequorum} in
@@ -1075,50 +1060,31 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
 
 let handle_forged_preattestation state signed_preattestation =
   let open Lwt_syntax in
-  let {
-    vote_consensus_content =
-      {
-        level;
-        round = att_round;
-        block_payload_hash = att_payload_hash;
-        slot = _;
-      };
-    delegate;
-    _;
-  } =
-    signed_preattestation.unsigned_consensus_vote
-  in
-  let att_level = Raw_level.to_int32 level in
-  let check_payload state preattestation do_action =
+  let check_payload state do_action =
     match state.level_state.attestable_payload with
     | None ->
         (* No attestable payload set, we are free to inject the
            preattestations *)
         do_action
     | Some payload ->
-        if
-          not
-            Block_payload_hash.(
-              payload.proposal.block.payload_hash
-              = preattestation.unsigned_consensus_vote.vote_consensus_content
-                  .block_payload_hash)
-        then
+        let preattestation_payload =
+          signed_preattestation.unsigned_consensus_vote.vote_consensus_content
+            .block_payload_hash
+        in
+        let state_payload = payload.proposal.block.payload_hash in
+        if not Block_payload_hash.(preattestation_payload = state_payload) then
           (* The preattestation payload does not match the one set in the
              state, we cannot inject the preattestation. *)
           let* () =
-            Events.(
-              emit
-                discarding_unexpected_preattestation_with_different_payload
-                ( delegate,
-                  att_payload_hash,
-                  att_level,
-                  att_round,
-                  payload.proposal.block.payload_hash ))
+            Events
+            .emit_discarding_unexpected_preattestation_with_different_payload
+              signed_preattestation
+              ~state_payload
           in
           do_nothing state
         else do_action
   in
-  (check_payload state signed_preattestation
+  (check_payload state
   @@ Lwt.return (state, Inject_preattestation {signed_preattestation}))
   [@profiler.record_s {verbosity = Debug} "check payload"]
 
@@ -1132,7 +1098,6 @@ let handle_forged_attestation state signed_attestation =
         block_payload_hash = att_payload_hash;
         slot = _;
       };
-    delegate;
     _;
   } =
     signed_attestation.unsigned_consensus_vote
@@ -1147,9 +1112,7 @@ let handle_forged_attestation state signed_attestation =
     && Compare.Int32.(shell.level = att_level)
   in
   if not attestation_matches_proposal then
-    let* () =
-      Events.(emit discarding_attestation (delegate, att_level, att_round))
-    in
+    let* () = Events.(emit discarding_attestation) signed_attestation in
     (do_nothing
        state [@profiler.record_s {verbosity = Debug} "discarding attestation"])
   else

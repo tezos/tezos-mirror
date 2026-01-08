@@ -1253,7 +1253,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                 max_operation_data_length;
                 max_block_header_length;
                 operation_list_quota;
-              } ->
+              }
+            ->
            ( ( (),
                (),
                test_chain_status,
@@ -1269,7 +1270,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                   max_operation_data_length,
                   max_block_header_length,
                   operation_list_quota ),
-                protocol_data ) ->
+                protocol_data )
+            ->
            {
              protocol_data;
              test_chain_status;
@@ -1915,7 +1917,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                  branch_refused;
                  branch_delayed;
                  unprocessed;
-               } ->
+               }
+             ->
             ( validated,
               refused,
               outdated,
@@ -1927,7 +1930,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                  outdated,
                  branch_refused,
                  branch_delayed,
-                 unprocessed ) ->
+                 unprocessed )
+             ->
             {
               validated;
               refused;
@@ -2485,7 +2489,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             ?(sort = false)
             ?timestamp
             ~protocol_data
-            operations ->
+            operations
+          ->
           f
             chain
             block
@@ -2632,8 +2637,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                      (* The same [version] type is used for versioning all the
                         RPC. Even though this version is not supported for this
                         RPC we need to handle it. We rely on the supported
-                        version list to fail at parsing for this version *) ),
-                   operations ) -> operations)
+                        version list to fail at parsing for this version *)
+                     ),
+                   operations )
+               -> operations)
             stream,
           stopper )
 
@@ -2689,11 +2696,10 @@ module Empty = Make (Fake_protocol) (Fake_protocol)
 
 let () =
   Printexc.register_printer (function
-      | ( Json_schema.Cannot_parse _ | Json_schema.Dangling_reference _
-        | Json_schema.Bad_reference _ | Json_schema.Unexpected _
-        | Json_schema.Duplicate_definition _ ) as exn ->
-          Some
-            (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
-      | _ -> None)
+    | ( Json_schema.Cannot_parse _ | Json_schema.Dangling_reference _
+      | Json_schema.Bad_reference _ | Json_schema.Unexpected _
+      | Json_schema.Duplicate_definition _ ) as exn ->
+        Some (Format.asprintf "%a" (fun ppf -> Json_schema.print_error ppf) exn)
+    | _ -> None)
 
 let protocols = Empty.protocols

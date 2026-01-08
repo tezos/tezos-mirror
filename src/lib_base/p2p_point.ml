@@ -103,9 +103,22 @@ module Id = struct
     let open Data_encoding in
     check_size
       (4 (* Uint30 that gives the size of the encoded string *)
-      + (8 (*number of IPv6 chunks *) * (*size of IPv6 chunks*) 4)
-      + (*IPv6 chunk separators*) 7 + (*optional enclosing bracket*) 2
-      + (*port separator*) 1 + (*size of port number*) 5)
+      + 8 (*number of IPv6 chunks *)
+        *
+        (*size of IPv6 chunks*)
+        4
+      +
+      (*IPv6 chunk separators*)
+      7
+      +
+      (*optional enclosing bracket*)
+      2
+      +
+      (*port separator*)
+      1
+      +
+      (*size of port number*)
+      5)
     @@ def "p2p_point.id" ~description:"Identifier for a peer point"
     @@ conv to_string of_string_exn string
 
@@ -286,7 +299,8 @@ module Info = struct
                 last_seen;
                 last_miss;
                 expected_peer_id;
-              } ->
+              }
+            ->
            let p2p_peer_id = State.of_p2p_peer_id state in
            ( ( trusted,
                reconnection_time,
@@ -309,7 +323,8 @@ module Info = struct
                   last_disconnection,
                   last_seen,
                   last_miss ),
-                expected_peer_id ) ->
+                expected_peer_id )
+            ->
            let state = State.of_peerid_state state p2p_peer_id in
            {
              trusted;

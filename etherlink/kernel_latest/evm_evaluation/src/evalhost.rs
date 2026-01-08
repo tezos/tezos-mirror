@@ -8,7 +8,7 @@ use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
     extensions::WithGas,
     internal_runtime::{ExtendedRuntime, InternalRuntime},
-    runtime::MockKernelHost,
+    runtime::{IsEvmNode, MockKernelHost},
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
@@ -43,8 +43,8 @@ impl SdkRuntime for EvalHost {
     #[inline(always)]
     fn write_debug(&self, data: &str) {
         let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{}", data) {
-            eprint!("Error due to: {}", e)
+        if let Err(e) = write!(*unboxed_buffer, "{data}") {
+            eprint!("Error due to: {e}")
         }
     }
 
@@ -218,6 +218,13 @@ impl ExtendedRuntime for EvalHost {
     ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
         self.host.store_get_hash(path)
     }
+
+    fn internal_store_read_all<T: Path>(
+        &self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read_all(path)
+    }
 }
 
 impl Verbosity for EvalHost {
@@ -233,5 +240,11 @@ impl WithGas for EvalHost {
 
     fn executed_gas(&self) -> u64 {
         self.host.executed_gas()
+    }
+}
+
+impl IsEvmNode for EvalHost {
+    fn is_evm_node(&self) -> bool {
+        panic!("`is_evm_node` should not be used by REVM");
     }
 }

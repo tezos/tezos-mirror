@@ -102,7 +102,11 @@ let publish_at_levels node dal_node client ~slot_size ~last_level publisher
    the DAL node.  Returns a pair of (number of published slot headers, number
    of attested slot indexes) at the given level. *)
 let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
-  let module Map = Map.Make (String) in
+  let module Map = Map.Make (struct
+    type t = Dal_RPC.slot_id_status
+
+    let compare = Stdlib.compare
+  end) in
   let slot_indices = List.init number_of_slots Fun.id in
   let* map, num_published =
     Lwt_list.fold_left_s
@@ -131,7 +135,8 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
     let open Format in
     pp_print_list
       ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-      (fun fmt (status, (c, _indexes)) -> Format.fprintf fmt "%d %s" c status)
+      (fun fmt (status, (c, _indexes)) ->
+        Format.fprintf fmt "%d %a" c Dal_RPC.pp_slot_id_status status)
   in
   let attested_level = string_of_int (published_level + lag) in
   let* metadata =
@@ -157,7 +162,7 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
         else x
   in
   let num_attested, indexes =
-    match Map.find_opt "attested" map with
+    match Map.find_opt (Dal_RPC.Attested lag) map with
     | None -> (0, [])
     | Some (c, l) -> (c, l)
   in

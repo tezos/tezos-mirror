@@ -25,6 +25,8 @@ let z_typ = Check.(convert Z.to_int64 int64)
 
 let expect_ok msg = function Ok x -> x | Error _err -> Test.fail msg
 
+let pool = Lwt_domain.setup_pool 1
+
 let test_wasm_runtime_id () =
   register ~title:"test wasm_runtime_run" @@ fun () ->
   Log.info "Initialize the tree" ;
@@ -35,16 +37,19 @@ let test_wasm_runtime_id () =
            "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm")
   in
   let tree = expect_ok "Should be able to create an initial state" tree in
+  let tree = Pvm.Wasm_internal.to_irmin_exn tree in
   Log.info "Run kernel_run" ;
   let* tree =
     Wasm_runtime.run
+      ~pool
       ~preimages_dir:Temp.(dir "wasm_2_0_0")
       ~entrypoint:"kernel_run"
       ~native_execution:true
       tree
       Tezos_crypto.Hashed.Smart_rollup_address.zero
-      []
+      (`Inbox [])
   in
+  let tree = Pvm.Wasm_internal.of_irmin tree in
   Log.info "Check state consistency" ;
   let* quantity =
     Etherlink_durable_storage.current_block_number (fun key ->

@@ -43,6 +43,8 @@ type block = t
 
 type full_metadata = block_header_metadata * operation_receipt list
 
+type block_with_metadata = block * full_metadata
+
 let get_alpha_ctxt b =
   let open Lwt_result_wrap_syntax in
   let*@ ctxt, _migration_balance_updates, _migration_operation_results =
@@ -76,6 +78,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 type baking_mode = Application | Baking
 
@@ -171,10 +174,37 @@ let get_next_baker_excluding excludes block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
+let get_next_baker_by_account_and_minimal_round pkh min_round block =
+  let open Lwt_result_wrap_syntax in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~delegates:[pkh] block
+  in
+  let* {delegate = pkh; consensus_key; timestamp; round; _} =
+    match
+      (* The RPC returns the list of all rounds in increasing order,
+         so `find` will find the first round after the requested minimal round
+         for the baker `pkh` to bake *)
+      List.find
+        (fun {Plugin.RPC.Baking_rights.round; _} ->
+          Round.to_int32 round >= Int32.of_int min_round)
+        bakers
+    with
+    | Some b -> return b
+    | None -> tzfail (No_slots_found_for pkh)
+  in
+  let*?@ round = Round.to_int round in
+  return
+    ( pkh,
+      consensus_key,
+      round,
+      WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
+
 let dispatch_policy = function
   | By_round r -> get_next_baker_by_round r
   | By_account a -> get_next_baker_by_account a
   | Excluding al -> get_next_baker_excluding al
+  | By_account_with_minimal_round (pkh, r) ->
+      get_next_baker_by_account_and_minimal_round pkh r
 
 let get_next_baker ?(policy = By_round 0) = dispatch_policy policy
 
@@ -184,6 +214,8 @@ let get_round (b : t) =
   Fitness.(
     let+ fitness = from_raw fitness in
     round fitness)
+
+let get_payload_round (b : t) = b.header.protocol_data.contents.payload_round
 
 let block_producer block =
   let open Lwt_result_wrap_syntax in
@@ -228,7 +260,6 @@ module Forge = struct
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
-      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~seed_nonce_hash shell =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -240,10 +271,7 @@ module Forge = struct
           proof_of_work_nonce = default_proof_of_work_nonce;
           seed_nonce_hash;
           per_block_votes =
-            {
-              liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_issuance_vote;
-            };
+            {liquidity_baking_vote = liquidity_baking_toggle_vote};
         }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
@@ -306,8 +334,7 @@ module Forge = struct
     Array.to_list t
 
   let forge_header ?locked_round ?payload_round ?(policy = By_round 0)
-      ?timestamp ?(operations = []) ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote pred =
+      ?timestamp ?(operations = []) ?liquidity_baking_toggle_vote pred =
     let open Lwt_result_wrap_syntax in
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
@@ -362,7 +389,6 @@ module Forge = struct
       make_contents
         ~seed_nonce_hash
         ?liquidity_baking_toggle_vote
-        ?adaptive_issuance_vote
         ~payload_hash
         ~payload_round
         shell
@@ -375,7 +401,6 @@ module Forge = struct
         Tezos_protocol_alpha_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
-      ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
       ~payload_hash ~payload_round shell_header =
     naive_pow_miner
       ~proof_of_work_threshold
@@ -383,11 +408,7 @@ module Forge = struct
       {
         Block_header.proof_of_work_nonce = default_proof_of_work_nonce;
         seed_nonce_hash;
-        per_block_votes =
-          {
-            liquidity_baking_vote = liquidity_baking_toggle_vote;
-            adaptive_issuance_vote;
-          };
+        per_block_votes = {liquidity_baking_vote = liquidity_baking_toggle_vote};
         payload_hash;
         payload_round;
       }
@@ -458,7 +479,7 @@ let initial_alpha_context ?(commitments = []) constants
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
   let typecheck_smart_contract (ctxt : Alpha_context.context)
-      (script : Alpha_context.Script.t) =
+      (script : Alpha_context.Script.michelson_with_storage) =
     let allow_forged_tickets_in_storage, allow_forged_lazy_storage_id_in_storage
         =
       (false, false)
@@ -470,7 +491,7 @@ let initial_alpha_context ?(commitments = []) constants
         ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
         ~allow_forged_tickets_in_storage
         ~allow_forged_lazy_storage_id_in_storage
-        script
+        (Script script)
     in
     let* storage, lazy_storage_diff, ctxt =
       Script_ir_translator.extract_lazy_storage_diff
@@ -505,7 +526,7 @@ let initial_alpha_context ?(commitments = []) constants
   in
   return result
 
-let genesis_with_parameters parameters =
+let genesis_with_parameters ?prepare_context parameters =
   let open Lwt_result_wrap_syntax in
   let hash =
     Block_hash.of_b58check_exn
@@ -546,6 +567,21 @@ let genesis_with_parameters parameters =
   in
   let chain_id = Chain_id.of_block_hash hash in
   let*@ {context; _} = Main.init chain_id ctxt shell in
+  let* context =
+    match prepare_context with
+    | None -> return context
+    | Some f ->
+        let*@ context, _balance_updates, _origination_results =
+          Init_storage.prepare
+            context
+            ~level:0l
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~timestamp:Time.Protocol.epoch
+        in
+        let*@ context = f context in
+        let context = Raw_context.recover context in
+        return context
+  in
   return
     {
       hash;
@@ -583,7 +619,8 @@ let prepare_initial_context_params ?consensus_committee_size
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
-    ?allow_tz4_delegate_enable ?aggregate_attestation () =
+    ?allow_tz4_delegate_enable ?aggregate_attestation ?native_contracts_enable
+    () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -669,6 +706,11 @@ let prepare_initial_context_params ?consensus_committee_size
   let aggregate_attestation =
     Option.value ~default:constants.aggregate_attestation aggregate_attestation
   in
+  let native_contracts_enable =
+    Option.value
+      ~default:constants.native_contracts_enable
+      native_contracts_enable
+  in
   let cache_sampler_state_cycles =
     consensus_rights_delay + Constants_repr.slashing_delay + 2
   and cache_stake_distribution_cycles =
@@ -707,6 +749,7 @@ let prepare_initial_context_params ?consensus_committee_size
       cache_stake_distribution_cycles;
       allow_tz4_delegate_enable;
       aggregate_attestation;
+      native_contracts_enable;
     }
   in
   let* () = check_constants_consistency constants in
@@ -741,7 +784,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?dal_incentives_enable ?zk_rollup_enable ?hard_gas_limit_per_block
     ?nonce_revelation_threshold ?dal ?adaptive_issuance
-    ?allow_tz4_delegate_enable ?aggregate_attestation
+    ?allow_tz4_delegate_enable ?aggregate_attestation ?native_contracts_enable
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
@@ -767,6 +810,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold_size
       ?adaptive_issuance
       ?allow_tz4_delegate_enable
       ?aggregate_attestation
+      ?native_contracts_enable
       ()
   in
   let* () =
@@ -868,11 +912,11 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = finalize_validation validation_state in
   finalize_application application_state shell_header
 
-let detect_manager_failure :
-    type kind. kind Apply_results.operation_metadata -> _ =
+let detect_manager_failure : type kind.
+    kind Apply_results.operation_metadata -> _ =
   let open Result_syntax in
-  let rec detect_manager_failure :
-      type kind. kind Apply_results.contents_result_list -> _ =
+  let rec detect_manager_failure : type kind.
+      kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
     let open Apply_operation_result in
     let open Apply_internal_results in
@@ -978,7 +1022,7 @@ let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ?check_size ?baking_mode ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
+    ?liquidity_baking_toggle_vote pred =
   let open Lwt_result_syntax in
   let operations =
     match (operation, operations) with
@@ -995,7 +1039,6 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
       ?policy
       ?operations
       ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
       pred
   in
   let* header = Forge.sign_header header in
@@ -1010,7 +1053,7 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
 
 let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
     ?check_size ?baking_mode ?(allow_manager_failures = false)
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n pred =
+    ?liquidity_baking_toggle_vote n pred =
   let open Lwt_result_syntax in
   let get_next b =
     bake_with_metadata
@@ -1022,7 +1065,6 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
       ?baking_mode
       ~allow_manager_failures
       ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
       b
   in
   let* b = get_next pred in
@@ -1030,7 +1072,7 @@ let bake_n_with_metadata ?locked_round ?policy ?timestamp ?payload_round
 
 let bake ?baking_mode ?(allow_manager_failures = false) ?payload_round
     ?locked_round ?policy ?timestamp ?operation ?operations
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote ?check_size pred =
+    ?liquidity_baking_toggle_vote ?check_size pred =
   let open Lwt_result_syntax in
   let* t, (_metadata : block_header_metadata * operation_receipt list) =
     bake_with_metadata
@@ -1043,7 +1085,6 @@ let bake ?baking_mode ?(allow_manager_failures = false) ?payload_round
       ?operation
       ?operations
       ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
       ?check_size
       pred
   in
@@ -1051,39 +1092,26 @@ let bake ?baking_mode ?(allow_manager_failures = false) ?payload_round
 
 (********** Cycles ****************)
 
-let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote n b =
+let bake_n ?baking_mode ?policy ?liquidity_baking_toggle_vote n b =
   List.fold_left_es
-    (fun b _ ->
-      bake
-        ?baking_mode
-        ?policy
-        ?liquidity_baking_toggle_vote
-        ?adaptive_issuance_vote
-        b)
+    (fun b _ -> bake ?baking_mode ?policy ?liquidity_baking_toggle_vote b)
     b
     (1 -- n)
 
 let rec bake_while_with_metadata ?baking_mode ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote
+    ?liquidity_baking_toggle_vote
     ?(invariant = fun _ -> Lwt_result_syntax.return_unit) ?previous_metadata
     predicate b =
   let open Lwt_result_syntax in
   let* () = invariant b in
   let* new_block, (metadata, _) =
-    bake_with_metadata
-      ?baking_mode
-      ?policy
-      ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
-      b
+    bake_with_metadata ?baking_mode ?policy ?liquidity_baking_toggle_vote b
   in
   if predicate new_block metadata then
     (bake_while_with_metadata [@ocaml.tailcall])
       ?baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
       ~previous_metadata:metadata
       ~invariant
       predicate
@@ -1092,28 +1120,26 @@ let rec bake_while_with_metadata ?baking_mode ?policy
 
 let bake_while_with_metadata = bake_while_with_metadata ?previous_metadata:None
 
-let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote ?invariant predicate b =
+let bake_while ?baking_mode ?policy ?liquidity_baking_toggle_vote ?invariant
+    predicate b =
   let open Lwt_result_syntax in
   let* b, _ =
     bake_while_with_metadata
       ?baking_mode
       ?policy
       ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
       ?invariant
       (fun block _metadata -> predicate block)
       b
   in
   return b
 
-let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote level b =
+let bake_until_level ?baking_mode ?policy ?liquidity_baking_toggle_vote level b
+    =
   bake_while
     ?baking_mode
     ?policy
     ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote
     (fun b -> b.header.shell.level <= Raw_level.to_int32 level)
     b
 
@@ -1135,8 +1161,7 @@ let balance_update_of_internal_operation_result = function
           | IEvent_result _ ->
               []))
 
-let balance_update_of_operation_result :
-    type a.
+let balance_update_of_operation_result : type a.
     a Protocol.Apply_results.manager_operation_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
@@ -1163,8 +1188,7 @@ let balance_update_of_operation_result :
       | Increase_paid_storage_result {balance_updates; _} ->
           balance_updates)
 
-let balance_updates_of_single_content :
-    type a.
+let balance_updates_of_single_content : type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Proposals_result | Ballot_result
@@ -1192,8 +1216,7 @@ let balance_updates_of_single_content :
         |> List.flatten)
       @ balance_update_of_operation_result operation_result
 
-let rec balance_updates_of_contents :
-    type a.
+let rec balance_updates_of_contents : type a.
     a Protocol.Apply_results.contents_result_list ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Single_result c -> balance_updates_of_single_content c
@@ -1223,7 +1246,7 @@ let get_balance_updates_from_metadata
   @ implicit_balance_updates
 
 let bake_n_with_all_balance_updates ?baking_mode ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
+    ?liquidity_baking_toggle_vote n b =
   let open Lwt_result_syntax in
   let+ b, balance_updates_rev =
     List.fold_left_es
@@ -1233,7 +1256,6 @@ let bake_n_with_all_balance_updates ?baking_mode ?policy
             ?baking_mode
             ?policy
             ?liquidity_baking_toggle_vote
-            ?adaptive_issuance_vote
             b
         in
         let balance_updates_rev =
@@ -1292,16 +1314,10 @@ let bake_n_with_origination_results ?baking_mode ?policy n b =
   (b, List.rev origination_results_rev)
 
 let bake_n_with_liquidity_baking_toggle_ema ?baking_mode ?policy
-    ?liquidity_baking_toggle_vote ?adaptive_issuance_vote n b =
+    ?liquidity_baking_toggle_vote n b =
   let open Lwt_result_syntax in
   let+ b, (metadata, _) =
-    bake_n_with_metadata
-      ?baking_mode
-      ?policy
-      ?liquidity_baking_toggle_vote
-      ?adaptive_issuance_vote
-      n
-      b
+    bake_n_with_metadata ?baking_mode ?policy ?liquidity_baking_toggle_vote n b
   in
   (b, metadata.liquidity_baking_toggle_ema)
 

@@ -213,8 +213,8 @@ let redirect_if_many :
   | [attr] -> (state, {(fattr attr) with id})
   | _ :: _ :: _ as attrs -> redirect state attrs fattr id
 
-let rec seq_field_of_data_encoding0 :
-    type a. state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
+let rec seq_field_of_data_encoding0 : type a.
+    state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
  fun state ({encoding; _} as whole_encoding) id ->
   let id = escape_id id in
   match encoding with
@@ -564,8 +564,8 @@ let rec seq_field_of_data_encoding0 :
       in
       (state, [attr])
 
-and seq_field_of_data_encoding :
-    type a. state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
+and seq_field_of_data_encoding : type a.
+    state -> a DataEncoding.t -> string -> state * AttrSpec.t list =
  fun state whole_encoding id ->
   match
     AnyEncoding.Tbl.find_opt state.extern (AnyEncoding.pack whole_encoding)
@@ -582,8 +582,7 @@ and seq_field_of_data_encoding :
         ] )
   | None -> seq_field_of_data_encoding0 state whole_encoding id
 
-and seq_field_of_tups :
-    type a.
+and seq_field_of_tups : type a.
     state -> Helpers.tid_gen -> a DataEncoding.desc -> state * AttrSpec.t list =
  fun state tid_gen d ->
   match d with
@@ -615,8 +614,8 @@ and seq_field_of_tups :
       (state, seq)
   | _ -> failwith "Non-tup(s) inside a tups"
 
-and seq_field_of_field :
-    type a. state -> a DataEncoding.field -> state * AttrSpec.t list =
+and seq_field_of_field : type a.
+    state -> a DataEncoding.field -> state * AttrSpec.t list =
  fun state f ->
   match f with
   | Req {name; encoding; title; description} ->
@@ -680,8 +679,7 @@ and seq_field_of_field :
       in
       (state, Option.to_list attr_o)
 
-and seq_field_of_union :
-    type a.
+and seq_field_of_union : type a.
     state ->
     Data_encoding__Binary_size.tag_size ->
     a DataEncoding.case list ->
@@ -693,7 +691,8 @@ and seq_field_of_union :
        parts we don't care about like injection and projection functions. *)
     List.filter_map
       (fun (DataEncoding.Case
-             {title; tag; description; encoding; proj = _; inj = _}) ->
+              {title; tag; description; encoding; proj = _; inj = _})
+         ->
         Data_encoding__Uint_option.fold
           ~none:None
           ~some:(fun tag ->
@@ -729,7 +728,8 @@ and seq_field_of_union :
   let state, payload_attrs =
     List.fold_left
       (fun (state, payload_attrs)
-           (_, case_id, _, AnyEncoding.AnyEncoding encoding) ->
+           (_, case_id, _, AnyEncoding.AnyEncoding encoding)
+         ->
         let state, attrs = seq_field_of_data_encoding state encoding case_id in
         match attrs with
         | [] -> (state, payload_attrs)
@@ -769,8 +769,7 @@ and seq_field_of_union :
   let payload_attrs = List.rev payload_attrs in
   (state, tag_attr :: payload_attrs)
 
-and seq_field_of_collection :
-    type a.
+and seq_field_of_collection : type a.
     state ->
     DataEncoding.limit ->
     int DataEncoding.encoding option ->
@@ -860,8 +859,7 @@ let add_original_id_to_description ?description id =
   | None -> "Encoding id: " ^ id
   | Some description -> "Encoding id: " ^ id ^ "\nDescription: " ^ description
 
-let from_data_encoding :
-    type a.
+let from_data_encoding : type a.
     id:string ->
     ?extern:string AnyEncoding.Tbl.t ->
     a DataEncoding.t ->

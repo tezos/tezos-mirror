@@ -98,3 +98,36 @@ dnf_with_retries() {
 
 # Replace dnf with the new function
 alias dnf="dnf_with_retries"
+
+get_node_version() {
+  url="http://localhost:8732/version"
+  max_attempts=100
+  wait_seconds=15
+  i=1 # Initialize counter
+  response=""
+
+  while [ "$i" -le "$max_attempts" ]; do
+    # 1. --silent hides progress
+    # 2. --fail handles HTTP errors (404/500)
+    # 3. 2> /dev/null HIDES the "Failed to connect" connection errors
+    if response=$(curl --silent --fail "$url" 2> /dev/null); then
+      # SUCCESS: Echo the version to stdout
+      echo "$response"
+      return 0
+    else
+      # WAITING: Echo status to stderr
+      echo "Service not yet ready, waiting... (Attempt $i/$max_attempts)" >&2
+    fi
+
+    # Increment counter
+    i=$((i + 1))
+
+    # Wait before next attempt (only if not the last attempt to save time)
+    if [ "$i" -le "$max_attempts" ]; then
+      sleep "$wait_seconds"
+    fi
+  done
+
+  echo "Service did not become ready within the specified time." >&2
+  return 1
+}

@@ -112,7 +112,7 @@ let test_set_input_step_in_padding ~version () =
     match tick_state with
     | Stuck
         (Wasm_pvm_errors.Invalid_state
-          (Wasm_pvm_errors.Truncated "No input required during padding")) ->
+           (Wasm_pvm_errors.Truncated "No input required during padding")) ->
         return_unit
     | _ ->
         failwith

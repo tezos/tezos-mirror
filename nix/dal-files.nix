@@ -1,4 +1,8 @@
-{fetchurl}: {
+# SPDX-FileCopyrightText: 2025 TriliTech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+{ fetchurl }:
+{
   g1 = fetchurl {
     url = "https://assets.nomadic-labs.cloud/dal_trusted_setup/srsu_g1";
     sha256 = "c48ce4add1de2a7561108f17bf0c16bc1e93c0bff24bc7da465c24e0b4b2653e";

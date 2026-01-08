@@ -235,13 +235,13 @@ module Daemon (Event : EVENTS) = struct
         (fun () -> f ())
         ~on_error:(function
           | errs ->
-              let*! () =
-                Event.(
-                  emit
-                    cannot_start_process
-                    (Format.asprintf "%a" pp_print_trace errs))
-              in
-              run_with_backoff ~backoff:(Time.System.now (), sleep *. 1.2) ~f)
+          let*! () =
+            Event.(
+              emit
+                cannot_start_process
+                (Format.asprintf "%a" pp_print_trace errs))
+          in
+          run_with_backoff ~backoff:(Time.System.now (), sleep *. 1.2) ~f)
     else
       let*! () = Event.(emit waiting_for_process_restart sleep) in
       let*! () = Lwt_unix.sleep sleep in

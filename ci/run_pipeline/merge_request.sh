@@ -4,6 +4,7 @@ set -eu
 
 # Project ID defaults to tezos/tezos.
 CI_PROJECT_NAMESPACE="${CI_PROJECT_NAMESPACE:-tezos}"
+DOCKER_FORCE_BUILD="${DOCKER_FORCE_BUILD:-false}"
 BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 CI_MERGE_REQUEST_TARGET_BRANCH_NAME="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-master}"
 CI_MERGE_REQUEST_DIFF_BASE_SHA="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$(git merge-base HEAD origin/master)}"
@@ -29,6 +30,10 @@ DATA="$(
     {
       "key": "CI_MERGE_REQUEST_DIFF_BASE_SHA",
       "value": "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+    },
+    {
+      "key": "DOCKER_FORCE_BUILD",
+      "value": "$DOCKER_FORCE_BUILD"
     }
   ]
 }
@@ -40,6 +45,7 @@ cat << EOF
 Will run a before_merging pipeline for:
 
                CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
+                 DOCKER_FORCE_BUILD = $DOCKER_FORCE_BUILD
                              BRANCH = $BRANCH
 CI_MERGE_REQUEST_TARGET_BRANCH_NAME = $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
      CI_MERGE_REQUEST_DIFF_BASE_SHA = $CI_MERGE_REQUEST_DIFF_BASE_SHA

@@ -13,10 +13,7 @@ ENV BLST_PORTABLE=true
 # https://gitlab.com/dannywillems/ocaml-bls12-381/-/merge_requests/135/
 ENV BLST_PORTABLE=true
 
-ARG APT_PROXY
-ENV APT_PROXY=${APT_PROXY:-false}
 COPY --chown=tezos:tezos \
-  images/scripts/install_datadog_static.sh \
   images/scripts/install_sccache_static.sh \
   images/scripts/install_opam_static.sh \
   scripts/kiss-fetch.sh \
@@ -27,8 +24,7 @@ COPY --chown=tezos:tezos \
 # We install sccache as a static binary because at the moment of writing
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
-RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install --no-install-recommends -y bubblewrap \
       rsync git m4 build-essential \
       patch unzip curl wget ca-certificates \
@@ -43,8 +39,11 @@ RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy &&
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+
+ARG OPAM_VERSION
+ENV OPAM_VERSION=${OPAM_VERSION}
+
 RUN /tmp/install_sccache_static.sh && \
-    /tmp/install_datadog_static.sh && \
     /tmp/install_opam_static.sh
 
 COPY --link scripts/version.sh /root/tezos/scripts/
@@ -65,7 +64,9 @@ COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
-COPY --link opam/virtual/stdcompat.opam.locked /root/tezos/opam/virtual/
+COPY --link opam/virtual/release-tools-deps.opam.locked /root/tezos/opam/virtual/
+COPY --link opam/virtual/dream-httpaf.opam.locked /root/tezos/opam/virtual/
+COPY --link opam/virtual/dream.opam.locked /root/tezos/opam/virtual/
 COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos

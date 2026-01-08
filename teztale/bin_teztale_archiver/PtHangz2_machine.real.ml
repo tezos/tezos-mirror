@@ -63,18 +63,18 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
            contents =
              Single
                (Endorsement_with_slot
-                 {
-                   endorsement =
-                     {
-                       shell = _;
-                       protocol_data =
-                         {
-                           contents = Single (Endorsement {level});
-                           signature = _;
-                         };
-                     };
-                   slot;
-                 });
+                  {
+                    endorsement =
+                      {
+                        shell = _;
+                        protocol_data =
+                          {
+                            contents = Single (Endorsement {level});
+                            signature = _;
+                          };
+                      };
+                    slot;
+                  });
            signature = _;
          };
      shell = {branch};
@@ -195,13 +195,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           match receipt with
           | Receipt
               (Protocol.Apply_results.Operation_metadata
-                {
-                  contents =
-                    Single_result
-                      (Protocol.Apply_results.Endorsement_with_slot_result
-                        (Tezos_raw_protocol_011_PtHangz2.Apply_results
-                         .Endorsement_result {delegate; slots; _}));
-                }) ->
+                 {
+                   contents =
+                     Single_result
+                       (Protocol.Apply_results.Endorsement_with_slot_result
+                          (Tezos_raw_protocol_011_PtHangz2.Apply_results
+                           .Endorsement_result
+                             {delegate; slots; _}));
+                 }) ->
               Some
                 Consensus_ops.
                   {

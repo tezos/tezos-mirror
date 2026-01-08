@@ -44,24 +44,24 @@ class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
 
     method generic_media_type_call = t#generic_media_type_call
 
-    method call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       t#call_service
 
-    method call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       t#call_streamed_service
 
     (** Abstracts variables <chain_id> and <block_id> in protocol RPCs
@@ -203,6 +203,11 @@ let () =
        "operation"
        ["internal"]
        Protocol.Apply_internal_results.internal_operation_encoding ;
+  register
+  @@ def
+       "operation"
+       ["internal_and_metadata"]
+       Protocol.Apply_internal_results.internal_operation_result_encoding ;
   register
   @@ def
        "operation"

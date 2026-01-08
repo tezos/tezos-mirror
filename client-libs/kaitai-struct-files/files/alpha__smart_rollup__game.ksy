@@ -78,6 +78,12 @@ types:
     - id: published
       type: published
       if: (content_tag == content_tag::published)
+    - id: unpublished_dyn
+      type: unpublished_dyn
+      if: (content_tag == content_tag::unpublished_dyn)
+    - id: published_dyn
+      type: published_dyn
+      if: (content_tag == content_tag::published_dyn)
   dal_snapshot:
     seq:
     - id: dal_snapshot_tag
@@ -200,6 +206,28 @@ types:
     - id: v0
       type: v0
       if: (published_tag == published_tag::v0)
+  published_dyn:
+    seq:
+    - id: publisher
+      type: alpha__contract_id
+      doc: ! >-
+        A contract handle: A contract notation as given to an RPC or inside scripts.
+        Can be a base58 implicit contract hash or a base58 originated contract hash.
+    - id: is_proto_attested
+      type: u1
+      enum: bool
+    - id: attested_shards
+      type: u2be
+    - id: total_shards
+      type: u2be
+    - id: attestation_lag
+      type: u1
+    - id: published_dyn_tag
+      type: u1
+      enum: published_dyn_tag
+    - id: v0
+      type: v0
+      if: (published_dyn_tag == published_dyn_tag::v0)
   refuted_stop_chunk:
     seq:
     - id: state_tag
@@ -224,6 +252,14 @@ types:
       type: s4be
     - id: index
       type: u1
+  unpublished_dyn:
+    seq:
+    - id: attestation_lag
+      type: u1
+    - id: level
+      type: s4be
+    - id: index
+      type: u1
   v0:
     seq:
     - id: level
@@ -242,6 +278,8 @@ enums:
   content_tag:
     2: unpublished
     3: published
+    4: unpublished_dyn
+    5: published_dyn
   dal_snapshot_tag:
     0: dal_skip_list_legacy
     1: dal_skip_list
@@ -253,6 +291,8 @@ enums:
     1: secp256k1
     2: p256
     3: bls
+  published_dyn_tag:
+    0: v0
   published_tag:
     0: v0
   turn_tag:

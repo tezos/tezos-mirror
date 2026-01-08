@@ -109,6 +109,16 @@ let ignored_periodic_snapshot =
     ~level:Warning
     ()
 
+let ignored_preconfirmations =
+  declare_0
+    ~section
+    ~name:"ignored_preconfirmations"
+    ~msg:
+      "Inclusion preconfirmations and preconfirmed receipts will be ignored \
+       since the kernel does not support it"
+    ~level:Warning
+    ()
+
 let catching_up_evm_event =
   Internal_event.Simple.declare_2
     ~section
@@ -132,16 +142,6 @@ let event_is_ready =
     ("websockets", Data_encoding.bool)
     ~pp4:(fun fmt b ->
       (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
-
-let legacy_mode =
-  Internal_event.Simple.declare_0
-    ~section
-    ~name:"legacy_mode"
-    ~level:Warning
-    ~msg:
-      "node is using the (deprecated) legacy block storage, import a recent \
-       snapshot to start using the new block storage"
-    ()
 
 let importing_legacy_snapshot =
   Internal_event.Simple.declare_0
@@ -244,6 +244,16 @@ let replicate_transaction_dropped =
     ~level:Warning
     ~pp1:Ethereum_types.pp_hash
     ("hash", Ethereum_types.hash_encoding)
+    ("reason", Data_encoding.string)
+
+let replicate_operation_dropped =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"replicate_operation_dropped"
+    ~msg:"operation {hash} was dropped because it is now invalid ({reason})"
+    ~level:Warning
+    ~pp1:Operation_hash.pp
+    ("hash", Operation_hash.encoding)
     ("reason", Data_encoding.string)
 
 type kernel_log_kind = Application | Simulation
@@ -502,6 +512,33 @@ let multichain_node_singlechain_kernel =
        because the multichain feature is not yet enabled in the rollup"
     ()
 
+let event_next_block_timestamp =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"next_block_timestamp"
+    ~msg:"received timestamp of the next block {timestamp}"
+    ~level:Notice
+    ("timestamp", Time.Protocol.encoding)
+
+let event_tx_inclusion =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"inclusion"
+    ~msg:"received inclusion confirmation for the transaction {txn_hash}"
+    ~level:Notice
+    ("txn_hash", Ethereum_types.hash_encoding)
+
+let patched_sequencer_key =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"patched_sequencer_key"
+    ~msg:"patched state with sequencer key {pk} ({pkh})"
+    ~level:Warning
+    ~pp1:Signature.Public_key.pp
+    ~pp2:Signature.Public_key_hash.pp
+    ("pk", Signature.Public_key.encoding)
+    ("pkh", Signature.Public_key_hash.encoding)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -532,12 +569,12 @@ let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
 let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
 
+let ignored_preconfirmations () = emit ignored_preconfirmations ()
+
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
 let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_is_ready (rpc_addr, rpc_port, backend, websockets)
-
-let legacy_mode () = emit legacy_mode ()
 
 let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 
@@ -628,3 +665,13 @@ let import_snapshot_archive_in_progress ~archive_name ~elapsed_time =
 
 let replicate_transaction_dropped hash reason =
   emit replicate_transaction_dropped (hash, reason)
+
+let replicate_operation_dropped hash reason =
+  emit replicate_operation_dropped (hash, reason)
+
+let next_block_timestamp t = emit event_next_block_timestamp t
+
+let inclusion t = emit event_tx_inclusion t
+
+let patched_sequencer_key pk =
+  emit patched_sequencer_key (pk, Signature.Public_key.hash pk)

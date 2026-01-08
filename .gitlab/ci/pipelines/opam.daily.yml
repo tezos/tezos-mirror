@@ -1,0 +1,783 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- images
+- packaging
+
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+    GCLOUD_VERSION: 543.0.0
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+datadog_pipeline_trace:
+  image: datadog/ci:v4.1.0
+  stage: start
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+opam:prepare:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - git init _opam-repo-for-release
+  - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+  - git -C _opam-repo-for-release add packages
+  - git -C _opam-repo-for-release commit -m "tezos packages"
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    paths:
+    - _opam-repo-for-release/
+
+opam:all_6:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 6 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - tezt-tezos
+      - tezos-protocol-genesis
+      - tezos-protocol-demo-noops
+      - tezos-protocol-demo-counter
+      - tezos-openapi
+      - tezos-dal-node-services
+      - tezos-benchmark
+      - octez-shell-libs
+      - octez-riscv-pvm
+      - octez-proto-libs
+      - octez-performance-metrics
+      - octez-lib-upnp
+      - octez-l2-libs
+      - efunc_core
+      - dal_node_migrations
+
+opam:exec_6:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 6 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-version
+      - octez-protocol-compiler
+
+opam:all_2:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 2 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-smart-rollup-node-lib
+      - octez-smart-rollup-node-PtParisB
+      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-node-PsRiotum
+      - octez-smart-rollup-node-PsQuebec
+      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
+      - octez-protocol-022-PsRiotum-libs
+      - octez-protocol-021-PsQuebec-libs
+      - octez-protocol-020-PsParisC-libs
+      - octez-protocol-019-PtParisB-libs
+      - octez-protocol-018-Proxford-libs
+      - octez-protocol-017-PtNairob-libs
+      - octez-protocol-016-PtMumbai-libs
+      - octez-protocol-000-Ps9mPmXa-libs
+      - octez-injector
+      - octez-baker-lib
+
+opam:all_1:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-smart-rollup-node-alpha
+      - octez-smart-rollup-node-PtTALLiN
+      - octez-smart-rollup-node-PtSeouLo
+      - octez-protocol-alpha-libs
+      - octez-protocol-024-PtTALLiN-libs
+      - octez-protocol-023-PtSeouLo-libs
+
+opam:all_3:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 3 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - tezos-client-demo-counter
+      - octez-rpc-process
+      - octez-protocol-015-PtLimaPt-libs
+      - octez-protocol-014-PtKathma-libs
+      - octez-protocol-013-PtJakart-libs
+      - octez-protocol-012-Psithaca-libs
+      - octez-protocol-011-PtHangz2-libs
+      - octez-protocol-010-PtGRANAD-libs
+      - octez-protocol-009-PsFLoren-libs
+      - octez-protocol-008-PtEdo2Zk-libs
+      - octez-protocol-007-PsDELPH1-libs
+      - octez-protocol-006-PsCARTHA-libs
+      - octez-protocol-005-PsBabyM1-libs
+      - octez-protocol-004-Pt24m4xi-libs
+      - octez-protocol-003-PsddFKi3-libs
+      - octez-protocol-002-PsYLVpVv-libs
+      - octez-protocol-001-PtCJ7pwo-libs
+
+opam:exec_4:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 4 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-signer
+
+opam:all_4:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 4 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-008-PtEdoTez
+      - tezos-protocol-008-PtEdo2Zk
+      - tezos-protocol-007-PsDELPH1
+      - tezos-protocol-006-PsCARTHA
+      - tezos-protocol-005-PsBabyM1
+      - tezos-protocol-005-PsBABY5H
+      - tezos-protocol-004-Pt24m4xi
+      - tezos-protocol-003-PsddFKi3
+      - tezos-protocol-002-PsYLVpVv
+      - tezos-protocol-001-PtCJ7pwo
+      - tezos-protocol-000-Ps9mPmXa
+      - tezos-dal-node-lib
+      - tezos-client-genesis
+      - octez-node-config
+      - octez-crawler
+      - octez-baking-common-lib
+
+opam:exec_1:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-smart-rollup-node
+      - octez-node
+      - octez-dal-node
+      - octez-codec
+      - octez-client
+      - octez-baker-PtTALLiN
+      - octez-baker-PtSeouLo
+      - octez-baker
+      - octez-accuser-PtTALLiN
+      - octez-accuser-PtSeouLo
+      - octez-accuser
+
+opam:all_5:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 5 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - tezos-protocol-alpha
+      - tezos-protocol-024-PtTALLiN
+      - tezos-protocol-023-PtSeouLo
+      - tezos-protocol-022-PsRiotum
+      - tezos-protocol-021-PsQuebec
+      - tezos-protocol-020-PsParisC
+      - tezos-protocol-019-PtParisB
+      - tezos-protocol-018-Proxford
+      - tezos-protocol-017-PtNairob
+      - tezos-protocol-016-PtMumbai
+      - tezos-protocol-015-PtLimaPt
+      - tezos-protocol-014-PtKathma
+      - tezos-protocol-013-PtJakart
+      - tezos-protocol-012-Psithaca
+      - tezos-protocol-011-PtHangz2
+      - tezos-protocol-010-PtGRANAD
+      - tezos-protocol-009-PsFLoren
+
+opam:all_7:
+  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - when: delayed
+    start_in: 7 minutes
+  needs:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  dependencies:
+  - oc.docker:ci:amd64
+  - opam:prepare
+  timeout: 90 minutes
+  cache:
+  - key: opam-sccache
+    paths:
+    - $CI_PROJECT_DIR/_build/_sccache
+    policy: pull-push
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    RUNTEZTALIAS: "true"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    CARGO_NET_OFFLINE: "false"
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  parallel:
+    matrix:
+    - package:
+      - octez-rustzcash-deps
+      - octez-rust-tezos-context
+      - octez-rust-deps
+      - octez-riscv-api
+      - octez-protocol-compiler-compat
+      - octez-lwt-domain
+      - octez-libs
+      - octez-lib-upnp-args
+      - octez-internal-libs
+      - octez-igd-next
+      - octez-distributed-lwt-internal
+      - octez-distributed-internal
+      - octez-alcotezt
+      - bls12-381

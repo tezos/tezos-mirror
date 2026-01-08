@@ -474,7 +474,7 @@ let may_synchronise_context synchronisation_state chain_store =
     Context_ops.sync context_index
   else Lwt.return_unit
 
-let[@warning "-32"] reset_profilers =
+let[@warning "-32"] profiling_section =
   let profilers =
     Shell_profiling.
       [
@@ -486,14 +486,20 @@ let[@warning "-32"] reset_profilers =
         rpc_server_profiler;
       ]
   in
-  let reset_sections =
-    let to_string b = Block_hash.to_b58check (Store.Block.hash b) in
-    List.map
-      (Tezos_profiler.Profiler.section_maker Store.Block.equal to_string)
-      profilers
+  let section_makers =
+    let equal x y =
+      match (x, y) with
+      | `On_launch, `On_launch -> true
+      | `Block x, `Block y when Store.Block.equal x y -> true
+      | _ -> false
+    in
+    let to_string = function
+      | `On_launch -> "ON_LAUNCH"
+      | `Block b -> Block_hash.to_b58check (Store.Block.hash b)
+    in
+    List.map (Tezos_profiler.Profiler.section_maker equal to_string) profilers
   in
-  fun block ->
-    List.iter (fun reset_section -> reset_section block) reset_sections
+  fun section -> List.iter (fun f -> f section) section_makers
 
 let on_validation_request w peer start_testchain active_chains spawn_child block
     =
@@ -515,7 +521,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   if not accepted_head then return Ignored_head
   else
     let* previous = Store.Chain.set_head chain_store block in
-    () [@profiler.overwrite reset_profilers (block, [])] ;
+    () [@profiler.overwrite profiling_section (`Block block, [])] ;
     let () =
       if is_bootstrapped nv then
         Distributed_db.Advertise.current_head nv.chain_db block
@@ -568,10 +574,8 @@ let on_notify_head w peer_id (block_hash, header) mempool =
        when the received block is actually the current head or it's
        predecessor. *)
     if
-      not
-        Block_hash.(
-          Store.Block.hash current_head = block_hash
-          || Store.Block.predecessor current_head = block_hash)
+      Store.Block.hash current_head <> block_hash
+      && Store.Block.predecessor current_head <> block_hash
     then (
       Lwt_watcher.notify nv.received_block_input block_hash ;
       with_activated_peer_validator w peer_id (fun pv ->
@@ -824,6 +828,7 @@ let may_load_protocols parameters =
 type launch_error = error trace
 
 let on_launch w _ parameters =
+  () [@profiler.overwrite profiling_section (`On_launch, [])] ;
   let open Lwt_result_syntax in
   let notify_branch peer_id locator =
     Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))

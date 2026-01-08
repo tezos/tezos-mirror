@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 5a1ca8269e88d6e28cf6eae6a80d563c77f81d2567f363ae1a080e38bc7f4260 # shrinks to typed = TypedValueAndType { ty: Or((Or((Timestamp, Address)), List(KeyHash))), val: Or(Right(List(MichelsonList([KeyHash(Tz1(ContractTz1Hash("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw"))), KeyHash(Tz1(ContractTz1Hash("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw")))])))) }
+cc 69579740d00c523bbc1679586d4f4a698bf6bc93857f9530c30fc7cf7f5952de # shrinks to typed = TypedValueAndType { ty: Pair((Int, Or((Int, Pair((Int, Signature)))))), val: Pair((Int(0), Or(Right(Pair((Int(0), Signature(Bls(BlsSignature("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F"))))))))) }

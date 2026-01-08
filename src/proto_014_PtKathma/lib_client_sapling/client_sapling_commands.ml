@@ -185,7 +185,8 @@ let shield_cmd =
          source
          sapling_dst
          contract_dst
-         cctxt ->
+         cctxt
+       ->
       keys_of_implicit_account cctxt source >>=? fun (pkh, src_pk, src_sk) ->
       let open Context in
       cctxt#warning
@@ -274,7 +275,8 @@ let unshield_cmd =
          (name, _sapling_uri)
          tz_dst
          contract_dst
-         cctxt ->
+         cctxt
+       ->
       let open Context in
       let stez = Shielded_tez.of_tez amount in
       cctxt#warning
@@ -379,7 +381,8 @@ let forge_shielded_cmd =
          (name, _sapling_uri)
          destination
          contract_dst
-         cctxt ->
+         cctxt
+       ->
       let open Context in
       let stez = Shielded_tez.of_tez amount in
       do_sapling_transfer cctxt ?message contract_dst name stez destination
@@ -446,7 +449,8 @@ let submit_shielded_cmd =
          filename
          source
          destination
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       cctxt#message
         "Reading forge transaction from file %s -- sending it to %a@."
         filename
@@ -551,7 +555,8 @@ let use_key_for_contract_cmd =
     (fun default_memo_size
          (name, _sapling_uri)
          contract
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       Wallet.find_vk cctxt name >>=? fun vk ->
       Context.Client_state.register
         cctxt
@@ -576,7 +581,8 @@ let import_key_cmd =
     @@ Sapling_key.fresh_alias_param @@ Tezos_clic.stop)
     (fun (force, unencrypted, mnemonic_opt)
          fresh_name
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       (match mnemonic_opt with
       | None ->
           let rec loop_words (acc : string list) i =
@@ -633,7 +639,8 @@ let commands () =
            fresh_name
            (existing_name, _existing_uri)
            child_index
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         Sapling_key.of_fresh cctxt force fresh_name >>=? fun new_name ->
         Wallet.derive
           cctxt
@@ -663,7 +670,10 @@ let commands () =
       (Tezos_clic.args1 index_arg)
       (Tezos_clic.prefixes ["sapling"; "gen"; "address"]
       @@ Sapling_key.alias_param @@ Tezos_clic.stop)
-      (fun index_opt (name, _sapling_uri) (cctxt : Protocol_client_context.full) ->
+      (fun index_opt
+           (name, _sapling_uri)
+           (cctxt : Protocol_client_context.full)
+         ->
         Wallet.new_address cctxt name index_opt
         >>=? fun (_, corrected_index, address) ->
         let address_b58 =
@@ -687,7 +697,11 @@ let commands () =
            ~desc:"Filename."
            Client_proto_args.string_parameter
       @@ Tezos_clic.stop)
-      (fun () (name, _sapling_uri) file (cctxt : Protocol_client_context.full) ->
+      (fun ()
+           (name, _sapling_uri)
+           file
+           (cctxt : Protocol_client_context.full)
+         ->
         Wallet.export_vk cctxt name >>=? fun vk_json ->
         return (save_json_to_file vk_json file));
     Tezos_clic.command
@@ -711,7 +725,8 @@ let commands () =
       (fun verbose
            (name, _sapling_uri)
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         Wallet.find_vk cctxt name >>= function
         | Error _ -> cctxt#error "Account %s not found" name
         | Ok vk -> (

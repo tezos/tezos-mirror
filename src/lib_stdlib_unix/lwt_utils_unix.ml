@@ -265,6 +265,29 @@ let copy_dir ?(perm = 0o755) src dst =
   if src_dir_exists then copy_dir src dst
   else Lwt.fail (Unix.Unix_error (Unix.ENOTDIR, "", "copy_dir"))
 
+let hardlink_dir ?(perm = 0o755) src dst =
+  let open Lwt_syntax in
+  let rec link_dir dir dst_dir =
+    let* () = create_dir ~perm dst in
+    let files = Lwt_unix.files_of_directory dir in
+    Lwt_stream.iter_p
+      (fun file ->
+        if file = Filename.current_dir_name || file = Filename.parent_dir_name
+        then Lwt.return_unit
+        else
+          let basename = file in
+          let file = Filename.concat dir file in
+          if Sys.is_directory file then
+            let new_dir = Filename.concat dst_dir basename in
+            let* () = create_dir ~perm new_dir in
+            link_dir file new_dir
+          else Lwt_unix.link file (Filename.concat dst_dir basename))
+      files
+  in
+  let* src_dir_exists = dir_exists src in
+  if src_dir_exists then link_dir src dst
+  else Lwt.fail (Unix.Unix_error (Unix.ENOTDIR, "", "hardlink_dir"))
+
 let of_sockaddr = function
   | Unix.ADDR_UNIX _ -> None
   | Unix.ADDR_INET (addr, port) -> (

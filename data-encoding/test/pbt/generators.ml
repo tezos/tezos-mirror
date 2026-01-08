@@ -1032,8 +1032,8 @@ let full_tup3 : type a b c. a full -> b full -> c full -> (a * b * c) full =
           Fullc.encoding)
   end)
 
-let full_tup4 :
-    type a b c d. a full -> b full -> c full -> d full -> (a * b * c * d) full =
+let full_tup4 : type a b c d.
+    a full -> b full -> c full -> d full -> (a * b * c * d) full =
  fun fulla fullb fullc fulld ->
   let module Fulla = (val fulla) in
   let module Fullb = (val fullb) in
@@ -1601,8 +1601,8 @@ let compactfull_tup1 : type a. a compactfull -> a compactfull =
     let encoding = Data_encoding.Compact.tup1 CompactFull.encoding
   end)
 
-let compactfull_tup2 :
-    type a b. a compactfull -> b compactfull -> (a * b) compactfull =
+let compactfull_tup2 : type a b.
+    a compactfull -> b compactfull -> (a * b) compactfull =
  fun compactfulla compactfullb ->
   try
     let module CompactFulla = (val compactfulla) in
@@ -1625,8 +1625,7 @@ let compactfull_tup2 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_tup3 :
-    type a b c.
+let compactfull_tup3 : type a b c.
     a compactfull -> b compactfull -> c compactfull -> (a * b * c) compactfull =
  fun compactfulla compactfullb compactfullc ->
   try
@@ -1663,8 +1662,7 @@ let compactfull_tup3 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_tup4 :
-    type a b c d.
+let compactfull_tup4 : type a b c d.
     a compactfull ->
     b compactfull ->
     c compactfull ->
@@ -1720,8 +1718,7 @@ let compactfull_tup4 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_tup7 :
-    type a b c d e f g.
+let compactfull_tup7 : type a b c d e f g.
     a compactfull ->
     b compactfull ->
     c compactfull ->
@@ -1946,8 +1943,8 @@ let compactfull_union1 : type a. a compactfull -> a compactfull =
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_union2 :
-    type a b. a compactfull -> b compactfull -> (a, b) either compactfull =
+let compactfull_union2 : type a b.
+    a compactfull -> b compactfull -> (a, b) either compactfull =
  fun compactfulla compactfullb ->
   try
     let module CompactFulla = (val compactfulla) in
@@ -1990,8 +1987,7 @@ let compactfull_union2 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_union4 :
-    type a b c d.
+let compactfull_union4 : type a b c d.
     a compactfull ->
     b compactfull ->
     c compactfull ->
@@ -2081,8 +2077,8 @@ let compactfull_union4 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
-let compactfull_union4spill :
-    type a b. a compactfull -> b compactfull -> (a, b) either compactfull =
+let compactfull_union4spill : type a b.
+    a compactfull -> b compactfull -> (a, b) either compactfull =
  fun compactfulla compactfullb ->
   try
     let module CompactFulla = (val compactfulla) in

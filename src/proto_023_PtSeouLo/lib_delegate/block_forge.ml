@@ -40,7 +40,7 @@ type simulation_kind =
     }
 
 (* [forge_faked_protocol_data ?payload_hash ~payload_round ~seed_nonce_hash
-   ~liquidity_baking_toggle_vote ~adaptive_issuance_vote] forges a fake [block_header_data] with
+   ~liquidity_baking_toggle_vote] forges a fake [block_header_data] with
    [payload_hash] ([zero] by default), [payload_round], [seed_nonce_hash],
    [liquidity_baking_toggle_vote] and with an empty [proof_of_work_nonce] and a
    dummy [signature]. *)
@@ -84,8 +84,8 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
    [fitness] is computed from the [round] and [locked_round]
    arguments. *)
 let finalize_block_header ~shell_header ~validation_result ~operations_hash
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash ~round
-    ~locked_round =
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
+    ~round ~locked_round =
   let open Lwt_result_syntax in
   let* fitness =
     match validation_result with
@@ -166,7 +166,7 @@ let check_protocol_changed ~user_activated_upgrades ~level
    [shell_header], the list of operations that have been applied in the block
    and the [payload_hash] corresponding to these operations. *)
 let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
-    ~faked_protocol_data ~timestamp ~(pred_info : Baking_state.block_info)
+    ~faked_protocol_data ~timestamp ~(pred_info : Baking_state_types.block_info)
     ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
@@ -214,7 +214,7 @@ let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
    [filter_via_node] is called to return these values. *)
 let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
     ~faked_protocol_data ~user_activated_upgrades ~timestamp
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
     ~force_apply ~round ~context_index ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let* incremental =
@@ -287,7 +287,8 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
    via {!Node_rpc.preapply_block}. A [shell_header] is recovered from this call
    and returned alongside of the list of operations and the payload_hash. *)
 let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
-    ~(pred_info : Baking_state.block_info) ~ordered_pool ~payload_hash cctxt =
+    ~(pred_info : Baking_state_types.block_info) ~ordered_pool ~payload_hash
+    cctxt =
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
   let operations = Operation_pool.ordered_to_list_list ordered_pool in
@@ -312,7 +313,7 @@ let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
    consensus operations only from an [ordered_pool] via
    {!Operation_selection.filter_consensus_operations_only}. *)
 let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
-    ~timestamp ~(pred_info : Baking_state.block_info)
+    ~timestamp ~(pred_info : Baking_state_types.block_info)
     ~pred_resulting_context_hash ~force_apply ~round ~ordered_pool
     ~context_index ~payload_hash cctxt =
   let open Lwt_result_syntax in
@@ -499,7 +500,8 @@ let partition_consensus_operations_on_proposal consensus_operations =
     (fun operation
          ( attestations_aggregate_opt,
            eligible_attestations,
-           remaining_operations ) ->
+           remaining_operations )
+       ->
       let ({shell; protocol_data = Operation_data protocol_data; _} as
            packed_operation) =
         Prioritized_operation.packed operation
@@ -548,7 +550,8 @@ let partition_consensus_operations_on_reproposal consensus_operations =
            eligible_attestations,
            eligible_preattestations,
            other_operations )
-         operation ->
+         operation
+       ->
       let {shell; protocol_data = Operation_data protocol_data} = operation in
       let {contents; signature} = protocol_data in
       match (contents, signature) with
@@ -612,7 +615,8 @@ let filter_best_attestations_per_slot attestations =
   let slot_map =
     List.fold_left
       (fun slot_map
-           (({protocol_data; _} : Kind.attestation operation) as attestation) ->
+           (({protocol_data; _} : Kind.attestation operation) as attestation)
+         ->
         let slot, dal_count =
           match protocol_data.contents with
           | Single (Attestation {consensus_content; dal_content}) ->
@@ -663,7 +667,8 @@ let aggregate_attestations aggregate_opt eligible_attestations =
       let committee, signatures =
         List.fold_left
           (fun ((slots, signatures) as acc)
-               ({protocol_data; _} : Kind.attestation operation) ->
+               ({protocol_data; _} : Kind.attestation operation)
+             ->
             match (protocol_data.contents, protocol_data.signature) with
             | ( Single (Attestation {consensus_content; dal_content}),
                 Some (Bls signature) )
@@ -735,7 +740,8 @@ let aggregate_preattestations_on_reproposal aggregate_opt
       let committee, signatures =
         List.fold_left
           (fun ((slots, signatures) as acc)
-               ({protocol_data; _} : Kind.preattestation operation) ->
+               ({protocol_data; _} : Kind.preattestation operation)
+             ->
             match (protocol_data.contents, protocol_data.signature) with
             | Single (Preattestation consensus_content), Some (Bls signature)
               when not (SlotSet.mem consensus_content.slot aggregated_slots) ->
@@ -797,7 +803,7 @@ let aggregate_consensus_operations_on_reproposal consensus_operations =
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
 let forge (cctxt : #Protocol_client_context.full) ~chain_id
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
     ~pred_live_blocks ~timestamp ~round ~liquidity_baking_toggle_vote
     ~adaptive_issuance_vote ~user_activated_upgrades fees_config ~force_apply
     ~seed_nonce_hash ~payload_round simulation_mode simulation_kind constants =

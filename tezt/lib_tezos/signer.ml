@@ -33,6 +33,7 @@ module Parameters = struct
     launch_mode : launch_mode option;
     keys : Account.key list;
     magic_byte : string option;
+    check_highwatermark : bool;
     allow_list_known_keys : bool;
     allow_to_prove_possession : bool;
     mutable pending_ready : unit option Lwt.u list;
@@ -64,6 +65,8 @@ open Parameters
 include Daemon.Make (Parameters)
 
 let uri signer = signer.persistent_state.uri
+
+let base_dir signer = signer.persistent_state.base_dir
 
 let trigger_ready signer value =
   let pending = signer.persistent_state.pending_ready in
@@ -103,7 +106,7 @@ let spawn_import_secret_key signer (key : Account.key) =
   let sk_uri =
     match key.secret_key with
     | Unencrypted sk -> "unencrypted:" ^ sk
-    | Encrypted _ ->
+    | Encrypted _ | Remote _ ->
         Test.fail "[spawn_import_secret_key] expected an unencrypted key"
   in
   spawn_command signer ["import"; "secret"; "key"; key.alias; sk_uri]
@@ -112,7 +115,7 @@ let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
 let create ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner
-    ?magic_byte ?(allow_list_known_keys = false)
+    ?(check_highwatermark = true) ?magic_byte ?(allow_list_known_keys = false)
     ?(allow_to_prove_possession = false) ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
@@ -141,6 +144,7 @@ let create ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner
         uri;
         keys;
         pending_ready = [];
+        check_highwatermark;
         magic_byte;
         allow_list_known_keys;
         allow_to_prove_possession;
@@ -178,6 +182,11 @@ let run signer =
         in
         ["launch"; "local"; "signer"] @ socket_args
   in
+  let check_highwatermark_args =
+    if signer.persistent_state.check_highwatermark then
+      ["--check-high-watermark"]
+    else []
+  in
   let magic_bytes_args =
     match signer.persistent_state.magic_byte with
     | None -> []
@@ -194,8 +203,9 @@ let run signer =
     else []
   in
   let arguments =
-    base_dir_arg @ launch_mode_args @ magic_bytes_args
-    @ allow_list_known_keys_args @ allow_to_prove_possession_args
+    base_dir_arg @ launch_mode_args @ check_highwatermark_args
+    @ magic_bytes_args @ allow_list_known_keys_args
+    @ allow_to_prove_possession_args
   in
   let arguments =
     if !passfile = "" then arguments
@@ -226,7 +236,8 @@ let wait_for_ready signer =
       check_event signer "Signer started." promise
 
 let init ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner ?keys
-    ?magic_byte ?allow_list_known_keys ?allow_to_prove_possession () =
+    ?check_highwatermark ?magic_byte ?allow_list_known_keys
+    ?allow_to_prove_possession () =
   let* signer =
     create
       ?name
@@ -237,6 +248,7 @@ let init ?name ?color ?event_pipe ?base_dir ?launch_mode ?uri ?runner ?keys
       ?uri
       ?runner
       ?keys
+      ?check_highwatermark
       ?magic_byte
       ?allow_list_known_keys
       ?allow_to_prove_possession

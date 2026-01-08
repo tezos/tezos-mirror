@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_011_PtHangz2
@@ -141,7 +141,7 @@
   tezos-protocol-011-PtHangz2.protocol.raw)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives)
  (modules Protocol Tezos_protocol_011_PtHangz2))
 
@@ -265,7 +265,8 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warning -51 -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34-51 -warn-error +a .)))
 
 (library
  (name tezos_protocol_011_PtHangz2_lifted)
@@ -277,7 +278,7 @@
   tezos-protocol-011-PtHangz2.protocol)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives
   -open Tezos_protocol_011_PtHangz2)
  (modules Lifted_protocol))
@@ -296,7 +297,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives)
  (modules Functor))
 
@@ -418,7 +419,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -51)
+  -w -32-34-51)
  (modules Registerer))
 
 (rule

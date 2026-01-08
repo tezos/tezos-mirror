@@ -317,7 +317,8 @@ let reveal_encoding =
       (fun ( (),
              page_id,
              attestation_threshold_percent,
-             restricted_commitments_publishers ) ->
+             restricted_commitments_publishers )
+         ->
         Request_adal_page
           {
             page_id;
@@ -654,6 +655,9 @@ module type PROTO_VERIFICATION = sig
     proof ->
     input_request tzresult Lwt.t
 
+  (** [get_proof_state_level proof] returns the tezos level of the proof inner state. *)
+  val get_proof_state_level : proof -> Raw_level_repr.t option tzresult Lwt.t
+
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)
   type output_proof
@@ -734,7 +738,7 @@ module type S = sig
   end
 end
 
-module type Generic_pvm_context_sig = sig
+module type Generic_irmin_pvm_context_sig = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
   type tree = Tree.tree
@@ -746,6 +750,12 @@ module type Generic_pvm_context_sig = sig
   val proof_before : proof -> Sc_rollup_repr.State_hash.t
 
   val proof_after : proof -> Sc_rollup_repr.State_hash.t
+
+  (** [cast_read_only proof] replaces [proof.after] with [proof.before].
+      This allows to use {!verify_proof} with another step transition to read
+      the inner state of the proof. This leaks abstraction on how Irmin proof
+      verification work. *)
+  val cast_read_only : proof -> proof
 
   val verify_proof :
     proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t

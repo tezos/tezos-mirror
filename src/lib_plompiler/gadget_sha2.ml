@@ -38,11 +38,12 @@ open Sha2_variants
 module MAKE
     (L : LIB)
     (V : VARIANT)
-    (Op : Limb_list
-            with type scalar = L.scalar
-             and type 'a repr = 'a L.repr
-             and type 'a t = 'a L.t
-             and type 'a input = 'a L.Input.t) =
+    (Op :
+      Limb_list
+        with type scalar = L.scalar
+         and type 'a repr = 'a L.repr
+         and type 'a t = 'a L.t
+         and type 'a input = 'a L.Input.t) =
 struct
   open L
   module M64 = Gadget_mod_arith.ArithMod64 (L)

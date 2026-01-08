@@ -27,14 +27,6 @@ open Protocol
 open Alpha_context
 open Baking_state_types
 
-(** A delegate slot consists of the delegate's consensus key, its public key
-    hash, its first slot, and its attesting power at some level. *)
-type delegate_slot = {
-  delegate : Delegate.t;
-  first_slot : Slot.t;
-  attesting_power : int;
-}
-
 val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
 
 module Delegate_slots : sig
@@ -86,19 +78,15 @@ val compute_delegate_slots :
 
 (** {2 Consensus operations types functions} *)
 
-(* An association list between delegates and promises for their DAL attestations
-   at some level (as obtained through the [get_attestable_slots] RPC). See usage
-   in {!level_state}. *)
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
-
 type consensus_vote_kind = Attestation | Preattestation
 
 val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
 
 val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
+
+val pp_dal_content : Format.formatter -> dal_content -> unit
+
+val dal_content_encoding : dal_content Data_encoding.t
 
 (** An unsigned consensus vote consists of the consensus vote kind, either an
     attestation or a preattestation, the delegate keys and its protocol and dal
@@ -109,6 +97,18 @@ type unsigned_consensus_vote = {
   delegate : Delegate.t;
   dal_content : dal_content option;
 }
+
+val pp_unsigned_consensus_vote :
+  Format.formatter -> unsigned_consensus_vote -> unit
+
+(** Partial encoding that omits secret keys to avoid leaking them in
+    event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val unsigned_consensus_vote_encoding_for_logging__cannot_decode :
+  unsigned_consensus_vote Data_encoding.t
 
 (** A batch content contains information common to all consensus operation in a
     batch of consensus votes. *)
@@ -157,6 +157,17 @@ type signed_consensus_vote = {
   signed_operation : packed_operation;
 }
 
+val pp_signed_consensus_vote : Format.formatter -> signed_consensus_vote -> unit
+
+(** Partial encoding that omits secret keys to avoid leaking them in
+    event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val signed_consensus_vote_encoding_for_logging__cannot_decode :
+  signed_consensus_vote Data_encoding.t
+
 (** Similar to {!unsigned_consensus_vote_batch} type but the list of the operation
     are signed consensus votes. *)
 type signed_consensus_vote_batch = private {
@@ -192,37 +203,11 @@ val make_singleton_consensus_vote_batch :
 
 (** {2 Block info types and functions}  *)
 
-(** A prequorum consists of a level, a round, a block_payload_hash and the list
-    of preattestations that has a total voting power higher than the protocol
-    threshold. *)
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : packed_operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : packed_operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 val block_info_encoding : block_info Data_encoding.t
 
 val pp_block_info : Format.formatter -> block_info -> unit
 
 (** {2 Proposal type and functions}  *)
-
-(** A proposal consists of information about the current block proposal and its
-    predecessor. *)
-type proposal = {block : block_info; predecessor : block_info}
 
 val proposal_encoding : proposal Data_encoding.t
 
@@ -400,6 +385,8 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
+val pp_forge_event : Format.formatter -> forge_event -> unit
+
 (** Partial encoding for {!forge_event} that omits secret keys to
     avoid leaking them in event logs; see
     {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
@@ -542,6 +529,11 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
+val pp_event : Format.formatter -> event -> unit
+
+(** Prints event description in a few words. *)
+val pp_short_event : Format.formatter -> event -> unit
+
 (** Partial encoding for {!event} that omits secret keys to avoid
     leaking them in event logs; see
     {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
@@ -549,5 +541,3 @@ type event =
     Warning: As a consequence, decoding from this encoding will always
     fail. *)
 val event_encoding_for_logging__cannot_decode : event Data_encoding.t
-
-val pp_short_event : Format.formatter -> event -> unit

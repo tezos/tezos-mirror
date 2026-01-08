@@ -1,0 +1,27 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/list_concat_bytes.tz on storage 0x00ab and input '{ 0xcd ; 0xef ; 0x00 }' --level 1 --trace-stack
+storage
+  0x00abcdef00
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (just consumed gas: 5.822)
+    [ (Pair { 0xcd ; 0xef ; 0x00 } 0x00ab) ]
+  - location: 8 (just consumed gas: 0.010)
+    [ { 0xcd ; 0xef ; 0x00 }
+      0x00ab ]
+  - location: 9 (just consumed gas: 0.010)
+    [ 0x00ab
+      { 0xcd ; 0xef ; 0x00 } ]
+  - location: 10 (just consumed gas: 0.010)
+    [ { 0x00ab ; 0xcd ; 0xef ; 0x00 } ]
+  - location: 11 (just consumed gas: 0.142)
+    [ 0x00abcdef00 ]
+  - location: 12 (just consumed gas: 0.010)
+    [ {}
+      0x00abcdef00 ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Pair {} 0x00abcdef00) ]
+

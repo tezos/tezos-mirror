@@ -1,8 +1,76 @@
 How to Test a Protocol Proposal
 ===============================
 
-In this tutorial we show how to test a newly developed protocol and, in
-particular, how to test the migration process from its predecessor. We also
+In this tutorial we show how to test the protocol proposal under development.
+The tutorial focuses essentially on testing the process of migrating to the new protocol, which is a critical part of the test suite involving more complex testing scenarios.
+However, we start by describing how the general testsuite for the protocol under development can be run.
+
+Running protocol tests
+----------------------
+
+Protocols, like any piece of software, come with a testsuite. Running this battery of tests successfully gives some confidence in the correct behavior of a new protocol.
+Conversely, failing some tests indicates some issues or regressions to be fixed.
+
+To run the protocol tests you must work in a clone of the Octez repository, in which you have compiled the sources as instructed in :doc:`../introduction/howtobuild`.
+
+You can run the tests for any protocol whose sources are in a subdirectory of the form ``src/proto*/``.
+For example, you can perform the protocol tests on protocol Alpha as follows::
+
+	dune runtest src/proto_alpha/lib_protocol/test
+
+You can execute only tests located in a particular subfolder, for example consensus-related tests this way::
+
+	dune runtest src/proto_alpha/lib_protocol/test/integration/consensus
+
+or using ``dune exec``::
+
+	dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
+
+In the latter form you may further select tests by providing options such as::
+
+	dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe -- \
+		--file test_aggregate.ml
+
+To see all the options available, do::
+
+	dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe -- --help
+
+Beyond the protocol testsuite, there are also integration tests checking how the protocol integrates with various Octez tools such as the node or the baker.
+These tests can be run for example for protocol Alpha with::
+
+	dune exec tezt/tests/main.exe -- --match alpha
+
+You may also specify a specific file name (using ``--file``) or a specific test name (using ``--title``).
+To see all the options available, do::
+
+	dune exec tezt/tests/main.exe -- --help
+
+See the `Dune documentation <https://dune.readthedocs.io/>`__ for more information on using Dune to run tests.
+
+Running the tests within Docker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is also possible to execute the protocol testsuite in a Docker container, by using a specific Docker project: https://gitlab.com/nomadic-labs/prototest
+
+This may cover several use cases, such as:
+
+- easily checking that a protocol proposal provided by a third party passes the protocol testsuite
+- allowing anyone to do so for your own protocol proposal.
+
+That Docker project essentially automates the steps described above, but doesn't require cloning the Octez repository locally, and neither having any developer expertise.
+
+For more details and usage instructions, refer directly the above repository.
+
+.. warning::
+
+	The dockerized tool executes by default the testsuite designed for proposals developed by the "protocol team" (see :doc:`./protocol_playbook`).
+	Extending the testsuite with specific tests for a new protocol proposal is under the entire responsibility of its proposers.
+
+Testing the protocol migration
+------------------------------
+
+Hereafter, we focus in
+particular on how to test the migration process to a new protocol from its predecessor. We also
 provide a short guide on how to read the migration code.
 
 We start by describing the branch that contains the protocol proposal that is

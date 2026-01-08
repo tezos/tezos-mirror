@@ -12,13 +12,36 @@ pub mod blake2b;
 pub mod base58;
 #[cfg(feature = "bls")]
 pub mod bls;
+pub mod crypto_box;
 #[macro_use]
 pub mod hash;
+pub mod nonce;
+pub mod proof_of_work;
 pub mod public_key;
 pub mod public_key_hash;
 pub mod signature;
+use std::sync::Arc;
 
-#[derive(Debug, Error)]
+use ed25519_dalek::SignatureError as Ed25519Error;
+
+#[derive(Debug, Clone)]
+pub struct Ed25519ErrorHandle(Arc<ed25519_dalek::SignatureError>);
+
+impl From<Ed25519Error> for Ed25519ErrorHandle {
+    fn from(e: Ed25519Error) -> Self {
+        Self(Arc::new(e))
+    }
+}
+
+impl PartialEq for Ed25519ErrorHandle {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for Ed25519ErrorHandle {}
+
+#[derive(Debug, PartialEq, Eq, Clone, Error)]
 pub enum CryptoError {
     #[error("Invalid crypto key, reason: {reason}")]
     InvalidKey { reason: String },
@@ -38,8 +61,8 @@ pub enum CryptoError {
     Unsupported(&'static str),
     #[error("Algorithm error: `{0}`")]
     AlgorithmError(String),
-    #[error("Ed25519 error: {0}")]
-    Ed25519(ed25519_dalek::SignatureError),
+    #[error("Ed25519 error: {0:?}")]
+    Ed25519(Ed25519ErrorHandle),
     #[error("Incorrect signature type: {0}")]
     SignatureType(#[from] signature::TryFromSignatureError),
 }

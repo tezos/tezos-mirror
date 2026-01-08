@@ -32,7 +32,8 @@
   lwt-exit
   uri
   memtrace
-  octez-baker-lib)
+  octez-baker-lib
+  octez-baking-common-lib)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (library_flags (:standard -linkall))

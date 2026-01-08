@@ -188,7 +188,8 @@ module Core = struct
             (* we are looking for the second-oldest, not the oldest
                (remember threshold >= 2 so they are distinct) *)
             i <> state.index_of_oldest_candidate
-            && (* has to be at least as old as the previously known second oldest *)
+            &&
+            (* has to be at least as old as the previously known second oldest *)
             earlier_or_coincident_o
               known_candidate
               state.candidates.(!index_of_second_oldest_candidate)

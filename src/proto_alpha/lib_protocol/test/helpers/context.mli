@@ -30,6 +30,9 @@ open Alpha_context
 
 type t = B of Block.t | I of Incremental.t
 
+type raw_context_modifier =
+  Raw_context.t -> Raw_context.t Environment.Error_monad.tzresult Lwt.t
+
 val get_alpha_ctxt : t -> context tzresult Lwt.t
 
 val branch : t -> Block_hash.t
@@ -38,40 +41,55 @@ val pred_branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-(** Given a context, returns the list of attesters charactized by
-    the [level], the public key hash of the [delegate], its [consensus_key]
-    and its assigned [slots].
-    see {! Plugin.RPC.Validator.t}. *)
-val get_attesters : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
+(** A delegate's keys and attesting slots at a given level. *)
+type attester = Plugin.RPC.Validators.delegate = {
+  delegate : Signature.public_key_hash;
+  consensus_key : Signature.public_key_hash;
+  companion_key : Signature.Bls.Public_key_hash.t option;
+  rounds : Round.t list;
+  attesting_power : int64;
+  attestation_slot : Slot.t;
+}
+
+(** Retrieves the attesting rights at the level of the given context
+    by calling {!Plugin.RPC.Validators.S.validators}. *)
+val get_attesters : t -> attester list tzresult Lwt.t
+
+(** Returns an attester at the level of the given context.
+
+    If [manager_pkh] is provided, returns the attester with this
+    manager key ({!field-delegate}) and fails if there is no such
+    attester. If [manager_pkh] is omitted, returns the first element
+    of the output of {!get_attesters}. *)
+val get_attester : ?manager_pkh:public_key_hash -> t -> attester tzresult Lwt.t
 
 (** Return the two first elements of the list returns by [get_attesters]. *)
-val get_first_different_attesters :
-  t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
-
-(** Return the first element [delegate,slot] of the list returns by
-    [get_attesters], where [delegate] is the [consensus key] when
-    is set. *)
-val get_attester : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
-
-(** Given a [delegate], and a context [ctxt], if [delegate] is in
-    [get_attesters ctxt] returns the [slots] of [delegate] otherwise
-    return [None]. *)
-val get_attester_slot :
-  t -> public_key_hash -> Slot.t list option tzresult Lwt.t
+val get_first_different_attesters : t -> (attester * attester) tzresult Lwt.t
 
 (** Return the [n]th element of the list returns by [get_attesters]. *)
-val get_attester_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
+val get_attester_n : t -> int -> (public_key_hash * Round.t list) tzresult Lwt.t
+
+(** Whether the {!type-attester}'s **consensus key** is a BLS key. *)
+val attester_has_bls_key : attester -> bool
+
+(** Same as {!get_attesters} but returns only attesters with a BLS
+    consensus key. *)
+val get_attesters_with_bls_key : t -> attester list tzresult Lwt.t
+
+(** Returns an attester with a BLS consensus key (the first eligible
+    attester returned by {!get_attesters}). *)
+val get_attester_with_bls_key : t -> attester tzresult Lwt.t
 
 (** Counts the number of attesting slots that the given delegate has
     in the requested level. If ommited, [level] defaults to the next
     level. *)
 val get_attesting_power_for_delegate :
-  t -> ?level:Raw_level.t -> public_key_hash -> int tzresult Lwt.t
+  t -> ?level:Raw_level.t -> public_key_hash -> int64 tzresult Lwt.t
 
 (** Sums the result of [get_attesting_power_for_delegate] over a list
     of levels. *)
 val get_cumulated_attesting_power_for_delegate :
-  t -> levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
+  t -> levels:Raw_level.t list -> public_key_hash -> int64 tzresult Lwt.t
 
 val get_current_voting_power :
   t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
@@ -335,6 +353,9 @@ module Delegate : sig
   val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
 
   val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
+
+  val baking_power_distribution_for_current_cycle :
+    t -> manager_pkh:public_key_hash -> (int64 * int64 option) tzresult Lwt.t
 end
 
 module Sc_rollup : sig
@@ -405,6 +426,7 @@ type 'accounts init :=
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?allow_tz4_delegate_enable:bool ->
   ?aggregate_attestation:bool ->
+  ?native_contracts_enable:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 
@@ -436,14 +458,22 @@ val init3 :
 
 val init_with_constants_gen :
   ?algo:Signature.algo ->
+  ?prepare_context:raw_context_modifier ->
   (Alpha_context.Contract.t, 'contracts) tup ->
   Constants.Parametric.t ->
   (Block.t * 'contracts) tzresult Lwt.t
 
 val init_with_constants_n :
   ?algo:Signature.algo ->
+  ?prepare_context:raw_context_modifier ->
   Constants.Parametric.t ->
   int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+val init_with_constants_algo_list :
+  ?prepare_context:raw_context_modifier ->
+  Constants.Parametric.t ->
+  Signature.algo option list ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
 val init_with_constants1 :
@@ -459,6 +489,7 @@ val init_with_constants2 :
     accounts. The number of bootstrap accounts, and the structure of the
     returned contracts, are specified by the [tup] argument. *)
 val init_with_parameters_gen :
+  ?prepare_context:raw_context_modifier ->
   (Alpha_context.Contract.t, 'contracts) tup ->
   Parameters.t ->
   (Block.t * 'contracts) tzresult Lwt.t

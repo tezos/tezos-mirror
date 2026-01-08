@@ -41,6 +41,8 @@ type block = t
 
 type full_metadata = block_header_metadata * operation_receipt list
 
+type block_with_metadata = block * full_metadata
+
 (** Not the same as [Context.get_alpha_ctxt] as it does not construct a new block *)
 val get_alpha_ctxt : t -> context tzresult Lwt.t
 
@@ -59,6 +61,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 (**
    The default baking functions below is to use (blocks) [Application] mode.
@@ -76,6 +79,8 @@ val get_next_baker :
   (public_key_hash * public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
+
+val get_payload_round : block -> Round.t
 
 (** Returns the consensus key that was used to bake the block. *)
 val block_producer : block -> Consensus_key.pk tzresult Lwt.t
@@ -249,7 +254,7 @@ val bake_with_metadata :
   ?liquidity_baking_toggle_vote:Per_block_votes.per_block_vote ->
   ?adaptive_issuance_vote:Per_block_votes.per_block_vote ->
   t ->
-  (t * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
+  block_with_metadata tzresult Lwt.t
 
 (** Bakes [n] blocks. *)
 val bake_n :
@@ -321,11 +326,10 @@ val bake_n_with_metadata :
   ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   int ->
   block ->
-  (block * (block_header_metadata * operation_receipt list)) tzresult Lwt.t
+  block_with_metadata tzresult Lwt.t
 
 val get_balance_updates_from_metadata :
-  block_header_metadata * operation_receipt list ->
-  Alpha_context.Receipt.balance_updates
+  full_metadata -> Alpha_context.Receipt.balance_updates
 
 (** Bake blocks while a predicate over the block holds. The returned
     block is the last one for which the predicate holds; in case the

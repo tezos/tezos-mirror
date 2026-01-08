@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 
 (** {2 Action types}  *)
 
@@ -81,7 +82,7 @@ val pp_action : Format.formatter -> action -> unit
 
     - generating the seed nonce hash if needed
 
-    - setting the votes for liquidity baking and adaptive issuance according to the
+    - setting the vote for liquidity baking according to the
     per_block_vote_file
 
     - calling [Block_forge.forge] to forge the block

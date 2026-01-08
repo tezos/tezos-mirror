@@ -1,0 +1,41 @@
+(module
+  (import
+    "smart_rollup_core"
+    "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32))
+  )
+
+  (import
+    "smart_rollup_core"
+    "reveal"
+    (func $reveal (param i32 i32 i32 i32) (result i32))
+  )
+
+  (memory 1)
+  (export "memory" (memory 0))
+
+  (data (i32.const 0) "\03")
+  (data (i32.const 100) "/foo")
+
+  (func (export "kernel_run") (local $len i32)
+    ;; Reveal something
+    (call $reveal
+      (i32.const 0)
+      (i32.const 1)
+      ;; Destination address and length
+      (i32.const 1000) (i32.const 1000)
+    )
+    (local.set $len)
+    ;; Write the revealed parameters to the durable storage to modify the
+    ;; states when the fast execution is used.
+    (call $store_write
+      ;; Key address and length
+      (i32.const 100) (i32.const 4)
+      ;; Offset into the target value
+      (i32.const 0)
+      ;; Memory address and length of the payload to write
+      (i32.const 1000) (local.get $len)
+    )
+    (drop)
+  )
+)

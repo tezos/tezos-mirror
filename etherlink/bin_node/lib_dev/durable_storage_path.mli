@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -50,33 +50,32 @@ val sequencer_key : path
 
 val maximum_gas_per_transaction : path
 
+(** Kernel communication canal for individual transaction execution *)
+module Single_tx : sig
+  val input_tx : path
+end
+
 (** Paths related to accounts. *)
 module Accounts : sig
-  (** Path to the account's balance. *)
+  (** Path to the account's info. Should be used in place of `balance`, `nonce` and `code` *)
+  val info : address -> path
+
+  (** Path to the account's balance. DEPRECATED use `info` *)
   val balance : address -> path
 
-  (** Path to the account's nonce. *)
+  (** Path to the account's nonce. DEPRECATED use `info` *)
   val nonce : address -> path
 
   (** Path to the account's code. *)
   val code : address -> path
 
-  (** Path to the account's code hash. *)
+  (** Path to the account's code hash. DEPRECATED use `info` *)
   val code_hash : address -> path
 
   (** Path to the account's storage at a given index. *)
   val storage : address -> path -> path
 
   type error += Invalid_address of string | Invalid_key of string
-
-  (** Path to the account's balance. Error if address is invalid. *)
-  val balance_e : address -> path tzresult
-
-  (** Path to the account's nonce. Error if address is invalid. *)
-  val nonce_e : address -> path tzresult
-
-  (** Path to the account's code. Error if address is invalid. *)
-  val code_e : address -> path tzresult
 
   (** Path to the account's storage at a given index. Error if address or
       storage key is invalid. *)
@@ -89,6 +88,16 @@ module Code : sig
   val code : hash -> path
 end
 
+module Blueprint : sig
+  val current_generation : path
+
+  val chunk : blueprint_number:Z.t -> chunk_index:int -> path
+
+  val nb_chunks : blueprint_number:Z.t -> path
+
+  val generation : blueprint_number:Z.t -> path
+end
+
 (** Paths related to blocks. *)
 module Block : sig
   (** Block number is either the current head or a specific height. *)
@@ -97,18 +106,35 @@ module Block : sig
   (** Path to the given block. *)
   val by_hash : root:path -> block_hash -> path
 
+  (** Path to the current block data. *)
+  val current_block : root:path -> path
+
   (** Path to the current block number. *)
   val current_number : root:path -> path
 
   (** Path to the current block hash. *)
   val current_hash : root:path -> path
+
+  (** Path to the current block receipts. *)
+  val current_receipts : root:path -> path
+
+  (** Path to the current block transactions objects. *)
+  val current_transactions_objects : root:path -> path
 end
 
+(** Paths related to block headers. *)
+module BlockHeader : sig
+  (** Path to the current block header. *)
+  val current : path
+end
+
+(** Can't be used if storage version >= 41 *)
 module Indexes : sig
   (** Make the path to the indexed block hash. *)
   val block_by_number : root:path -> Block.number -> path
 end
 
+(** Can't be used if storage version >= 41 *)
 module Transaction_receipt : sig
   val receipts : path
 
@@ -116,6 +142,7 @@ module Transaction_receipt : sig
   val receipt : hash -> path
 end
 
+(** Can't be used if storage version >= 41 *)
 module Transaction_object : sig
   val objects : path
 

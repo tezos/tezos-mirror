@@ -38,6 +38,7 @@ val create : ?runner:Runner.t -> ?path:string -> ?name:string -> unit -> t
     as [~aliases:(List aliases)] have been dumped.
 *)
 val create_from_context :
+  ?rich_accounts:int * int ->
   ?aliases:aliases ->
   node:Node.t ->
   client:Client.t ->

@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 1111.0~rc2+dev (958bc09e)"
+    "version": "Octez 2223.0~rc1+dev (00bee1ae)"
   },
   "paths": {
     "/": {
@@ -1177,16 +1177,27 @@
                     "allow_tz4_delegate_enable": {
                       "type": "boolean"
                     },
-                    "all_bakers_attest_activation_level": {
-                      "nullable": true,
-                      "oneOf": [
-                        {
-                          "title": "Some",
+                    "all_bakers_attest_activation_threshold": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 2147483647
+                          "maximum": 65535
+                        },
+                        "denominator": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
                         }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
                       ]
+                    },
+                    "native_contracts_enable": {
+                      "type": "boolean"
                     },
                     "issuance_modification_delay": {
                       "type": "integer",
@@ -1282,7 +1293,8 @@
                     "direct_ticket_spending_enable",
                     "aggregate_attestation",
                     "allow_tz4_delegate_enable",
-                    "all_bakers_attest_activation_level",
+                    "all_bakers_attest_activation_threshold",
+                    "native_contracts_enable",
                     "issuance_modification_delay",
                     "consensus_key_activation_delay",
                     "unstake_finalization_delay"
@@ -1958,16 +1970,27 @@
                     "allow_tz4_delegate_enable": {
                       "type": "boolean"
                     },
-                    "all_bakers_attest_activation_level": {
-                      "nullable": true,
-                      "oneOf": [
-                        {
-                          "title": "Some",
+                    "all_bakers_attest_activation_threshold": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
                           "type": "integer",
                           "minimum": 0,
-                          "maximum": 2147483647
+                          "maximum": 65535
+                        },
+                        "denominator": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
                         }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
                       ]
+                    },
+                    "native_contracts_enable": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -2033,7 +2056,8 @@
                     "direct_ticket_spending_enable",
                     "aggregate_attestation",
                     "allow_tz4_delegate_enable",
-                    "all_bakers_attest_activation_level"
+                    "all_bakers_attest_activation_threshold",
+                    "native_contracts_enable"
                   ]
                 }
               }
@@ -2120,7 +2144,28 @@
                       "$ref": "#/components/schemas/Signature.Public_key_hash"
                     },
                     "script": {
-                      "$ref": "#/components/schemas/alpha.scripted.contracts"
+                      "oneOf": [
+                        {
+                          "title": "michelson",
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/alpha.scripted.contracts"
+                            }
+                          ]
+                        },
+                        {
+                          "title": "native",
+                          "type": "object",
+                          "properties": {
+                            "kind": {},
+                            "storage": {}
+                          },
+                          "required": [
+                            "kind",
+                            "storage"
+                          ]
+                        }
+                      ]
                     },
                     "counter": {
                       "$ref": "#/components/schemas/positive_bignum"
@@ -3743,6 +3788,103 @@
                                         "index",
                                         "commitment"
                                       ]
+                                    },
+                                    {
+                                      "title": "unpublished_dyn",
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "unpublished"
+                                          ]
+                                        },
+                                        "attestation_lag": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        },
+                                        "level": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 2147483647
+                                        },
+                                        "index": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attestation_lag",
+                                        "level",
+                                        "index"
+                                      ]
+                                    },
+                                    {
+                                      "title": "published_dyn",
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "published"
+                                          ]
+                                        },
+                                        "publisher": {
+                                          "$ref": "#/components/schemas/alpha.contract_id"
+                                        },
+                                        "is_proto_attested": {
+                                          "type": "boolean"
+                                        },
+                                        "attested_shards": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 65535
+                                        },
+                                        "total_shards": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 65535
+                                        },
+                                        "attestation_lag": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        },
+                                        "version": {
+                                          "type": "string",
+                                          "enum": [
+                                            "0"
+                                          ]
+                                        },
+                                        "level": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 2147483647
+                                        },
+                                        "index": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 255
+                                        },
+                                        "commitment": {
+                                          "$ref": "#/components/schemas/DAL_commitment"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "publisher",
+                                        "is_proto_attested",
+                                        "attested_shards",
+                                        "total_shards",
+                                        "attestation_lag",
+                                        "version",
+                                        "level",
+                                        "index",
+                                        "commitment"
+                                      ]
                                     }
                                   ]
                                 },
@@ -3767,6 +3909,146 @@
                         }
                       ]
                     }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/dal/past_parameters/{block_level}": {
+      "get": {
+        "description": "Get the DAL parameters to use for a given level",
+        "parameters": [
+          {
+            "name": "block_level",
+            "in": "path",
+            "description": "A level integer",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "feature_enable": {
+                      "type": "boolean"
+                    },
+                    "incentives_enable": {
+                      "type": "boolean"
+                    },
+                    "number_of_slots": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "attestation_lag": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "attestation_threshold": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "minimal_participation_ratio": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "$ref": "#/components/schemas/bignum"
+                        },
+                        "denominator": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
+                      ]
+                    },
+                    "rewards_ratio": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "$ref": "#/components/schemas/bignum"
+                        },
+                        "denominator": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
+                      ]
+                    },
+                    "traps_fraction": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "$ref": "#/components/schemas/bignum"
+                        },
+                        "denominator": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
+                      ]
+                    },
+                    "redundancy_factor": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255
+                    },
+                    "page_size": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "slot_size": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "number_of_shards": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    }
+                  },
+                  "required": [
+                    "feature_enable",
+                    "incentives_enable",
+                    "number_of_slots",
+                    "attestation_lag",
+                    "attestation_threshold",
+                    "minimal_participation_ratio",
+                    "rewards_ratio",
+                    "traps_fraction",
+                    "redundancy_factor",
+                    "page_size",
+                    "slot_size",
+                    "number_of_shards"
                   ]
                 }
               }
@@ -4056,6 +4338,103 @@
                                             "is_proto_attested",
                                             "attested_shards",
                                             "total_shards",
+                                            "version",
+                                            "level",
+                                            "index",
+                                            "commitment"
+                                          ]
+                                        },
+                                        {
+                                          "title": "unpublished_dyn",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "unpublished"
+                                              ]
+                                            },
+                                            "attestation_lag": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            },
+                                            "level": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 2147483647
+                                            },
+                                            "index": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "attestation_lag",
+                                            "level",
+                                            "index"
+                                          ]
+                                        },
+                                        {
+                                          "title": "published_dyn",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": [
+                                                "published"
+                                              ]
+                                            },
+                                            "publisher": {
+                                              "$ref": "#/components/schemas/alpha.contract_id"
+                                            },
+                                            "is_proto_attested": {
+                                              "type": "boolean"
+                                            },
+                                            "attested_shards": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 65535
+                                            },
+                                            "total_shards": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 65535
+                                            },
+                                            "attestation_lag": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            },
+                                            "version": {
+                                              "type": "string",
+                                              "enum": [
+                                                "0"
+                                              ]
+                                            },
+                                            "level": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 2147483647
+                                            },
+                                            "index": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 255
+                                            },
+                                            "commitment": {
+                                              "$ref": "#/components/schemas/DAL_commitment"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "publisher",
+                                            "is_proto_attested",
+                                            "attested_shards",
+                                            "total_shards",
+                                            "attestation_lag",
                                             "version",
                                             "level",
                                             "index",
@@ -6573,6 +6952,54 @@
         }
       }
     },
+    "/context/destination/{destination_id}/index": {
+      "get": {
+        "description": "Returns the index assigned to the address if it was indexed by the opcode INDEX_ADDRESS, otherwise returns null",
+        "parameters": [
+          {
+            "name": "destination_id",
+            "in": "path",
+            "description": "A destination identifier encoded in b58check.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/positive_bignum"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/context/issuance/current_yearly_rate": {
       "get": {
         "description": "Returns the current expected maximum yearly issuance rate (in %). The value only includes participation rewards (and does not include liquidity baking)",
@@ -6745,10 +7172,10 @@
                       "baking_reward_fixed_portion": {
                         "$ref": "#/components/schemas/alpha.mutez"
                       },
-                      "baking_reward_bonus_per_slot": {
+                      "baking_reward_bonus_per_block": {
                         "$ref": "#/components/schemas/alpha.mutez"
                       },
-                      "attesting_reward_per_slot": {
+                      "attesting_reward_per_block": {
                         "$ref": "#/components/schemas/alpha.mutez"
                       },
                       "seed_nonce_revelation_tip": {
@@ -6764,8 +7191,8 @@
                     "required": [
                       "cycle",
                       "baking_reward_fixed_portion",
-                      "baking_reward_bonus_per_slot",
-                      "attesting_reward_per_slot",
+                      "baking_reward_bonus_per_block",
+                      "attesting_reward_per_block",
                       "seed_nonce_revelation_tip",
                       "vdf_revelation_tip",
                       "dal_attesting_reward_per_shard"
@@ -8250,6 +8677,103 @@
                                               "index",
                                               "commitment"
                                             ]
+                                          },
+                                          {
+                                            "title": "unpublished_dyn",
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "unpublished"
+                                                ]
+                                              },
+                                              "attestation_lag": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              },
+                                              "level": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 2147483647
+                                              },
+                                              "index": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "attestation_lag",
+                                              "level",
+                                              "index"
+                                            ]
+                                          },
+                                          {
+                                            "title": "published_dyn",
+                                            "type": "object",
+                                            "properties": {
+                                              "kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "published"
+                                                ]
+                                              },
+                                              "publisher": {
+                                                "$ref": "#/components/schemas/alpha.contract_id"
+                                              },
+                                              "is_proto_attested": {
+                                                "type": "boolean"
+                                              },
+                                              "attested_shards": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 65535
+                                              },
+                                              "total_shards": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 65535
+                                              },
+                                              "attestation_lag": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              },
+                                              "version": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "0"
+                                                ]
+                                              },
+                                              "level": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 2147483647
+                                              },
+                                              "index": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 255
+                                              },
+                                              "commitment": {
+                                                "$ref": "#/components/schemas/DAL_commitment"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "publisher",
+                                              "is_proto_attested",
+                                              "attested_shards",
+                                              "total_shards",
+                                              "attestation_lag",
+                                              "version",
+                                              "level",
+                                              "index",
+                                              "commitment"
+                                            ]
                                           }
                                         ]
                                       },
@@ -9411,6 +9935,76 @@
         }
       }
     },
+    "/helpers/all_bakers_attest_activation_level": {
+      "get": {
+        "description": "Returns the activation level of All Bakers Attest. If the level is not set, returns `null`.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "description": "The level of the block relative to genesis. This is also the Shell's notion of level.",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "level_position": {
+                          "description": "The level of the block relative to the successor of the genesis block. More precisely, it is the position of the block relative to the block that starts the \"Alpha family\" of protocols, which includes all protocols except Genesis (that is, from 001 onwards).",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "cycle": {
+                          "description": "The current cycle's number. Note that cycles are a protocol-specific notion. As a result, the cycle number starts at 0 with the first block of the Alpha family of protocols.",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "cycle_position": {
+                          "description": "The current level of the block relative to the first block of the current cycle.",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "expected_commitment": {
+                          "description": "Tells whether the baker of this block has to commit a seed nonce hash.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "level_position",
+                        "cycle",
+                        "cycle_position",
+                        "expected_commitment"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/attestation_rights": {
       "get": {
         "description": "Retrieves the delegates allowed to attest a block.\nBy default, it gives the attestation power for delegates that have at least one attestation slot for the next block.\nParameters `level` and `cycle` can be used to specify the (valid) level(s) in the past or future at which the attestation rights have to be returned. Parameter `delegate` can be used to restrict the results to the given delegates.\nParameter `consensus_key` can be used to restrict the results to the given consensus_keys. \nReturns the smallest attestation slots and the attestation power. Also returns the minimal timestamp that corresponds to attestation at the given level. The timestamps are omitted for levels in the past, and are only estimates for levels higher that the next block's, based on the hypothesis that all predecessor blocks were baked at the first round.",
@@ -9480,7 +10074,7 @@
                               "minimum": 0,
                               "maximum": 65535
                             },
-                            "attestation_power": {
+                            "attesting_power": {
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 65535
@@ -9492,7 +10086,7 @@
                           "required": [
                             "delegate",
                             "first_slot",
-                            "attestation_power",
+                            "attesting_power",
                             "consensus_key"
                           ]
                         }
@@ -9504,6 +10098,68 @@
                     "required": [
                       "level",
                       "delegates"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/helpers/baking_power_distribution_for_current_cycle": {
+      "get": {
+        "description": "Returns the total baking power and the list of active delegates with their respective baking power, used to determine consensus rights for the current cycle. Note that these baking powers correspond to the staked and delegated balances that were held by bakers at the end of (current_cycle - CONSENSUS_RIGHTS_DELAY - 1).",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/int64"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "delegate": {
+                                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                                  },
+                                  "consensus_pkh": {
+                                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                                  }
+                                },
+                                "required": [
+                                  "delegate",
+                                  "consensus_pkh"
+                                ]
+                              },
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        }
+                      }
                     ]
                   }
                 }
@@ -10255,9 +10911,6 @@
                     "liquidity_baking_toggle_vote": {
                       "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
                     },
-                    "adaptive_issuance_vote": {
-                      "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
-                    },
                     "signature": {
                       "$ref": "#/components/schemas/Signature.V2"
                     }
@@ -10267,7 +10920,6 @@
                     "payload_round",
                     "proof_of_work_nonce",
                     "liquidity_baking_toggle_vote",
-                    "adaptive_issuance_vote",
                     "signature"
                   ]
                 }
@@ -10425,9 +11077,6 @@
                       "liquidity_baking_toggle_vote": {
                         "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
                       },
-                      "adaptive_issuance_vote": {
-                        "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
-                      },
                       "signature": {
                         "$ref": "#/components/schemas/Signature.V2"
                       }
@@ -10438,7 +11087,6 @@
                       "payload_round",
                       "proof_of_work_nonce",
                       "liquidity_baking_toggle_vote",
-                      "adaptive_issuance_vote",
                       "signature"
                     ]
                   },
@@ -12731,6 +13379,66 @@
         }
       }
     },
+    "/helpers/tz4_baker_number_ratio": {
+      "get": {
+        "description": "Returns the ratio of active bakers using a tz4.",
+        "parameters": [
+          {
+            "name": "cycle",
+            "in": "query",
+            "description": "A cycle integer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Universal string representation",
+                  "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "invalid_utf8_string": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        }
+                      },
+                      "required": [
+                        "invalid_utf8_string"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/helpers/validators": {
       "get": {
         "description": "Retrieves the level, the attestation slots and the public key hash of each delegate allowed to attest a block. Also returns each delegate's current consensus key, and current companion key when needed for crafting and validating attestations at this level.\nBy default, it provides this information for the next level.\nParameter `level` can be used to specify the (valid) level(s) in the past or future at which the attestation rights have to be returned. Parameter `delegate` can be used to restrict the results results to the given delegates. Parameter `consensus_key` can be used to restrict the results to the given consensus_keys.\n",
@@ -12778,29 +13486,62 @@
                         "minimum": 0,
                         "maximum": 2147483647
                       },
-                      "delegate": {
-                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      "consensus_threshold": {
+                        "$ref": "#/components/schemas/int64"
                       },
-                      "slots": {
+                      "consensus_committee": {
+                        "$ref": "#/components/schemas/int64"
+                      },
+                      "all_bakers_attest_activated": {
+                        "type": "boolean"
+                      },
+                      "delegates": {
                         "type": "array",
                         "items": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 65535
+                          "type": "object",
+                          "properties": {
+                            "delegate": {
+                              "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            },
+                            "rounds": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              }
+                            },
+                            "consensus_key": {
+                              "$ref": "#/components/schemas/Signature.Public_key_hash"
+                            },
+                            "companion_key": {
+                              "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
+                            },
+                            "attesting_power": {
+                              "$ref": "#/components/schemas/int64"
+                            },
+                            "attestation_slot": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            }
+                          },
+                          "required": [
+                            "delegate",
+                            "rounds",
+                            "consensus_key",
+                            "attesting_power",
+                            "attestation_slot"
+                          ]
                         }
-                      },
-                      "consensus_key": {
-                        "$ref": "#/components/schemas/Signature.Public_key_hash"
-                      },
-                      "companion_key": {
-                        "$ref": "#/components/schemas/Bls12_381.Public_key_hash"
                       }
                     },
                     "required": [
                       "level",
-                      "delegate",
-                      "slots",
-                      "consensus_key"
+                      "consensus_threshold",
+                      "consensus_committee",
+                      "all_bakers_attest_activated",
+                      "delegates"
                     ]
                   }
                 }
@@ -14151,31 +14892,6 @@
           }
         ]
       },
-      "alpha.adaptive_issuance_vote": {
-        "oneOf": [
-          {
-            "title": "per_block_vote_on",
-            "type": "string",
-            "enum": [
-              "on"
-            ]
-          },
-          {
-            "title": "per_block_vote_off",
-            "type": "string",
-            "enum": [
-              "off"
-            ]
-          },
-          {
-            "title": "per_block_vote_pass",
-            "type": "string",
-            "enum": [
-              "pass"
-            ]
-          }
-        ]
-      },
       "alpha.apply_internal_results.alpha.operation_result": {
         "oneOf": [
           {
@@ -14403,9 +15119,6 @@
           "liquidity_baking_toggle_vote": {
             "$ref": "#/components/schemas/alpha.liquidity_baking_vote"
           },
-          "adaptive_issuance_vote": {
-            "$ref": "#/components/schemas/alpha.adaptive_issuance_vote"
-          },
           "signature": {
             "$ref": "#/components/schemas/Signature.V2"
           }
@@ -14423,7 +15136,6 @@
           "payload_round",
           "proof_of_work_nonce",
           "liquidity_baking_toggle_vote",
-          "adaptive_issuance_vote",
           "signature"
         ]
       },
@@ -15249,50 +15961,52 @@
           "False",
           "CAST",
           "ISNAT",
-          "address",
+          "unit",
           "PACK",
           "EMIT",
-          "mutez",
-          "bls12_381_g1",
+          "string",
+          "chain_id",
           "Pair",
+          "constant",
           "IF_CONS",
-          "bool",
-          "bytes",
+          "INDEX_ADDRESS",
+          "signature",
           "storage",
           "OR",
+          "chest",
           "view",
           "UNPACK",
           "ADD",
           "DIP",
-          "map",
+          "lambda",
           "MEM",
           "BYTES",
           "SENDER",
           "ADDRESS",
           "CDR",
           "SAPLING_EMPTY_STATE",
-          "or",
+          "nat",
           "LOOP",
-          "contract",
-          "unit",
+          "GET_ADDRESS_INDEX",
+          "mutez",
           "SHA512",
           "CREATE_ACCOUNT",
           "BLAKE2B",
           "READ_TICKET",
           "LE",
-          "chain_id",
+          "sapling_transaction_deprecated",
+          "bytes",
           "timestamp",
-          "operation",
-          "set",
+          "or",
           "CHAIN_ID",
-          "chest",
+          "ticket",
           "SELF_ADDRESS",
           "SOURCE",
           "IMPLICIT_ACCOUNT",
-          "key",
+          "contract",
           "AMOUNT",
           "CHECK_SIGNATURE",
-          "sapling_transaction_deprecated",
+          "tx_rollup_l2_address",
           "LSR",
           "EQ",
           "Elt",
@@ -15305,16 +16019,16 @@
           "SWAP",
           "Some",
           "parameter",
-          "pair",
-          "bls12_381_g2",
+          "option",
+          "never",
           "VIEW",
           "None",
           "SLICE",
-          "int",
+          "bool",
           "ABS",
-          "lambda",
+          "key",
           "DUG",
-          "list",
+          "key_hash",
           "CAR",
           "GET",
           "HASH_KEY",
@@ -15324,7 +16038,7 @@
           "TOTAL_VOTING_POWER",
           "Lambda_rec",
           "SIZE",
-          "nat",
+          "map",
           "STEPS_TO_QUOTA",
           "IF_NONE",
           "UNPAIR",
@@ -15337,39 +16051,39 @@
           "PAIR",
           "SPLIT_TICKET",
           "RIGHT",
-          "key_hash",
+          "int",
           "AND",
           "NEG",
-          "option",
+          "big_map",
           "BALANCE",
           "SET_DELEGATE",
           "NEVER",
           "MIN_BLOCK_TIME",
           "INT",
-          "chest_key",
+          "bls12_381_fr",
           "ITER",
           "True",
           "Right",
           "Ticket",
           "GT",
           "DIG",
-          "tx_rollup_l2_address",
+          "operation",
           "SUB",
           "EDIV",
           "MAP",
           "IF_LEFT",
-          "big_map",
+          "list",
           "VOTING_POWER",
           "LAMBDA_REC",
           "Left",
-          "ticket",
+          "bls12_381_g2",
           "TICKET_DEPRECATED",
-          "bls12_381_fr",
-          "never",
+          "bls12_381_g1",
+          "sapling_state",
           "DUP",
           "LEFT",
-          "constant",
-          "signature",
+          "chest_key",
+          "pair",
           "SHA3",
           "LAMBDA",
           "NOT",
@@ -15377,8 +16091,8 @@
           "NOW",
           "NAT",
           "GE",
-          "string",
-          "sapling_transaction",
+          "set",
+          "address",
           "NEQ",
           "IF",
           "FAILWITH",
@@ -15390,7 +16104,7 @@
           "DROP",
           "EMPTY_BIG_MAP",
           "UNIT",
-          "sapling_state",
+          "sapling_transaction",
           "TICKET",
           "EMPTY_MAP",
           "APPLY",
@@ -17826,6 +18540,24 @@
                   },
                   "lazy_storage_diff": {
                     "$ref": "#/components/schemas/alpha.lazy_storage_diff"
+                  },
+                  "address_registry_diff": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "$ref": "#/components/schemas/alpha.transaction_destination"
+                        },
+                        "index": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "index"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -18033,6 +18765,24 @@
                   },
                   "lazy_storage_diff": {
                     "$ref": "#/components/schemas/alpha.lazy_storage_diff"
+                  },
+                  "address_registry_diff": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "$ref": "#/components/schemas/alpha.transaction_destination"
+                        },
+                        "index": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "index"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -18157,9 +18907,31 @@
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                   },
                   "consensus_power": {
-                    "type": "integer",
-                    "minimum": -1073741824,
-                    "maximum": 1073741823
+                    "type": "object",
+                    "properties": {
+                      "slots": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "baking_power": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slots",
+                      "baking_power"
+                    ]
                   },
                   "consensus_key": {
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
@@ -18222,9 +18994,31 @@
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                   },
                   "consensus_power": {
-                    "type": "integer",
-                    "minimum": -1073741824,
-                    "maximum": 1073741823
+                    "type": "object",
+                    "properties": {
+                      "slots": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "baking_power": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slots",
+                      "baking_power"
+                    ]
                   },
                   "consensus_key": {
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
@@ -18285,9 +19079,31 @@
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
                   },
                   "consensus_power": {
-                    "type": "integer",
-                    "minimum": -1073741824,
-                    "maximum": 1073741823
+                    "type": "object",
+                    "properties": {
+                      "slots": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "baking_power": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slots",
+                      "baking_power"
+                    ]
                   },
                   "consensus_key": {
                     "$ref": "#/components/schemas/Signature.Public_key_hash"
@@ -18379,9 +19195,31 @@
                           "$ref": "#/components/schemas/Signature.Public_key_hash"
                         },
                         "consensus_power": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
+                          "type": "object",
+                          "properties": {
+                            "slots": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "baking_power": {
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/int64"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "slots",
+                            "baking_power"
+                          ]
                         }
                       },
                       "required": [
@@ -18392,9 +19230,31 @@
                     }
                   },
                   "total_consensus_power": {
-                    "type": "integer",
-                    "minimum": -1073741824,
-                    "maximum": 1073741823
+                    "type": "object",
+                    "properties": {
+                      "slots": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "baking_power": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slots",
+                      "baking_power"
+                    ]
                   }
                 },
                 "required": [
@@ -18469,9 +19329,31 @@
                           "$ref": "#/components/schemas/Signature.Public_key_hash"
                         },
                         "consensus_power": {
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
+                          "type": "object",
+                          "properties": {
+                            "slots": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            "baking_power": {
+                              "nullable": true,
+                              "oneOf": [
+                                {
+                                  "title": "Some",
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/components/schemas/int64"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "slots",
+                            "baking_power"
+                          ]
                         }
                       },
                       "required": [
@@ -18482,9 +19364,31 @@
                     }
                   },
                   "total_consensus_power": {
-                    "type": "integer",
-                    "minimum": -1073741824,
-                    "maximum": 1073741823
+                    "type": "object",
+                    "properties": {
+                      "slots": {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      "baking_power": {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/int64"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "slots",
+                      "baking_power"
+                    ]
                   }
                 },
                 "required": [
@@ -22982,6 +23886,24 @@
                   },
                   "lazy_storage_diff": {
                     "$ref": "#/components/schemas/alpha.lazy_storage_diff"
+                  },
+                  "address_registry_diff": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "$ref": "#/components/schemas/alpha.transaction_destination"
+                        },
+                        "index": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "index"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -23189,6 +24111,24 @@
                   },
                   "lazy_storage_diff": {
                     "$ref": "#/components/schemas/alpha.lazy_storage_diff"
+                  },
+                  "address_registry_diff": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "$ref": "#/components/schemas/alpha.transaction_destination"
+                        },
+                        "index": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "address",
+                        "index"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -24810,36 +25750,10 @@
                 ]
               }
             ]
-          },
-          "adaptive_issuance_vote": {
-            "oneOf": [
-              {
-                "title": "per_block_vote_on",
-                "type": "string",
-                "enum": [
-                  "on"
-                ]
-              },
-              {
-                "title": "per_block_vote_off",
-                "type": "string",
-                "enum": [
-                  "off"
-                ]
-              },
-              {
-                "title": "per_block_vote_pass",
-                "type": "string",
-                "enum": [
-                  "pass"
-                ]
-              }
-            ]
           }
         },
         "required": [
-          "liquidity_baking_vote",
-          "adaptive_issuance_vote"
+          "liquidity_baking_vote"
         ]
       },
       "alpha.sapling_state_id": {

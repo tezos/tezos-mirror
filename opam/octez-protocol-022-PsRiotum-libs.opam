@@ -17,25 +17,14 @@ depends: [
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "tezt" { >= "4.1.0" & < "5.0.0" }
-  "tezt-tezos" { = version }
-  "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs" { = version }
-  "octez-version" { = version }
-  "octez-node-config" { = version }
-  "tezos-dal-node-services" { = version }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "memtrace"
-  "octez-baker-lib" { = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
-  "octez-alcotezt" { with-test & = version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

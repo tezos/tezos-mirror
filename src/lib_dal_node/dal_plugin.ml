@@ -27,6 +27,8 @@ type operation_application_result = Succeeded | Failed
 
 type slot_index = int
 
+type attestation_lag = int
+
 type slot_header = {
   published_level : int32;
   slot_index : slot_index;
@@ -43,6 +45,8 @@ module type T = sig
   type attestation_operation
 
   type tb_slot
+
+  val tb_slot_to_int : tb_slot -> int
 
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
@@ -65,18 +69,13 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot
-    * Signature.public_key_hash option
-    * attestation_operation
-    * dal_attestation option)
-    list
-    tzresult
+    (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
-  val get_committee :
+  val get_committees :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
+    (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val dal_attestation : block_info -> dal_attestation tzresult
 
@@ -97,6 +96,17 @@ module type T = sig
     proof:Cryptobox.shard_proof ->
     tb_slot:tb_slot ->
     unit tzresult Lwt.t
+
+  val publish :
+    Tezos_rpc.Context.generic ->
+    block_level:int32 ->
+    source:Signature.Public_key_hash.t ->
+    slot_index:slot_index ->
+    commitment:Tezos_crypto_dal.Cryptobox.commitment ->
+    commitment_proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
+    src_sk:Signature.Secret_key.t ->
+    unit ->
+    Operation_hash.t tzresult Lwt.t
 
   val is_delegate :
     Tezos_rpc.Context.generic ->
@@ -120,15 +130,20 @@ module type T = sig
 
     val cell_hash : cell -> hash
 
+    val back_pointer : cell -> index:int -> (hash option, unit) result
+
     val cells_of_level :
       attested_level:int32 ->
       Tezos_rpc.Context.generic ->
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
-      (hash * cell * slot_index) list tzresult Lwt.t
+      (hash * cell * slot_index * attestation_lag) list tzresult Lwt.t
 
     val slot_header_of_cell : cell -> slot_header option
+
+    val proto_attestation_status :
+      cell -> [`Attested of attestation_lag | `Unattested | `Unpublished] option
   end
 
   module RPC : sig

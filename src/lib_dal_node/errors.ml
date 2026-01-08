@@ -33,6 +33,10 @@ type error +=
   | Not_enough_history of {stored_levels : int; minimal_levels : int}
   | Not_enough_l1_history of {stored_cycles : int; minimal_cycles : int}
   | Amplificator_initialization_failed
+  | Wrong_chain_id of {
+      current_chain_id : Chain_id.t;
+      stored_chain_id : Chain_id.t;
+    }
 
 let () =
   register_error_kind
@@ -140,7 +144,31 @@ let () =
     ~description:"Amplificator initialization failed"
     Data_encoding.empty
     (function Amplificator_initialization_failed -> Some () | _ -> None)
-    (fun () -> Amplificator_initialization_failed)
+    (fun () -> Amplificator_initialization_failed) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.wrong_chain_id"
+    ~title:"Wrong chain id"
+    ~description:"Chain id is not the one stored in the config file"
+    ~pp:(fun ppf (current_chain_id, stored_chain_id) ->
+      Format.fprintf
+        ppf
+        "Chain identifier of the endpoint is: %a, whereas the storage is \
+         related to %a."
+        Chain_id.pp
+        current_chain_id
+        Chain_id.pp
+        stored_chain_id)
+    Data_encoding.(
+      obj2
+        (req "current_chain_id" Chain_id.encoding)
+        (req "stored_chain_id" Chain_id.encoding))
+    (function
+      | Wrong_chain_id {current_chain_id; stored_chain_id} ->
+          Some (current_chain_id, stored_chain_id)
+      | _ -> None)
+    (fun (current_chain_id, stored_chain_id) ->
+      Wrong_chain_id {current_chain_id; stored_chain_id})
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 

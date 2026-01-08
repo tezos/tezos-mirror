@@ -15,7 +15,7 @@ ARG GIT_SHORTREF
 ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
-RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
+RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
@@ -25,6 +25,7 @@ COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup sdk/rust tezos/sdk/rust
 COPY --chown=tezos:nogroup irmin tezos/irmin
@@ -38,9 +39,8 @@ COPY --chown=tezos:nogroup dune-workspace tezos/dune-workspace
 COPY --chown=tezos:nogroup dune-project tezos/dune-project
 COPY --chown=tezos:nogroup vendors tezos/vendors
 COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
-COPY --chown=tezos:nogroup cohttp tezos/cohttp
 COPY --chown=tezos:nogroup websocket tezos/websocket
-COPY --chown=tezos:nogroup opentelemetry tezos/opentelemetry
+COPY --chown=tezos:nogroup lwt_domain tezos/lwt_domain
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup teztale tezos/teztale

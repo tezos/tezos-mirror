@@ -1,0 +1,26 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/or_binary.tz on storage None and input '(Pair 7 7)' --level 1 --trace-stack
+storage
+  (Some 7)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (just consumed gas: 5.999)
+    [ (Pair (Pair 7 7) None) ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Pair 7 7) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ 7
+      7 ]
+  - location: 12 (just consumed gas: 0.035)
+    [ 7 ]
+  - location: 13 (just consumed gas: 0.010)
+    [ (Some 7) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ {}
+      (Some 7) ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Pair {} (Some 7)) ]
+

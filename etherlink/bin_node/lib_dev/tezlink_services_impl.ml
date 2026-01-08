@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 module type Backend = sig
-  include Durable_storage.READER
+  include Simulator.SimulationBackend
 
   val block_param_to_block_number :
     Ethereum_types.Block_parameter.extended ->
@@ -14,6 +14,8 @@ end
 
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
+  include Simulator.MakeTezlink (Backend)
+
   type block_param =
     [ `Head of int32
     | `Level of int32
@@ -91,20 +93,72 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let* state = Backend.get_state ~block () in
     Backend.read state p
 
+  let subkeys ~block p =
+    let open Lwt_result_syntax in
+    let* block = shell_block_param_to_eth_block_param block in
+    let* state = Backend.get_state ~block () in
+    Backend.subkeys state p
+
   let balance chain block c =
     let `Main = chain in
     Tezlink_durable_storage.balance (read ~block) c
+
+  let bootstrap_accounts () =
+    let open Lwt_result_syntax in
+    (* We call bootstrap accounts those that were present in durable storage
+       at the start of the chain. *)
+    let block = `Level 0l in
+    let chain = `Main in
+    let* contracts_keys =
+      subkeys ~block Tezlink_durable_storage.Path.accounts_index
+    in
+    let contracts =
+      List.filter_map Tezlink_durable_storage.contract_of_path contracts_keys
+    in
+    List.map_es
+      (fun c ->
+        let* balance =
+          balance chain block (Tezos_types.Contract.of_implicit c)
+        in
+        return (c, balance))
+      contracts
 
   let get_storage chain block c =
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.storage c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
 
-    Durable_storage.inspect_durable_and_decode
-      (read ~block)
-      (Tezlink_durable_storage.Path.storage c)
-      (Data_encoding.Binary.of_bytes_opt
-         Tezlink_imports.Alpha_context.Script.expr_encoding)
+  let get_code chain block c =
+    (* TODO: #7986
+       Support unparsing_mode argument. *)
+    let `Main = chain in
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.code c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
+
+  let get_script chain block c =
+    let open Lwt_result_syntax in
+    match Tezlink_mock.mocked_script c with
+    | Some c -> return_some c
+    | None -> (
+        let* code = get_code chain block c in
+        let* storage = get_storage chain block c in
+        match (code, storage) with
+        | Some code, Some storage ->
+            return
+            @@ Some
+                 Tezlink_imports.Imported_protocol.Alpha_context.Script.
+                   {code = lazy_expr code; storage = lazy_expr storage}
+        | _ -> return_none)
 
   let manager_key chain block c =
     let open Lwt_result_syntax in
@@ -186,35 +240,9 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let* number = shell_block_param_to_block_number block in
     Block_storage.nth_block_hash (Z.of_int32 number)
 
-  let operations chain ~chain_id block_param =
+  let simulate_operation ~chain_id ~skip_signature op hash block =
     let open Lwt_result_syntax in
-    let `Main = chain in
-    let* block = block chain block_param in
-    let operations =
-      Data_encoding.Binary.to_bytes_exn Data_encoding.bytes block.operations
-    in
-    let operations =
-      Data_encoding.Binary.of_bytes_exn
-        Data_encoding.(
-          list
-            (tup3
-               Operation_hash.encoding
-               Tezos_base.Operation.shell_header_encoding
-               bytes))
-        operations
-    in
-    let operations =
-      List.map
-        (fun (hash, shell, op_and_receipt) ->
-          let protocol_data, receipt =
-            Data_encoding.Binary.of_bytes_exn
-              Tezlink_imports.Imported_protocol
-              .operation_data_and_receipt_encoding
-              op_and_receipt
-          in
-          ({chain_id; hash; shell; protocol_data; receipt = Receipt receipt}
-            : Tezos_services.Block_services.operation))
-        operations
-    in
-    return operations
+    let read = read ~block in
+    let* block = shell_block_param_to_eth_block_param block in
+    simulate_operation ~read ~chain_id ~skip_signature op hash block
 end

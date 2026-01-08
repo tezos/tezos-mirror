@@ -39,30 +39,46 @@ module Contract : sig
 
   val encoding : t Data_encoding.t
 
+  val implicit_encoding : Signature.public_key_hash Data_encoding.t
+
   val of_b58check : string -> t tzresult
 
-  val of_implicit : Signature.V1.public_key_hash -> t
-end
+  val of_implicit : Signature.public_key_hash -> t
 
-module Operation : sig
-  type t = {
-    source : Signature.V1.public_key_hash;
-    counter : Z.t;
-    op : Tezlink_imports.Alpha_context.packed_operation;
-    raw : bytes;
-  }
-
-  val hash_operation : t -> Ethereum_types.hash
-
-  val encoding : t Data_encoding.t
-
-  val decode : bytes -> t tzresult
+  val of_hex : string -> Signature.public_key_hash option
 end
 
 module Tez : sig
   include module type of Tezlink_imports.Alpha_context.Tez
 
   val of_string_exn : string -> t
+
+  val to_mutez_z : t -> Z.t
+end
+
+module Operation : sig
+  type t = {
+    source : Signature.public_key_hash;
+    first_counter : Z.t;
+    length : int;
+    op : Tezlink_imports.Alpha_context.packed_operation;
+    raw : bytes;
+    fee : Tez.t;
+    gas_limit : Z.t;
+  }
+
+  val counter_to_z :
+    Tezlink_imports.Alpha_context.Manager_counter.t -> Z.t tzresult
+
+  val hash_operation : t -> Ethereum_types.hash
+
+  val encoding : t Data_encoding.t
+
+  val gas_limit_to_z : Tezlink_imports.Alpha_context.Gas.Arith.integral -> Z.t
+
+  (** Underapproximation of the size of the smallest operation, defined as a
+      Reveal of tz1 key, with zero fees/gas limit/storage limit/....*)
+  val minimum_operation_size : int
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

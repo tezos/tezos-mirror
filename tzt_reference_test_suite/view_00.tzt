@@ -1,0 +1,16 @@
+code { VIEW "a" nat ; };
+
+input
+  {
+    Stack_elt unit Unit;
+    Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+  };
+
+output { Stack_elt (option nat) (Some 1) };
+
+views
+  {
+    Views "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" { View "a" unit nat { DROP; PUSH nat 1 } }
+  };
+
+storages { Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit };

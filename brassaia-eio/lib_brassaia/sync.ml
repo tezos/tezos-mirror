@@ -57,24 +57,24 @@ module Make (S : Store.Generic_key.S) = struct
     let conv_commit_v = Type.unstage (conv RP.Commit.Val.t SP.Commit.Val.t) in
     let s = SP.Slice.empty () in
     RP.Slice.iter r (function
-        | `Contents (k, v) -> (
-            let k = conv_contents_k k in
-            let v = conv_contents_v v in
-            match (k, v) with
-            | Ok k, Ok v -> SP.Slice.add s (`Contents (k, v))
-            | _ -> ())
-        | `Node (k, v) -> (
-            let k = conv_node_k k in
-            let v = conv_node_v v in
-            match (k, v) with
-            | Ok k, Ok v -> SP.Slice.add s (`Node (k, v))
-            | _ -> ())
-        | `Commit (k, v) -> (
-            let k = conv_commit_k k in
-            let v = conv_commit_v v in
-            match (k, v) with
-            | Ok k, Ok v -> SP.Slice.add s (`Commit (k, v))
-            | _ -> ())) ;
+      | `Contents (k, v) -> (
+          let k = conv_contents_k k in
+          let v = conv_contents_v v in
+          match (k, v) with
+          | Ok k, Ok v -> SP.Slice.add s (`Contents (k, v))
+          | _ -> ())
+      | `Node (k, v) -> (
+          let k = conv_node_k k in
+          let v = conv_node_v v in
+          match (k, v) with
+          | Ok k, Ok v -> SP.Slice.add s (`Node (k, v))
+          | _ -> ())
+      | `Commit (k, v) -> (
+          let k = conv_commit_k k in
+          let v = conv_commit_v v in
+          match (k, v) with
+          | Ok k, Ok v -> SP.Slice.add s (`Commit (k, v))
+          | _ -> ())) ;
     s
 
   let convs src dst l =
@@ -95,7 +95,8 @@ module Make (S : Store.Generic_key.S) = struct
   let status_t t =
     let open Type in
     variant "status" (fun empty head -> function
-      | `Empty -> empty | `Head c -> head c)
+      | `Empty -> empty
+      | `Head c -> head c)
     |~ case0 "empty" `Empty
     |~ case1 "head" S.(commit_t @@ repo t) (fun c -> `Head c)
     |> sealv

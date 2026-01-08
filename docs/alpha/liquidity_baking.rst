@@ -29,7 +29,10 @@ Subsidy
 At every block in the chain, a small amount of tez is minted and credited to the
 CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the
 ``xtz_pool`` balance in its storage. The amount that is minted and sent to the
-CPMM contract for each block is a protocol constant (``LIQUIDITY_BAKING_SUBSIDY``), defining a fixed target rate of 5 tez/minute.
+CPMM contract for each block is derived from the protocol constant
+``LIQUIDITY_BAKING_SUBSIDY``, that specifies the amount to be be
+minted per minute (set to 5 tez/minute since the :doc:`Paris
+protocol<../protocols/020_paris>`.)
 One can easily compute the value of the per block subsidy by taking into account the minimal block time, under the assumption that all blocks are produced at round 0.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
@@ -64,7 +67,9 @@ For indicative purposes, if among the non-abstaining blocks a fraction
 reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
 non-abstaining blocks, about 1386 blocks if everyone signals, 1963
 blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
-that assuming six blocks per minute there are 8640 blocks per day.
+that since :ref:`MINIMAL_BLOCK_DELAY<cs_constants_alpha>` is 6
+seconds, there are 14400 blocks per day (assuming all blocks are
+produced at round zero.)
 
 When producing blocks using Octez baking daemon ``octez-baker``, there
 are two command-line options affecting toggle vote. The
@@ -72,7 +77,7 @@ are two command-line options affecting toggle vote. The
 value to be used in each block. Note that this option must be placed
 **after** ``run`` on the command-line. Moreover, the path of a JSON
 file can be given to the ``--votefile <path>`` option
-e.g. ``octez-baker-<protocol codename> run with local node
+e.g. ``octez-baker run with local node
 ~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile
 "per_block_votes.json"``, or placed in a default location:
 ``per_block_votes.json`` in the current working directory **or** in
@@ -89,4 +94,4 @@ file is deleted or becomes malformed while the baker is running, the
 last valid value read is used. If neither a valid vote file is
 provided nor a CLI value given, the baker will fail on the first block
 after it was started. See also the :ref:`baker man
-page<baker_manual_alpha>`.
+page <baker_manual>`.

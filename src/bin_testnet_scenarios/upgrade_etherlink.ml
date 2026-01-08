@@ -167,8 +167,10 @@ let prepare_and_run_sequencer rollup_node =
                Some (Sc_rollup_node.data_dir rollup_node ^ "/wasm_2_0_0");
              private_rpc_port = Some 8546;
              time_between_blocks = Some Nothing;
-             sequencer =
-               "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
+             sequencer_keys =
+               [
+                 "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
+               ];
              genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
@@ -176,10 +178,11 @@ let prepare_and_run_sequencer rollup_node =
              catchup_cooldown = None;
              max_number_of_chunks = None;
              wallet_dir = None;
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
              dal_slots = None;
+             sequencer_sunset_sec = None;
            })
       (Sc_rollup_node.endpoint rollup_node)
   in

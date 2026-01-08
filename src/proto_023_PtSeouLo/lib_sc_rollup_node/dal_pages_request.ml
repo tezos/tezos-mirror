@@ -96,7 +96,10 @@ module Pages_cache =
   Aches_lwt.Lache.Make (Aches.Rache.Transfer (Aches.Rache.LRU) (Slot_id))
 
 let get_slot_pages =
-  let pages_cache = Pages_cache.create 16 (* 130MB *) in
+  let pages_cache =
+    Pages_cache.create 16
+    (* 130MB *)
+  in
   fun dal_cctxt slot_id ->
     Pages_cache.bind_or_put
       pages_cache
@@ -104,21 +107,13 @@ let get_slot_pages =
       (Dal_node_client.get_slot_pages dal_cctxt)
       Lwt.return
 
-let download_confirmed_slot_pages ({Node_context.dal_cctxt; _} as node_ctxt)
-    ~published_level ~index =
-  let open Environment.Error_monad.Lwt_result_syntax in
-  let* published_in_block_hash =
-    Node_context.hash_of_level node_ctxt (Raw_level.to_int32 published_level)
-  in
-  let* header =
-    Node_context.get_slot_header node_ctxt ~published_in_block_hash index
-  in
+let download_confirmed_slot_pages {Node_context.dal_cctxt; _} ~published_level
+    ~index =
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
   (* DAL must be configured for this point to be reached *)
-  let slot_id : Slot_id.t =
-    {slot_level = header.id.published_level; slot_index = header.id.index}
-  in
-  get_slot_pages dal_cctxt slot_id
+  get_slot_pages
+    dal_cctxt
+    {slot_level = Raw_level.to_int32 published_level; slot_index = index}
 
 module Slots_statuses_cache =
   Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
@@ -241,11 +236,17 @@ let get_page node_ctxt ~inbox_level page_id =
   in
   Lwt.return @@ Environment.wrap_tzresult res
 
-let slot_id_is_valid
+let shadownet = Chain_id.of_b58check_exn "NetXsqzbfFenSTS"
+
+let slot_id_is_valid chain_id
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~origination_level ~inbox_level slot_id
     ~dal_attested_slots_validity_lag =
   let open Alpha_context in
+  let dal_activation_level =
+    if Chain_id.(chain_id = shadownet) then Some (Raw_level.of_int32_exn 1l)
+    else dal_activation_level
+  in
   Result.is_ok
     (Dal.Slot_index.check_is_in_range
        ~number_of_slots:dal_constants.number_of_slots
@@ -264,7 +265,7 @@ let slot_id_is_valid
         ~published_level:slot_id.published_level
   | _ -> false
 
-let page_id_is_valid
+let page_id_is_valid chain_id
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~origination_level ~inbox_level
     Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
@@ -274,6 +275,7 @@ let page_id_is_valid
          (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
        page_index)
   && slot_id_is_valid
+       chain_id
        dal_constants
        ~dal_activation_level
        ~origination_level
@@ -286,13 +288,15 @@ let slot_pages
     ~dal_activation_level ~inbox_level node_ctxt slot_id
     ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
-  let Node_context.{genesis_info = {level = origination_level; _}; _} =
+  let Node_context.{genesis_info = {level = origination_level; _}; l1_ctxt; _} =
     node_ctxt
   in
+  let* chain_id = Layer1.get_chain_id l1_ctxt in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   if
     not
     @@ slot_id_is_valid
+         chain_id
          dal_constants
          ~dal_activation_level
          ~origination_level
@@ -317,12 +321,14 @@ let page_content
     ~restricted_commitments_publishers page_id ~dal_attested_slots_validity_lag
     =
   let open Lwt_result_syntax in
-  let Node_context.{genesis_info = {level = origination_level; _}; _} =
+  let Node_context.{genesis_info = {level = origination_level; _}; l1_ctxt; _} =
     node_ctxt
   in
+  let* chain_id = Layer1.get_chain_id l1_ctxt in
   if
     not
     @@ page_id_is_valid
+         chain_id
          dal_constants
          ~dal_activation_level
          ~origination_level

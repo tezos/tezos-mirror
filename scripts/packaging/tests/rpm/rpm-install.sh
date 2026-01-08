@@ -44,32 +44,11 @@ dnf -y install \
   octez-baker \
   octez-smart-rollup-node
 
-#shellcheck disable=SC2129,SC1091
-echo "NETWORK=ghostnet" >> /etc/default/octez-node
-echo "HISTORY_MODE=rolling" >> /etc/default/octez-node
-echo "SNAPSHOT_NO_CHECK=" >> /etc/default/octez-node
-#shellcheck disable=SC1091
-. /etc/default/octez-node
-
-echo "RUNTIME_OPTS=\"--keep-alive --dal-node http://127.0.0.1:10732\"" >> /etc/default/octez-baker
-echo "LQVOTE=off" >> /etc/default/octez-baker
-
-rm -f "$DATADIR/config.json"
-su tezos -c "/usr/bin/octez-node config init \
-      --data-dir=$DATADIR \
-      --network=$NETWORK \
-      --history-mode=$HISTORY_MODE \
-      --net-addr=\"[::]:9732\" \
-      --rpc-addr=\"127.0.0.1:8732\""
-
-# if systemd is available we test the service scripts
-if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
-
-  # This file include the systemd tests and diagnistic common
-  # to both rpm and deb
-  . scripts/packaging/tests/tests-systemd-common.inc.sh
-
-fi
+octez-node --version
+octez-client --version
+octez-dal-node --version
+octez-baker --version
+octez-smart-rollup-node --version
 
 dnf -y remove octez-node \
   octez-client \

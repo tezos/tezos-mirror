@@ -104,7 +104,8 @@ let test_multiple_misbehaviors =
   init_constants ~blocks_per_cycle:24l ~reward_per_block:0L ()
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
   --> next_cycle
-  --> (* various make misbehaviors spread over 1 or two cycles *)
+  -->
+  (* various make misbehaviors spread over 1 or two cycles *)
   List.fold_left
     (fun acc i ->
       acc
@@ -145,8 +146,7 @@ let check_has_no_slots ~loc baker_name =
       | [] -> return input
       | [{level = _; delegates_rights; estimated_time = _}] -> (
           match delegates_rights with
-          | [{delegate; consensus_key = _; first_slot = _; attestation_power}]
-            ->
+          | [{delegate; consensus_key = _; first_slot = _; attesting_power}] ->
               Test.fail
                 ~__LOC__
                 "%s: delegate '%s'(%a) expected to have no attestation power, \
@@ -155,7 +155,7 @@ let check_has_no_slots ~loc baker_name =
                 baker_name
                 Signature.Public_key_hash.pp
                 delegate
-                attestation_power
+                attesting_power
           | _ ->
               (* Cannot happen: RPC called for only one delegate *) assert false
           )
@@ -195,15 +195,21 @@ let check_has_slots ~loc baker_name =
 let test_delegate_forbidden =
   let crd (_, state) = state.State.constants.consensus_rights_delay in
   init_constants ~blocks_per_cycle:32l ()
-  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
+  --> (Tag "non tz4" --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
+      |+ Tag "tz4"
+         --> begin_test
+               ~default_algo:Bls
+               ["delegate"; "bootstrap1"; "bootstrap2"])
   --> set_baker "bootstrap1"
   --> (Tag "Is not forbidden until first denunciation"
        --> loop 14 (double_bake "delegate")
        --> exclude_bakers ["delegate"]
-       --> (* ensure delegate is not forbidden until the denunciations are done *)
+       -->
+       (* ensure delegate is not forbidden until the denunciations are done *)
        check_is_not_forbidden "delegate"
        --> make_denunciations ()
-       --> (* delegate is forbidden directly after the first denunciation *)
+       -->
+       (* delegate is forbidden directly after the first denunciation *)
        check_is_forbidden ~loc:__LOC__ "delegate"
       |+ Tag "Is forbidden after single misbehavior"
          --> double_attest "delegate"

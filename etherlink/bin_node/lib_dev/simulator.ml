@@ -18,7 +18,7 @@ module type SimulationBackend = sig
     bytes tzresult Lwt.t
 end
 
-module Make (SimulationBackend : SimulationBackend) = struct
+module MakeEtherlink (SimulationBackend : SimulationBackend) = struct
   let call_simulation ?(state_override = Ethereum_types.state_override_empty)
       ~log_file ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
@@ -55,8 +55,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let* storage_version =
       Durable_storage.storage_version (SimulationBackend.read simulation_state)
     in
-    if storage_version < 12 then return `V0
-    else if storage_version > 12 then return `V2
+    if Storage_version.simulation_v0 ~storage_version then return `V0
+    else if Storage_version.simulation_v2 ~storage_version then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)
@@ -99,13 +99,15 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     Lwt.return (Simulation.simulation_result bytes)
 
-  let call_estimate_gas call simulation_state =
+  let call_estimate_gas ?(state_override = Ethereum_types.state_override_empty)
+      call simulation_state =
     let open Lwt_result_syntax in
     let* bytes =
       call_simulation
         ~log_file:"estimate_gas"
         ~input_encoder:Simulation.encode
         ~input:call
+        ~state_override
         simulation_state
     in
     Lwt.return (Simulation.gas_estimation bytes)
@@ -156,7 +158,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
     return da_fee
 
   let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
-      ~simulation_version (call : Ethereum_types.call) gas simulation_state =
+      ~simulation_version ~state_override (call : Ethereum_types.call) gas
+      simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
@@ -164,6 +167,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
+        ~state_override
         (simulation_input
            ~timestamp
            ~simulation_version
@@ -188,6 +192,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
+              ~state_override
               call
               (Qty maximum_gas_per_transaction)
               simulation_state
@@ -196,6 +201,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
+              ~state_override
               call
               new_gas
               simulation_state
@@ -222,11 +228,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
-  let estimate_gas call block =
+  let estimate_gas call block_param state_override =
     let open Lwt_result_syntax in
-    let* simulation_state =
-      SimulationBackend.get_state ~block:(Block_parameter block) ()
-    in
+    let* simulation_state = SimulationBackend.get_state ~block:block_param () in
     let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
       Etherlink_durable_storage.maximum_gas_per_transaction
@@ -235,6 +239,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
+        ~state_override
         (simulation_input
            ~timestamp
            ~simulation_version
@@ -256,6 +261,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
           confirm_gas
+            ~state_override
             ~timestamp
             ~maximum_gas_per_transaction
             ~simulation_version
@@ -265,4 +271,94 @@ module Make (SimulationBackend : SimulationBackend) = struct
         in
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res
+end
+
+type error += Operation_serialization_error of Data_encoding.Binary.write_error
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.operation_serialization_error"
+    ~title:"Operation serialization failed"
+    ~description:"An error occured during the serialization of an operation."
+    ~pp:(fun ppf e ->
+      Format.fprintf
+        ppf
+        "Operation serialization failed: %a"
+        Data_encoding.Binary.pp_write_error
+        e)
+    Data_encoding.(obj1 (req "error" Binary.write_error_encoding))
+    (function Operation_serialization_error e -> Some e | _ -> None)
+    (fun e -> Operation_serialization_error e)
+
+module MakeTezlink (SimulationBackend : SimulationBackend) = struct
+  open Tezlink_imports
+  open Imported_protocol
+
+  let call_simulation ~input ~skip_signature block =
+    let open Lwt_result_syntax in
+    let* simulation_state = SimulationBackend.get_state ~block () in
+    let skip_signature_tag = if skip_signature then "\000" else "\001" in
+    let*? messages = String.chunk_bytes 4096 (Bytes.of_string input) in
+    let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["tezlink"; "simulation_result"];
+      ]
+    in
+    SimulationBackend.simulate_and_read
+      ~state_override:Ethereum_types.state_override_empty
+      simulation_state
+      ~input:
+        {
+          messages =
+            [Simulation.simulation_tag; skip_signature_tag; nb_messages]
+            @ messages;
+          reveal_pages = None;
+          insight_requests;
+          log_kernel_debug_file = Some "simulate_call";
+        }
+
+  let simulate_operation ~chain_id ~skip_signature ~read
+      (op : Imported_protocol.operation) _hash block =
+    let open Lwt_result_syntax in
+    let*? input =
+      Data_encoding.Binary.to_string Alpha_context.Operation.encoding op
+      |> Result.map_error_e @@ fun e ->
+         Result_syntax.tzfail (Operation_serialization_error e)
+    in
+    (* First, prevalidate the operation because there is no point
+       in simulating it if it's invalid (invalid operations don't
+       produce any receipt). *)
+    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
+      Tezlink_prevalidation.parse_and_validate_for_queue
+        ~check_signature:(not skip_signature)
+        ~read
+        input
+    in
+    let* () =
+      match prevalidation_res with
+      | Ok _op -> return_unit
+      | Error message -> Error_monad.failwith "Prevalidation error: %s" message
+    in
+
+    (* Now, the actual simulation. *)
+    let* bytes = call_simulation ~input ~skip_signature block in
+    let*? operations =
+      Tezos_services.Current_block_services.deserialize_operations
+        ~chain_id
+        bytes
+    in
+    let* simulation_receipt =
+      match operations with
+      | [op] -> (
+          match op.receipt with
+          | Receipt receipt -> return receipt
+          | Empty -> failwith "Simulation produced an empty receipt"
+          | Too_large -> failwith "Produced simulation receipt was too large.")
+      | _ ->
+          failwith
+            "Simulation produced a list of operations whose length is not 1"
+    in
+    return simulation_receipt
 end

@@ -77,8 +77,6 @@ Most of the functions implemented for VIEW will work on the `tree` stored in the
 
 The modifications to the `tree` will be stored in the disk (the `store`) when the `commit` function is called. It will return the hash of the commit.
 
-Irmin implements what they call a *garbage collector*. In my (@mattiasdrp) opinion, this should not be called a GC because it will remove all the data older than a chosen commit. Accessing data older than this commit will be impossible even though the data younger is still pointing to it. Instead of calling it a GC it could be called a "commit pruner" or something else that indicates that the data are removed regardless of their liveness.
-
 Other functions use the disk and need to be documented (some of them already are in `Lib_context.Sigs.Context`:
 - `sync` synchronises the `context` with the `index`
 - `split`: *not sure about what it does currently*

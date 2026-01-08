@@ -1,0 +1,36 @@
+[package]
+name = "tezos_base"
+version = "1.0.0"
+authors = ["nomadic labs"]
+edition = "2021"
+rust-version = "1.58"
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1"
+time = { version = "0.3", features = ["formatting", "parsing"] }
+derive_builder = "0.9"
+thiserror = "1.0"
+getset = "0.1"
+hex = "0.4"
+lazy_static = "1.4"
+serde = { version = "1.0", features = ["derive"] }
+slog = { version = "2.7", features = [
+  "max_level_trace",
+  "release_max_level_trace",
+] }
+strum = "0.20"
+strum_macros = "0.20"
+num-bigint = "0.3"
+num-traits = "0.2.8"
+nom = "7.1"
+
+# local dependencies
+tezos_crypto_rs = { path = "../../../../sdk/rust/crypto/", default-features = false, features = [
+  "std",
+] }
+tezos_data_encoding = { path = "../../../../sdk/rust/encoding" }
+tezos_data_encoding_derive = { path = "../../../../sdk/rust/encoding-derive/" }
+
+[dev-dependencies]
+serde_json = "1.0.145"

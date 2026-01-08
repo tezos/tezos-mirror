@@ -186,8 +186,8 @@ let test_poorly_distributed_dissection () =
     R.game_move ctxt rollup ~player:refuter ~opponent:defender ~step ~choice
   in
   assert_fails_with_f ~__LOC__ (Lwt.return res) (function
-      | D.Dissection_invalid_distribution _ -> true
-      | _ -> false)
+    | D.Dissection_invalid_distribution _ -> true
+    | _ -> false)
 
 let test_single_valid_game_move () =
   let open Lwt_result_wrap_syntax in

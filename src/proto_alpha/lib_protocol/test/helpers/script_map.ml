@@ -24,8 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let of_list :
-    type k v.
+let of_list : type k v.
     k Protocol.Script_typed_ir.comparable_ty ->
     (k * v) list ->
     (k, v) Protocol.Script_typed_ir.map =

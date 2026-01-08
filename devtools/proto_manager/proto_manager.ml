@@ -35,7 +35,8 @@ let check_proto_name proto_name pattern =
 let check_arguments =
   let commands =
     Command.FIFO.empty
-    |> (* Check source and target *)
+    |>
+    (* Check source and target *)
     Command.register
       (Command.create
          ~desc:(fun state ->
@@ -58,7 +59,8 @@ let check_arguments =
     |> Command.register
          (Command.File.check_not_exist (fun state ->
               State.Target.Dir.Absolute.get_doc state))
-    |> (* Check git directory *)
+    |>
+    (* Check git directory *)
     Command.register
       (Command.File.check_exists
          ~error_msg:(fun _state ->
@@ -663,7 +665,8 @@ let copy_source =
     |> Command.register
          (Command.Log.printfln (fun state -> State.Source.get_name state))
     |> Command.register add_predecessor
-    |> (* All modifications that impact target protocol hash has been done, it
+    |>
+    (* All modifications that impact target protocol hash has been done, it
           is time to compute the target protocol hash. *)
     Command.register compute_and_replace_hash
     |> Command.register rename_binaries

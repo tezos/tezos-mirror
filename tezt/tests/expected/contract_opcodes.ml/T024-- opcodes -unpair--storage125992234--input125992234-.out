@@ -1,0 +1,462 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/unpair.tz on storage Unit and input Unit --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 126.560)
+    [ (Pair Unit Unit) ]
+  - location: 7 (just consumed gas: 0.010)
+    [  ]
+  - location: 8 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 9 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 10 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 12 (just consumed gas: 0.035)
+    [  ]
+  - location: 14 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 15 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 16 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 17 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 18 (just consumed gas: 0.035)
+    [  ]
+  - location: 20 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 21 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 22 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 23 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 24 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 25 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 27 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 28 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 29 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 31 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 32 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 33 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 35 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 36 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 37 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 39 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 40 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 41 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 43 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 44 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 45 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 47 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 48 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 49 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 51 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 52 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 53 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 55 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 56 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 57 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 59 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 60 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 61 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 63 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 64 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 65 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 67 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 68 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 69 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 71 (just consumed gas: 0.010)
+    [  ]
+  - location: 72 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 73 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 74 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 75 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 76 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 77 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 79 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 80 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 81 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 83 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 84 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 85 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 87 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 88 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 89 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 91 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 92 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 93 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 95 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 96 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 97 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 99 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 100 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 101 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 103 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 104 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 105 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 107 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 108 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 109 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 111 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 112 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 113 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 115 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 116 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 117 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 119 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 120 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 121 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 123 (just consumed gas: 0.010)
+    [  ]
+  - location: 124 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 125 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 126 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 127 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 128 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 129 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 131 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 132 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 133 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 135 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 136 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 137 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 139 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 140 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 141 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 143 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 144 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 145 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 147 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 148 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 149 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 151 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 152 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 153 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 155 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 156 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 157 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 159 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 160 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 161 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 163 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 164 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 165 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 167 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 168 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 169 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 171 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 172 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 173 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 175 (just consumed gas: 0.010)
+    [  ]
+  - location: 176 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 177 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 178 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 179 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 180 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 181 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 183 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 184 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 185 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 187 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 188 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 189 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 191 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 192 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 193 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 195 (just consumed gas: 0.010)
+    [ (Pair Unit Unit)
+      (Pair Unit Unit) ]
+  - location: 196 (just consumed gas: 0.010)
+    [ Unit
+      Unit
+      (Pair Unit Unit) ]
+  - location: 197 (just consumed gas: 0.035)
+    [ (Pair Unit Unit) ]
+  - location: 199 (just consumed gas: 0.010)
+    [  ]
+  - location: 200 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 201 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 202 (just consumed gas: 0.010)
+    [ (Pair Unit Unit) ]
+  - location: 203 (just consumed gas: 0.010)
+    [ Unit
+      Unit ]
+  - location: 204 (just consumed gas: 0.035)
+    [  ]
+  - location: 206 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 207 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 209 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

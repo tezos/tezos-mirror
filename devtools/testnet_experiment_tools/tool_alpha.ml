@@ -252,20 +252,34 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let* constants =
     Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
+  let*? round_durations =
+    Round.Durations.create
+      ~first_round_duration:constants.parametric.minimal_block_delay
+      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
+    |> Environment.wrap_tzresult
+  in
   let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~constants cctxt
+    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
+  in
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~number_of_slots:constants.parametric.dal.number_of_slots
   in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
+    ~constants
     ~chain
     config
     operation_worker
+    dal_attestable_slots_worker
     ~current_proposal
+    round_durations
     delegates
 
 let compute_current_round_duration round_durations
-    ~(predecessor : Baking_state.block_info) round =
+    ~(predecessor : Baking_state_types.block_info) round =
   let open Result_syntax in
   let* start =
     Round.timestamp_of_round
@@ -288,7 +302,7 @@ let compute_current_round_duration round_durations
 let one_minute = Ptime.Span.of_int_s 60
 
 let wait_next_block block_stream current_proposal =
-  let open Baking_state in
+  let open Baking_state_types in
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
@@ -473,7 +487,10 @@ let pp_initial_state fmt {operation_queues; _} =
 let init ~operations_file_path =
   Format.printf "Parsing operations file@." ;
   let op_encoding = Protocol.Alpha_context.Operation.encoding in
-  let buffer = Bytes.create (10 * 1024 * 1024) (* 10mb *) in
+  let buffer =
+    Bytes.create (10 * 1024 * 1024)
+    (* 10mb *)
+  in
   let*! ic = Lwt_io.open_file ~mode:Input operations_file_path in
   let rec loop acc =
     let*! op_len =
@@ -803,10 +820,10 @@ let cycle_eras_encoding =
   let cycle_era_encoding =
     let open Data_encoding in
     conv
-      (fun {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment} ->
-        (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment))
-      (fun (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment) ->
-        {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment})
+      (fun {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment}
+         -> (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment))
+      (fun (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment)
+         -> {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment})
       (obj4
          (req
             "first_level"

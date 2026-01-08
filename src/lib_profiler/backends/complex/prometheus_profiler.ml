@@ -110,7 +110,8 @@ module Prometheus : DRIVER with type config = prometheus_config = struct
           List.iter
             (fun ( id,
                    {start = _; duration = Span d; contents; item_verbosity = _}
-                 ) ->
+                 )
+               ->
               output_entry t.name id 1 d ;
               output contents)
             recorded

@@ -39,6 +39,12 @@
                 <strong>{{ agent.name }}</strong>
                 <ul>
                     <li><strong>Machine type: </strong>{{ agent.machine_type }}</li>
+                    {%- if agent.disk_type %}
+                      <li><strong>Disk type: </strong>{{ agent.disk_type }}</li>
+                    {% endif %}
+                    {%- if agent.disk_size_gb %}
+                      <li><strong>Disk size: </strong>{{ agent.disk_size_gb }} GB</li>
+                    {% endif %}
                     <li><strong>Docker image: </strong>{{ agent.docker_image }}</li>
                     <li><strong>Max run duration: </strong>{{ agent.max_run_duration }}</li>
                     <li><strong>Binaries path: </strong>{{ agent.binaries_path }}</li>

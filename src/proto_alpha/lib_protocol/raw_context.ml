@@ -73,7 +73,8 @@ let consensus_pk_encoding =
            consensus_pkh;
            companion_pk;
            companion_pkh = _;
-         } ->
+         }
+       ->
       let delegate =
         if Signature.Public_key_hash.equal consensus_pkh delegate then None
         else Some delegate
@@ -91,29 +92,35 @@ let consensus_pk_encoding =
        (opt "delegate" Signature.Public_key_hash.encoding)
        (opt "companion_pk" Bls.Public_key.encoding))
 
+type consensus_power = {
+  consensus_key : consensus_pk;
+  attesting_power : Attesting_power_repr.t;
+  dal_power : int;
+}
+
 module Raw_consensus = struct
   (** Consensus operations are indexed by their [initial slots]. Given
       a delegate, the [initial slot] is the lowest slot assigned to
       this delegate. *)
 
   type t = {
-    current_attestation_power : int;
-        (** Number of attestation slots recorded for the current block. *)
-    allowed_attestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+    current_attesting_power : Attesting_power_repr.t;
+        (** Number of attestation slots and their related staking power recorded
+            for the current block. *)
+    allowed_attestations : consensus_power Slot_repr.Map.t option;
         (** Attestations rights for the current block. Only an attestation for
             the lowest slot in the block can be recorded. The map associates to
             each initial slot the [pkh] associated to this slot with its
-            consensus attestation power and DAL attestation power. This is
-            [None] only in mempool mode. *)
-    allowed_preattestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+            consensus attestation power, DAL attestation power, and staking power.
+            This is [None] only in mempool mode. *)
+    allowed_preattestations : consensus_power Slot_repr.Map.t option;
         (** Preattestations rights for the current block. Only a preattestation
             for the lowest slot in the block can be recorded. The map associates
             to each initial slot the [pkh] associated to this slot with its
-            consensus attestation power and DAL attestation power. This is
+            consensus attestation power, DAL attestation power and staking power. This is
             [None] only in mempool mode, or in application mode when there is no
             locked round (so the block cannot contain any preattestations). *)
-    allowed_consensus :
-      (consensus_pk * int * int) Slot_repr.Map.t Level_repr.Map.t option;
+    allowed_consensus : consensus_power Slot_repr.Map.t Level_repr.Map.t option;
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
@@ -125,8 +132,8 @@ module Raw_consensus = struct
     preattestations_seen : Slot_repr.Set.t;
         (** Record the preattestations already seen. Only initial slots
             are indexed. *)
-    locked_round_evidence : (Round_repr.t * int) option;
-        (** Record the preattestation power for a locked round. *)
+    locked_round_evidence : (Round_repr.t * Attesting_power_repr.t) option;
+        (** Record the preattestation power and staking power for a locked round. *)
     preattestations_quorum_round : Round_repr.t option;
         (** in block construction mode, record the round of preattestations
             included in a block. *)
@@ -145,7 +152,7 @@ module Raw_consensus = struct
 
   let empty : t =
     {
-      current_attestation_power = 0;
+      current_attesting_power = Attesting_power_repr.zero;
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
@@ -174,20 +181,24 @@ module Raw_consensus = struct
 
   let record_attestation t ~initial_slot ~power =
     let open Result_syntax in
-    let+ () =
+    let* () =
       error_when
         (Slot_repr.Set.mem initial_slot t.attestations_seen)
         Double_inclusion_of_consensus_operation
     in
-    {
-      t with
-      current_attestation_power = t.current_attestation_power + power;
-      attestations_seen = Slot_repr.Set.add initial_slot t.attestations_seen;
-    }
+    let current_attesting_power =
+      Attesting_power_repr.add power t.current_attesting_power
+    in
+    return
+      {
+        t with
+        current_attesting_power;
+        attestations_seen = Slot_repr.Set.add initial_slot t.attestations_seen;
+      }
 
   let record_preattestation ~initial_slot ~power round t =
     let open Result_syntax in
-    let+ () =
+    let* () =
       error_when
         (Slot_repr.Set.mem initial_slot t.preattestations_seen)
         Double_inclusion_of_consensus_operation
@@ -200,14 +211,16 @@ module Raw_consensus = struct
              It doesn't matter in that case since quorum certificates
              are not used in mempool.
              For other cases [Apply.check_round] verifies it. *)
-          Some (round, evidences + power)
+          let power = Attesting_power_repr.add power evidences in
+          Some (round, power)
     in
-    {
-      t with
-      locked_round_evidence;
-      preattestations_seen =
-        Slot_repr.Set.add initial_slot t.preattestations_seen;
-    }
+    return
+      {
+        t with
+        locked_round_evidence;
+        preattestations_seen =
+          Slot_repr.Set.add initial_slot t.preattestations_seen;
+      }
 
   let set_forbidden_delegates delegates t =
     {t with forbidden_delegates = delegates}
@@ -261,6 +274,10 @@ module Raw_dal = struct
     }
 end
 
+module Raw_address_registry = struct
+  type diff = {address : Destination_repr.t; index : Z.t}
+end
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -290,7 +307,8 @@ type back = {
   reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
-  adaptive_issuance_enable : bool;
+  address_registry_diff_rev : Raw_address_registry.diff list;
+  all_bakers_attest_first_level : Level_repr.t option;
 }
 
 (*
@@ -364,7 +382,8 @@ let[@inline] reward_coeff_for_current_cycle ctxt =
 
 let[@inline] dal ctxt = ctxt.back.dal
 
-let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
+let[@inline] all_bakers_attest_first_level ctxt =
+  ctxt.back.all_bakers_attest_first_level
 
 let[@inline] update_back ctxt back = {ctxt with back}
 
@@ -416,8 +435,8 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
 
 let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
 
-let[@inline] set_adaptive_issuance_enable ctxt =
-  update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
+let[@inline] set_all_bakers_attest_first_level ctxt level =
+  update_back ctxt {ctxt.back with all_bakers_attest_first_level = Some level}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -880,8 +899,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
-    ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp
+    ~all_bakers_attest_first_level ctxt =
   let open Lwt_result_syntax in
   let*? level = Raw_level_repr.of_int32 level in
   let* () = check_inited ctxt in
@@ -929,14 +948,15 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
           Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
-        adaptive_issuance_enable;
+        all_bakers_attest_first_level;
+        address_registry_diff_rev = [];
       };
   }
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) S023 (* Alpha predecessor *)
+  | (* Alpha predecessor *) T024 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -953,8 +973,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "s023_023") then
-          return (S023, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "t024_024") then
+          return (T024, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1252,7 +1272,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  direct_ticket_spending_enable;
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
-                 all_bakers_attest_activation_level;
+                 all_bakers_attest_activation_threshold;
+                 native_contracts_enable;
+                 swrr_new_baker_lottery_enable;
                }
                 : Previous.t) =
             c
@@ -1304,7 +1326,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold;
+            native_contracts_enable;
+            swrr_new_baker_lottery_enable;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1314,9 +1338,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | S023 ->
+    | T024 ->
         (*
-            FIXME chain_id is used for Q to S023 migration and nomore after.
+            FIXME chain_id is used for Q to T024 migration and nomore after.
             We ignored for automatic stabilisation, should it be removed in
             Beta?
         *)
@@ -1328,7 +1352,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  feature_enable;
                  incentives_enable;
                  number_of_slots;
-                 attestation_lag;
+                 attestation_lag = _;
                  attestation_threshold;
                  cryptobox_parameters;
                  minimal_participation_ratio;
@@ -1342,7 +1366,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.feature_enable;
             incentives_enable;
             number_of_slots;
-            attestation_lag;
+            attestation_lag = 5;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;
@@ -1547,7 +1571,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  direct_ticket_spending_enable;
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
-                 all_bakers_attest_activation_level;
+                 all_bakers_attest_activation_threshold;
                }
                 : Previous.t) =
             c
@@ -1599,7 +1623,10 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold;
+            (* Feature flag should be set to true once the feature has been enabled. *)
+            native_contracts_enable = false;
+            swrr_new_baker_lottery_enable = false;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1613,7 +1640,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
       ~level
       ~predecessor_timestamp:timestamp
       ~timestamp
-      ~adaptive_issuance_enable:false
+      ~all_bakers_attest_first_level:None
   in
   (previous_proto, previous_proto_constants, ctxt)
 
@@ -1927,7 +1954,7 @@ let sampler_for_cycle ~read ctxt cycle =
   match Cycle_repr.Map.find cycle map with
   | Some (seed, state) -> return (ctxt, seed, state)
   | None ->
-      let* seed, state = read ctxt in
+      let* ctxt, seed, state = read ctxt in
       let map = Cycle_repr.Map.add cycle (seed, state) map in
       let ctxt = update_sampler_state ctxt map in
       return (ctxt, seed, state)
@@ -1944,13 +1971,12 @@ let sort_stakes_pk_for_stake_info stakes_pk =
         consensus_pk2.delegate)
     stakes_pk
 
-let init_stake_info_for_cycle ctxt cycle total_stake stakes_pk =
+let init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk =
   let open Result_syntax in
   let map = stake_info ctxt in
   if Cycle_repr.Map.mem cycle map then tzfail (Stake_info_already_set cycle)
   else
     let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-    let total_stake = Stake_repr.staking_weight total_stake in
     let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
     let ctxt = update_stake_info ctxt map in
     return ctxt
@@ -1961,7 +1987,7 @@ let stake_info_for_cycle ~read ctxt cycle =
   match Cycle_repr.Map.find cycle map with
   | Some (total_stake, stakes_pk) -> return (ctxt, total_stake, stakes_pk)
   | None ->
-      let* total_stake, stakes_pk = read ctxt in
+      let* ctxt, total_stake, stakes_pk = read ctxt in
       let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
       let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
       let ctxt = update_stake_info ctxt map in
@@ -2017,32 +2043,34 @@ module type CONSENSUS = sig
 
   type round
 
-  type consensus_pk
+  type attesting_power
 
-  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
+  type consensus_power
 
-  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_attestations : t -> consensus_power slot_map option
 
-  val allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option
+  val allowed_preattestations : t -> consensus_power slot_map option
+
+  val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
 
-  val current_attestation_power : t -> int
+  val current_attesting_power : t -> attesting_power
 
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
-    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
+    allowed_attestations:consensus_power slot_map option ->
+    allowed_preattestations:consensus_power slot_map option ->
+    allowed_consensus:consensus_power slot_map level_map option ->
     t
 
-  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation :
+    t -> initial_slot:slot -> power:attesting_power -> t tzresult
 
   val record_preattestation :
-    t -> initial_slot:slot -> power:int -> round -> t tzresult
+    t -> initial_slot:slot -> power:attesting_power -> round -> t tzresult
 
   val forbid_delegate : t -> Signature.Public_key_hash.t -> t
 
@@ -2054,7 +2082,7 @@ module type CONSENSUS = sig
 
   val set_preattestations_quorum_round : t -> round -> t
 
-  val locked_round_evidence : t -> (round * int) option
+  val locked_round_evidence : t -> (round * attesting_power) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
@@ -2069,7 +2097,8 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type consensus_pk := consensus_pk = struct
+     and type attesting_power := Attesting_power_repr.t
+     and type consensus_power := consensus_power = struct
   let[@inline] update_consensus_with ctxt f =
     {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
 
@@ -2092,8 +2121,8 @@ module Consensus :
   let[@inline] set_forbidden_delegates ctxt delegates =
     update_consensus_with ctxt (Raw_consensus.set_forbidden_delegates delegates)
 
-  let[@inline] current_attestation_power ctxt =
-    ctxt.back.consensus.current_attestation_power
+  let[@inline] current_attesting_power ctxt =
+    ctxt.back.consensus.current_attesting_power
 
   let[@inline] get_preattestations_quorum_round ctxt =
     ctxt.back.consensus.preattestations_quorum_round
@@ -2258,6 +2287,26 @@ module Dal = struct
   let only_if_incentives_enabled ctxt ~default f =
     let constants = constants ctxt in
     if constants.dal.incentives_enable then f ctxt else default ctxt
+end
+
+module Address_registry = struct
+  type diff = Raw_address_registry.diff = {
+    address : Destination_repr.t;
+    index : Z.t;
+  }
+
+  let register_diff ctxt diff =
+    {
+      ctxt with
+      back =
+        {
+          ctxt.back with
+          address_registry_diff_rev =
+            diff :: ctxt.back.address_registry_diff_rev;
+        };
+    }
+
+  let get_diffs ctxt = List.rev ctxt.back.address_registry_diff_rev
 end
 
 (* The type for relative context accesses instead from the root. In order for

@@ -844,8 +844,7 @@ end = struct
     in
     (`Data data_block, `Command command_chunk, data_name)
 
-  let rec spec_list :
-      type dim.
+  let rec spec_list : type dim.
       dim axes ->
       dim spec list ->
       GP_data.t list ->

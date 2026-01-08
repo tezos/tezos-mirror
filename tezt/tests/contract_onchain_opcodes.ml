@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -853,6 +835,181 @@ module Tickets = struct
       ]
 end
 
+let get_first_transaction_address_registry_diff client =
+  let* head_block_operations =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations ~metadata:true ~force_metadata:true ()
+  in
+  let first_transaction_address_registry_diff =
+    JSON.(
+      head_block_operations |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result" |-> "address_registry_diff" |> as_list)
+  in
+  return
+  @@ List.map
+       (fun diff ->
+         JSON.(diff |-> "address" |> as_string, diff |-> "index" |> as_int))
+       first_transaction_address_registry_diff
+
+let call_and_check_diff client contract addresses expected =
+  let addresses = List.map (fun s -> sf {|"%s"|} s) addresses in
+  let arg = "{" ^ String.concat ";" addresses ^ "}" in
+  let* () =
+    Client.transfer
+      ~giver:Account.Bootstrap.keys.(1).alias
+      ~receiver:contract
+      ~amount:Tez.zero
+      ~arg
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* diffs = get_first_transaction_address_registry_diff client in
+  Check.((diffs = expected) (list (tuple2 string int)))
+    ~error_msg:"Expected diff %R, but got %L" ;
+  unit
+
+(* Test that operation metadata contains newly added address through
+   INDEX_ADDRESS, but not those already in the storage. *)
+let test_index_address_diffs ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Contract onchain opcodes: test index_address diffs"
+    ~tags:["contract"; "onchain"; "opcodes"]
+    ~supports:(Protocol.From_protocol 24)
+    (fun protocol ->
+      let* _node, client = Client.init_with_protocol ~protocol `Client () in
+      let bootstrap1 = Account.Bootstrap.keys.(1) in
+      let bootstrap2 = Account.Bootstrap.keys.(2) in
+
+      let* contract, _address =
+        Client.originate_contract_at
+          ~amount:(Tez.of_int 1000)
+          ~src:"bootstrap1"
+          ~init:"{}"
+          ~burn_cap:Tez.one
+          client
+          ["opcodes"; "index_addresses"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+
+      (* First diff should only contain bootstrap1 address. *)
+      let* () =
+        call_and_check_diff
+          client
+          contract
+          [bootstrap1.public_key_hash]
+          [(bootstrap1.public_key_hash, 1)]
+      in
+
+      (* Second call with another address, counter has been incremented. *)
+      let* () =
+        call_and_check_diff
+          client
+          contract
+          [bootstrap2.public_key_hash]
+          [(bootstrap2.public_key_hash, 2)]
+      in
+
+      (* Third call with an already revealed address, the diff is empty. *)
+      let* () =
+        call_and_check_diff client contract [bootstrap2.public_key_hash] []
+      in
+
+      (* Fourth call with multiple reveal address. *)
+      let* () =
+        call_and_check_diff
+          client
+          contract
+          [
+            "tz1TXhefsLkdNcoFA3pFW7t1oxs2UQrkGQQr";
+            "tz4YEFnMnqGvKW5io6hR1EwGzxa1341Boc8Z";
+            "tz1auQsqioeYNAEAXN8QU9omqhkuM9hkGnj7";
+          ]
+          [
+            ("tz1TXhefsLkdNcoFA3pFW7t1oxs2UQrkGQQr", 3);
+            ("tz4YEFnMnqGvKW5io6hR1EwGzxa1341Boc8Z", 4);
+            ("tz1auQsqioeYNAEAXN8QU9omqhkuM9hkGnj7", 5);
+          ]
+      in
+      unit)
+    protocols
+
+let test_get_address_index ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Contract onchain opcodes: test GET_ADDRESS_INDEX"
+    ~tags:["contract"; "onchain"; "opcodes"]
+    ~supports:(Protocol.From_protocol 24)
+    (fun protocol ->
+      let* _node, client = Client.init_with_protocol ~protocol `Client () in
+
+      let* contract, _address =
+        Client.originate_contract_at
+          ~amount:(Tez.of_int 1000)
+          ~src:"bootstrap1"
+          ~init:"{}"
+          ~burn_cap:Tez.one
+          client
+          ["opcodes"; "index_addresses"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+
+      let addr1 = "tz1TXhefsLkdNcoFA3pFW7t1oxs2UQrkGQQr" in
+      let addr2 = "tz4YEFnMnqGvKW5io6hR1EwGzxa1341Boc8Z" in
+      let addr3 = "tz1auQsqioeYNAEAXN8QU9omqhkuM9hkGnj7" in
+      let* () =
+        call_and_check_diff
+          client
+          contract
+          [addr1; addr2; addr3]
+          [(addr1, 1); (addr2, 2); (addr3, 3)]
+      in
+
+      let parse_int_option (s : string) : int option =
+        let s = String.trim s in
+        if s = "None" then None
+        else if
+          String.length s >= 7
+          && String.sub s 0 6 = "(Some "
+          && s.[String.length s - 1] = ')'
+        then
+          let inner = String.sub s 6 (String.length s - 7) |> String.trim in
+          Some (int_of_string inner)
+        else Test.fail "Invalid format: %s" s
+      in
+
+      (* Calls `GET_ADDRESS_INDEX` via a view, it must return the sames indexes
+         as found in the operation's metadata. *)
+      let check_get_address_index addr expected =
+        let* index =
+          Client.run_view ~view:"v" ~contract ~input:(sf {|"%s"|} addr) client
+        in
+        let* rpc_index =
+          Client.RPC.call client
+          @@ RPC.get_chain_block_context_destination_index addr
+        in
+        let index = parse_int_option index in
+        Check.((index = expected) (option int))
+          ~error_msg:(sf "Expected index %%R for %s got %%L" addr1) ;
+        Check.((rpc_index = expected) (option int))
+          ~error_msg:(sf "Expected index %%R for %s got %%L" addr1) ;
+        unit
+      in
+
+      let* () = check_get_address_index addr1 (Some 1) in
+      let* () = check_get_address_index addr2 (Some 2) in
+      let* () = check_get_address_index addr3 (Some 3) in
+
+      (* Check a not indexed address. *)
+      let* () =
+        check_get_address_index "tz1KmScKtmTaeVQQBPXqi29Q846VkEbh39DQ" None
+      in
+      unit)
+    protocols
+
 let register ~protocols =
   List.iter
     (fun (title, body) ->
@@ -885,4 +1042,6 @@ let register ~protocols =
       ("test_level", test_level);
       ("test_big_map_origination", test_big_map_origination);
     ] ;
-  Tickets.register ~protocols
+  Tickets.register ~protocols ;
+  test_index_address_diffs ~protocols ;
+  test_get_address_index ~protocols

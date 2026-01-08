@@ -8,7 +8,8 @@
  (libraries
   octez-libs.base
   octez-libs.rpc
-  octez-libs.crypto-dal)
+  octez-libs.crypto-dal
+  lwt-watcher)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

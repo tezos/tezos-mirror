@@ -24,7 +24,8 @@
   mtime.clock.os
   uri
   progress
-  camlp-streams)
+  camlp-streams
+  octez-lwt-domain)
  (flags
   (:standard)
   -open Tezos_error_monad

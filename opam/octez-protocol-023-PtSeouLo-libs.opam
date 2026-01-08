@@ -28,6 +28,7 @@ depends: [
   "lwt-exit"
   "memtrace"
   "octez-baker-lib" { = version }
+  "octez-baking-common-lib" { = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }
@@ -35,7 +36,7 @@ depends: [
   "octez-alcotezt" { with-test & = version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

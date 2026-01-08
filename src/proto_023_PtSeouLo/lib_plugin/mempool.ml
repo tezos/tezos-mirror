@@ -100,7 +100,8 @@ let config_encoding : config Data_encoding.t =
            minimal_nanotez_per_byte;
            clock_drift;
            replace_by_fee_factor;
-         } ->
+         }
+       ->
       ( minimal_fees,
         minimal_nanotez_per_gas_unit,
         minimal_nanotez_per_byte,
@@ -110,7 +111,8 @@ let config_encoding : config Data_encoding.t =
            minimal_nanotez_per_gas_unit,
            minimal_nanotez_per_byte,
            clock_drift,
-           replace_by_fee_factor ) ->
+           replace_by_fee_factor )
+       ->
       {
         minimal_fees;
         minimal_nanotez_per_gas_unit;
@@ -266,8 +268,7 @@ let weight_and_resources_manager_operation ~hard_gas_limit_per_block ?size ~fee
   let resources = Q.max size_ratio gas_ratio in
   (Q.(fee_f / resources), resources)
 
-let pre_filter_manager :
-    type t.
+let pre_filter_manager : type t.
     info ->
     config ->
     Operation.packed_protocol_data ->

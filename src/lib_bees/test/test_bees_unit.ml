@@ -24,8 +24,7 @@ let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
         =
      fun _w request ->
@@ -325,21 +324,7 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Lwt_result_syntax.return_unit
 
-let tztest label fn =
-  Tztest.tztest label `Quick @@ fun () ->
-  match Lwt_unix.fork () with
-  | 0 -> (
-      match
-        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true fn
-      with
-      | Ok () -> exit 0
-      | Error _ -> exit 1)
-  | pid -> (
-      let open Lwt_result_syntax in
-      let*! _, status = Lwt_unix.waitpid [] pid in
-      match status with
-      | Unix.WEXITED 0 -> return_unit
-      | _ -> Lwt.return_error [])
+let tztest label fn = Alcotezt_process.test_case_lwt label `Quick fn
 
 let tests_history =
   ( "Queue history",
@@ -363,8 +348,7 @@ let tests_buffer =
   ("Buffer handling", [tztest "Dropbox/Async" test_async_dropbox])
 
 let () =
-  Alcotest_lwt.run
+  Alcotezt_process.run
     ~__FILE__
     "Bees_workers"
     [tests_history; tests_status; tests_buffer]
-  |> Lwt_main.run

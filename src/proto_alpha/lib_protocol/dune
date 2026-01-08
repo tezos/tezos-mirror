@@ -44,7 +44,6 @@
   Blinded_public_key_hash
   Block_payload_hash
   Sc_rollup_reveal_hash
-  Merkle_list
   Bounded_history_repr
   Context_binary_proof
   Ratio_repr
@@ -54,6 +53,7 @@
   Cycle_repr
   Tez_repr
   Deposits_repr
+  Attesting_power_repr
   Unstaked_frozen_deposits_repr
   Staking_pseudotoken_repr
   Period_repr
@@ -73,6 +73,7 @@
   Script_repr_costs_generated
   Script_repr_costs
   Script_repr
+  Script_native_repr
   Cache_memory_helpers
   Seed_repr
   Sampler
@@ -167,7 +168,6 @@
   Nonce_storage
   Seed_storage
   Contract_manager_storage
-  Delegate_activation_storage
   Sapling_storage_costs_generated
   Sapling_storage_costs
   Sapling_storage
@@ -177,7 +177,10 @@
   Cache_repr_costs_generated
   Cache_repr_costs
   Cache_repr
+  Selected_distribution_storage
+  Delegate_activation_storage
   Zk_rollup_storage
+  All_bakers_attest_activation_storage
   Stake_context
   Adaptive_issuance_costs
   Contract_delegate_storage
@@ -196,6 +199,7 @@
   Delegate_storage
   Delegate_sampler
   Delegate_rewards
+  Consensus_parameters_storage
   Already_denounced_storage
   Dal_already_denounced_storage
   Delegate_missed_attestations_storage
@@ -222,8 +226,10 @@
   Sc_rollup_storage
   Sc_rollup_stake_storage
   Dal_slot_storage
+  Dal_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
+  Address_registry_storage
   Bootstrap_storage
   Init_storage
   Destination_storage
@@ -238,6 +244,8 @@
   Dependent_bool
   Script_list
   Script_typed_ir
+  Script_native_types
+  Script_typed
   Script_comparable
   Gas_comparable_input_size
   Script_set
@@ -258,6 +266,7 @@
   Script_ir_unparser
   Script_ir_translator
   Script_big_map
+  Script_address_registry
   Script_cache
   Script_tc_errors_registration
   Ticket_token_unparser
@@ -271,6 +280,7 @@
   Ticket_operations_diff
   Ticket_accounting
   Ticket_transfer
+  Script_native
   Script_interpreter_defs
   Script_interpreter
   Sc_rollup_management_protocol
@@ -332,7 +342,6 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
-  merkle_list.ml merkle_list.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
@@ -342,6 +351,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -362,6 +372,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -458,7 +469,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -468,7 +478,11 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
+  all_bakers_attest_activation_storage.ml
+  all_bakers_attest_activation_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
@@ -487,6 +501,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml
@@ -514,8 +529,10 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
+  dal_storage.ml dal_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -530,6 +547,8 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
+  script_native_types.ml script_native_types.mli
+  script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
   script_set.ml script_set.mli
@@ -550,6 +569,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -563,6 +583,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -625,7 +646,6 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
-  merkle_list.ml merkle_list.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
@@ -635,6 +655,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -655,6 +676,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -751,7 +773,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -761,7 +782,11 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
+  all_bakers_attest_activation_storage.ml
+  all_bakers_attest_activation_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
@@ -780,6 +805,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml
@@ -807,8 +833,10 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
+  dal_storage.ml dal_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -823,6 +851,8 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
+  script_native_types.ml script_native_types.mli
+  script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
   script_set.ml script_set.mli
@@ -843,6 +873,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -856,6 +887,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -902,7 +934,6 @@
   blinded_public_key_hash.ml blinded_public_key_hash.mli
   block_payload_hash.ml block_payload_hash.mli
   sc_rollup_reveal_hash.ml sc_rollup_reveal_hash.mli
-  merkle_list.ml merkle_list.mli
   bounded_history_repr.ml bounded_history_repr.mli
   context_binary_proof.ml context_binary_proof.mli
   ratio_repr.ml ratio_repr.mli
@@ -912,6 +943,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -932,6 +964,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -1028,7 +1061,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -1038,7 +1070,11 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
+  all_bakers_attest_activation_storage.ml
+  all_bakers_attest_activation_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
@@ -1057,6 +1093,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml
@@ -1084,8 +1121,10 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_slot_storage.ml dal_slot_storage.mli
+  dal_storage.ml dal_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -1100,6 +1139,8 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
+  script_native_types.ml script_native_types.mli
+  script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
   script_set.ml script_set.mli
@@ -1120,6 +1161,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -1133,6 +1175,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli

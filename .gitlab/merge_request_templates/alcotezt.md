@@ -2,7 +2,7 @@
 Template for the Alcotezt porting MRs (https://gitlab.com/tezos/tezos/-/milestones/65) -->
 
 <!--
-Thanks you for taking the time to contributing to the Tezos project!
+Thank you for taking the time to contributing to the Tezos project!
 
 Make sure to read our Contributing guide (https://tezos.gitlab.io/developer/contributing.html) and the Merge process description (https://tezos.gitlab.io/developer/merge_team.html). -->
 
@@ -66,7 +66,7 @@ tezt --list --file [TEST_FILE]
 ## In the CI
 
 As the tests are linked with `tezt/tests/main.exe`, they run in the CI
-in the `tezt` jobs. The GitLab interface offers little 
+in the `tezt` jobs. The GitLab interface offers little
 to find individual test cases in the set of tezt jobs, but you can
 download the Tezt records from a pipeline on this MR
 (e.g. `[PIPELINE_ID]`) and check that they contain the test in

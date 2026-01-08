@@ -145,11 +145,11 @@ let test_multiple_origination_and_delegation () =
       (function
         | Contents_result
             (Manager_operation_result
-              {
-                operation_result =
-                  Applied (Origination_result {originated_contracts = [h]; _});
-                _;
-              }) ->
+               {
+                 operation_result =
+                   Applied (Origination_result {originated_contracts = [h]; _});
+                 _;
+               }) ->
             h
         | _ -> assert false)
       tickets

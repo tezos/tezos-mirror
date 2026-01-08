@@ -33,6 +33,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   | ParisB -> V4
   | ParisC -> V4
   | Proto_alpha -> V5
+  | T024 -> V5
   | S023 -> V5
   | R022 -> V5
   | Quebec -> V5
@@ -468,7 +469,8 @@ let patch_reboot_counter durable reboot_counter =
 let clean_up_input_buffer buffers =
   let open Tezos_webassembly_interpreter in
   function
-  | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input | _ -> ()
+  | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input
+  | _ -> ()
 
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.

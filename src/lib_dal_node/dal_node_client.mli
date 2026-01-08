@@ -59,3 +59,10 @@ val post_slot :
   ?slot_index:Tezos_dal_node_services.Types.slot_index ->
   string ->
   (Cryptobox.commitment * Cryptobox.commitment_proof) tzresult Lwt.t
+
+(** [get_slot_status cctxt slot_id] returns the attestation
+    info (status and lag) of the slot whose id is given. *)
+val get_slot_status :
+  cctxt ->
+  Tezos_dal_node_services.Types.slot_id ->
+  Tezos_dal_node_services.Types.header_status tzresult Lwt.t

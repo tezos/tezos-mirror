@@ -10,9 +10,10 @@
     The signal publisher should be started before the blueprint publisher
     because it expects messages from the blueprint publisher.*)
 val start :
-  signer:Signer.t ->
+  signer:Signer.map ->
   smart_rollup_address:string ->
   rollup_node_endpoint:Uri.t ->
+  rollup_node_endpoint_timeout:float ->
   unit ->
   unit tzresult Lwt.t
 

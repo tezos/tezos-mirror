@@ -271,6 +271,7 @@ module M019 = PtParisB_machine.M
 module M020 = PsParisC_machine.M
 module M022 = PsRiotum_machine.M
 module M023 = PtSeouLo_machine.M
+module M024 = PtTALLiN_machine.M
 module Malpha = Alpha_machine.M
 module M021 = PsQuebec_machine.M
 

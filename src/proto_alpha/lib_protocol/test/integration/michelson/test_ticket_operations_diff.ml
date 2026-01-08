@@ -241,7 +241,7 @@ let two_ticketers block =
   let open Lwt_result_wrap_syntax in
   let* result = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt result in
-  let*! cs = Contract.list ctxt in
+  let*! cs = Contract.For_RPC.list ctxt in
   match cs with c1 :: c2 :: _ -> return (c1, c2) | _ -> assert false
 
 let one_ticketer block =
@@ -267,22 +267,22 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
   let unparsed_storage = storage in
   let*@ ( Script_ir_translator.Ex_script
             (Script
-              {
-                storage_type;
-                storage;
-                code = _;
-                arg_type = _;
-                views = _;
-                entrypoints = _;
-                code_size = _;
-              }),
+               {
+                 storage_type;
+                 storage;
+                 implementation = _;
+                 arg_type = _;
+                 views = _;
+                 entrypoints = _;
+                 code_size = _;
+               }),
           ctxt ) =
     Script_ir_translator.parse_script
       ctxt
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged_tickets_in_storage:true
       ~allow_forged_lazy_storage_id_in_storage:true
-      script
+      (Script script)
   in
   let operation =
     Script_typed_ir.Internal_operation
@@ -1207,7 +1207,8 @@ let test_transfer_fails_on_multiple_zero_tickets () =
   assert_fails
     ~loc:__LOC__
     ~error:Script_tc_errors.Forbidden_zero_ticket_quantity
-  @@ (* let* operation, incr = *)
+  @@
+  (* let* operation, incr = *)
   transfer_tickets_operation
     ~incr
     ~sender:(Contract sender)

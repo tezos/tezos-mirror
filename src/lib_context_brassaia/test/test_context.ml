@@ -99,9 +99,9 @@ module Make_generic
     (Type_parameters : sig
       type memory_context_tree
     end)
-    (Context : Tezos_context_sigs.Context.TEZOS_CONTEXT
-                 with type memory_context_tree :=
-                   Type_parameters.memory_context_tree) =
+    (Context :
+      Tezos_context_sigs.Context.TEZOS_CONTEXT
+        with type memory_context_tree := Type_parameters.memory_context_tree) =
 struct
   open Context
 

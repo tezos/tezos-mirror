@@ -165,10 +165,16 @@
   (select void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer from
    (octez-protocol-021-PsQuebec-libs.plugin-registerer -> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty))
-  tezos-protocol-022-PsRiotum.embedded-protocol
-  octez-protocol-022-PsRiotum-libs.plugin-registerer
+  (select void_for_linking-tezos-protocol-022-PsRiotum-embedded-protocol from
+   (tezos-protocol-022-PsRiotum.embedded-protocol -> void_for_linking-tezos-protocol-022-PsRiotum-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-022-PsRiotum-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-022-PsRiotum-libs-plugin-registerer from
+   (octez-protocol-022-PsRiotum-libs.plugin-registerer -> void_for_linking-octez-protocol-022-PsRiotum-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-022-PsRiotum-libs-plugin-registerer.empty))
   tezos-protocol-023-PtSeouLo.embedded-protocol
   octez-protocol-023-PtSeouLo-libs.plugin-registerer
+  tezos-protocol-024-PtTALLiN.embedded-protocol
+  octez-protocol-024-PtTALLiN-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
@@ -250,6 +256,8 @@
    (write-file void_for_linking-octez-protocol-020-PsParisC-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-021-PsQuebec-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-022-PsRiotum-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 

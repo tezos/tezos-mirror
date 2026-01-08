@@ -20,7 +20,9 @@ Version 11.1 fixes some storage issues, as well as some build issues.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v11.1

@@ -48,31 +48,52 @@ module Skip_list_cells : sig
     Skip_list_hash.t ->
     Skip_list_cell.t option tzresult Lwt.t
 
-  (** [find_by_slot_id_opt ?conn store ~attested_level ~slot_index] returns the cell
-      associated to ([attested_level], [slot_index]) in the [store], if
-      any. Uses the [conn] if provided (defaults to [None]). *)
+  (** [find_by_slot_id_opt ?conn store ~slot_id] returns the cell associated to
+      ([slot_id]) in the [store] alongside the attestation lag, if any. Uses the
+      [conn] if provided (defaults to [None]). *)
   val find_by_slot_id_opt :
     ?conn:conn ->
     t ->
-    attested_level:int32 ->
-    slot_index:Types.slot_index ->
-    Skip_list_cell.t option tzresult Lwt.t
+    Types.slot_id ->
+    (Skip_list_cell.t * int) option tzresult Lwt.t
 
-  (** [insert ?conn store ~attested_level values] inserts the given
-      list of [values] associated to the given [attested_level] in the
-      [store]. Any existing value is overridden. Uses the [conn] if
-      provided (defaults to [None]). *)
+  (** [find_by_level ?conn store ~published_level] retrieves the tuples (cell *
+      hash * slot_index) for the given published level, if any. The results are
+      sorted in decreasing order w.r.t. slot indices. *)
+  val find_by_level :
+    ?conn:conn ->
+    t ->
+    published_level:int32 ->
+    (Dal_proto_types.Skip_list_cell.t
+    * Dal_proto_types.Skip_list_hash.t
+    * Types.slot_index)
+    list
+    tzresult
+    Lwt.t
+
+  (** [insert ?conn store ~attested_level values extract] inserts the given list
+      of [values] associated to the given [attested_level] in the [store]. Any
+      existing value is overridden. Uses the [conn] if provided (defaults to
+      [None]). The function [extract] is applied to each element of [values] to
+      extract the necessary components for insertion lazily, avoiding an
+      unnecessary intermediate list when the base data is not matching exactly
+      the expected format. *)
   val insert :
     ?conn:conn ->
     t ->
     attested_level:int32 ->
-    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
+    'a list ->
+    ('a ->
+    Skip_list_hash.t
+    * Skip_list_cell.t
+    * Types.slot_index
+    * Types.attestation_lag) ->
     unit tzresult Lwt.t
 
-  (** [remove ?conn store ~attested_level] removes any data related to
-      [attested_level] from the [store]. Uses the [conn] if provided
+  (** [remove ?conn store ~published_level] removes any data related to
+      [published_level] from the [store]. Uses the [conn] if provided
       (defaults to [None]). *)
-  val remove : ?conn:conn -> t -> attested_level:int32 -> unit tzresult Lwt.t
+  val remove : ?conn:conn -> t -> published_level:int32 -> unit tzresult Lwt.t
 
   (** [schemas t] returns the list of SQL statements
       allowing to recreate the tables of the store [t]. *)

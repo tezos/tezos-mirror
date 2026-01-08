@@ -87,17 +87,13 @@ let log_errors_and_continue ~name p =
 let get_seed_computation cctxt chain_id hash =
   let chain = `Hash chain_id in
   let block = `Hash (hash, 0) in
-  Alpha_services.Seed_computation.get cctxt (chain, block)
+  Node_rpc.seed_computation cctxt ~chain ~block
 
 let get_level_info cctxt level =
   let open Lwt_result_syntax in
   let level = Raw_level.to_int32 level in
   let* {protocol_data = {level_info; _}; _} =
-    Protocol_client_context.Alpha_block_services.metadata
-      cctxt
-      ~chain:cctxt#chain
-      ~block:(`Level level)
-      ()
+    Node_rpc.block_metadata cctxt ~chain:cctxt#chain ~block:(`Level level)
   in
   return level_info
 
@@ -140,17 +136,15 @@ let inject_vdf_revelation cctxt state setup solution chain_id hash
   | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
       if eq_vdf_setup setup seed_discriminant seed_challenge then (
         let* op_bytes =
-          Plugin.RPC.Forge.vdf_revelation
+          Node_rpc.forge_vdf_revelation
             cctxt
-            (chain, block)
+            ~chain
+            ~block
             ~branch:hash
             ~solution
-            ()
         in
         let op_bytes = Tezos_crypto.Signature.V_latest.(concat op_bytes zero) in
-        let* op_hash =
-          Shell_services.Injection.operation cctxt ~chain op_bytes
-        in
+        let* op_hash = Node_rpc.inject_operation_bytes cctxt ~chain op_bytes in
         (* If injection is successful, update the status to [Injected]. *)
         state.computation_status <- Injected ;
         let*! () =

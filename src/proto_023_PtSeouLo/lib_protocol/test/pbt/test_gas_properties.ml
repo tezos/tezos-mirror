@@ -93,16 +93,16 @@ let test_consume_commutes (start, cost1, cost2) =
 (** Arbitrary context with a gas limit of 100_000_000. *)
 let context_gen : Alpha_context.t QCheck2.Gen.t =
   QCheck2.Gen.return
-    (Lwt_main.run
-       (let open Lwt_result_syntax in
-        let* b, _contract = Context.init1 () in
-        let+ inc = Incremental.begin_construction b in
-        Alpha_context.Gas.set_limit
-          (Incremental.alpha_ctxt inc)
-          Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
-     |> function
-     | Ok a -> a
-     | Error _ -> assert false)
+    ( Lwt_main.run
+        (let open Lwt_result_syntax in
+         let* b, _contract = Context.init1 () in
+         let+ inc = Incremental.begin_construction b in
+         Alpha_context.Gas.set_limit
+           (Incremental.alpha_ctxt inc)
+           Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
+    |> function
+      | Ok a -> a
+      | Error _ -> assert false )
 
 (** This arbitrary could be improved (pretty printer and shrinker) if there was a way to convert a [cost] back to an [int]. Otherwise one needs to write a custom [arbitrary] instance, but I wanted to stick to the former design of this test for the time being. *)
 let gas_cost_gen : Alpha_context.Gas.cost QCheck2.Gen.t =

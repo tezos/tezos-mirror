@@ -1,0 +1,25 @@
+[package]
+name = "rust_tezos_context"
+version = "0.1.0"
+edition = "2024"
+
+[build]
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+[dependencies]
+ocaml = "*"
+tezos_context = { path = "./context" }
+tezos_context_api = { path = "./context-api" }
+tezos_crypto_rs = { path = "../../../sdk/rust/crypto/", default-features = false, features = [
+  "std",
+] }
+
+# edgekv = { path = "./edgekv" }
+# spsc = { path = "./spsc", package = "tezos_spsc" }
+# storage = { path = "./storage" }
+# tezos_timing = { path = "./timing", package = "tezos_timing" }
+# tezos_base = { path = "./tezos-base", package = "tezos_base" }
+# tezos_api = { path = "./tezos-api", package = "tezos_api" }
+
+[build-dependencies]
+ocaml-build = { version = "1.0.0", features = ["dune"] }

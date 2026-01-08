@@ -93,6 +93,9 @@ val create :
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 
+(** [get_chain_id t] retreives the chain id of the layer 1 chain. *)
+val get_chain_id : t -> Chain_id.t tzresult Lwt.t
+
 (** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer
     1 chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection) it,
@@ -100,6 +103,17 @@ val shutdown : t -> unit Lwt.t
     differentiate iterations on the same connection. *)
 val iter_heads :
   ?name:string -> t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+
+(** [iter_finalized_heads ?name ~prefetch t f] is the same as [iter_heads] but
+    only iterates on blocks that are considered finalized. [prefetch] is a
+    function that is called as soon as a block is seen on L1, even if it's
+    unfinalized, to prefetch it for the next processing call. *)
+val iter_finalized_heads :
+  ?name:string ->
+  prefetch:(t -> head -> unit) ->
+  t ->
+  (header -> unit tzresult Lwt.t) ->
+  unit tzresult Lwt.t
 
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)

@@ -44,7 +44,9 @@ Version 16.1 fixes an implementation bug in the baker binary that would made bak
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v16.1

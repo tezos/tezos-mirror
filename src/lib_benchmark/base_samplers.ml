@@ -141,7 +141,8 @@ module Adversarial = struct
     let elements =
       List.init ~when_negative_length:() card (fun _ ->
           common_prefix ^ rand_suffix ())
-      |> (* see [invalid_arg] above *)
+      |>
+      (* see [invalid_arg] above *)
       WithExceptions.Result.get_ok ~loc:__LOC__
     in
     (common_prefix, elements)
@@ -155,7 +156,8 @@ module Adversarial = struct
     let elements =
       List.init ~when_negative_length:() card (fun _ ->
           Bytes.cat common_prefix (rand_suffix ()))
-      |> (* see [invalid_arg] above *)
+      |>
+      (* see [invalid_arg] above *)
       WithExceptions.Result.get_ok ~loc:__LOC__
     in
     (common_prefix, elements)

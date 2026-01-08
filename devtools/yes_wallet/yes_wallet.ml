@@ -59,8 +59,8 @@ let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
       Format.eprintf "error:@.%a@." Error_monad.pp_print_trace trace ;
       exit 1
 
-let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases ~other_accounts_pkh =
+let run_build_yes_wallet ?staking_share_opt ?network_opt ?rich_accounts_over
+    base_dir ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -68,6 +68,7 @@ let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
       (build_yes_wallet
          ?staking_share_opt
          ?network_opt
+         ?rich_accounts_over
          base_dir
          ~active_bakers_only
          ~aliases
@@ -182,6 +183,8 @@ let level_opt_name = "--level"
 
 let other_accounts_opt_name = "--other-accounts"
 
+let rich_accounts_over_opt_name = "--rich-accounts-over"
+
 let supported_networks = List.map fst Yes_wallet_lib.supported_networks
 
 let force = ref false
@@ -216,7 +219,9 @@ let usage () =
      parameter (default is mainnet) @,\
      if %s <pkh .. pkh> is used, the generated wallet will also contain the \
      addresses for the given list of space separated pkh. Consensus keys are \
-     not supported for this parameter @]@]@,\
+     not supported for this parameter @,\
+     if %s <N>,<M> is used, the generated wallet will also contain the <N> \
+     accounts owning at least <M> spendable tokens (in tez) @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -243,6 +248,7 @@ let usage () =
         pp_print_string)
     supported_networks
     other_accounts_opt_name
+    rich_accounts_over_opt_name
     alias_file_opt_name
     force_opt_name
 
@@ -306,7 +312,21 @@ let () =
     in
     aux argv
   in
-
+  let parse_rich_accounts_over_args n_m =
+    match String.split_on_char ',' n_m with [n; m] -> Some (n, m) | _ -> None
+  in
+  let rich_accounts_over =
+    let rec aux argv =
+      match argv with
+      | [] -> None
+      | str :: n_m :: _ when str = rich_accounts_over_opt_name ->
+          Option.map
+            (fun (x, y) -> (int_of_string x, Int64.of_string y))
+            (parse_rich_accounts_over_args n_m)
+      | _ :: argv' -> aux argv'
+    in
+    aux argv
+  in
   let is_supported_network net =
     List.mem (String.lowercase_ascii net) supported_networks
     || String.starts_with ~prefix:"http" net
@@ -365,6 +385,10 @@ let () =
       | opt :: net :: t when opt = network_opt_name && is_supported_network net
         ->
           filter t
+      | opt :: n_m :: t
+        when opt = rich_accounts_over_opt_name
+             && Option.is_some (parse_rich_accounts_over_args n_m) ->
+          filter t
       | h :: t -> h :: filter t
     in
     filter options
@@ -394,14 +418,40 @@ let () =
           run_build_yes_wallet
             ?staking_share_opt
             ?network_opt
+            ?rich_accounts_over
             base_dir
             ~active_bakers_only
             ~aliases
             ~other_accounts_pkh
         in
+        let all_keys_count, consensus_keys_count, companion_keys_count =
+          let consensus_key_re =
+            Re.Str.regexp "^baker_[0-9]+_consensus_key_[0-9]+$"
+          in
+          let companion_key_re =
+            Re.Str.regexp "^baker_[0-9]+_companion_key_[0-9]+$"
+          in
+          List.fold_left
+            (fun (all, consensus, companion) (alias, _, _, _) ->
+              if Re.Str.string_match consensus_key_re alias 0 then
+                (succ all, succ consensus, companion)
+              else if Re.Str.string_match companion_key_re alias 0 then
+                (succ all, consensus, succ companion)
+              else (succ all, consensus, companion))
+            (0, 0, 0)
+            yes_alias_list
+        in
+        let delegate_keys_count =
+          all_keys_count - consensus_keys_count - companion_keys_count
+        in
         Format.printf
-          "@[<h>Number of keys to export:@;<3 0>%d@]@."
-          (List.length yes_alias_list) ;
+          "@[<h>Number of keys to export:@;\
+           <3 0>%d (%d delegate keys | %d consensus keys | %d companion \
+           keys)@]@."
+          all_keys_count
+          delegate_keys_count
+          consensus_keys_count
+          companion_keys_count ;
         if populate_wallet ~replace:!force yes_wallet_dir yes_alias_list then
           Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
@@ -450,7 +500,8 @@ let () =
                        staked_balance;
                        unstaked_frozen_balance;
                        unstaked_finalizable_balance;
-                     } ->
+                     }
+                   ->
                   Format.fprintf
                     fmtr
                     "%s, %Ld, %Ld, %Ld, %Ld, %Ld@."
@@ -463,7 +514,7 @@ let () =
                 contracts_list)
       | None -> exit 0)
   | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
-      let alias_pkh_pk_list, _other_accounts =
+      let alias_pkh_pk_list, _, _other_accounts =
         run_load_bakers_public_keys
           ?staking_share_opt
           ?network_opt
@@ -473,7 +524,6 @@ let () =
           aliases
           other_accounts_pkh
       in
-
       let flags =
         if !force then [Open_wronly; Open_creat; Open_trunc; Open_text]
         else [Open_wronly; Open_creat; Open_excl; Open_text]
@@ -492,7 +542,8 @@ let () =
                    _ck,
                    stake,
                    frozen_deposits,
-                   unstake_frozen_deposits ) ->
+                   unstake_frozen_deposits )
+               ->
               Format.fprintf
                 fmtr
                 "%s, %Ld, %Ld, %Ld\n"

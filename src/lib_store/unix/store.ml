@@ -308,8 +308,8 @@ module Block = struct
     Shared.use chain_state (fun {validated_blocks; _} ->
         Option.value ~default:Lwt.return_false
         @@ Block_lru_cache.bind validated_blocks hash (function
-               | None -> Lwt.return_false
-               | Some _ -> Lwt.return_true))
+             | None -> Lwt.return_false
+             | Some _ -> Lwt.return_true))
 
   let is_known chain_store hash =
     let open Lwt_syntax in
@@ -453,14 +453,14 @@ module Block = struct
 
   let check_metadata_list ~block_hash ~operations ~ops_metadata =
     fail_unless
-      (List.for_all2
-         ~when_different_lengths:(`X "unreachable")
-         (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
-         operations
-         ops_metadata
-       |> function
-       | Ok b -> b
-       | _ -> assert false)
+      ( List.for_all2
+          ~when_different_lengths:(`X "unreachable")
+          (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
+          operations
+          ops_metadata
+      |> function
+        | Ok b -> b
+        | _ -> assert false )
       (let to_string l =
          Format.asprintf
            "[%a]"
@@ -510,7 +510,7 @@ module Block = struct
     let open Lwt_result_syntax in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    () [@profiler.reset_block_section {verbosity = Notice} hash] ;
+    () [@profiler.overwrite Profiler.reset_block_section (hash, [])] ;
     (let {
        Block_validation.validation_store =
          {
@@ -3132,10 +3132,10 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let* () = check_history_mode_consistency chain_dir history_mode in
-  let*! context_index, commit_genesis =
+  let* context_index, commit_genesis =
     match commit_genesis with
     | Some commit_genesis ->
-        let*! context_index =
+        let* context_index =
           Context_ops.init
             ~kind:`Disk
             ~readonly:true
@@ -3143,9 +3143,9 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~data_dir
             ()
         in
-        Lwt.return (context_index, commit_genesis)
+        return (context_index, commit_genesis)
     | None ->
-        let*! context_index =
+        let* context_index =
           Context_ops.init ~kind:`Disk ~readonly ?patch_context ~data_dir ()
         in
         let commit_genesis ~chain_id =
@@ -3155,7 +3155,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
             ~time:genesis.time
             ~protocol:genesis.protocol
         in
-        Lwt.return (context_index, commit_genesis)
+        return (context_index, commit_genesis)
   in
   let chain_dir_path = Naming.dir_path chain_dir in
   let*! valid_chain_dir_path = Lwt_utils_unix.dir_exists chain_dir_path in
@@ -3316,7 +3316,7 @@ let may_switch_history_mode ~store_dir ~data_dir genesis ~new_history_mode =
     (* Nothing to do, the store is not set *)
     return_unit
   else
-    let*! context_index =
+    let* context_index =
       Context_ops.init ~kind:`Disk ~readonly:false ~data_dir ()
     in
     let* store =
@@ -3706,7 +3706,7 @@ module Unsafe = struct
     in
     protect
       (fun () ->
-        let*! context_index =
+        let* context_index =
           Context_ops.init ~kind:`Disk ~readonly:true ~data_dir ()
         in
         let* store =

@@ -25,7 +25,7 @@ features = ["derive"]
 git = "https://github.com/tezos/riscv-pvm.git"
 
 [workspace.dependencies.ocaml]
-version = "1.1.0"
+version = "1.2.1"
 default-features = false
 
 [workspace.dependencies.ocaml-sys]

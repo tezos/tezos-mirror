@@ -1,0 +1,38 @@
+
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz on storage 0x00 and input 257 --level 1 --trace-stack
+storage
+  0x0101000000000000000000000000000000000000000000000000000000000000
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (just consumed gas: 10.761)
+    [ (Pair 257 0x0000000000000000000000000000000000000000000000000000000000000000) ]
+  - location: 7 (just consumed gas: 0.010)
+    [ 257 ]
+  - location: 8 (just consumed gas: 0.010)
+    [ 1
+      257 ]
+  - location: 11 (just consumed gas: 0.010)
+    [ 257
+      1 ]
+  - location: 12 (just consumed gas: 0.080)
+    [ (Some (Pair 257 0)) ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Pair 257 0) ]
+  - location: 14 (just consumed gas: 0.025)
+    [ (Pair 257 0) ]
+  - location: 20 (just consumed gas: 0.010)
+    [ 257 ]
+  - location: 21 (just consumed gas: 0.010)
+    [ 0x0100000000000000000000000000000000000000000000000000000000000000
+      257 ]
+  - location: 24 (just consumed gas: 0.267)
+    [ 0x0101000000000000000000000000000000000000000000000000000000000000 ]
+  - location: 25 (just consumed gas: 0.010)
+    [ {}
+      0x0101000000000000000000000000000000000000000000000000000000000000 ]
+  - location: 27 (just consumed gas: 0.010)
+    [ (Pair {} 0x0101000000000000000000000000000000000000000000000000000000000000) ]
+

@@ -62,7 +62,210 @@ Compiling the sources
 
 These issues concern installing by :ref:`compiling the sources <build_from_sources>`.
 
-Currently, the ``CONFIG_SITE`` environment variable must not be
-set during the installation process, or the ``stdcompat`` package
-may be installed incorrectly. See `thierry-martinez/stdcompat#13
-<https://github.com/thierry-martinez/stdcompat/issues/13>`__.
+If you have trouble **compiling on MacOS**, update ``brew`` packages and development tools such as Xcode.
+If you have recently updated to a new version of MacOS, you may need to reinstall these tools.
+Also, if you have built Octez before, ``brew`` may be linked to an older version of PostgreSQL.
+In this case, you can force ``brew`` to update its link to the newer version by running ``brew link --overwrite postgresql@15``, for example.
+
+Running out of Memory
+~~~~~~~~~~~~~~~~~~~~~
+
+Compiling the sources can be memory demanding.
+On Linux-based operating systems, depending on the memory allocation on the machine, the available memory might not suffice to compile the sources; resulting in a crash during the compilation process.
+To address this, we describe below how to increase the swap space on a Linux distribution and solve the aforementioned problem.
+
+.. note::
+   The following steps were tested on a Debian-based distribution.
+   They can usually be adapted to other Linux distributions, though details may differ.
+   For example, Fedora uses Btrfs as its default filesystem (since version 33), which requires special handling for swap files (disabling copy-on-write and compression).
+   Note that these commands require root privileges and direct access to the host system; they will not normally work inside standard container environments.
+
+
+What Is Swap Memory?
+^^^^^^^^^^^^^^^^^^^^
+
+Swap memory, or swap space, is a portion of the hard drive used by the
+system to store data that would normally reside in RAM when physical
+memory is fully utilised.
+
+It can be implemented as a **file** (e.g., ``/swapfile``) or as a
+**dedicated partition**.
+
+How Much Swap Memory Is Required for Tezos?
+'''''''''''''''''''''''''''''''''''''''''''
+
+Swap memory is essential for compiling the Octez suite, particularly during
+critical stages such as:
+- Compiling Rust dependencies (``wasm-toolchain``, ``cargo``).
+- Linking OCaml binaries (``ocamlopt``).
+- Parallel execution (``make -j16``).
+
+Thus, a larger swap allocation is necessary to install Tezos. The
+minimum requirement depends on the machine configuration, but additional
+swap may be needed if resource-intensive applications are run
+concurrently with the build process.
+
++---------------+-----------------+----------------------------------+
+| Configuration | Recommended     | Notes                            |
+|               | Swap            |                                  |
++===============+=================+==================================+
+| RAM ≤ 16 GiB  | 16 GiB          | Minimum to prevent crashes       |
++---------------+-----------------+----------------------------------+
+| RAM > 16 GiB  | 12 GiB          | Sufficient for most builds       |
++---------------+-----------------+----------------------------------+
+| 16-core CPU   | 16 GiB          | Recommended for ``make -j16``    |
++---------------+-----------------+----------------------------------+
+
+For the remainder of this section, we assume an increase to **16 GiB**,
+though this value can be adjusted as needed.
+
+Checking Available Swap
+'''''''''''''''''''''''
+
+To determine the amount of available swap memory, several methods can be
+used.
+
+
+.. note::
+
+	The commands ``free``, ``vmstat``, and ``htop``, used below, may not be installed by default in some Linux distributions, so you may have to install them beforehand (e.g. for Debian, they can be found both in package ``procps``).
+
+The ``free`` command provides information on available RAM and swap:
+
+.. code:: shell-session
+
+   $ free -h
+                 total        used        free      shared  buff/cache   available
+   Mem:           15Gi       12Gi       1.2Gi      0.5Gi       2.0Gi       1.8Gi
+   Swap:         2.0Gi      1.5Gi       0.5Gi
+
+The ``swapon --show`` command lists the location of active swap files or
+partitions:
+
+.. code:: shell-session
+
+   $ sudo swapon --show
+   NAME       TYPE      SIZE   USED PRIO
+   /swapfile  file      2G     1.5G   -2
+
+Additionally, the ``htop`` command offers real-time system monitoring.
+
+
+Increasing Swap Memory
+^^^^^^^^^^^^^^^^^^^^^^
+
+In this section, we will increase the swap memory. This involves
+defining the desired capacity, creating a file of the corresponding
+size, disabling the current swap, and then re-enabling it with the new
+configuration.
+
+Creating a Swap File
+''''''''''''''''''''
+
+To create a **16 GiB** swap file, use the ``fallocate`` command:
+
+.. code:: sh
+
+   sudo fallocate -l 16G /swapfile
+
+If ``fallocate`` fails, the ``dd`` command can be used as an
+alternative:
+
+.. code:: sh
+
+   sudo dd if=/dev/zero of=/swapfile bs=1G count=16
+
+In both cases, the value ``16`` can be replaced with a different size if
+required. Alternatively, a different filename can be specified, though
+this will need to be reflected in subsequent steps.
+
+Once created, set the correct permissions for the file:
+
+.. code:: sh
+
+   sudo chmod 600 /swapfile
+
+Verify the file has been created correctly:
+
+.. code:: shell-session
+
+   $ ls -lh /swapfile
+   -rw------- 1 root root 16G  [date] /swapfile
+
+Disabling Current Swap
+''''''''''''''''''''''
+
+For security reasons, we will disable the existing swap. Ensure
+resource-intensive processes are stopped to prevent system slowdowns
+during this step.
+
+.. code:: sh
+
+   sudo swapoff -a
+
+Associating ``/swapfile`` with Swap Memory
+''''''''''''''''''''''''''''''''''''''''''
+
+Now, inform the system of the new swap file location:
+
+.. code:: shell-session
+
+   sudo mkswap /swapfile
+
+Re-enabling Swap Memory
+'''''''''''''''''''''''
+
+Re-enable the swap with the new configuration:
+
+.. code:: sh
+
+   sudo swapon /swapfile
+
+Verifying Changes
+'''''''''''''''''
+
+To confirm the changes, use ``free -h``, ``swapon --show``, or ``htop``:
+
+.. code:: shell-session
+
+   $ free -h
+                 total        used        free      shared  buff/cache   available
+   Mem:           15Gi       3.2Gi       8.1Gi       0.5Gi       3.7Gi        11Gi
+   Swap:          16Gi       0.0Gi       16Gi
+
+.. code:: shell-session
+
+   $ sudo swapon --show
+   NAME       TYPE      SIZE   USED PRIO
+   /swapfile  file      16G    0B   -2
+
+
+Making Changes Permanent (Optional)
+'''''''''''''''''''''''''''''''''''
+
+If the swap modification is only needed for a single build, you can
+proceed with the build and the changes will revert upon reboot.
+
+To retain the new swap configuration permanently, modify the
+``/etc/fstab`` file:
+
+.. code:: sh
+
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+
+Real-Time Swap Monitoring
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To monitor swap usage in real time while building the Octez sources with ``make``, use (in another terminal)
+``htop``.
+
+If the build process causes significant system slowdowns, you can log
+swap activity using:
+
+.. code:: sh
+
+   vmstat 1 > tezos_build_swap.log
+
+The log file (``tezos_build_swap.log``) can be reviewed after the build
+completes or following a system reboot.

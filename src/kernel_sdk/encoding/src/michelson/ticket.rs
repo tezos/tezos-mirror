@@ -10,12 +10,9 @@ use super::{
     micheline::{annots::Annotations, Node},
     MichelsonTicketContent, TICKET_TAG,
 };
-use crate::{
-    contract::Contract,
-    michelson::{
-        Michelson, MichelsonBytes, MichelsonContract, MichelsonInt, MichelsonNat,
-        MichelsonOption, MichelsonPair, MichelsonString, MichelsonUnit,
-    },
+use crate::michelson::{
+    Michelson, MichelsonBytes, MichelsonContract, MichelsonInt, MichelsonNat,
+    MichelsonOption, MichelsonPair, MichelsonString, MichelsonUnit,
 };
 use core::{
     cmp::Ordering,
@@ -36,6 +33,7 @@ use tezos_data_encoding::{
     nom::{error::DecodeError, NomReader, NomResult},
     types::{SizedBytes, Zarith},
 };
+use tezos_protocol::contract::Contract;
 use thiserror::Error;
 
 #[cfg(feature = "testing")]

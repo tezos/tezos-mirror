@@ -12,12 +12,13 @@ resolver = "2"
 members = [
   "ethereum",
   "kernel",
-  "evm_execution",
   "evm_evaluation",
   "indexable_storage",
+  "tracing",
   "logging",
   "storage",
   "revm",
+  "revm_evaluation",
   "runtime",
 ]
 
@@ -48,8 +49,7 @@ nom = { version = "7.1", default-features = false }
 serde = { version = "1.0", features = ["derive", "rc"] }
 
 # ethereum VM
-revm = { version = "25.0.0", default-features = false }
-evm = { path = "../sputnikvm", default-features = false }
+revm = { version = "33.1.0", default-features = false, features = [ "optional_eip3607" ] }
 aurora-engine-modexp = { version = "1.0", default-features = false }
 bn = { package = "substrate-bn", version = "0.6", default-features = false }
 
@@ -67,16 +67,24 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 revm-etherlink = { package = "revm-etherlink", path = "./revm" }
 tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
-evm-execution = { package = "evm-execution-latest", path = "./evm_execution" }
 tezos-execution = { package = "tezos-execution-latest", path = "./tezos_execution" }
 tezos-evm-logging = { package = "tezos-evm-logging-latest", path = "./logging" }
+tezos-tracing = { package = "tezos-tracing-latest", path = "./tracing" }
 tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
 tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
-tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "testing"]  }
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = [
+  "std",
+  "crypto",
+  "dlmalloc",
+  "panic-hook",
+  "data-encoding",
+  "storage",
+  "testing",
+] }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
 tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
@@ -90,6 +98,7 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
 tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+tezos-protocol = { path = "../../sdk/rust/protocol" }
 
 # property based testing
 rand = { version = "0.8" }
@@ -97,13 +106,24 @@ proptest = { version = "1.0" }
 pretty_assertions = { version = "1.4.0" }
 
 # alloy
-alloy-sol-types = { version = "0.7.7", default-features = false, features = [
+alloy-sol-types = { version = "1.3.0", default-features = false, features = [
   "json",
 ] }
-alloy-primitives = { version = "0.7.7", default-features = false }
+alloy-primitives = { version = "1.2.0", default-features = false }
+alloy-consensus = { version = "1.0.32", default-features = false }
 
-# mir without bls
-mir = { path = "../../contrib/mir", default-features = false }
+# mir without bls nor transfer of big maps
+mir = { path = "../../contrib/mir", default-features = false, features = ["allow_lazy_storage_transfer"] }
+typed-arena = "2"
+
+# miscs
+format_no_std = "1.2.0"
+
+# kernel execution profiling
+nop-macros = { version = "0.2.0" }
+tracing = { version = "0.1.41", features = ["attributes"] }
+syn = { version = "2", features = ["full"] }
+quote = "1"
 
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates

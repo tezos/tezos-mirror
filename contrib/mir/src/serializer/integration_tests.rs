@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Tests that cover several components, including Micheline encoding.
 
@@ -14,8 +11,9 @@
 mod test_typed_encode {
     use typed_arena::Arena;
 
-    use crate::ast::{byte_repr_trait::*, IntoMicheline, KeyHash, Micheline};
+    use crate::ast::{byte_repr_trait::*, IntoMicheline, Micheline};
     use crate::ast::{Address, TypedValue};
+    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 
     // Expected bytes to be produced with
     // octez-client --mode mockup run script "parameter unit; storage bytes; code { DROP; PUSH $ty $val; PACK; NIL operation; PAIR }" on storage 0x and input Unit
@@ -51,7 +49,7 @@ mod test_typed_encode {
     fn test_key_hash() {
         check(
             TypedValue::KeyHash(
-                KeyHash::from_base58_check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa").unwrap(),
+                PublicKeyHash::from_b58check("tz1NyAf1KeeFCCPPAZ9ard9YVshVGFibzVKa").unwrap(),
             ),
             "0x050a00000015002486eda3c7bbbe6be511b46d6deeb1594258a7fd",
         )

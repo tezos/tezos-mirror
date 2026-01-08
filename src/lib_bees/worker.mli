@@ -118,7 +118,11 @@ module type T = sig
   end
 
   (** [launch table name parameters handlers] creates an instance of the
-      worker, of the given queue kind. *)
+      worker, of the given queue kind.
+      Requires callers to run inside {!Tezos_base_unix.Event_loop.main_run}
+      (or after the Event_loop main switch has been initialised), otherwise the
+      worker initialisation will block while waiting for the main-domain
+      scheduler. *)
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
@@ -288,7 +292,10 @@ module type T = sig
 
   (** [launch table name parameters handlers] creates a swarm of bees
       (workers), each running on a separate domain. By default only a single
-      domain (then worker) is used to handle the requests. *)
+      domain (then worker) is used to handle the requests.
+      As with {!launch}, callers must ensure the Event_loop main switch has been
+      started (typically via {!Tezos_base_unix.Event_loop.main_run}) so that the
+      worker initialisation scheduled on the main domain can complete. *)
   val launch_eio :
     'kind table ->
     ?timeout:Time.System.Span.t ->

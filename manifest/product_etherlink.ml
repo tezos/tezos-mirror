@@ -11,34 +11,17 @@
 open Manifest
 open Externals
 open Internals
-open Product_cohttp
 open Product_octez
 open Product_prometheus
 open Product_websocket
 open Product_efunc_core
+open Product_lwt_domain
 
 include Product (struct
   let name = "etherlink"
 
   let source = ["etherlink"; "src"] @ Product_websocket.product_source
 end)
-
-let tezt_etherlink =
-  private_lib
-    "tezt_etherlink"
-    ~path:"etherlink/tezt/lib"
-    ~opam:"tezt-etherlink"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_performance_regression |> open_;
-        octez_crypto;
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_cloud |> open_;
-        octez_test_helpers |> open_;
-      ]
-    ~release_status:Unreleased
 
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs = Sub_lib.make_container ()
@@ -96,6 +79,9 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../kernel_calypso"];
                  [S "source_tree"; S "../kernel_calypso2"];
                  [S "source_tree"; S "../kernel_dionysus"];
+                 [S "source_tree"; S "../kernel_dionysus_r1"];
+                 [S "source_tree"; S "../kernel_ebisu"];
+                 [S "source_tree"; S "../kernel_farfadet"];
                  [S "source_tree"; S "../../src/rustzcash_deps"];
                  [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
                  [S "source_tree"; S "../../src/riscv"];
@@ -107,7 +93,8 @@ let lib_etherlink_wasm_runtime =
              ];
            ])
 
-let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+let tezt ?(deps = []) =
+  tezt ~deps:(bls12_381_archive :: deps) ~include_in_main_tezt_exe:false
 
 let wasm_runtime_callbacks =
   octez_evm_node_lib
@@ -121,11 +108,12 @@ let wasm_runtime_callbacks =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_layer2_irmin_context |> open_;
-        Product_cohttp.cohttp_lwt_unix;
+        cohttp_lwt_unix;
+        lwt_domain;
         opentelemetry_lwt;
       ]
 
-let _wasm_runtime_callbacks_tests =
+let wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
     ~path:"etherlink/lib_wasm_runtime_callbacks/test"
@@ -244,9 +232,27 @@ let evm_node_lib_dev_encoding =
         uuidm;
       ]
 
+let tezt_etherlink =
+  private_lib
+    "tezt_etherlink"
+    ~path:"etherlink/tezt/lib"
+    ~opam:"tezt-etherlink"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        evm_node_lib_dev_encoding;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+        octez_crypto;
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
+        octez_test_helpers |> open_;
+      ]
+    ~release_status:Unreleased
+
 let evm_node_lib_dev_tezlink =
   let tezlink_target_proto =
-    List.find (fun proto -> Protocol.short_hash proto = "PsRiotum") Protocol.all
+    List.find (fun proto -> Protocol.short_hash proto = "PtSeouLo") Protocol.all
   in
   let tezlink_protocol_plugin =
     match Protocol.plugin tezlink_target_proto with
@@ -280,6 +286,8 @@ let evm_node_lib_dev_tezlink =
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
         octez_version;
+        octez_micheline;
+        Protocol.test_helpers_exn tezlink_target_proto;
         lwt_watcher;
       ]
 
@@ -345,6 +353,26 @@ let evm_node_lib_dev =
         performance_metrics;
         opentelemetry_lwt;
         octez_telemetry;
+        lwt_domain;
+      ]
+
+let floodgate_lib =
+  private_lib
+    "floodgate_lib"
+    ~path:"etherlink/bin_floodgate/lib_floodgate"
+    ~opam:"floodgate"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        efunc_core;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_clic;
+        evm_node_lib_dev |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_config |> open_;
+        octez_workers;
       ]
 
 let _octez_evm_node_tests =
@@ -391,7 +419,7 @@ let _octez_evm_node_tests =
         octez_client_base_unix;
       ]
 
-let _tezt_etherlink =
+let _etherlink_tezts =
   tezt
     [
       "evm_rollup";
@@ -401,6 +429,8 @@ let _tezt_etherlink =
       "eth_call";
       "gc";
       "tezlink";
+      "preconfirmation";
+      "tezosx";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
@@ -411,6 +441,8 @@ let _tezt_etherlink =
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
+        (* This executable includes the tests of [lib_wasm_runtime_callbacks]. *)
+        wasm_runtime_callbacks_tests;
         evm_node_lib_dev_encoding;
         Protocol.(main alpha);
       ]
@@ -420,10 +452,32 @@ let _tezt_etherlink =
     ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
+let _courier =
+  public_exe
+    "courier"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_courier"
+    ~opam:"etherlink-courier"
+    ~synopsis:
+      "An ad-hoc client to allow the sequencer to withdraw inclusion fees to \
+       the Layer 1 using a key hosted on GCP KMS"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_clic;
+        evm_node_config |> open_;
+        floodgate_lib;
+      ]
+
 let _evm_node =
   public_exe
-    (sf "octez-evm-node")
-    ~internal_name:(sf "main")
+    "octez-evm-node"
+    ~internal_name:"main"
     ~path:"etherlink/bin_node"
     ~opam:"octez-evm-node"
     ~synopsis:
@@ -469,6 +523,74 @@ let _tezt_testnet_scenarios =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
       ]
+
+let tezt_benchmark_lib =
+  private_lib
+    "etherlink_benchmark_lib"
+    ~path:"etherlink/tezt/benchmarks/lib"
+    ~opam:"tezt-etherlink"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        bls12_381_archive;
+        crunch;
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
+        floodgate_lib;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "static_contracts.ml"];
+            [S "deps"; [S "glob_files_rec"; S "contracts/**.{abi,bin,json}"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "bin";
+                S "-e";
+                S "abi";
+                S "-e";
+                S "json";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S "contracts";
+              ];
+            ];
+          ];
+        ]
+
+let _tezt_node_benchmark =
+  public_exe
+    "etherlink-benchmark"
+    ~internal_name:"main"
+    ~path:"etherlink/tezt/benchmarks"
+    ~synopsis:"Run EVM node benchmark"
+    ~bisect_ppx:No
+    ~static:false
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
+        floodgate_lib;
+        tezt_benchmark_lib;
+      ]
+    ~with_macos_security_framework:true
+    ~dep_globs:
+      ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
+    ~dep_globs_rec:["../../kernel_latest/*"]
 
 let _tezt_etherlink_benchmark_producer =
   public_exe
@@ -533,14 +655,8 @@ let _floodgate_bin =
       [
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        efunc_core;
-        octez_rpc_http_client_unix;
-        octez_clic;
-        evm_node_lib_dev |> open_;
-        evm_node_lib_dev_encoding |> open_;
         evm_node_config |> open_;
-        octez_workers;
+        floodgate_lib |> open_;
       ]
 
 let _outbox_monitor =

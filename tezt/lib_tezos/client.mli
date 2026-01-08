@@ -40,6 +40,10 @@ type ai_vote = On | Off | Pass
     argument (e.g., [http://127.0.0.1:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
 
+(** A string representation of an endpoint suitable to be used inside URLs
+    argument (e.g., [http%3A%2F%2F127.0.0.1%3A5893]). *)
+val url_encoded_string_of_endpoint : ?hostname:bool -> endpoint -> string
+
 (** Values that can be passed to the client's [--media-type] argument *)
 type media_type = Json | Binary | Any
 
@@ -881,6 +885,7 @@ val spawn_activate_account :
 val transfer :
   ?env:string String_map.t ->
   ?hooks:Process.hooks ->
+  ?log_requests:bool ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -906,6 +911,7 @@ val transfer :
 val spawn_transfer :
   ?env:string String_map.t ->
   ?hooks:Process.hooks ->
+  ?log_requests:bool ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -1037,6 +1043,7 @@ val spawn_call_contract :
 (** Run [octez-client reveal key for <src>]. *)
 val reveal :
   ?endpoint:endpoint ->
+  ?log_requests:bool ->
   ?wait:string ->
   ?fee:Tez.t ->
   ?fee_cap:Tez.t ->
@@ -1455,6 +1462,8 @@ val spawn_stresstest_with_filename :
   ?tps:int ->
   ?fresh_probability:float ->
   ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
+  ?strategy:int ->
+  ?level_limit:int ->
   t ->
   string ->
   Process.t
@@ -1525,6 +1534,9 @@ val stresstest_fund_accounts_from_source :
   ?env:string String_map.t ->
   ?endpoint:endpoint ->
   source_key_pkh:string ->
+  ?burn_cap:int ->
+  ?fee_cap:int ->
+  ?default_gas_limit:int ->
   ?batch_size:int ->
   ?batches_per_block:int ->
   ?initial_amount:Tez.t ->
@@ -3447,3 +3459,8 @@ val share_bls_secret_key :
 (** Run [octez-client threshold bls signatures <id_signatures>]. *)
 val threshold_bls_signatures :
   pk:string -> msg:string -> t -> (int * string) list -> string Lwt.t
+
+(* Environment variable names for experimental client/baker features *)
+val signing_delay_env_var : string
+
+val fixed_seed_env_var : string

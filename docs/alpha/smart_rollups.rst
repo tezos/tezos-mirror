@@ -252,6 +252,8 @@ There is no need to synchronize between operators: if two honest
 operators publish the same commitment for a given commitment period,
 the commitment will be published with two stakes on it.
 
+.. _withdrawal_period_alpha:
+
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
 after a commitment is published, a two-week refutation period
@@ -261,9 +263,10 @@ concurrent commitment for the same commitment period to force the
 removal of the invalid commitment. If no one posts such a concurrent
 commitment during the refutation period, the commitment can be
 cemented with a dedicated operation injected in Layer 1, and the
-outbox messages can be executed by the Layer 1 by an explicit Layer 1
-operation (see :doc:`../shell/smart_rollup_node`), typically
+outbox messages can be executed by an explicit Layer 1
+operation (see :ref:`triggering_execution_outbox_message`), typically
 to transfer assets from the rollup to the Layer 1.
+Note that such withdrawals are possible during a limited time after cementation, given by the protocol constant ``smart_rollup_max_active_outbox_levels``, which currently corresponds to about 10 days.
 
 The outbox messages can follow three different formats. Firstly, the
 Layer 1 operations contained in the outbox messages can be left
@@ -284,18 +287,41 @@ Bonds
 ^^^^^
 
 The committer's bond of 10,000 tez is frozen automatically when the committer makes their first commitment.
-The bond remains frozen until the committer is no longer staking on any uncemented commitment.
-
+If the committer's account has less than 10,000 liquid, unstaked tez, the commitment operation fails.
+The rollup node also refuses to start if the operator does not have enough tez and the node is configured to publish commitments.
 Because nodes have the length of the refutation period to challenge another node's commitment, the bond stays locked until the end of the refutation period for the last commitment that the node posted.
+
+When this last commitment becomes cemented, the bond becomes available for recovery.
+This can happen when the node stops making commitments for any reason, including when it is set to ``bailout`` mode or when it stops running (which is dangerous because it is not available to defend uncemented commitments).
+You can check if you have a frozen bond on a given Smart Rollup by passing the address of the Smart Rollup and your account address to the RPC endpoint `GET ../<block_id>/context/smart_rollups/smart_rollup/<smart_rollup_address>/staker/<pkh>/staked_on_commitment <https://octez.tezos.com/docs/active/rpc.html#get-block-id-context-smart-rollups-smart-rollup-smart-rollup-address-staker-pkh-staked-on-commitment>`__.
+This RPC returns the newest uncemented commitment on which your account staked; if it returns nothing, you do not have an uncemented commitment and thus can recover your bond.
+
 Recovering the bond safely takes a few steps; in general, node operators follow these steps:
 
 #. Switch the rollup node to ``bailout`` mode, which defends existing commitments but does not post new commitments.
+   To run the node in ``bailout`` mode, stop the node temporarily and restart it with a command similar to this example:
+
+   .. code:: sh
+
+      octez-smart-rollup-node --base-dir "${OCLIENT_DIR}" \
+                        run bailout \
+                        for "${SR_ALIAS_OR_ADDR}" \
+                        with operators "${OPERATOR_ADDR}" \
+                        --data-dir "${ROLLUP_NODE_DIR}"
 
 #. Wait until the last commitment is cemented.
    If operators shut down the node before the last commitment is cemented, they risk losing their bond if another node challenges their commitments.
 
 #. Recover the bond by running the ``recover bond`` operation, which unlocks their tez.
    Nodes running in ``bailout`` mode attempt to run this command automatically when the last commitment is cemented.
+
+   .. code:: sh
+
+      octez-client --base-dir "${OCLIENT_DIR}" \
+         recover bond of "${OPERATOR_ADDR}" \
+         for smart rollup "${SR_ALIAS_OR_ADDR}" \
+         from "${OPERATOR_ADDR}"
+
    For more information, see :ref:`deploying_a_rollup_node`.
 
 Refutation
@@ -363,7 +389,7 @@ The whitelist is optionally defined at origination. The rollup is
 considered public if no white-list is defined, private otherwise. The
 whitelist can be updated with a specific outbox message. This message
 contains an optional list, the new list completely replaces the stored
-whitelist in layer 1. If the message contains no list, then the
+whitelist in Layer 1. If the message contains no list, then the
 rollup becomes public. In turn, it is forbidden to make a public
 rollup private by sending an outbox message with a non-empty
 whitelist.

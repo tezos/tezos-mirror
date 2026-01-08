@@ -257,7 +257,8 @@ module V1 = struct
              start_level;
              inbox_level;
              game_state;
-           } ->
+           }
+         ->
         ( turn,
           inbox_snapshot,
           dal_snapshot,
@@ -269,7 +270,8 @@ module V1 = struct
              dal_snapshot,
              start_level,
              inbox_level,
-             game_state ) ->
+             game_state )
+         ->
         {
           turn;
           inbox_snapshot;

@@ -268,11 +268,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
               el)
       (function
         | e ->
-            failwith
-              "ERROR while Handling %a: %s\n%!"
-              pp
-              ()
-              (Printexc.to_string e))
+        failwith "ERROR while Handling %a: %s\n%!" pp () (Printexc.to_string e))
 
   let should_handle (type a) ?(section = Internal_event.Section.empty)
       {event_filter; _} m =
@@ -485,8 +481,7 @@ module Query = struct
                     | `Directory p | `Special (_, p) ->
                         return_with_warning
                           previous
-                          (`Expecting_regular_file_at
-                            (path // date // time // p)))
+                          (`Expecting_regular_file_at (path // date // time // p)))
             | `Directory _ (* filtered out *) -> return previous
             | `Regular_file p | `Special (_, p) ->
                 return_with_warning
@@ -571,7 +566,7 @@ module Query = struct
                                 return_with_warning
                                   previous
                                   (`Unknown_event_name_at
-                                    (event_name, sink_path // dir))
+                                     (event_name, sink_path // dir))
                             | Some f ->
                                 fold_event_kind_directory
                                   ~time_query

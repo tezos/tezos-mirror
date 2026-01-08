@@ -248,6 +248,7 @@ module Make
       include Sig.CORE with type error := error
     end)
     (Trace : Sig.TRACE)
-    (Monad : Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
-               with type 'error trace := 'error Trace.trace) :
+    (Monad :
+      Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
+        with type 'error trace := 'error Trace.trace) :
   S with type error := Error.error and type 'error trace := 'error Trace.trace

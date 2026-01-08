@@ -55,8 +55,9 @@ module type S = sig
 end
 
 module Make_impl
-    (PC : Kzg.Interfaces.Polynomial_commitment
-            with type Commitment.t = Kzg.Bls.G1.t SMap.t) =
+    (PC :
+      Kzg.Interfaces.Polynomial_commitment
+        with type Commitment.t = Kzg.Bls.G1.t SMap.t) =
 struct
   type secret = PC.secret
 

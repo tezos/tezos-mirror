@@ -87,7 +87,7 @@ let prioritize_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
   let l = to_list (Contents_list contents) in
   List.fold_left_e
     (fun ((first_source, first_counter, total_fee, total_gas) as acc) ->
-       function
+      function
       | Contents (Manager_operation {source; counter; fee; gas_limit; _}) ->
           let* total_fee =
             Environment.wrap_tzresult @@ Tez.(total_fee +? fee)

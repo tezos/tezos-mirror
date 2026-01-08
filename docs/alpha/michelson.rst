@@ -1165,7 +1165,7 @@ Syntax
 Primitive applications can receive one or many annotations.
 
 An annotation is a sequence of characters that matches the regular
-expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
+expression ``@%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
 :ref:`special annotations <SpecialAnnotations_alpha>` and are not allowed everywhere.
 
@@ -2063,8 +2063,10 @@ primitives which can be used are:
 - ``parameter``,
 - ``amount``,
 - ``balance``,
-- ``other_contracts``, and
-- ``big_maps``.
+- ``other_contracts``,
+- ``big_maps``,
+- ``storages``, and
+- ``views``.
 
 Mandatory primitives
 ~~~~~~~~~~~~~~~~~~~~
@@ -2198,6 +2200,18 @@ particular order.
   integers representing ``big_map`` indices and descriptions of big
   maps (see the :ref:`syntax of extra big maps specifications
   <syntax_of_extra_big_maps_alpha>`)
+
+- ``storages`` (optional, defaults to ``{}``): mapping between
+  the contract addresses that are assumed to exist and their
+  storage type and storage value (see the :ref:`syntax of storages
+  specifications <syntax_of_storages_alpha>`)
+
+- ``views`` (optional, defaults to ``{}``): mapping between
+  the contract addresses that are assumed to exist and their
+  views (see the :ref:`syntax of views
+  specifications <syntax_of_views_alpha>`). Every address that appears
+  on ``views`` must also appear in ``storages``,
+  since a contract's storage is imperative in the execution of its view.
 
 The following test example asserts that the default value for the `NOW
 <https://tezos.gitlab.io/michelson-reference/#instr-NOW>`__
@@ -2509,3 +2523,95 @@ instruction in the `big_map
    input { Stack_elt (big_map string nat) 4 };
    code { PUSH string "foo"; GET };
    output { Stack_elt (option nat) None }
+
+.. _syntax_of_storages_alpha:
+
+Syntax of storages specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To test the `VIEW <https://tezos.gitlab.io/michelson-reference/#instr-VIEW>`__
+instruction, the ``storages`` toplevel primitive can be used to specify, for each
+contract address, the type and value of the contract's storage.
+
+The mapping given to the ``storages`` toplevel primitive is a
+Micheline sequence whose elements have the form::
+
+   Storage "KT1..." <ty> <value>
+
+where
+
+-  ``"KT1..."`` is a valid smart contract address,
+- ``<ty>`` is the storage type of that contract, and
+- ``<value>`` is the storage value, which must be of type ``<ty>``.
+
+Each address should appear at most once in the ``storages`` mapping,
+and the order in which storages are specified is irrelevant.
+
+The following example specifies the storage for a single contract
+whose storage type is ``unit`` and whose storage value is ``Unit``::
+
+   storages { Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit };
+
+.. _syntax_of_views_alpha:
+
+Syntax of views specifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of the `VIEW
+<https://tezos.gitlab.io/michelson-reference/#instr-VIEW>`__ instruction
+depends on the set of views declared for contracts in the
+context. The ``views`` toplevel primitive can be used to specify, for
+each contract address, the views that are available, together with
+their argument and return types and their implementation.
+
+The mapping given to the ``views`` toplevel primitive is a Micheline
+sequence whose elements have the form::
+
+   Views "KT1..." { View <name> <arg_ty> <ret_ty> { <code> } ;
+                    View <name2> <arg_ty2> <ret_ty2> { <code2> } ;
+                    ... }
+
+where
+
+- ``"KT1..."`` is a valid smart contract address with storage type ``<storage_ty>``,
+- each ``<name>`` is a Micheline string giving the name of a view
+  defined on that contract,
+- each ``<arg_ty>`` is the input type of the view,
+- each ``<ret_ty>`` is the return type of the view, and
+- each ``{ <code> }`` block is the
+  implementation of the view, written as Michelson code of type ``Pair <arg_ty> <storage_ty> : [] => <ret_ty> : []``.
+
+For a given ``Views <addr> { ... }`` block, each view name should
+appear at most once. The order of contracts in the outer ``views``
+mapping, and the order of view declarations inside each ``Views``
+block, is irrelevant.
+
+Every address in ``views`` must also appear in ``storages`` so that
+the view can be correctly interpreted.
+
+The following example defines a single view ``"a"`` on a contract
+whose storage is of type ``unit`` and which always returns the constant
+``1`` of type ``nat``::
+
+   code { VIEW "a" nat ; };
+
+   input
+     {
+       Stack_elt unit Unit;
+       Stack_elt address "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+     };
+
+   output { Stack_elt (option nat) (Some 1) };
+
+   views
+     {
+       Views
+         "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"
+         { View "a" unit nat { DROP; PUSH nat 1 } }
+     };
+
+   storages
+     { Storage "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" unit Unit };
+
+this tests that a call to ``VIEW "a" nat`` on the given address returns
+``Some 1``.

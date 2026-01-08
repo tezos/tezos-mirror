@@ -52,6 +52,9 @@ val eth_account : string -> path
 (** [balance addr] is the path to the [addr] account's balance. *)
 val balance : string -> path
 
+(** [nonce addr] is the path to the [addr] account's nonce. *)
+val nonce : string -> path
+
 (** [code addr] is the path to the [addr] account's code. *)
 val code : string -> path
 

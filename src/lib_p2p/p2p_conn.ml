@@ -184,16 +184,16 @@ module Handlers = struct
    fun _self
        _name
        (Types.P
-         {
-           conn;
-           messages;
-           canceler;
-           greylister;
-           disable_peer_discovery;
-           callback;
-           peer_id;
-           last_sent_swap_request;
-         }) ->
+          {
+            conn;
+            messages;
+            canceler;
+            greylister;
+            disable_peer_discovery;
+            callback;
+            peer_id;
+            last_sent_swap_request;
+          }) ->
     let conn_info =
       P2p_answerer.
         {
@@ -217,8 +217,7 @@ module Handlers = struct
     in
     Lwt.return_ok (Types.S t)
 
-  let on_request :
-      type response error.
+  let on_request : type response error.
       self -> (response, error) Request.t -> (response, error) result Lwt.t =
    fun self Loop ->
     let (Types.S state) = Worker.state self in
@@ -230,8 +229,7 @@ module Handlers = struct
     let (Types.S state) = Worker.state self in
     Error_monad.cancel_with_exceptions state.canceler
 
-  let on_error :
-      type response error.
+  let on_error : type response error.
       self ->
       _ ->
       (response, error) Request.t ->
@@ -247,8 +245,8 @@ module Handlers = struct
         return `Shutdown
     | err -> Lwt.return_error err
 
-  let on_completion :
-      type resp err. self -> (resp, err) Request.t -> resp -> _ -> unit Lwt.t =
+  let on_completion : type resp err.
+      self -> (resp, err) Request.t -> resp -> _ -> unit Lwt.t =
    fun _self _ _ _status -> Lwt.return_unit
 end
 

@@ -89,14 +89,14 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
-  adaptive_issuance_enable:bool ->
+  all_bakers_attest_first_level:Level_repr.t option ->
   Context.t ->
   t tzresult Lwt.t
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) S023 (* Alpha predecessor *)
+  | (* Alpha predecessor *) T024 (* Alpha predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
@@ -291,12 +291,12 @@ val init_sampler_for_cycle :
     the [read] function and then cached in [ctxt] like
     [init_sampler_for_cycle]. *)
 val sampler_for_cycle :
-  read:(t -> (Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t) ->
+  read:(t -> (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t) ->
   t ->
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
-(** [init_stake_info_for_cycle ctxt cycle total_stake stakes_pk] caches the stakes
+(** [init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk] caches the stakes
     of the active delegates for [cycle] in memory for quick access.
 
     @return [Error Stake_info_already_set] if the info was already
@@ -304,7 +304,7 @@ val sampler_for_cycle :
 val init_stake_info_for_cycle :
   t ->
   Cycle_repr.t ->
-  Stake_repr.t ->
+  total_stake:Int64.t ->
   (consensus_pk * Int64.t) list ->
   t tzresult
 
@@ -313,9 +313,10 @@ val init_stake_info_for_cycle :
     [init_stake_info_for_cycle] or [stake_info_for_cycle] was previously
     called for the same [cycle]. Otherwise, it is read "on-disk" with
     the [read] function and then cached in [ctxt] like
-    [init_stake_info_for_cycle]. *)
+    [init_stake_info_for_cycle].
+    The list follows a lexicographical order on the delegate pkh. *)
 val stake_info_for_cycle :
-  read:(t -> (Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
+  read:(t -> (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
   t ->
   Cycle_repr.t ->
   (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t
@@ -343,17 +344,24 @@ val reward_coeff_for_current_cycle : t -> Q.t
     [Adaptive_issuance_storage] *)
 val update_reward_coeff_for_current_cycle : t -> Q.t -> t
 
-(** Returns true if adaptive issuance has launched. *)
-val adaptive_issuance_enable : t -> bool
+(** Returns the first level at which all bakers attest is active.
+    Returns [None] if it is not set to activate yet. *)
+val all_bakers_attest_first_level : t -> Level_repr.t option
 
-(** Set the feature flag of adaptive issuance. *)
-val set_adaptive_issuance_enable : t -> t
+(** Set the feature flag of all bakers attest. *)
+val set_all_bakers_attest_first_level : t -> Level_repr.t -> t
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t
 
   val add_cycles : t -> int -> t
 end
+
+type consensus_power = {
+  consensus_key : consensus_pk;
+  attesting_power : Attesting_power_repr.t;
+  dal_power : int;
+}
 
 module type CONSENSUS = sig
   type t
@@ -368,21 +376,24 @@ module type CONSENSUS = sig
 
   type round
 
-  type consensus_pk
+  type attesting_power
+
+  (** Info on the power of a given member of the consensus committee.
+      Contains a consensus_pk, its attesting power and its DAL power. *)
+  type consensus_power
 
   (** Returns a map where from the initial slot of each attester in the TB
       committee for a given level, to the attester's public key and its
       consensus power and DAL power. *)
-  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_attestations : t -> consensus_power slot_map option
 
   (** See {!allowed_attestations}. *)
-  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_preattestations : t -> consensus_power slot_map option
 
   (** Returns a map that associates a level with a slot map.
       The slot map links a delegate's public key to a tuple containing
       (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
-  val allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option
+  val allowed_consensus : t -> consensus_power slot_map level_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -392,18 +403,18 @@ module type CONSENSUS = sig
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
 
-  (** [attestation power ctx] returns the attestation power of the
+  (** [attestation power ctx] returns the attestation power and stake of the
      current block. *)
-  val current_attestation_power : t -> int
+  val current_attesting_power : t -> attesting_power
 
   (** Initializes the map of allowed attestations and preattestations, this
       function must be called only once and before applying any consensus
       operation. *)
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
-    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
+    allowed_attestations:consensus_power slot_map option ->
+    allowed_preattestations:consensus_power slot_map option ->
+    allowed_consensus:consensus_power slot_map level_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -412,7 +423,8 @@ module type CONSENSUS = sig
       The attestation should be valid in the sense that
       [Int_map.find_opt initial_slot allowed_attestation ctx = Some
       (pkh, power)].  *)
-  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation :
+    t -> initial_slot:slot -> power:attesting_power -> t tzresult
 
   (** [record_preattestation ctx ~initial_slot ~power round
      payload_hash power] records a preattestation for a proposal at
@@ -422,7 +434,7 @@ module type CONSENSUS = sig
      [Int_map.find_opt initial_slot allowed_preattestation ctx = Some
      (pkh, power)].  *)
   val record_preattestation :
-    t -> initial_slot:slot -> power:int -> round -> t tzresult
+    t -> initial_slot:slot -> power:attesting_power -> round -> t tzresult
 
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
       forbidden delegates, which prevents this delegate from baking or
@@ -450,7 +462,7 @@ module type CONSENSUS = sig
 
   (** [locked_round_evidence ctx] returns the round of the recorded
      preattestations as well as their power. *)
-  val locked_round_evidence : t -> (round * int) option
+  val locked_round_evidence : t -> (round * attesting_power) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
@@ -465,7 +477,8 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type consensus_pk := consensus_pk
+     and type attesting_power := Attesting_power_repr.t
+     and type consensus_power := consensus_power
 
 module Sc_rollup_in_memory_inbox : sig
   val current_messages : t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t
@@ -532,4 +545,18 @@ module Dal : sig
   (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
      DAL incentives flag is enabled and otherwise [default ctxt]. *)
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+end
+
+module Address_registry : sig
+  (** Type representing the addition of an address in the registry.
+      - [address]: The address added in the storage.
+      - [index]: The index newly associated to the address.
+
+      This type is used in transaction receipts.
+  *)
+  type diff = {address : Destination_repr.t; index : Z.t}
+
+  val register_diff : t -> diff -> t
+
+  val get_diffs : t -> diff list
 end

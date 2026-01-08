@@ -57,6 +57,12 @@ type dal = {
   traps_fraction : Q.t;
 }
 
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+      (** This is the migration level up to which the parameters were used. *)
+}
+
 let minimal_participation_ratio_encoding =
   between_zero_and_one_q_encoding
     "dal.minimal_participation_ratio must be a value between zero and one"
@@ -83,7 +89,8 @@ let dal_encoding =
            minimal_participation_ratio;
            rewards_ratio;
            traps_fraction;
-         } ->
+         }
+       ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
@@ -101,7 +108,8 @@ let dal_encoding =
              minimal_participation_ratio,
              rewards_ratio,
              traps_fraction ),
-           cryptobox_parameters ) ->
+           cryptobox_parameters )
+       ->
       {
         feature_enable;
         incentives_enable;
@@ -126,6 +134,17 @@ let dal_encoding =
           (req "rewards_ratio" rewards_ratio_encoding)
           (req "traps_fraction" traps_fraction_encoding))
        Dal.parameters_encoding)
+
+let past_dal_parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {dal_parameters; next_protocol_activation} ->
+      (dal_parameters, next_protocol_activation))
+    (fun (dal_parameters, next_protocol_activation) ->
+      {dal_parameters; next_protocol_activation})
+    (obj2
+       (req "dal_parameters" dal_encoding)
+       (req "next_protocol_activation" Raw_level_repr.encoding))
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
@@ -183,7 +202,8 @@ let sc_rollup_reveal_activation_level_encoding :
            metadata,
            dal_page,
            dal_parameters,
-           dal_attested_slots_validity_lag ) ->
+           dal_attested_slots_validity_lag )
+       ->
       {
         raw_data;
         metadata;
@@ -300,7 +320,9 @@ type t = {
   direct_ticket_spending_enable : bool;
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
-  all_bakers_attest_activation_level : Raw_level_repr.t option;
+  all_bakers_attest_activation_threshold : Ratio_repr.t;
+  native_contracts_enable : bool;
+  swrr_new_baker_lottery_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -336,7 +358,8 @@ let sc_rollup_encoding =
              sc_rollup_max_number_of_parallel_games,
              sc_rollup_reveal_activation_level,
              sc_rollup_private_enable,
-             sc_rollup_riscv_pvm_enable ) ) ->
+             sc_rollup_riscv_pvm_enable ) )
+       ->
       {
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
         origination_size = sc_rollup_origination_size;
@@ -386,12 +409,14 @@ let zk_rollup_encoding =
             min_pending_to_process;
             max_ticket_payload_size;
           } :
-           zk_rollup) ->
+           zk_rollup)
+       ->
       (enable, origination_size, min_pending_to_process, max_ticket_payload_size))
     (fun ( zk_rollup_enable,
            zk_rollup_origination_size,
            zk_rollup_min_pending_to_process,
-           zk_rollup_max_ticket_payload_size ) ->
+           zk_rollup_max_ticket_payload_size )
+       ->
       {
         enable = zk_rollup_enable;
         origination_size = zk_rollup_origination_size;
@@ -434,7 +459,8 @@ let adaptive_rewards_params_encoding =
            growth_rate;
            center_dz;
            radius_dz;
-         } ->
+         }
+       ->
       ( issuance_ratio_final_min,
         issuance_ratio_final_max,
         issuance_ratio_initial_min,
@@ -454,7 +480,8 @@ let adaptive_rewards_params_encoding =
            max_bonus,
            growth_rate,
            center_dz,
-           radius_dz ) ->
+           radius_dz )
+       ->
       {
         issuance_ratio_final_min;
         issuance_ratio_final_max;
@@ -486,13 +513,15 @@ let adaptive_issuance_encoding =
            global_limit_of_staking_over_baking;
            edge_of_staking_over_delegation;
            adaptive_rewards_params;
-         } ->
+         }
+       ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         adaptive_rewards_params ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
-           adaptive_rewards_params ) ->
+           adaptive_rewards_params )
+       ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
@@ -515,7 +544,8 @@ let issuance_weights_encoding =
             vdf_revelation_tip_weight;
             dal_rewards_weight;
           } :
-           issuance_weights) ->
+           issuance_weights)
+       ->
       ( base_total_issued_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
@@ -529,7 +559,8 @@ let issuance_weights_encoding =
            attesting_reward_weight,
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight,
-           dal_rewards_weight ) ->
+           dal_rewards_weight )
+       ->
       {
         base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
@@ -596,7 +627,9 @@ let encoding =
                       ( c.direct_ticket_spending_enable,
                         c.aggregate_attestation,
                         c.allow_tz4_delegate_enable,
-                        c.all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ))
+                        c.all_bakers_attest_activation_threshold,
+                        c.native_contracts_enable,
+                        c.swrr_new_baker_lottery_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
@@ -641,7 +674,10 @@ let encoding =
                          ( direct_ticket_spending_enable,
                            aggregate_attestation,
                            allow_tz4_delegate_enable,
-                           all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ) ->
+                           all_bakers_attest_activation_threshold,
+                           native_contracts_enable,
+                           swrr_new_baker_lottery_enable ) ) ) ) ) ) ) ) )
+       ->
       {
         consensus_rights_delay;
         blocks_preservation_cycles;
@@ -688,7 +724,9 @@ let encoding =
         direct_ticket_spending_enable;
         aggregate_attestation;
         allow_tz4_delegate_enable;
-        all_bakers_attest_activation_level;
+        all_bakers_attest_activation_threshold;
+        native_contracts_enable;
+        swrr_new_baker_lottery_enable;
       })
     (merge_objs
        (merge_objs
@@ -752,13 +790,15 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj4
+                            (obj6
                                (req "direct_ticket_spending_enable" bool)
                                (req "aggregate_attestation" bool)
                                (req "allow_tz4_delegate_enable" bool)
                                (req
-                                  "all_bakers_attest_activation_level"
-                                  (option Raw_level_repr.encoding)))))))))))
+                                  "all_bakers_attest_activation_threshold"
+                                  Ratio_repr.encoding)
+                               (req "native_contracts_enable" bool)
+                               (req "swrr_new_baker_lottery_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a
@@ -767,10 +807,52 @@ let update_sc_rollup_parameter ratio_i32 c =
   {
     (* Constants expressed in number of blocks *)
     challenge_window_in_blocks = ratio_int c.challenge_window_in_blocks;
-    max_active_outbox_levels = ratio_i32 c.max_active_outbox_levels;
+    max_active_outbox_levels = c.max_active_outbox_levels;
     commitment_period_in_blocks = ratio_int c.commitment_period_in_blocks;
     max_lookahead_in_blocks = ratio_i32 c.max_lookahead_in_blocks;
     timeout_period_in_blocks = ratio_int c.timeout_period_in_blocks;
+    (* Other constants *)
+    max_outbox_messages_per_level = c.max_outbox_messages_per_level;
+    arith_pvm_enable = c.arith_pvm_enable;
+    origination_size = c.origination_size;
+    stake_amount = c.stake_amount;
+    number_of_sections_in_dissection = c.number_of_sections_in_dissection;
+    max_number_of_stored_cemented_commitments =
+      c.max_number_of_stored_cemented_commitments;
+    max_number_of_parallel_games = c.max_number_of_parallel_games;
+    reveal_activation_level = c.reveal_activation_level;
+    private_enable = c.private_enable;
+    riscv_pvm_enable = c.riscv_pvm_enable;
+  }
+
+let update_sc_rollup_parameter_with_block_time block_time c =
+  (* For comments, see [make_sc_rollup_parameter] from
+     [lib_parameters/default_parameters.ml] *)
+  let seconds_in_a_day = 60 * 60 * 24 in
+  let seconds_in_a_week = seconds_in_a_day * 7 in
+  let commitment_period_in_blocks = 60 * 15 / block_time in
+  let challenge_window_in_blocks = seconds_in_a_week * 2 / block_time in
+
+  (* Here we don't update the value so there is no need for such
+     migration, but it reduces the time a user has to execute a outbox
+     message.
+
+     For a new network it should be ~ 2 weeks, so `seconds_in_a_week *
+     2 / block_time`. *)
+  let max_active_outbox_levels = c.max_active_outbox_levels in
+  let timeout_period_in_blocks = seconds_in_a_week / block_time in
+  let max_lookahead_in_blocks =
+    let seconds_in_a_month = Int32.of_int (seconds_in_a_day * 30) in
+    let block_time = Int32.of_int block_time in
+    Int32.div seconds_in_a_month block_time
+  in
+  {
+    (* Constants expressed in number of blocks *)
+    challenge_window_in_blocks;
+    max_active_outbox_levels;
+    commitment_period_in_blocks;
+    max_lookahead_in_blocks;
+    timeout_period_in_blocks;
     (* Other constants *)
     max_outbox_messages_per_level = c.max_outbox_messages_per_level;
     arith_pvm_enable = c.arith_pvm_enable;

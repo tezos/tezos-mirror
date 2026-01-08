@@ -17,7 +17,7 @@ let team = Tag.layer1
 let test_check_signature =
   Protocol.register_test
     ~__FILE__
-    ~title:"Test yes crypto signatures can only be used with yes crypto checks"
+    ~title:"Test yes crypto signatures and checks"
     ~tags:[team; "client"; "signature"; "check"; "yes_crypto"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
@@ -35,7 +35,6 @@ let test_check_signature =
   let* () = Process.check transfer in
   let* () = Process.check bake1 in
 
-  Log.info "Check operation signed by a yes-client is refused by a vanilla node" ;
   let env =
     String_map.add
       Tezos_crypto.Helpers.yes_crypto_environment_variable
@@ -43,15 +42,35 @@ let test_check_signature =
       String_map.empty
   in
 
-  let yes_transfer =
-    Client.spawn_transfer
-      ~env
-      client
-      ~amount:(Tez.of_int 1)
-      ~giver:"bootstrap3"
-      ~receiver:"bootstrap1"
+  let* () =
+    (* The semantics of yes_crypto changed in signature_v2: an operation signed
+       by a yes-client can be accepted by a vanilla node. We differentiate both
+       behaviours here until protocols <= 22 are removed from the test suite. *)
+    if Protocol.number protocol > 22 then (
+      Log.info
+        "Check operation signed by a yes-client is accepted by a vanilla node" ;
+      let yes_transfer =
+        Client.spawn_transfer
+          ~env
+          client
+          ~amount:(Tez.of_int 1)
+          ~giver:"bootstrap3"
+          ~receiver:"bootstrap1"
+      in
+      Process.check yes_transfer)
+    else (
+      Log.info
+        "Check operation signed by a yes-client is refused by a vanilla node" ;
+      let yes_transfer =
+        Client.spawn_transfer
+          ~env
+          client
+          ~amount:(Tez.of_int 1)
+          ~giver:"bootstrap3"
+          ~receiver:"bootstrap1"
+      in
+      Process.check_error yes_transfer)
   in
-  let* () = Process.check_error yes_transfer in
 
   Log.info "Restart node with yes_crypto enabled" ;
   let* () = Node.terminate node in
@@ -85,8 +104,7 @@ let test_check_signature =
   let* () = Process.check bake3 in
   let* () = Process.check transfer2 in
 
-  Log.info
-    "Check that running a node with only environement variable is refused" ;
+  Log.info "Check that running a node with only environment variable is refused" ;
   let* () = Node.terminate node in
   let* () = Node.run ~env node [] in
   let* () =

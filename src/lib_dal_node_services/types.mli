@@ -36,6 +36,9 @@ type slot_index = int
 (** An index of a DAL page. *)
 type page_index = int
 
+(** A DAL attestation lag *)
+type attestation_lag = int
+
 (** An ID associated to a slot or to its commitment. *)
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}
@@ -236,10 +239,11 @@ type header_status =
   [ `Waiting_attestation
     (** The slot header was included and applied in a finalized L1 block
           but remains to be attested. *)
-  | `Attested  (** The slot header was included in an L1 block and attested. *)
+  | `Attested of attestation_lag
+    (** The slot header was included in an L1 block and attested. *)
   | `Unattested
     (** The slot header was included in an L1 block but not timely attested. *)
-  ]
+  | `Unpublished  (** The slot header was not included in any L1 block. *) ]
 
 (** A DAL node can be in one of two profiles (aka modes): bootstrap or
     controller. A controller node can have one or more (sub)profiles that
@@ -405,4 +409,29 @@ module Health : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
+end
+
+module Attestable_event : sig
+  type backfill_payload = {
+    slot_ids : slot_id list;
+        (** All slots that should be marked attestable for this delegate *)
+    trap_slot_ids : slot_id list;
+        (* All slots that should be marked as traps for this delegate *)
+    no_shards_attestation_levels : level list;
+        (** All attestation levels where this delegate has no shards *)
+  }
+
+  (** DAL attestability items emitted on a per-delegate stream.
+      The delegate is implicit, as each stream is bound to a single delegate. *)
+  type t =
+    | Attestable_slot of {slot_id : slot_id}
+        (** the [slot_id] is now attestable for the delegate *)
+    | No_shards_assigned of {attestation_level : level}
+        (** the delegate has no assigned shards at [attestation_level] *)
+    | Slot_has_trap of {slot_id : slot_id}
+        (** the [slot_id] is a trap for the delegate *)
+    | Backfill of {backfill_payload : backfill_payload}
+        (** information about the delegate attestation status from the past *)
+
+  val encoding : t Data_encoding.t
 end

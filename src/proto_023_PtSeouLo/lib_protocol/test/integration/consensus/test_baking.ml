@@ -221,12 +221,6 @@ let test_rewards_block_and_payload_producer () =
   let* baker_b1_contract = get_contract_for_pkh contracts baker_b1 in
   let* b1 = Block.bake ~policy:(By_round 0) genesis in
   let* attesters = Context.get_attesters (B b1) in
-  let* attesters =
-    List.map_es
-      (function
-        | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-      attesters
-  in
   (* We let just a part of the attesters vote; we assume here that 5 of 10
      attesters will have together at least one slot (to pass the threshold), but
      not all slots (to make the test more interesting, otherwise we know the
@@ -234,12 +228,16 @@ let test_rewards_block_and_payload_producer () =
   let attesters = List.take_n 5 attesters in
   let* attestations =
     List.map_ep
-      (fun (attester, _slots) -> Op.attestation ~delegate:attester b1)
+      (fun attester ->
+        Op.attestation
+          ~attesting_slot:(Op.attesting_slot_of_attester attester)
+          b1)
       attesters
   in
   let attesting_power =
     List.fold_left
-      (fun acc (_pkh, slots) -> acc + List.length slots)
+      (fun acc attester ->
+        acc + List.length attester.Plugin.RPC.Validators.slots)
       0
       attesters
   in
@@ -276,16 +274,13 @@ let test_rewards_block_and_payload_producer () =
      correspond to a slot of [baker_b2] and it includes the PQC for [b2]. We
      check that the fixed baking reward goes to the payload producer [baker_b2],
      while the bonus goes to the the block producer (aka baker) [baker_b2']. *)
-  let* attesters = Context.get_attesters (B b2) in
-  let* preattesters =
-    List.map_es
-      (function
-        | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-      attesters
-  in
+  let* preattesters = Context.get_attesters (B b2) in
   let* preattestations =
     List.map_ep
-      (fun (attester, _slots) -> Op.preattestation ~delegate:attester b2)
+      (fun attester ->
+        Op.preattestation
+          ~attesting_slot:(Op.attesting_slot_of_attester attester)
+          b2)
       preattesters
   in
   let* baker_b2 = Context.get_baker (B b1) ~round:Round.zero in

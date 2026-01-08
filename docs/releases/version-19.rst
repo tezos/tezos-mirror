@@ -99,7 +99,9 @@ Version 19.2 fixes a bug in the Smart Rollup node, where the incorrect computati
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v19.2

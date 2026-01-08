@@ -128,8 +128,7 @@ module Delayed_transaction = struct
       | Deposit -> decode_exn (Bytes.of_string raw)
       | Fa_deposit -> decode_exn (Bytes.of_string raw)
     in
-    let rlp = List [Value hash; List [Value tag; content]] in
-    encode rlp
+    List [Value hash; List [Value tag; content]]
 
   let pp_kind fmt = function
     | Transaction -> Format.pp_print_string fmt "Transaction"

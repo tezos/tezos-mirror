@@ -31,7 +31,6 @@ val get_delegates :
   Baking_state_types.Key.t list tzresult Lwt.t
 
 val run_baker :
-  ?recommend_agnostic_baker:bool ->
   string option
   * bool
   * string option
@@ -48,7 +47,8 @@ val run_baker :
   * bool
   * Baking_configuration.state_recorder_config
   * Q.t option
-  * Q.t option ->
+  * Q.t option
+  * bool ->
   baking_mode ->
   Environment.Signature.public_key_hash list ->
   Protocol_client_context.full ->

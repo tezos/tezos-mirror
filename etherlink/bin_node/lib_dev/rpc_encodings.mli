@@ -73,6 +73,8 @@ module JSONRPC : sig
 
   type value = (Data_encoding.json, error) result
 
+  type return_value = Direct of value | Lazy of value Lwt.t
+
   (** JSON-RPC Response object:
   {@js[
       { "jsonrpc": "2.0",
@@ -85,6 +87,8 @@ module JSONRPC : sig
       Note that `result` and `error` cannot appear at the same time, hence the
       choice of using the result type as representation. *)
   type response = {value : value; id : id}
+
+  type return_response = {return_value : return_value; id : id}
 
   val response_encoding : response Data_encoding.t
 end
@@ -260,6 +264,12 @@ module Send_raw_transaction :
     with type input = Ethereum_types.hex
      and type output = Ethereum_types.hash
 
+module Send_raw_transaction_sync :
+  METHOD
+    with type input =
+      Ethereum_types.hex * int64 * Ethereum_types.Block_parameter.t
+     and type output = Transaction_receipt.t
+
 module Eth_call :
   METHOD
     with type input =
@@ -270,11 +280,13 @@ module Eth_call :
 
 module Get_estimate_gas :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
+    with type input = Eth_call.input
      and type output = Ethereum_types.quantity
 
 module Txpool_content :
-  METHOD with type input = unit and type output = Ethereum_types.txpool
+  METHOD
+    with type input = unit
+     and type output = Transaction_object.txqueue_content
 
 module Web3_clientVersion :
   METHOD with type input = unit and type output = string
@@ -287,7 +299,8 @@ module Web3_sha3 :
 module Get_logs :
   METHOD
     with type input = Ethereum_types.Filter.t
-     and type output = Ethereum_types.Filter.changes list
+     and type output =
+      Ethereum_types.transaction_log Ethereum_types.pre_encoded list
 
 type produce_block_input = {
   timestamp : Time.Protocol.t option;
@@ -304,7 +317,7 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Ethereum_types.legacy_transaction_object * string
+    with type input = Transaction_object.t * string * bool
      and type output = Ethereum_types.hash
 
 module Inject_tezlink_operation :
@@ -391,7 +404,7 @@ val map_method_name :
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;
   stream : Subscription.notification Lwt_stream.t;
-  stopper : unit -> unit;
+  stopper : unit -> bool tzresult Lwt.t;
 }
 
 type websocket_response = {

@@ -26,6 +26,38 @@
 (** A list of failures. *)
 type t
 
+type dal_parameters = {
+  number_of_slots : int64;
+  attestation_lag : int64;
+  slot_size : int64;
+  page_size : int64;
+}
+
+(** DAL page selector and payload-forging strategy.
+
+    Optional fields act as wildcards:
+    - [None] means "match any value" for that dimension.
+      Example:
+        { published_level = None; slot_index = Some 3; page_index = None; _ }
+      matches every page of slot index 3 at any level.
+
+    Fields:
+    - [published_level]: L1 level at which the slot was published (or [None]).
+    - [slot_index]: Index of the target slot at that level (or [None]).
+    - [page_index]: Index of the target page within the slot (or [None]).
+    - [page_payload_strategy]: How the faulty/losing node derives the payload
+      from the honest page:
+        - [`Alter]: Mutate the bytes of an existing [Some payload].
+                    No effect if the honest payload is [None].
+        - [`Flip]: Toggle presence: [None] -> [Some bytes],
+                   [Some _] -> [None]. *)
+type dal_page = {
+  published_level : int32 option;
+  slot_index : int option;
+  page_index : int option;
+  page_payload_strategy : [`Alter | `Flip];
+}
+
 val encoding : t Data_encoding.t
 
 (** [no_failures] are planned. *)
@@ -44,3 +76,26 @@ val make : string -> t option
    [message_index] and for all [message_ticks]. Ticks are sorted by
    increasing order. *)
 val is_failure : t -> level:int -> message_index:int -> int64 list
+
+val is_invalid_dal_parameters : t -> dal_parameters option
+
+(** Decide whether to corrupt a DAL page and, if so, how.
+
+    Given the current [published_level], [slot_index], [page_index], [page_size],
+    the honest page payload ([honest_payload]), and a failure plan [t], this
+    function checks whether an [Invalid_dal_page] rule matches (wildcards allowed
+    via [None] in the rule). If no rule applies, returns [Either.left ()].
+
+    If a rule applies, returns [Either.right forged]:
+    - [forged = None]    -> payload is removed (flip from [Some _] to [None]).
+    - [forged = Some bs] -> payload is replaced with [bs].
+
+    See {!dal_page} above for forge strategies. *)
+val is_invalid_dal_page :
+  published_level:int32 ->
+  slot_index:int ->
+  page_index:int ->
+  page_size:int ->
+  honest_payload:bytes option ->
+  t ->
+  (unit, bytes option) Either.t

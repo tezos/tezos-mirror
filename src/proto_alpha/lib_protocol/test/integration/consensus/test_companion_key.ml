@@ -70,24 +70,25 @@ type key_kind = Protocol.Operation_repr.consensus_key_kind =
 
 let check_error_invalid_consensus_key_update_active ~loc ~pkh ~kind errs =
   Assert.expect_error ~loc errs (function
-      | [
-          Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
-            (err_pkh, err_kind);
-        ]
-        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
-          true
-      | _ -> false)
+    | [
+        Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
+          (err_pkh, err_kind);
+      ]
+      when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
+        true
+    | _ -> false)
 
 let check_error_invalid_consensus_key_update_another_delegate ~loc ~pkh ~kind
     errs =
   Assert.expect_error ~loc errs (function
-      | [
-          Protocol.Delegate_consensus_key
-          .Invalid_consensus_key_update_another_delegate (err_pkh, err_kind);
-        ]
-        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
-          true
-      | _ -> false)
+    | [
+        Protocol.Delegate_consensus_key
+        .Invalid_consensus_key_update_another_delegate
+          (err_pkh, err_kind);
+      ]
+      when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
+        true
+    | _ -> false)
 
 let check_ck_status ~loc ~ck ~registered_for (status : key_status)
     (kind : key_kind) : (t, t) scenarios =
@@ -207,6 +208,30 @@ let update_key ?proof_signer ?force_no_signer ~kind ~ck_name src =
   | Companion ->
       update_companion_key ?proof_signer ?force_no_signer ~ck_name src
 
+let test_init_with_cks_for_bootstraps =
+  let check_finalized_every_block = [(fun _ -> check_all_cks)] in
+  init_constants ()
+  --> begin_test
+        ~check_finalized_every_block
+        ~force_attest_all:true
+        ~bootstrap_info_list:
+          [
+            make "no_ck";
+            make "with_consensus_key" ~consensus_key:(Some Any_algo);
+            make "with_companion_key" ~companion_key:true;
+            make "with_both_tz4" ~consensus_key:(Some Bls) ~companion_key:true;
+          ]
+        []
+  --> exec_unit check_all_cks
+  (* Bake a bit, check at each block *)
+  --> next_block
+  --> next_block
+  (* With some DAL, to test the companion key *)
+  --> exec_state (fun (_block, state) ->
+          Lwt_result.return {state with State.force_attest_all = false})
+  --> attest_aggreg_with ~delegates_with_dal:[("with_both_tz4", Z.of_int 7)] []
+  --> next_block
+
 let test_simple_register_consensus_and_companion_keys =
   let bootstrap_accounts = ["bootstrap1"; "bootstrap2"] in
   let delegate = "delegate" in
@@ -214,20 +239,20 @@ let test_simple_register_consensus_and_companion_keys =
   let consensus_rights_delay =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> (Tag "is bootstrap"
        --> begin_test
              ~force_attest_all:true
-             ~check_finalized_block_perm
+             ~check_finalized_every_block
              (delegate :: bootstrap_accounts)
       |+ Tag "is created"
          --> begin_test
                ~force_attest_all:true
-               ~check_finalized_block_perm
-               ~algo:Bls
+               ~check_finalized_every_block
+               ~default_algo:Bls
                bootstrap_accounts
          --> add_account_with_funds
                delegate
@@ -328,8 +353,8 @@ let test_register_other_accounts_as_ck =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
-        ~check_finalized_block_perm:[(fun _ -> check_all_cks)]
+        ~default_algo:Bls
+        ~check_finalized_every_block:[(fun _ -> check_all_cks)]
         ~force_attest_all:true
         ["delegate"; "victim_1"; "victim_2"]
   (* Both victims start with themselves as their own consensus_keys *)
@@ -386,14 +411,14 @@ let test_self_register_as_companion =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   (* As expected, a delegate cannot register itself as a companion,
      if it is already itself its own consensus key *)
@@ -530,7 +555,7 @@ let test_register_same_key_multiple_times =
   in
   let delegate = "delegate" in
   let ck = "ck" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   let update_either_ck ~ck_name delegate =
     Tag "consensus" --> update_consensus_key ~ck_name delegate
     |+ Tag "companion" --> update_companion_key ~ck_name delegate
@@ -544,15 +569,15 @@ let test_register_same_key_multiple_times =
         let cycle, ck_pkh = Account_helpers.latest_consensus_key delegate in
         if Signature.Public_key_hash.equal ck_pkh ck.pkh then
           Assert.expect_error ~loc:__LOC__ err (function
-              | [
-                  Protocol.Delegate_consensus_key
-                  .Invalid_consensus_key_update_noop (err_cycle, err_kind);
-                ] ->
-                  Int32.equal
-                    (Protocol.Cycle_repr.to_int32 err_cycle)
-                    (State_account.Cycle.to_int32 cycle)
-                  && err_kind = Consensus
-              | _ -> false)
+            | [
+                Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
+                  (err_cycle, err_kind);
+              ] ->
+                Int32.equal
+                  (Protocol.Cycle_repr.to_int32 err_cycle)
+                  (State_account.Cycle.to_int32 cycle)
+                && err_kind = Consensus
+            | _ -> false)
         else
           check_error_invalid_consensus_key_update_active
             ~loc:__LOC__
@@ -573,15 +598,16 @@ let test_register_same_key_multiple_times =
                 ck_pkh
             then
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Delegate_consensus_key
-                      .Invalid_consensus_key_update_noop (err_cycle, err_kind);
-                    ] ->
-                      Int32.equal
-                        (Protocol.Cycle_repr.to_int32 err_cycle)
-                        (State_account.Cycle.to_int32 cycle)
-                      && err_kind = Companion
-                  | _ -> false)
+                | [
+                    Protocol.Delegate_consensus_key
+                    .Invalid_consensus_key_update_noop
+                      (err_cycle, err_kind);
+                  ] ->
+                    Int32.equal
+                      (Protocol.Cycle_repr.to_int32 err_cycle)
+                      (State_account.Cycle.to_int32 cycle)
+                    && err_kind = Companion
+                | _ -> false)
             else
               check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
@@ -594,9 +620,9 @@ let test_register_same_key_multiple_times =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   --> add_account ~algo:Bls ck
   --> update_either_ck ~ck_name:ck delegate
@@ -617,7 +643,7 @@ let test_register_new_key_every_cycle =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   let update_both_cks delegate =
     add_account "consensus_key"
     --> update_consensus_key ~ck_name:"consensus_key" delegate
@@ -628,9 +654,9 @@ let test_register_new_key_every_cycle =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   --> loop (consensus_rights_delay + 2) (update_both_cks delegate --> next_cycle)
 
@@ -639,14 +665,14 @@ let test_register_key_end_of_cycle =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   --> add_account ~algo:Bls "ck"
   --> exec bake_until_next_cycle_end_but_one
@@ -665,13 +691,13 @@ let test_register_key_end_of_cycle =
 
 let test_registration_override =
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   --> add_account ~algo:Bls "ck1"
   --> add_account ~algo:Bls "ck2"
@@ -725,7 +751,7 @@ let test_in_registration_table_twice =
      This ensures that a key can be pending for two different cycles at the same time. *)
   let consensus_rights_delay = 4 in
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   let check_is_pending_twice ~loc ~ck ~registered_for kind =
     let open Lwt_result_syntax in
     exec_unit (fun (block, state) ->
@@ -769,9 +795,9 @@ let test_in_registration_table_twice =
   --> set S.cache_stake_distribution_cycles (consensus_rights_delay + 3)
   --> set S.cache_sampler_state_cycles (consensus_rights_delay + 3)
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
-        ~check_finalized_block_perm
+        ~check_finalized_every_block
         [delegate]
   --> add_account ~algo:Bls "ck1"
   --> add_account ~algo:Bls "ck2"
@@ -830,16 +856,13 @@ let test_unregistered =
             ~expected_error:(fun (_block, state) err ->
               let account = State.find_account "account" state in
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Apply
-                      .Update_consensus_key_on_unregistered_delegate
-                        (err_account_pkh, err_kind);
-                    ] ->
-                      Signature.Public_key_hash.equal
-                        err_account_pkh
-                        account.pkh
-                      && err_kind = kind
-                  | _ -> false))
+                | [
+                    Protocol.Apply.Update_consensus_key_on_unregistered_delegate
+                      (err_account_pkh, err_kind);
+                  ] ->
+                    Signature.Public_key_hash.equal err_account_pkh account.pkh
+                    && err_kind = kind
+                | _ -> false))
             (update_key ~kind ~ck_name:"ck" "account"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
@@ -858,15 +881,16 @@ let test_forbidden_tz4 =
               let ck = State.find_account "ck" state in
               let* ck_account = Account.find ck.pkh in
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Delegate_consensus_key
-                      .Invalid_consensus_key_update_tz4 (err_ck_bls_pk, err_kind);
-                    ] ->
-                      kind = err_kind
-                      && Signature.Public_key.equal
-                           (Bls err_ck_bls_pk)
-                           ck_account.pk
-                  | _ -> false))
+                | [
+                    Protocol.Delegate_consensus_key
+                    .Invalid_consensus_key_update_tz4
+                      (err_ck_bls_pk, err_kind);
+                  ] ->
+                    kind = err_kind
+                    && Signature.Public_key.equal
+                         (Bls err_ck_bls_pk)
+                         ck_account.pk
+                | _ -> false))
             (update_key ~kind ~ck_name:"ck" "delegate"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
@@ -875,7 +899,7 @@ let test_fail_noop =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
   let delegate = "delegate" in
-  let check_finalized_block_perm = [(fun _ -> check_cks delegate)] in
+  let check_finalized_every_block = [(fun _ -> check_cks delegate)] in
   let assert_fail_with_invalid_consensus_key_update_noop kind =
     assert_failure ~loc:__LOC__ ~expected_error:(fun (_block, state) err ->
         let delegate = State.find_account delegate state in
@@ -885,20 +909,20 @@ let test_fail_noop =
           | Companion -> Account_helpers.latest_companion_key delegate |> fst
         in
         Assert.expect_error ~loc:__LOC__ err (function
-            | [
-                Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
-                  (err_cycle, err_kind);
-              ] ->
-                Int32.equal
-                  (Protocol.Cycle_repr.to_int32 err_cycle)
-                  (State_account.Cycle.to_int32 cycle)
-                && err_kind = kind
-            | _ -> false))
+          | [
+              Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
+                (err_cycle, err_kind);
+            ] ->
+              Int32.equal
+                (Protocol.Cycle_repr.to_int32 err_cycle)
+                (State_account.Cycle.to_int32 cycle)
+              && err_kind = kind
+          | _ -> false))
   in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
-  --> begin_test ~force_attest_all:true ~check_finalized_block_perm [delegate]
+  --> begin_test ~force_attest_all:true ~check_finalized_every_block [delegate]
   --> add_account ~algo:Bls "ck"
   --> fold_tag
         (fun kind ->
@@ -932,7 +956,7 @@ let test_fail_already_registered =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "ck"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "ck"]
   --> fold_tag
         (fun kind ->
           assert_failure
@@ -977,7 +1001,7 @@ let test_fail_wrong_signer =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "signer"]
   --> add_account ~algo:Bls "ck"
   --> fold_tag
         (fun kind ->
@@ -1000,7 +1024,7 @@ let test_fail_companion_not_tz4 =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "signer"]
   --> fold_tag
         (fun algo -> add_account ~algo "ck")
         [("Ed25519", Ed25519); ("Secp256k1", Secp256k1); ("P256", P256)]
@@ -1012,13 +1036,13 @@ let test_fail_companion_not_tz4 =
           let ck = State.find_account "ck" state in
           let* ck_account = Account.find ck.pkh in
           Assert.expect_error ~loc:__LOC__ err (function
-              | [
-                  Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
-                    {source = err_source; public_key = err_pk};
-                ] ->
-                  Signature.Public_key_hash.equal err_source delegate.pkh
-                  && Signature.Public_key.equal err_pk ck_account.pk
-              | _ -> false))
+            | [
+                Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
+                  {source = err_source; public_key = err_pk};
+              ] ->
+                Signature.Public_key_hash.equal err_source delegate.pkh
+                && Signature.Public_key.equal err_pk ck_account.pk
+            | _ -> false))
         (update_key ~kind:Companion ~ck_name:"ck" delegate)
 
 let test_batch =
@@ -1040,6 +1064,8 @@ let test_batch =
 let tests =
   tests_of_scenarios
   @@ [
+       ( "Test bootstrap accounts with initial consensus and companion keys",
+         test_init_with_cks_for_bootstraps );
        ( "Simple update ck for delegate",
          test_simple_register_consensus_and_companion_keys );
        ("Register other accounts as ck", test_register_other_accounts_as_ck);

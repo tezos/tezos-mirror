@@ -91,11 +91,14 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_monitor_finalized : bool;
   l1_rpc_timeout : float;
   loop_retry_delay : float;
+  dal_slot_status_max_fetch_attempts : int;
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
@@ -246,6 +249,10 @@ let default_l2_blocks_cache_size = 64
 
 let default_l1_rpc_timeout = 60. (* seconds *)
 
+let default_dal_slot_status_max_fetch_attempts = 15 (* 15 * 1 sec*)
+
+let default_l1_monitor_finalized = false
+
 let default_loop_retry_delay = 10. (* seconds *)
 
 let default_gc_parameters =
@@ -354,9 +361,11 @@ let batcher_encoding =
            min_batch_size;
            max_batch_elements;
            max_batch_size;
-         } ->
+         }
+       ->
       (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size))
-    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size) ->
+    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size)
+       ->
       let open Result_syntax in
       let error_when c s = if c then Error s else return_unit in
       let* () =
@@ -531,11 +540,13 @@ let encoding default_display : t Data_encoding.t =
            l1_blocks_cache_size;
            l2_blocks_cache_size;
            prefetch_blocks;
+           l1_monitor_finalized;
            l1_rpc_timeout;
            loop_retry_delay;
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
+           log_kernel_debug_file;
            unsafe_disable_wasm_kernel_checks;
            no_degraded;
            gc_parameters;
@@ -543,7 +554,9 @@ let encoding default_display : t Data_encoding.t =
            cors;
            bail_on_disagree;
            opentelemetry;
-         } ->
+           dal_slot_status_max_fetch_attempts;
+         }
+       ->
       ( ( ( sc_rollup_address,
             Some etherlink,
             boot_sector_file,
@@ -566,19 +579,22 @@ let encoding default_display : t Data_encoding.t =
             injector,
             l1_blocks_cache_size,
             l2_blocks_cache_size,
-            prefetch_blocks ),
+            prefetch_blocks,
+            l1_monitor_finalized ),
           ( ( l1_rpc_timeout,
               loop_retry_delay,
               index_buffer_size,
               irmin_cache_size,
               log_kernel_debug,
+              log_kernel_debug_file,
               unsafe_disable_wasm_kernel_checks ),
             ( no_degraded,
               gc_parameters,
               history_mode,
               cors,
               bail_on_disagree,
-              opentelemetry ) ) ) ))
+              opentelemetry,
+              dal_slot_status_max_fetch_attempts ) ) ) ))
     (fun ( ( ( sc_rollup_address,
                etherlink,
                boot_sector_file,
@@ -601,19 +617,23 @@ let encoding default_display : t Data_encoding.t =
                injector,
                l1_blocks_cache_size,
                l2_blocks_cache_size,
-               prefetch_blocks ),
+               prefetch_blocks,
+               l1_monitor_finalized ),
              ( ( l1_rpc_timeout,
                  loop_retry_delay,
                  index_buffer_size,
                  irmin_cache_size,
                  log_kernel_debug,
+                 log_kernel_debug_file,
                  unsafe_disable_wasm_kernel_checks ),
                ( no_degraded,
                  gc_parameters,
                  history_mode,
                  cors,
                  bail_on_disagree,
-                 opentelemetry ) ) ) ) ->
+                 opentelemetry,
+                 dal_slot_status_max_fetch_attempts ) ) ) )
+       ->
       {
         sc_rollup_address;
         etherlink =
@@ -641,11 +661,13 @@ let encoding default_display : t Data_encoding.t =
         l1_blocks_cache_size;
         l2_blocks_cache_size;
         prefetch_blocks;
+        l1_monitor_finalized;
         l1_rpc_timeout;
         loop_retry_delay;
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters;
@@ -653,6 +675,7 @@ let encoding default_display : t Data_encoding.t =
         cors;
         bail_on_disagree;
         opentelemetry;
+        dal_slot_status_max_fetch_attempts;
       })
     (merge_objs
        (merge_objs
@@ -732,16 +755,17 @@ let encoding default_display : t Data_encoding.t =
                 execute_outbox_messages_filter_encoding
                 default_execute_outbox_filter)))
        (merge_objs
-          (obj7
+          (obj8
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
              (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
-             (opt "prefetch_blocks" int31))
+             (opt "prefetch_blocks" int31)
+             (dft "l1_monitor_finalized" bool default_l1_monitor_finalized))
           (merge_objs
-             (obj6
+             (obj7
                 (dft
                    "l1_rpc_timeout"
                    Data_encoding.float
@@ -753,11 +777,12 @@ let encoding default_display : t Data_encoding.t =
                 (opt "index_buffer_size" int31 ~description:"Deprecated")
                 (opt "irmin_cache_size" int31)
                 (dft "log-kernel-debug" Data_encoding.bool false)
+                (opt "log-kernel-debug-file" Data_encoding.string)
                 (dft
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj6
+             (obj7
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
                    "gc-parameters"
@@ -770,7 +795,11 @@ let encoding default_display : t Data_encoding.t =
                    "opentelemetry"
                    ~description:"Enable or disable opentelemetry profiling"
                    Octez_telemetry.Opentelemetry_config.encoding
-                   Octez_telemetry.Opentelemetry_config.default)))))
+                   Octez_telemetry.Opentelemetry_config.default)
+                (dft
+                   "dal_slot_status_max_fetch_attempts"
+                   Data_encoding.uint8
+                   default_dal_slot_status_max_fetch_attempts)))))
 
 let encoding_no_default = encoding `Show
 
@@ -884,10 +913,10 @@ module Cli = struct
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -938,11 +967,16 @@ module Cli = struct
         l1_blocks_cache_size = default_l1_blocks_cache_size;
         l2_blocks_cache_size = default_l2_blocks_cache_size;
         prefetch_blocks = None;
+        l1_monitor_finalized =
+          Option.value
+            l1_monitor_finalized
+            ~default:default_l1_monitor_finalized;
         l1_rpc_timeout = default_l1_rpc_timeout;
         loop_retry_delay = default_loop_retry_delay;
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters =
@@ -962,6 +996,8 @@ module Cli = struct
           | None -> Octez_telemetry.Opentelemetry_config.default
           | Some enable ->
               {Octez_telemetry.Opentelemetry_config.default with enable});
+        dal_slot_status_max_fetch_attempts =
+          default_dal_slot_status_max_fetch_attempts;
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
@@ -969,10 +1005,10 @@ module Cli = struct
       ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
+      ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1044,6 +1080,10 @@ module Cli = struct
         irmin_cache_size =
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
+        log_kernel_debug_file =
+          Option.either
+            log_kernel_debug_file
+            configuration.log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks =
           unsafe_disable_wasm_kernel_checks
           || configuration.unsafe_disable_wasm_kernel_checks;
@@ -1075,6 +1115,10 @@ module Cli = struct
           (match profiling with
           | None -> configuration.opentelemetry
           | Some enable -> {configuration.opentelemetry with enable});
+        l1_monitor_finalized =
+          Option.value
+            l1_monitor_finalized
+            ~default:configuration.l1_monitor_finalized;
       }
 
   let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
@@ -1082,10 +1126,10 @@ module Cli = struct
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1114,6 +1158,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -1124,6 +1169,7 @@ module Cli = struct
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       return configuration
     else
@@ -1167,6 +1213,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -1177,6 +1224,7 @@ module Cli = struct
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       return config
 end

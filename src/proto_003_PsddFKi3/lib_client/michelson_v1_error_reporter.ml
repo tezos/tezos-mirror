@@ -187,8 +187,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           "@[<hov 0>@[<hov 2>Ill typed %adata:@ %a@]@ @[<hov 2>is not an \
            expression of type@ %a@]@]"
           (fun ppf -> function
-            | None -> ()
-            | Some s -> Format.fprintf ppf "%s " s)
+            | None -> () | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source
           (parsed, hilights)

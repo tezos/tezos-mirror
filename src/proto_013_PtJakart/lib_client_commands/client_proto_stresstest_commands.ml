@@ -247,23 +247,24 @@ let normalize_source cctxt =
     let warning msg alias =
       cctxt#warning msg alias >>= fun () -> Lwt.return_none
     in
-    (Client_keys_v0.alias_keys cctxt alias >>= function
-     | Error _ | Ok None -> warning "Alias \"%s\" not found in the wallet" alias
-     | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
-         warning
-           "Alias \"%s\" does not contain public or secret key and could not \
-            be used for stresstest"
-           alias
-     | Ok (Some (pkh, Some pk, Some sk_uri)) -> (
-         sk_of_sk_uri sk_uri >>= function
-         | None ->
-             warning
-               "Cannot extract the secret key form the alias \"%s\" of the \
-                wallet"
-               alias
-         | Some sk ->
-             Lwt.return_some
-               {source = {pkh; pk; sk}; origin = Wallet_alias alias}))
+    ( Client_keys_v0.alias_keys cctxt alias >>= function
+      | Error _ | Ok None ->
+          warning "Alias \"%s\" not found in the wallet" alias
+      | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
+          warning
+            "Alias \"%s\" does not contain public or secret key and could not \
+             be used for stresstest"
+            alias
+      | Ok (Some (pkh, Some pk, Some sk_uri)) -> (
+          sk_of_sk_uri sk_uri >>= function
+          | None ->
+              warning
+                "Cannot extract the secret key form the alias \"%s\" of the \
+                 wallet"
+                alias
+          | Some sk ->
+              Lwt.return_some
+                {source = {pkh; pk; sk}; origin = Wallet_alias alias}) )
     >>= function
     | None -> warning "Source given as alias \"%s\" ignored" alias
     | key -> Lwt.return key
@@ -273,20 +274,20 @@ let normalize_source cctxt =
       cctxt#warning msg Tezos_crypto.Signature.V0.Public_key_hash.pp pkh
       >>= fun () -> Lwt.return_none
     in
-    (Client_keys_v0.get_key cctxt pkh >>= function
-     | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
-     | Ok (alias, pk, sk_uri) -> (
-         sk_of_sk_uri sk_uri >>= function
-         | None ->
-             cctxt#warning
-               "Cannot extract the secret key form the pkh \"%a\" (alias: \
-                \"%s\") of the wallet"
-               Tezos_crypto.Signature.V0.Public_key_hash.pp
-               pkh
-               alias
-             >>= fun () -> Lwt.return_none
-         | Some sk ->
-             Lwt.return_some {source = {pkh; pk; sk}; origin = Wallet_pkh}))
+    ( Client_keys_v0.get_key cctxt pkh >>= function
+      | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
+      | Ok (alias, pk, sk_uri) -> (
+          sk_of_sk_uri sk_uri >>= function
+          | None ->
+              cctxt#warning
+                "Cannot extract the secret key form the pkh \"%a\" (alias: \
+                 \"%s\") of the wallet"
+                Tezos_crypto.Signature.V0.Public_key_hash.pp
+                pkh
+                alias
+              >>= fun () -> Lwt.return_none
+          | Some sk ->
+              Lwt.return_some {source = {pkh; pk; sk}; origin = Wallet_pkh}) )
     >>= function
     | None -> warning "Source given as pkh \"%a\" ignored" pkh
     | key -> Lwt.return key
@@ -1083,7 +1084,8 @@ let generate_random_transactions =
            verbose_flag,
            debug_flag )
          sources_json
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       verbose := verbose_flag ;
       debug := debug_flag ;
       Smart_contracts.init
@@ -1251,7 +1253,7 @@ let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
           match operation_result with
           | Applied
               (Transaction_result
-                (Transaction_to_contract_result {consumed_gas; _})) ->
+                 (Transaction_to_contract_result {consumed_gas; _})) ->
               return (Gas.Arith.ceil consumed_gas)
           | _ ->
               (match operation_result with

@@ -135,7 +135,9 @@ module Answer = struct
         Name.t ->
         Types.parameters ->
         (Types.state, launch_error) result Lwt.t =
-     fun self _name {my_peer_id; discovery_port; trust_discovered_peers; pool} ->
+     fun self
+         _name
+         {my_peer_id; discovery_port; trust_discovered_peers; pool} ->
       let open Lwt_result_syntax in
       let* socket =
         protect (fun () ->
@@ -144,8 +146,7 @@ module Answer = struct
       Lwt.return_ok
         {my_peer_id; discovery_port; trust_discovered_peers; pool; socket}
 
-    let on_request :
-        type response error.
+    let on_request : type response error.
         self ->
         (response, error) P2p_workers.Loop_request.t ->
         (response, error) result Lwt.t =
@@ -155,8 +156,7 @@ module Answer = struct
 
     let on_close _self = Lwt.return_unit
 
-    let on_error :
-        type response error.
+    let on_error : type response error.
         self ->
         _ ->
         (response, error) P2p_workers.Loop_request.t ->
@@ -319,8 +319,7 @@ module Sender = struct
           pool;
         }
 
-    let on_request :
-        type response error.
+    let on_request : type response error.
         self -> (response, error) Request.t -> (response, error) result Lwt.t =
      fun self Loop -> loop self
 
@@ -328,8 +327,7 @@ module Sender = struct
 
     let on_close _self = Lwt.return_unit
 
-    let on_error :
-        type response error.
+    let on_error : type response error.
         self ->
         _ ->
         (response, error) Request.t ->
@@ -340,9 +338,8 @@ module Sender = struct
       let*! () = loop_error error in
       return `Shutdown
 
-    let on_completion :
-        type resp err. self -> (resp, err) Request.t -> resp -> _ -> unit Lwt.t
-        =
+    let on_completion : type resp err.
+        self -> (resp, err) Request.t -> resp -> _ -> unit Lwt.t =
      fun self Loop config _status -> loop_completion config (Worker.state self)
   end
 

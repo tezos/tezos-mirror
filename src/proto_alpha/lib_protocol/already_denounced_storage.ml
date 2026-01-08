@@ -21,12 +21,13 @@ let already_denounced_aux ctxt delegate (level : Level_repr.t) round kind =
   | Some denounced, Double_attesting -> return denounced.for_double_attesting
   | Some denounced, Double_baking -> return denounced.for_double_baking
 
-let already_denounced ctxt delegate level round kind =
+let already_denounced ctxt delegate {Misbehaviour_repr.level; round; kind} =
   let open Lwt_result_syntax in
+  let level = Level_storage.from_raw ctxt level in
   let* answer = already_denounced_aux ctxt delegate level round kind in
   if answer || Round_repr.(round = zero) then return answer
   else
-    let* first_level = Storage.Tenderbake.First_level_of_protocol.get ctxt in
+    let* first_level = Storage.Protocol_activation_level.get ctxt in
     if Raw_level_repr.(level.level >= first_level) then return answer
     else
       (* Exception related to the migration from Oxford to P: because
@@ -48,8 +49,9 @@ let already_denounced ctxt delegate level round kind =
          protocol Q. *)
       already_denounced_aux ctxt delegate level Round_repr.zero kind
 
-let add_denunciation ctxt delegate (level : Level_repr.t) round kind =
+let add_denunciation ctxt delegate {Misbehaviour_repr.level; round; kind} =
   let open Lwt_result_syntax in
+  let level = Level_storage.from_raw ctxt level in
   let* denounced_opt =
     Storage.Already_denounced.find
       (ctxt, level.cycle)

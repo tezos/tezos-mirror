@@ -158,8 +158,8 @@ let check_successor_period ?level client expected_period =
 
 let level_type : RPC.level Check.typ =
   Check.convert
-    (fun RPC.{level; level_position; cycle; cycle_position; expected_commitment} ->
-      (level, level_position, cycle, cycle_position, expected_commitment))
+    (fun RPC.{level; level_position; cycle; cycle_position; expected_commitment}
+       -> (level, level_position, cycle, cycle_position, expected_commitment))
     Check.(tuple5 int int int int bool)
 
 let get_current_level client =
@@ -180,10 +180,10 @@ let get_proposals ?level client =
   in
   JSON.as_list proposals |> List.map JSON.as_list
   |> List.map (function
-         | [hash; _] -> JSON.as_string hash
-         | _ ->
-             Test.fail
-               "invalid proposal in JSON response: expected a list with 2 items")
+       | [hash; _] -> JSON.as_string hash
+       | _ ->
+           Test.fail
+             "invalid proposal in JSON response: expected a list with 2 items")
   |> return
 
 let get_current_proposal ?level client =

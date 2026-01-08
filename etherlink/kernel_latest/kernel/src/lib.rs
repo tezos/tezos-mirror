@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -21,14 +21,16 @@ use inbox::StageOneStatus;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
+use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
 use storage::{
-    is_revm_enabled, read_chain_id, read_da_fee, read_kernel_version,
-    read_minimum_base_fee_per_gas, read_tracer_input, store_chain_id, store_da_fee,
-    store_kernel_version, store_minimum_base_fee_per_gas, store_storage_version,
-    STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
+    read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
+    store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
+    STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
@@ -37,6 +39,7 @@ use tezos_smart_rollup::outbox::{
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_tracing::trace_kernel;
 
 mod apply;
 mod block;
@@ -66,6 +69,7 @@ mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
 mod storage;
+mod sub_block;
 mod tick_model;
 mod transaction;
 mod upgrade;
@@ -94,6 +98,7 @@ fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
     }
 }
 
+#[trace_kernel]
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
@@ -104,6 +109,7 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 // DO NOT RENAME: function name is used during benchmark
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
+#[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
@@ -240,7 +246,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             return Ok(());
         }
         Ok(MigrationStatus::Done) => {
-            // If a migrtion was finished, we update the kernel version
+            // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
             host.mark_for_reboot()?;
@@ -282,16 +288,8 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
-    if is_revm_enabled(host)? {
-        let mut world_state_handler =
-            revm_etherlink::world_state_handler::new_world_state_handler()
-                .map_err(|_| Error::RevmPrecompileInitError)?;
-        revm_etherlink::precompile_init::init_precompile_bytecodes(
-            host,
-            &mut world_state_handler,
-        )
-        .map_err(|_| Error::RevmPrecompileInitError)?;
-    }
+    // Initialize custom precompile
+    init_precompile_bytecodes(host).map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
@@ -349,20 +347,22 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+// `kernel_loop` shouldn't be called in tests, as it won't use `MockInternal` for the
+// internal runtime. Use `kernel` instead.
 #[entrypoint::main]
 pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
-    // In order to setup the temporary directory, we need to move something
-    // from /evm to /tmp, so /evm must be non empty, this only happen
-    // at the first run.
+    kernel(
+        host,
+        tezos_evm_runtime::internal_runtime::WasmInternalHost(),
+    )
+}
 
-    // The kernel host is initialized as soon as possible. `kernel_loop`
-    // shouldn't be called in tests as it won't use `MockInternal` for the
-    // internal runtime.
-    let mut host: KernelHost<
-        Host,
-        &mut Host,
-        tezos_evm_runtime::internal_runtime::InternalHost,
-    > = KernelHost::init(host);
+pub fn kernel<Host, I>(host: &mut Host, internal: I)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+    I: InternalRuntime,
+{
+    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
 
     let reboot_counter = host
         .host
@@ -380,6 +380,9 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
         .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
+    // In order to setup the temporary directory, we need to move something
+    // from /evm to /tmp, so /evm must be non empty, this only happen
+    // at the first run.
     if world_state_subkeys == 0 {
         host.host
             .store_write(
@@ -420,7 +423,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     match run(&mut host) {
         Ok(()) => (),
         Err(err) => {
-            log!(&mut host, Fatal, "The kernel produced an error: {:?}", err);
+            log!(&host, Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }
@@ -429,25 +432,25 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
 mod tests {
     use std::str::FromStr;
 
+    use crate::block_storage::internal_for_tests::read_transaction_receipt_status;
     use crate::fees;
     use crate::parsing::RollupType;
     use crate::run;
-    use crate::storage::{
-        read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
-    };
-    use evm_execution::account_storage::{self, EthereumAccountStorage};
-    use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
-    use evm_execution::fa_bridge::test_utils::{
-        convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
-        ticket_id, SolCall,
-    };
-    use evm_execution::handler::RouterInterface;
-    use evm_execution::precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS;
-    use evm_execution::utilities::{bigint_to_u256, keccak256_hash};
-    use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
+    use crate::storage::{store_chain_id, ENABLE_FA_BRIDGE};
+    use alloy_primitives::keccak256;
+    use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
+    use revm_etherlink::helpers::legacy::{
+        alloy_to_h160, h160_to_alloy, h256_to_alloy, ticket_hash, u256_to_alloy,
+        FaDeposit,
+    };
+    use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
+    use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
+    use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
     use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::TransactionStatus;
@@ -456,13 +459,15 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use alloy_sol_types::SolCall;
     use tezos_evm_runtime::runtime::Runtime;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
         MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonOption, MichelsonPair,
     };
     use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
-    use tezos_smart_rollup::types::{Contract, Entrypoint};
+    use tezos_smart_rollup::types::Entrypoint;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::RefPath;
@@ -471,26 +476,37 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
-    fn set_balance<Host: Runtime>(
-        host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
-        address: &H160,
-        balance: U256,
-    ) {
-        let mut account = evm_account_storage
-            .get_or_create(host, &account_storage::account_path(address).unwrap())
-            .unwrap();
-        let current_balance = account.balance(host).unwrap();
-        if current_balance > balance {
-            account
-                .balance_remove(host, current_balance - balance)
-                .unwrap();
-        } else {
-            account
-                .balance_add(host, balance - current_balance)
-                .unwrap();
-        }
+    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
+        let mut info = account.info(host).unwrap();
+        info.balance = u256_to_alloy(&balance);
+        account.set_info(host, info).unwrap();
     }
+
+    /// Create ticket with dummy creator and content
+    pub fn dummy_ticket() -> FA2_1Ticket {
+        use tezos_crypto_rs::hash::HashTrait;
+
+        let ticketer = ContractKt1Hash::try_from_bytes(&[1u8; 20]).unwrap();
+        FA2_1Ticket::new(
+            Contract::from_b58check(&ticketer.to_base58_check()).unwrap(),
+            MichelsonPair(0.into(), MichelsonOption(None)),
+            1i32,
+        )
+        .expect("Failed to construct ticket")
+    }
+
+    /// Return ticket creator and content in forged form
+    pub fn ticket_id(ticket: &FA2_1Ticket) -> ([u8; 22], Vec<u8>) {
+        let mut ticketer = Vec::new();
+        ticket.creator().0.bin_write(&mut ticketer).unwrap();
+
+        let mut content = Vec::new();
+        ticket.contents().bin_write(&mut content).unwrap();
+
+        (ticketer.try_into().unwrap(), content)
+    }
+    sol!(kernel_wrapper, "../revm/contracts/abi/fa_bridge.abi");
 
     #[test]
     fn load_block_fees_new() {
@@ -550,13 +566,7 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
-        set_balance(
-            &mut host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
         let data = hex::decode(
@@ -583,6 +593,7 @@ mod tests {
             data,
             vec![],
             None,
+            None,
         );
 
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
@@ -594,12 +605,12 @@ mod tests {
             .unwrap()
             .to_bytes();
 
-        let tx_hash = keccak256_hash(&tx_payload);
+        let tx_hash = keccak256(&tx_payload);
 
         // encode as external message and submit to inbox
         let mut contents = Vec::new();
         contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(tx_hash.as_slice());
         contents.extend_from_slice(&tx_payload);
 
         let message = ExternalMessageFrame::Targetted {
@@ -751,9 +762,7 @@ mod tests {
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            mock_host
-                .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
-                .unwrap();
+            mock_host.store_write(&ENABLE_FA_BRIDGE, &[1u8], 0).unwrap();
         }
 
         // run level in order to initialize outbox counter (by SOL message)
@@ -762,36 +771,41 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
-        set_balance(
-            &mut mock_host,
-            &mut evm_account_storage,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut mock_host, &sender, sender_initial_balance);
 
         // construct ticket
         let ticket = dummy_ticket();
-        let ticket_hash = ticket_hash(&ticket).unwrap();
-        let amount = bigint_to_u256(ticket.amount()).unwrap();
+        let ticket_hash = h256_to_alloy(&ticket_hash(&ticket).unwrap());
+        let (_, bytes) = ticket.amount().to_bytes_le();
+        let amount = U256::from_little_endian(&bytes);
+
+        let mut system = StorageAccount::from_address(&SYSTEM_SOL_ADDR).unwrap();
 
         // patch ticket table
-        ticket_balance_add(
-            &mut mock_host,
-            &mut evm_account_storage,
-            &ticket_hash,
-            &sender,
-            amount,
-        );
+        let ticket_balance = system
+            .read_ticket_balance(
+                &mock_host,
+                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                &h160_to_alloy(&sender),
+            )
+            .unwrap();
+        system
+            .write_ticket_balance(
+                &mut mock_host,
+                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                &h160_to_alloy(&sender),
+                ticket_balance + u256_to_alloy(&amount),
+            )
+            .unwrap();
 
         // construct withdraw calldata
         let (ticketer, content) = ticket_id(&ticket);
         let routing_info = hex::decode("0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000").unwrap();
 
         let data = kernel_wrapper::withdrawCall::new((
-            convert_h160(&sender),
+            h160_to_alloy(&sender),
             routing_info.into(),
-            convert_u256(&amount),
+            u256_to_alloy(&amount),
             ticketer.into(),
             content.into(),
         ))
@@ -799,7 +813,7 @@ mod tests {
 
         // create and sign precompile call
         let gas_price = U256::from(40000000000u64);
-        let to = FA_BRIDGE_PRECOMPILE_ADDRESS;
+        let to = alloy_to_h160(&FA_BRIDGE_SOL_ADDR);
         let tx = EthereumTransactionCommon::new(
             TransactionType::Legacy,
             Some(U256::from(1337)),
@@ -812,6 +826,7 @@ mod tests {
             data,
             vec![],
             None,
+            None,
         );
 
         // corresponding caller's address is 0xaf1276cbb260bb13deddb4209ae99ae6e497f446
@@ -823,12 +838,12 @@ mod tests {
             .unwrap()
             .to_bytes();
 
-        let tx_hash = keccak256_hash(&tx_payload);
+        let tx_hash = keccak256(&tx_payload);
 
         // encode as external message and submit to inbox
         let mut contents = Vec::new();
         contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(tx_hash.as_slice());
         contents.extend_from_slice(&tx_payload);
 
         let message = ExternalMessageFrame::Targetted {
@@ -853,11 +868,5 @@ mod tests {
     fn test_fa_withdrawal_applied_if_feature_enabled() {
         // verify outbox is not empty
         assert_eq!(send_fa_withdrawal(true).len(), 1);
-    }
-
-    #[test]
-    fn test_fa_withdrawal_rejected_if_feature_disabled() {
-        // verify outbox is empty
-        assert!(send_fa_withdrawal(false).is_empty());
     }
 }

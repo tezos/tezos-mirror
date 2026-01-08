@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "evm-execution-ebisu"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+thiserror.workspace = true
+
+num-bigint.workspace = true
+num-traits.workspace = true
+primitive-types.workspace = true
+alloy-sol-types.workspace = true
+alloy-primitives.workspace = true
+
+hex.workspace = true
+rlp.workspace = true
+const-decoder.workspace = true
+
+enum_dispatch.workspace = true
+
+tezos_crypto_rs.workspace = true
+sha2.workspace = true
+sha3.workspace = true
+ripemd.workspace = true
+libsecp256k1.workspace = true
+revm.workspace = true
+revm-etherlink.workspace = true
+
+evm.workspace = true
+aurora-engine-modexp.workspace = true
+bn.workspace = true
+
+tezos_ethereum.workspace = true
+tezos-evm-logging.workspace = true
+tezos-evm-runtime.workspace = true
+tezos-indexable-storage.workspace = true
+tezos-storage.workspace = true
+
+tezos-smart-rollup-core.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos-smart-rollup-storage.workspace = true
+tezos_data_encoding.workspace = true
+
+# Adding these to 'dev_dependencies' causes the rand feature in crypto to be enabled
+# on wasm builds, when building the entire workspace.
+rand = { workspace = true, optional = true }
+proptest = { workspace = true, optional = true }
+
+# Enabled when testing feature is on
+tezos-smart-rollup-mock = { workspace = true, optional = true }
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+tezos-smart-rollup-mock.workspace = true
+
+[features]
+execution-test-utils = []
+default = ["evm_execution"]
+testing = ["rand", "proptest", "dep:tezos-smart-rollup-mock"]
+fa_bridge_testing = ["dep:tezos-smart-rollup-mock"]
+evm_execution = []
+debug = ["tezos-evm-logging/debug"]
+# the `benchmark` and `benchmark-opcodes` feature flags instrument the kernel for profiling
+benchmark = ["tezos-evm-logging/benchmark"]
+benchmark-opcodes = ["benchmark"]
+benchmark-full = ["debug", "benchmark", "benchmark-opcodes"]

@@ -93,8 +93,7 @@ module Processing :
     let open Lwt_result_syntax in
     return String.Map.empty
 
-  let handle_request :
-      type a.
+  let handle_request : type a.
       parameters ->
       state ->
       a request ->

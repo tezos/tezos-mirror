@@ -62,14 +62,23 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
     in
     Protocol.write_parameter_file
       ~base
-      ~bootstrap_accounts:
+      ~overwrite_bootstrap_accounts:
         (* [bootstrap1] will act as the sole baker
            so we include it as [bootstrap_accounts]. *)
-        [(Constant.bootstrap1, None)]
+        (Some [(Constant.bootstrap1, None)])
       ~additional_bootstrap_accounts:
         (* [bootstrap2] will act as the slot producer
            so we provide some tez for posting commitments. *)
-        [(Constant.bootstrap2, Some 1000000, false)]
+        [
+          ( Constant.bootstrap2,
+            Some
+              {
+                Protocol.balance = Some 1000000;
+                consensus_key = None;
+                delegate = None;
+              },
+            false );
+        ]
       parameter_overrides
   in
   (* Start node with the given protocol *)

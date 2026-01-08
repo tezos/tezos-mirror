@@ -47,13 +47,13 @@ val do_not_use__brassaia_dir : string -> string
     `Disk backend between `Shell and `Brassaia. [data_dir] stands for the root
     directory in which the context directory is expected to be find. *)
 val init :
-  kind:[< `Brassaia | `Brassaia_memory | `Disk | `Memory > `Disk `Memory] ->
+  kind:[`Disk | `Memory] ->
   ?patch_context:(t -> (t, tztrace) result Lwt.t) ->
   ?readonly:bool ->
   ?index_log_size:int ->
   data_dir:string ->
   unit ->
-  index Lwt.t
+  index tzresult Lwt.t
 
 val index : t -> index
 
@@ -216,3 +216,9 @@ val integrity_check :
   heads:string list option ->
   index ->
   unit Lwt.t
+
+val is_tezedge : t -> bool
+
+module Upgrade : sig
+  val v_3_3_upgrade : data_dir:string -> unit tzresult Lwt.t
+end

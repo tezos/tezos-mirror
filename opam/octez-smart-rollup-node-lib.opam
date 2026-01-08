@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "tezos-openapi" { = version }
   "octez-node-config" { = version }
   "tezos-dal-node-lib" { = version }
@@ -22,7 +23,7 @@ depends: [
   "opentelemetry-lwt"
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

@@ -27,12 +27,8 @@ let on_new_blueprint (type f)
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
-  let*? (module Tx_container) =
-    let open Result_syntax in
-    match tx_container with
-    | Evm_tx_container m -> return m
-    | Michelson_tx_container _ ->
-        error_with "Observer mode is not supported for Tezlink"
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
   in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
@@ -74,7 +70,16 @@ let on_new_blueprint (type f)
             ~clear_pending_queue_after:false
             ~confirmed_txs
         in
-        return `Continue
+        let*! head = Evm_context.head_info () in
+        let* storage_version = Evm_state.storage_version head.evm_state in
+        let sub_block_latency_disabled =
+          Storage_version.sub_block_latency_entrypoints_disabled
+            ~storage_version
+        in
+        return
+          (`Continue
+             Blueprints_follower.
+               {sbl_callbacks_activated = not sub_block_latency_disabled})
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         (* If we have diverged, but should keep the node alive. This happens
            when the node successfully reset its head. We restart the blueprints
@@ -109,14 +114,34 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
     Evm_context.apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
   else return_unit
 
+let on_next_block_info timestamp number =
+  let open Lwt_result_syntax in
+  let*! () = Events.next_block_timestamp timestamp in
+  let* () = Evm_context.next_block_info timestamp number in
+  return_unit
+
+let on_inclusion (txn : Broadcast.transaction) hash =
+  let open Lwt_result_syntax in
+  Broadcast.notify_inclusion txn hash ;
+  let*! () = Events.inclusion hash in
+  let* opt_receipt = Evm_context.execute_single_transaction txn hash in
+  Option.iter
+    (fun (r : Transaction_receipt.t) ->
+      Broadcast.notify_transaction_result
+        {hash = r.transactionHash; result = Ok r})
+    opt_receipt ;
+  return_unit
+
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
-    finalizer_public_server finalizer_private_server finalizer_rpc_process =
+    finalizer_public_server finalizer_private_server finalizer_rpc_process
+    telemetry_cleanup =
   let open Lwt_syntax in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
   in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
   let* () = finalizer_public_server () in
   let* () = finalizer_private_server () in
@@ -127,74 +152,17 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~keep_alive ~evm_node_endpoint :
-    f Services_backend_sig.tx_container tzresult =
-  let (module Tx_container) =
-    (module struct
-      type address = Ethereum_types.address
-
-      type legacy_transaction_object = Ethereum_types.legacy_transaction_object
-
-      type transaction_object = Transaction_object.t
-
-      let nonce ~next_nonce _address = Lwt_result.return next_nonce
-
-      let add ~next_nonce:_ _tx_object ~raw_tx =
-        Injector.send_raw_transaction
-          ~keep_alive
-          ~base:evm_node_endpoint
-          ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-
-      let find _hash = Lwt_result.return None
-
-      let content () =
-        Lwt_result.return
-          {pending = AddressMap.empty; queued = AddressMap.empty}
-
-      let shutdown () = Lwt_result_syntax.return_unit
-
-      let clear () = Lwt_result_syntax.return_unit
-
-      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
-
-      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-        Lwt_result_syntax.return_unit
-
-      let lock_transactions () = Lwt_result_syntax.return_unit
-
-      let unlock_transactions () = Lwt_result_syntax.return_unit
-
-      let is_locked () = Lwt_result_syntax.return_false
-
-      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-        Lwt_result_syntax.return_unit
-
-      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-          ~initial_validation_state:_ =
-        Lwt_result_syntax.return_nil
-    end : Services_backend_sig.Tx_container
-      with type address = Ethereum_types.address
-       and type legacy_transaction_object =
-         Ethereum_types.legacy_transaction_object
-       and type transaction_object = Transaction_object.t)
-  in
-  let open Result_syntax in
-  match chain_family with
-  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
-  | Michelson ->
-      error_with "Observer.container_forward_tx not implemented for Tezlink"
-
-let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
+let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let open Configuration in
-  let*! () =
+  let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
-      ~data_dir
+      ~data_dir:config.data_dir
       ~service_namespace:"evm_node"
       ~service_name:"observer"
-      config.opentelemetry
+      ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
+      config.opentelemetry.config
   in
   let*? {evm_node_endpoint; rollup_node_tracking} =
     Configuration.observer_config_exn config
@@ -202,131 +170,120 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address
       ~keep_alive:config.keep_alive
-      ~evm_node_endpoint
+      ~timeout:config.rpc_timeout
+      evm_node_endpoint
   in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
+      ~timeout:config.rpc_timeout
       ~evm_node_endpoint
       ()
   in
 
-  let*? snapshot_url =
-    Option.map_e
-      (Snapshots.interpolate_snapshot_provider
-         ~rollup_address:smart_rollup_address
-         ?network
-         (Option.value
-            ~default:Configuration.default_history_mode
-            config.history_mode))
-      init_from_snapshot
-  in
-
-  let* l2_chain_id, Ex_chain_family chain_family =
-    match config.experimental_features.l2_chains with
-    | None -> return (None, L2_types.Ex_chain_family EVM)
-    | Some [l2_chain] -> return (Some l2_chain.chain_id, l2_chain.chain_family)
-    | _ -> tzfail Node_error.Unexpected_multichain
-  in
-
-  let*? start_tx_container, tx_container, ping_tx_pool =
+  let*? snapshot_source =
     let open Result_syntax in
-    match config.experimental_features.enable_tx_queue with
-    | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family in
-        return
-          ( (fun ~tx_pool_parameters:_ ->
-              start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
-            tx_container,
-            false )
-    | None ->
-        if config.finalized_view then
-          let* tx_container =
-            container_forward_tx
-              ~chain_family
-              ~keep_alive:config.keep_alive
-              ~evm_node_endpoint
-          in
-          return
-            ( (fun ~tx_pool_parameters:_ -> Lwt_result_syntax.return_unit),
-              tx_container,
-              false )
-        else
-          let* tx_container = Tx_pool.tx_container ~chain_family in
-          return (Tx_pool.start, tx_container, true)
+    match init_from_snapshot with
+    | None -> return_none
+    | Some provider ->
+        let+ url =
+          Snapshots.interpolate_snapshot_provider
+            ~rollup_address:smart_rollup_address
+            ?network
+            (Option.value
+               ~default:Configuration.default_history_mode
+               config.history_mode)
+            provider
+        in
+        Some (Evm_context.Url_legacy url)
+  in
+
+  let (Ex_chain_family chain_family) =
+    Configuration.retrieve_chain_family
+      ~l2_chains:config.experimental_features.l2_chains
+  in
+
+  let* tx_container =
+    let start, tx_container = Tx_queue.tx_container ~chain_family in
+    let* () =
+      start
+        ~config:config.tx_queue
+        ~keep_alive:config.keep_alive
+        ~timeout:config.rpc_timeout
+        ()
+    in
+    return tx_container
   in
 
   let* _loaded =
     Evm_context.start
       ~configuration:config
-      ~data_dir
       ?kernel_path
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~store_perm:Read_write
-      ?snapshot_url
+      ?snapshot_source
       ~tx_container
       ()
   in
+  (* One domain for the Lwt scheduler, one domain for Evm_context, one domain
+     for spawning processes, one for the Irmin GC and the rest of the RPCs. *)
+  let pool = Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 4)) in
   let* ro_ctxt =
-    Evm_ro_context.load ?network ~smart_rollup_address ~data_dir config
+    Evm_ro_context.load ~pool ?network ~smart_rollup_address config
   in
+  let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
 
-  let observer_backend =
+  let (module Rpc_backend) =
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
   (* Check that the multichain configuration is consistent with the
      kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* _l2_chain_id, _chain_family =
-    let (module Backend) = observer_backend in
-    Backend.single_chain_id_and_family ~config ~enable_multichain
+  let* l2_chain_id, _chain_family =
+    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
-  let* () =
-    start_tx_container
-      ~tx_pool_parameters:
-        {
-          backend = observer_backend;
-          smart_rollup_address =
-            Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-              smart_rollup_address;
-          mode = Relay;
-          tx_timeout_limit = config.tx_pool_timeout_limit;
-          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit =
-            Int64.to_int config.tx_pool_tx_per_addr_limit;
-          chain_family = Ex_chain_family chain_family;
-        }
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
   in
-
   Metrics.init
     ~mode:"observer"
-    ~tx_pool_size_info:Tx_pool.size_info
-    ~smart_rollup_address ;
+    ~tx_pool_size_info:Tx_container.size_info
+    ~smart_rollup_address
+    () ;
 
+  let* () =
+    Prevalidator.start
+      ~max_number_of_chunks:config.sequencer.max_number_of_chunks
+      ~chain_family
+      Minimal
+      (module Rpc_backend)
+  in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
+  let tick () =
+    Tx_container.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
+  in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~is_sequencer:false
+      ~mode:(Observer tx_container)
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
-      ~data_dir
       ~rpc_server_family
-      Minimal
+      ~tick
       config
-      tx_container
-      (observer_backend, smart_rollup_address)
+      ((module Rpc_backend), smart_rollup_address)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
+      ~mode:(Observer tx_container)
       ~rpc_server_family
+      ~tick
       config
-      tx_container
-      (observer_backend, smart_rollup_address)
+      ((module Rpc_backend), smart_rollup_address)
   in
 
   let* () =
@@ -336,6 +293,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
           {
             rollup_node_endpoint = config.rollup_node_endpoint;
             keep_alive = config.keep_alive;
+            rpc_timeout = config.rpc_timeout;
             filter_event =
               (function
               | New_delayed_transaction _ | Upgrade_event _
@@ -348,6 +306,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         Rollup_node_follower.start
           ~keep_alive:config.keep_alive
           ~rollup_node_endpoint:config.rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:config.rpc_timeout
           ()
       in
       return_unit
@@ -356,8 +315,8 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       return_unit
   in
 
-  let finalizer_rpc_process =
-    Option.map
+  let*! finalizer_rpc_process =
+    Option.map_s
       (fun port ->
         let protected_endpoint =
           Uri.make ~scheme:"http" ~host:config.public_rpc.addr ~port ()
@@ -371,7 +330,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
           ~exposed_port:config.public_rpc.port
           ~protected_endpoint
           ?private_endpoint
-          ~data_dir
+          ~data_dir:config.data_dir
           ())
       config.experimental_features.spawn_rpc
   in
@@ -381,6 +340,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
+      telemetry_cleanup
       ~tx_container
   in
 
@@ -394,21 +354,27 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     let* () =
       Blueprints_follower.start
         ~multichain:enable_multichain
-        ~ping_tx_pool
         ~time_between_blocks
         ~evm_node_endpoint
+        ~rpc_timeout:config.rpc_timeout
         ~next_blueprint_number
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
+        ~on_next_block_info
+        ~on_inclusion
+        ~on_dropped:(fun hash reason ->
+          Broadcast.notify_transaction_result {hash; result = Error reason} ;
+          let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
+          return_unit)
         ()
     and* () =
-      Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
+      Drift_monitor.run
+        ~evm_node_endpoint
+        ~timeout:config.rpc_timeout
+        Evm_context.next_blueprint_number
     and* () =
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
-      in
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)
-        ~tick_interval:0.05
+        ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)
     in
     return_unit

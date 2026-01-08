@@ -38,6 +38,7 @@ type cli_args = {
   better_errors : bool;
   client_mode : client_mode;
   log_coloring : bool option;
+  allow_fixed_random_seed : bool;
 }
 
 and client_mode = [`Mode_client | `Mode_light | `Mode_mockup | `Mode_proxy]
@@ -283,7 +284,8 @@ module Cfg_file = struct
              password_filename;
              internal_events;
              log;
-           } ->
+           }
+         ->
         ( ( base_dir,
             node_addr,
             node_port,
@@ -305,7 +307,8 @@ module Cfg_file = struct
                remote_signer,
                signing_version,
                confirmations ),
-             (password_filename, internal_events, log) ) ->
+             (password_filename, internal_events, log) )
+         ->
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -370,6 +373,7 @@ let default_cli_args =
     better_errors = false;
     client_mode = `Mode_client;
     log_coloring = Some true;
+    allow_fixed_random_seed = false;
   }
 
 let string_parameter () = Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
@@ -686,6 +690,18 @@ let client_mode_arg () =
        ~autocomplete:(fun _ -> Lwt.return_ok mode_strings)
        (fun _ param -> Lwt.return (parse_client_mode param)))
 
+let client_fixed_random_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"
+
+let allow_fixed_random_seed () =
+  Tezos_clic.switch
+    ~long:"allow-fixed-random-seed"
+    ~doc:
+      (Format.sprintf
+         "Allow the use of a fixed random seed specified with %s for testing \
+          purposes. This is insecure and should never be used in production."
+         client_fixed_random_seed_env_var)
+    ()
+
 let read_config_file config_file =
   let open Lwt_result_syntax in
   let*! r = Lwt_utils_unix.Json.read_file config_file in
@@ -916,7 +932,9 @@ let commands config_file cfg (client_mode : client_mode)
             ~default:((cfg.base_dir // mockup_protocol_constants) ^ ".json")
             (parameter (fun _ctx str -> Lwt.return_ok str))))
       (fixed ["config"; "init"])
-      (fun (config_file, bootstrap_accounts_file, protocol_constants_file) cctxt ->
+      (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
+           cctxt
+         ->
         match client_mode with
         | `Mode_client | `Mode_light | `Mode_proxy ->
             config_init_client config_file cfg
@@ -930,7 +948,7 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  Tezos_clic.args20
+  Tezos_clic.args21
     (base_dir_arg ())
     (no_base_dir_warnings_switch ())
     (config_file_arg ())
@@ -951,6 +969,7 @@ let global_options () =
     (password_filename_arg ())
     (client_mode_arg ())
     (log_coloring ())
+    (allow_fixed_random_seed ())
 
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
@@ -1125,7 +1144,8 @@ let parse_config_args (ctx : #Client_context.full) argv =
            remote_signer,
            password_filename,
            client_mode,
-           log_coloring ),
+           log_coloring,
+           allow_fixed_random_seed ),
          remaining ) =
     Tezos_clic.parse_global_options (global_options ()) ctx argv
   in
@@ -1290,6 +1310,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       protocol;
       client_mode;
       log_coloring;
+      allow_fixed_random_seed;
     }
   in
   return
@@ -1323,6 +1344,7 @@ type t =
   * string option
   * client_mode
   * bool option
+  * bool
 
 module type Remote_params = sig
   val authenticate :

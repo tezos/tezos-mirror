@@ -37,6 +37,9 @@ module Request : sig
 
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
+  val eth_sendRawTransactionSync :
+    raw_tx:string -> timeout:string -> block:block_param -> Evm_node.request
+
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
   val eth_estimateGas :
@@ -76,6 +79,8 @@ module Request : sig
     | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
+    | NewPreconfirmedReceipts
 
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 
@@ -129,6 +134,14 @@ val get_logs :
 (** [block_number evm_node] calls [eth_blockNumber]. *)
 val block_number :
   ?websocket:Websocket.t -> Evm_node.t -> (int32, error) result Lwt.t
+
+(** [generic_block_number evm_node] calls [tez_blockNumber]. Works for Tezlink/Etherlink. *)
+val generic_block_number :
+  ?websocket:Websocket.t -> Evm_node.t -> (int32, error) result Lwt.t
+
+(** [generic_block_number evm_node] calls [tez_blockNumber]. Works for Tezlink/Etherlink. *)
+val generic_block_number_opt :
+  ?websocket:Websocket.t -> Evm_node.t -> (int32 option, error) result Lwt.t
 
 (** [block_number_opt evm_node] calls [eth_blockNumber]. allows None
     when no block have been produced yet.  *)
@@ -217,6 +230,16 @@ val send_raw_transaction :
   raw_tx:string ->
   Evm_node.t ->
   (string, error) result Lwt.t
+
+(** [eth_send_raw_transaction_sync ~raw_tx evm_node] calls
+    [eth_sendRawTransactionSync] with [raw_tx] as argument. *)
+val eth_send_raw_transaction_sync :
+  ?websocket:Websocket.t ->
+  raw_tx:string ->
+  ?timeout:int ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (Transaction.transaction_receipt, error) result Lwt.t
 
 (** [get_transaction_receipt ~tx_hash evm_node] calls
     [eth_getTransactionReceipt] with [tx_hash] as argument. *)

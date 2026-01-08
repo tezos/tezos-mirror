@@ -61,7 +61,7 @@ val get_slot_pages :
 val polynomial_from_shards :
   Cryptobox.t ->
   Cryptobox.shard Seq.t ->
-  (Cryptobox.polynomial, [> Errors.other]) result Lwt.t
+  (Cryptobox.polynomial, [> Errors.other]) result
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
@@ -101,6 +101,23 @@ val get_slot_content :
   Node_context.t ->
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
+
+(** [try_get_slot_header_from_indexed_skip_list plugin node_ctxt ~attested_level
+    slot_id] retrieves the slot header associated with [slot_id], based on the
+    local skip list cell stored in the SQLite store.
+
+   Steps:
+   - Fetch the skip list cell for the given [attested_level] and slot index from
+     the SQLite store.
+   - Decode the cell using the DAL [plugin].
+   - Return the extracted slot header.
+
+    Returns [None] if the cell is not found in the store.
+*)
+val try_get_slot_header_from_indexed_skip_list :
+  Node_context.t ->
+  Types.slot_id ->
+  Dal_plugin.slot_header option tzresult Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store
     cryptobox commitment slot polynomial] registers the shards of the
@@ -161,33 +178,22 @@ val store_slot_headers :
   block_level:int32 ->
   Dal_plugin.slot_header list ->
   Store.t ->
-  unit tzresult Lwt.t
+  unit Lwt.t
 
-(** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
-    ~number_of_slots attested_slots store] updates the statuses of the
-    previously selected slots at level [block_level] - [attestation_lag] and
-    that were waiting for attestation.
-
-    Slot headers whose indexes are in [attested_slots] are now set as
-    {!`Attested} in [store]. Those which are not are marked as
-    {!`Unattested} in the [store] if they previously had a "waiting for
-    attestation" status.
-*)
-val update_selected_slot_headers_statuses :
-  block_level:int32 ->
-  attestation_lag:int ->
-  number_of_slots:int ->
-  (Dal_plugin.slot_index -> bool) ->
-  Store.t ->
-  unit tzresult Lwt.t
+(** [update_slot_header_status store slot_id status] updates the status of
+    [slot_id] setting it to [status], if the previous status was not present in
+    the store or was {!`Waiting_attestation}. *)
+val update_slot_header_status :
+  Store.t -> Types.slot_id -> Types.header_status -> unit
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently
-    stored for that slot id.
+    stored for that slot id. Relies on a cache and the skip list store.
+    i.e. only works for operator nodes.
 *)
 val get_slot_status :
   slot_id:Types.slot_id ->
-  Store.t ->
+  Node_context.t ->
   (Types.header_status, [Errors.other | Errors.not_found]) result Lwt.t
 
 (** [get_slot_shard store slot_id shard_index] returns the shard at

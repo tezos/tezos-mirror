@@ -41,6 +41,8 @@ module Parameters = struct
     node_version_check_bypass : bool;
     node_version_allowed : string option;
     keep_alive : bool;
+    allow_fixed_random_seed : bool;
+    allow_signing_delay : bool;
   }
 
   type session_state = {mutable ready : bool}
@@ -73,10 +75,10 @@ let liquidity_baking_votefile ?path vote =
   JSON.encode_to_file_u
     votefile
     (`O
-      [
-        ( "liquidity_baking_toggle_vote",
-          `String (liquidity_baking_vote_to_string vote) );
-      ]) ;
+       [
+         ( "liquidity_baking_toggle_vote",
+           `String (liquidity_baking_vote_to_string vote) );
+       ]) ;
   votefile
 
 let enable_remote_mode =
@@ -91,7 +93,8 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
     ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ~base_dir
-    ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false) () =
+    ~node_data_dir ~node_rpc_endpoint ?(keep_alive = false)
+    ?(allow_fixed_random_seed = false) ?(allow_signing_delay = false) () =
   let remote_mode =
     Option.value
       remote_mode
@@ -122,19 +125,28 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
         node_version_check_bypass;
         node_version_allowed;
         keep_alive;
+        allow_fixed_random_seed;
+        allow_signing_delay;
       }
   in
   agnostic_baker
 
 let handle_event node ({name; _} : event) =
-  match name with "starting_daemon.v0" -> set_ready node | _ -> ()
+  match name with
+  | "starting_daemon.v0" ->
+      Log.info "Baker %s received starting_daemon event" node.name ;
+      set_ready node
+  | _ -> ()
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
     ?remote_mode ?operations_pool ?dal_node_rpc_endpoint
     ?dal_node_timeout_percentage ?(state_recorder = false)
-    ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive node
-    client =
+    ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive
+    ?allow_fixed_random_seed ?allow_signing_delay node client =
+  let node_rpc_endpoint =
+    Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
+  in
   let agnostic_baker =
     create_from_uris
       ?runner
@@ -155,8 +167,10 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ?node_version_allowed
       ~base_dir:(Client.base_dir client)
       ~node_data_dir:(Node.data_dir node)
-      ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
+      ~node_rpc_endpoint
       ?keep_alive
+      ?allow_fixed_random_seed
+      ?allow_signing_delay
       ()
   in
   on_event agnostic_baker (handle_event agnostic_baker) ;
@@ -234,15 +248,23 @@ let run_args agnostic_baker =
       "keep-alive"
       agnostic_baker.persistent_state.keep_alive
   in
+  let allow_signing_delay =
+    Cli_arg.optional_switch
+      "allow-signing-delay"
+      agnostic_baker.persistent_state.allow_signing_delay
+  in
   let run_args =
     if agnostic_baker.persistent_state.remote_mode then ["remotely"]
     else ["with"; "local"; "node"; node_data_dir]
   in
-  ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
+  (if agnostic_baker.persistent_state.allow_fixed_random_seed then
+     ["--allow-fixed-random-seed"]
+   else [])
+  @ ["--endpoint"; node_addr; "--base-dir"; base_dir; "run"]
   @ run_args @ delegates @ liquidity_baking_toggle_vote @ votefile
   @ force_apply_from_round @ operations_pool @ dal_node_endpoint @ without_dal
   @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
-  @ node_version_allowed @ keep_alive
+  @ node_version_allowed @ keep_alive @ allow_signing_delay
 
 let raw ?env ?event_level ?event_sections_levels ~arguments (agnostic_baker : t)
     =
@@ -252,6 +274,7 @@ let raw ?env ?event_level ?event_sections_levels ~arguments (agnostic_baker : t)
       Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
+    Log.info "Baker %s terminated" agnostic_baker.name ;
     trigger_ready agnostic_baker None ;
     unit
   in
@@ -319,12 +342,21 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "starting baker daemon" promise
 
+let wait_for_termination (baker : t) : unit Lwt.t =
+  match baker.status with
+  | Not_running -> Lwt.return_unit
+  | Running {event_loop_promise = Some p; _} -> p
+  | Running {event_loop_promise = None; _} ->
+      invalid_arg
+        "Agnostic_baker.wait_for_termination called before Agnostic_baker.run \
+         returned"
+
 let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
     ?operations_pool ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
     ?state_recorder ?node_version_check_bypass ?node_version_allowed ?keep_alive
-    node client =
+    ?allow_fixed_random_seed ?allow_signing_delay ?extra_arguments node client =
   let* () = Node.wait_for_ready node in
   let agnostic_baker =
     create
@@ -345,10 +377,14 @@ let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
       ?node_version_allowed
       ~delegates
       ?keep_alive
+      ?allow_fixed_random_seed
+      ?allow_signing_delay
       node
       client
   in
-  let* () = run ?env ?event_level ?event_sections_levels agnostic_baker in
+  let* () =
+    run ?env ?event_level ?event_sections_levels ?extra_arguments agnostic_baker
+  in
   let* () = wait_for_ready agnostic_baker in
   return agnostic_baker
 

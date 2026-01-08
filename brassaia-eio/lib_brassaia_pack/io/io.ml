@@ -316,7 +316,7 @@ module Unix = struct
              | _ -> false
              | exception End_of_file ->
                  (* Something went wrong but we still need to wait for the child
-                    process *)
+                  process *)
                  false
            in
            ignore (Unix.close_process_in inc) ;

@@ -28,7 +28,8 @@
 
 type error +=
   | (* `Temporary *)
-      Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
+      Balance_too_low of
+      Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
@@ -42,13 +43,15 @@ type error +=
       found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.t
+      Non_existing_contract of
+      Contract_repr.t
   | (* `Permanent *)
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *) Failure of string
   | (* `Branch *)
-      Empty_implicit_contract of Signature.Public_key_hash.t
+      Empty_implicit_contract of
+      Signature.Public_key_hash.t
   | (* `Branch *)
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t
@@ -76,8 +79,6 @@ val must_exist : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
    originated, and it fails with [Empty_implicit_contract] if the
    contract is implicit. *)
 val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
-
-val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment :
   Raw_context.t ->
@@ -122,7 +123,7 @@ val get_script_code :
 val get_script :
   Raw_context.t ->
   Contract_hash.t ->
-  (Raw_context.t * Script_repr.t option) tzresult Lwt.t
+  (Raw_context.t * Contract_repr.originated_kind option) tzresult Lwt.t
 
 val get_storage :
   Raw_context.t ->
@@ -181,6 +182,12 @@ val raw_originate :
   Contract_hash.t ->
   script:Script_repr.t * Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
+
+val native_originate :
+  Raw_context.t ->
+  Contract_hash.t ->
+  script:Script_native_repr.with_storage * Lazy_storage_diff.diffs option ->
+  (Raw_context.t, error trace) result Lwt.t
 
 val fresh_contract_from_current_nonce :
   Raw_context.t -> (Raw_context.t * Contract_hash.t) tzresult
@@ -329,6 +336,15 @@ val simulate_spending :
 val get_total_supply : Raw_context.t -> Tez_repr.t tzresult Lwt.t
 
 module For_RPC : sig
+  val list : Raw_context.t -> Contract_repr.t list Lwt.t
+
+  val fold :
+    Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+
   val get_staked_balance :
     Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
 

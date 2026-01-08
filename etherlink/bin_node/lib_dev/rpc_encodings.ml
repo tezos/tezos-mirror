@@ -92,7 +92,11 @@ module JSONRPC = struct
 
   type value = (Data_encoding.json, error) result
 
+  type return_value = Direct of value | Lazy of value Lwt.t
+
   type response = {value : value; id : id}
+
+  type return_response = {return_value : return_value; id : id}
 
   let response_encoding =
     Data_encoding.(
@@ -182,12 +186,6 @@ let encoding_with_optional_extended_block_param encoding =
     encoding
     Ethereum_types.Block_parameter.extended_encoding
     Ethereum_types.Block_parameter.(Block_parameter Latest)
-
-let encoding_with_optional_block_param encoding =
-  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
-    encoding
-    Ethereum_types.Block_parameter.encoding
-    Ethereum_types.Block_parameter.Latest
 
 module Kernel_version = struct
   type input = unit
@@ -655,6 +653,54 @@ module Send_raw_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Send_raw_transaction_sync = struct
+  open Ethereum_types
+
+  type input = hex * int64 * Block_parameter.t
+
+  type output = Transaction_receipt.t
+
+  let default_timeout = 0L
+
+  let default_block_param = Block_parameter.Latest
+
+  let input_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Only raw transaction"
+          (Tag 0)
+          (tup1 hex_encoding)
+          (fun (_, _, _) -> None)
+          (fun c -> (c, default_timeout, default_block_param));
+        case
+          ~title:"Raw transaction and timeout"
+          (Tag 1)
+          (tup2 hex_encoding Data_encoding.int64)
+          (fun (_, _, _) -> None)
+          (fun (c, b) -> (c, b, default_block_param));
+        case
+          ~title:"Raw transaction and block parameter"
+          (Tag 2)
+          (tup2 hex_encoding Block_parameter.encoding)
+          (fun (_, _, _) -> None)
+          (fun (c, s) -> (c, default_timeout, s));
+        case
+          ~title:"Raw transaction, timeout and block parameter"
+          (Tag 3)
+          (tup3 hex_encoding Data_encoding.int64 Block_parameter.encoding)
+          (fun (c, b, s) -> Some (c, b, s))
+          (fun (c, b, s) -> (c, b, s));
+      ]
+
+  let output_encoding = Transaction_receipt.encoding
+
+  let method_ = "eth_sendRawTransactionSync"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_call = struct
   open Ethereum_types
 
@@ -709,11 +755,11 @@ end
 module Get_estimate_gas = struct
   open Ethereum_types
 
-  type input = call * Block_parameter.t
+  type input = Eth_call.input
 
   type output = quantity
 
-  let input_encoding = encoding_with_optional_block_param call_encoding
+  let input_encoding = Eth_call.input_encoding
 
   let output_encoding = quantity_encoding
 
@@ -723,15 +769,13 @@ module Get_estimate_gas = struct
 end
 
 module Txpool_content = struct
-  open Ethereum_types
-
   type input = unit
 
-  type output = txpool
+  type output = Transaction_object.txqueue_content
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = txpool_encoding
+  let output_encoding = Transaction_object.txqueue_content_encoding
 
   let method_ = "txpool_content"
 
@@ -771,12 +815,14 @@ end
 module Get_logs = struct
   type input = Ethereum_types.Filter.t
 
-  type output = Ethereum_types.Filter.changes list
+  type output = Ethereum_types.transaction_log Ethereum_types.pre_encoded list
 
   let input_encoding = Data_encoding.tup1 Ethereum_types.Filter.encoding
 
   let output_encoding =
-    Data_encoding.list Ethereum_types.Filter.changes_encoding
+    Data_encoding.list
+      (Ethereum_types.pre_encoded_encoding
+         Ethereum_types.transaction_log_encoding)
 
   let method_ = "eth_getLogs"
 
@@ -828,13 +874,12 @@ end
 module Inject_transaction = struct
   open Ethereum_types
 
-  type input = Ethereum_types.legacy_transaction_object * string
+  type input = Transaction_object.t * string * bool
 
   type output = hash
 
   let input_encoding =
-    Data_encoding.(
-      tup2 Ethereum_types.legacy_transaction_object_encoding string)
+    Data_encoding.(tup3 Transaction_object.encoding string bool)
 
   let output_encoding = hash_encoding
 
@@ -1119,6 +1164,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Get_uncle_by_block_hash_and_index);
     (module Get_uncle_by_block_number_and_index);
     (module Send_raw_transaction);
+    (module Send_raw_transaction_sync);
     (module Eth_call);
     (module Get_estimate_gas);
     (module Txpool_content);
@@ -1192,6 +1238,7 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
   [
     (module Generic_block_number);
     (module Send_raw_transaction);
+    (module Send_raw_transaction_sync);
     (* Private RPCs *)
     (module Produce_block);
     (module Inject_transaction);
@@ -1248,7 +1295,7 @@ let map_method_name (type f)
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;
   stream : Subscription.notification Lwt_stream.t;
-  stopper : unit -> unit;
+  stopper : unit -> bool tzresult Lwt.t;
 }
 
 type websocket_response = {

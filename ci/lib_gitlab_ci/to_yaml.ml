@@ -224,11 +224,12 @@ let enc_artifacts : artifacts -> value =
     ]
 
 let enc_cache : cache -> value =
- fun {key = k; paths; policy} ->
+ fun {key = k; paths; policy; fallback_keys} ->
   obj_flatten
     [
       key "key" string k;
       key "paths" strings paths;
+      opt "fallback_keys" strings fallback_keys;
       key
         "policy"
         (fun policy ->

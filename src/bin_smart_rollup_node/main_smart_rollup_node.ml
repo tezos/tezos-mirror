@@ -43,7 +43,7 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args23
+       (args24
           force_switch
           data_dir_arg
           config_file_arg
@@ -63,17 +63,19 @@ let config_init_command =
           index_buffer_size_arg
           index_buffer_size_arg
           log_kernel_debug_arg
+          log_kernel_debug_file_arg
           boot_sector_file_arg
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args6
+       (args7
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
           profiling_arg
-          etherlink_switch))
+          etherlink_switch
+          l1_monitor_finalized_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -98,6 +100,7 @@ let config_init_command =
              index_buffer_size,
              irmin_cache_size,
              log_kernel_debug,
+             log_kernel_debug_file,
              boot_sector_file,
              no_degraded,
              gc_frequency,
@@ -107,11 +110,13 @@ let config_init_command =
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
              profiling,
-             force_etherlink ) )
+             force_etherlink,
+             l1_monitor_finalized ) )
          mode
          sc_rollup_address
          operators
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -140,6 +145,7 @@ let config_init_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
@@ -150,6 +156,7 @@ let config_init_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       let config_file = Configuration.config_filename ~data_dir config_file in
       let* () = Configuration.save ~force ~config_file config in
@@ -168,7 +175,7 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args11
+       (args12
           data_dir_arg
           config_file_arg
           mode_arg
@@ -179,7 +186,8 @@ let legacy_run_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
-          disable_performance_metrics_arg)
+          disable_performance_metrics_arg
+          l1_monitor_finalized_switch)
        (args21
           loser_mode_arg
           reconnection_delay_arg
@@ -213,7 +221,8 @@ let legacy_run_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
-             disable_performance_metrics ),
+             disable_performance_metrics,
+             l1_monitor_finalized ),
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -235,7 +244,8 @@ let legacy_run_command =
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
              profiling ) )
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -266,6 +276,7 @@ let legacy_run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
@@ -276,11 +287,11 @@ let legacy_run_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       Rollup_node_daemon.run
         ~data_dir
         ~irmin_cache_size:Configuration.default_irmin_cache_size
-        ?log_kernel_debug_file
         configuration
         cctxt)
 
@@ -294,7 +305,7 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args13
+       (args14
           data_dir_arg
           config_file_arg
           rpc_addr_arg
@@ -305,6 +316,7 @@ let run_command =
           enable_performance_metrics_arg
           disable_performance_metrics_arg
           loser_mode_arg
+          l1_monitor_finalized_switch
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
@@ -340,6 +352,7 @@ let run_command =
              enable_performance_metrics,
              disable_performance_metrics,
              loser_mode,
+             l1_monitor_finalized,
              reconnection_delay,
              dal_node_endpoint,
              pre_images_endpoint ),
@@ -363,7 +376,8 @@ let run_command =
          mode
          sc_rollup_address
          operators
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -393,6 +407,7 @@ let run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~boot_sector_file
           ~no_degraded
@@ -404,11 +419,11 @@ let run_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       Rollup_node_daemon.run
         ~data_dir
         ~irmin_cache_size:Configuration.default_irmin_cache_size
-        ?log_kernel_debug_file
         configuration
         cctxt)
 
@@ -486,7 +501,12 @@ let patch_durable_storage =
     (prefixes ["patch"; "durable"; "storage"; "at"]
     @@ param ~name:"path" ~desc:"Durable storage path" Cli.string_parameter
     @@ prefixes ["with"]
-    @@ param ~name:"value" ~desc:"Patched value" Cli.hex_parameter
+    @@ param
+         ~name:"value"
+         ~desc:
+           "Patched value. If prefixed by `file:`, it is interpreted a path. \
+            Otherwise, it is expected to be an hexadecimal encoded value."
+         Cli.hex_or_file_parameter
     @@ stop)
     (fun (data_dir, force) key value cctxt ->
       if force then
@@ -572,7 +592,8 @@ let export_snapshot_named =
            compact,
            rollup_node_endpoint )
          filename
-         cctxt ->
+         cctxt
+       ->
       export_snapshot
         ( data_dir,
           None,
@@ -595,7 +616,10 @@ let import_snapshot =
        Cli.import_force_switch
        Cli.apply_unsafe_patches_switch)
     (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
-    (fun (data_dir, no_checks, force, apply_unsafe_patches) snapshot_file cctxt ->
+    (fun (data_dir, no_checks, force, apply_unsafe_patches)
+         snapshot_file
+         cctxt
+       ->
       let open Lwt_result_syntax in
       let* () =
         Snapshots.import

@@ -14,8 +14,7 @@ irmin
 brassaia
 brassaia-eio
 rust-toolchain
+lwt_domain
 data-encoding
-cohttp
-opentelemetry
 prometheus
 resto

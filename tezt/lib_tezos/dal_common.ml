@@ -68,10 +68,10 @@ module Parameters = struct
       attestation_threshold;
     }
 
-  let from_client client =
+  let from_client ?block client =
     let* json =
       Client.RPC.call_via_endpoint client
-      @@ RPC.get_chain_block_context_constants ()
+      @@ RPC.get_chain_block_context_constants ?block ()
     in
     from_protocol_parameters json |> return
 
@@ -194,12 +194,43 @@ module Dal_RPC = struct
 
   type profile = Bootstrap | Controller of controller_profiles
 
+  type slot_id_status =
+    | Waiting_attestation
+    | Attested of int (* of attestation lag *)
+    | Unattested
+    | Unpublished
+
   type slot_header = {
     slot_level : int;
     slot_index : int;
     commitment : string;
     status : string;
   }
+
+  let pp_slot_id_status fmt = function
+    | Waiting_attestation -> Format.fprintf fmt "Waiting_attestation"
+    | Attested lag -> Format.fprintf fmt "Attested(lag:%d)" lag
+    | Unattested -> Format.fprintf fmt "Unattested"
+    | Unpublished -> Format.fprintf fmt "Unpublished"
+
+  let slot_id_status_of_json =
+    let legacy_attestation_lag = 8 in
+    fun json ->
+      match String.lowercase_ascii @@ JSON.as_string json with
+      | "waiting_attestation" -> Waiting_attestation
+      | "attested" -> Attested legacy_attestation_lag
+      | "unattested" -> Unattested
+      | "unpublished" -> Unpublished
+      | exception _exn -> (
+          match
+            JSON.
+              ( json |-> "kind" |> as_string,
+                json |-> "attestation_lag" |> as_int )
+          with
+          | "attested", lag -> Attested lag
+          | (exception _) | _ ->
+              failwith @@ Format.sprintf "Unknown slot_id status")
+      | s -> failwith @@ Format.sprintf "Unknown slot_id status %s" s
 
   let slot_header_of_json json =
     let open JSON in
@@ -279,7 +310,7 @@ module Dal_RPC = struct
 
   type commitment_proof = string
 
-  let get_level_index_commitment ~slot_level ~slot_index =
+  let get_level_slot_commitment ~slot_level ~slot_index =
     make
       GET
       [
@@ -350,7 +381,7 @@ module Dal_RPC = struct
         string_of_int slot_index;
         "status";
       ]
-      JSON.as_string
+      slot_id_status_of_json
 
   let get_assigned_shard_indices ~level ~pkh =
     make
@@ -363,6 +394,25 @@ module Dal_RPC = struct
         "assigned_shard_indices";
       ]
       (fun json -> JSON.(json |> as_list |> List.map as_int))
+
+  type trap = {delegate : string; slot_index : int}
+
+  let trap_of_json json =
+    JSON.
+      {
+        delegate = json |-> "delegate" |> as_string;
+        slot_index = json |-> "slot_index" |> as_int;
+      }
+
+  let get_published_level_known_traps ~published_level ~pkh ~slot_index =
+    let query_string =
+      [("delegate", pkh); ("slot_index", string_of_int slot_index)]
+    in
+    make
+      GET
+      ["published_levels"; string_of_int published_level; "known_traps"]
+      ~query_string
+      (fun json -> JSON.(json |> as_list |> List.map trap_of_json))
 
   type slot_set = bool list
 
@@ -607,6 +657,8 @@ module Helpers = struct
 
   type slot = string
 
+  let bytes_of_slot = Bytes.of_string
+
   let make_slot ?(padding = true) ~slot_size slot =
     let actual_slot_size = String.length slot in
     if actual_slot_size < slot_size && padding then
@@ -796,7 +848,7 @@ module Helpers = struct
         ~is_trusted:false
         ()
     in
-    let* () = Dal_node.run dal_node2 in
+    let* () = Dal_node.run ~event_level:`Debug dal_node2 in
     Log.info
       "Node %s started. Waiting for connection with node %s"
       (Dal_node.name dal_node2)
@@ -849,6 +901,9 @@ module Check = struct
 
   let topics_peers_typ : (topic * string list) list Check.typ =
     Check.list (Check.tuple2 topic_typ (Check.list Check.string))
+
+  let slot_id_status_typ =
+    Check.equalable Dal_RPC.pp_slot_id_status Stdlib.( = )
 
   let slot_header_typ : slot_header Check.typ =
     Check.convert slot_header_to_json_u Check.json_u

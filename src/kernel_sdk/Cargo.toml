@@ -35,3 +35,8 @@ default-features = false
 version = "0.6.0"
 path = "../../sdk/rust/encoding"
 default-features = false
+
+[workspace.dependencies.tezos-protocol]
+version = "0.1.0"
+path = "../../sdk/rust/protocol"
+default-features = false

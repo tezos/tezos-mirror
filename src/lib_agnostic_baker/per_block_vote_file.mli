@@ -46,6 +46,9 @@
     baker's vote without having to restart it), each time a block is
     being built, the baker will try and read the vote file present in
     the config in order to check for updated votes.
+
+    [adaptive_issuance_vote] is ignored and deprecated, and will be
+    removed soon: https://gitlab.com/tezos/tezos/-/issues/8055
 *)
 
 (** Default vote file name that should be looked up when the baker
@@ -64,10 +67,9 @@ val read_per_block_votes_no_fail :
     vote is mandatory, it has to come from either the per-block vote
     file [per_block_vote_file] or from
     [default_liquidity_baking_vote]. If a vote cannot be determined
-    from those values, this function fails. Adaptive issuance feature
-    vote is optional. Priority is given to the values in the
-    [per_block_vote_file] file for all votes at the time of the block
-    (the file is freshly read each time). *)
+    from those values, this function fails. Priority is given to the
+    values in the [per_block_vote_file] file for all votes at the time
+    of the block (the file is freshly read each time). *)
 val load_per_block_votes_config :
   default_liquidity_baking_vote:Per_block_votes.per_block_vote option ->
   per_block_vote_file:string option ->

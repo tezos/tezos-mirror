@@ -178,13 +178,13 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
+   Remove this argument in Octez v25. *)
 let adaptive_issuance_vote_arg =
   Tezos_clic.arg
     ~doc:
-      "Vote to adopt or not the adaptive issuance feature. The possible values \
-       for this option are: \"off\" to request not activating it, \"on\" to \
-       request activating it, and \"pass\" to abstain. If you do not vote, \
-       default value is \"pass\"."
+      "DEPRECATED: This argument is ignored by the baker and will be removed \
+       in the next major version of Octez."
     ~long:"adaptive-issuance-vote"
     ~placeholder:"vote"
     per_block_vote_parameter
@@ -319,8 +319,19 @@ let remote_calls_timeout_arg =
          try return (Q.of_string s)
          with _ -> failwith "remote-calls-timeout expected int or float."))
 
+let allow_signing_delay_arg =
+  Tezos_clic.switch
+    ~long:"allow-signing-delay"
+    ~doc:
+      (Format.sprintf
+         "Allow the use of a signing delay specified with the environment \
+          variable %s for testing purposes. This is insecure and should never \
+          be used in production."
+         Octez_baking_common.Signing_delay.env_var)
+    ()
+
 let baker_args =
-  Tezos_clic.args17
+  Tezos_clic.args18
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -338,6 +349,7 @@ let baker_args =
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
+    allow_signing_delay_arg
 
 let directory_parameter =
   let open Lwt_result_syntax in
@@ -388,6 +400,7 @@ type t = {
   state_recorder : bool;
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
+  allow_signing_delay : bool;
 }
 
 (** Create the configuration from the given arguments. *)
@@ -408,7 +421,8 @@ let create_config
       without_dal,
       state_recorder,
       pre_emptive_forge_time,
-      remote_calls_timeout ) =
+      remote_calls_timeout,
+      allow_signing_delay ) =
   {
     pidfile;
     node_version_check_bypass;
@@ -427,10 +441,10 @@ let create_config
     state_recorder;
     pre_emptive_forge_time;
     remote_calls_timeout;
+    allow_signing_delay;
   }
 
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Per_block_votes.per_block_vote;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote;
 }

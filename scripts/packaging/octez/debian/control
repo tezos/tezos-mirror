@@ -25,7 +25,7 @@ Depends: adduser,
   curl,
   systemd
 Pre-Depends: jq
-Recommends: octez-client (= ${source:Version}),
+Recommends: octez-client (= ${source:Version}), dialog
 Suggests: lz4
 Description: L1 Octez node for the Tezos network
  This package serves as the core implementation for the Tezos blockchain node.
@@ -36,7 +36,8 @@ Description: L1 Octez node for the Tezos network
 
 Package: octez-client
 Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends},
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Recommends: dialog
 Description: Client for interacting with the Tezos blockchain
  This package serves as the client-side interface for interacting with the
  Tezos blockchain. It includes command-line tools and functionalities for
@@ -57,7 +58,8 @@ Depends:
  curl, systemd
 Recommends:
  octez-signer (= ${source:Version}),
- octez-dal-node (= ${source:Version})
+ octez-dal-node (= ${source:Version}),
+ dialog
 Description: Octez baking software for the Tezos blockchain.
  The Octez baker includes the necessary tools and functionalities for
  participating in the baking process, such as block creation, attestations, and
@@ -70,8 +72,8 @@ Description: Octez baking software for the Tezos blockchain.
 
 Package: octez-signer
 Architecture: amd64 arm64
-Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version}),
-Recommends: systemd
+Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version})
+Recommends: systemd, dialog
 Suggests: wireguard, openssh-client
 Description: Signing client for the Tezos blockchain.
  The Octez signer provides the essential tools and functionalities for securely
@@ -87,7 +89,7 @@ Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},
  octez-node (= ${source:Version}),
  systemd
-Recommends: octez-client (= ${source:Version})
+Recommends: octez-client (= ${source:Version}), dialog
 Description: Smart Rollup node for the Tezos blockchain.
  The Octez Smart Rollup node enables rollup deployment, managing progress
  through commitment publication and refutation games. Similar to the Octez
@@ -99,6 +101,7 @@ Package: octez-dal-node
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends},
  systemd
+Recommends: dialog
 Suggests: octez-baker (= ${source:Version})
 Description: Octez distribution Availability Layer (DAL) node
  The DAL node is responsible for temporarily storing data and providing it to

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -42,6 +42,7 @@ val craft_tx :
   gas_price:int ->
   ?legacy:bool ->
   ?access_list:(string * string list) list ->
+  ?authorization:string ->
   address:string ->
   ?signature:string ->
   ?arguments:string list ->
@@ -73,6 +74,7 @@ val craft_deploy_tx :
   gas_price:int ->
   ?legacy:bool ->
   ?access_list:(string * string list) list ->
+  ?authorization:string ->
   data:string ->
   unit ->
   string Lwt.t
@@ -96,3 +98,18 @@ val call :
   endpoint:string ->
   address:string ->
   string Lwt.t
+
+(** [wallet_sign_auth ?nonce ~authorization ~private_key ~endpoint] signs with [private_key]
+    a delegation authorization to address [authorization]. The [endpoint] will be used to
+    retrieve the chain id and the nonce of the signer. *)
+val wallet_sign_auth :
+  ?nonce:int ->
+  authorization:string ->
+  private_key:string ->
+  endpoint:string ->
+  unit ->
+  string Lwt.t
+
+(** [call ~endpoint ~address ~arg] calls [address] only with the raw calldata as argument.
+    Useful when calling precompiles as they don't expect a prepended signature. *)
+val raw_call : endpoint:string -> address:string -> arg:string -> string Lwt.t

@@ -212,7 +212,7 @@ let try_migrate_legacy_nonces state =
     let new_location = Baking_files.filename stateful_location in
     let* nonces = cctxt#load new_location ~default:empty encoding in
     let* {cycle = current_cycle; _} =
-      Plugin.RPC.current_level cctxt (chain, `Head 0)
+      Node_rpc.current_level cctxt ~chain ~block:(`Head 0) ()
     in
     let*! nonces, failed_migration =
       Block_hash.Map.fold_s
@@ -223,7 +223,11 @@ let try_migrate_legacy_nonces state =
               return existing_nonces
             else
               let* {cycle = nonce_cycle; level = nonce_level; _} =
-                Plugin.RPC.current_level cctxt (chain, `Hash (block_hash, 0))
+                Node_rpc.current_level
+                  cctxt
+                  ~chain
+                  ~block:(`Hash (block_hash, 0))
+                  ()
               in
               match is_outdated constants nonce_cycle current_cycle with
               | true ->
@@ -231,7 +235,12 @@ let try_migrate_legacy_nonces state =
                   return existing_nonces
               | false -> (
                   let* nonce_info =
-                    Alpha_services.Nonce.get cctxt (chain, `Head 0) nonce_level
+                    Node_rpc.get_nonce
+                      cctxt
+                      ~chain
+                      ~block:(`Head 0)
+                      ~level:nonce_level
+                      ()
                   in
                   match nonce_info with
                   | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
@@ -335,10 +344,12 @@ let partition_unrevealed_nonces {cctxt; chain; _} nonces
                  nonce_revelation_threshold has not passed. See [Nonce_storage.check_unrevealed]
               *)
               let+ nonce_info =
-                (Alpha_services.Nonce.get
+                (Node_rpc.get_nonce
                    cctxt
-                   (chain, `Head 0)
-                   level
+                   ~chain
+                   ~block:(`Head 0)
+                   ~level
+                   ()
                  [@profiler.aggregate_s
                    {verbosity = Debug} "get nonce information"])
               in
@@ -428,44 +439,45 @@ let generate_seed_nonce ?timeout
 let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
     nonce ~cycle ~level ~round =
   let open Lwt_result_syntax in
-  (let*! () = Events.(emit registering_nonce block_hash) in
-   (* Register the nonce *)
-   let legacy_location =
-     Baking_files.resolve_location ~chain_id `Legacy_nonce
-   in
-   let stateful_location =
-     Baking_files.resolve_location ~chain_id `Stateful_nonce
-   in
-   let orphaned_location =
-     Baking_files.resolve_location ~chain_id `Orphaned_nonce
-   in
-   () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
-   cctxt#with_lock @@ fun () ->
-   let* nonces =
-     (load
-        cctxt
-        ~stateful_location [@profiler.record_s {verbosity = Info} "load nonces"])
-   in
-   let nonces =
-     (add
-        nonces
-        {
-          nonce;
-          nonce_hash = Nonce.hash nonce;
-          block_hash;
-          cycle;
-          level;
-          round = Some round;
-          nonce_state = Committed;
-        } [@profiler.record_f {verbosity = Info} "add nonces"])
-   in
-   (save
-      cctxt
-      ~legacy_location
-      ~stateful_location
-      nonces
-      ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
-  [@profiler.record_s {verbosity = Notice} "register nonce"]
+  ((let*! () = Events.(emit registering_nonce block_hash) in
+    (* Register the nonce *)
+    let legacy_location =
+      Baking_files.resolve_location ~chain_id `Legacy_nonce
+    in
+    let stateful_location =
+      Baking_files.resolve_location ~chain_id `Stateful_nonce
+    in
+    let orphaned_location =
+      Baking_files.resolve_location ~chain_id `Orphaned_nonce
+    in
+    () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
+    cctxt#with_lock @@ fun () ->
+    let* nonces =
+      (load
+         cctxt
+         ~stateful_location
+       [@profiler.record_s {verbosity = Info} "load nonces"])
+    in
+    let nonces =
+      (add
+         nonces
+         {
+           nonce;
+           nonce_hash = Nonce.hash nonce;
+           block_hash;
+           cycle;
+           level;
+           round = Some round;
+           nonce_state = Committed;
+         } [@profiler.record_f {verbosity = Info} "add nonces"])
+    in
+    (save
+       cctxt
+       ~legacy_location
+       ~stateful_location
+       nonces
+       ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
+  [@profiler.record_s {verbosity = Notice} "register nonce"])
 
 (** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one
     [Seed_nonce_revelation] operation per each nonce to be revealed, together with
@@ -481,9 +493,10 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
       List.iter_es
         (fun (level, nonce) ->
           let* bytes =
-            (Plugin.RPC.Forge.seed_nonce_revelation
+            (Node_rpc.forge_seed_nonce_revelation
                cctxt
-               (chain, block)
+               ~chain
+               ~block
                ~branch
                ~level
                ~nonce
@@ -493,7 +506,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           in
           let bytes = Signature.concat bytes Signature.zero in
           let* oph =
-            (Shell_services.Injection.operation
+            (Node_rpc.inject_operation_bytes
                ~async:true
                cctxt
                ~chain
@@ -513,7 +526,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
 (** [reveal_potential_nonces state new_proposal] updates the internal [state]
     of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
-let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
+let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
   let open Lwt_result_syntax in
   let {
     cctxt;
@@ -526,7 +539,7 @@ let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
   } =
     state
   in
-  let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
+  let new_predecessor_hash = new_proposal.Baking_state_types.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
     && not (Baking_state.is_first_block_in_protocol new_proposal)
@@ -549,7 +562,9 @@ let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
         let*! () = Events.(emit cannot_read_nonces err) in
         return_unit
     | Ok nonces -> (
-        let* current_level = Plugin.RPC.current_level cctxt (chain, `Head 0) in
+        let* current_level =
+          Node_rpc.current_level cctxt ~chain ~block:(`Head 0) ()
+        in
         let*! partitioned_nonces =
           (partition_unrevealed_nonces
              state
@@ -654,8 +669,8 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
         ()
         [@profiler.record
           {verbosity = Notice}
-            (Block_hash.to_b58check new_proposal.Baking_state.block.hash)] ;
-        last_proposal := Some new_proposal.Baking_state.block.hash ;
+            (Block_hash.to_b58check new_proposal.Baking_state_types.block.hash)] ;
+        last_proposal := Some new_proposal.Baking_state_types.block.hash ;
         if !should_shutdown then return_unit
         else
           let* _ =

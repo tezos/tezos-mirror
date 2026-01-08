@@ -9,6 +9,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
+use std::fmt::Display;
 use tezos_crypto_rs::base58::{FromBase58Check, FromBase58CheckError};
 use tezos_crypto_rs::hash::{ContractKt1Hash, Hash, HashTrait, HashType};
 use tezos_data_encoding::enc::{self, BinResult, BinWriter};
@@ -18,6 +19,9 @@ use tezos_data_encoding::nom::{NomReader, NomResult};
 
 use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// Contract id - of either an implicit account or originated account.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Contract {
@@ -25,6 +29,15 @@ pub enum Contract {
     Implicit(PublicKeyHash),
     /// Smart contract account
     Originated(ContractKt1Hash),
+}
+
+impl Display for Contract {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Implicit(pkh) => write!(f, "{}", pkh),
+            Self::Originated(kt1) => write!(f, "{}", kt1),
+        }
+    }
 }
 
 impl Contract {

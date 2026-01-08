@@ -8,5 +8,5 @@
   octez-libs.prometheus
   octez-libs.prometheus-app.unix
   cmdliner
-  octez-libs.cohttp-lwt
-  octez-libs.cohttp-lwt-unix))
+  cohttp-lwt
+  cohttp-lwt-unix))

@@ -1,8 +1,6 @@
 .. note::
 
-  For information about how to stake, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
-
-  For operational details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
+  To stake easily, directly from a user wallet, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
 
 =================
 Staking mechanism
@@ -44,7 +42,7 @@ abusing the slashing mechanism for profit at the expense of their
 stakers.
 
 :ref:`Participation rewards <adaptive_rewards_alpha>` are automatically shared
-between delegates and their stakers. Staker's rewards are proportional to their
+between delegates and their stakers. Stakers' rewards are proportional to their
 participation in the delegate's total staked at the time the rewards are given.
 This means that the staker gets rewards for staked tez as soon as they are staked,
 and stops receiving rewards as soon as the tez are unstaked, disregarding the
@@ -53,14 +51,14 @@ fact that baking rights for the delegate are computed with some delays.
 policy <staking_policy_configuration_alpha>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
-They can also configure which proportion of the staking rewards from other stakers is set
-to accrue to their own staked balance instead, thereby collecting an *edge* from the
-rewards attributable to their stakers.
+They can also configure the proportion of staking rewards from other
+stakers that accrues to their own staked balance, which is referred to
+as their "edge" on stakers' rewards.
 
 Freezing and unfreezing of staked funds is controlled directly by delegates and
 stakers.
 This entails that staked funds are frozen until manually
-unfrozen by stakers. This is a two step process which spans for at least
+unfrozen by stakers. This is a two-step process that spans at least
 ``UNSTAKE_FINALIZATION_DELAY`` cycles (cf. :ref:`Staked funds
 management <staked_funds_management_alpha>`).
 
@@ -208,7 +206,9 @@ or more conveniently::
 
    octez-client finalize unstake for <staker>
 
-Note that starting with protocol S, not only the staker, but anyone can trigger ``finalize_unstake`` (in any case, the unfrozen funds still go to the staker).
+With the activation of the Seoul protocol on mainnet, anyone can trigger ``finalize_unstake`` operations on behalf of the staker (and not just the staker themselves). In any case, the unfrozen funds always go to the staker, without any ownership transfer.
+
+In particular, this allows for deploying off-chain finalization bots such as `Finn <https://spotlight.tezos.com/finn-unstaking/>`__, which regularly checks finalizable unstakes on block explorers and triggers `their finalization operations <https://tzkt.io/tz1i92Eptw7UZ8JSb8j8jBFJ9Poa4TTnSQwZ/operations/>`__ automatically.
 
 In some circumstances, unstake and finalize can be done implicitly: any call
 to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
@@ -226,3 +226,7 @@ to be delegated to the old delegate, however the spending
 balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
+
+.. note::
+
+  For further details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.

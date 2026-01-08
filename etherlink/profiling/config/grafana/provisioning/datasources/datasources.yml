@@ -1,0 +1,36 @@
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    uid: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - datasourceUid: Tempo
+          type: label
+          label: trace_id
+          name: TraceID
+          url: '$${__value}'
+          urlDisplayLabel: 'View Trace'
+        - datasourceUid: Tempo
+          type: label
+          label: span_id
+          name: SpanID
+          url: '{ span:id = "$${__value}" }'
+          urlDisplayLabel: 'View Span'
+
+  - name: Tempo
+    uid: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: 'Loki'
+        tags: [{ key: 'service.instance.id', value: 'service_instance_id' }]
+        spanStartTimeShift: '-1m'
+        spanEndTimeShift: '1m'
+        filterByTraceID: true
+        filterBySpanID: true

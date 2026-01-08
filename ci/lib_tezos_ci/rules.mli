@@ -60,6 +60,36 @@ val merge_train : If.t
     [TZ_SCHEDULE_KIND] set to [EXTENDED_TESTS]. *)
 val schedule_extended_tests : If.t
 
+(** A rule that is true for daily debian test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [debian.daily]. *)
+val debian_daily : If.t
+
+(** A rule that is true for daily RPM test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [rpm.daily]. *)
+val rpm_daily : If.t
+
+(** A rule that is true for daily Homebrew test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [homebrew.daily]. *)
+val homebrew_daily : If.t
+
+(** A rule that is true for daily Base Images test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [base_images.daily]. *)
+val base_images_daily : If.t
+
+(** A rule that is true for daily OPAM test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [opam.daily]. *)
+val opam_daily : If.t
+
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
@@ -178,3 +208,6 @@ val never : If.t
 
 (** A rule that is always true. *)
 val always : If.t
+
+(** A rule that is true if the variable DOCKER_FORCE_REBUILD = True *)
+val force_rebuild : If.t

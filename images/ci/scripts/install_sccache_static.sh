@@ -1,0 +1,1 @@
+../../scripts/install_sccache_static.sh

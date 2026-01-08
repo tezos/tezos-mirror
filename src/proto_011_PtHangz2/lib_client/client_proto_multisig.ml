@@ -1075,14 +1075,8 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~multisig_contract ~action ~signatures ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () =
   prepare_multisig_transaction cctxt ~chain ~block ~multisig_contract ~action ()
-  >>=? fun {
-             bytes;
-             threshold;
-             keys;
-             counter = stored_counter;
-             entrypoint;
-             generic;
-           } ->
+  >>=?
+  fun {bytes; threshold; keys; counter = stored_counter; entrypoint; generic} ->
   check_multisig_signatures ~bytes ~threshold ~keys signatures
   >>=? fun optional_signatures ->
   multisig_param_string

@@ -16,6 +16,7 @@ type content =
 type t = {
   verbosity : string option;
   profiler_module : string option;
+  cpu_profiling : bool option;
   metadata : Ppxlib.expression option;
   content : content;
   driver_ids : Handled_drivers.t;

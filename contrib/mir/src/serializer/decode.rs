@@ -1,10 +1,7 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/* Copyright (c) [2022-2023] TriliTech <contact@trili.tech>                   */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+// SPDX-FileCopyrightText: [2022-2023] TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
 
 //! Micheline deserialization.
 
@@ -24,7 +21,7 @@ use crate::{
 };
 
 /// Errors that can happen during deserialization.
-#[derive(PartialEq, Debug, Clone, Copy, thiserror::Error)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, thiserror::Error)]
 pub enum DecodeError {
     /// Trailing bytes present after decoding a value.
     #[error("trailing bytes after decoding the value")]
@@ -190,10 +187,10 @@ fn decode_int(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
         }
     }
     bitvec.set_uninitialized(false);
-    return Ok(Micheline::Int(BigInt::from_bytes_le(
+    Ok(Micheline::Int(BigInt::from_bytes_le(
         sign,
         &bitvec.into_vec(),
-    )));
+    )))
 }
 
 fn get_bytes<'a>(bytes: &mut BytesIt<'a>) -> Result<&'a [u8], DecodeError> {
@@ -248,14 +245,14 @@ fn decode_seq<'a>(
 }
 
 fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
-    // @%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
+    // @%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
     macro_rules! alpha_num {
       () => {
         b'_' | b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z'
       }
     }
     match bytes {
-        b"@%" | b"@%%" | b"%@" => {}
+        b"@%" | b"@%%" | b"%@" | b"@" | b":" | b"%" => {}
         [b'@' | b':' | b'%', alpha_num!(), rest @ ..]
             if rest
                 .iter()

@@ -24,10 +24,18 @@ module Make (Args : Gc_args.S) = struct
   module Ao = Append_only_file.Make (Io) (Errs)
   module Worker = Gc_worker.Make (Args)
 
+  module type TASK = sig
+    module Async : Async.S
+
+    val v : Async.t
+  end
+
+  type task = (module TASK)
+
   type t = {
     root : string;
     generation : int;
-    task : Async.t;
+    task : task;
     unlink : bool;
     new_suffix_start_offset : int63;
     resolver : (Stats.Latest_gc.stats, Errs.t) result Lwt.u;
@@ -42,8 +50,19 @@ module Make (Args : Gc_args.S) = struct
     latest_gc_target_offset : int63;
   }
 
+  let async ~async_domain f =
+    let (module Async) =
+      if async_domain then (module Async.Domain : Async.S)
+      else (module Async.Unix : Async.S)
+    in
+    (module struct
+      module Async = Async
+
+      let v = Async.async f
+    end : TASK)
+
   let v ~root ~lower_root ~output ~generation ~unlink ~dispatcher ~fm ~contents
-      ~node ~commit commit_key =
+      ~node ~commit ~async_domain commit_key =
     let open Result_syntax in
     let new_suffix_start_offset, latest_gc_target_offset =
       let state : _ Pack_key.state = Pack_key.inspect commit_key in
@@ -65,9 +84,9 @@ module Make (Args : Gc_args.S) = struct
                previous.latest_gc_target_offset >= latest_gc_target_offset) ->
           Error
             (`Gc_disallowed
-              (Fmt.str "%a is less than or equal to previous GC offset of %a"
-                 Int63.pp latest_gc_target_offset Int63.pp
-                 previous.latest_gc_target_offset))
+               (Fmt.str "%a is less than or equal to previous GC offset of %a"
+                  Int63.pp latest_gc_target_offset Int63.pp
+                  previous.latest_gc_target_offset))
       | _ -> Ok ()
     in
     let new_files_path =
@@ -112,7 +131,7 @@ module Make (Args : Gc_args.S) = struct
     let promise, resolver = Lwt.wait () in
     (* start worker task *)
     let task =
-      Async.async (fun () ->
+      async ~async_domain (fun () ->
           Worker.run_and_output_result root commit_key new_suffix_start_offset
             ~lower_root ~generation ~new_files_path)
     in
@@ -299,16 +318,18 @@ module Make (Args : Gc_args.S) = struct
           in
           Lwt.return result
         in
+        let module Task = (val t.task) in
         if wait then
-          let* status = Async.await t.task in
+          let* status = Task.Async.await Task.v in
           go status
         else
-          match Async.status t.task with
+          match Task.Async.status Task.v with
           | `Running -> Lwt.return_ok `Running
-          | #Async.outcome as status -> go status)
+          | #Task.Async.outcome as status -> go status)
 
   let finalise_without_swap t =
-    let* status = Async.await t.task in
+    let module Task = (val t.task) in
+    let* status = Task.Async.await Task.v in
     let gc_output = read_gc_output ~root:t.root ~generation:t.generation in
     match (status, gc_output) with
     | `Success, Ok gc_results ->
@@ -336,7 +357,8 @@ module Make (Args : Gc_args.S) = struct
     ()
 
   let cancel t =
-    let cancelled = Async.cancel t.task in
+    let module Task = (val t.task) in
+    let cancelled = Task.Async.cancel Task.v in
     if cancelled then clean_after_abort t;
     cancelled
 end

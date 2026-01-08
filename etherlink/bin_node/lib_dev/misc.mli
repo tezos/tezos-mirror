@@ -38,3 +38,13 @@ val interpolate :
   string ->
   (char * [`Available of string | `Disabled of string]) list ->
   string tzresult
+
+(** [domain_count_cap ()] returns the number of domains the node is allowing
+    itself to spawn.
+
+    The result is always between 5 and 16. *)
+val domain_count_cap : unit -> int
+
+exception Timeout
+
+val with_timeout : int -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t

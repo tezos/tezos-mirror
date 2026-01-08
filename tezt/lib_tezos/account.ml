@@ -24,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type secret_key = Unencrypted of string | Encrypted of string
+type secret_key =
+  | Unencrypted of string
+  | Encrypted of string
+  | Remote of string
 
 type key = {
   alias : string;
@@ -35,10 +38,18 @@ type key = {
 
 let require_unencrypted_secret_key ~__LOC__ = function
   | Unencrypted b58_secret_key -> b58_secret_key
-  | Encrypted _ ->
+  | Encrypted _ | Remote _ ->
       Test.fail
         ~__LOC__
         "[require_unencrypted_secret_key] expected an unencrypted secret key"
+
+let require_unencrypted_or_remote_secret_key ~__LOC__ = function
+  | Unencrypted _ | Remote _ -> ()
+  | Encrypted _ ->
+      Test.fail
+        ~__LOC__
+        "[require_unencrypted_or_remote_secret_key] expected an unencrypted or \
+         remote secret key"
 
 let sign_bytes ?watermark ~(signer : key) (message : Bytes.t) =
   let b58_secret_key =
@@ -52,10 +63,13 @@ let sign_bytes ?watermark ~(signer : key) (message : Bytes.t) =
 let uri_of_secret_key = function
   | Unencrypted secret_key -> "unencrypted:" ^ secret_key
   | Encrypted secret_key -> "encrypted:" ^ secret_key
+  | Remote pkh -> "remote:" ^ pkh
 
 let secret_key_equal secret_key1 secret_key2 =
   match (secret_key1, secret_key2) with
-  | Unencrypted s1, Unencrypted s2 | Encrypted s1, Encrypted s2 ->
+  | Unencrypted s1, Unencrypted s2
+  | Encrypted s1, Encrypted s2
+  | Remote s1, Remote s2 ->
       String.equal s1 s2
   | _ -> false
 
@@ -80,6 +94,17 @@ let key_typ : key Check.typ =
       && String.equal key1.public_key_hash key2.public_key_hash
       && String.equal key1.public_key key2.public_key
       && secret_key_equal key1.secret_key key2.secret_key)
+
+(* The key is not added to a client, it must be manually added later *)
+let generate_new_key ~algo ~alias =
+  let open Tezos_crypto.Signature in
+  let pkh, pk, sk = generate_key ~algo () in
+  {
+    alias;
+    public_key = Public_key.to_b58check pk;
+    public_key_hash = Public_key_hash.to_b58check pkh;
+    secret_key = Unencrypted (Secret_key.to_b58check sk);
+  }
 
 module Wallet : sig
   val write : key list -> base_dir:string -> unit
