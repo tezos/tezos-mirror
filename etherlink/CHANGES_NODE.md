@@ -31,6 +31,8 @@
 
 - Fix the kernel upgrade detection of the node’s execution runtime, which would
   prevent the node to progress correctly under certain edge cases. (!20135)
+- Fix a race condition in the tx queue of the observer node, which could lead
+  to transient inconsistent changes. (!20385)
 
 ### Storage changes
 
