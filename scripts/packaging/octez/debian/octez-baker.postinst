@@ -22,6 +22,11 @@ configure)
   else
     echoerr "Upgrading octez-baker from version $2 ( postinst )"
   fi
+
+  # Reload systemd if unit files changed during upgrade
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+  fi
   ;;
 *)
   : nop

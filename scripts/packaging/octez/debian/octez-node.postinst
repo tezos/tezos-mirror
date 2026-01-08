@@ -46,6 +46,11 @@ configure)
     mkdir -p /var/log/tezos
     chown tezos /var/log/tezos
   fi
+
+  # Reload systemd if unit files changed during upgrade
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+  fi
   ;;
 *)
   : noop
