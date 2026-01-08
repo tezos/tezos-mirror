@@ -6,11 +6,13 @@
 
 ### Configuration changes
 
+- Deprecate now irrelevant `log_filter.chunk_size`. (!20332)
+
 ### RPCs changes
 
 - Optimize `eth_getLogs` with up to 10x latency improvement when filtering on
   addresses or topics by implementing bloom filter checks in SQLite
-  directly. (!20366)
+  directly. (!20366, !20332)
 
 ### Metrics changes
 
@@ -23,6 +25,7 @@
 - Update the command that creates an upgrade payload with a delay, it
   can also takes a smart rollup alias or address as a argument.
   (!20302)
+- Deprecate now irrelevant argument `--chunk-size`. (!20332)
 
 ### Execution changes
 

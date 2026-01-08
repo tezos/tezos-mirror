@@ -12,7 +12,9 @@
            request. */,
       "chunk_size"?:
         integer ∈ [1, 2^30]
-        /* Number of blocks to be filter concurrently when executing a `eth_getLogs` request. */ },
+        /* Number of blocks to be filter concurrently when executing a `eth_getLogs` request.
+           DEPRECATED: this field is now ignore. You can still use `max_nb_blocks` and
+           `max_nb_logs` to limit the computation done by `eth_getLogs`. */ },
   "sequencer"?:
     { "time_between_blocks"?:
         $time_between_blocks
