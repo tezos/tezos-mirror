@@ -13,6 +13,8 @@
 - Optimize `eth_getLogs` with up to 10x latency improvement when filtering on
   addresses or topics by implementing bloom filter checks in SQLite
   directly. (!20366, !20332)
+- Fix JSON encoding for transaction inclusion messages in `/evm/messages`.
+  (!20391)
 
 ### Metrics changes
 

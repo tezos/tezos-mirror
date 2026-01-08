@@ -21,13 +21,15 @@ let common_transaction =
       case
         ~title:"Evm"
         (Tag 0)
-        (obj2 (req "kind" (constant "evm")) (req "transaction" string))
+        (obj2 (req "kind" (constant "evm")) (req "transaction" (string' Hex)))
         (function Evm ts -> Some ((), ts) | _ -> None)
         (fun ((), ts) -> Evm ts);
       case
         ~title:"Michelson"
         (Tag 1)
-        (obj2 (req "kind" (constant "michelson")) (req "transaction" string))
+        (obj2
+           (req "kind" (constant "michelson"))
+           (req "transaction" (string' Hex)))
         (function Michelson ts -> Some ((), ts) | _ -> None)
         (fun ((), ts) -> Michelson ts);
     ]
