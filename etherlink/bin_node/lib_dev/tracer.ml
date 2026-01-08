@@ -312,12 +312,7 @@ let trace_transaction (module Exe : Evm_execution.S) ~block_number
     in
     return state
   in
-  let* apply_result =
-    Exe.replay
-      ~log_file:"trace_transaction"
-      ~alter_evm_state:set_input
-      block_number
-  in
+  let* apply_result = Exe.replay ~alter_evm_state:set_input block_number in
   match apply_result with
   | Apply_failure -> tzfail Tracer_types.Trace_not_found
   | Apply_success {evm_state; _} ->
@@ -367,12 +362,7 @@ let trace_block (module Exe : Evm_execution.S)
       in
       return state
     in
-    let* apply_result =
-      Exe.replay
-        ~log_file:"trace_transaction"
-        ~alter_evm_state:set_input
-        block_number
-    in
+    let* apply_result = Exe.replay ~alter_evm_state:set_input block_number in
     let* traces =
       match apply_result with
       | Apply_failure -> tzfail Tracer_types.Trace_not_found

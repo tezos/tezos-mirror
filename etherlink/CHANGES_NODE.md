@@ -33,6 +33,9 @@
   prevent the node to progress correctly under certain edge cases. (!20135)
 - Fix a race condition in the tx queue of the observer node, which could lead
   to transient inconsistent changes. (!20385)
+- Remove kernel debug log file generation from trace RPC operations to
+  prevent unnecessary disk usage. This affects `trace_transaction_*`
+  and `replay_*` files in the `kernel_logs` directory. (!20388)
 
 ### Storage changes
 
