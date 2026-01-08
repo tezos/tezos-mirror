@@ -677,25 +677,25 @@ struct
     let build_sequencer_batch ~(state : Types.state) (seq : queue_request Seq.t)
         =
       let open Lwt_result_syntax in
-      let rec select rev_selected rev_callbacks seq =
+      let rec select rev_hashes rev_selected seq =
         match seq () with
-        | Seq.Nil -> return (rev_selected, rev_callbacks)
+        | Seq.Nil -> return (rev_hashes, rev_selected)
         | Seq.Cons ({hash; payload; queue_callback}, rest) -> (
             let raw_tx = Ethereum_types.hex_to_bytes payload in
             match Transaction_objects.find state.tx_object hash with
             | None ->
                 let*! () = Tx_queue_events.missing_tx_object hash in
                 let*! () = queue_callback `Refused in
-                select rev_selected rev_callbacks rest
+                select rev_hashes rev_selected rest
             | Some tx_object ->
                 select
+                  (hash :: rev_hashes)
                   ((raw_tx, Tx.to_transaction_object_t tx_object)
                   :: rev_selected)
-                  ((hash, queue_callback) :: rev_callbacks)
                   rest)
       in
-      let* rev_selected, rev_callbacks = select [] [] seq in
-      return (List.rev rev_selected, rev_callbacks)
+      let* rev_hashes, rev_selected = select [] [] seq in
+      return (List.rev rev_hashes, List.rev rev_selected)
 
     let send_transactions_batch ~evm_node_endpoint ~timeout ~keep_alive ~state
         self transactions =
@@ -746,22 +746,41 @@ struct
                 batch
             in
             check_missed_transactions ~self ~hashes ~responses
-        | Block_producer ->
-            let* batch, rev_callbacks =
+        | Block_producer -> (
+            let* hashes, transactions =
               build_sequencer_batch ~state transactions
             in
-            let* hashes =
-              Block_producer.preconfirm_transactions ~transactions:batch
+            let*! hashes_and_status =
+              Block_producer.preconfirm_transactions ~transactions
             in
-            let*! () =
-              List.iter_s
-                (fun (hash, callback) ->
-                  if List.exists (Ethereum_types.equal_hash hash) hashes then
-                    callback `Accepted
-                  else callback `Refused)
-                rev_callbacks
+            let inject_status status =
+              List.iter_p (fun txn_hash ->
+                  let open Lwt_syntax in
+                  let*! _added =
+                    Worker.Queue.push_request
+                      self
+                      (Injection_confirmation {txn_hash; status})
+                  in
+                  return_unit)
             in
-            return_unit
+            match hashes_and_status with
+            | Ok {accepted; refused; dropped} ->
+                let*! () =
+                  Lwt.join
+                    [
+                      inject_status `Accepted accepted;
+                      inject_status `Refused refused;
+                      inject_status `Refused dropped;
+                    ]
+                in
+                return_unit
+            | Error [Block_producer.IC_disabled] ->
+                (* This case should not happens, it means the
+                     block_producer worker has ic deactivated and so
+                     we should not call it. *)
+                let*! () = inject_status `Refused hashes in
+                return_unit
+            | Error err -> fail err)
 
     (** clear values and keep the allocated space *)
     let clear

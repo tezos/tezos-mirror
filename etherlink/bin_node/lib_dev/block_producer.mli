@@ -21,6 +21,18 @@ type force =
   | With_timestamp of Time.Protocol.t
       (** Force the creation of a block with the provided timestamp *)
 
+type preconfirmed_transactions_result = {
+  accepted : Ethereum_types.hash list;
+      (** Transactions that were validated by the
+          preconfirm_transactions request. *)
+  refused : Ethereum_types.hash list;
+      (** Transactions that were invalidated by the preconfirm_transactions request. *)
+  dropped : Ethereum_types.hash list;
+      (** Transactions that were dropped by the
+          preconfirm_transactions request when there is already too
+          many transaction. *)
+}
+
 (** [start parameters] starts the events follower. *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -41,12 +53,15 @@ val produce_genesis :
 val produce_block :
   force:force -> [`Block_produced of int | `No_block] tzresult Lwt.t
 
-(** [preconfirm_transactions ~transactions] validates each transaction in
-    [transactions] and streams every successfully validated one to the
-    preconfirmation pipeline. *)
+type error += IC_disabled
+
+(** [preconfirm_transactions ~transactions] validates each transaction
+    in [transactions] and streams every successfully validated one to
+    the preconfirmation pipeline. Fails with [IC_disabled] if instant
+    confirmation is not enabled. *)
 val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->
-  Ethereum_types.hash list tzresult Lwt.t
+  preconfirmed_transactions_result tzresult Lwt.t
 
 module Internal_for_tests : sig
   val produce_block :

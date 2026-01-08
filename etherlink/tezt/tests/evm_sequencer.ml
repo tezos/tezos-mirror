@@ -12434,6 +12434,9 @@ let test_tx_queue_nonce =
   Log.info
     "Send another txs to create a gap and check that the nonce in pending is \
      still the same" ;
+  let observer_dropped_one =
+    Evm_node.wait_for_tx_queue_transaction_dropped observer
+  in
   let* _lost_hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
 
   let* () =
@@ -12466,6 +12469,7 @@ let test_tx_queue_nonce =
     wait_for_all_tx_process_p ~hashes ~name:"tx confirmed in observer" ~waiter
   in
 
+  let observer_txs_confirmed = observer_wait_tx_confirmed () in
   (* Checks that all txs were included in a unique block by the sequencer *)
   let* () =
     let*@ included_nb_txs = produce_block sequencer in
@@ -12475,7 +12479,8 @@ let test_tx_queue_nonce =
         ~__LOC__
         ~error_msg:"Produce block included %L transaction expected %R") ;
     unit
-  and* _ = observer_wait_tx_confirmed () in
+  and* _ = observer_txs_confirmed
+  and* _ = observer_dropped_one in
 
   let* () =
     check_nonce
@@ -12491,21 +12496,12 @@ let test_tx_queue_nonce =
       ()
   in
   let* () =
-    (* In the observer the wrong ordered tx is still in pending *)
+    (* In the sequencer the wrong ordered tx is dropped when creating
+        In the observer the wrong ordered tx has been dropped with the
+       instant confirmation. *)
     check_nonce
       ~__LOC__
       ~check_observer:true
-      ~check_sequencer:false
-      ~block:"pending"
-      ~expected:(nb_txs + 2)
-      ()
-  in
-  let* () =
-    (* In the sequencer the wrong ordered tx is dropped when creating
-       the block *)
-    check_nonce
-      ~__LOC__
-      ~check_observer:false
       ~check_sequencer:true
       ~block:"pending"
       ~expected:(nb_txs + 1)
