@@ -215,6 +215,22 @@ module Kernel_root_hash = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Sequencer = struct
+  open Ethereum_types
+
+  type input = Block_parameter.extended
+
+  type output = Signature.Public_key.t
+
+  let input_encoding = Block_parameter.extended_encoding
+
+  let output_encoding = Signature.Public_key.encoding
+
+  let method_ = "tez_sequencer"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Generic_block_number = struct
   open Ethereum_types
 
@@ -1166,6 +1182,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Generic_block_number);
     (module Kernel_version);
     (module Kernel_root_hash);
+    (module Sequencer);
     (module Network_id);
     (module Chain_id);
     (module Chain_family);

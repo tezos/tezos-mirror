@@ -387,7 +387,7 @@ Run commands:
       [-n --native-execution-policy <policy>] [--initial-kernel <evm_installer.wasm>]
       [--dont-track-rollup-node] [--no-sync]
       [--init-from-snapshot [snapshot url or file path]]
-      [--history <archive | rolling:n | full:n>] [--network <network>]
+      [--history <archive | rolling:n | full:n>] [--network <network>] [--sandbox]
     Start the EVM node in observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
@@ -460,6 +460,9 @@ Run commands:
       `testnet` or `shadownet`. If set, additional sanity checks are performed on the node’s
       startup.
       If set, defaults to the value of the environment variable `$EVM_NODE_NETWORK`.
+    --sandbox: Enable sandbox mode
+      At startup, the observer node will fetch the public key used by its remote EVM endpoint
+      and patch its local state accordingly.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>] [--rpc-addr <ADDR>]
       [--rpc-port <PORT>] [--rpc-batch-limit <PORT>] [--cors-origins <ALLOWED_ORIGINS>]

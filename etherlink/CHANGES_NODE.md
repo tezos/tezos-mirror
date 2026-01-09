@@ -15,6 +15,8 @@
   directly. (!20366, !20332)
 - Fix JSON encoding for transaction inclusion messages in `/evm/messages`.
   (!20391)
+- Add a new Etherlink-specific JSONRPC method `tez_sequencer` to retreive the
+  sequencer’s public key for a given block. (!20365)
 
 ### Metrics changes
 
@@ -28,6 +30,8 @@
   can also takes a smart rollup alias or address as a argument.
   (!20302)
 - Deprecate now irrelevant argument `--chunk-size`. (!20332)
+- Add a new CLI argument `--sandbox` to `run observer` to make it easier to
+  start an observer for a sandbox setup. (!20365)
 
 ### Execution changes
 
