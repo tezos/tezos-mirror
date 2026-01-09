@@ -5,8 +5,9 @@
 
 use crate::{
     apply::{pure_fa_deposit, revm_run_transaction},
+    block::GAS_LIMIT,
     block_storage,
-    bridge::{execute_deposit, DepositResult},
+    bridge::{execute_etherlink_deposit, DepositResult},
     chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
     error::{Error, StorageError, TransferError},
@@ -38,9 +39,9 @@ use tezos_ethereum::{
     },
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
-use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::{host::RuntimeError, types::Timestamp};
-use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_tracing::trace_kernel;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
@@ -142,33 +143,29 @@ fn get_evm_config<Host: Runtime>(host: &mut Host) -> Result<EvmChainConfig, Erro
     Ok(fetch_pure_evm_config(host, chain_id))
 }
 
-fn get_evm_safe_host<'a, Host: Runtime>(
-    host: &'a mut Host,
-    config: &EvmChainConfig,
-) -> SafeStorage<&'a mut Host> {
-    SafeStorage {
-        host,
-        world_state: OwnedPath::from(&config.storage_root_path()),
-    }
-}
-
 struct IterReceiptData {
-    last_log: usize,
-    current_cumulative_gas: U256,
+    log_index: usize,
+    cumulative_gas: U256,
 }
 
 fn get_iter_receipt_data(receipts: &[TransactionReceipt]) -> IterReceiptData {
-    let mut current_cumulative_gas = U256::zero();
-    let mut last_log = 0;
+    let mut log_index = 0;
 
     for receipt in receipts {
-        current_cumulative_gas += receipt.cumulative_gas_used;
-        last_log += receipt.logs.len();
+        log_index += receipt.logs.len();
     }
 
+    let cumulative_gas = match receipts.last() {
+        Some(TransactionReceipt {
+            cumulative_gas_used,
+            ..
+        }) => *cumulative_gas_used,
+        None => U256::zero(),
+    };
+
     IterReceiptData {
-        last_log,
-        current_cumulative_gas,
+        log_index,
+        cumulative_gas,
     }
 }
 
@@ -274,17 +271,25 @@ fn handle_receipt<Host: Runtime>(
     from: H160,
     receipt_data: ReceiptData,
     result_data: &ResultData,
+    overall_gas_used: U256,
 ) -> Result<(), Error> {
     let mut receipts = get_current_transaction_receipts(host)?;
 
+    // We might be handling a new block since last execution.
+    // In this case, we need to empty the receipts before adding the
+    // new one.
+    if !receipts.is_empty()
+        && receipts.first().unwrap().block_number != input_data.block_number
+    {
+        receipts = vec![];
+    }
+
     let IterReceiptData {
-        last_log,
-        current_cumulative_gas,
+        log_index,
+        cumulative_gas,
     } = get_iter_receipt_data(&receipts);
 
-    let log_index = (last_log + 1)
-        .try_into()
-        .map_err(|_| Error::InvalidConversion)?;
+    let log_index = log_index.try_into().map_err(|_| Error::InvalidConversion)?;
 
     let logs: Vec<IndexedLog> = result_data
         .logs
@@ -305,17 +310,22 @@ fn handle_receipt<Host: Runtime>(
 
     let logs_bloom = TransactionReceipt::logs_to_bloom(&logs);
 
+    let cumulative_gas_used = cumulative_gas
+        .checked_add(overall_gas_used)
+        .ok_or(Error::Transfer(TransferError::CumulativeGasUsedOverflow))?;
+
     let receipt = TransactionReceipt {
         hash: input_data.tx.tx_hash,
-        index: (receipts.len() + 1)
+        index: receipts
+            .len()
             .try_into()
             .map_err(|_| Error::InvalidConversion)?,
         block_number: input_data.block_number,
         from,
         to: receipt_data.to,
-        cumulative_gas_used: current_cumulative_gas + result_data.gas_used,
+        cumulative_gas_used,
         effective_gas_price,
-        gas_used: result_data.gas_used.into(),
+        gas_used: overall_gas_used,
         contract_address: result_data.contract_address,
         logs,
         logs_bloom,
@@ -334,20 +344,30 @@ fn handle_transaction_object<Host: Runtime>(
     from: H160,
     input_data: &SingleTxExecutionInput,
     gas_price: U256,
-    result_data: &ResultData,
+    gas: U256,
 ) -> Result<(), Error> {
     let mut txs_objects = get_current_transactions_objects(host)?;
+
+    // We might be handling a new block since last execution.
+    // In this case, we need to empty the txs objects before adding the
+    // new one.
+    if !txs_objects.is_empty()
+        && txs_objects.first().unwrap().block_number != input_data.block_number
+    {
+        txs_objects = vec![];
+    }
 
     let tx_object = TransactionObject {
         block_number: input_data.block_number,
         from,
-        gas_used: result_data.gas_used.into(),
+        gas_used: gas,
         gas_price,
         hash: input_data.tx.tx_hash,
         input: input_data.tx.data(),
         nonce: input_data.tx.nonce(),
         to: input_data.tx.to()?,
-        index: (txs_objects.len() + 1)
+        index: txs_objects
+            .len()
             .try_into()
             .map_err(|_| Error::InvalidConversion)?,
         value: input_data.tx.value(),
@@ -375,7 +395,7 @@ fn block_constants<Host: Runtime>(
         number,
         coinbase,
         timestamp: timestamp.as_u64().into(),
-        gas_limit: config.get_limits().maximum_gas_limit,
+        gas_limit: GAS_LIMIT,
         block_fees,
         chain_id: config.get_chain_id(),
         prevrandao: None,
@@ -386,6 +406,8 @@ struct RunOutcome {
     result: ExecutionResult,
     caller: H160,
     receipt_data: ReceiptData,
+    gas_price: U256,
+    gas: Option<U256>,
 }
 
 #[trace_kernel]
@@ -415,28 +437,26 @@ pub fn handle_run_transaction<Host: Runtime>(
     __trace_kernel_add_attrs!(host, __attrs);
 
     let config = get_evm_config(host)?;
-    // Safe storage isn't necessary as it can be managed by the node
-    // but using it on kernel allow us to make cache and in-memory in it.
-    // See !19515.
-    let mut safe_host = get_evm_safe_host(host, &config);
-    safe_host.start()?;
-    let block_constants = block_constants(
-        &mut safe_host,
-        &config,
-        input_data.timestamp,
-        input_data.block_number,
-    )?;
+    let block_constants =
+        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
     let RunOutcome {
         result,
         caller,
         receipt_data,
+        gas_price,
+        gas,
     } = match &input_data.tx.content {
         TransactionContent::Ethereum(ethx)
         | TransactionContent::EthereumDelayed(ethx) => {
             let caller = ethx.caller().map_err(|_| Error::InvalidSignatureCheck)?;
-            let ExecutionOutcome { result, .. } = revm_run_transaction(
-                &mut safe_host,
+            let ExecutionOutcome {
+                result,
+                // TODO: Handle withdrawals results and outbox queue if executed by sequencer
+                // see `etherlink/kernel_farfadet_r1/kernel/src/block.rs` > `promote_block`
+                withdrawals: _,
+            } = revm_run_transaction(
+                host,
                 &block_constants,
                 Some(input_data.tx.tx_hash),
                 caller,
@@ -465,10 +485,12 @@ pub fn handle_run_transaction<Host: Runtime>(
                     to: ethx.to,
                     type_: ethx.type_,
                 },
+                gas_price: ethx.max_fee_per_gas,
+                gas: Some(ethx.gas_limit_with_fees().into()),
             }
         }
         TransactionContent::Deposit(deposit) => {
-            let DepositResult { outcome, .. } = execute_deposit(&mut safe_host, deposit)
+            let DepositResult { outcome, .. } = execute_etherlink_deposit(host, deposit)
                 .map_err(|e| {
                     Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
                         e.to_string(),
@@ -486,11 +508,13 @@ pub fn handle_run_transaction<Host: Runtime>(
                     to: Some(receiver),
                     type_: TransactionType::Legacy,
                 },
+                gas_price: block_constants.base_fee_per_gas(),
+                gas: None,
             }
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             let outcome = pure_fa_deposit(
-                &mut safe_host,
+                host,
                 fa_deposit,
                 &block_constants,
                 input_data.tx.tx_hash,
@@ -506,6 +530,8 @@ pub fn handle_run_transaction<Host: Runtime>(
                     to: Some(fa_deposit.receiver),
                     type_: TransactionType::Legacy,
                 },
+                gas_price: block_constants.base_fee_per_gas(),
+                gas: None,
             }
         }
     };
@@ -516,16 +542,17 @@ pub fn handle_run_transaction<Host: Runtime>(
         .tx
         .content
         .fee_updates(&block_constants.block_fees, result_data.gas_used.into());
+
+    let sequencer_pool_address =
+        (block_constants.coinbase != H160::default()).then_some(block_constants.coinbase);
     fee_updates
-        .apply(host, caller, Some(block_constants.coinbase))
+        .apply(host, caller, sequencer_pool_address)
         .map_err(|_| {
             Error::Transfer(TransferError::Custom(
                 "Applying fees to the sequencer pool address failed",
             ))
         })?;
 
-    // Don't pass `safe_host` because we don't want this to be cached
-    // but we still want it to be accessible by the node.
     handle_receipt(
         host,
         &input_data,
@@ -533,14 +560,18 @@ pub fn handle_run_transaction<Host: Runtime>(
         caller,
         receipt_data,
         &result_data,
+        fee_updates.overall_gas_used,
     )?;
 
     handle_transaction_object(
         host,
         caller,
         &input_data,
-        block_constants.base_fee_per_gas(),
-        &result_data,
+        gas_price,
+        match gas {
+            Some(gas) => gas,
+            None => fee_updates.overall_gas_used,
+        },
     )
 }
 
