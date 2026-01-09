@@ -225,17 +225,6 @@ module type PVM_with_context_and_state = sig
     val page_info :
       (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
 
-    (** Some parameters of the DAL. Needed when checking a page's proof against
-        a slot's {!val: Dal_slot_repr.commitment}. *)
-    val dal_parameters : Dal_slot_repr.parameters
-
-    (** The lag between the time an attestation is published on L1
-        (its published_level) and the level it should be confirmed. *)
-    val dal_attestation_lag : int
-
-    (** The number of DAL slots provided by the L1. *)
-    val dal_number_of_slots : int
-
     (** The level at which the DAL got activated, [None] if the DAL has not yet been activated. *)
     val dal_activation_level : Raw_level_repr.t option
 

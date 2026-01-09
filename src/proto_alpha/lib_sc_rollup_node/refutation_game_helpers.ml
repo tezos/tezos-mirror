@@ -139,13 +139,11 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
+  (* Here is the place where we get the constants used all over the game. *)
   let* constants =
     Protocol_plugins.get_constants_of_level node_ctxt snapshot_level_int32
   in
   let dal_l1_parameters = constants.dal in
-  let dal_parameters = dal_l1_parameters.cryptobox_parameters in
-  let dal_attestation_lag = dal_l1_parameters.attestation_lag in
-  let dal_number_of_slots = dal_l1_parameters.number_of_slots in
   let* dal_activation_level, dal_attested_slots_validity_lag =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level when dal_l1_parameters.feature_enable ->
@@ -231,12 +229,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let confirmed_slots_history = dal_slots_history
 
       let get_history = get_cell_from_hash
-
-      let dal_attestation_lag = dal_attestation_lag
-
-      let dal_parameters = dal_parameters
-
-      let dal_number_of_slots = dal_number_of_slots
 
       let page_info = page_info
 

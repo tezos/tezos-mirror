@@ -544,12 +544,6 @@ module type PVM_with_context_and_state = sig
     val page_info :
       (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
 
-    val dal_parameters : Dal_slot_repr.parameters
-
-    val dal_attestation_lag : int
-
-    val dal_number_of_slots : int
-
     val dal_activation_level : Raw_level_repr.t option
 
     val dal_attested_slots_validity_lag : int
