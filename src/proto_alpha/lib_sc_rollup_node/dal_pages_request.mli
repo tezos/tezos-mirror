@@ -55,7 +55,6 @@ open Alpha_context
     When present, the returned content corresponds to the page index carried by
     the given [Dal.Page.t]. *)
 val page_content :
-  Octez_smart_rollup.Rollup_constants.dal_constants ->
   dal_activation_level:Raw_level.t option ->
   inbox_level:int32 ->
   _ Node_context.t ->

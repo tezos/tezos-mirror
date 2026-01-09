@@ -153,7 +153,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           let inbox_level = Int32.of_int level in
           let*! content =
             Dal_pages_request.page_content
-              constants.dal
               ~dal_activation_level
               ~dal_attested_slots_validity_lag
               ~inbox_level
@@ -334,7 +333,6 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
           | Some fuel ->
               let* content_opt =
                 Dal_pages_request.page_content
-                  constants.dal
                   ~inbox_level:(Int32.of_int level)
                   ~dal_activation_level
                   ~dal_attested_slots_validity_lag

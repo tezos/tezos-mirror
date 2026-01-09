@@ -75,7 +75,6 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
       let Dal.Page.{slot_id; page_index} = page_id in
       let* page_content_opt =
         Dal_pages_request.page_content
-          constants.Rollup_constants.dal
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           ~inbox_level
