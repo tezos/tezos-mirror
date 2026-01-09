@@ -121,7 +121,7 @@ let metadata (node_ctxt : _ Node_context.t) =
   Sc_rollup.Metadata.{address; origination_level}
 
 let generate_proof (node_ctxt : _ Node_context.t)
-    (game : Octez_smart_rollup.Game.t) (start_state : Context.pvmstate) =
+    (game : Octez_smart_rollup.Game.t) (start_state : _ Context.pvmstate) =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let snapshot =
