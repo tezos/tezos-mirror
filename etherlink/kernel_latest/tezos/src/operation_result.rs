@@ -9,6 +9,7 @@ use crate::operation::{
     ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
     OperationContent, OriginationContent, RevealContent, TransferContent,
 };
+use mir::ast::Entrypoint;
 use mir::gas;
 use mir::gas::interpret_cost::SigCostError;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
@@ -309,6 +310,10 @@ impl OperationKind for OriginationContent {
     type Success = OriginationSuccess;
 }
 
+impl OperationKind for EventContent {
+    type Success = EventSuccess;
+}
+
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
 #[derive(PartialEq, Debug, BinWriter)]
 pub enum TransferTarget {
@@ -404,6 +409,11 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+}
+
+#[derive(PartialEq, Debug, BinWriter)]
+pub struct EventSuccess {
+    pub consumed_milligas: Narith,
 }
 
 impl Default for TransferSuccess {
@@ -527,12 +537,37 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
     pub result: ContentResult<M>,
 }
 
+// Unlike transfers and originations, there is no event kind in Tezos external operations.
+// This structure is only used to build the
+// `InternalOperationSum::Event` receipt, so it is intentionally *not* added to
+// `sdk/rust/protocol/src/operation.rs`.
+//
+// Field mapping / encoding notes (Rust/MIR/OCaml):
+// - `ty` is `Or<Type, Vec<u8>>` in MIR, and ends up as a Micheline-encoded `Script.expr` in OCaml.
+// - `tag` corresponds to `Option<FieldAnnotation<'a>>` in MIR and `Entrypoint.t` in OCaml. We keep
+//   it as an `Option` because it is encoded as an `opt` on the OCaml side; when absent on decode,
+//   OCaml uses `Entrypoint.is_default`.
+// - `payload` corresponds to `TypedValue<'a>` in MIR and a Micheline-encoded `Script.expr` in OCaml.
+//   We keep it as an `Option` because it is encoded as an `opt` on the OCaml side; when absent on
+//   decode, OCaml uses `Script_repr.unit`.
+//
+// See: `Event` case in `internal_operation_contents` type and `event_case` value
+// in `src/proto_alpha/lib_protocol/apply_internal_results.ml`.
+#[derive(PartialEq, Debug, Clone, BinWriter)]
+pub struct EventContent {
+    pub ty: Vec<u8>,
+    pub tag: Option<Entrypoint>,
+    pub payload: Option<Vec<u8>>,
+}
+
 #[derive(PartialEq, Debug, BinWriter)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
     #[encoding(tag = 2)]
     Origination(InternalContentWithMetadata<OriginationContent>),
+    #[encoding(tag = 4)] // tag 3 is for delegation on L1
+    Event(InternalContentWithMetadata<EventContent>),
 }
 
 impl BalanceUpdate {
@@ -563,6 +598,9 @@ impl InternalOperationSum {
             InternalOperationSum::Origination(op_res) => {
                 op_res.result.backtrack_if_applied();
             }
+            InternalOperationSum::Event(op_res) => {
+                op_res.result.backtrack_if_applied();
+            }
         }
     }
     pub fn is_applied(&self) -> bool {
@@ -571,6 +609,9 @@ impl InternalOperationSum {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
             InternalOperationSum::Origination(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            InternalOperationSum::Event(op_res) => {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
         }
