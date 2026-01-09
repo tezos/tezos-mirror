@@ -648,13 +648,13 @@ evm_context_request_failed:
                   || { /* new_delayed_transaction */
                        "kind": $unistring,
                        "event":
-                         [ "transaction" || "deposit" || "fa_deposit",
+                         [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                   || { /* flush_delayed_inbox */
                        "kind": $unistring,
                        "event":
-                         [ [ [ "transaction" || "deposit" || "fa_deposit",
+                         [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
@@ -674,13 +674,13 @@ evm_context_request_failed:
                      || { /* new_delayed_transaction */
                           "kind": $unistring,
                           "event":
-                            [ "transaction" || "deposit" || "fa_deposit",
+                            [ "transaction" || "deposit" || "fa_deposit" || "operation",
                               $unistring,
                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                      || { /* flush_delayed_inbox */
                           "kind": $unistring,
                           "event":
-                            [ [ [ "transaction" || "deposit" || "fa_deposit",
+                            [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
@@ -692,7 +692,7 @@ evm_context_request_failed:
                        "nb_chunks": integer ∈ [-2^30, 2^30],
                        "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
-                   [ [ "transaction" || "deposit" || "fa_deposit",
+                   [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
@@ -709,7 +709,7 @@ evm_context_request_failed:
                  "evm_node_endpoint": $unistring,
                  "blueprint_with_events":
                    { "delayed_transactions":
-                       [ [ "transaction" || "deposit" || "fa_deposit",
+                       [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
@@ -739,7 +739,7 @@ evm_context_request_failed:
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
-                          [ "transaction" || "deposit" || "fa_deposit",
+                          [ "transaction" || "deposit" || "fa_deposit" || "operation",
                             $unistring,
                             /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
                  "hash": $unistring }
@@ -978,13 +978,13 @@ evm_events_new_event:
         || { /* new_delayed_transaction */
              "kind": $unistring,
              "event":
-               [ "transaction" || "deposit" || "fa_deposit",
+               [ "transaction" || "deposit" || "fa_deposit" || "operation",
                  $unistring,
                  /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
         || { /* flush_delayed_inbox */
              "kind": $unistring,
              "event":
-               [ [ [ "transaction" || "deposit" || "fa_deposit",
+               [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                      $unistring,
                      /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                  $timestamp.protocol,
@@ -2602,13 +2602,13 @@ evm_context_request_failed:
                   || { /* new_delayed_transaction */
                        "kind": $unistring,
                        "event":
-                         [ "transaction" || "deposit" || "fa_deposit",
+                         [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                   || { /* flush_delayed_inbox */
                        "kind": $unistring,
                        "event":
-                         [ [ [ "transaction" || "deposit" || "fa_deposit",
+                         [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                $unistring,
                                /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                            $timestamp.protocol,
@@ -2628,13 +2628,13 @@ evm_context_request_failed:
                      || { /* new_delayed_transaction */
                           "kind": $unistring,
                           "event":
-                            [ "transaction" || "deposit" || "fa_deposit",
+                            [ "transaction" || "deposit" || "fa_deposit" || "operation",
                               $unistring,
                               /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] }
                      || { /* flush_delayed_inbox */
                           "kind": $unistring,
                           "event":
-                            [ [ [ "transaction" || "deposit" || "fa_deposit",
+                            [ [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                                   $unistring,
                                   /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                               $timestamp.protocol,
@@ -2646,7 +2646,7 @@ evm_context_request_failed:
                        "nb_chunks": integer ∈ [-2^30, 2^30],
                        "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
-                   [ [ "transaction" || "deposit" || "fa_deposit",
+                   [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
@@ -2663,7 +2663,7 @@ evm_context_request_failed:
                  "evm_node_endpoint": $unistring,
                  "blueprint_with_events":
                    { "delayed_transactions":
-                       [ [ "transaction" || "deposit" || "fa_deposit",
+                       [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                            $unistring,
                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
                      "kernel_upgrade"?: [ $unistring, $timestamp.protocol ],
@@ -2693,7 +2693,7 @@ evm_context_request_failed:
                    || { /* Delayed_transaction */
                         "kind": "Delayed_transaction",
                         "transaction":
-                          [ "transaction" || "deposit" || "fa_deposit",
+                          [ "transaction" || "deposit" || "fa_deposit" || "operation",
                             $unistring,
                             /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
                  "hash": $unistring }

@@ -21,6 +21,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_storage::read_u16_le_default;
+use tezos_tezlink::operation::Operation;
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
@@ -42,6 +43,9 @@ pub const DELAYED_DEPOSIT_TAG: u8 = 0x02;
 
 // Tag that indicates the delayed transaction is a FA deposit.
 pub const DELAYED_FA_DEPOSIT_TAG: u8 = 0x03;
+
+// Tag that indicates the delayed transaction is a Tezos operation.
+pub const DELAYED_TEZOS_OPERATION_TAG: u8 = 0x04;
 
 /// Hash of a transaction
 ///
@@ -84,6 +88,7 @@ pub enum DelayedTransaction {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
     FaDeposit(FaDeposit),
+    Tezos(Operation),
 }
 
 impl Encodable for DelayedTransaction {
@@ -101,6 +106,13 @@ impl Encodable for DelayedTransaction {
             DelayedTransaction::FaDeposit(delayed_fa_deposit) => {
                 stream.append(&DELAYED_FA_DEPOSIT_TAG);
                 stream.append(delayed_fa_deposit);
+            }
+            DelayedTransaction::Tezos(op) => {
+                stream.append(&DELAYED_TEZOS_OPERATION_TAG);
+                // We don't want the kernel to panic if there's an error
+                // and we can't print a log as we don't have access to
+                // the host. So we just ignore the result.
+                let _ = op.rlp_append(stream);
             }
         }
     }
@@ -130,6 +142,10 @@ impl Decodable for DelayedTransaction {
             DELAYED_FA_DEPOSIT_TAG => {
                 let fa_deposit = FaDeposit::decode(&payload)?;
                 Ok(DelayedTransaction::FaDeposit(fa_deposit))
+            }
+            DELAYED_TEZOS_OPERATION_TAG => {
+                let op = Operation::decode(&payload)?;
+                Ok(DelayedTransaction::Tezos(op))
             }
             _ => Err(DecoderError::Custom("unknown tag")),
         }
@@ -199,7 +215,8 @@ impl DelayedInbox {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
-            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit)
+            TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit),
+            TransactionContent::TezosDelayed(op) => DelayedTransaction::Tezos(op),
         };
         let item = DelayedInboxItem {
             transaction,
@@ -235,6 +252,10 @@ impl DelayedInbox {
             DelayedTransaction::FaDeposit(fa_deposit) => Transaction {
                 tx_hash: tx_hash.0,
                 content: TransactionContent::FaDeposit(fa_deposit),
+            },
+            DelayedTransaction::Tezos(op) => Transaction {
+                tx_hash: tx_hash.0,
+                content: TransactionContent::TezosDelayed(op),
             },
         }
     }

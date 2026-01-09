@@ -198,7 +198,7 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-fn path_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<OwnedPath, Error> {
+pub fn path_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<OwnedPath, Error> {
     let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
     let address_path =
         OwnedPath::try_from(address_path).map_err(|e| Error::Custom(e.to_string()))?;

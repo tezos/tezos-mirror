@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS;
+use crate::chains::ExperimentalFeatures;
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::tick_model::constants::{
     TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE, TICKS_FOR_DELAYED_MESSAGES,
@@ -306,6 +307,7 @@ pub struct SequencerParsingContext {
     // Number of the next expected blueprint, handling blueprints
     // before this is useless.
     pub next_blueprint_number: U256,
+    pub experimental_features: ExperimentalFeatures,
 }
 
 fn check_unsigned_blueprint_chunk(
@@ -457,14 +459,51 @@ mod delayed_chunked_transaction {
     // We consider that all messages are transmitted within a single
     // L1 operation, but in several inbox messages.
 
-    use crate::parsing::BufferTransactionChunks;
+    use crate::{
+        parsing::BufferTransactionChunks,
+        tezosx::{ETHEREUM_RUNTIME_TAG, TEZOS_RUNTIME_TAG},
+    };
+    use rlp::DecoderError;
     use sha3::{Digest, Keccak256};
+    use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::{
         transaction::TransactionHash, tx_common::EthereumTransactionCommon,
     };
+    use tezos_tezlink::operation::Operation;
 
     pub const NEW_CHUNK_TAG: u8 = 0x0;
     pub const CHUNK_TAG: u8 = 0x1;
+
+    #[allow(clippy::large_enum_variant)]
+    pub enum Transaction {
+        Ethereum(EthereumTransactionCommon),
+        Tezos(Operation),
+    }
+
+    impl Transaction {
+        pub fn from_bytes(bytes: &[u8]) -> Result<Self, DecoderError> {
+            if bytes.is_empty() {
+                return Err(DecoderError::Custom("Empty transaction bytes"));
+            }
+
+            let (tag, remaining) = bytes.split_first().unwrap();
+            match *tag {
+                ETHEREUM_RUNTIME_TAG => {
+                    let tx: EthereumTransactionCommon =
+                        EthereumTransactionCommon::from_bytes(remaining)?;
+                    Ok(Transaction::Ethereum(tx))
+                }
+                TEZOS_RUNTIME_TAG => {
+                    let tx: Operation =
+                        Operation::nom_read_exact(remaining).map_err(|_| {
+                            DecoderError::Custom("Failed to parse Tezos operation")
+                        })?;
+                    Ok(Transaction::Tezos(tx))
+                }
+                _ => Err(DecoderError::Custom("Unknown transaction tag")),
+            }
+        }
+    }
 
     pub fn parse_new_chunk(
         bytes: &[u8],
@@ -479,6 +518,38 @@ mod delayed_chunked_transaction {
                 chunks: vec![],
             })
         }
+    }
+
+    pub fn parse_multi_runtime_chunk(
+        bytes: &[u8],
+        buffer_transaction_chunks_opt: &mut Option<BufferTransactionChunks>,
+    ) -> Option<(Transaction, TransactionHash)> {
+        let is_complete = match buffer_transaction_chunks_opt.as_mut() {
+            None => {
+                // Again, it's the responsibility of the contract to respect
+                // the message protocol.
+                return None;
+            }
+            Some(buffer_transaction_chunks) => {
+                buffer_transaction_chunks.chunks.extend(bytes);
+                buffer_transaction_chunks.accumulated += 1;
+                buffer_transaction_chunks.total == buffer_transaction_chunks.accumulated
+            }
+        };
+
+        if !is_complete {
+            return None;
+        }
+
+        // Transaction is complete.
+        //
+        // Drop the mutable borrow before clearing the buffer.
+        let buffer_transaction_chunks = buffer_transaction_chunks_opt.take()?;
+        let chunks = buffer_transaction_chunks.chunks;
+
+        let transaction = Transaction::from_bytes(&chunks).ok()?;
+        let tx_hash: TransactionHash = Keccak256::digest(&chunks).into();
+        Some((transaction, tx_hash))
     }
 
     pub fn parse_chunk(
@@ -556,28 +627,60 @@ impl Parsable for SequencerInput {
 
         let (tag, remaining) = parsable!(bytes.split_first());
 
-        let (tx, tx_hash) = parsable!(match *tag {
-            delayed_chunked_transaction::NEW_CHUNK_TAG => {
-                delayed_chunked_transaction::parse_new_chunk(
-                    remaining,
-                    &mut context.buffer_transaction_chunks,
-                );
-                None
-            }
-            delayed_chunked_transaction::CHUNK_TAG =>
-                delayed_chunked_transaction::parse_chunk(
-                    remaining,
-                    &mut context.buffer_transaction_chunks,
-                ),
-            _ => None,
-        });
+        if context.experimental_features.is_tezos_runtime_enabled() {
+            let (tx, tx_hash) = parsable!(match *tag {
+                delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                    delayed_chunked_transaction::parse_new_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    );
+                    None
+                }
+                delayed_chunked_transaction::CHUNK_TAG =>
+                    delayed_chunked_transaction::parse_multi_runtime_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    ),
+                _ => None,
+            });
 
-        InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
-            Transaction {
-                tx_hash,
-                content: TransactionContent::EthereumDelayed(tx),
-            },
-        ))))
+            InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
+                Transaction {
+                    tx_hash,
+                    content: match tx {
+                        delayed_chunked_transaction::Transaction::Ethereum(tx) => {
+                            TransactionContent::EthereumDelayed(tx)
+                        }
+                        delayed_chunked_transaction::Transaction::Tezos(op) => {
+                            TransactionContent::TezosDelayed(op)
+                        }
+                    },
+                },
+            ))))
+        } else {
+            let (tx, tx_hash) = parsable!(match *tag {
+                delayed_chunked_transaction::NEW_CHUNK_TAG => {
+                    delayed_chunked_transaction::parse_new_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    );
+                    None
+                }
+                delayed_chunked_transaction::CHUNK_TAG =>
+                    delayed_chunked_transaction::parse_chunk(
+                        remaining,
+                        &mut context.buffer_transaction_chunks,
+                    ),
+                _ => None,
+            });
+
+            InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
+                Transaction {
+                    tx_hash,
+                    content: TransactionContent::EthereumDelayed(tx),
+                },
+            ))))
+        }
     }
 
     fn on_deposit(context: &mut Self::Context) {

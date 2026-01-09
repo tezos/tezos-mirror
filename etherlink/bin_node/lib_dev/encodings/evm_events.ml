@@ -45,7 +45,7 @@ let fail_decode_event tag =
       Internal_event.Simple.emit (Event.fail_decode_evm_event event) tag
 
 module Delayed_transaction = struct
-  type kind = Transaction | Deposit | Fa_deposit
+  type kind = EthereumTransaction | Deposit | Fa_deposit | TezosOperation
 
   type t = {
     kind : kind;
@@ -62,8 +62,8 @@ module Delayed_transaction = struct
           (Tag 0)
           ~title:"transaction"
           (constant "transaction")
-          (function Transaction -> Some () | _ -> None)
-          (function () -> Transaction);
+          (function EthereumTransaction -> Some () | _ -> None)
+          (function () -> EthereumTransaction);
         case
           (Tag 1)
           ~title:"deposit"
@@ -76,6 +76,12 @@ module Delayed_transaction = struct
           (constant "fa_deposit")
           (function Fa_deposit -> Some () | _ -> None)
           (function () -> Fa_deposit);
+        case
+          (Tag 3)
+          ~title:"operation"
+          (constant "operation")
+          (function TezosOperation -> Some () | _ -> None)
+          (function () -> TezosOperation);
       ]
 
   let encoding : t Data_encoding.t =
@@ -85,8 +91,8 @@ module Delayed_transaction = struct
       (fun (kind, hash, raw) -> {kind; hash; raw})
       (tup3 encoding_kind hash_encoding (string' Hex))
 
-  let of_rlp_content ?(transaction_tag = "\x03") ?(fa_deposit_tag = "\x04") hash
-      rlp_content =
+  let of_rlp_content ?(transaction_tag = "\x03") ?(fa_deposit_tag = "\x04")
+      ?(operation_tag = "\x05") hash rlp_content =
     match rlp_content with
     | Rlp.(List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
@@ -100,7 +106,10 @@ module Delayed_transaction = struct
            payload but have a different tag for transaction.
         *)
         | tag, Rlp.Value raw_tx when tag = transaction_tag ->
-            Some {kind = Transaction; hash; raw = Bytes.to_string raw_tx}
+            Some
+              {kind = EthereumTransaction; hash; raw = Bytes.to_string raw_tx}
+        | tag, Rlp.Value raw_op when tag = operation_tag ->
+            Some {kind = TezosOperation; hash; raw = Bytes.to_string raw_op}
         | tag, fa_deposit when tag = fa_deposit_tag ->
             (* Delayed inbox item has tag 3, inbox::transaction has tag 4. Event
                uses the inbox::transaction tag. *)
@@ -116,24 +125,27 @@ module Delayed_transaction = struct
     let open Rlp in
     let tag =
       (match kind with
-      | Transaction -> "\x03"
+      | EthereumTransaction -> "\x03"
       | Deposit -> "\x02"
-      | Fa_deposit -> "\x04")
+      | Fa_deposit -> "\x04"
+      | TezosOperation -> "\x05")
       |> Bytes.of_string
     in
     let hash = hash_to_bytes hash |> Bytes.of_string in
     let content =
       match kind with
-      | Transaction -> Value (Bytes.of_string raw)
+      | EthereumTransaction -> Value (Bytes.of_string raw)
       | Deposit -> decode_exn (Bytes.of_string raw)
       | Fa_deposit -> decode_exn (Bytes.of_string raw)
+      | TezosOperation -> Value (Bytes.of_string raw)
     in
     List [Value hash; List [Value tag; content]]
 
   let pp_kind fmt = function
-    | Transaction -> Format.pp_print_string fmt "Transaction"
+    | EthereumTransaction -> Format.pp_print_string fmt "Transaction"
     | Deposit -> Format.pp_print_string fmt "Deposit"
     | Fa_deposit -> Format.pp_print_string fmt "FA_Deposit"
+    | TezosOperation -> Format.pp_print_string fmt "Operation"
 
   let pp fmt {raw; kind; _} =
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)

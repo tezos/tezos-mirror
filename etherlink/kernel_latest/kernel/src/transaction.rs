@@ -21,6 +21,7 @@ use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
+use tezos_tezlink::operation::Operation;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
@@ -29,12 +30,14 @@ pub enum TransactionContent {
     Deposit(Deposit),
     EthereumDelayed(EthereumTransactionCommon),
     FaDeposit(FaDeposit),
+    TezosDelayed(Operation),
 }
 
 const ETHEREUM_TX_TAG: u8 = 1;
 const DEPOSIT_TX_TAG: u8 = 2;
 const ETHEREUM_DELAYED_TX_TAG: u8 = 3;
 const FA_DEPOSIT_TX_TAG: u8 = 4;
+const TEZOS_DELAYED_OPERATION_TX_TAG: u8 = 5;
 
 impl Encodable for TransactionContent {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
@@ -55,6 +58,13 @@ impl Encodable for TransactionContent {
             TransactionContent::FaDeposit(fa_dep) => {
                 stream.append(&FA_DEPOSIT_TX_TAG);
                 fa_dep.rlp_append(stream)
+            }
+            TransactionContent::TezosDelayed(op) => {
+                stream.append(&TEZOS_DELAYED_OPERATION_TX_TAG);
+                // We don't want the kernel to panic if there's an error
+                // and we can't print a log as we don't have access to
+                // the host. So we just ignore the result.
+                let _ = op.rlp_append(stream);
             }
         }
     }
@@ -87,6 +97,10 @@ impl Decodable for TransactionContent {
                 let fa_deposit = FaDeposit::decode(&tx)?;
                 Ok(Self::FaDeposit(fa_deposit))
             }
+            TEZOS_DELAYED_OPERATION_TX_TAG => {
+                let operation = Operation::decode(&tx)?;
+                Ok(Self::TezosDelayed(operation))
+            }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),
         }
     }
@@ -107,6 +121,7 @@ impl Transaction {
                 e.data.len() as u64
             }
             TransactionContent::FaDeposit(_) => 0,
+            TransactionContent::TezosDelayed(op) => op.content.len() as u64,
         }
     }
 
@@ -114,6 +129,7 @@ impl Transaction {
         match &self.content {
             TransactionContent::Deposit(_)
             | TransactionContent::EthereumDelayed(_)
+            | TransactionContent::TezosDelayed(_)
             | TransactionContent::FaDeposit(_) => true,
             TransactionContent::Ethereum(_) => false,
         }
@@ -127,6 +143,7 @@ impl Transaction {
                 tx_execution_gas_limit(e, fees, true)
             }
             TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_QUEUE_GAS_LIMIT),
+            TransactionContent::TezosDelayed(_) => Ok(0),
         }
     }
 
@@ -143,6 +160,7 @@ impl Transaction {
             }
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.to,
+            TransactionContent::TezosDelayed(_) => None,
         })
     }
 
@@ -153,6 +171,7 @@ impl Transaction {
             | TransactionContent::EthereumDelayed(transaction) => {
                 transaction.data.clone()
             }
+            TransactionContent::TezosDelayed(_) => vec![],
         }
     }
 
@@ -160,6 +179,7 @@ impl Transaction {
         match &self.content {
             TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
             &TransactionContent::FaDeposit(_) => U256::zero(),
+            TransactionContent::TezosDelayed(_) => U256::zero(),
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.value,
         }
@@ -167,7 +187,9 @@ impl Transaction {
 
     pub fn nonce(&self) -> u64 {
         match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => 0,
+            TransactionContent::Deposit(_)
+            | TransactionContent::FaDeposit(_)
+            | TransactionContent::TezosDelayed(_) => 0,
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.nonce,
         }
@@ -175,7 +197,9 @@ impl Transaction {
 
     pub fn signature(&self) -> Option<TxSignature> {
         match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => None,
+            TransactionContent::Deposit(_)
+            | TransactionContent::FaDeposit(_)
+            | TransactionContent::TezosDelayed(_) => None,
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => {
                 transaction.signature.clone()
@@ -211,10 +235,12 @@ impl Decodable for Transaction {
 impl Transaction {
     pub fn type_(&self) -> TransactionType {
         match &self.content {
-            // The deposit is considered arbitrarily as a legacy transaction
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => {
-                TransactionType::Legacy
-            }
+            // The deposits and Tezos operations are considered arbitrarily as legacy transactions
+            // TODO: We probably wants to filter the Tezos operations more precisely in the future
+            // and have this function return an Option<TransactionType>
+            TransactionContent::Deposit(_)
+            | TransactionContent::FaDeposit(_)
+            | TransactionContent::TezosDelayed(_) => TransactionType::Legacy,
             TransactionContent::Ethereum(tx)
             | TransactionContent::EthereumDelayed(tx) => tx.type_,
         }

@@ -403,7 +403,7 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 (** Install a events handler. *)
 val on_event : t -> (event -> unit) -> unit
 
-type delayed_transaction_kind = Deposit | Transaction | FaDeposit
+type delayed_transaction_kind = Deposit | Transaction | FaDeposit | Operation
 
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind

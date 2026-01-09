@@ -70,6 +70,7 @@ mod simulation;
 mod stage_one;
 mod storage;
 mod sub_block;
+mod tezosx;
 mod tick_model;
 mod transaction;
 mod upgrade;

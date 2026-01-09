@@ -51,7 +51,18 @@ struct
 
   let get_script _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
 
-  let manager_key _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
+  let manager_key _chain block contract =
+    let open Lwt_result_syntax in
+    on_head_block block @@ fun state ->
+    on_implicit_account contract @@ fun pkh ->
+    let* read_result =
+      Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+    in
+    match read_result with
+    | Some bytes ->
+        let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+        return info.public_key
+    | None -> failwith "Account not found"
 
   let counter _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
 

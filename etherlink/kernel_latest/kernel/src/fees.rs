@@ -91,7 +91,7 @@ impl TransactionContent {
         match self {
             Self::Deposit(_) => FeeUpdates::for_deposit(execution_gas_used),
             Self::Ethereum(tx) => FeeUpdates::for_tx(tx, block_fees, execution_gas_used),
-            Self::EthereumDelayed(_) => {
+            Self::EthereumDelayed(_) | Self::TezosDelayed(_) => {
                 FeeUpdates::for_delayed_tx(block_fees, execution_gas_used)
             }
             Self::FaDeposit(_) => FeeUpdates::for_fa_deposit(execution_gas_used),

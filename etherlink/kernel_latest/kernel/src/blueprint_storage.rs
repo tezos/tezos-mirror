@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::chains::{ChainConfigTrait, ChainHeaderTrait};
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, ExperimentalFeatures};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
@@ -517,20 +517,33 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
 ) -> anyhow::Result<(DelayedTransactionFetchingResult<Transaction>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
+    let experimental_features = ExperimentalFeatures::read_from_storage(host);
     for tx_hash in delayed_hashes {
         let tx = delayed_inbox.find_transaction(host, tx_hash)?;
-        // This is overestimated, as the transactions cannot be chunked in the
-        // delayed bridge.
-        total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
-        // If the size would overflow the 512KB, reject the blueprint
-        if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
-            return Ok((
-                DelayedTransactionFetchingResult::BlueprintTooLarge,
-                total_size,
-            ));
-        }
         match tx {
-            Some(tx) => delayed_txs.push(tx.0),
+            Some(tx) => {
+                if let TransactionContent::TezosDelayed(_) = &tx.0.content {
+                    if !experimental_features.is_tezos_runtime_enabled() {
+                        log!(
+                            host,
+                            Error,
+                            "TezosDelayed transaction found in delayed inbox while Tezos runtime is disabled. Skipping."
+                        );
+                        continue;
+                    }
+                }
+                // This is overestimated, as the transactions cannot be chunked in the
+                // delayed bridge.
+                total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
+                // If the size would overflow the 512KB, reject the blueprint
+                if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
+                    return Ok((
+                        DelayedTransactionFetchingResult::BlueprintTooLarge,
+                        total_size,
+                    ));
+                }
+                delayed_txs.push(tx.0)
+            }
             None => {
                 return Ok((
                     DelayedTransactionFetchingResult::DelayedHashMissing(tx_hash),

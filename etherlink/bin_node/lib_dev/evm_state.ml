@@ -458,6 +458,7 @@ let get_delayed_inbox_item evm_state hash =
         @@ Evm_events.Delayed_transaction.of_rlp_content
              ~transaction_tag:"\x01"
              ~fa_deposit_tag:"\x03"
+             ~operation_tag:"\x04"
              hash
              rlp_item
       in
