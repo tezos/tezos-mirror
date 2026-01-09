@@ -1042,8 +1042,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer ?additional_sequencer_keys ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?(kernels = Kernel.etherlink_all) ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
@@ -1131,7 +1131,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
     ?tez_bootstrap_accounts ?sequencer ?additional_sequencer_keys
-    ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?sequencer_pool_address ?(kernels = Kernel.etherlink_all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window

@@ -8,7 +8,7 @@
 
 type t = Mainnet | Latest
 
-let all = [Mainnet; Latest]
+let etherlink_all = [Mainnet; Latest]
 
 let to_uses_and_tags = function
   | Mainnet -> ("mainnet", Constant.WASM.mainnet_kernel)
