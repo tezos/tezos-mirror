@@ -243,6 +243,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
       ~patch_config
       ~mode:observer_mode
       ~config_file
+      ~end_test_on_failure:true
       ?history_mode
       ?websockets
       (Evm_node.endpoint evm_node)
@@ -510,7 +511,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
     ?history_mode ?spawn_rpc ?periodic_snapshot_path ?(signatory = false)
-    ?tx_queue ?(sequencer_sunset_sec = 0) ?with_runtimes protocol =
+    ?tx_queue ?(sequencer_sunset_sec = 0) ?with_runtimes ?instant_confirmations
+    protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -637,7 +639,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?spawn_rpc
-      ~preconfirmation_stream_enabled:(not enable_multichain)
+      ~preconfirmation_stream_enabled:
+        (Option.value ~default:(not enable_multichain) instant_confirmations)
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -650,6 +653,11 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?periodic_snapshot_path
+      ~preconfirmation_stream_enabled:
+        (Option.value
+           ~default:
+             ((not enable_multichain) && kernel = Constant.WASM.evm_kernel)
+           instant_confirmations)
       ()
   in
   let proxy_patch_config =
@@ -762,7 +770,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?spawn_rpc ?periodic_snapshot_path ?signatory
-    ?l2_chains ?sequencer_sunset_sec ?with_runtimes protocol =
+    ?l2_chains ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations
+    protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
     Option.value
@@ -822,6 +831,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?signatory
       ?sequencer_sunset_sec
       ?with_runtimes
+      ?instant_confirmations
       protocol
   in
   return (multichain_setup_to_single ~setup:sequencer_setup)
@@ -843,7 +853,8 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
-    ?sequencer_sunset_sec ?with_runtimes body ~title ~tags protocols =
+    ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body ~title
+    ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -915,6 +926,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?signatory
         ?sequencer_sunset_sec
         ?with_runtimes
+        ?instant_confirmations
         protocol
     in
     body sequencer_setup protocol
@@ -964,8 +976,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?commitment_period ?challenge_window ?uses ?additional_uses
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
-    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes body ~title ~tags
-    protocols =
+    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes
+    ?instant_confirmations body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -1016,6 +1028,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~l2_setups
     ?sequencer_sunset_sec
     ?with_runtimes
+    ?instant_confirmations
     body
     ~title
     ~tags
@@ -1035,8 +1048,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
     ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?history_mode ?tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
-    ~tags body protocols =
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec
+    ?instant_confirmations ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -1084,6 +1097,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?signatory
         ?l2_setups
         ?sequencer_sunset_sec
+        ?instant_confirmations
         ~title
         ~tags
         body
@@ -1125,8 +1139,8 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
-    ~tags body protocols =
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec
+    ?instant_confirmations ~title ~tags body protocols =
   let register_cases = function
     | Register_both {additional_tags_with; additional_tags_without} ->
         [(false, additional_tags_without); (true, additional_tags_with)]
@@ -1192,6 +1206,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
             ?signatory
             ?l2_setups
             ?sequencer_sunset_sec
+            ?instant_confirmations
             ~title
             ~tags:(dal_tags @ multichain_tags @ tags)
             body

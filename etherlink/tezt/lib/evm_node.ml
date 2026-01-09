@@ -966,12 +966,13 @@ let run_args evm_node =
   in
   mode_args @ shared_args
 
-let run ?(wait = true) ?(extra_arguments = []) evm_node =
+let run ?(wait = true) ?(end_test_on_failure = false) ?(extra_arguments = [])
+    evm_node =
   on_event evm_node (handle_is_ready_event evm_node) ;
   on_event evm_node (handle_blueprint_injected_event evm_node) ;
   on_event evm_node (handle_blueprint_applied_event evm_node) ;
   on_event evm_node (handle_blueprint_finalized_event evm_node) ;
-  let on_terminate _status =
+  let on_terminate (status : Unix.process_status) =
     (* Cancel all event listeners. *)
     trigger_ready evm_node None ;
     let pending_blueprint_injected =
@@ -998,7 +999,10 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (fun _ pending_list ->
         List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
       pending_blueprint_finalized ;
-    unit
+    match status with
+    | WEXITED 100 when end_test_on_failure ->
+        Test.fail "%s exited unexpectedly" evm_node.name
+    | _ -> unit
   in
   let env =
     match Sys.getenv_opt "RUST_LOG" with
@@ -1295,6 +1299,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_queue_tx_per_addr_limit
+        @ Cli_arg.optional_switch "fail-on-divergence" true
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -1438,9 +1443,9 @@ let patch_config_gc ?history_mode json =
        | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
        | Full retention -> `String (Format.sprintf "full:%d" retention))
 
-let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
-    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets
-    ?extra_arguments rollup_node =
+let init ?patch_config ?name ?runner ?mode ?end_test_on_failure ?data_dir
+    ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc
+    ?websockets ?extra_arguments rollup_node =
   let evm_node =
     create
       ?name
@@ -1473,7 +1478,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
                 `O [("protected_port", `Float (float_of_int port))]))
     else return ()
   in
-  let* () = run ?extra_arguments evm_node in
+  let* () = run ?extra_arguments ?end_test_on_failure evm_node in
   return evm_node
 
 let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node

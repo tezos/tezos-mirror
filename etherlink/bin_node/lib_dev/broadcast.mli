@@ -34,6 +34,7 @@ type message =
     }
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
   | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
+  | Block_hash of Ethereum_types.block_hash
 
 val encoding : message Octez_telemetry.Traceparent.instrumented Data_encoding.t
 
@@ -68,6 +69,10 @@ val notify_inclusion : transaction -> Ethereum_types.hash -> unit
 (** [notify_dropped ~hash ~reason] advertizes a dropped transaction with its [hash] and [reason]
     to the broadcast stream *)
 val notify_dropped : hash:Ethereum_types.hash -> reason:string -> unit
+
+(** [notify_block_hash tx] advertizes [hash] as the block hash produced by the latest blueprint
+    application of the sequencer *)
+val notify_block_hash : Ethereum_types.block_hash -> unit
 
 (** Type representing the result of a transaction pre-confirmed execution. *)
 type transaction_result = {

@@ -40,6 +40,12 @@ module Single_tx = struct
   let input_tx = single_tx_path ^ "/input_tx"
 end
 
+module Assemble_block = struct
+  let path = World_state.make "/assemble_block"
+
+  let input = path ^ "/input"
+end
+
 let etherlink_root = World_state.make ""
 
 let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =

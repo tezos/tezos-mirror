@@ -40,6 +40,18 @@ applied_upgrade:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+assemble_block_diverged:
+  description: Assemble block diverged on level {level}, node is going to re-execute the full blueprint
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* assemble_block_diverged version 0 */
+      "assemble_block_diverged.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
 background_task_error:
   description: background task {name} failed with error {error}
   level: fatal
@@ -694,7 +706,8 @@ evm_context_request_failed:
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
-                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
+                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                 "block_hash"?: $unistring }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
             || { /* Patch_state */
@@ -1913,6 +1926,18 @@ sandbox_started:
          Decimal representation of a big number */
       string
   
+seq_block_hash_missing:
+  description: Assemble block can not validate its output for levl {level} because sequencer block hash is missing
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* seq_block_hash_missing version 0 */
+      "seq_block_hash_missing.v0": $positive_bignum }
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+  
 sequencer_disabled_native_execution:
   description: native execution is disabled for block application in sequencer mode
   level: warning
@@ -2648,7 +2673,8 @@ evm_context_request_failed:
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit" || "operation",
                        $unistring,
-                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
+                       /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ],
+                 "block_hash"?: $unistring }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
             || { /* Patch_state */

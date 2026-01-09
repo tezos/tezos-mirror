@@ -167,7 +167,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
     ~next_blueprint_number
     ~instant_confirmations:
       config.experimental_features.preconfirmation_stream_enabled
-    ~on_new_blueprint:(fun (Qty number) blueprint ->
+    ~on_new_blueprint:(fun (Qty number) blueprint ~expected_block_hash ->
       let (Qty level) = blueprint.blueprint.number in
       if Z.Compare.(number = level) then (
         let* () =
@@ -175,6 +175,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
           Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
         in
         let* () = Prevalidator.refresh_state () in
+        Option.iter Broadcast.notify_block_hash expected_block_hash ;
         Broadcast.notify_blueprint blueprint ;
         Metrics.set_level ~level:number ;
         let* () = set_metrics_confirmed_levels ctxt in

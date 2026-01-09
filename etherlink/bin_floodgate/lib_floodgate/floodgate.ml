@@ -684,7 +684,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data () =
     ~rpc_timeout:Network_info.timeout
     ~next_blueprint_number
     ~instant_confirmations
-    ~on_new_blueprint:(fun number blueprint ->
+    ~on_new_blueprint:(fun number blueprint ~expected_block_hash:_ ->
       let*! () = Floodgate_events.received_blueprint number in
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with

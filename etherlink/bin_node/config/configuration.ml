@@ -205,7 +205,11 @@ type gcp_kms = {
   gcloud_path : string;
 }
 
-type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
+type observer = {
+  evm_node_endpoint : Uri.t;
+  rollup_node_tracking : bool;
+  fail_on_divergence : bool;
+}
 
 type proxy = {
   finalized_view : bool option;
@@ -576,8 +580,9 @@ let observer_evm_node_endpoint = function
   | Shadownet -> "https://relay.shadownet.etherlink.com"
 
 let observer_config_dft ~evm_node_endpoint
-    ?(rollup_node_tracking = default_rollup_node_tracking) () =
-  {evm_node_endpoint; rollup_node_tracking}
+    ?(rollup_node_tracking = default_rollup_node_tracking)
+    ?(fail_on_divergence = false) () =
+  {evm_node_endpoint; rollup_node_tracking; fail_on_divergence}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -857,14 +862,15 @@ let observer_encoding ?network () =
     | None -> req ~description name encoding
   in
   conv
-    (fun {evm_node_endpoint; rollup_node_tracking} ->
-      (Uri.to_string evm_node_endpoint, rollup_node_tracking))
-    (fun (evm_node_endpoint, rollup_node_tracking) ->
+    (fun {evm_node_endpoint; rollup_node_tracking; fail_on_divergence} ->
+      (Uri.to_string evm_node_endpoint, rollup_node_tracking, fail_on_divergence))
+    (fun (evm_node_endpoint, rollup_node_tracking, fail_on_divergence) ->
       {
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         rollup_node_tracking;
+        fail_on_divergence;
       })
-    (obj2
+    (obj3
        (evm_node_endpoint_field
           ~description:
             "Upstream EVM node endpoint used to fetch speculative blueprints \
@@ -878,7 +884,13 @@ let observer_encoding ?network () =
              upstream EVM node."
           "rollup_node_tracking"
           bool
-          default_rollup_node_tracking))
+          default_rollup_node_tracking)
+       (dft
+          ~description:
+            "Enable or disable hard failure on assemble block divergence"
+          "fail_on_divergence"
+          bool
+          false))
 
 let rpc_server_encoding =
   let open Data_encoding in
@@ -2081,7 +2093,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots ?sunset_sec ?rpc_timeout configuration =
+      ?dal_slots ?sunset_sec ?rpc_timeout ?fail_on_divergence configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2185,6 +2197,10 @@ module Cli = struct
                   value
                     ~default:observer_config.rollup_node_tracking
                     (map not dont_track_rollup_node));
+              fail_on_divergence =
+                Option.value
+                  ~default:observer_config.fail_on_divergence
+                  fail_on_divergence;
             }
       | None ->
           Option.map
@@ -2295,7 +2311,7 @@ module Cli = struct
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
       ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
-      ?rpc_timeout () =
+      ?rpc_timeout ?fail_on_divergence () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2335,6 +2351,7 @@ module Cli = struct
          ?history_mode
          ?sunset_sec
          ?rpc_timeout
+         ?fail_on_divergence
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
@@ -2346,7 +2363,8 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode ?sunset_sec ?rpc_timeout config_file =
+      ?network ?history_mode ?sunset_sec ?rpc_timeout ?fail_on_divergence
+      config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2407,6 +2425,7 @@ module Cli = struct
           ?dal_slots
           ?sunset_sec
           ?rpc_timeout
+          ?fail_on_divergence
           configuration
       in
       return configuration
@@ -2451,6 +2470,7 @@ module Cli = struct
           ?history_mode
           ?sunset_sec
           ?rpc_timeout
+          ?fail_on_divergence
           ()
       in
       return config

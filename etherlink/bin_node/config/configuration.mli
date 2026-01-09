@@ -152,7 +152,11 @@ type sequencer = {
   sunset_sec : int64;
 }
 
-type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
+type observer = {
+  evm_node_endpoint : Uri.t;
+  rollup_node_tracking : bool;
+  fail_on_divergence : bool;
+}
 
 type proxy = {
   finalized_view : bool option;
@@ -288,7 +292,11 @@ val observer_config_exn : t -> observer tzresult
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
-  evm_node_endpoint:Uri.t -> ?rollup_node_tracking:bool -> unit -> observer
+  evm_node_endpoint:Uri.t ->
+  ?rollup_node_tracking:bool ->
+  ?fail_on_divergence:bool ->
+  unit ->
+  observer
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
@@ -353,6 +361,7 @@ module Cli : sig
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     unit ->
     t
 
@@ -394,6 +403,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     t ->
     t
 
@@ -436,6 +446,7 @@ module Cli : sig
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
     ?rpc_timeout:float ->
+    ?fail_on_divergence:bool ->
     string ->
     t tzresult Lwt.t
 end

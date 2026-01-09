@@ -6907,17 +6907,10 @@ let test_blueprint_is_limited_in_size =
       "Checks the sequencer doesn't produce blueprint bigger than the given \
        maximum number of chunks"
     ~use_dal:ci_enabled_dal_registration
+      (* IC set to false because transaction dropping mechanism from IC workflow invalidates it:
+      Remaining transactions are not included in the last block *)
+    ~instant_confirmations:false
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
-  (* Preconfirmation set to false because transaction dropping mechanism from IC workflow invalidates it:
-    Remaining transactions are not included in the last block *)
-  let* () = Evm_node.terminate sequencer in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~preconfirmation_stream_enabled:false
-      ()
-  in
-  let* () = Evm_node.Config_file.update sequencer patch_config in
-  let* () = Evm_node.run sequencer in
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, hashes = batch_n_transactions ~evm_node:sequencer txs in
   (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
@@ -6999,20 +6992,13 @@ let test_blueprint_limit_with_delayed_inbox =
        maximum number of chunks and count delayed transactions size in the \
        blueprint"
     ~use_dal:ci_enabled_dal_registration
+      (* IC set to false because transaction dropping mechanism from IC workflow invalidates it:
+      Delayed transactions are included by remaining common transaction are not *)
+    ~instant_confirmations:false
   @@
   fun {sc_rollup_node; client; sequencer; sc_rollup_address; l1_contracts; _}
       _protocol
     ->
-  (* Preconfirmation set to false because transaction dropping mechanism from IC workflow invalidates it:
-    Delayed transactions are included by remaining common transaction are not *)
-  let* () = Evm_node.terminate sequencer in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~preconfirmation_stream_enabled:false
-      ()
-  in
-  let* () = Evm_node.Config_file.update sequencer patch_config in
-  let* () = Evm_node.run sequencer in
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   (* The first 3 transactions will be sent to the delayed inbox *)
   let delayed_txs, direct_txs = Tezos_base.TzPervasives.TzList.split_n 3 txs in
@@ -12928,6 +12914,8 @@ let test_withdrawal_events =
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fast_withdrawal:true
+      ~instant_confirmations:false
+        (* TODO: Specify next block timestamp with a test RPC *)
       protocol
   in
 
@@ -13016,6 +13004,8 @@ let test_fa_deposit_and_withdrawals_events =
       ~enable_multichain:false
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
+      ~instant_confirmations:false
+        (* TODO: Specify next block timestamp with a test RPC *)
       protocol
   in
   (* Send a FA deposit to the delayed inbox *)
@@ -13643,6 +13633,8 @@ let test_sequencer_key_change =
     ~sequencer:sequencer_owner
     ~additional_sequencer_keys:[new_sequencer_owner]
     ~genesis_timestamp
+    ~instant_confirmations:false
+  (* TODO: Specify next block timestamp with a test RPC *)
   @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let new_key = new_sequencer_owner.public_key in

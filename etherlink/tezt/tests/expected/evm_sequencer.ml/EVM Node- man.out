@@ -558,9 +558,9 @@ Configuration commands:
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
       [--maximum-blueprints-ahead <AHEAD>] [--maximum-blueprints-catch-up <CATCH_UP>]
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
-      [--history <archive | rolling:n | full:n>] [--dont-track-rollup-node]
-      [-d --wallet-dir <path>] [-f --force] [--dal-slots <slot indices>] [--network <network>]
-      [--sunset-sec <SEC>]
+      [--history <archive | rolling:n | full:n>] [--fail-on-divergence]
+      [--dont-track-rollup-node] [-d --wallet-dir <path>] [-f --force]
+      [--dal-slots <slot indices>] [--network <network>] [--sunset-sec <SEC>]
     Create an initial config with default value.
     If the <rollup-node-endpoint> is set then adds the configuration for the proxy mode. If
     the  <sequencer-key> is set,then adds the configuration for the sequencer mode. If the
@@ -631,6 +631,7 @@ Configuration commands:
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --history <archive | rolling:n | full:n>: History mode for the EVM node. ':n' means n days
       of history.
+    --fail-on-divergence: Instant confirmation observer hard fails on block hash divergence
     --dont-track-rollup-node: Disable tracking the head of the rollup node. Tracking the state
       of a rollup node allows to confirm the blocks received from the upstream EVM node.
     -d --wallet-dir <path>: The directory where the Tezos client stores all its wallet

@@ -119,6 +119,26 @@ let ignored_preconfirmations =
     ~level:Warning
     ()
 
+let assemble_block_diverged =
+  declare_1
+    ~section
+    ~name:"assemble_block_diverged"
+    ~msg:
+      "Assemble block diverged on level {level}, node is going to re-execute \
+       the full blueprint"
+    ~level:Warning
+    ("level", Data_encoding.n)
+
+let seq_block_hash_missing =
+  declare_1
+    ~section
+    ~name:"seq_block_hash_missing"
+    ~msg:
+      "Assemble block can not validate its output for levl {level} because \
+       sequencer block hash is missing"
+    ~level:Warning
+    ("level", Data_encoding.n)
+
 let catching_up_evm_event =
   Internal_event.Simple.declare_2
     ~section
@@ -583,6 +603,10 @@ let ignored_kernel_arg () = emit ignored_kernel_arg ()
 let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
 
 let ignored_preconfirmations () = emit ignored_preconfirmations ()
+
+let assemble_block_diverged level = emit assemble_block_diverged level
+
+let seq_block_hash_missing level = emit seq_block_hash_missing level
 
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 

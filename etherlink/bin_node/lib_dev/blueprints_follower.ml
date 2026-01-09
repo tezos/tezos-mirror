@@ -14,6 +14,7 @@ type sbl_callbacks_activated = {sbl_callbacks_activated : bool}
 type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
+  expected_block_hash:Ethereum_types.block_hash option ->
   [`Restart_from of quantity | `Continue of sbl_callbacks_activated] tzresult
   Lwt.t
 
@@ -247,7 +248,12 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
   let* fold_result =
     Blueprints_sequence.fold
       (fun next_blueprint_number blueprint ->
-        let* result = params.on_new_blueprint next_blueprint_number blueprint in
+        let* result =
+          params.on_new_blueprint
+            next_blueprint_number
+            blueprint
+            ~expected_block_hash:None
+        in
         match result with
         | `Restart_from l -> return (`Cut l)
         | `Continue _ ->
@@ -293,7 +299,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
             params)
 
 and stream_loop ~multichain ~sbl_callbacks_activated ~instant_confirmations
-    (Qty next_blueprint_number) params monitor =
+    ?block_hash (Qty next_blueprint_number) params monitor =
   let open Lwt_result_syntax in
   Metrics.stop_bootstrapping () ;
   let*! candidate =
@@ -334,7 +340,10 @@ and stream_loop ~multichain ~sbl_callbacks_activated ~instant_confirmations
                 ~service_name
                 "on_new_blueprint"
               @@ fun _scope ->
-              params.on_new_blueprint (Qty next_blueprint_number) blueprint
+              params.on_new_blueprint
+                (Qty next_blueprint_number)
+                blueprint
+                ~expected_block_hash:block_hash
             in
             match r with
             | `Continue is_sub_block_activated ->
@@ -422,6 +431,15 @@ and stream_loop ~multichain ~sbl_callbacks_activated ~instant_confirmations
               ~multichain
               ~sbl_callbacks_activated
               ~instant_confirmations
+              (Qty next_blueprint_number)
+              params
+              monitor
+        | Block_hash hash ->
+            (stream_loop [@tailcall])
+              ~multichain
+              ~sbl_callbacks_activated
+              ~instant_confirmations
+              ~block_hash:hash
               (Qty next_blueprint_number)
               params
               monitor)
