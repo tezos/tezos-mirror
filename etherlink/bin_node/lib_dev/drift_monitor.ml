@@ -30,7 +30,6 @@ let measure_drift (type f) ~(chain_family : f L2_types.chain_family)
 
 let run ~chain_family ~evm_node_endpoint ~timeout get_next_blueprint_number =
   let open Lwt_result_syntax in
-  let*! () = Lwt_unix.sleep 60. in
   let* () =
     measure_drift
       ~chain_family
