@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let forever () = fst (Lwt.task ())
+
 type preconfirmed_data = {
   timestamp : Ptime.t;
   block_number : Ethereum_types.quantity;
@@ -722,6 +724,10 @@ let init_ic_data ~ic_bench_csv =
       oc = open_out ic_bench_csv;
     }
   in
+  let _callback =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        Lwt.return (close_out ic_data.oc))
+  in
   Printf.fprintf
     ic_data.oc
     "block_number|hash|diff_sent_included|diff_sent_preconfirmed|diff_included_preconfirmed\n" ;
@@ -758,66 +764,63 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   in
   let* () = start_container ~config ~keep_alive:true ~timeout:10. () in
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
-  let* () =
-    match ws_endpoint with
-    (* When benchmarking the instant confirmations, we need a websocket endpoint
-       the blueprint follower but we don't want to start a stream to monitor heads.
-       It is required to use the blueprint follower, hence the following condition. *)
-    | Some ws_uri when not benchmark_instant_confirmations_enabled ->
-        start_new_head_monitor ~ws_uri
-    | Some _ | None ->
-        start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ()
-  and* () =
-    if benchmark_instant_confirmations_enabled then
+
+  Misc.background_task ~name:"chain_monitor" (fun () ->
       match ws_endpoint with
-      | Some ws_uri -> start_new_preconfirmed_receipts ~ic_data ~ws_uri
-      | None -> return_unit
-    else return_unit
-  and* () =
-    Tx_container.tx_queue_beacon
-      ~evm_node_endpoint:(Rpc rpc_endpoint)
-      ~tick_interval
-  and* () =
-    let* token, gas_limit =
-      prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
-    in
-    let* simple_gas_limit =
-      Network_info.get_gas_limit
-        ~rpc_endpoint
-        ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
-        ~to_:(Account.address_et controller)
-        ()
-    in
-    let* () =
-      Seq.ES.iter
-        (fun _ ->
-          let* () = Lwt_result.ok (Lwt_unix.sleep spawn_interval)
-          and* () =
-            let* node =
-              fund_fresh_account
-                ~infos
-                ~relay_endpoint
-                ~initial_balance
-                ~gas_limit:simple_gas_limit
-                controller
-            in
-            let*! () =
-              Floodgate_events.spam_started (Account.address_et node)
-            in
-            Lwt_result.ok
-              (spam_with_account
-                 ~txs_per_salvo
-                 ~token
-                 ~infos
-                 ~gas_limit
-                 ~retry_attempt
-                 ~ic_data
-                 node)
+      | Some ws_uri when benchmark_instant_confirmations_enabled ->
+          Lwt.pick
+            [
+              start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ();
+              start_new_preconfirmed_receipts ~ic_data ~ws_uri;
+            ]
+      | Some ws_uri -> start_new_head_monitor ~ws_uri
+      | None ->
+          start_blueprint_follower ~relay_endpoint ~rpc_endpoint ?ic_data ()) ;
+
+  Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+      Tx_container.tx_queue_beacon
+        ~evm_node_endpoint:(Rpc rpc_endpoint)
+        ~tick_interval) ;
+
+  Misc.background_task ~name:"reporter" (fun () ->
+      State.report ~elapsed_time:elapsed_time_between_report) ;
+
+  let* token, gas_limit =
+    prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
+  in
+  let* simple_gas_limit =
+    Network_info.get_gas_limit
+      ~rpc_endpoint
+      ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
+      ~to_:(Account.address_et controller)
+      ()
+  in
+  let* () =
+    Seq.ES.iter
+      (fun _ ->
+        let* () = Lwt_result.ok (Lwt_unix.sleep spawn_interval)
+        and* () =
+          let* node =
+            fund_fresh_account
+              ~infos
+              ~relay_endpoint
+              ~initial_balance
+              ~gas_limit:simple_gas_limit
+              controller
           in
-          return_unit)
-        (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
-    in
-    Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = State.report ~elapsed_time:elapsed_time_between_report in
-  Option.iter (fun {oc; _} -> close_out oc) ic_data ;
-  return_unit
+          let*! () = Floodgate_events.spam_started (Account.address_et node) in
+          Lwt_result.ok
+            (spam_with_account
+               ~txs_per_salvo
+               ~token
+               ~infos
+               ~gas_limit
+               ~retry_attempt
+               ~ic_data
+               node)
+        in
+        return_unit)
+      (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
+  in
+  let*! () = Floodgate_events.setup_completed () in
+  forever ()
