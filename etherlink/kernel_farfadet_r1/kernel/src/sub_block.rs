@@ -6,7 +6,7 @@
 use crate::{
     apply::{pure_fa_deposit, revm_run_transaction},
     block_storage,
-    bridge::{execute_deposit, DepositResult},
+    bridge::{execute_etherlink_deposit, DepositResult},
     chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
     error::{Error, StorageError, TransferError},
@@ -468,8 +468,8 @@ pub fn handle_run_transaction<Host: Runtime>(
             }
         }
         TransactionContent::Deposit(deposit) => {
-            let DepositResult { outcome, .. } = execute_deposit(&mut safe_host, deposit)
-                .map_err(|e| {
+            let DepositResult { outcome, .. } =
+                execute_etherlink_deposit(&mut safe_host, deposit).map_err(|e| {
                     Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
                         e.to_string(),
                     ))

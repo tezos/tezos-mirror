@@ -349,7 +349,7 @@ pub struct DepositResult {
 }
 
 #[trace_kernel]
-pub fn execute_deposit<Host: Runtime>(
+pub fn execute_etherlink_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
 ) -> Result<DepositResult, BridgeError> {
@@ -406,7 +406,7 @@ mod tests {
         DepositInfo, DepositReceiver, DepositResult, DEPOSIT_EVENT_TOPIC,
     };
 
-    use super::{execute_deposit, Deposit};
+    use super::{execute_etherlink_deposit, Deposit};
 
     mod events {
         alloy_sol_types::sol! {
@@ -607,7 +607,8 @@ mod tests {
 
         let deposit = dummy_deposit();
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         let logs = outcome.result.logs();
         assert!(outcome.result.is_success());
         assert_eq!(logs.len(), 1);
@@ -629,10 +630,12 @@ mod tests {
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         assert!(outcome.result.is_success());
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
     }

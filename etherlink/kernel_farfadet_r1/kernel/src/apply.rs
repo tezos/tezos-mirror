@@ -44,7 +44,7 @@ use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tracing::trace_kernel;
 
-use crate::bridge::{execute_deposit, Deposit, DepositResult};
+use crate::bridge::{execute_etherlink_deposit, Deposit, DepositResult};
 use crate::chains::EvmLimits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
@@ -472,7 +472,7 @@ fn apply_deposit<Host: Runtime>(
     let DepositResult {
         outcome: execution_outcome,
         estimated_ticks_used,
-    } = execute_deposit(host, deposit).map_err(|e| {
+    } = execute_etherlink_deposit(host, deposit).map_err(|e| {
         Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
     })?;
 
