@@ -232,3 +232,8 @@ val sent_inclusion : Ethereum_types.hash -> unit Lwt.t
 (** [patched_sequencer_key pk] advertises that the sequencer key in
     state was patched with [pk] . *)
 val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t
+
+(** [forced_native_execution_instant_confirmation ()] advertises that the
+    native execution policy is being overridden for instant confirmation
+    compatibility. *)
+val forced_native_execution_instant_confirmation : unit -> unit Lwt.t

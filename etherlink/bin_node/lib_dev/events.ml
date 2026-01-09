@@ -572,6 +572,16 @@ let background_task_error =
     ("name", Data_encoding.string)
     ("error", Data_encoding.string)
 
+let forced_native_execution_instant_confirmation =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"instant_confirmation_requires_native_execution"
+    ~msg:
+      "instant confirmation is enabled, forcing native execution policy to \
+       `always`"
+    ~level:Warning
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -721,3 +731,6 @@ let sent_inclusion hash = emit event_tx_inclusion ("sent", hash)
 
 let patched_sequencer_key pk =
   emit patched_sequencer_key (pk, Signature.Public_key.hash pk)
+
+let forced_native_execution_instant_confirmation () =
+  emit forced_native_execution_instant_confirmation ()

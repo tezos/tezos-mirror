@@ -157,6 +157,17 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot ~sandbox () =
   let open Lwt_result_syntax in
   let open Configuration in
+  let* config =
+    if config.experimental_features.preconfirmation_stream_enabled then
+      let*! () = Events.forced_native_execution_instant_confirmation () in
+      return
+        {
+          config with
+          kernel_execution =
+            {config.kernel_execution with native_execution_policy = Always};
+        }
+    else return config
+  in
   let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir:config.data_dir
