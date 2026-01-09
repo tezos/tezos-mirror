@@ -263,23 +263,13 @@ module Dal_helpers = struct
     && ttl_not_expired
 
   (* The [dal_number_of_slots] and [cryptobox_parameters] parameters to use here
-     should be those of the target page id's published_level (below) not those
-     of import_inbox_level as done currently. In fact:
+     should be those of the target page id's published_level (below).
+     This function is called twice:
+     - Via verify/valid below. The parameters are fetched from published_level.
+     - Via produce functions below. The parameters are fetched from published_level.
 
-     - When this function is called via verify/valid below. The parameters
-     fetched from the protocol's table are those of import_inbox_level. Those of
-     published_level should be fetched and used for this check.
-
-     - When the function is called via produce functions below. A function
-     `find_parameters` is also provided from call location in
-     ./lib_sc_rollup_node/refutation_game_helpers.ml:302. That function
-     basically inspects the protocol's table via an RPC as well. Same as
-     above. The published_level of the page should be used instead of the import
-     level
-
-     - When the function is called from
-     ./lib_sc_rollup_node/dal_pages_request.ml:xxx to fetch the pages requested
-     by a rollup, The same adaptation is needed (see in that file).  *)
+     In both cases a function `find_parameters` is provided. That function
+     basically inspects the protocol's table via an RPC. *)
   let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
       ~dal_attestation_lag ~origination_level ~import_inbox_level
       cryptobox_parameters
@@ -425,9 +415,8 @@ let valid (type state proof output)
           Option.value ~default:metadata.origination_level disputed_level
         in
         let* dal_parameters : Constants_parametric_repr.dal =
-          find_dal_parameters import_inbox_level
+          find_dal_parameters page_id.slot_id.published_level
         in
-        (*XXX*)
         Dal_helpers.verify
           ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
@@ -629,15 +618,18 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
             Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
     | Needs_reveal (Request_dal_page page_id) ->
         let open Dal_with_history in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters page_id.slot_id.published_level
+        in
         let*! disputed_level = P.get_current_level P.state in
         let import_inbox_level =
           Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
-          ~dal_number_of_slots
+          ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
-          dal_parameters
+          dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
@@ -654,6 +646,9 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
              restricted_commitments_publishers;
            }) ->
         let open Dal_with_history in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters page_id.slot_id.published_level
+        in
         let attestation_threshold_percent =
           Some attestation_threshold_percent
         in
@@ -662,10 +657,10 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
-          ~dal_number_of_slots
+          ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
-          dal_parameters
+          dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
