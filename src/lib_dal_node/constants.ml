@@ -123,3 +123,8 @@ let traps_cache_size =
 let time_to_join_new_topics_in_levels ~minimal_block_delay =
   let time_to_join_new_topics = 5 in
   1 + (time_to_join_new_topics / minimal_block_delay)
+
+(* For observability purpose, we aim for a non-slot operator profile to keep
+   shards for about 10 minutes. 150 blocks is 10 minutes on Ghostnet, 20 minutes
+   on Mainnet. *)
+let shard_retention_period_in_levels = 150
