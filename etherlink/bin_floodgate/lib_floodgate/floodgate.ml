@@ -779,7 +779,7 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
 
   Misc.background_task ~name:"tx_queue_beacon" (fun () ->
       Tx_container.tx_queue_beacon
-        ~evm_node_endpoint:(Rpc rpc_endpoint)
+        ~evm_node_endpoint:(Rpc relay_endpoint)
         ~tick_interval) ;
 
   Misc.background_task ~name:"reporter" (fun () ->
