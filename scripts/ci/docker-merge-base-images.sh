@@ -66,6 +66,6 @@ create_and_push_manifest() {
 
 create_and_push_manifest "${LATEST_TAG}"
 create_and_push_manifest "${LATEST_TAG_GENERIC}"
-if [[ "${CI_COMMIT_REF_PROTECTED:-}" == "true" ]]; then
+if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
   create_and_push_manifest "${RELEASE}"
 fi

@@ -7,12 +7,11 @@ BINFMT_VERSION=9.2.2-52
 
 LATEST_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 LATEST_TAG_GENERIC="${CI_COMMIT_REF_SLUG}"
-VERSION=${VERSION:?"Version missing"}
 
 ## Build multi-arch Docker image
 gcp="${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$DISTRIBUTION:$RELEASE-${LATEST_TAG}"
 gcp_generic="${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$DISTRIBUTION:$RELEASE-${LATEST_TAG_GENERIC}"
-protected_gcp="${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-$VERSION"
+protected_gcp="${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE"
 
 # Native vs emulated build.
 # if we set the platform to only one architecture, we
