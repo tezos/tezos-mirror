@@ -56,7 +56,7 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -196,7 +196,7 @@ oc.build-rockylinux-data:
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -254,7 +254,7 @@ oc.docker-build-fedora-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -397,7 +397,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -455,7 +455,7 @@ oc.docker-systemd-tests-rpm-fedora:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -503,7 +503,7 @@ oc.docker-systemd-merge-manifest.fedora:
       - gcp_very_high_cpu
 
 oc.install_bin_fedora_39.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
   stage: publishing_tests
   tags:
   - gcp
@@ -582,7 +582,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
   parallel:
     matrix:
     - RELEASE:
@@ -629,7 +629,7 @@ oc.docker-systemd-merge-manifest.rockylinux:
       - gcp_arm64
 
 oc.install_bin_rockylinux_9.3.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publishing_tests
   tags:
   - gcp
