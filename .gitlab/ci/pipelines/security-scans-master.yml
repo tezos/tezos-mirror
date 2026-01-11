@@ -163,7 +163,7 @@ container_scanning_tezos-tezos-master:
     paths:
     - gl-container-scanning-report-tezos-tezos-master.json
 
-container_scanning_tezos-debian-unstable-1.0:
+container_scanning_tezos-debian-unstable-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -188,13 +188,13 @@ container_scanning_tezos-debian-unstable-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:unstable-1.0
-    REPORT: gl-container-scanning-report-tezos-debian-unstable-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:unstable-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-debian-unstable-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-unstable-1.0.json
+    - gl-container-scanning-report-tezos-debian-unstable-master-6253f76a.json
 
-container_scanning_tezos-debian-bookworm-1.0:
+container_scanning_tezos-debian-bookworm-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -219,13 +219,13 @@ container_scanning_tezos-debian-bookworm-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-1.0
-    REPORT: gl-container-scanning-report-tezos-debian-bookworm-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-debian-bookworm-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-bookworm-1.0.json
+    - gl-container-scanning-report-tezos-debian-bookworm-master-6253f76a.json
 
-container_scanning_tezos-debian-trixie-1.0:
+container_scanning_tezos-debian-trixie-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -250,13 +250,13 @@ container_scanning_tezos-debian-trixie-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-1.0
-    REPORT: gl-container-scanning-report-tezos-debian-trixie-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-debian-trixie-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-trixie-1.0.json
+    - gl-container-scanning-report-tezos-debian-trixie-master-6253f76a.json
 
-container_scanning_tezos-ubuntu-noble-1.0:
+container_scanning_tezos-ubuntu-noble-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -281,13 +281,13 @@ container_scanning_tezos-ubuntu-noble-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-1.0
-    REPORT: gl-container-scanning-report-tezos-ubuntu-noble-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-ubuntu-noble-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-noble-1.0.json
+    - gl-container-scanning-report-tezos-ubuntu-noble-master-6253f76a.json
 
-container_scanning_tezos-ubuntu-jammy-1.0:
+container_scanning_tezos-ubuntu-jammy-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -312,13 +312,13 @@ container_scanning_tezos-ubuntu-jammy-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-1.0
-    REPORT: gl-container-scanning-report-tezos-ubuntu-jammy-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-ubuntu-jammy-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-jammy-1.0.json
+    - gl-container-scanning-report-tezos-ubuntu-jammy-master-6253f76a.json
 
-container_scanning_tezos-ubuntu-plucky-1.0:
+container_scanning_tezos-ubuntu-plucky-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -343,13 +343,13 @@ container_scanning_tezos-ubuntu-plucky-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky-1.0
-    REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-plucky-1.0.json
+    - gl-container-scanning-report-tezos-ubuntu-plucky-master-6253f76a.json
 
-container_scanning_tezos-fedora-39-1.0:
+container_scanning_tezos-fedora-39-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -374,13 +374,13 @@ container_scanning_tezos-fedora-39-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-1.0
-    REPORT: gl-container-scanning-report-tezos-fedora-39-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-fedora-39-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-39-1.0.json
+    - gl-container-scanning-report-tezos-fedora-39-master-6253f76a.json
 
-container_scanning_tezos-fedora-41-1.0:
+container_scanning_tezos-fedora-41-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -405,13 +405,13 @@ container_scanning_tezos-fedora-41-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41-1.0
-    REPORT: gl-container-scanning-report-tezos-fedora-41-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-fedora-41-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-41-1.0.json
+    - gl-container-scanning-report-tezos-fedora-41-master-6253f76a.json
 
-container_scanning_tezos-fedora-42-1.0:
+container_scanning_tezos-fedora-42-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -436,13 +436,13 @@ container_scanning_tezos-fedora-42-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:42-1.0
-    REPORT: gl-container-scanning-report-tezos-fedora-42-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:42-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-fedora-42-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-42-1.0.json
+    - gl-container-scanning-report-tezos-fedora-42-master-6253f76a.json
 
-container_scanning_tezos-rockylinux-9.3-1.0:
+container_scanning_tezos-rockylinux-9.3-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -467,13 +467,13 @@ container_scanning_tezos-rockylinux-9.3-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-1.0
-    REPORT: gl-container-scanning-report-tezos-rockylinux-9.3-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-rockylinux-9.3-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-rockylinux-9.3-1.0.json
+    - gl-container-scanning-report-tezos-rockylinux-9.3-master-6253f76a.json
 
-container_scanning_tezos-rockylinux-9.6-1.0:
+container_scanning_tezos-rockylinux-9.6-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -498,13 +498,13 @@ container_scanning_tezos-rockylinux-9.6-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-1.0
-    REPORT: gl-container-scanning-report-tezos-rockylinux-9.6-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-rockylinux-9.6-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-rockylinux-9.6-1.0.json
+    - gl-container-scanning-report-tezos-rockylinux-9.6-master-6253f76a.json
 
-container_scanning_tezos-rockylinux-10.0-1.0:
+container_scanning_tezos-rockylinux-10.0-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -529,11 +529,11 @@ container_scanning_tezos-rockylinux-10.0-1.0:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10.0-1.0
-    REPORT: gl-container-scanning-report-tezos-rockylinux-10.0-1.0.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10.0-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-rockylinux-10.0-master-6253f76a.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-rockylinux-10.0-1.0.json
+    - gl-container-scanning-report-tezos-rockylinux-10.0-master-6253f76a.json
 
 container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
@@ -545,35 +545,35 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-1.0
-  - container_scanning_tezos-debian-bookworm-1.0
-  - container_scanning_tezos-debian-trixie-1.0
-  - container_scanning_tezos-ubuntu-noble-1.0
-  - container_scanning_tezos-ubuntu-jammy-1.0
-  - container_scanning_tezos-ubuntu-plucky-1.0
-  - container_scanning_tezos-fedora-39-1.0
-  - container_scanning_tezos-fedora-41-1.0
-  - container_scanning_tezos-fedora-42-1.0
-  - container_scanning_tezos-rockylinux-9.3-1.0
-  - container_scanning_tezos-rockylinux-9.6-1.0
-  - container_scanning_tezos-rockylinux-10.0-1.0
+  - container_scanning_tezos-debian-unstable-master-6253f76a
+  - container_scanning_tezos-debian-bookworm-master-6253f76a
+  - container_scanning_tezos-debian-trixie-master-6253f76a
+  - container_scanning_tezos-ubuntu-noble-master-6253f76a
+  - container_scanning_tezos-ubuntu-jammy-master-6253f76a
+  - container_scanning_tezos-ubuntu-plucky-master-6253f76a
+  - container_scanning_tezos-fedora-39-master-6253f76a
+  - container_scanning_tezos-fedora-41-master-6253f76a
+  - container_scanning_tezos-fedora-42-master-6253f76a
+  - container_scanning_tezos-rockylinux-9.3-master-6253f76a
+  - container_scanning_tezos-rockylinux-9.6-master-6253f76a
+  - container_scanning_tezos-rockylinux-10.0-master-6253f76a
   dependencies:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-1.0
-  - container_scanning_tezos-debian-bookworm-1.0
-  - container_scanning_tezos-debian-trixie-1.0
-  - container_scanning_tezos-ubuntu-noble-1.0
-  - container_scanning_tezos-ubuntu-jammy-1.0
-  - container_scanning_tezos-ubuntu-plucky-1.0
-  - container_scanning_tezos-fedora-39-1.0
-  - container_scanning_tezos-fedora-41-1.0
-  - container_scanning_tezos-fedora-42-1.0
-  - container_scanning_tezos-rockylinux-9.3-1.0
-  - container_scanning_tezos-rockylinux-9.6-1.0
-  - container_scanning_tezos-rockylinux-10.0-1.0
+  - container_scanning_tezos-debian-unstable-master-6253f76a
+  - container_scanning_tezos-debian-bookworm-master-6253f76a
+  - container_scanning_tezos-debian-trixie-master-6253f76a
+  - container_scanning_tezos-ubuntu-noble-master-6253f76a
+  - container_scanning_tezos-ubuntu-jammy-master-6253f76a
+  - container_scanning_tezos-ubuntu-plucky-master-6253f76a
+  - container_scanning_tezos-fedora-39-master-6253f76a
+  - container_scanning_tezos-fedora-41-master-6253f76a
+  - container_scanning_tezos-fedora-42-master-6253f76a
+  - container_scanning_tezos-rockylinux-9.3-master-6253f76a
+  - container_scanning_tezos-rockylinux-9.6-master-6253f76a
+  - container_scanning_tezos-rockylinux-10.0-master-6253f76a
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
