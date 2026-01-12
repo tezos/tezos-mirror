@@ -32,6 +32,8 @@
 - Deprecate now irrelevant argument `--chunk-size`. (!20332)
 - Add a new CLI argument `--sandbox` to `run observer` to make it easier to
   start an observer for a sandbox setup. (!20365)
+- Support using a kernel name instead of a root hash in `make upgrade payload`.
+  (!20410)
 
 ### Execution changes
 

@@ -171,6 +171,30 @@ module Params = struct
 
   let evm_node_private_endpoint = endpoint
 
+  let kernel_root_hash k =
+    let open Tezos_clic in
+    param
+      ~name:"kernel-id"
+      ~desc:
+        "Either a root hash of the kernel to download, or the name of a \
+         supported kernel (\"bifrost\", \"calypso\", \"calypso2\", \
+         \"dionysus\", \"dionysus-r1\", \"ebisu\", \"farfadet\" or \
+         \"farfadet-r1\")."
+      (parameter (fun _ str ->
+           let open Evm_node_lib_dev.Constants in
+           let open Lwt_result_syntax in
+           match kernel_from_string str with
+           | Some kernel -> return (root_hash_from_kernel kernel)
+           | None ->
+               trace
+                 (error_of_fmt
+                    "%s in neither a known kernel nor a valid root hash"
+                    str)
+                 (let open Lwt_result_syntax in
+                  let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
+                  return hex)))
+      k
+
   let sequencer_key =
     Tezos_clic.param
       ~name:"sequencer-key"
@@ -1850,10 +1874,7 @@ let make_upgrade_command =
     ~desc:"Create bytes payload for the upgrade entrypoint."
     (merge_options wallet_command_args (args1 rollup_address_param))
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
-    @@ param
-         ~name:"preimage_hash"
-         ~desc:"Root hash of the kernel to upgrade to."
-         Params.string
+    @@ Params.kernel_root_hash
     @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
@@ -1867,7 +1888,7 @@ let make_upgrade_command =
          Params.timestamp
     @@ stop)
     (fun ((password_filename, wallet_dir), rollup_addr_opt)
-         root_hash
+         (`Hex root_hash)
          timestamp
          ()
        ->
@@ -3723,28 +3744,7 @@ let preemptive_kernel_download_command =
        preimages_endpoint_arg
        num_download_retries
        (supported_network_arg ()))
-    (prefixes ["download"; "kernel"]
-    @@ param
-         ~name:"kernel-id"
-         ~desc:
-           "Either a root hash of the kernel to download, or the name of a \
-            supported kernel (\"bifrost\", \"calypso\", \"calypso2\", \
-            \"dionysus\", \"dionysus-r1\", \"ebisu\", \"farfadet\" or \
-            \"farfadet-r1\")."
-         (Tezos_clic.parameter (fun _ str ->
-              let open Evm_node_lib_dev.Constants in
-              let open Lwt_result_syntax in
-              match kernel_from_string str with
-              | Some kernel -> return (root_hash_from_kernel kernel)
-              | None ->
-                  trace
-                    (error_of_fmt
-                       "%s in neither a known kernel nor a valid root hash"
-                       str)
-                    (let open Lwt_result_syntax in
-                     let*? hex = Evm_node_lib_dev.Misc.normalize_hex str in
-                     return hex)))
-    @@ stop)
+    (prefixes ["download"; "kernel"] @@ Params.kernel_root_hash @@ stop)
     (fun ( data_dir,
            config_file,
            preimages,
