@@ -348,6 +348,71 @@ type apply_result =
     }
   | Apply_failure
 
+type block_in_progress = {
+  timestamp : Time.Protocol.t;
+  number : Ethereum_types.quantity;
+  transactions_count : int32;
+}
+
+let execute_single_transaction ~data_dir ~pool ~native_execution ~config
+    evm_state block_in_progress (Hash hash) (tx : Broadcast.transaction) =
+  let open Lwt_result_syntax in
+  Octez_telemetry.Trace.add_attrs (fun () ->
+      Telemetry.Attributes.
+        [Transaction.hash (Hash hash); Block.number block_in_progress.number]) ;
+  let* tx =
+    match tx with
+    | Broadcast.Common (Evm tx) ->
+        let hash = Ethereum_types.hex_to_real_bytes hash in
+        let tx_bytes = String.to_bytes tx in
+        let tag = Bytes.of_string "\x01" in
+        let rlp = Rlp.(List [Value hash; List [Value tag; Value tx_bytes]]) in
+        return rlp
+    | Broadcast.Common (Michelson _op) ->
+        failwith "Michelson operations can not be executed individually"
+    | Broadcast.Delayed tx -> return (Evm_events.Delayed_transaction.to_rlp tx)
+  in
+  let rlp =
+    Rlp.List
+      [
+        tx;
+        Value (Ethereum_types.timestamp_to_bytes block_in_progress.timestamp);
+        Value (Ethereum_types.encode_u256_le block_in_progress.number);
+      ]
+  in
+  let*! evm_state =
+    modify
+      ~key:Durable_storage_path.Single_tx.input_tx
+      ~value:(Rlp.encode rlp |> Bytes.to_string)
+      evm_state
+  in
+  let* evm_state =
+    execute
+      ~pool
+      ~native_execution
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:"single_tx_execution"
+      evm_state
+      (`Inbox [])
+  in
+  let*! read_res =
+    inspect
+      evm_state
+      (Durable_storage_path.Block.current_receipts
+         ~root:Durable_storage_path.etherlink_safe_root)
+  in
+  match read_res with
+  | Some bytes ->
+      return
+        ( Transaction_receipt.decode_last_from_list
+            Ethereum_types.(Block_hash (Hex (String.make 64 '0')))
+            bytes,
+          evm_state )
+  | None ->
+      failwith
+        "No value found in context where transactions receipts should be stored"
+
 let retrieve_block ~chain_family evm_state =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in

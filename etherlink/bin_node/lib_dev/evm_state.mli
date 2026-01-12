@@ -121,6 +121,27 @@ val apply_unsigned_chunks :
   Sequencer_blueprint.unsigned_chunked_blueprint ->
   apply_result tzresult Lwt.t
 
+type block_in_progress = {
+  timestamp : Time.Protocol.t;
+  number : Ethereum_types.quantity;
+  transactions_count : int32;
+}
+
+(** [execute_single_transaction ~data_dir ~pool ~native_execution ~config
+    evm_state block_in_progress hash txn] calls the kernel entrypoint allowing
+    to execute [txn] on top of [evm_state], where [txn] is the
+    [block_in_progress.transactions_count]th transaction of the next block. *)
+val execute_single_transaction :
+  data_dir:string ->
+  pool:Lwt_domain.pool ->
+  native_execution:bool ->
+  config:Pvm_types.config ->
+  t ->
+  block_in_progress ->
+  Ethereum_types.hash ->
+  Broadcast.transaction ->
+  (Transaction_receipt.t * t) tzresult Lwt.t
+
 (** [assemble_block ~pool ~data_dir ~chain_family ~config ~timestamp ~number
     ~native_execution t]
     builds an L2 block at height [number] and [timestamp] from the transactions
