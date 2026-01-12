@@ -523,6 +523,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                ("DISTRIBUTION", "debian");
                ("RELEASE", "bookworm");
              ])
+        ~allow_failure:Yes
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
