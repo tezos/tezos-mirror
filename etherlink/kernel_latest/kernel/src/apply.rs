@@ -162,7 +162,7 @@ pub enum Validity {
 //       arguably, effective_gas_price should be set on EthereumTransactionCommon
 //       directly - initialised when constructed.
 #[instrument(skip_all)]
-fn is_valid_ethereum_transaction_common<Host: Runtime>(
+pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
