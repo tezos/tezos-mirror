@@ -289,12 +289,11 @@ fn handle_receipt<Host: Runtime>(
         cumulative_gas,
     } = get_iter_receipt_data(&receipts);
 
-    let log_index = log_index.try_into().map_err(|_| Error::InvalidConversion)?;
-
     let logs: Vec<IndexedLog> = result_data
         .logs
         .iter()
-        .map(|revm::primitives::Log { address, data }| IndexedLog {
+        .enumerate()
+        .map(|(i, revm::primitives::Log { address, data })| IndexedLog {
             log: Log {
                 address: H160(*address.0),
                 topics: data
@@ -304,7 +303,7 @@ fn handle_receipt<Host: Runtime>(
                     .collect(),
                 data: data.data.to_vec(),
             },
-            index: log_index,
+            index: (log_index + i) as u64,
         })
         .collect();
 
