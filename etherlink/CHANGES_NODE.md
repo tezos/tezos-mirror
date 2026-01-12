@@ -1,8 +1,21 @@
 # Changelog
 
-## Unreleased
+## Version 0.51 (2026-01-13)
 
-### Breaking changes
+This release improves RPC performance with up to 10x faster
+`eth_getLogs` queries through direct SQLite bloom filter checks. It
+also adds a new Etherlink-specific RPC method for retrieving sequencer
+public keys and includes several bug fixes.
+
+This release is also the last one before the stabilization of the
+instant confirmation feature. As such, it brings a number of bug fixes
+and improvements that are necessary for making sure the initial
+activation of the feature is a success on Etherlink Mainnet. Users
+wanting to test it will need to have an observer node with the
+experimental feature enabled.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -13,16 +26,14 @@
 - Optimize `eth_getLogs` with up to 10x latency improvement when filtering on
   addresses or topics by implementing bloom filter checks in SQLite
   directly. (!20366, !20332)
-- Fix JSON encoding for transaction inclusion messages in `/evm/messages`.
-  (!20391)
 - Add a new Etherlink-specific JSONRPC method `tez_sequencer` to retreive the
   sequencer’s public key for a given block. (!20365)
 
 ### Metrics changes
 
-- Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
-  instant preconfirmations. (!20369)
 - Fix the status of traces for our workers’ handlers remaining unset. (!20379)
+- Traceparents are now propagated by nodes via `/evm/messages` when `?otel` is
+  set to `true` (it is `false` by default). (!20389)
 
 ### Command-line interface changes
 
@@ -45,16 +56,28 @@
   prevent unnecessary disk usage. This affects `trace_transaction_*`
   and `replay_*` files in the `kernel_logs` directory. (!20388)
 
-### Storage changes
-
-### Documentation changes
-
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Observers that have instant confirmations enabled can use the results of
+  transactions executed individually to assemble blocks instead of re-applying
+  the full blueprint. (!20101)
+- Rework  instant confirmation messages sent through `/evm/messages` to reduce
+  their number and verbosity. (!20310)
+- Fix inclusion of delayed transactions even in the absence of transactions in
+  the tx queue. (!20250)
+- Fix JSON encoding for transaction inclusion messages in `/evm/messages`.
+  (!20391)
+- Add the attribute `etherlink.block.number` to OpenTelemetry traces related to
+  instant preconfirmations. (!20369)
+- Backport several fixes related to incremental execution of blocks by
+  observers in Farfadet first revision. (!20419 !20406 !20411 !20396)
+- Force native execution for block execution when using instant confirmation
+  in an Observer node. (!20404)
 
 ## Version 0.50 (2025-12-19)
 
