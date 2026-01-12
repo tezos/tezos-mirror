@@ -460,6 +460,13 @@ val wait_for_tx_queue_add_transaction :
 val wait_for_tx_queue_transaction_confirmed :
   ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
+(** [wait_for_tx_queue_transaction_dropped ?timeout ?hash evm_node]
+    waits for the event [tx_queue_transaction_dropped.v0] using
+    {!wait_for} and returns the transaction hash. If [hash] is
+    provided, wait for that hash to be confirmed. *)
+val wait_for_tx_queue_transaction_dropped :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
 (** [wait_for_tx_queue_injecting_transaction ?timeout evm_node] waits
     for the event [tx_queue_injecting_transaction.v0] using
     {!wait_for} and returns the number of transactions injected. *)

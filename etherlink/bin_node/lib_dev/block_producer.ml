@@ -90,6 +90,12 @@ end
 
 type force = True | False | With_timestamp of Time.Protocol.t
 
+type preconfirmed_transactions_result = {
+  accepted : Ethereum_types.hash list;
+  refused : Ethereum_types.hash list;
+  dropped : Ethereum_types.hash list;
+}
+
 module Request = struct
   type ('a, 'b) t =
     | Produce_genesis :
@@ -103,7 +109,7 @@ module Request = struct
     | Propose_next_block_timestamp : Time.System.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
-        -> (Ethereum_types.hash list, tztrace) t
+        -> (preconfirmed_transactions_result, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
     | Produce_genesis _ -> "Produce_genesis"
@@ -696,8 +702,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     | None -> init_validation_state ~tx_container:state.tx_container
   in
   let input_validation_state = {validation_state with current_size} in
-  let validate
-      (validation_state, rev_txns, rev_accepted_hashes, opt_delayed_hashes)
+  let validate (validation_state, rev_txns, rev_hashes, opt_delayed_hashes)
       ((raw, tx_object) as entry) =
     let* res, wrapped_raw, hash =
       match tx_object with
@@ -726,7 +731,10 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     | `Drop msg ->
         Broadcast.notify_dropped ~hash ~reason:msg ;
         return
-          (validation_state, rev_txns, rev_accepted_hashes, opt_delayed_hashes)
+          ( validation_state,
+            rev_txns,
+            {rev_hashes with refused = hash :: rev_hashes.refused},
+            opt_delayed_hashes )
     | `Keep latest_validation_state ->
         let* () =
           match opt_delayed_hashes with
@@ -744,19 +752,37 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         return
           ( latest_validation_state,
             entry :: rev_txns,
-            hash :: rev_accepted_hashes,
+            {rev_hashes with accepted = hash :: rev_hashes.accepted},
             None )
-    | `Stop -> return (validation_state, rev_txns, rev_accepted_hashes, None)
+    | `Stop ->
+        return
+          ( validation_state,
+            rev_txns,
+            {rev_hashes with dropped = hash :: rev_hashes.dropped},
+            None )
   in
-  let* validation_state, rev_validated_txns, rev_accepted_hashes, _ =
+  let* ( validation_state,
+         rev_validated_txns,
+         {accepted = rev_accepted; refused = rev_refused; dropped = rev_dropped},
+         _ ) =
     List.fold_left_es
       validate
-      (input_validation_state, [], [], opt_delayed_hashes)
+      ( input_validation_state,
+        [],
+        {accepted = []; refused = []; dropped = []},
+        opt_delayed_hashes )
       transactions
   in
   state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
   state.validation_state <- Some validation_state ;
-  return (List.rev rev_accepted_hashes)
+  return
+    {
+      accepted = List.rev rev_accepted;
+      refused = List.rev rev_refused;
+      dropped = List.rev rev_dropped;
+    }
+
+type error += IC_disabled
 
 module Handlers = struct
   type self = worker
@@ -777,13 +803,14 @@ module Handlers = struct
         state.next_block_timestamp <- Some timestamp ;
         Lwt_result_syntax.return_unit
     | Request.Preconfirm_transactions transactions -> (
+        let open Lwt_result_syntax in
         protect @@ fun () ->
         (* If we are before the first created block and block producer
           is not aware of its future timestamp, preconfirmation are disabled *)
         match state.next_block_timestamp with
         | Some timestamp ->
             preconfirm_transactions ~state ~transactions ~timestamp
-        | None -> Lwt_result_syntax.return [])
+        | None -> tzfail IC_disabled)
 
   type launch_error = error trace
 
@@ -829,6 +856,33 @@ let worker_promise, worker_waker = Lwt.task ()
 type error += No_block_producer
 
 type error += Block_producer_terminated
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"No_block_producer"
+    ~title:"No_block_producer"
+    ~description:
+      "Failed to add a request to the Block producer, it was not started."
+    Data_encoding.unit
+    (function No_block_producer -> Some () | _ -> None)
+    (fun () -> No_block_producer) ;
+  register_error_kind
+    `Permanent
+    ~id:"Block_producer_is_closed"
+    ~title:"Block_producer_is_closed"
+    ~description:"Failed to add a request to the Block producer, it's closed."
+    Data_encoding.unit
+    (function No_block_producer -> Some () | _ -> None)
+    (fun () -> No_block_producer) ;
+  register_error_kind
+    `Permanent
+    ~id:"Instant_confirmation_is_disabled"
+    ~title:"Instant_confirmation_is_disabled"
+    ~description:"Instant confirmation is disabled, request can't be traited."
+    Data_encoding.unit
+    (function IC_disabled -> Some () | _ -> None)
+    (fun () -> IC_disabled)
 
 let worker =
   lazy
