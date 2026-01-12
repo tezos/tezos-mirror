@@ -20,6 +20,7 @@ members = [
   "revm",
   "revm_evaluation",
   "runtime",
+  "tezosx-interfaces",
 ]
 
 [workspace.dependencies]
@@ -73,6 +74,7 @@ tezos-tracing = { package = "tezos-tracing-latest", path = "./tracing" }
 tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
 tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
+tezosx-interfaces = { package = "tezosx-interfaces", path = "./tezosx-interfaces" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
