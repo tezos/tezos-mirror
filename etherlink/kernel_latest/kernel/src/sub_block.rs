@@ -4,7 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    apply::{pure_fa_deposit, revm_run_transaction},
+    apply::{
+        is_valid_ethereum_transaction_common, pure_fa_deposit, revm_run_transaction,
+        Validity,
+    },
     block::GAS_LIMIT,
     block_storage, blueprint_storage,
     bridge::{execute_etherlink_deposit, DepositResult},
@@ -440,6 +443,11 @@ pub fn handle_run_transaction<Host: Runtime>(
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
 
+    let is_delayed = matches!(
+        &input_data.tx.content,
+        TransactionContent::EthereumDelayed(_)
+    );
+
     let RunOutcome {
         result,
         caller,
@@ -450,6 +458,20 @@ pub fn handle_run_transaction<Host: Runtime>(
         TransactionContent::Ethereum(ethx)
         | TransactionContent::EthereumDelayed(ethx) => {
             let caller = ethx.caller().map_err(|_| Error::InvalidSignatureCheck)?;
+            let gas = match is_valid_ethereum_transaction_common(
+                host,
+                ethx,
+                &block_constants,
+                block_constants.base_fee_per_gas(),
+                is_delayed,
+                &config.limits,
+            )? {
+                Validity::Valid(_, gas) => Ok(gas),
+                e => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                    format!("{e:?}"),
+                ))),
+            }?;
+
             let ExecutionOutcome {
                 result,
                 // TODO: Handle withdrawals results and outbox queue if executed by sequencer
@@ -463,7 +485,7 @@ pub fn handle_run_transaction<Host: Runtime>(
                 ethx.to,
                 ethx.value,
                 ethx.data.clone(),
-                ethx.gas_limit,
+                gas,
                 block_constants.base_fee_per_gas(),
                 config.limits.maximum_gas_limit,
                 ethx.access_list.clone(),
