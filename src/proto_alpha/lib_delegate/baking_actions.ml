@@ -1222,13 +1222,13 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
 let prepare_block_request state block_to_bake =
   let open Lwt_result_syntax in
   let request = Forge_and_sign_block block_to_bake in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_preattestations_request state unsigned_preattestations =
   let open Lwt_result_syntax in
   let request = Forge_and_sign_preattestations {unsigned_preattestations} in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 let prepare_attestations_request state unsigned_attestations =
@@ -1240,7 +1240,7 @@ let prepare_attestations_request state unsigned_attestations =
     Forge_and_sign_attestations
       {unsigned_attestations = unsigned_attestations_with_dal}
   in
-  state.global_state.forge_worker_hooks.push_request request ;
+  let*! _ = state.global_state.forge_worker_hooks.push_request request in
   return state
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539

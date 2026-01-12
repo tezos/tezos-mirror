@@ -399,7 +399,7 @@ val forge_event_encoding_for_logging__cannot_decode :
 (** [forge_worker_hooks] type that allows interactions with the forge worker.
     Hooks are needed in order to break a circular dependency. *)
 type forge_worker_hooks = {
-  push_request : forge_request -> unit;
+  push_request : forge_request -> bool Lwt.t;
   get_forge_event_stream : unit -> forge_event Lwt_stream.t;
   cancel_all_pending_tasks : unit -> unit;
 }
