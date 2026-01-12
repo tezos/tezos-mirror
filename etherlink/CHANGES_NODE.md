@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## Version 0.51 (2026-01-13)
+
+This release improves RPC performance with up to 10x faster
+`eth_getLogs` queries through direct SQLite bloom filter checks. It
+also adds a new Etherlink-specific RPC method for retrieving sequencer
+public keys and includes several bug fixes.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Breaking changes
 
