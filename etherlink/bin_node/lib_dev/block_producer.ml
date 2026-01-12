@@ -63,6 +63,11 @@ module Types = struct
 
   type preconfirmation_state =
     | Potential_next_block_timestamp of Time.Protocol.t
+    | Selecting_delayed_txs of {
+        timestamp : Time.Protocol.t;
+        rev_delayed_txs : Ethereum_types.hash list;
+        current_size : int;
+      }
 
   type preconfirmation =
     | Disabled
@@ -76,7 +81,6 @@ module Types = struct
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
     mutable preconfirmation_state : preconfirmation;
-    mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
     mutable validation_state : Validation_types.validation_state option;
@@ -497,7 +501,6 @@ let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
 let clear_preconfirmation_data ~(state : Types.state) =
   let open Lwt_result_syntax in
   state.validated_txns <- [] ;
-  state.selected_delayed_txns <- [] ;
   state.validation_state <- None ;
   return_unit
 
@@ -524,6 +527,44 @@ let set_preconfirmation_state (state : Types.state) preconfirmation_state =
   | Types.Disabled -> ()
   | Awaiting_first_timestamp | Enabled _ ->
       state.preconfirmation_state <- Enabled preconfirmation_state
+
+let notify_next_block_info ~timestamp ~next_blueprint_number =
+  let open Lwt_syntax in
+  Broadcast.notify_next_block_info timestamp next_blueprint_number ;
+  let* () = Events.sent_next_block_info timestamp next_blueprint_number in
+  Evm_context.next_block_info timestamp next_blueprint_number
+
+let notify_delayed_tx ~raw_tx ~tx_hash =
+  Broadcast.notify_inclusion (Delayed raw_tx) tx_hash ;
+  Events.sent_inclusion tx_hash
+
+let add_selected_delayed_txs (head_info : Evm_context.head)
+    (preconfirmation_state : Types.preconfirmation_state) delayed_hash =
+  let open Lwt_result_syntax in
+  match preconfirmation_state with
+  | Potential_next_block_timestamp timestamp ->
+      let* () =
+        notify_next_block_info
+          ~timestamp
+          ~next_blueprint_number:head_info.next_blueprint_number
+      in
+      let* raw_tx =
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
+      in
+      let*! () = notify_delayed_tx ~raw_tx ~tx_hash:delayed_hash in
+      return
+        (Types.Selecting_delayed_txs
+           {timestamp; rev_delayed_txs = [delayed_hash]; current_size = 4096})
+  | Selecting_delayed_txs
+      {timestamp; rev_delayed_txs = rev_current; current_size} ->
+      let* raw_tx =
+        Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
+      in
+      let*! () = notify_delayed_tx ~raw_tx ~tx_hash:delayed_hash in
+      let rev_delayed_txs = delayed_hash :: rev_current in
+      return
+        (Types.Selecting_delayed_txs
+           {timestamp; rev_delayed_txs; current_size = current_size + 4096})
 
 let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
   let open Lwt_result_syntax in
@@ -553,8 +594,12 @@ let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
 let choose_block_timestamp preconfirmation_state (force : force) =
   match (force, preconfirmation_state) with
   | With_timestamp t, _ -> t
-  | _, Types.Enabled (Potential_next_block_timestamp t) -> t
-  | _, _ -> Misc.now ()
+  | _, Types.(Disabled | Awaiting_first_timestamp) -> Misc.now ()
+  | _, Types.Enabled preconfirmation_state -> (
+      match preconfirmation_state with
+      | Types.Potential_next_block_timestamp timestamp
+      | Selecting_delayed_txs {timestamp; _} ->
+          timestamp)
 
 let produce_block (state : Types.state) ~force ~with_delayed_transactions =
   let open Lwt_result_syntax in
@@ -604,48 +649,59 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
       return result)
     else
       let* delayed_hashes, transactions_and_objects =
-        if preconfirmation_stream_enabled state then
-          let* delayed_hashes =
-            match (state.selected_delayed_txns, state.validated_txns) with
-            | [], [] ->
-                let* delayed_hashes, _rem_size =
-                  head_info_and_delayed_transactions
-                    ~with_delayed_transactions
-                    head_info.evm_state
-                    state.maximum_number_of_chunks
-                in
-                return delayed_hashes
-            | selected_delayed_txns, _validated_txns ->
-                return
-                @@ List.map
-                     (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
-                     selected_delayed_txns
-          in
-          return
-            ( delayed_hashes,
-              List.map
-                (fun (raw, obj) ->
-                  match obj with
-                  | Tx_queue_types.Evm obj -> (raw, Transaction_object.hash obj)
-                  | Tx_queue_types.Michelson obj ->
-                      ( raw,
-                        Tx_queue_types.Tezlink_operation.hash_of_tx_object obj
-                      ))
-                state.validated_txns )
-        else
-          let* delayed_hashes, remaining_cumulative_size =
-            head_info_and_delayed_transactions
-              ~with_delayed_transactions
-              head_info.evm_state
-              state.maximum_number_of_chunks
-          in
-          let* transactions_and_objects =
-            pop_valid_tx
-              ~tx_container
-              head_info
-              ~maximum_cumulative_size:remaining_cumulative_size
-          in
-          return (delayed_hashes, transactions_and_objects)
+        match state.preconfirmation_state with
+        | Disabled ->
+            let* delayed_hashes, remaining_cumulative_size =
+              head_info_and_delayed_transactions
+                ~with_delayed_transactions
+                head_info.evm_state
+                state.maximum_number_of_chunks
+            in
+            let* transactions_and_hashes =
+              pop_valid_tx
+                ~tx_container
+                head_info
+                ~maximum_cumulative_size:remaining_cumulative_size
+            in
+            return (delayed_hashes, transactions_and_hashes)
+        | (Awaiting_first_timestamp | Enabled (Potential_next_block_timestamp _))
+          when state.validated_txns = [] ->
+            let* delayed_hashes, _rem_size =
+              head_info_and_delayed_transactions
+                ~with_delayed_transactions
+                head_info.evm_state
+                state.maximum_number_of_chunks
+            in
+            return (delayed_hashes, [])
+        | Awaiting_first_timestamp | Enabled (Potential_next_block_timestamp _)
+          ->
+            return
+              ( [],
+                List.map
+                  (fun (raw, obj) ->
+                    match obj with
+                    | Tx_queue_types.Evm obj ->
+                        (raw, Transaction_object.hash obj)
+                    | Tx_queue_types.Michelson obj ->
+                        ( raw,
+                          Tx_queue_types.Tezlink_operation.hash_of_tx_object obj
+                        ))
+                  state.validated_txns )
+        | Enabled
+            (Selecting_delayed_txs
+               {rev_delayed_txs; timestamp = _; current_size = _}) ->
+            return
+              ( List.rev rev_delayed_txs,
+                List.map
+                  (fun (raw, obj) ->
+                    match obj with
+                    | Tx_queue_types.Evm obj ->
+                        (raw, Transaction_object.hash obj)
+                    | Tx_queue_types.Michelson obj ->
+                        ( raw,
+                          Tx_queue_types.Tezlink_operation.hash_of_tx_object obj
+                        ))
+                  state.validated_txns )
       in
       let* result =
         produce_block_if_needed
@@ -670,53 +726,62 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
       let* () = clear_preconfirmation_data ~state in
       return result
 
-let notify_next_block_with_delayed ~next_block_timestamp ~delayed_hashes ~number
-    ~(state : Types.state) evm_state =
+let preconfirm_delayed_transactions
+    (preconfirmation_state : Types.preconfirmation_state)
+    ~maximum_number_of_chunks (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
-  Broadcast.notify_next_block_info next_block_timestamp number ;
-  let*! () = Events.sent_next_block_info next_block_timestamp number in
-  let* txns =
-    List.map_es
-      (fun delayed_hash ->
-        let* tx = Evm_state.get_delayed_inbox_item evm_state delayed_hash in
-        Broadcast.notify_inclusion (Delayed tx) delayed_hash ;
-        let*! () = Events.sent_inclusion delayed_hash in
-        return tx)
+  let* delayed_hashes, remaining_cumulative_size =
+    head_info_and_delayed_transactions
+      ~with_delayed_transactions:true
+      head_info.evm_state
+      maximum_number_of_chunks
+  in
+  let* preconfirmation_state =
+    List.fold_left_es
+      (add_selected_delayed_txs head_info)
+      preconfirmation_state
       delayed_hashes
   in
-  state.selected_delayed_txns <- txns ;
-  return_unit
+  return
+    ( remaining_cumulative_size,
+      match preconfirmation_state with
+      | Potential_next_block_timestamp _ -> true
+      | _ -> false )
 
-let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
+let preconfirm_transactions
+    (preconfirmation_state : Types.preconfirmation_state)
+    ~maximum_number_of_chunks ~validation_state ~transactions ~tx_container =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
-      state.maximum_number_of_chunks
+      maximum_number_of_chunks
   in
   let*! head_info = Evm_context.head_info () in
   Octez_telemetry.Trace.add_attrs (fun () ->
       [Telemetry.Attributes.Block.number head_info.next_blueprint_number]) ;
-  let* current_size, opt_delayed_hashes =
-    (* Accumulator empty and at least one transaction = start next future block *)
-    if state.validated_txns = [] && transactions <> [] then
-      let* delayed_hashes, remaining_cumulative_size =
-        head_info_and_delayed_transactions
-          ~with_delayed_transactions:true
-          head_info.evm_state
-          state.maximum_number_of_chunks
-      in
-      return
-        ( Int.sub maximum_cumulative_size remaining_cumulative_size,
-          Some delayed_hashes )
-    else return (0, None)
+  let* current_size, notify_next_block, timestamp =
+    match preconfirmation_state with
+    | Potential_next_block_timestamp timestamp ->
+        let* remaining_cumulative_size, notify_next_block =
+          preconfirm_delayed_transactions
+            preconfirmation_state
+            head_info
+            ~maximum_number_of_chunks
+        in
+        return
+          ( Int.sub maximum_cumulative_size remaining_cumulative_size,
+            notify_next_block,
+            timestamp )
+    | Selecting_delayed_txs {current_size; timestamp; _} ->
+        return (current_size, false, timestamp)
   in
   let* validation_state =
-    match state.validation_state with
+    match validation_state with
     | Some state -> return state
-    | None -> init_validation_state ~tx_container:state.tx_container
+    | None -> init_validation_state ~tx_container
   in
   let input_validation_state = {validation_state with current_size} in
-  let validate (validation_state, rev_txns, rev_hashes, opt_delayed_hashes)
+  let validate (validation_state, rev_txns, rev_hashes, notify_next_block)
       ((raw, tx_object) as entry) =
     let* res, wrapped_raw, hash =
       match tx_object with
@@ -748,18 +813,14 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
           ( validation_state,
             rev_txns,
             {rev_hashes with refused = hash :: rev_hashes.refused},
-            opt_delayed_hashes )
+            notify_next_block )
     | `Keep latest_validation_state ->
         let* () =
-          match opt_delayed_hashes with
-          | Some delayed_hashes ->
-              notify_next_block_with_delayed
-                ~next_block_timestamp:timestamp
-                ~delayed_hashes
-                ~number:head_info.next_blueprint_number
-                ~state
-                head_info.evm_state
-          | None -> return_unit
+          if notify_next_block then
+            notify_next_block_info
+              ~timestamp
+              ~next_blueprint_number:head_info.next_blueprint_number
+          else return_unit
         in
         Broadcast.notify_inclusion (Common wrapped_raw) hash ;
         let*! () = Events.sent_inclusion hash in
@@ -767,13 +828,13 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
           ( latest_validation_state,
             entry :: rev_txns,
             {rev_hashes with accepted = hash :: rev_hashes.accepted},
-            None )
+            false )
     | `Stop ->
         return
           ( validation_state,
             rev_txns,
             {rev_hashes with dropped = hash :: rev_hashes.dropped},
-            None )
+            false )
   in
   let* ( validation_state,
          rev_validated_txns,
@@ -784,17 +845,17 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
       ( input_validation_state,
         [],
         {accepted = []; refused = []; dropped = []},
-        opt_delayed_hashes )
+        notify_next_block )
       transactions
   in
-  state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
-  state.validation_state <- Some validation_state ;
   return
-    {
-      accepted = List.rev rev_accepted;
-      refused = List.rev rev_refused;
-      dropped = List.rev rev_dropped;
-    }
+    ( List.rev rev_validated_txns,
+      validation_state,
+      {
+        accepted = List.rev rev_accepted;
+        refused = List.rev rev_refused;
+        dropped = List.rev rev_dropped;
+      } )
 
 type error += IC_disabled
 
@@ -826,8 +887,18 @@ module Handlers = struct
         match state.preconfirmation_state with
         | Disabled -> tzfail IC_disabled
         | Awaiting_first_timestamp -> tzfail IC_disabled
-        | Enabled (Potential_next_block_timestamp timestamp) ->
-            preconfirm_transactions ~state ~transactions ~timestamp)
+        | Enabled preconfirmation_state ->
+            let* validated_txns, validation_state, selected_txns_hashes =
+              preconfirm_transactions
+                ~maximum_number_of_chunks:state.maximum_number_of_chunks
+                ~validation_state:state.validation_state
+                ~transactions
+                ~tx_container:state.tx_container
+                preconfirmation_state
+            in
+            state.validated_txns <- state.validated_txns @ validated_txns ;
+            state.validation_state <- Some validation_state ;
+            return selected_txns_hashes)
 
   type launch_error = error trace
 
@@ -852,7 +923,6 @@ module Handlers = struct
             (if preconfirmation_stream_enabled then Awaiting_first_timestamp
              else Disabled);
           validation_state = None;
-          selected_delayed_txns = [];
           validated_txns = [];
         }
 
