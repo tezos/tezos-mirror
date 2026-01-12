@@ -1246,6 +1246,14 @@ inclusion:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+instant_confirmation_requires_native_execution:
+  description: instant confirmation is enabled, forcing native execution policy to `always`
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* instant_confirmation_requires_native_execution version 0 */
+      "instant_confirmation_requires_native_execution.v0": any }
+  
 invalidated_token:
   description: authentication token was invalidated before its expired date
   level: warning
