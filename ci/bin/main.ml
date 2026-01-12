@@ -181,6 +181,8 @@ let () =
   let octez_smart_rollup_node_release_tag_re =
     "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
   in
+  (* Matches Octez packaging revision tags, e.g. [octez-v1.0-2]. *)
+  let octez_packaging_revision_tag_re = "/^octez-v\\d+\\.\\d+\\-\\d+$/" in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -207,6 +209,7 @@ let () =
           octez_evm_node_release_tag_re;
           octez_smart_rollup_node_release_tag_re;
           Sdk_bindings_ci.Release.tag_re;
+          octez_packaging_revision_tag_re;
         ]
       @ Cacio.get_release_tag_rexes ()
     in
@@ -317,6 +320,19 @@ let () =
         octez-evm-node-vX.Y(-rcN). Creates and publishes a release on GitLab \
         with associated etherlink artifacts (static binaries and Docker \
         image)." ^ release_description) ;
+  register
+    "octez_packaging_revision_test"
+    If.(
+      not_on_tezos_namespace && push
+      && Rules.has_tag_match octez_packaging_revision_tag_re)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~jobs:Release_tag.octez_packaging_revision_jobs
+    ~description:
+      "Dry run pipeline for 'octez_packaging_revision_tag'.\n\n\
+       This pipeline checks that 'octez_packaging_revision_tag' pipelines work \
+       as intended, without publishing any assets. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
