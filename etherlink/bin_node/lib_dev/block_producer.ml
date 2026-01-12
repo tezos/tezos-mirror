@@ -100,6 +100,7 @@ module Request = struct
         force : force;
       }
         -> ([`Block_produced of int | `No_block], tztrace) t
+    | Propose_next_block_timestamp : Time.System.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
         -> (Ethereum_types.hash list, tztrace) t
@@ -107,6 +108,7 @@ module Request = struct
   let name : type a b. (a, b) t -> string = function
     | Produce_genesis _ -> "Produce_genesis"
     | Produce_block _ -> "Produce_block"
+    | Propose_next_block_timestamp _ -> "Propose_next_block_timestamp"
     | Preconfirm_transactions _ -> "Preconfirm_transactions"
 
   type view = View : _ t -> view
@@ -175,6 +177,17 @@ module Request = struct
               | _ -> False
             in
             View (Produce_block {with_delayed_transactions; force}));
+        case
+          Json_only
+          ~title:"Propose_next_block_timestamp"
+          (obj2
+             (req "request" (constant "propose_next_block_timestamp"))
+             (req "timestamp" Time.System.encoding))
+          (function
+            | View (Propose_next_block_timestamp timestamp) ->
+                Some ((), timestamp)
+            | _ -> None)
+          (fun ((), timestamp) -> View (Propose_next_block_timestamp timestamp));
         case
           Json_only
           ~title:"Preconfirm_transactions"
@@ -759,6 +772,10 @@ module Handlers = struct
     | Request.Produce_block {with_delayed_transactions; force} ->
         protect @@ fun () ->
         produce_block state ~force ~with_delayed_transactions
+    | Request.Propose_next_block_timestamp timestamp ->
+        protect @@ fun () ->
+        state.next_block_timestamp <- Some timestamp ;
+        Lwt_result_syntax.return_unit
     | Request.Preconfirm_transactions transactions -> (
         protect @@ fun () ->
         (* If we are before the first created block and block producer
@@ -872,6 +889,14 @@ let preconfirm_transactions ~transactions =
 module Internal_for_tests = struct
   let produce_block ~with_delayed_transactions =
     produce_block ~with_delayed_transactions
+
+  let propose_next_block_timestamp ~next_block_timestamp =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait
+      worker
+      (Request.Propose_next_block_timestamp next_block_timestamp)
+    |> handle_request_error
 end
 
 let produce_block = produce_block ~with_delayed_transactions:true

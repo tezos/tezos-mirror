@@ -873,6 +873,20 @@ module Produce_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Propose_next_block_timestamp = struct
+  type input = Time.System.t
+
+  type output = unit
+
+  let input_encoding = Time.System.encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "proposeNextBlockTimestamp"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Produce_proposal = struct
   type input = Time.Protocol.t
 
@@ -1220,6 +1234,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Web3_clientVersion);
     (module Web3_sha3);
     (module Produce_block);
+    (module Propose_next_block_timestamp);
     (module Produce_proposal);
     (module Inject_transaction);
     (module Wait_transaction_confirmation);
@@ -1293,6 +1308,7 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
     (module Send_raw_transaction_sync);
     (* Private RPCs *)
     (module Produce_block);
+    (module Propose_next_block_timestamp);
     (module Inject_transaction);
     (module Wait_transaction_confirmation);
     (module Inject_tezlink_operation);

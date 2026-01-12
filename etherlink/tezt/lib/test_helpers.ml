@@ -658,6 +658,15 @@ let send_transactions_to_sequencer ~(sends : (unit -> 'a Lwt.t) list) sequencer
 let send_transaction_to_sequencer ?timestamp (transaction : unit -> 'a Lwt.t)
     sequencer =
   let open Rpc.Syntax in
+  let* () =
+    match timestamp with
+    | Some timestamp ->
+        (* We must propose a timestamp else the sequencer set it to now *)
+        let*@ () = Rpc.propose_next_block_timestamp ~timestamp sequencer in
+        unit
+    | None -> unit
+  in
+
   let* transaction =
     send_transaction_to_sequencer_dont_produce_block transaction sequencer
   in

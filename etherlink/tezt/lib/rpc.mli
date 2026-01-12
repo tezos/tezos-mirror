@@ -33,6 +33,8 @@ module Request : sig
     unit ->
     Evm_node.request
 
+  val proposeNextBlockTimestamp : timestamp:string -> Evm_node.request
+
   val produceProposal : ?timestamp:string -> unit -> Evm_node.request
 
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
@@ -200,6 +202,16 @@ val produce_block :
   ?timestamp:string ->
   Evm_node.t ->
   (int, error) result Lwt.t
+
+(** [propose_next_block_timestamp ~timestamp evm_node] calls the
+    private RPC [proposeNextBlockTimestamp]. If provided the next
+    produced block might have timestamp [timestamp] (in RFC3339)
+    format. *)
+val propose_next_block_timestamp :
+  ?websocket:Websocket.t ->
+  timestamp:string ->
+  Evm_node.t ->
+  (unit, error) result Lwt.t
 
 (** [produce_proposal ?timestamp evm_node] calls the private RPC [produceProposal].
     If provided the block will have timestamp [timestamp] (in RFC3339) format. *)

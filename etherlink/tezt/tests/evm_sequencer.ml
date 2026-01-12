@@ -12914,8 +12914,7 @@ let test_withdrawal_events =
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fast_withdrawal:true
-      ~instant_confirmations:false
-        (* TODO: Specify next block timestamp with a test RPC *)
+      ~instant_confirmations:true
       protocol
   in
 
@@ -13004,8 +13003,7 @@ let test_fa_deposit_and_withdrawals_events =
       ~enable_multichain:false
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
-      ~instant_confirmations:false
-        (* TODO: Specify next block timestamp with a test RPC *)
+      ~instant_confirmations:true
       protocol
   in
   (* Send a FA deposit to the delayed inbox *)
@@ -13633,11 +13631,14 @@ let test_sequencer_key_change =
     ~sequencer:sequencer_owner
     ~additional_sequencer_keys:[new_sequencer_owner]
     ~genesis_timestamp
-    ~instant_confirmations:false
-  (* TODO: Specify next block timestamp with a test RPC *)
+    ~instant_confirmations:true
   @@ fun {sequencer; sc_rollup_node; client; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let new_key = new_sequencer_owner.public_key in
+  let*@ () =
+    (* We must propose a timestamp else the sequencer set it to now *)
+    Rpc.propose_next_block_timestamp ~timestamp:genesis_timestamp_str sequencer
+  in
   let* tx =
     call_evm_based_sequencer_key_change
       ~sender:whale.private_key
@@ -13645,7 +13646,8 @@ let test_sequencer_key_change =
       ~sequencer_owner
       ~new_key
   in
-  let*@ _ = produce_block sequencer ~timestamp:genesis_timestamp_str in
+  let*@ _ = produce_block sequencer in
+  (* timestamp was set with `propose_next_block_timestamp` *)
   let*@! Transaction.{logs; status; _} =
     Rpc.get_transaction_receipt ~tx_hash:tx sequencer
   in

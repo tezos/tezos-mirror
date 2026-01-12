@@ -92,6 +92,10 @@ module Request = struct
     let parameters = `O (with_delayed_transactions @ timestamp) in
     {method_ = "produceBlock"; parameters}
 
+  let proposeNextBlockTimestamp ~timestamp =
+    let parameters = `String timestamp in
+    {method_ = "proposeNextBlockTimestamp"; parameters}
+
   let stateValue ?block path =
     let parameters =
       match block with
@@ -526,6 +530,21 @@ let produce_block ?websocket ?with_delayed_transactions ?timestamp evm_node =
   return
   @@ decode_or_error
        (fun json -> Evm_node.extract_result json |> JSON.as_int)
+       json
+
+let propose_next_block_timestamp ?websocket ~timestamp evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      (Request.proposeNextBlockTimestamp ~timestamp)
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
        json
 
 let produce_proposal ?websocket ?timestamp evm_node =
