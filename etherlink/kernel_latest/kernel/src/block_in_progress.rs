@@ -20,7 +20,6 @@ use anyhow::Context;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
-use revm_etherlink::tezosx::TezosXRuntime;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -34,6 +33,7 @@ use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
+use tezosx_interfaces::RuntimeId;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
@@ -402,7 +402,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
         // keep track of execution gas used
         self.cumulative_execution_gas += execution_gas_used;
         match runtime {
-            TezosXRuntime::Ethereum => {
+            RuntimeId::Ethereum => {
                 // register transaction as done
                 self.valid_txs.push(transaction.tx_hash);
                 self.index += 1;
@@ -419,7 +419,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
                 let tx_object = self.make_object(object_info);
                 self.cumulative_tx_objects.push(tx_object);
             }
-            TezosXRuntime::Tezos => (),
+            RuntimeId::Tezos => (),
         };
         Ok(())
     }

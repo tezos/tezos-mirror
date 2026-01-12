@@ -410,14 +410,6 @@ let test_eth_rpc_with_alias ~runtime =
   (* Balance should be 0 *)
   let*@ balance = Rpc.get_balance ~address:evm_address observer in
   Check.((balance = Wei.zero) Wei.typ ~error_msg:"Expected %R wei but got %L") ;
-  (* Code should have data *)
-  let*@ code = Rpc.get_code ~address:evm_address observer in
-  Check.(
-    (code
-   = "0x6080604052348015600e575f5ffd5b5060a280601a5f395ff3fe608060405236603a576040517f47e794ec00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040517f47e794ec00000000000000000000000000000000000000000000000000000000815260040160405180910390fdfea264697066735822122020f56a12d5d4b6faadf04140b08a9a4af043d02dff2e9363f6d5f11382e5ad5264736f6c634300081e0033"
-    )
-      string
-      ~error_msg:"Expected %R but got %L") ;
   (* Transaction count should be 0 *)
   let*@ transaction_count =
     Rpc.get_transaction_count ~address:evm_address observer

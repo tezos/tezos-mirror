@@ -1222,6 +1222,8 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
+ "tezosx-interfaces",
+ "tezosx-tezos-runtime",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -2540,6 +2542,8 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezosx-interfaces",
+ "tezosx-tezos-runtime",
  "thiserror 1.0.69",
  "tracing",
 ]

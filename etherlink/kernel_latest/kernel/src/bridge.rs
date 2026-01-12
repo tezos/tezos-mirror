@@ -15,7 +15,6 @@ use revm::primitives::{Address, Bytes, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, h160_to_alloy, u256_to_alloy};
 use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
-use revm_etherlink::tezosx::TezosXRuntime;
 use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
@@ -41,6 +40,8 @@ use tezos_tezlink::operation_result::{
     TransferTarget,
 };
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::RuntimeId;
+use tezosx_tezos_runtime::TezosRuntime;
 
 use crate::apply::{pure_xtz_deposit, ExecutionResult, TransactionResult};
 use crate::chains::EvmLimits;
@@ -382,6 +383,8 @@ impl Decodable for Deposit {
 
 pub struct DepositResult<Outcome> {
     pub outcome: Outcome,
+    #[allow(dead_code)]
+    pub runtime: RuntimeId,
 }
 
 #[trace_kernel]
@@ -415,7 +418,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                 execution_outcome,
                 gas_used,
                 estimated_ticks_used: TICKS_FOR_DEPOSIT,
-                runtime: TezosXRuntime::Ethereum,
+                runtime: RuntimeId::Ethereum,
             };
 
             Ok(ExecutionResult::Valid(transaction_result))
@@ -424,7 +427,9 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
             let amount = mutez_from_wei(deposit.amount)
                 .map_err(|_| crate::Error::InvalidConversion)?;
 
-            match revm_etherlink::tezosx::add_balance(host, pkh, amount.into()) {
+            match TezosRuntime::add_balance(host, pkh, U256::from(amount))
+                .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))
+            {
                 Ok(()) => {
                     let execution_outcome = ExecutionOutcome {
                         result: revm::context::result::ExecutionResult::Success {
@@ -446,7 +451,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         execution_outcome,
                         gas_used,
                         estimated_ticks_used: TICKS_FOR_DEPOSIT,
-                        runtime: TezosXRuntime::Tezos,
+                        runtime: RuntimeId::Tezos,
                     };
 
                     Ok(ExecutionResult::Valid(transaction_result))
@@ -468,7 +473,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         execution_outcome,
                         gas_used,
                         estimated_ticks_used: TICKS_FOR_DEPOSIT,
-                        runtime: TezosXRuntime::Tezos,
+                        runtime: RuntimeId::Tezos,
                     };
 
                     Ok(ExecutionResult::Valid(transaction_result))
@@ -538,6 +543,7 @@ pub fn execute_tezlink_deposit<Host: Runtime, C: Context>(
 
     let result = DepositResult {
         outcome: (result, content),
+        runtime: RuntimeId::Tezos,
     };
 
     Ok(result)
