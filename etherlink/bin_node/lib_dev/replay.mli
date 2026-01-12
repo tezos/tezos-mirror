@@ -17,6 +17,7 @@
     [config] Node configuration.
 *)
 val main :
+  strategy:Evm_ro_context.replay_strategy ->
   disable_da_fees:bool ->
   ?kernel:Pvm_types.kernel ->
   ?kernel_verbosity:Events.kernel_log_level ->

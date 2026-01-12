@@ -476,8 +476,88 @@ type replay_result =
     }
   | Replay_failure
 
+type replay_strategy = Blueprint | Assemble
+
+let apply_blueprint ?log_file ?profile ctxt blueprint evm_state =
+  let open Lwt_result_syntax in
+  let*? chunks =
+    Sequencer_blueprint.chunks_of_external_messages
+      blueprint.Blueprint_types.blueprint.payload
+  in
+  (* We are replaying, so we can assume the signatures are correct *)
+  let chunks = Sequencer_blueprint.unsafe_drop_signatures chunks in
+  Evm_state.apply_unsigned_chunks
+    ~pool:ctxt.execution_pool
+    ?log_file
+    ?profile
+    ~data_dir:ctxt.data_dir
+    ~chain_family:EVM
+    ~config:(pvm_config ctxt)
+    ~native_execution_policy:ctxt.native_execution_policy
+    evm_state
+    chunks
+
+let assemble_blueprint ?log_file ?profile ctxt blueprint evm_state =
+  let open Lwt_result_syntax in
+  let*? txns =
+    Blueprint_decoder.transactions blueprint.Blueprint_types.blueprint.payload
+  in
+  if txns = [] then apply_blueprint ?log_file ?profile ctxt blueprint evm_state
+  else
+    let* txns =
+      List.map_es
+        (function
+          | hash, Some txn -> return (hash, Broadcast.Common (Evm txn))
+          | hash, None -> (
+              let* sql_res =
+                Evm_store.(
+                  use ctxt.store @@ fun conn ->
+                  Delayed_transactions.at_hash conn hash)
+              in
+              match sql_res with
+              | Some txn -> return (hash, Broadcast.Delayed txn)
+              | None ->
+                  failwith
+                    "Missing delayed transaction %a"
+                    Ethereum_types.pp_hash
+                    hash))
+        txns
+    in
+    let* evm_state, _ =
+      List.fold_left_es
+        (fun (evm_state, idx) (hash, txn) ->
+          let* _, evm_state =
+            Evm_state.execute_single_transaction
+              ~data_dir:ctxt.data_dir
+              ~pool:ctxt.execution_pool
+              ~native_execution:(ctxt.native_execution_policy = Always)
+              ~config:(pvm_config ctxt)
+              evm_state
+              {
+                timestamp = blueprint.blueprint.timestamp;
+                number = blueprint.blueprint.number;
+                transactions_count = idx;
+              }
+              hash
+              txn
+          in
+          return (evm_state, Int32.succ idx))
+        (evm_state, 0l)
+        txns
+    in
+
+    Evm_state.assemble_block
+      ~pool:ctxt.execution_pool
+      ~data_dir:ctxt.data_dir
+      ~chain_family:EVM
+      ~timestamp:blueprint.blueprint.timestamp
+      ~number:blueprint.blueprint.number
+      ~native_execution:(ctxt.native_execution_policy = Always)
+      ~config:(pvm_config ctxt)
+      evm_state
+
 let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
-    (Ethereum_types.Qty number) =
+    strategy (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
   let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
   let* evm_state = get_evm_state ctxt hash in
@@ -505,23 +585,11 @@ let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
         process_time := dt ;
         Lwt.return_unit)
     @@ fun () ->
-    let*? chunks =
-      Sequencer_blueprint.chunks_of_external_messages
-        blueprint.blueprint.payload
-    in
-    (* We are replaying, so we can assume the signatures are correct *)
-    let chunks = Sequencer_blueprint.unsafe_drop_signatures chunks in
-    Evm_state.apply_unsigned_chunks
-      ~pool:ctxt.execution_pool
-      ?log_file
-      ?profile
-      ~data_dir:ctxt.data_dir
-      ~chain_family:EVM
-      ~config:(pvm_config ctxt)
-      ~native_execution_policy:ctxt.native_execution_policy
-      evm_state
-      chunks
+    match strategy with
+    | Blueprint -> apply_blueprint ?log_file ?profile ctxt blueprint evm_state
+    | Assemble -> assemble_blueprint ?log_file ?profile ctxt blueprint evm_state
   in
+
   match apply_result with
   | Apply_success {block; evm_state} ->
       let* (Qty base_fee_per_gas) =
@@ -566,7 +634,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
     let replay ?log_file ?profile ?alter_evm_state number =
       let open Lwt_result_syntax in
-      let+ result = replay ctxt ?log_file ?profile ?alter_evm_state number in
+      let+ result =
+        replay ctxt ?log_file ?profile ?alter_evm_state Blueprint number
+      in
       match result with
       | Replay_success {block; evm_state; _} ->
           Evm_state.Apply_success {block; evm_state}

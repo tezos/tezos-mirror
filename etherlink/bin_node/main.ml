@@ -557,6 +557,13 @@ let profile_arg =
     ~default:"flamegraph"
     Params.profile
 
+let simulate_instant_confirmation_arg =
+  Tezos_clic.switch
+    ~long:"simulate-instant-confirmation"
+    ~short:'I'
+    ~doc:"Simulate instant confirmation for this replay."
+    ()
+
 let disable_da_fees_arg =
   Tezos_clic.switch
     ~long:"disable-da-fees"
@@ -2071,7 +2078,7 @@ let reset_command =
            and not accidentally delete data.")
 
 let replay_args =
-  Tezos_clic.args9
+  Tezos_clic.args10
     data_dir_arg
     config_path_arg
     preimages_arg
@@ -2081,6 +2088,7 @@ let replay_args =
     kernel_verbosity_arg
     profile_arg
     disable_da_fees_arg
+    simulate_instant_confirmation_arg
 
 let replay_many_command =
   let open Tezos_clic in
@@ -2099,7 +2107,8 @@ let replay_many_command =
            kernel,
            kernel_verbosity,
            profile,
-           disable_da_fees )
+           disable_da_fees,
+           simulate_instant_confirmation )
          l2_level
          ()
        ->
@@ -2118,6 +2127,8 @@ let replay_many_command =
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
       Evm_node_lib_dev.Replay.main
+        ~strategy:
+          (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity
@@ -2150,7 +2161,8 @@ let replay_command =
            kernel,
            kernel_verbosity,
            profile,
-           disable_da_fees )
+           disable_da_fees,
+           simulate_instant_confirmation )
          l2_level
          upto
          ()
@@ -2170,6 +2182,8 @@ let replay_command =
       let*! () = init_logs ~daily_logs:false configuration in
       let*! () = set_gc_parameters configuration in
       Evm_node_lib_dev.Replay.main
+        ~strategy:
+          (if simulate_instant_confirmation then Assemble else Blueprint)
         ~disable_da_fees
         ?kernel
         ?kernel_verbosity

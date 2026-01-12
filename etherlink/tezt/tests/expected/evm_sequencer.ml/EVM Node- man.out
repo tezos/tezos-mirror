@@ -1021,6 +1021,7 @@ Debug commands:
       [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
       [-n --native-execution-policy <policy>] [--kernel <evm_kernel.wasm>]
       [--kernel-verbosity <info>] [--profile [minimal|flamegraph]] [--disable-da-fees]
+      [-I --simulate-instant-confirmation]
     Replay a range of block levels.
     <level>: First block to replay.
     <level>: Last block to replay.
@@ -1045,11 +1046,13 @@ Debug commands:
       flamegraph indexed on tick consumption
       Defaults to `flamegraph`.
     --disable-da-fees: Disable DA fees for this replay.
+    -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
   
   replay blueprint <level> [--data-dir <data-dir>] [--config-file <path>]
       [--preimages-dir <_evm_installer_preimages>] [--preimages-endpoint <url>]
       [-n --native-execution-policy <policy>] [--kernel <evm_kernel.wasm>]
       [--kernel-verbosity <info>] [--profile [minimal|flamegraph]] [--disable-da-fees]
+      [-I --simulate-instant-confirmation]
     Replay a specific block level.
     <level>: Level to replay.
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
@@ -1073,6 +1076,7 @@ Debug commands:
       flamegraph indexed on tick consumption
       Defaults to `flamegraph`.
     --disable-da-fees: Disable DA fees for this replay.
+    -I --simulate-instant-confirmation: Simulate instant confirmation for this replay.
   
   transform dump <dump.json> to rlp <dump.rlp> [-k --keep-everything]
     Transforms the JSON list of instructions to a RLP list.
