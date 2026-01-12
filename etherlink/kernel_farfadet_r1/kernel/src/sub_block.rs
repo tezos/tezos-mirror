@@ -6,7 +6,7 @@
 use crate::{
     apply::{pure_fa_deposit, revm_run_transaction},
     block::GAS_LIMIT,
-    block_storage,
+    block_storage, blueprint_storage,
     bridge::{execute_etherlink_deposit, DepositResult},
     chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
@@ -686,6 +686,13 @@ pub fn assemble_block<Host: Runtime>(
         &block_constants,
         base_fee_per_gas,
     );
+
+    // We need to store the block header in order for the evm node
+    // to be able to switch between [assemble_block] and [apply_blueprint].
+    // If we don't do the following store instruction, the [apply_blueprint]
+    // will fail to fetch the current block number.
+    let header: blueprint_storage::BlockHeader<_> = sub_block.clone().into();
+    blueprint_storage::store_current_block_header(host, &header)?;
 
     block_storage::store_current(
         host,
