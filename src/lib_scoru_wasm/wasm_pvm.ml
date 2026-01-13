@@ -210,7 +210,41 @@ let pvm_state_encoding =
           Data_encoding.n)
        output_buffer_parameters_encoding)
 
-module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
+module type CONTEXT_PROOF = sig
+  type context
+
+  module Wrapped_tree : Tezos_tree_encoding.TREE
+
+  val empty_tree : unit -> Wrapped_tree.tree
+
+  val tree_hash :
+    Wrapped_tree.tree -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
+
+  type proof
+
+  val proof_encoding : proof Data_encoding.t
+
+  val proof_start_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val proof_stop_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val produce_proof :
+    context ->
+    Wrapped_tree.tree ->
+    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
+    (proof * 'a) option Lwt.t
+
+  val verify_proof :
+    proof ->
+    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
+    (Wrapped_tree.tree * 'a) option Lwt.t
+
+  val cast_read_only : proof -> proof
+end
+
+module Make_machine_with_vm
+    (Wasm_vm : Wasm_vm_sig.S)
+    (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.Machine with type tree = T.tree = struct
   type tree = T.tree
 
@@ -463,4 +497,24 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
   end
 end
 
-module Make_machine = Make_pvm (Wasm_vm)
+module Make_machine = Make_machine_with_vm (Wasm_vm)
+
+module Make_pvm_machine_with_vm
+    (Wasm_vm : Wasm_vm_sig.S)
+    (Context : CONTEXT_PROOF) :
+  Wasm_pvm_sig.S
+    with type tree = Context.Wrapped_tree.tree
+     and type context = Context.context
+     and type state = Context.Wrapped_tree.tree
+     and type proof = Context.proof = struct
+  include Make_machine_with_vm (Wasm_vm) (Context.Wrapped_tree)
+  include Context
+
+  type state = Context.Wrapped_tree.tree
+
+  let empty_state = empty_tree
+
+  let state_hash = Context.tree_hash
+end
+
+module Make_pvm_machine = Make_pvm_machine_with_vm (Wasm_vm)
