@@ -82,7 +82,7 @@ systemctl list-unit-files --type=service | grep "octez"
 sudo rm -f /usr/sbin/policy-rc.d
 apt-get upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y octez-node octez-dal-node octez-baker
 
-# It has to be started automatically because v23* packages are broken
+sudo systemctl start octez-node
 sudo systemctl start octez-dal-node
 sudo systemctl start octez-baker
 
