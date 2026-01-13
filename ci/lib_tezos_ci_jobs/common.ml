@@ -501,11 +501,12 @@ module Packaging = struct
       ~tag:Dynamic
       script
 
-  let make_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution
-      ~base_image ~script =
+  let make_docker_build_dependencies ~__POS__ ?rules ~name ~matrix ~distribution
+      ~base_image ~script () =
     job_docker_authenticated
       ~__POS__
       ~name
+      ?rules
       ~stage:Stages.images
       ~variables:
         (make_variables

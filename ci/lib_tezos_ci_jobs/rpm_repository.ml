@@ -127,6 +127,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-rockylinux-dependencies"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
+      ()
   in
   let job_docker_build_fedora_dependencies : tezos_job =
     make_job_docker_build_dependencies
@@ -134,6 +135,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-fedora-dependencies"
       ~distribution:"fedora"
       ~matrix:(fedora_package_release_matrix pipeline_type)
+      ()
   in
 
   (* docker merge jobs *)
