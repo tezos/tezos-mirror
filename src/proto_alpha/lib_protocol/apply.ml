@@ -1348,18 +1348,27 @@ let apply_manager_operation : type kind.
             ~allow_forged_lazy_storage_id_in_storage:false
             (Script script)
         in
-        let (Script {storage_type; views; storage; _}) = parsed_script in
-        let views_result =
-          Script_ir_translator.parse_views
-            ctxt
-            ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
-            storage_type
-            views
+        let (Script {storage_type; storage; implementation; _}) =
+          parsed_script
         in
-        let* _typed_views, ctxt =
-          trace
-            (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
-            views_result
+        let* ctxt =
+          match implementation with
+          | Lambda {views; _} ->
+              let views_result =
+                Script_ir_translator.parse_views
+                  ctxt
+                  ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+                  storage_type
+                  views
+              in
+              let* _typed_views, ctxt =
+                trace
+                  (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
+                  views_result
+              in
+              return ctxt
+          (* Native branch is technically dead, a native contract cannot be originated *)
+          | Native _ -> return ctxt
         in
         let+ ctxt, origination_result, ops =
           apply_origination

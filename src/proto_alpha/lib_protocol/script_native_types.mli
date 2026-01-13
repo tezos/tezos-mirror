@@ -10,6 +10,11 @@
 open Alpha_context
 open Script_typed_ir
 
+type ('arg, 'output) view_type = {
+  input_ty : 'arg ty_ex_c;
+  output_ty : 'output ty_ex_c;
+}
+
 (** Types declaration of CLST contracts (entrypoints and storage). *)
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
@@ -38,6 +43,21 @@ type ex_kind_and_types =
     types for the given native contract kind. *)
 val get_typed_kind_and_types :
   Script_native_repr.t -> ex_kind_and_types tzresult
+
+type ('arg, 'storage, 'output) view = {
+  name : Script_string.t;
+  ty : ('arg, 'output) view_type;
+  implementation :
+    context * step_constants ->
+    'arg ->
+    'storage ->
+    ('output * context) tzresult Lwt.t;
+}
+
+type 'storage ex_view =
+  | Ex_view : ('arg, 'storage, 'output) view -> 'storage ex_view
+
+type 'storage view_map = (Script_string.t, 'storage ex_view) map
 
 module Internal_for_tests : sig
   val eq_native_kind : ('arg, 'storage) kind -> ('arg', 'storage') kind -> bool

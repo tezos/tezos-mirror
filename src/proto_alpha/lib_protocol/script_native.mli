@@ -18,6 +18,10 @@ module CLST_contract : sig
     | Amount_too_large of Destination.t * CLST_types.nat
 end
 
+val get_views :
+  'arg 'storage.
+  ('arg, 'storage) kind -> (Script_string.t, 'storage ex_view) map tzresult
+
 (* [execute ctxt kind arg storage] executes the given native contract [kind]
    with [arg] and [storage], and returns the list of operations, the new storage
    and the context. *)

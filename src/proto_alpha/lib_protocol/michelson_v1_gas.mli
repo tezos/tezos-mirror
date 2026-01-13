@@ -349,7 +349,13 @@ module Cost_of : sig
 
     val view_get : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
 
+    val native_view_get :
+      Script_string.t -> 'storage Script_native_types.view_map -> Gas.cost
+
     val view_update : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
+
+    val native_view_update :
+      Script_string.t -> 'storage Script_native_types.view_map -> Gas.cost
 
     val transfer_tokens : Gas.cost
 

@@ -106,6 +106,26 @@ module Helpers = struct
     (ty, {root = entrypoint; original_type_expr = ty.untyped})
 end
 
+type ('arg, 'output) view_type = {
+  input_ty : 'arg ty_ex_c;
+  output_ty : 'output ty_ex_c;
+}
+
+type ('arg, 'storage, 'output) view = {
+  name : Script_string.t;
+  ty : ('arg, 'output) view_type;
+  implementation :
+    context * step_constants ->
+    'arg ->
+    'storage ->
+    ('output * context) tzresult Lwt.t;
+}
+
+type 'storage ex_view =
+  | Ex_view : ('arg, 'storage, 'output) view -> 'storage ex_view
+
+type 'storage view_map = (Script_string.t, 'storage ex_view) map
+
 module CLST_types = struct
   open Helpers
 

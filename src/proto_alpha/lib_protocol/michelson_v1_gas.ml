@@ -630,7 +630,15 @@ module Cost_of = struct
     let view_get (elt : Script_string.t) (m : Script_typed_ir.view_map) =
       map_get elt m
 
+    let native_view_get (elt : Script_string.t)
+        (m : 'storage Script_native_types.view_map) =
+      map_get elt m
+
     let view_update (elt : Script_string.t) (m : Script_typed_ir.view_map) =
+      map_update elt m
+
+    let native_view_update (elt : Script_string.t)
+        (m : 'storage Script_native_types.view_map) =
       map_update elt m
 
     let join_tickets :

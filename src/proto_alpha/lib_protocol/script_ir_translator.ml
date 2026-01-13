@@ -1128,6 +1128,7 @@ type ('arg, 'storage) implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+      views : view_map;
     }
       -> ('arg, 'storage) implementation
   | Native : {
@@ -1140,7 +1141,6 @@ type ('arg, 'storage) code =
       implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) ty;
       storage_type : ('storage, _) ty;
-      views : view_map;
       entrypoints : 'arg entrypoints;
       code_size : Cache_memory_helpers.sint;
     }
@@ -5177,7 +5177,6 @@ let get_typed_native_code :
              arg_type;
              storage_type;
              entrypoints;
-             views = Script_map.empty string_t;
              code_size = Saturation_repr.zero;
            }),
       ctxt )
@@ -5242,10 +5241,9 @@ let parse_code :
       ( Ex_code
           (Code
              {
-               implementation = Lambda {code};
+               implementation = Lambda {code; views};
                arg_type;
                storage_type;
-               views;
                entrypoints;
                code_size;
              }),
@@ -5311,7 +5309,6 @@ let parse_script :
                     implementation;
                     arg_type;
                     storage_type;
-                    views;
                     entrypoints;
                     code_size;
                   }),
@@ -5343,7 +5340,6 @@ let parse_script :
              arg_type;
              storage;
              storage_type;
-             views;
              entrypoints;
            }),
       ctxt )
@@ -6189,7 +6185,6 @@ let script_size
             storage;
             storage_type;
             entrypoints = _;
-            views = _;
           })) =
   let nodes, storage_size =
     Script_typed_ir_size.value_size storage_type storage

@@ -571,7 +571,9 @@ module Raw = struct
           match script_opt with
           | None -> (return_none [@ocaml.tailcall]) ctxt
           | Some script -> (
-              let* Ex_script (Script {storage; storage_type; views; _}), ctxt =
+              let* ( Ex_script
+                       (Script {storage; storage_type; implementation; _}),
+                     ctxt ) =
                 parse_script
                   ~elab_conf:legacy
                   ~allow_forged_tickets_in_storage:true
@@ -579,80 +581,151 @@ module Raw = struct
                   ctxt
                   script
               in
-              let*? ctxt =
-                Gas.consume ctxt (Interp_costs.view_get name views)
-              in
-              match Script_map.get name views with
-              | None -> (return_none [@ocaml.tailcall]) ctxt
-              | Some view -> (
-                  let view_result =
-                    Script_ir_translator.parse_view
-                      ctxt
-                      ~elab_conf:legacy
-                      storage_type
-                      view
+              match implementation with
+              | Native {kind} -> (
+                  let*? views = Script_native.get_views kind in
+                  let*? ctxt =
+                    Gas.consume ctxt (Interp_costs.native_view_get name views)
                   in
-                  let* ( Typed_view
-                           {
-                             input_ty = input_ty';
-                             output_ty = output_ty';
-                             kinstr;
-                             original_code_expr = _;
-                           },
-                         ctxt ) =
-                    trace_eval
-                      (fun () ->
-                        Script_tc_errors.Ill_typed_contract
-                          (Micheline.strip_locations view.view_code, []))
-                      view_result
-                  in
-                  let io_ty =
-                    let open Gas_monad.Syntax in
-                    let* out_eq =
-                      ty_eq ~error_details:Fast output_ty' output_ty
-                    in
-                    let+ in_eq = ty_eq ~error_details:Fast input_ty input_ty' in
-                    (out_eq, in_eq)
-                  in
-                  let*? eq, ctxt = Gas_monad.run ctxt io_ty in
-                  match eq with
-                  | Error Inconsistent_types_fast ->
-                      (return_none [@ocaml.tailcall]) ctxt
-                  | Ok (Eq, Eq) ->
-                      let kcons =
-                        KCons (ICons_some (kinstr_location k, k), ks)
+                  match Script_map.get name views with
+                  | None -> (return_none [@ocaml.tailcall]) ctxt
+                  | Some
+                      (Ex_view
+                         {
+                           name = _;
+                           ty =
+                             {
+                               input_ty = Ty_ex_c input_ty';
+                               output_ty = Ty_ex_c output_ty';
+                             };
+                           implementation;
+                         }) -> (
+                      let io_ty =
+                        let open Gas_monad.Syntax in
+                        let* out_eq =
+                          ty_eq ~error_details:Fast output_ty' output_ty
+                        in
+                        let+ in_eq =
+                          ty_eq ~error_details:Fast input_ty input_ty'
+                        in
+                        (out_eq, in_eq)
                       in
-                      let* ctxt, balance =
-                        Contract.get_balance_carbonated ctxt c
-                      in
-                      let gas, ctxt =
-                        local_gas_counter_and_outdated_context ctxt
-                      in
-                      let sty =
-                        Option.map (fun t -> Item_t (output_ty, t)) stack_ty
-                      in
-                      (step [@ocaml.tailcall])
-                        ( ctxt,
-                          {
-                            sender =
-                              Destination.Contract (Contract.Originated sc.self);
-                            self = contract_hash;
-                            amount = Tez.zero;
-                            balance;
-                            (* The following remain unchanged, but let's
+                      let*? eq, ctxt = Gas_monad.run ctxt io_ty in
+                      match eq with
+                      | Error Inconsistent_types_fast ->
+                          (return_none [@ocaml.tailcall]) ctxt
+                      | Ok (Eq, Eq) ->
+                          let* ctxt, balance =
+                            Contract.get_balance_carbonated ctxt c
+                          in
+                          let step_constants =
+                            {
+                              sender =
+                                Destination.Contract
+                                  (Contract.Originated sc.self);
+                              self = contract_hash;
+                              amount = Tez.zero;
+                              balance;
+                              (* The following remain unchanged, but let's
                                list them anyway, so that we don't forget
                                to update something added later. *)
-                            payer = sc.payer;
-                            chain_id = sc.chain_id;
-                            now = sc.now;
-                            level = sc.level;
-                          } )
-                        gas
-                        kinstr
-                        (instrument
-                        @@ KView_exit (sc, KReturn (stack, sty, kcons)))
-                        (input, storage)
-                        (EmptyCell, EmptyCell))))
+                              payer = sc.payer;
+                              chain_id = sc.chain_id;
+                              now = sc.now;
+                              level = sc.level;
+                            }
+                          in
+                          let* result, ctxt =
+                            implementation (ctxt, step_constants) input storage
+                          in
+                          let gas, ctxt =
+                            local_gas_counter_and_outdated_context ctxt
+                          in
+                          (step [@ocaml.tailcall])
+                            (ctxt, sc)
+                            gas
+                            (ICons_some (kinstr_location k, k))
+                            ks
+                            result
+                            stack))
+              | Lambda {views; _} -> (
+                  let*? ctxt =
+                    Gas.consume ctxt (Interp_costs.view_get name views)
+                  in
+                  match Script_map.get name views with
+                  | None -> (return_none [@ocaml.tailcall]) ctxt
+                  | Some view -> (
+                      let view_result =
+                        Script_ir_translator.parse_view
+                          ctxt
+                          ~elab_conf:legacy
+                          storage_type
+                          view
+                      in
+                      let* ( Typed_view
+                               {
+                                 input_ty = input_ty';
+                                 output_ty = output_ty';
+                                 kinstr;
+                                 original_code_expr = _;
+                               },
+                             ctxt ) =
+                        trace_eval
+                          (fun () ->
+                            Script_tc_errors.Ill_typed_contract
+                              (Micheline.strip_locations view.view_code, []))
+                          view_result
+                      in
+                      let io_ty =
+                        let open Gas_monad.Syntax in
+                        let* out_eq =
+                          ty_eq ~error_details:Fast output_ty' output_ty
+                        in
+                        let+ in_eq =
+                          ty_eq ~error_details:Fast input_ty input_ty'
+                        in
+                        (out_eq, in_eq)
+                      in
+                      let*? eq, ctxt = Gas_monad.run ctxt io_ty in
+                      match eq with
+                      | Error Inconsistent_types_fast ->
+                          (return_none [@ocaml.tailcall]) ctxt
+                      | Ok (Eq, Eq) ->
+                          let kcons =
+                            KCons (ICons_some (kinstr_location k, k), ks)
+                          in
+                          let* ctxt, balance =
+                            Contract.get_balance_carbonated ctxt c
+                          in
+                          let gas, ctxt =
+                            local_gas_counter_and_outdated_context ctxt
+                          in
+                          let sty =
+                            Option.map (fun t -> Item_t (output_ty, t)) stack_ty
+                          in
+                          (step [@ocaml.tailcall])
+                            ( ctxt,
+                              {
+                                sender =
+                                  Destination.Contract
+                                    (Contract.Originated sc.self);
+                                self = contract_hash;
+                                amount = Tez.zero;
+                                balance;
+                                (* The following remain unchanged, but let's
+                               list them anyway, so that we don't forget
+                               to update something added later. *)
+                                payer = sc.payer;
+                                chain_id = sc.chain_id;
+                                now = sc.now;
+                                level = sc.level;
+                              } )
+                            gas
+                            kinstr
+                            (instrument
+                            @@ KView_exit (sc, KReturn (stack, sty, kcons)))
+                            (input, storage)
+                            (EmptyCell, EmptyCell)))))
 
   and step : type a s b t r f. (a, s, b, t, r, f) step_type =
     let open Lwt_result_syntax in
@@ -1835,7 +1908,6 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
                 storage = old_storage;
                 storage_type;
                 entrypoints;
-                views;
               }),
          ctxt ) =
     match cached_script with
@@ -1874,7 +1946,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   in
   let* (ops, new_storage), ctxt =
     match implementation with
-    | Lambda {code} ->
+    | Lambda {code; _} ->
         trace
           (Runtime_contract_error step_constants.self)
           (interp logger (ctxt, step_constants) code (arg, old_storage))
@@ -1918,7 +1990,6 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
            storage;
            storage_type;
            entrypoints;
-           views;
          })
   in
   let*? arg_type_has_tickets, ctxt =

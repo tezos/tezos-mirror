@@ -95,6 +95,7 @@ type ('arg, 'storage) implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+      views : view_map;
     }
       -> ('arg, 'storage) implementation
   | Native : {
@@ -107,7 +108,6 @@ type ('arg, 'storage) code =
       implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) Script_typed_ir.ty;
       storage_type : ('storage, _) Script_typed_ir.ty;
-      views : Script_typed_ir.view_map;
       entrypoints : 'arg Script_typed_ir.entrypoints;
       code_size : Cache_memory_helpers.sint;
           (** This is an over-approximation of the value size in memory, in

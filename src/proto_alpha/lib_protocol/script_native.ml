@@ -116,6 +116,11 @@ module CLST_contract = struct
         execute_withdraw (ctxt, step_constants) amount storage
 end
 
+let get_views : type arg storage.
+    (arg, storage) kind -> storage Script_native_types.view_map tzresult =
+  function
+  | CLST_kind -> assert false
+
 let execute (type arg storage) (ctxt, step_constants)
     (kind : (arg, storage) kind) (arg : arg) (storage : storage) :
     ((operation Script_list.t, storage) pair * context, error trace) result
