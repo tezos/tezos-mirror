@@ -85,7 +85,7 @@ const CONFIG: Config = Config {
     ..Config::shanghai()
 };
 
-const KERNEL_VERSION: &str = env!("GIT_HASH");
+const KERNEL_VERSION: &str = "9ab8acd92eb91c5aa2325fbb2c1794bc11aa1b68";
 
 fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {

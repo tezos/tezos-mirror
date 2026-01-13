@@ -76,6 +76,7 @@ mod upgrade;
 
 extern crate alloc;
 
+// This needs to be set to the frozen commit on snapshot time
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
