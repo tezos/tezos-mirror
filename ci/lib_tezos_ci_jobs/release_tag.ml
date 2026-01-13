@@ -363,4 +363,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   | _ -> []
 
 let octez_packaging_revision_jobs =
-  [(* Stage: start *) job_datadog_pipeline_trace]
+  let jobs_debian_repository =
+    Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
+  in
+  job_datadog_pipeline_trace :: jobs_debian_repository
