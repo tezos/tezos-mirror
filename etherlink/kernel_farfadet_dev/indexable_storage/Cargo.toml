@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-indexable-storage-farfadet-dev"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+thiserror.workspace = true
+rlp.workspace = true
+num-bigint.workspace = true
+tezos-evm-logging.workspace = true
+tezos-evm-runtime.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-mock.workspace = true
+tezos-smart-rollup-storage.workspace = true
+tezos-storage.workspace = true
