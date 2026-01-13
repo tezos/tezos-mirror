@@ -114,12 +114,36 @@ module CLST_contract = struct
     | L () (* deposit *) -> execute_deposit (ctxt, step_constants) () storage
     | R amount (* withdraw *) ->
         execute_withdraw (ctxt, step_constants) amount storage
+
+  module Views = struct
+    let balance : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "get_balance" in
+      let* ty = CLST_types.balance_view_ty in
+      let implementation (ctxt, _step_constants) ((address : address), token_id)
+          (ledger : storage) =
+        let open Lwt_result_syntax in
+        if Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
+        then Clst_storage.get_balance_from_storage ctxt ledger address
+        else return (Script_int.zero_n, ctxt)
+      in
+      return (Ex_view {name; ty; implementation})
+
+    let view_map : storage Script_native_types.view_map tzresult =
+      let open Result_syntax in
+      let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
+      return
+      @@ Script_map.update
+           get_balance_name
+           (Some get_balance)
+           (Script_map.empty string_t)
+  end
 end
 
 let get_views : type arg storage.
     (arg, storage) kind -> storage Script_native_types.view_map tzresult =
   function
-  | CLST_kind -> assert false
+  | CLST_kind -> CLST_contract.Views.view_map
 
 let execute (type arg storage) (ctxt, step_constants)
     (kind : (arg, storage) kind) (arg : arg) (storage : storage) :

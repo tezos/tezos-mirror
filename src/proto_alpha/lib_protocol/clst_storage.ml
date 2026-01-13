@@ -9,6 +9,9 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+(* In case of single assets contracts, the token id of the asset is always 0. *)
+let token_id = Script_int.zero_n
+
 let get_storage ctxt =
   let open Lwt_result_syntax in
   let* clst_contract_hash = Contract.get_clst_contract_hash ctxt in

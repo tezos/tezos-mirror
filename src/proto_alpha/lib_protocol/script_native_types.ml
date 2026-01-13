@@ -155,6 +155,13 @@ module CLST_types = struct
     return (finalize_entrypoint arg_type)
 
   let storage_type : storage ty_node tzresult = address_big_map_ty (nat_ty ())
+
+  type balance_view = (address * nat, nat) view_type
+
+  let balance_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = pair_ty (address_ty ()) (nat_ty ()) in
+    return {input_ty; output_ty = (nat_ty ()).typed}
 end
 
 type ('arg, 'storage) kind =
