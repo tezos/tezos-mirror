@@ -360,15 +360,16 @@ For instance, to configure and run the node on the active protocol on Shadownet 
 Note in the commands above that ``node`` is the name of the service running the ``octez-node`` executable.
 You may ignore possible warnings about environment variable ``BAKER_ADDRESS``, that we will set later on for the DAL node.
 
+The client and node data are stored in local subdirectories of your current directory, respectively ``./client_data/`` and ``./node_data/``.
+You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
+
 .. note::
 
     If the node complains that it is configured for another network, you'll have to remove the node configuration file before running it:
 
     ::
 
-        docker compose -f bake.yml run --rm \
-          --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
-          node
+        rm ./node_data/data/config.json
 
 You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
 

@@ -8,8 +8,8 @@ services:
       - 9732:9732
       - 8732:8732
     volumes:
-      - node_data:/var/run/tezos/node
-      - client_data:/var/run/tezos/client
+      - ./node_data:/var/run/tezos/node
+      - ./client_data:/var/run/tezos/client
     restart: on-failure
 
   dal-node:
@@ -18,8 +18,8 @@ services:
     hostname: octez-dal
     command: octez-dal-node run --endpoint http://node:8732 --attester-profile=$BAKER_ADDRESS
     volumes:
-      - client_data:/var/run/tezos/client
-      - node_data:/var/run/tezos/node
+      - ./client_data:/var/run/tezos/client
+      - ./node_data:/var/run/tezos/node
     restart: on-failure
 
   baker:
@@ -28,8 +28,8 @@ services:
     hostname: octez-baker
     command: octez-baker --base-dir /var/run/tezos/node/data --endpoint http://node:8732 run with local node /var/run/tezos/node/data --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE --dal-node http://dal-node:10732
     volumes:
-      - client_data:/var/run/tezos/client
-      - node_data:/var/run/tezos/node
+      - ./client_data:/var/run/tezos/client
+      - ./node_data:/var/run/tezos/node
     restart: on-failure
 
   accuser:
@@ -38,10 +38,6 @@ services:
     hostname: octez-accuser
     command: octez-accuser --base-dir /var/run/tezos/node/data --endpoint http://node:8732 run
     volumes:
-      - client_data:/var/run/tezos/client
-      - node_data:/var/run/tezos/node
+      - ./client_data:/var/run/tezos/client
+      - ./node_data:/var/run/tezos/node
     restart: on-failure
-
-volumes:
-  node_data: {}
-  client_data: {}
