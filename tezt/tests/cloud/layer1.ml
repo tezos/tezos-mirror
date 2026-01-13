@@ -776,6 +776,41 @@ let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
+let run_stresstest stresstesters tps seed =
+  (* run the stresstest *)
+  Lwt_list.iteri_p
+    (fun i {agent; client; accounts; _} ->
+      let* filename =
+        (* The list of account is too big to be passed by ssh,
+                   so we generate the account list locally,
+                   copy it the the agent,
+                   and pass the filename to stresstest invocation directly *)
+        let sources =
+          `A
+            (List.map
+               (fun ({public_key_hash = pkh; _} : Account.key) ->
+                 `O [("pkh", `String pkh)])
+               accounts)
+        in
+        (* As we run in parrallel, and as Temp.file does not return a unique file name,
+                   we need a different base filename name for each stresstester *)
+        let base = sf "stresstest-%i-sources.json" i in
+        let source = Temp.file ?runner:None base in
+        let destination = Temp.file ?runner:(Agent.runner agent) base in
+        let () = JSON.encode_to_file_u source sources in
+        Tezt_cloud.Agent.copy agent ~destination ~source
+      in
+      let _ =
+        Client.spawn_stresstest_with_filename
+          ~env:yes_crypto_env
+          ~tps
+          ~seed
+          client
+          filename
+      in
+      Lwt.return_unit)
+    stresstesters
+
 let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
   let open Scenarios_configuration.LAYER1 in
   let () = toplog "Init" in
@@ -932,39 +967,9 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
             stresstesters
         in
         let* () =
-          (* run the stresstest *)
-          Lwt_list.iteri_p
-            (fun i {agent; client; accounts; _} ->
-              let* filename =
-                (* The list of account is too big to be passed by ssh,
-                   so we generate the account list locally,
-                   copy it the the agent,
-                   and pass the filename to stresstest invocation directly *)
-                let sources =
-                  `A
-                    (List.map
-                       (fun ({public_key_hash = pkh; _} : Account.key) ->
-                         `O [("pkh", `String pkh)])
-                       accounts)
-                in
-                (* As we run in parrallel, and as Temp.file does not return a unique file name,
-                   we need a different base filename name for each stresstester *)
-                let base = sf "stresstest-%i-sources.json" i in
-                let source = Temp.file ?runner:None base in
-                let destination = Temp.file ?runner:(Agent.runner agent) base in
-                let () = JSON.encode_to_file_u source sources in
-                Tezt_cloud.Agent.copy agent ~destination ~source
-              in
-              let _ =
-                Client.spawn_stresstest_with_filename
-                  ~env:yes_crypto_env
-                  ~tps
-                  ~seed
-                  client
-                  filename
-              in
-              Lwt.return_unit)
-            stresstesters
+          match configuration.migration with
+          | None -> run_stresstest stresstesters tps seed
+          | Some _ -> Lwt.return_unit
         in
         Lwt.return stresstesters
   in
@@ -1463,11 +1468,31 @@ let register (module Cli : Scenarios_cli.Layer1) =
     | None -> false
     | Some termination_level -> level >= termination_level
   in
+  let may_start_stresstesting t stresstesting_started migration_level level =
+    if stresstesting_started then Lwt.return_true
+    else
+      match migration_level with
+      | None -> Lwt.return_true
+      | Some migration_level ->
+          if level > migration_level - 100 then
+            match configuration.stresstest with
+            | None -> Lwt.return_true
+            | Some {tps; seed} ->
+                let tps =
+                  tps / Stresstest.nb_stresstester configuration.network tps
+                in
+                let* () = run_stresstest t.stresstesters tps seed in
+                Lwt.return_true
+          else Lwt.return stresstesting_started
+  in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop with_producers level =
+    (let rec loop stresstesting_started with_producers level =
        let level = succ level in
        toplog "Loop at level %d" level ;
+       let* stresstesting_started =
+         may_start_stresstesting t stresstesting_started migration_level level
+       in
        if should_terminate level then
          let* () =
            may_export_snapshot t.bootstrap configuration.migration level
@@ -1480,6 +1505,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
              Lwt.return_unit
            else produce_slot t level
          in
-         loop with_producers level
+         loop stresstesting_started with_producers level
      in
-     loop (List.compare_length_with t.producers 0 = 0))
+     loop (migration_level = None) (List.compare_length_with t.producers 0 = 0))
