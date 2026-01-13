@@ -14,17 +14,8 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
-open Tezos_ci.Cache
 open Common.Packaging
 open Common.Helpers
-
-let build_debian_packages_image =
-  Image.mk_external
-    ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
-
-(* the name of the image depends on the variables in the parallel matrix.
-   we delcare it once, but we use it in two different contexts *)
-let systemd_test_debian_packages_image = build_debian_packages_image
 
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
@@ -102,42 +93,20 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) pipeline_type =
-  let variables ?(kind = "build") add =
-    ("FLAVOUR", kind)
-    :: ( "DEP_IMAGE",
-         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
-       (* this second variable is for a read only registry and we want it to be
-          tezos/tezos *)
-    :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
-    :: add
-  in
-  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ~stage:Stages.images
-      ~variables:
-        (variables
-           ~kind:"systemd-tests"
-           [
-             ("DISTRIBUTION", distribution);
-             ( "BASE_IMAGE",
-               Images.Base_images.(
-                 sf
-                   "%s/$DISTRIBUTION:$RELEASE-%a"
-                   path_prefix
-                   version_pp
-                   debian_version) );
-           ])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      [
-        "./scripts/ci/build-packages-dependencies.sh \
-         images/packages/debian-systemd-tests.Dockerfile";
-      ]
+  let make_job_docker_systemd_tests =
+    make_job_docker_systemd_tests
+      ~base_image:
+        Images.Base_images.(
+          sf
+            "%s/$DISTRIBUTION:$RELEASE-%a"
+            path_prefix
+            version_pp
+            debian_version)
+      ~script:
+        [
+          "./scripts/ci/build-packages-dependencies.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ]
   in
   let job_docker_systemd_test_debian_dependencies : tezos_job =
     make_job_docker_systemd_tests
@@ -154,30 +123,20 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
 
-  let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
-      ~distribution =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ~stage:Stages.images
-      ~variables:
-        (variables
-           [
-             ("DISTRIBUTION", distribution);
-             ( "BASE_IMAGE",
-               Images.Base_images.(
-                 sf
-                   "%s/$DISTRIBUTION:$RELEASE-%a"
-                   path_prefix
-                   version_pp
-                   debian_version) );
-           ])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      [
-        "./scripts/ci/build-packages-dependencies.sh \
-         images/packages/debian-deps-build.Dockerfile";
-      ]
+  let make_job_docker_build_debian_dependencies =
+    make_docker_build_dependencies
+      ~base_image:
+        Images.Base_images.(
+          sf
+            "%s/$DISTRIBUTION:$RELEASE-%a"
+            path_prefix
+            version_pp
+            debian_version)
+      ~script:
+        [
+          "./scripts/ci/build-packages-dependencies.sh \
+           images/packages/debian-deps-build.Dockerfile";
+        ]
   in
   let job_docker_build_debian_dependencies : tezos_job =
     make_job_docker_build_debian_dependencies
@@ -193,44 +152,8 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"ubuntu"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
-  let make_job_build_debian_packages ~__POS__ ?timeout ~name ~matrix
-      ~distribution ~script ~dependencies () =
-    job
-      ~__POS__
-      ~name
-      ~image:build_debian_packages_image
-      ~stage:Stages.build
-      ~variables:
-        (variables
-           (("DISTRIBUTION", distribution)
-           ::
-           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-           ))
-      ~parallel:(Matrix matrix)
-      ~dependencies
-      ?timeout
-      ~tag:Dynamic
-      ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-      [
-        (* This is an hack to enable Cargo networking for jobs in child pipelines.
-
-           There is an weird gotcha with how variables are passed to
-           child pipelines. Global variables of the parent pipeline
-           are passed to the child pipeline. Inside the child
-           pipeline, variables received from the parent pipeline take
-           precedence over job-level variables. It's bit strange. So
-           to override the default [CARGO_NET_OFFLINE=true], we cannot
-           just set it in the job-level variables of this job.
-
-           [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
-
-           See
-           {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
-           for more info. *)
-        "export CARGO_NET_OFFLINE=false";
-        script;
-      ]
-    |> enable_sccache
+  let make_job_build_debian_packages =
+    make_job_build_packages ~limit_dune_build_jobs
   in
 
   (* data packages. we build them once *)
@@ -238,10 +161,10 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
     job
       ~__POS__
       ~name:"oc.build-data_packages"
-      ~image:build_debian_packages_image
+      ~image:Common.Packaging.build_dependency_image
       ~stage:Stages.build
       ~variables:
-        (variables
+        (Common.Packaging.make_variables
            [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~tag:Dynamic
@@ -387,7 +310,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
         [
@@ -405,7 +328,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "jammy")])
         [
@@ -423,7 +346,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "jammy")])
         [
@@ -441,7 +364,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
         [
@@ -459,7 +382,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
         [
@@ -494,7 +417,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_debian;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [
                ("PREFIX", "");
@@ -516,7 +439,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_debian;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [
                ("PREFIX", "");
@@ -539,7 +462,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
                Job job_apt_repo_debian;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [
                ("PREFIX", "");
