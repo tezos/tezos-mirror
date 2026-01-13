@@ -453,4 +453,7 @@ let octez_evm_node_jobs ?(test = false) () =
   ]
 
 let octez_packaging_revision_jobs =
-  [(* Stage: start *) job_datadog_pipeline_trace]
+  let jobs_debian_repository =
+    Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
+  in
+  job_datadog_pipeline_trace :: jobs_debian_repository
