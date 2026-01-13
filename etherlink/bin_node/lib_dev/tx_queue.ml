@@ -382,6 +382,7 @@ struct
           reason : string;
         }
           -> (unit, tztrace) t
+      | Drop_stale_transactions : (unit, tztrace) t
 
     let name (type a b) (t : (a, b) t) =
       match t with
@@ -400,6 +401,7 @@ struct
       | Pop_transactions _ -> "Pop_transactions"
       | Confirm_transactions _ -> "Confirm_transactions"
       | Dropped_transaction _ -> "Dropped_transaction"
+      | Drop_stale_transactions -> "Drop_stale_transactions"
 
     type view = View : _ t -> view
 
@@ -556,6 +558,12 @@ struct
                   Some ((), dropped_tx, reason)
               | _ -> None)
             (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Drop_stale_transactions"
+            (obj1 (req "request" (constant "drop_stale_transactions")))
+            (function View Drop_stale_transactions -> Some () | _ -> None)
+            (fun _ -> assert false);
         ]
 
     let pp fmt (View r) =
@@ -587,6 +595,7 @@ struct
           fprintf fmt "Popping transactions with validation function"
       | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
       | Dropped_transaction _ -> fprintf fmt "Dropping transaction"
+      | Drop_stale_transactions -> fprintf fmt "Drop_stale_transactions"
   end
 
   module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
@@ -1096,16 +1105,6 @@ struct
                     (fun ({hash; _} as txn : queue_request) -> (hash, txn))
                     transactions_to_inject)) ;
           state.queue <- Queue.of_seq remaining_transactions ;
-          let txns =
-            Pending_transactions.drop
-              ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
-              state.pending
-          in
-          let*! () =
-            List.iter_s
-              (fun {pending_callback; _} -> pending_callback `Dropped)
-              txns
-          in
 
           Lwt.dont_wait
             (fun () ->
@@ -1263,6 +1262,19 @@ struct
             | None -> Lwt.return_unit
           in
           return_unit
+      | Drop_stale_transactions ->
+          protect @@ fun () ->
+          let txns =
+            Pending_transactions.drop
+              ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
+              state.pending
+          in
+          let*! () =
+            List.iter_s
+              (fun {pending_callback; _} -> pending_callback `Dropped)
+              txns
+          in
+          return_unit
 
     type launch_error = tztrace
 
@@ -1415,10 +1427,14 @@ struct
   let tx_queue_tick ~evm_node_endpoint =
     bind_worker @@ fun w -> push_request w (Tick {evm_node_endpoint})
 
+  let drop_stale_transactions () =
+    bind_worker @@ fun w -> push_request w Drop_stale_transactions
+
   let tx_queue_beacon ~evm_node_endpoint ~tick_interval =
     let open Lwt_result_syntax in
     let rec loop () =
       let* () = tx_queue_tick ~evm_node_endpoint in
+      let* () = drop_stale_transactions () in
       let*! () = Lwt_unix.sleep tick_interval in
       loop ()
     in
