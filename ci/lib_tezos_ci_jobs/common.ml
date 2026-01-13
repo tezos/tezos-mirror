@@ -433,16 +433,39 @@ module Packaging = struct
         String.concat " " (List.map Runner.Arch.show_uniform archs) );
     ]
 
-  let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
-      ~variables ~image =
+  let build_dependency_image =
+    Image.mk_external
+      ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+
+  let make_variables ?(kind = "build") add =
+    ("FLAVOUR", kind)
+    :: ( "DEP_IMAGE",
+         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
+       (* this second variable is for a read only registry and we want it to be
+            tezos/tezos *)
+    :: ( "DEP_IMAGE_PROTECTED",
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
+       )
+    :: add
+
+  let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
+      ~name ~matrix ~distribution ~script ~dependencies ?(variables = []) () =
     job
       ~__POS__
       ~name
-      ~image
+      ~image:build_dependency_image
       ~stage:Stages.build
-      ~variables
+      ~variables:
+        (make_variables
+           (("DISTRIBUTION", distribution)
+           ::
+           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+           )
+        @ variables)
       ~parallel:(Matrix matrix)
       ~dependencies
+      ?timeout
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
@@ -464,4 +487,31 @@ module Packaging = struct
         script;
       ]
     |> enable_sccache
+
+  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution ~script
+      ~base_image =
+    job_docker_authenticated
+      ~__POS__
+      ~name
+      ~stage:Stages.images
+      ~variables:
+        (make_variables
+           ~kind:"systemd-tests"
+           [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
+      ~parallel:(Matrix matrix)
+      ~tag:Dynamic
+      script
+
+  let make_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution
+      ~base_image ~script =
+    job_docker_authenticated
+      ~__POS__
+      ~name
+      ~stage:Stages.images
+      ~variables:
+        (make_variables
+           [("DISTRIBUTION", distribution); ("BASE_IMAGE", base_image)])
+      ~parallel:(Matrix matrix)
+      ~tag:Dynamic
+      script
 end
