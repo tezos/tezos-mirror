@@ -211,8 +211,10 @@ let pvm_state_encoding =
        output_buffer_parameters_encoding)
 
 module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.S with type tree = T.tree = struct
+  Wasm_pvm_sig.Machine with type tree = T.tree = struct
   type tree = T.tree
+
+  type state = tree
 
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
@@ -461,4 +463,4 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
   end
 end
 
-module Make = Make_pvm (Wasm_vm)
+module Make_machine = Make_pvm (Wasm_vm)

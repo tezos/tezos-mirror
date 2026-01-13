@@ -79,14 +79,14 @@ module type Internal_for_tests = sig
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)
-module type S = sig
+module type Machine = sig
   type tree
 
-  include Wasm_vm_sig.Generic with type state := tree
+  include Wasm_vm_sig.Generic with type state = tree
 
   (** [initial_state empty_tree] computes the initial tree whose hash
       is hard-coded in the protocol. *)
-  val initial_state : version -> tree -> tree Lwt.t
+  val initial_state : version -> state -> state Lwt.t
 
   (** [install_boot_sector ~ticks_per_snapshot ~output_validity_period payload
       tree] installs the [payload] passed as an argument in [tree] so that it is
@@ -96,16 +96,16 @@ module type S = sig
     outbox_validity_period:int32 ->
     outbox_message_limit:Z.t ->
     string ->
-    tree ->
-    tree Lwt.t
+    state ->
+    state Lwt.t
 
   (** [get_output output state] returns the payload associated with the given
       output. The result is meant to be deserialized using
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
-  val get_output : output_info -> tree -> string option Lwt.t
+  val get_output : output_info -> state -> string option Lwt.t
 
-  val get_wasm_version : tree -> Wasm_pvm_state.version Lwt.t
+  val get_wasm_version : state -> Wasm_pvm_state.version Lwt.t
 
   module Unsafe : Unsafe with type tree := tree
 

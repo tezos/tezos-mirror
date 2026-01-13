@@ -32,7 +32,7 @@ val durable_buffers_encoding :
 
 val durable_storage_encoding : Durable.t Tezos_tree_encoding.t
 
-module Make (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.S with type tree = T.tree
+module Make_machine (T : Tezos_tree_encoding.TREE) :
+  Wasm_pvm_sig.Machine with type tree = T.tree and type state = T.tree
 
-module Make_pvm (Wasm_vm : Wasm_vm_sig.S) : module type of Make
+module Make_pvm (Wasm_vm : Wasm_vm_sig.S) : module type of Make_machine

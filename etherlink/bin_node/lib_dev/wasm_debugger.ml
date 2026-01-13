@@ -40,7 +40,7 @@ end
    To avoid introducing a dependency to Wasmer, we redefine a `Wasm_utils`
    module which uses the (slow) PVM both for fast and slow execution. *)
 module Ctx = Tezos_tree_encoding.Encodings_util.Make (Bare_context)
-module Slow_pvm = Tezos_scoru_wasm.Wasm_pvm.Make (Ctx.Tree)
+module Slow_pvm = Tezos_scoru_wasm.Wasm_pvm.Make_machine (Ctx.Tree)
 module Wasm_utils = Wasm_utils_functor.Make (Ctx) (Slow_pvm) (Slow_pvm)
 
 module Wasm =

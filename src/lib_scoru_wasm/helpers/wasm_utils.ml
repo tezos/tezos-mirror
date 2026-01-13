@@ -78,7 +78,7 @@ let write_debug_on_stdout =
 
 module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
   Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree =
-  Make (Ctx) (Wasm_pvm.Make (Ctx.Tree))
+  Make (Ctx) (Wasm_pvm.Make_machine (Ctx.Tree))
     (Tezos_scoru_wasm_fast.Pvm.Make (Ctx.Tree))
 
 module In_memory_context =

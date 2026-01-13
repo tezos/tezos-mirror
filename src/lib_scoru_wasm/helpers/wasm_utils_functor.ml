@@ -35,8 +35,8 @@ let new_message_counter () =
 
 module Make
     (Ctx : Tezos_tree_encoding.Encodings_util.S)
-    (Wasm : Wasm_pvm_sig.S with type tree = Ctx.Tree.tree)
-    (Wasm_fast : Wasm_pvm_sig.S with type tree = Ctx.Tree.tree) :
+    (Wasm : Wasm_pvm_sig.Machine with type tree = Ctx.Tree.tree)
+    (Wasm_fast : Wasm_pvm_sig.Machine with type tree = Ctx.Tree.tree) :
   Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree = struct
   module Ctx = Ctx
   module Tree_encoding_runner = Ctx.Tree_encoding_runner
