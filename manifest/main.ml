@@ -78,6 +78,7 @@ let exclude filename =
   (* We need to tell Dune about excluding directories without defining targets
      in those directories. Therefore we hand write some Dune in these. *)
   | "src" :: "riscv" :: _ -> true
+  | ["src"; "rust_libcrux"; "dune"] -> true
   (* [src/dune] is either absent or copied from [script-inputs/slim-mode-dune]. *)
   | "src" :: "dune" :: _ -> true
   (* [manifest/dune] serves for ocaml-lsp to handle the manifest. *)

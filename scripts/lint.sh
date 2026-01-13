@@ -56,6 +56,8 @@ src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.ml
 src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.mli
 etherlink/lwt_domain/lwt_domain.ml
 etherlink/lwt_domain/lwt_domain.mli
+src/rust_libcrux/src/octez_libcrux_ml_dsa.ml
+src/rust_libcrux/src/octez_libcrux_ml_dsa.mli
 EOF
 )
 

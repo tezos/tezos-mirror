@@ -1886,6 +1886,11 @@ oc.script:test-gen-genesis:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -1897,6 +1902,8 @@ oc.script:test-gen-genesis:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2167,6 +2174,11 @@ oc.unit:webassembly-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
   interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -2179,6 +2191,8 @@ oc.unit:webassembly-x86_64:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}

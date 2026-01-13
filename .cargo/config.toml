@@ -11,3 +11,6 @@ rustflags = [
   "-C",
   "default-linker-libraries",
 ]
+
+[profile.release]
+lto = "off"

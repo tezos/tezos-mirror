@@ -762,7 +762,9 @@ opam:all_7:
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
+      - octez-ml-dsa
       - octez-lwt-domain
+      - octez-libcrux-ml-dsa
       - octez-lib-upnp-args
       - octez-internal-libs
       - octez-igd-next

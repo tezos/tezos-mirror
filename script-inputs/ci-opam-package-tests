@@ -22,8 +22,10 @@ octez-internal-libs	all	7
 octez-l2-libs	all	6
 octez-lib-upnp	all	6
 octez-lib-upnp-args	all	7
+octez-libcrux-ml-dsa	all	7
 octez-libs	all	6
 octez-lwt-domain	all	7
+octez-ml-dsa	all	7
 octez-node	exec	1
 octez-node-config	all	4
 octez-performance-metrics	all	6

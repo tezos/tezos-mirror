@@ -42,6 +42,7 @@ depends: [
   "hacl-star-raw"
   "bls12-381" { = version }
   "octez-alcotezt" { = version }
+  "octez-ml-dsa" { = version }
   "secp256k1-internal" { >= "0.4.0" }
   "bigarray-compat"
   "eqaf"
