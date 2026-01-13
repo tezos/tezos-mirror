@@ -456,7 +456,6 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
