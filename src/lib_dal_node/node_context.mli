@@ -260,6 +260,10 @@ val get_attestable_slots_watcher_table : t -> Attestable_slots_watcher_table.t
     using protocol parameters obtained using [ctxt]. *)
 val get_attestation_lag : t -> level:int32 -> int32 tzresult
 
+(** [get_attestation_lags ctxt ~level] returns the list of attestation lags found
+    at [~level] using protocol parameters using [ctxt]. *)
+val get_attestation_lags : t -> level:int32 -> int32 list tzresult
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point
