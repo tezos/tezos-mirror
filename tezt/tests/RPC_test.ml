@@ -463,6 +463,19 @@ let test_adaptive_issuance ~contracts ?endpoint client =
   in
   unit
 
+let test_clst ~contracts ?endpoint client =
+  Log.info "Test CLST parameters retrieval" ;
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_clst_total_supply ()
+  in
+  let bootstrap = List.hd contracts in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_clst_balance ~id:bootstrap ()
+  in
+  unit
+
 let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
@@ -660,6 +673,11 @@ let test_delegates _test_mode_tag protocol ?endpoint client =
 let test_adaptive_issuance _test_mode_tag (_ : Protocol.t) ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   test_adaptive_issuance ~contracts ?endpoint client
+
+(* Test the CLST RPC. *)
+let test_clst _test_mode_tag (_ : Protocol.t) ?endpoint client =
+  let* contracts = get_contracts ?endpoint client in
+  test_clst ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
@@ -1691,6 +1709,10 @@ let register protocols =
     check_rpc_regression
       "adaptive_issuance"
       ~test_function:test_adaptive_issuance ;
+    check_rpc_regression
+      ~supports:Protocol.(From_protocol 25)
+      "clst"
+      ~test_function:test_clst ;
     check_rpc_regression
       "votes"
       ~test_function:test_votes

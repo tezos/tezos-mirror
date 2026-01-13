@@ -41,9 +41,9 @@ let get_storage ctxt =
       identity ctxt storage
   | None -> return (None, ctxt)
 
-let get_balance_from_storage ctxt storage contract =
+let get_balance_from_storage ctxt (ledger, _total_supply) contract =
   let open Lwt_result_syntax in
-  let* balance, ctxt = Script_big_map.get ctxt contract storage in
+  let* balance, ctxt = Script_big_map.get ctxt contract ledger in
   return (Option.value balance ~default:Script_int.zero_n, ctxt)
 
 let get_balance ctxt contract =
@@ -60,5 +60,19 @@ let get_balance ctxt contract =
   | Some storage -> get_balance_from_storage ctxt storage contract
   | None -> return (Script_int.zero_n, ctxt)
 
-let set_balance_from_storage ctxt storage contract amount =
-  Script_big_map.update ctxt contract (Some amount) storage
+let set_balance_from_storage ctxt (ledger, total_supply) contract amount =
+  let open Lwt_result_syntax in
+  let* ledger, ctxt =
+    Script_big_map.update ctxt contract (Some amount) ledger
+  in
+  return ((ledger, total_supply), ctxt)
+
+let get_total_supply ctxt =
+  let open Lwt_result_syntax in
+  let* storage_opt, ctxt = get_storage ctxt in
+  let total_supply =
+    match storage_opt with
+    | Some (_ledger, total_supply) -> total_supply
+    | None -> Script_int.zero_n
+  in
+  return (total_supply, ctxt)

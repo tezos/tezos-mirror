@@ -27,11 +27,17 @@ module CLST_types : sig
 
   type ledger = (address, nat) big_map
 
-  type storage = ledger
+  type total_supply = nat
+
+  type storage = ledger * total_supply
 
   type balance_view = (address * nat, nat) view_type
 
+  type total_supply_view = (unit, nat) view_type
+
   val balance_view_ty : balance_view tzresult
+
+  val total_supply_view_ty : total_supply_view
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)

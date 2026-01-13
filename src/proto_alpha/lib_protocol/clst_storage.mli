@@ -42,3 +42,7 @@ val set_balance_from_storage :
   address ->
   CLST_types.nat ->
   (CLST_types.storage * context) tzresult Lwt.t
+
+(** [get_total_supply context] returns the total supply of CLST tokens
+    in the CLST contract. *)
+val get_total_supply : context -> (CLST_types.nat * context) tzresult Lwt.t

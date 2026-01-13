@@ -1,0 +1,24 @@
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/contracts
+[ "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/delegates
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./octez-client --mode light rpc get /chains/main/blocks/head/context/clst/total_supply
+"0"
+
+./octez-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_balance'
+"0"

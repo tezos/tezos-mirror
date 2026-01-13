@@ -1514,3 +1514,17 @@ val get_abaab_activation_level :
     [block] defaults to ["head"]. *)
 val get_chain_block_context_destination_index :
   ?chain:string -> ?block:string -> string -> int option t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/total_supply]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_clst_total_supply :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/clst_balance]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_contract_clst_balance :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
