@@ -1205,17 +1205,45 @@ let get_migration_level_offsets (migration : Protocol_migration.t) ~snapshot
       | Cycle_offset c -> c * blocks_per_cycle
     in
     return
-      ( Protocol_migration.
-          {
-            migration_offset = Level_offset migration_level_offset;
-            termination_offset = Level_offset termination_level_offset;
-          },
+      ( {
+          migration with
+          migration_offset = Level_offset migration_level_offset;
+          termination_offset = Level_offset termination_level_offset;
+        },
         current_level + migration_level_offset,
         current_level + migration_level_offset + termination_level_offset )
   in
   let* () = Node.terminate node in
   let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
   Lwt.return migration
+
+let may_export_snapshot (t : bootstrap)
+    (migration : Protocol_migration.t option) level =
+  match migration with
+  | None -> Lwt.return_unit
+  | Some migration when not migration.export_snapshot -> Lwt.return_unit
+  | Some _ -> (
+      match Tezt_cloud_cli.artifacts_dir with
+      | None -> Lwt.return_unit
+      | Some artifacts_dir ->
+          let snapshot_name = sf "%d.rolling" level in
+          let destination =
+            Artifact_helpers.local_path
+              [artifacts_dir; "migration"; snapshot_name]
+          in
+          let* () =
+            Node.snapshot_export
+              ~history_mode:Rolling_history
+              ~export_format:Tar
+              t.node
+              snapshot_name
+          in
+          Agent.scp
+            t.agent
+            ~is_directory:true
+            ~source:snapshot_name
+            ~destination
+            `FromRunner)
 
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : Scenarios_configuration.LAYER1.t =
@@ -1440,7 +1468,11 @@ let register (module Cli : Scenarios_cli.Layer1) =
     (let rec loop with_producers level =
        let level = succ level in
        toplog "Loop at level %d" level ;
-       if should_terminate level then Lwt.return_unit
+       if should_terminate level then
+         let* () =
+           may_export_snapshot t.bootstrap configuration.migration level
+         in
+         Lwt.return_unit
        else
          let* () =
            if with_producers then
