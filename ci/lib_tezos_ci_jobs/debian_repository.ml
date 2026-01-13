@@ -101,7 +101,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs ?(limit_dune_build_jobs = false) pipeline_type =
+let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
@@ -148,7 +148,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"ubuntu"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
-
   let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
       ~distribution =
     job_docker_authenticated
@@ -162,6 +161,9 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
              ( "BASE_IMAGE",
                Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
            ])
+      ?rules:
+        (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+         else None)
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [
