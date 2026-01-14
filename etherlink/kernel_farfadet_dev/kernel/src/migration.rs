@@ -716,6 +716,43 @@ fn migrate_to<Host: Runtime>(
             }
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V46 => {
+            // Clean remaining leftover block indexes from V41.
+            if let Ok(current_number) =
+                read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+            {
+                let last_to_keep = current_number.as_u64().saturating_sub(BLOCKS_STORED);
+                let paths_indexed_blocks = concat(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &RefPath::assert_from(b"/indexes/blocks"),
+                )?;
+                // We keep the last BLOCKS_STORED block hashes.
+                let mut block_hashes: Vec<(OwnedPath, Vec<u8>)> =
+                    Vec::with_capacity(BLOCKS_STORED.try_into().unwrap_or(256));
+                for i in last_to_keep..=current_number.as_u64() {
+                    let path: Vec<u8> = format!("/{i}").into();
+                    let owned_path = RefPath::assert_from(&path);
+                    let read_path = concat(&paths_indexed_blocks, &owned_path)?;
+                    match host.store_read_all(&read_path) {
+                        Ok(hash) => {
+                            block_hashes.push((read_path, hash));
+                            Ok(())
+                        }
+                        Err(RuntimeError::PathNotFound) => Ok(()),
+                        Err(err) => Err(err),
+                    }?;
+                }
+
+                // We dump all the remaining block hashes.
+                allow_path_not_found(host.store_delete(&paths_indexed_blocks))?;
+
+                // We rewrite the last BLOCKS_STORED block hashes.
+                for (path, hash) in block_hashes {
+                    host.store_write_all(&path, &hash)?;
+                }
+            }
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
