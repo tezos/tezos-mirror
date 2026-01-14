@@ -200,6 +200,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     return
     @@ List.map
          (fun Plugin.RPC.Dal.S.{delegate; indexes} ->
+           let delegate =
+             Tezos_crypto.Signature.Of_V2.public_key_hash delegate
+           in
            Data.Dal.{delegate; assigned_shard_indices = indexes})
          shard_assignments
 

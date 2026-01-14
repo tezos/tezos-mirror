@@ -853,31 +853,44 @@ let sources_from_operation ctxt
     ({shell = _; protocol_data = Operation_data {contents; _}} : Main.operation)
     =
   let open Lwt_syntax in
-  match contents with
-  | Single (Failing_noop _) -> return_nil
-  | Single (Preattestation consensus_content)
-  | Single (Attestation {consensus_content; dal_content = _}) ->
-      let level = Level.from_raw ctxt consensus_content.level in
-      sources_from_level_and_slot ctxt level consensus_content.slot
-  | Single (Preattestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate ctxt consensus_content committee
-  | Single (Attestations_aggregate {consensus_content; committee}) ->
-      sources_from_aggregate
-        ctxt
-        consensus_content
-        (Operation.committee_slots committee)
-  | Single (Seed_nonce_revelation _)
-  | Single (Double_consensus_operation_evidence _)
-  | Single (Double_baking_evidence _)
-  | Single (Dal_entrapment_evidence _)
-  | Single (Activate_account _)
-  | Single (Vdf_revelation _) ->
-      return_nil
-  | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
-      return [source]
-  | Single (Drain_delegate {delegate; _}) -> return [delegate]
-  | Single (Manager_operation {source; _}) -> return [source]
-  | Cons (Manager_operation {source; _}, _) -> return [source]
+  let* sources =
+    match contents with
+    | Single (Failing_noop _) -> return_nil
+    | Single (Preattestation consensus_content)
+    | Single (Attestation {consensus_content; dal_content = _}) ->
+        let level = Level.from_raw ctxt consensus_content.level in
+        let* sources =
+          sources_from_level_and_slot ctxt level consensus_content.slot
+        in
+        return sources
+    | Single (Preattestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate ctxt consensus_content committee
+        in
+        return sources
+    | Single (Attestations_aggregate {consensus_content; committee}) ->
+        let* sources =
+          sources_from_aggregate
+            ctxt
+            consensus_content
+            (Operation.committee_slots committee)
+        in
+        return sources
+    | Single (Seed_nonce_revelation _)
+    | Single (Double_consensus_operation_evidence _)
+    | Single (Double_baking_evidence _)
+    | Single (Dal_entrapment_evidence _)
+    | Single (Activate_account _)
+    | Single (Vdf_revelation _) ->
+        return_nil
+    | Single (Proposals {source; _}) | Single (Ballot {source; _}) ->
+        return [source]
+    | Single (Drain_delegate {delegate; _}) -> return [delegate]
+    | Single (Manager_operation {source; _}) -> return [source]
+    | Cons (Manager_operation {source; _}, _) -> return [source]
+  in
+  let map_pkh_env = List.map Tezos_crypto.Signature.Of_V2.public_key_hash in
+  return @@ map_pkh_env sources
 
 module Internal_for_tests = struct
   let default_config_with_clock_drift clock_drift =

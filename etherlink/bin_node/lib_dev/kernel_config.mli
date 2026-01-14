@@ -45,7 +45,7 @@ val make :
   ?max_delayed_inbox_blueprint_length:string * string ->
   ?evm_version:evm_version ->
   ?with_runtimes:Tezosx.runtime list ->
-  ?tez_bootstrap_accounts:Signature.public_key list ->
+  ?tez_bootstrap_accounts:Signature.V2.public_key list ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   output:string ->
   unit ->
@@ -58,7 +58,7 @@ val make_l2 :
   eth_bootstrap_balance:Z.t ->
   tez_bootstrap_balance:Tezos_types.Tez.t ->
   ?eth_bootstrap_accounts:Ethereum_types.address list ->
-  ?tez_bootstrap_accounts:Signature.Public_key.t list ->
+  ?tez_bootstrap_accounts:Signature.V2.Public_key.t list ->
   ?tez_bootstrap_contracts:(Tezos_types.Contract.t * string * string) list ->
   ?minimum_base_fee_per_gas:string * string ->
   ?da_fee_per_byte:string * string ->

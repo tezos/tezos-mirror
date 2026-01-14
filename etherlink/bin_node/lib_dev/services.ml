@@ -982,7 +982,9 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Tezosx.Get_tezos_ethereum_address.Method ->
             let f tezos_address =
-              tezos_address |> Tezosx_mod.Tezos_runtime.ethereum_alias |> rpc_ok
+              Tezos_crypto.Signature.V2.Of_V_latest.get_public_key_hash_exn
+                tezos_address
+              |> Tezosx_mod.Tezos_runtime.ethereum_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->

@@ -39,13 +39,13 @@ module Contract : sig
 
   val encoding : t Data_encoding.t
 
-  val implicit_encoding : Signature.public_key_hash Data_encoding.t
+  val implicit_encoding : Signature.V2.public_key_hash Data_encoding.t
 
   val of_b58check : string -> t tzresult
 
-  val of_implicit : Signature.public_key_hash -> t
+  val of_implicit : Signature.V2.public_key_hash -> t
 
-  val of_hex : string -> Signature.public_key_hash option
+  val of_hex : string -> Signature.V2.public_key_hash option
 end
 
 module Tez : sig
@@ -58,7 +58,7 @@ end
 
 module Operation : sig
   type t = {
-    source : Signature.public_key_hash;
+    source : Signature.V2.public_key_hash;
     first_counter : Z.t;
     length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;

@@ -155,6 +155,7 @@ module Plugin = struct
     let* block_hash =
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
+    let*? source = Signature.Of_V_latest.get_public_key_hash source in
     let* counter =
       let* pcounter =
         Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
@@ -189,6 +190,7 @@ module Plugin = struct
         Operation.unsigned_encoding
         ({branch = block_hash}, Contents_list (Single operation))
     in
+    let*? src_sk = Signature.Of_V_latest.get_secret_key src_sk in
     let bytes =
       Signature.append ~watermark:Signature.Generic_operation src_sk bytes
     in

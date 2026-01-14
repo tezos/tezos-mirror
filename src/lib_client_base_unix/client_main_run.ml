@@ -116,7 +116,10 @@ let register_default_signer ?signing_version ?other_registrations ?logger
           | Some Signature.Version_1 ->
               let* sign = Client_keys.V1.sign cctxt sk_uri payload in
               return @@ Signature.V_latest.Of_V1.signature sign
-          | Some Signature.Version_2 -> Client_keys.V2.sign cctxt sk_uri payload
+          | Some Signature.Version_2 ->
+              let* sign = Client_keys.V2.sign cctxt sk_uri payload in
+              return @@ Signature.V_latest.Of_V2.signature sign
+          | Some Signature.Version_3 -> Client_keys.V3.sign cctxt sk_uri payload
           | None -> Client_keys.V_latest.sign cctxt sk_uri payload)
       | [] ->
           failwith

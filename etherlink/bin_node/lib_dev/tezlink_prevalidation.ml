@@ -28,7 +28,7 @@ type error +=
   | Not_a_manager_operation of clue
   | Unsupported_manager_operation of clue
   | Oversized_operation of clue * int * int
-  | Bls_is_not_allowed of clue * public_key_hash
+  | Bls_is_not_allowed of clue * Signature.V2.public_key_hash
 
 let () =
   register_error_kind
@@ -44,12 +44,12 @@ let () =
         "Failed to validate operation %a: tz4 keys are forbidden %a"
         pp_clue
         clue
-        Signature.Public_key_hash.pp
+        Signature.V2.Public_key_hash.pp
         key)
     Data_encoding.(
       obj2
         (req "operation" clue_encoding)
-        (req "key" Signature.Public_key_hash.encoding))
+        (req "key" Signature.V2.Public_key_hash.encoding))
     (function Bls_is_not_allowed (clue, err) -> Some (clue, err) | _ -> None)
     (fun (clue, err) -> Bls_is_not_allowed (clue, err)) ;
   register_error_kind
@@ -145,7 +145,7 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
       | Some (Hash _), Reveal {public_key; _} ->
           (* The operation might be the reveal of the public key we're
              searching for. *)
-          let open Signature in
+          let open Signature.V2 in
           let pkh_revealed = Public_key.hash public_key in
           if Public_key_hash.equal source pkh_revealed then
             return @@ Ok (public_key, source, counter)
@@ -216,7 +216,7 @@ let validate_reveal ctxt (Reveal {public_key; _}) =
   | Bls _ ->
       tzfail
       @@ Bls_is_not_allowed
-           (ctxt.error_clue, Signature.Public_key.hash public_key)
+           (ctxt.error_clue, Signature.V2.Public_key.hash public_key)
   | _ -> return (Ok ())
 
 let validate_transaction ctxt (Transaction {destination; _}) =
@@ -238,7 +238,7 @@ let validate_supported_operation (type kind) ~ctxt
 
 let validate_source ~ctxt second_source =
   let open Lwt_result_syntax in
-  if Signature.Public_key_hash.equal ctxt.source second_source then
+  if Signature.V2.Public_key_hash.equal ctxt.source second_source then
     return (Ok ())
   else
     tzfail_p
@@ -469,7 +469,7 @@ let validate_signature ~check_signature shell contents pk signature =
     if
       (* That watermark ({!Generic_operation}) is used for all operations
          except endorsement, which we don't support. *)
-      Signature.check
+      Signature.V2.check
         ~watermark:Generic_operation
         pk
         signature
@@ -566,12 +566,12 @@ let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
   Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
 let add_ source cache =
-  String.Map.add (Signature.Public_key_hash.to_b58check source) cache
+  String.Map.add (Signature.V2.Public_key_hash.to_b58check source) cache
 
 let get_ read cache source =
   let open Lwt_result_syntax in
   match
-    String.Map.find (Signature.Public_key_hash.to_b58check source) cache
+    String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
   | None -> read (Tezlink_imports.Alpha_context.Contract.Implicit source)
