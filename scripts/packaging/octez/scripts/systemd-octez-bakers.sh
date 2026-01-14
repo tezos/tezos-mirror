@@ -16,7 +16,6 @@ for file in /usr/bin/octez-baker-P*; do
   # Enable or start/stop the systemd service based on the argument
   if [ "$1" = "start" ]; then
     if grep -q "\-\-dal-node" /etc/default/octez-baker; then
-      systemctl enable octez-dal-node
       systemctl start octez-dal-node
     fi
     if [ "$AGNOSTIC_BAKER" = "true" ]; then
