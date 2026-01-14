@@ -46,23 +46,8 @@ If the profiler patches are conflicting for some reason, the simplest is
 basically to regenerate them (assuming the conflicting branch is based on
 `master`, otherwise replace it with your branches' upstream):
 
-1. create a local branch on top of master (let's call it `master-patched`),
-apply the patch on top of it and create a commit:
-
 ```
-git apply -- scripts/profile_alpha.patch
-git commit -a -m "Patch alpha"
+scripts/udpate_profiler_patch.sh
 ```
 
-2. Move to your working branch, cherry-pick `patch-alpha`, which will put the
-commit `Patch alpha` on top of it. If there are conflicts, resolve them.
-
-3. Create a patch out of it and commit it:
-```
-git format-patch -n HEAD^
-git reset --hard HEAD^ # to remove the patched commit, but not the generated file
-mv <patch-file> scripts/profiler_alpha.patch
-git commit -a -m "Scripts: regenerate protocol alpha patches"
-```
-
-4. You can remove the temporary branch `master-patched` for the patch
+and follow its guidance.
