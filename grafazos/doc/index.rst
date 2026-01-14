@@ -68,7 +68,7 @@ To create the dashboards for a different branch
     BRANCH=foo make
 
 By default, the instance names label is set to ``instance``. If you are
-using a particular label for the instance names, you can use `NODE_INSTANCE_LABEL` to set it:
+using a particular label for the instance names, you can use ``NODE_INSTANCE_LABEL`` to set it:
 
 .. code-block:: shell
 
@@ -76,11 +76,11 @@ using a particular label for the instance names, you can use `NODE_INSTANCE_LABE
 
 
 By default, the logs are filtered using the ``job`` label. If you need to use
-a different label for filtering logs (e.g., ``service``), you can configure it with `LOGS_LABEL`:
+a different label for filtering logs (e.g., ``service``), you can configure it with ``LOGS_LABEL``:
 
 .. code-block:: shell
 
-    LOGS_LABEL=app
+    LOGS_LABEL=service
 
 
 If you need hardware metrics, note that, by default, the storage stat considered is the used
