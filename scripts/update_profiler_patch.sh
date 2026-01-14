@@ -11,6 +11,13 @@ for arg in "$@"; do
   "--no-check")
     NOCHECK='--no-check'
     ;;
+  "--help")
+    echo "$0: regenerates the profiler patch and automatically creates a commit with it."
+    echo "  --resume: resumes the scripts after conflict resolution. Only use it if asked by the script."
+    echo "  --check-patch-only: compilation of the protocol with the patch, without commiting it."
+    echo "  --no-check: update the patch without compiling it. Use with care as it will eventually generate an invalid patch."
+    exit 0
+    ;;
   esac
 done
 
