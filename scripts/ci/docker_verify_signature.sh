@@ -9,6 +9,8 @@
 
 set -eu
 
+echo "Starting Docker image signature verification process..."
+
 # Check if argument is valid
 if [ $# -gt 1 ]; then
   echo "Usage: $0 [<IMAGE:TAG>]"
@@ -40,7 +42,7 @@ verify_image() {
 
   # Get image digest (better than tag for precision)
   IMAGE_DIGEST="$(docker image inspect "$1:$2" --format="{{index .RepoDigests 0}}")"
-  echo "Image digest: ${IMAGE_DIGEST}"
+  echo "Image digest to verify: ${IMAGE_DIGEST}"
 
   # Get the location of image signature as reference
   IMAGE_SIGNATURE_LOCATION=$(cosign triangulate "${IMAGE_DIGEST}")
@@ -69,3 +71,5 @@ else
     verify_image "${docker_image}" "${DOCKER_IMAGE_TAG}"
   done
 fi
+
+echo "Docker image signature verification process done."
