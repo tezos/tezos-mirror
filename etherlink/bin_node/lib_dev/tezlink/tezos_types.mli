@@ -45,6 +45,8 @@ module Contract : sig
 
   val of_implicit : Signature.V2.public_key_hash -> t
 
+  val of_originated : Tezlink_imports.Imported_protocol.Contract_hash.t -> t
+
   val of_hex : string -> Signature.V2.public_key_hash option
 end
 

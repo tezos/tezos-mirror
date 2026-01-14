@@ -1167,15 +1167,31 @@ module Tezosx = struct
   module Get_tezos_ethereum_address = struct
     open Ethereum_types
 
-    type input = Signature.public_key_hash
+    type input = Signature.V2.public_key_hash
 
     type output = address
 
-    let input_encoding = Signature.Public_key_hash.encoding
+    let input_encoding = Signature.V2.Public_key_hash.encoding
 
     let output_encoding = address_encoding
 
     let method_ = "tez_getTezosEthereumAddress"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+
+  module Get_ethereum_tezos_address = struct
+    open Ethereum_types
+
+    type input = address
+
+    type output = Tezos_types.Contract.t
+
+    let input_encoding = address_encoding
+
+    let output_encoding = Tezos_types.Contract.encoding
+
+    let method_ = "tez_getEthereumTezosAddress"
 
     type ('input, 'output) method_ += Method : (input, output) method_
   end
@@ -1249,6 +1265,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Trace_block);
     (* Tezos X rpcs *)
     (module Tezosx.Get_tezos_ethereum_address);
+    (module Tezosx.Get_ethereum_tezos_address);
   ]
 
 let evm_unsupported_methods : string list =

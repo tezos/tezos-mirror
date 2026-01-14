@@ -57,6 +57,8 @@ module Contract = struct
 
   let of_implicit c = Tezlink_imports.Alpha_context.Contract.Implicit c
 
+  let of_originated c = Tezlink_imports.Alpha_context.Contract.Originated c
+
   let of_b58check s =
     Tezlink_imports.Imported_env.wrap_tzresult
     @@ Tezlink_imports.Alpha_context.Contract.of_b58check s

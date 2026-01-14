@@ -428,6 +428,11 @@ type websocket_handler = JSONRPC.request -> websocket_response Lwt.t
 module Tezosx : sig
   module Get_tezos_ethereum_address :
     METHOD
-      with type input = Signature.public_key_hash
+      with type input = Signature.V2.public_key_hash
        and type output = Ethereum_types.address
+
+  module Get_ethereum_tezos_address :
+    METHOD
+      with type input = Ethereum_types.address
+       and type output = Tezos_types.Contract.t
 end

@@ -327,7 +327,7 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
     ~with_runtimes:[runtime]
   @@ fun sandbox ->
   let tezos_address = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
-  let expected = "0xccef676171871a48bbd6e2be75bbcc09d38830c5" in
+  let expected = "0x341af4de1e67241d8d2536b2ea47c7e9debf7cb2" in
   let* rpc_result =
     Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
   in
@@ -341,6 +341,29 @@ let test_get_tezos_ethereum_address_rpc ~runtime () =
         "Could not get the EVM address corresponding to the Tezos address %s: \
          %s"
         tezos_address
+        err.Rpc.message
+
+let test_get_ethereum_tezos_address_rpc ~runtime () =
+  Setup.register_sandbox_test
+    ~title:"Test the tez_getEthereumTezosAddress RPC"
+    ~tags:["rpc"]
+    ~with_runtimes:[runtime]
+  @@ fun sandbox ->
+  let ethereum_address = "0xccef676171871a48bbd6e2be75bbcc09d38830c5" in
+  let expected = "KT1C5w6TSyk4syouR5ncGPVyshR2hvYi8sKE" in
+  let* rpc_result =
+    Rpc.Tezosx.tez_getEthereumTezosAddress ethereum_address sandbox
+  in
+  match rpc_result with
+  | Ok tezos_address ->
+      Check.(
+        (tezos_address = expected) string ~error_msg:"Expected %R but got %L") ;
+      unit
+  | Error err ->
+      Test.fail
+        "Could not get the Tezos address corresponding to the Ethereum address \
+         %s: %s"
+        ethereum_address
         err.Rpc.message
 
 let test_eth_rpc_with_alias ~runtime =
@@ -431,4 +454,5 @@ let () =
   test_transfer [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
-  test_get_tezos_ethereum_address_rpc ~runtime:Tezos ()
+  test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
+  test_get_ethereum_tezos_address_rpc ~runtime:Tezos ()
