@@ -14,6 +14,9 @@
 
 ### Execution changes
 
+- Fix transaction objects submitted several times remaining in the tx queue
+  past their lifespan. (!20445)
+
 ### Storage changes
 
 ### Documentation changes
