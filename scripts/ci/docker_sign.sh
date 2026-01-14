@@ -15,6 +15,13 @@
 
 set -eu
 
+echo "Starting Docker image signing process..."
+
+# In case Cosign crashes during signature process especially during TLog upload
+# (i.e Rekor Transparency Log timeout)
+MAX_RETRY_ATTEMPTS=5
+SLEEP_TIME=5
+
 # Check if argument is valid
 if [ $# -gt 1 ]; then
   echo "Usage: $0 [<IMAGE:TAG>]"
@@ -47,16 +54,43 @@ cosign version
 sign_image() {
   # Get image digest (better than tag for precision)
   IMAGE_DIGEST="$1@$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest')"
-  echo "Image digest: ${IMAGE_DIGEST}"
+  echo "Image digest to sign: ${IMAGE_DIGEST}"
+
+  # Disable error catching to be able to retry
+  set +e
 
   # Sign image with cosign
   # Check if the image is a multi-arch image
-  # --recursive is needed to sign all included images and not only the manifest list for multi-arch images
+  # --recursive is needed to sign all included images and not only the manifest
+  # list for multi-arch images
+
+  retry_attempt=0
   if [ "$(docker manifest inspect "${IMAGE_DIGEST}" | jq '.manifests | length > 1')" ]; then
-    cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" --recursive -y
+    until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+      cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" --recursive -y && break
+      retry_attempt="$((retry_attempt + 1))"
+      if [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; then
+        echo "Fatal: Failed to sign recursively ${IMAGE_DIGEST} after ${MAX_RETRY_ATTEMPTS} attempts."
+        exit 1
+      else
+        echo "Recursive signing failed, retrying in ${SLEEP_TIME}s..."
+        sleep "${SLEEP_TIME}"
+      fi
+    done
   else
-    cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y
+    until [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; do
+      cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y && break
+      retry_attempt="$((retry_attempt + 1))"
+      if [ "${retry_attempt}" -ge "${MAX_RETRY_ATTEMPTS}" ]; then
+        echo "Fatal: Failed to sign ${IMAGE_DIGEST} after ${MAX_RETRY_ATTEMPTS} attempts."
+        exit 1
+      else
+        echo "Signing failed, retrying in ${SLEEP_TIME}s..."
+        sleep "${SLEEP_TIME}"
+      fi
+    done
   fi
+  set -e
 
   # Get the location of image signature as reference
   IMAGE_SIGNATURE_LOCATION=$(cosign triangulate "${IMAGE_DIGEST}")
@@ -80,3 +114,5 @@ fi
 
 # Remove credentials
 rm signer_sa.json
+
+echo "Docker image signing process done."
