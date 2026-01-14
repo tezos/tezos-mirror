@@ -15,7 +15,7 @@ gcp_arm64 | gcp_dev_arm64)
   PLATFORM="linux/arm64"
   ARCHITECTURE="arm64"
   ;;
-gcp | gcp_dev | gcp_high_cpu | gcp_very_high_cpu | gcp_very_high_cpu_ramfs | gcp_very_high_cpu_ramfs_dev)
+gcp | gcp_dev | gcp_high_cpu | gcp_high_cpu_dev | gcp_very_high_cpu | gcp_very_high_cpu_dev | gcp_very_high_cpu_ramfs | gcp_very_high_cpu_ramfs_dev)
   PLATFORM="linux/amd64"
   ARCHITECTURE="amd64"
   ;;
