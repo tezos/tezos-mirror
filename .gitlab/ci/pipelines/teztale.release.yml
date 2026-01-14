@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -69,7 +69,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -90,7 +90,7 @@ teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -138,7 +138,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -186,7 +186,7 @@ teztale.gitlab_release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - teztale.build-x86_64
   - teztale.build-arm64
@@ -210,7 +210,7 @@ teztale.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true

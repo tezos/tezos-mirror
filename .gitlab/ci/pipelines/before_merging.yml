@@ -13,7 +13,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -40,7 +40,7 @@ oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -66,7 +66,7 @@ oc.docker:client-libs-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -91,7 +91,7 @@ oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -117,7 +117,7 @@ oc.docker:rust-sdk-bindings:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -143,7 +143,7 @@ oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -174,7 +174,7 @@ trigger:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: manual
     allow_failure: false
@@ -198,7 +198,7 @@ oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
@@ -250,7 +250,7 @@ oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
@@ -309,7 +309,7 @@ oc.build_arm64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
@@ -366,7 +366,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -437,7 +437,7 @@ oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -509,7 +509,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - changes:
     - '**/*.rst'
@@ -589,7 +589,7 @@ oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - '**/*.rst'
@@ -685,7 +685,7 @@ oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - '**/*.rst'
@@ -779,7 +779,7 @@ build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -939,7 +939,7 @@ test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -987,7 +987,7 @@ test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: on_success
     allow_failure: true
@@ -1039,7 +1039,7 @@ oc.install_opam_noble:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1065,7 +1065,7 @@ oc.compile_sources_doc_master:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - changes:
     - docs/introduction/compile-sources.sh
@@ -1163,7 +1163,7 @@ oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - Dockerfile
@@ -1201,7 +1201,7 @@ oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - Dockerfile
@@ -1237,7 +1237,7 @@ oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1265,7 +1265,7 @@ oc.script.docker_verify_image_amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1293,7 +1293,7 @@ select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -1351,7 +1351,7 @@ check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - images/create_image.sh
@@ -1402,7 +1402,7 @@ audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - sdk/rust/**/*
@@ -1445,7 +1445,7 @@ test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - images/create_image.sh
@@ -1497,7 +1497,7 @@ oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -1585,7 +1585,7 @@ sanity_ci:
   image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/ci/**/*'
@@ -1616,7 +1616,7 @@ docker:hadolint:
   image: hadolint/hadolint:2.12.0-alpine
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - Dockerfile
@@ -1641,7 +1641,7 @@ oc.ocaml_fmt:
   image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.ml'
@@ -1681,7 +1681,7 @@ oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - devtools/**/*
@@ -1709,7 +1709,7 @@ check_jsonnet:
   image: ${jsonnet_image_name_protected}:master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.jsonnet'
@@ -1736,7 +1736,7 @@ check_rust_fmt:
   image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.rs'
@@ -1759,7 +1759,7 @@ nix:
   image: nixos/nix:2.22.1
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.nix'
@@ -1795,7 +1795,7 @@ oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - src/bin_tps_evaluation/lift_limits.patch
@@ -1842,7 +1842,7 @@ oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.py'
@@ -1873,7 +1873,7 @@ oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -1939,7 +1939,7 @@ oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -1996,7 +1996,7 @@ oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - scripts/snapshot_alpha.sh
@@ -2043,7 +2043,7 @@ oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - scripts/b58_prefix/b58_prefix.py
@@ -2074,7 +2074,7 @@ oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - scripts/check-liquidity-baking-scripts.sh
@@ -2110,7 +2110,7 @@ oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - scripts/test_octez_release_version.sh
@@ -2140,7 +2140,7 @@ oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - scripts/ci/octez-packages-version.sh
@@ -2168,7 +2168,7 @@ oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2234,7 +2234,7 @@ oc.unit:webassembly-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2292,7 +2292,7 @@ oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2377,7 +2377,7 @@ oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2455,7 +2455,7 @@ oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2540,7 +2540,7 @@ oc.unit:other-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_high_cpu
+  - gcp_high_cpu_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -2625,7 +2625,7 @@ ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - '**/*.ml'
@@ -2670,7 +2670,7 @@ build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - when: manual
     allow_failure: true
@@ -2720,7 +2720,7 @@ etherlink.lint_wasm_runtime:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - src/lib_wasm_runtime/**/*.rs
@@ -2764,7 +2764,7 @@ etherlink.lint_solidity_artifacts:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - etherlink/kernel_latest/revm/contracts/predeployed/*.bin
@@ -2796,7 +2796,7 @@ etherlink.unit_tests:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - etherlink/**/*
@@ -2860,7 +2860,7 @@ etherlink.test_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - contrib/mir/**/*.lalrpop
@@ -2916,7 +2916,7 @@ etherlink.test_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - etherlink/firehose/**/*
@@ -2965,7 +2965,7 @@ etherlink.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - etherlink.mk
@@ -3019,7 +3019,7 @@ etherlink.test_revm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - etherlink.mk
@@ -3071,7 +3071,7 @@ etherlink.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - contrib/mir/**/*.lalrpop
@@ -3107,7 +3107,7 @@ etherlink.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - contrib/mir/**/*.lalrpop
@@ -3144,7 +3144,7 @@ etherlink.build_tezt:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3226,7 +3226,7 @@ documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - '**/*.rst'
@@ -3250,7 +3250,7 @@ documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3306,7 +3306,7 @@ documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3373,7 +3373,7 @@ client-libs.kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - client-libs/*kaitai*/**/*
@@ -3425,7 +3425,7 @@ client-libs.kaitai_e2e_checks:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - client-libs/*kaitai*/**/*
@@ -3458,7 +3458,7 @@ grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - grafazos/**/*
@@ -3492,7 +3492,7 @@ teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - teztale/**/*
@@ -3545,7 +3545,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - changes:
     - teztale/**/*
@@ -3598,7 +3598,7 @@ documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3663,7 +3663,7 @@ documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3720,7 +3720,7 @@ documentation.linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: manual
@@ -3775,7 +3775,7 @@ documentation.install_python_bookworm:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
@@ -3804,7 +3804,7 @@ etherlink.tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3901,7 +3901,7 @@ etherlink.tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -3997,7 +3997,7 @@ etherlink.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4092,7 +4092,7 @@ etherlink.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4188,7 +4188,7 @@ etherlink.build_evm_node_static_arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - etherlink/**/*
@@ -4241,7 +4241,7 @@ etherlink.build_evm_node_static_x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - changes:
     - etherlink/**/*
@@ -4294,7 +4294,7 @@ oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - client-libs/**/*
@@ -4333,7 +4333,7 @@ commit_titles:
   image: ${ci_image_name_protected}/prebuild:amd64--master
   stage: sanity
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure:
@@ -4354,7 +4354,7 @@ de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - data-encoding/**
@@ -4381,7 +4381,7 @@ de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - data-encoding/**
@@ -4408,7 +4408,7 @@ resto.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - changes:
     - resto/**
@@ -4435,7 +4435,7 @@ resto.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - resto/**
@@ -4462,7 +4462,7 @@ tezt-static-binaries:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4554,7 +4554,7 @@ tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4649,7 +4649,7 @@ tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4742,7 +4742,7 @@ tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4836,7 +4836,7 @@ tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -4929,7 +4929,7 @@ tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml
@@ -5023,7 +5023,7 @@ tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   rules:
   - changes:
     - .gitlab-ci.yml

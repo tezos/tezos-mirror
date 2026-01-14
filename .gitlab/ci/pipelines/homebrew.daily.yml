@@ -9,7 +9,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -31,7 +31,7 @@ oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-6253f76a
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.create-homebrew-formula
   dependencies: []
@@ -58,7 +58,7 @@ oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-6253f76a
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes

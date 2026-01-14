@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -64,7 +64,7 @@ oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -95,7 +95,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -116,7 +116,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - when: always
   needs:
@@ -165,7 +165,7 @@ oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: always
   needs:
@@ -228,7 +228,7 @@ oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:rust-toolchain:amd64
   dependencies:
@@ -279,7 +279,7 @@ etherlink.lint_wasm_runtime:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -318,7 +318,7 @@ etherlink.unit_tests:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -375,7 +375,7 @@ etherlink.test_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
@@ -415,7 +415,7 @@ etherlink.test_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
@@ -454,7 +454,7 @@ etherlink.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
@@ -497,7 +497,7 @@ etherlink.test_revm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
@@ -538,7 +538,7 @@ etherlink.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -566,7 +566,7 @@ etherlink.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -594,7 +594,7 @@ etherlink.build_tezt:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -648,7 +648,7 @@ etherlink.build_evm_node_static_arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -694,7 +694,7 @@ etherlink.build_evm_node_static_x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -740,7 +740,7 @@ etherlink.tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -807,7 +807,7 @@ etherlink.tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -873,7 +873,7 @@ etherlink.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -939,7 +939,7 @@ etherlink.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_tezt_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released

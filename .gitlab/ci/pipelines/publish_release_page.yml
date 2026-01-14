@@ -10,7 +10,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -37,7 +37,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -58,7 +58,7 @@ publish:release-page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -94,7 +94,7 @@ grafazos.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -130,7 +130,7 @@ teztale.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -166,7 +166,7 @@ octez-smart-rollup-node.release-page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true

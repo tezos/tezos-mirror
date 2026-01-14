@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -64,7 +64,7 @@ oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -95,7 +95,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -116,7 +116,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -160,7 +160,7 @@ oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -204,7 +204,7 @@ oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -233,7 +233,7 @@ oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -262,7 +262,7 @@ oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-6253f76a
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -285,7 +285,7 @@ docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -312,7 +312,7 @@ gitlab:publish:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
@@ -384,8 +384,8 @@ oc.docker-build-debian-dependencies:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-debian:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -429,8 +429,8 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
+      - gcp_very_high_cpu_ramfs_dev
+      - gcp_dev_arm64
 
 oc.build-data_packages:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -466,7 +466,7 @@ apt_repo_debian:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:trixie-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -526,8 +526,8 @@ oc.docker-build-ubuntu-dependencies:
       - noble
       - jammy
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-ubuntu:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -571,14 +571,14 @@ oc.build-ubuntu:
       - noble
       - jammy
       TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
+      - gcp_very_high_cpu_ramfs_dev
+      - gcp_dev_arm64
 
 apt_repo_ubuntu:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:noble-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-ubuntu
   - oc.build-data_packages
@@ -637,8 +637,8 @@ oc.docker-build-rockylinux-dependencies:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -671,8 +671,8 @@ oc.docker-systemd-tests-rpm-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-rockylinux:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -715,8 +715,8 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
+      - gcp_very_high_cpu_ramfs_dev
+      - gcp_dev_arm64
 
 oc.build-rockylinux-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -758,14 +758,14 @@ oc.build-rockylinux-data:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 rpm_repo_rockylinux:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
@@ -825,8 +825,8 @@ oc.docker-build-fedora-dependencies:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.docker-systemd-tests-rpm-fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -860,8 +860,8 @@ oc.docker-systemd-tests-rpm-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 oc.build-fedora:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -905,8 +905,8 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu_ramfs
-      - gcp_arm64
+      - gcp_very_high_cpu_ramfs_dev
+      - gcp_dev_arm64
 
 oc.build-fedora-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -949,14 +949,14 @@ oc.build-fedora-data:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
-      - gcp_arm64
+      - gcp_very_high_cpu_dev
+      - gcp_dev_arm64
 
 rpm_repo_fedora:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - oc.build-fedora
   - oc.build-fedora-data
@@ -988,7 +988,7 @@ grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1020,7 +1020,7 @@ teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   rules:
   - when: manual
     allow_failure: true
@@ -1071,7 +1071,7 @@ teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1122,7 +1122,7 @@ octez-smart-rollup-node.build:static-arm64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1167,7 +1167,7 @@ octez-smart-rollup-node.build:static-x86_64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1212,7 +1212,7 @@ grafazos.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1250,7 +1250,7 @@ teztale.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1290,7 +1290,7 @@ octez-smart-rollup-node.release-page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true
@@ -1331,7 +1331,7 @@ octez-smart-rollup-node.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_arm64
+  - gcp_dev_arm64
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1361,7 +1361,7 @@ octez-smart-rollup-node.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1391,7 +1391,7 @@ octez-smart-rollup-node.docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - octez-smart-rollup-node.docker:amd64
   - octez-smart-rollup-node.docker:arm64

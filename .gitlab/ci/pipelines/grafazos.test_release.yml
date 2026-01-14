@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -64,7 +64,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -85,7 +85,7 @@ grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:jsonnet:amd64
   dependencies:
@@ -114,7 +114,7 @@ grafazos.gitlab_release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   needs:
   - grafazos.build
   dependencies:
@@ -136,7 +136,7 @@ grafazos.release_page:
   image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
-  - gcp_not_interruptible
+  - gcp_not_interruptible_dev
   rules:
   - when: manual
     allow_failure: true

@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -59,7 +59,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs
+  - gcp_very_high_cpu_ramfs_dev
   rules:
   - when: always
   needs:
@@ -108,7 +108,7 @@ oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   rules:
   - when: always
   needs:
@@ -173,7 +173,7 @@ documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -193,7 +193,7 @@ documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -227,7 +227,7 @@ documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -272,7 +272,7 @@ documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_dev
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -315,7 +315,7 @@ documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - documentation.odoc
@@ -350,7 +350,7 @@ documentation.linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - documentation.manuals
@@ -382,7 +382,7 @@ documentation.install_python_bookworm:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -401,7 +401,7 @@ documentation.install_python_jammy:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:jammy-master-6253f76a
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -420,7 +420,7 @@ documentation.install_python_noble:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ubuntu:noble-master-6253f76a
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes

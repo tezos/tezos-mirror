@@ -10,7 +10,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -37,7 +37,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -59,7 +59,7 @@ opam:prepare:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 1 minute
@@ -90,7 +90,7 @@ opam:all_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 6 minutes
@@ -162,7 +162,7 @@ opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 6 minutes
@@ -221,7 +221,7 @@ opam:all_2:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 2 minutes
@@ -295,7 +295,7 @@ opam:all_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 1 minute
@@ -358,7 +358,7 @@ opam:all_3:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 3 minutes
@@ -432,7 +432,7 @@ opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 4 minutes
@@ -490,7 +490,7 @@ opam:all_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 4 minutes
@@ -563,7 +563,7 @@ opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 1 minute
@@ -631,7 +631,7 @@ opam:all_5:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 5 minutes
@@ -705,7 +705,7 @@ opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
-  - gcp
+  - gcp_dev
   rules:
   - when: delayed
     start_in: 7 minutes

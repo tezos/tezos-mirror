@@ -10,7 +10,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp
+  - gcp_dev
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -37,7 +37,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   allow_failure: true
@@ -58,7 +58,7 @@ container_scanning_tezos-tezos-latest:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -89,7 +89,7 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -120,7 +120,7 @@ container_scanning_tezos-tezos-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -151,7 +151,7 @@ container_scanning_tezos-debian-unstable-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -182,7 +182,7 @@ container_scanning_tezos-debian-bookworm-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -213,7 +213,7 @@ container_scanning_tezos-debian-trixie-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -244,7 +244,7 @@ container_scanning_tezos-ubuntu-noble-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -275,7 +275,7 @@ container_scanning_tezos-ubuntu-jammy-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -306,7 +306,7 @@ container_scanning_tezos-ubuntu-plucky-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -337,7 +337,7 @@ container_scanning_tezos-fedora-39-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -368,7 +368,7 @@ container_scanning_tezos-fedora-41-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -399,7 +399,7 @@ container_scanning_tezos-fedora-42-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -430,7 +430,7 @@ container_scanning_tezos-rockylinux-9-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -461,7 +461,7 @@ container_scanning_tezos-rockylinux-10-master-07a4c8c9:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -492,7 +492,7 @@ container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
