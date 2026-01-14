@@ -9,12 +9,11 @@
 use ocaml::Pointer;
 use zeroize::Zeroize;
 
-// TODO: Use optimised platform-dependent versions when possible
-// c.f. https://github.com/cryspen/libcrux/issues/1201
-use libcrux_ml_dsa::ml_dsa_44::portable::{generate_key_pair, sign, verify};
 use libcrux_ml_dsa::ml_dsa_44::{
     MLDSA44KeyPair, MLDSA44Signature, MLDSA44SigningKey, MLDSA44VerificationKey,
 };
+// This imports the multiplexing versions of these functions
+use libcrux_ml_dsa::ml_dsa_44::{generate_key_pair, sign, verify};
 use libcrux_ml_dsa::{KEY_GENERATION_RANDOMNESS_SIZE, SIGNING_RANDOMNESS_SIZE};
 
 /// Maximum context size
