@@ -22,6 +22,12 @@ val signing_key_to_bytes : signing_key -> bytes
     [bytes] is not [signing_key_size] long. *)
 val signing_key_from_bytes : bytes -> (signing_key, string) result
 
+(** [signing_key_from_bytes_opt bytes] attempts to deserialize [bytes] into a
+    signing key.
+
+    @return [None] if the [bytes] is not [signing_key_size] long. *)
+val signing_key_from_bytes_opt : bytes -> signing_key option
+
 (** Type of the verification key. *)
 type verification_key
 
@@ -38,6 +44,12 @@ val verification_key_to_bytes : verification_key -> bytes
     @return an error string "Invalid verification key size:.." if the
     [bytes] is not [verification_key_size] long. *)
 val verification_key_from_bytes : bytes -> (verification_key, string) result
+
+(** [verification_key_from_bytes_opt bytes] attempts to deserialize [bytes] into
+    a verification key.
+
+    @return [None] if the [bytes] is not [verification_key_size] long. *)
+val verification_key_from_bytes_opt : bytes -> verification_key option
 
 (** Type of the signature. *)
 type signature
@@ -56,6 +68,12 @@ val signature_to_bytes : signature -> bytes
     [signature_size] long. *)
 val signature_from_bytes : bytes -> (signature, string) result
 
+(** [signature_from_bytes_opt bytes] attempts to deserialize [bytes] into a
+    signature.
+
+    @return [None] if the [bytes] is not [signature_size] long. *)
+val signature_from_bytes_opt : bytes -> signature option
+
 (** The size of a randomness value for key generation. *)
 val key_gen_randomness_size : int
 
@@ -66,6 +84,13 @@ val key_gen_randomness_size : int
     [seed] is not [key_gen_randomness_size] long. *)
 val generate_key_pair :
   seed:bytes -> (signing_key * verification_key, string) result
+
+(** [generate_key_pair_opt ~seed] generates a new pair of [signing_key] and
+    [verification_key] based on the given [seed].
+
+    @return [None] if the [seed] is not [key_gen_randomness_size] long. *)
+val generate_key_pair_opt :
+  seed:bytes -> (signing_key * verification_key) option
 
 (** The size of a randomness value for signing. *)
 val signing_randomness_size : int
@@ -80,10 +105,25 @@ val signing_randomness_size : int
 val sign :
   randomness:bytes -> signing_key -> bytes -> (signature, string) result
 
+(** [sign_opt ~randomness signing_key message] signs the given [message] with the
+    [signing_key].
+
+    @return [None] if the [randomness] is not [signing_randomness_size] long.
+
+    @return [None] if the signing fails. *)
+val sign_opt : randomness:bytes -> signing_key -> bytes -> signature option
+
 (** [verify verification_key message signature] checks if the given
     [signature] is a valid signature of a [message] under a
     [verification_key].
 
     @return an error string "Verification failed: .." if the verification
-      fails. *)
+    fails. *)
 val verify : verification_key -> bytes -> signature -> (unit, string) result
+
+(** [verify_b verification_key message signature] checks if the given
+    [signature] is a valid signature of a [message] under a
+    [verification_key].
+
+    @return [false] if the verification fails. *)
+val verify_b : verification_key -> bytes -> signature -> bool
