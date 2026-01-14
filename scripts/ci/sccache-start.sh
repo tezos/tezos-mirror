@@ -34,19 +34,3 @@ if [ "${attempts}" = 0 ]; then
   echo "Could not start sccache after ${max_attempts}, running without sccache."
   export RUSTC_WRAPPER=""
 fi
-
-# get access to GCS backend to store the cache on protected branches
-if [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
-  echo "### Logging into protected repo ..."
-  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
-  gcloud auth activate-service-account --key-file=protected_sa.json
-
-  #
-  GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
-  export GOOGLE_OAUTH_ACCESS_TOKEN
-else
-  echo "### Logging into standard repo ..."
-  # Nothing to do
-fi
-
-echo "GCS sccache bucket: $GCP_SCCACHE_BUCKET"
