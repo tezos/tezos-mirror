@@ -1,37 +1,68 @@
 #!/bin/sh
 
-## See README.md for the "manual instructions"
+for arg in "$@"; do
+  case $arg in
+  "--resume")
+    RESUME='--resume'
+    ;;
+  "--check-patch-only")
+    CHECKPATCHONLY='--check-patch-only'
+    ;;
+  esac
+done
 
 # Check for uncommitted files, this will ensure `git commit -a` doesn't add
 # unwanted files to the patch.
 UNCOMMITED=$(git status | grep "Changes")
 
-if [ "$UNCOMMITED" != "" ] && [ "$1" != "--resume" ]; then
+# We can have uncommitted file if we are resuming, as these files can be results
+# from resolving the conflicts
+if [ "$UNCOMMITED" != "" ] && [ "$RESUME" = "" ]; then
   echo "Some files are not committed, the script must start from a clean branch"
   exit 2
 fi
 
 # Apply the patch with the 3-way merge, so that conflicts are explicitly added
-# to the files.
-if [ "$1" != "--resume" ]; then
+# to the files. Only when not resuming, otherwise it would apply them twice.
+if [ "$RESUME" = "" ]; then
   git apply -3 scripts/profile_alpha.patch
 fi
 
 CONFLICTS=$(git status | grep "Unmerged paths")
 
 if [ "$CONFLICTS" != "" ]; then
-  echo "Please fix conflicts and resume with $0 --resume"
+
+  echo "Please fix conflicts and resume with $0 --resume."
+  echo "You should also first try with '--resume --check-patch-only' to ensure the patch is correct and compiling."
+
   exit 2
 fi
 
-git commit -a -m "Profiler: patch proto_alpha"
+# Regenerate protocol environment files and check the patch is still valid.
+TEZOS_PPX_PROFILER=t dune build @src/proto_alpha/check
+if [ ! $? ]; then
+  echo "The profiler patch is not compiling, please make the change locally and retry with '--resume'."
+  exit 2
+fi
 
-OUTPUT_FILE=$(git format-patch -n HEAD^)
+if [ "$CHECKPATCHONLY" = "" ]; then
 
-git reset --hard HEAD^
+  # Now commit the patch, generate a patch file, revert the commit then finally
+  # commit the newly generated patch file.
 
-mv "$OUTPUT_FILE" scripts/profile_alpha.patch
+  git commit -a -m "Profiler: patch proto_alpha"
 
-git add scripts/profile_alpha.patch
+  OUTPUT_FILE=$(git format-patch -n HEAD^)
 
-git commit -m "Scripts: regenerate protocol alpha patches"
+  git reset --hard HEAD^
+
+  mv "$OUTPUT_FILE" scripts/profile_alpha.patch
+
+  git add scripts/profile_alpha.patch
+
+  git commit -m "Scripts: regenerate protocol alpha patches"
+
+  # If not resuming after a conflict, this means we are only trying to check the patch
+elif [ "$RESUME" = "" ]; then
+  git reset --hard HEAD
+fi
