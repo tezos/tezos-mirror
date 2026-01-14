@@ -436,6 +436,7 @@ let setup_rollup ~kind ?hooks ?alias ?(mode = Sc_rollup_node.Operator)
       tezos_node
       ?data_dir
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ?default_operator:operator
       ?operators
       ?name:rollup_node_name
@@ -1108,6 +1109,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
           node
           ?dal_node
           ~base_dir:(Client.base_dir client)
+          ~kind
           ~default_operator
           ~name:rollup_node_name
           ~loser_mode

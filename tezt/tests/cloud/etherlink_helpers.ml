@@ -299,6 +299,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
     Sc_rollup_node.Agent.create
       ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:account.alias
       ~operators
       ?dal_node
@@ -479,6 +480,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
     Sc_rollup_node.Agent.create
       ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       cloud
       agent
       Observer

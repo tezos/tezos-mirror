@@ -130,6 +130,7 @@ let with_fresh_rollup ?(kind = "arith") ~boot_sector f tezos_node tezos_client
       Operator
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~default_operator:operator
   in
   let* configuration_filename =

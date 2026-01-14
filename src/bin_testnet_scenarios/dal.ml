@@ -345,6 +345,7 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:Wallet.Airdrop.giver_alias
   in
 

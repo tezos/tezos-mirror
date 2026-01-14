@@ -135,6 +135,7 @@ val create :
   ?data_dir:string ->
   ?config_file:string ->
   base_dir:string ->
+  kind:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
@@ -162,6 +163,7 @@ val create_with_endpoint :
   ?data_dir:string ->
   ?config_file:string ->
   base_dir:string ->
+  kind:string ->
   ?remote_signer:Uri.t ->
   ?event_pipe:string ->
   ?metrics_addr:string ->
@@ -212,6 +214,12 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
+
+(** Get the PVM kind of an rollup node *)
+val kind : t -> string
+
+(** Returns if the rollup node only monitors finalized L1 heads. *)
+val monitors_finalized : t -> bool
 
 (** Get the metrics address and port of a node. *)
 val metrics : t -> string * int
