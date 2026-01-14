@@ -476,27 +476,23 @@ impl From<OwnedPath> for StorageAccount {
 #[cfg(test)]
 mod test {
     use crate::{
-        custom,
         precompiles::constants::{
-            FA_BRIDGE_SOL_CODE_HASH, FA_BRIDGE_SOL_CONTRACT,
-            INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
-            WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+            FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
+            WITHDRAWAL_SOL_CONTRACT,
         },
         storage::code::CodeStorage,
         Error,
     };
 
     use revm::{
-        primitives::{hex::FromHex, Bytes, FixedBytes, KECCAK_EMPTY},
+        primitives::{Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
     use rlp::Encodable;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
 
-    fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
-        Ok(Bytecode::new_legacy(
-            Bytes::from_hex(hex_str).map_err(custom)?,
-        ))
+    fn bytecode_from_static(bytes: &'static [u8]) -> Result<Bytecode, Error> {
+        Ok(Bytecode::new_legacy(Bytes::from_static(bytes)))
     }
 
     fn check_account_code_info_fetching(
@@ -516,24 +512,24 @@ mod test {
     #[test]
     fn check_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT).unwrap();
+        let code_voucher = bytecode_from_static(WITHDRAWAL_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            WITHDRAWAL_SOL_CODE_HASH,
+            WITHDRAWAL_SOL_CONTRACT.code_hash,
         );
     }
 
     #[test]
     fn check_fa_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_hex_str(FA_BRIDGE_SOL_CONTRACT).unwrap();
+        let code_voucher = bytecode_from_static(FA_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            FA_BRIDGE_SOL_CODE_HASH,
+            FA_BRIDGE_SOL_CONTRACT.code_hash,
         );
     }
 
@@ -541,12 +537,12 @@ mod test {
     fn check_internal_forwarder_code_info_fetching() {
         let mut host = MockKernelHost::default();
         let code_voucher =
-            bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT).unwrap();
+            bytecode_from_static(INTERNAL_FORWARDER_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            INTERNAL_FORWARDER_SOL_CODE_HASH,
+            INTERNAL_FORWARDER_SOL_CONTRACT.code_hash,
         );
     }
 
