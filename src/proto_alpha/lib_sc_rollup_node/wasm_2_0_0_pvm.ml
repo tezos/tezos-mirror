@@ -221,7 +221,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
     Pvm_sig.MUTABLE_STATE_S
       with type hash = hash
        and type t = Ctxt_wrapper.mut_state = struct
-    type t = tree ref
+    type t = state ref
 
     type hash = Sc_rollup.State_hash.t
 

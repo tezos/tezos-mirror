@@ -12265,25 +12265,27 @@ type info = {
 
 module Make
     (Tree : Context.TREE with type key = string list and type value = bytes) : sig
-  val initial_state : version -> Tree.tree -> Tree.tree Lwt.t
+  type state = Tree.tree
+
+  val initial_state : version -> state -> state Lwt.t
 
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->
     outbox_validity_period:int32 ->
     outbox_message_limit:Z.t ->
     string ->
-    Tree.tree ->
-    Tree.tree Lwt.t
+    state ->
+    state Lwt.t
 
-  val compute_step : Tree.tree -> Tree.tree Lwt.t
+  val compute_step : state -> state Lwt.t
 
-  val set_input_step : input -> string -> Tree.tree -> Tree.tree Lwt.t
+  val set_input_step : input -> string -> state -> state Lwt.t
 
-  val reveal_step : bytes -> Tree.tree -> Tree.tree Lwt.t
+  val reveal_step : bytes -> state -> state Lwt.t
 
-  val get_output : output -> Tree.tree -> string option Lwt.t
+  val get_output : output -> state -> string option Lwt.t
 
-  val get_info : Tree.tree -> info Lwt.t
+  val get_info : state -> info Lwt.t
 end
 end
 # 138 "v16.in.ml"
