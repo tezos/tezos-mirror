@@ -108,7 +108,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-1.0
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-6253f76a
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
@@ -3766,7 +3766,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-1.0
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: test
   tags:
   - gcp

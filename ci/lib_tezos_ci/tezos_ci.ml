@@ -1554,17 +1554,15 @@ module Images = struct
   include Images_external
 
   module Base_images = struct
-    type version = {major : int; minor : int}
-
-    let version_pp ppf v = Format.fprintf ppf "%d.%d" v.major v.minor
-
     let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
     let make_img distro version =
-      Image.mk_external
-        ~image_path:(sf "%s/%s-%a" path_prefix distro version_pp version)
+      Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    let debian_version = {major = 1; minor = 0}
+    (* !20289 merge commit: https://gitlab.com/tezos/tezos/-/commit/6253f76a *)
+    let common_version = "master-6253f76a"
+
+    let debian_version = common_version
 
     let debian_bookworm = make_img "debian:bookworm" debian_version
 
@@ -1578,7 +1576,7 @@ module Images = struct
 
     let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
 
-    let rpm_version = {major = 1; minor = 0}
+    let rpm_version = common_version
 
     let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
 
@@ -1592,11 +1590,11 @@ module Images = struct
 
     let fedora_42 = make_img "fedora:42" rpm_version
 
-    let homebrew_version = {major = 1; minor = 0}
+    let homebrew_version = common_version
 
     let homebrew = make_img "debian-homebrew:trixie" homebrew_version
 
-    let rust_toolchain_version = {major = 1; minor = 0}
+    let rust_toolchain_version = common_version
 
     let rust_toolchain_trixie =
       make_img "debian-rust:trixie" rust_toolchain_version

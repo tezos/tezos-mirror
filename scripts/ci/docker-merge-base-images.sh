@@ -51,10 +51,5 @@ create_and_push_manifest() {
 create_and_push_manifest "${LATEST_TAG}"
 create_and_push_manifest "${LATEST_TAG_GENERIC}"
 if [ "${CI_COMMIT_REF_PROTECTED:-}" = "true" ]; then
-  if [ -z "${VERSION:-}" ]; then
-    create_and_push_manifest "${RELEASE}"
-  else
-    # this case is used for base images where we append a version string
-    create_and_push_manifest "${RELEASE}-${VERSION}"
-  fi
+  create_and_push_manifest "${RELEASE}"
 fi
