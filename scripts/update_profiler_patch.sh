@@ -8,6 +8,9 @@ for arg in "$@"; do
   "--check-patch-only")
     CHECKPATCHONLY='--check-patch-only'
     ;;
+  "--no-check")
+    NOCHECK='--no-check'
+    ;;
   esac
 done
 
@@ -39,10 +42,12 @@ if [ "$CONFLICTS" != "" ]; then
 fi
 
 # Regenerate protocol environment files and check the patch is still valid.
-TEZOS_PPX_PROFILER=t dune build @src/proto_alpha/check
-if [ ! $? ]; then
-  echo "The profiler patch is not compiling, please make the change locally and retry with '--resume'."
-  exit 2
+if [ "$NOCHECK" = "" ]; then
+  TEZOS_PPX_PROFILER=t dune build @src/proto_alpha/check
+  if [ ! $? ]; then
+    echo "The profiler patch is not compiling, please make the change locally and retry with '--resume'."
+    exit 2
+  fi
 fi
 
 if [ "$CHECKPATCHONLY" = "" ]; then
