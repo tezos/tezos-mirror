@@ -268,6 +268,9 @@ let get_slot_header_attestation_info (Node_context.{cctxt; _} as node_ctxt)
            SI.of_list dal_constants.attestation_lags
          else SI.empty)
         |>
+        (* Check for unpublished slots (added with lag = 0). *)
+        SI.add 0
+        |>
         (* Add current lag if not already present *)
         SI.add dal_constants.attestation_lag
         |>
