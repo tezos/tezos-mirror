@@ -94,6 +94,13 @@ ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBet
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
   EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"
   ;;
+Rebuild | TestRebuild)
+  DEBVERSION=$VERSION
+  DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
+  # For now, the displayed version for a rebuild is vx.y+dev
+  # This will be fixed by upcoming work.
+  EXPECTED_VERSION="Octez ${gitlab_release_major_version}.${gitlab_release_minor_version}+dev"
+  ;;
 Master)
   DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
   DEBCHANGELOG="Packages for master $CI_COMMIT_SHORT_SHA"
