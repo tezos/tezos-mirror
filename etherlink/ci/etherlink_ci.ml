@@ -356,8 +356,8 @@ let job_tezt =
     ~description:"Run normal Etherlink Tezt tests."
     ~test_selection:
       (Tezos_ci_jobs.Tezt.tests_tag_selector [Not (Has_tag "flaky")])
-    ~parallel_jobs:18
-    ~parallel_tests:6
+    ~parallel_jobs:36
+    ~parallel_tests:3
     ~retry_jobs:2
 
 let job_tezt_slow =

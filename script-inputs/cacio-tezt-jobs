@@ -12,11 +12,11 @@ merge_request,,slow,12,3
 merge_request,,extra,1,6
 merge_request,,flaky,2,1
 merge_request,,static-binaries,1,3
-scheduled,etherlink,,18,6
+scheduled,etherlink,,36,3
 scheduled,etherlink,slow,3,3
 scheduled,etherlink,extra,12,6
 scheduled,etherlink,flaky,2,1
-merge_request,etherlink,,18,6
+merge_request,etherlink,,36,3
 merge_request,etherlink,slow,3,3
 merge_request,etherlink,extra,12,6
 merge_request,etherlink,flaky,2,1
