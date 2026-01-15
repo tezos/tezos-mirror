@@ -788,7 +788,7 @@ pub fn store_sequencer<Host: Runtime>(
 
 pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
     if host.store_has(&KEEP_EVENTS)?.is_some() {
-        host.store_delete(&KEEP_EVENTS);
+        host.store_delete(&KEEP_EVENTS)?;
         Ok(())
     } else {
         let index = IndexableStorage::new(&EVENTS)?;
