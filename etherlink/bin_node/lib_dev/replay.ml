@@ -46,8 +46,8 @@ let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile ?upto
-    config =
+let main ~strategy ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile
+    ?upto config =
   let open Lwt_result_syntax in
   let pool = Lwt_domain.setup_pool 1 in
   let* up_to_level =
@@ -71,7 +71,7 @@ let main ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile ?upto
     if current > up_to_level then return_unit
     else
       let* apply_result =
-        Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state current
+        Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state strategy current
       in
       match apply_result with
       | Replay_success {diverged; process_time; execution_gas; _} ->

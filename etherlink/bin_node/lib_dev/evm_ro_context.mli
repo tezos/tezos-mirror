@@ -60,6 +60,8 @@ val ro_backend :
   Configuration.t ->
   (module Services_backend_sig.S)
 
+type replay_strategy = Blueprint | Assemble
+
 type replay_result =
   | Replay_success of {
       block : Ethereum_types.legacy_transaction_object L2_types.block;
@@ -75,6 +77,7 @@ val replay :
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
   ?alter_evm_state:(Pvm.State.t -> (Pvm.State.t, tztrace) result Lwt.t) ->
+  replay_strategy ->
   Ethereum_types.quantity ->
   replay_result tzresult Lwt.t
 
