@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2026 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
 [workspace]
-
+resolver = "2"
 members = ["kernel", "collector"]
 
 [workspace.dependencies]
