@@ -985,7 +985,7 @@ etherlink.tezt:
     TEZT_VARIANT: ""
     TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
     TEZT_RETRY: "1"
-    TEZT_PARALLEL: "6"
+    TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
   artifacts:
     expire_in: 7 days
@@ -999,4 +999,4 @@ etherlink.tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 18
+  parallel: 36
