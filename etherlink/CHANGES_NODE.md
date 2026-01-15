@@ -16,6 +16,10 @@
 
 - Fix transaction objects submitted several times remaining in the tx queue
   past their lifespan. (!20445)
+- Fix the native execution wrongfully overwriting the kernel version stored in
+  the context of the chain, which resulted in an incorrect result for the
+  `tez_kernelVersion` RPC. Only nodes with the native execution policy set to
+  `always` were affected. (!20432)
 
 ### Storage changes
 
