@@ -7,7 +7,10 @@
 //! Mutable and Immutable wrappers over a generic type `T`.
 //! Exposes a mutable & immutable API to an underlying state when interfacing with OCaml
 
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 #[derive(Clone)]
 pub struct ImmutableState<T>(Arc<T>);
@@ -19,10 +22,15 @@ impl<T> ImmutableState<T> {
 }
 
 impl<T> From<MutableState<T>> for ImmutableState<T> {
-    /// Very cheap conversionn from [`MutableState<T>`] to [`ImmutableState<T>`]
+    /// Very cheap conversion from [`MutableState<T>`] to [`ImmutableState<T>`]
     fn from(value: MutableState<T>) -> Self {
         match value {
-            MutableState::Owned(state) => ImmutableState::new(state),
+            MutableState::Owned(state) => {
+                let inner = state
+                    .into_inner()
+                    .expect("MutableState RwLock should not be poisoned.");
+                ImmutableState::new(inner)
+            }
             MutableState::Borrowed(arc_state) => ImmutableState(arc_state),
         }
     }
@@ -68,7 +76,7 @@ impl<T> ImmutableState<T> {
 /// 1. Created from an underlying state `T` directly with constructor [`MutableState::Owned`]
 pub enum MutableState<T> {
     /// Owned variant of the state. When a mutating function is applied, the state is NOT copied, saving memory.
-    Owned(T),
+    Owned(RwLock<T>),
     /// Borrowed variant of the state.
     Borrowed(Arc<T>),
 }
@@ -81,6 +89,10 @@ impl<T> From<ImmutableState<T>> for MutableState<T> {
 }
 
 impl<T> MutableState<T> {
+    pub fn new(state: T) -> Self {
+        MutableState::Owned(RwLock::new(state))
+    }
+
     /// Create an immutable state from a mutable state
     #[inline]
     pub fn to_imm_state(&self) -> ImmutableState<T>
@@ -88,7 +100,12 @@ impl<T> MutableState<T> {
         T: Clone,
     {
         match self {
-            MutableState::Owned(state) => ImmutableState::new(state.clone()),
+            MutableState::Owned(state) => {
+                let read_guard = state
+                    .try_read()
+                    .expect("Should not be competing for read access to MutableState.");
+                ImmutableState::new(read_guard.clone())
+            }
             MutableState::Borrowed(arc_state) => ImmutableState(arc_state.clone()),
         }
     }
@@ -97,7 +114,12 @@ impl<T> MutableState<T> {
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         match self {
-            MutableState::Owned(state) => f(state),
+            MutableState::Owned(state) => {
+                let read_guard = state.try_read().expect(
+                    "Should not attempt read access to a MutableState that is being written to.",
+                );
+                f(read_guard.deref())
+            }
             MutableState::Borrowed(state) => f(state),
         }
     }
@@ -110,13 +132,18 @@ impl<T> MutableState<T> {
         T: Clone,
     {
         let (new, res) = match self {
-            MutableState::Owned(state) => return f(state),
+            MutableState::Owned(state) => {
+                let mut write_guard = state
+                    .try_write()
+                    .expect("Should not be competing for write access to MutableState.");
+                return f(write_guard.deref_mut());
+            }
             MutableState::Borrowed(arc_state) => {
                 // We don't know how many references there are to the Arc state because OCaml
                 // aliases the reference without invoking "clone" on the Rust side.
                 let mut state = arc_state.as_ref().clone();
                 let res = f(&mut state);
-                (MutableState::Owned(state), res)
+                (Self::new(state), res)
             }
         };
         *self = new;
