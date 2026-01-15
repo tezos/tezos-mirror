@@ -958,69 +958,25 @@ module State = struct
 
   let execute_single_transaction ctxt (tx : Broadcast.transaction) hash =
     let open Lwt_result_syntax in
-    Octez_telemetry.Trace.add_attrs (fun () ->
-        Telemetry.Attributes.
-          [
-            Transaction.hash hash;
-            Block.number ctxt.session.next_blueprint_number;
-          ]) ;
     match ctxt.session.future_block_info with
     | Some ({timestamp; next_tx_index; _} as future_block_info) ->
-        let* tx =
-          match tx with
-          | Broadcast.Common (Evm tx) ->
-              let hash =
-                Ethereum_types.(hash_raw_tx tx |> hash_to_bytes)
-                |> String.to_bytes
-              in
-              let tx_bytes = String.to_bytes tx in
-              let tag = Bytes.of_string "\x01" in
-              let rlp =
-                Rlp.(List [Value hash; List [Value tag; Value tx_bytes]])
-              in
-              return rlp
-          | Broadcast.Common (Michelson _op) ->
-              failwith "Michelson operations can not be executed individually"
-          | Broadcast.Delayed tx ->
-              return (Evm_events.Delayed_transaction.to_rlp tx)
-        in
-        let rlp =
-          Rlp.List
-            [
-              tx;
-              Value (Ethereum_types.timestamp_to_bytes timestamp);
-              Value
-                (Ethereum_types.encode_u256_le
-                   ctxt.session.next_blueprint_number);
-            ]
-        in
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.Single_tx.input_tx
-            ~value:(Rlp.encode rlp |> Bytes.to_string)
-            ctxt.session.evm_state
-        in
         let*! data_dir, config = execution_config in
-        let* evm_state =
-          Evm_state.execute
+        let* receipt, evm_state =
+          Evm_state.execute_single_transaction
             ~pool:ctxt.execution_pool
             ~native_execution:
               (ctxt.configuration.kernel_execution.native_execution_policy
              = Always)
             ~data_dir
             ~config
-            ~wasm_entrypoint:"single_tx_execution"
-            evm_state
-            (`Inbox [])
-        in
-        let read = read_from_state evm_state in
-        let* receipt =
-          Durable_storage.inspect_durable_and_decode
-            read
-            (Durable_storage_path.Block.current_receipts
-               ~root:Durable_storage_path.etherlink_safe_root)
-            (Transaction_receipt.decode_last_from_list
-               Ethereum_types.(Block_hash (Hex (String.make 64 '0'))))
+            ctxt.session.evm_state
+            {
+              timestamp;
+              number = ctxt.session.next_blueprint_number;
+              transactions_count = next_tx_index;
+            }
+            hash
+            tx
         in
         ctxt.session.evm_state <- evm_state ;
         ctxt.session.future_block_info <-
