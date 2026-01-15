@@ -143,10 +143,10 @@ module type S = sig
     (** [decode_durable_state enc tree] decodes a value using the encoder
         [enc] from the provided [tree] *)
     val decode_durable_state :
-      'a Tezos_tree_encoding.t -> Context.pvmstate -> 'a Lwt.t
+      'a Tezos_tree_encoding.t -> Irmin_context.tree -> 'a Lwt.t
 
     (** [proof_mem_tree t k] is false iff [find_tree k = None].*)
-    val proof_mem_tree : Context.pvmstate -> string list -> bool Lwt.t
+    val proof_mem_tree : Irmin_context.tree -> string list -> bool Lwt.t
 
     (** [fold ?depth t root ~order ~init ~f] recursively folds over the trees and
         values of t. The f callbacks are called with a key relative to root. f is
@@ -165,11 +165,11 @@ module type S = sig
         order of their keys. *)
     val proof_fold_tree :
       ?depth:Tezos_context_sigs.Context.depth ->
-      Context.pvmstate ->
+      Irmin_context.tree ->
       string list ->
       order:[`Sorted | `Undefined] ->
       init:'a ->
-      f:(string list -> Context.pvmstate -> 'a -> 'a Lwt.t) ->
+      f:(string list -> Irmin_context.tree -> 'a -> 'a Lwt.t) ->
       'a Lwt.t
   end
 

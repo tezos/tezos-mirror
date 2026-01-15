@@ -8,9 +8,10 @@
 
 let current_level_path = "/evm/world_state/blocks/current/number"
 
-let durable_lookup (module PVM : Pvm_plugin_sig.S) tree key_str =
+let durable_lookup (module PVM : Pvm_plugin_sig.S) state key_str =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key_str in
+  let tree = Context_wrapper.Irmin.of_node_pvmstate state in
   let* durable =
     PVM.Wasm_2_0_0.decode_durable_state
       Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
