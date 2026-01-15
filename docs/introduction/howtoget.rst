@@ -217,7 +217,7 @@ To remove the Octez packages you can simply run the following command.
                 octez-dal-node octez-smart-rollup-node
 
 To upgrade packages, use ``dnf update``.
-If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+If running Octez as services, see also how to :ref:`restart them <services_upgrade>`.
 
 
 .. _getting_static_binaries:
@@ -335,26 +335,33 @@ Docker compose files
 ~~~~~~~~~~~~~~~~~~~~
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
-``docker-compose`` files are available for all active
-protocols in directory :src:`scripts/docker`.
-Each compose file is able to launch services for a node, a baker, and an accuser for the given protocol.
+A working example of a simple Docker compose file is available at :src:`scripts/docker/bake.yml`.
+The compose file is able to launch services for an Octez node, a DAL node, a baker, and an accuser.
 
 First, you have to make some choices:
 
-- choose one of the above protocols and download its compose file
-- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``); that network must currently run your protocol
+- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``)
 - choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
 - specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
 
-For instance, to configure and run the node on the active protocol on Ghostnet, in Rolling history mode::
+For instance, to configure and run the node on the active protocol on Shadownet from a snapshot, in Rolling history mode::
 
-    export PROTO=parisC
-    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/$PROTO.yml
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
     export LIQUIDITY_BAKING_VOTE=pass
-    docker compose -f $PROTO.yml run --rm -it \
-      octez-node octez-node --network ghostnet --history-mode rolling
+    docker compose -f bake.yml run --rm -it node octez-node config init \
+       --network https://teztnets.com/shadownet --history-mode rolling \
+       --data-dir /var/run/tezos/node/data \
+       --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
+    wget -O $HOME/rolling https://snapshots.tzinit.org/shadownet/rolling
+    docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
+      node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
+    docker compose -f bake.yml up node
 
-(Note in the command above that ``octez-node`` is the name of both the container and executable.)
+Note in the commands above that ``node`` is the name of the service running the ``octez-node`` executable.
+You may ignore possible warnings about environment variable ``BAKER_ADDRESS``, that we will set later on for the DAL node.
+
+The client and node data are stored in local subdirectories of your current directory, respectively ``./client_data/`` and ``./node_data/``.
+You may want to start with empty (or non-existent) directories in the beginning, then reuse them to restart the services.
 
 .. note::
 
@@ -362,35 +369,39 @@ For instance, to configure and run the node on the active protocol on Ghostnet, 
 
     ::
 
-        docker compose -f $PROTO.yml run --rm \
-          --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
-          octez-node
-
-The node is now configured and started correctly, but may take a very long time to bootstrap.
-In most practical cases, you have to restart it from a :doc:`snapshot file <../user/snapshots>`. For that, you have to stop the node by hitting ^C (or executing in another terminal ``docker compose -f $PROTO.yml stop octez-node``), then clean up its data directory and import a snapshot that you previously downloaded::
-
-    docker compose -f $PROTO.yml run --rm \
-      --entrypoint='sh -c "cd /var/run/tezos/node/data/; \
-        rm -fr lock store context daily_logs"' \
-      octez-node
-    wget -O $HOME/rolling <snapshot-url>
-    docker compose -f $PROTO.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
-      octez-node octez-snapshot-import
-
-Now you can start all the services::
-
-    docker compose -f $PROTO.yml up
+        rm ./node_data/data/config.json
 
 You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
 
-    docker compose -f $PROTO.yml exec octez-node octez-client bootstrapped
+    docker compose -f bake.yml exec node octez-client bootstrapped
 
 You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
 
-    docker compose -f $PROTO.yml stop octez-node
-    docker compose -f $PROTO.yml run octez-node octez-upgrade-storage
-    docker compose -f $PROTO.yml up octez-node
+    docker compose -f bake.yml stop node
+    docker compose -f bake.yml run --rm node octez-node upgrade storage --data-dir /var/run/tezos/node/data
+    docker compose -f bake.yml up node
 
+To run the baker, you must configure a baking key (if you have one you may skip this step.
+While the node is running, do (in another window if needed)::
+
+    docker compose -f bake.yml exec node sh
+
+and in the shell do::
+
+    export TEZOS_CLIENT_DIR=/var/run/tezos/client
+    octez-client gen keys mybaker
+    octez-client show address mybaker
+    # Note down the address of mybaker
+    # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    octez-client register key mybaker as delegate
+    octez-client stake 6000 for mybaker
+
+Once the baking key is configured, stop the node and then run all the services::
+
+    export BAKER_ADDRESS=tz...
+    docker compose -f bake.yml up
+
+Now you should have running together: the node, the DAL node, the baker and the accuser.
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
