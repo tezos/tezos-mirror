@@ -1,16 +1,14 @@
 # Changelog
 
-## Unreleased
+## Version 0.52 (2026-01-16)
 
-### Breaking changes
+This is a bug fix release release for addressing several issues with the
+instant confirmation experimental feature. This version is required for
+providers wanting to enable this instant confirmation, but does not provide any
+changes compared to 0.51 otherwise.
 
-### Configuration changes
-
-### RPCs changes
-
-### Monitoring changes
-
-### Command-line interface changes
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
 
 ### Execution changes
 
@@ -21,16 +19,16 @@
   `tez_kernelVersion` RPC. Only nodes with the native execution policy set to
   `always` were affected. (!20432)
 
-### Storage changes
-
-### Documentation changes
-
 ### Experimental features changes
 
 *No guarantees are provided regarding backward compatibility of experimental
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Rework the incremental execution of included transactions in `farfadet-r1`
+  native execution to align it more closely to the execution path of regular
+  blueprints . (!20459)
 
 ## Version 0.51 (2026-01-13)
 
