@@ -40,9 +40,9 @@ pub struct EthBlockInProgress {
     /// block number
     pub number: U256,
     /// queue containing the transactions to execute
-    tx_queue: VecDeque<Transaction>,
+    pub tx_queue: VecDeque<Transaction>,
     /// list of transactions executed without issue
-    valid_txs: Vec<TransactionHash>,
+    pub valid_txs: Vec<TransactionHash>,
     pub delayed_txs: Vec<TransactionHash>,
     /// gas accumulator
     pub cumulative_gas: U256,

@@ -153,27 +153,6 @@ pub fn store_current_transactions_receipts<Host: Runtime>(
     Ok(())
 }
 
-pub fn read_current_transactions_receipts<Host: Runtime>(
-    host: &Host,
-    root: &impl Path,
-) -> Result<Vec<TransactionReceipt>, crate::Error> {
-    let receipts_bytes =
-        host.store_read_all(&path::current_block_transactions_receipts(root)?)?;
-    let receipts = rlp::Rlp::new(&receipts_bytes).as_list::<TransactionReceipt>()?;
-    Ok(receipts)
-}
-
-pub fn read_current_transactions_objects<Host: Runtime>(
-    host: &Host,
-    root: &impl Path,
-) -> Result<Vec<TransactionObject>, crate::Error> {
-    let transactions_objects_bytes =
-        host.store_read_all(&path::current_block_transactions_objects(root)?)?;
-    let transactions_objects =
-        rlp::Rlp::new(&transactions_objects_bytes).as_list::<TransactionObject>()?;
-    Ok(transactions_objects)
-}
-
 pub fn read_current_etherlink_block(host: &mut impl Runtime) -> anyhow::Result<EthBlock> {
     let block_path = path::current_block(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
     let bytes = &host.store_read_all(&block_path)?;

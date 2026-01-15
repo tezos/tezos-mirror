@@ -16,6 +16,8 @@ val tezlink_root : path
 
 val etherlink_root : path
 
+val etherlink_safe_root : path
+
 val root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
