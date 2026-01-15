@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+### Configuration changes
+
+### RPCs changes
+
+### Monitoring changes
+
+### Command-line interface changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
 ## Version 0.52 (2026-01-16)
 
 This is a bug fix release release for addressing several issues with the
