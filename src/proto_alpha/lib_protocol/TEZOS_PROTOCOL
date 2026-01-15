@@ -57,8 +57,8 @@
         "Entrypoint_repr",
 
         "Dal_slot_index_repr",
-        "Dal_attestation_repr",
         "Dal_attestations_repr",
+        "Dal_attestation_repr",
         "Dal_slot_repr",
 
         "Michelson_v1_gas_costs_generated",
