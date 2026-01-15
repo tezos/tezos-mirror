@@ -1,6 +1,12 @@
 Setting up Octez Services
 =========================
 
+.. warning::
+
+   **Experimental Tool Available**
+
+   An experimental tool called `octez-manager <https://github.com/trilitech/octez-manager>`_ is available to simplify the setup and management of Octez services. This tool is currently in beta and provides an alternative way to configure and run Octez daemons. While it may streamline the setup process, please be aware that it is still under active development and may have limitations or bugs. For production environments, we recommend carefully evaluating your requirements before using beta software.
+
 The Octez suite consists of :ref:`several executables <tezos_binaries>`, some to be run interactively, while others are to be run as daemons.
 
 Previous tutorials in this section showed how to :doc:`get started with the different executables <./howtouse>`, and different :doc:`options for participating to Tezos <./howtorun>` such as delegating, staking, and baking.
