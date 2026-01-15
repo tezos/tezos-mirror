@@ -35,10 +35,10 @@ val current : unit -> t option
 (** [propagate span_name x k] creates a span for the execution of [k x.data]. *)
 val propagate :
   ?service_name:string ->
-  ?attrs:(string * Opentelemetry.value) trace ->
+  ?attrs:('a -> (string * Opentelemetry.value) trace) ->
   ?kind:Opentelemetry_proto.Trace.span_span_kind ->
   ?links:Opentelemetry_proto.Trace.span_link trace ->
-  string ->
+  span_name:('a -> string) ->
   'a instrumented ->
   (Opentelemetry.Scope.t -> 'a -> 'b Lwt.t) ->
   'b Lwt.t
