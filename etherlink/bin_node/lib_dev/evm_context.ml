@@ -1018,7 +1018,7 @@ module State = struct
           Durable_storage.inspect_durable_and_decode
             read
             (Durable_storage_path.Block.current_receipts
-               ~root:Durable_storage_path.etherlink_root)
+               ~root:Durable_storage_path.etherlink_safe_root)
             (Transaction_receipt.decode_last_from_list
                Ethereum_types.(Block_hash (Hex (String.make 64 '0'))))
         in
