@@ -404,7 +404,13 @@ val resolve_or_timeout :
   ?timeout:float -> t -> name:string -> 'a Lwt.t -> 'a Lwt.t
 
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Install a events handler. *)
 val on_event : t -> (event -> unit) -> unit

@@ -439,8 +439,20 @@ module Make (X : PARAMETERS) = struct
     Background.register event_loop_promise ;
     unit
 
-  let wait_for_full ?where daemon name filter =
+  let wait_for_full ?timeout ?where daemon name filter =
     let promise, resolver = Lwt.task () in
+    let promise = Lwt.map Result.ok promise in
+    let promise =
+      match timeout with
+      | None -> promise
+      | Some timeout ->
+          Lwt.pick
+            [
+              promise;
+              (let* () = Lwt_unix.sleep timeout in
+               Lwt.return_error ());
+            ]
+    in
     let current_events =
       String_map.find_opt name daemon.one_shot_event_handlers
       |> Option.value ~default:[]
@@ -457,10 +469,16 @@ module Make (X : PARAMETERS) = struct
         daemon.one_shot_event_handlers ;
     let* result = promise in
     match result with
-    | None ->
+    | Ok (Some x) -> return x
+    | Ok None ->
         raise
           (Terminated_before_event {daemon = daemon.name; event = name; where})
-    | Some x -> return x
+    | Error () ->
+        Format.ksprintf
+          failwith
+          "Timeout waiting for event %s of %s"
+          name
+          daemon.name
 
   let event_from_full_event_filter filter json =
     let raw = get_event_from_full_event json in
@@ -470,8 +488,13 @@ module Make (X : PARAMETERS) = struct
        @see raw_event_from_event *)
     Option.bind raw (fun {value; _} -> filter value)
 
-  let wait_for ?where daemon name filter =
-    wait_for_full ?where daemon name (event_from_full_event_filter filter)
+  let wait_for ?timeout ?where daemon name filter =
+    wait_for_full
+      ?timeout
+      ?where
+      daemon
+      name
+      (event_from_full_event_filter filter)
 
   let on_event daemon handler =
     daemon.persistent_event_handlers <-

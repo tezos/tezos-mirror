@@ -91,7 +91,13 @@ val log_events : ?max_length:int -> t -> unit
     JSON structure, it is not given to [filter] and the event is
     ignored. See [wait_for_full] to know what the JSON value must
     look like. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
