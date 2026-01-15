@@ -5764,6 +5764,8 @@ let octez_smart_rollup_node_lib =
         octez_injector_lib |> open_;
         octez_version_value |> open_;
         octez_layer2_store |> open_;
+        octez_layer2_irmin_context |> open_;
+        octez_layer2_riscv_context |> open_;
         octez_smart_rollup_node_store_lib |> open_;
         octez_crawler |> open_;
         octez_workers |> open_;

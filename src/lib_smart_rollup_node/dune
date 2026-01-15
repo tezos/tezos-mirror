@@ -43,6 +43,8 @@
   octez-injector
   octez-version.value
   octez-l2-libs.layer2_store
+  octez-l2-libs.irmin_context
+  octez-l2-libs.riscv_context
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-crawler
   octez-libs.tezos-workers
@@ -61,6 +63,8 @@
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store
+  -open Tezos_layer2_irmin_context
+  -open Tezos_layer2_riscv_context
   -open Octez_smart_rollup_node_store
   -open Octez_crawler
   -open Tezos_workers
