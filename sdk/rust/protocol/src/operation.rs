@@ -15,48 +15,70 @@ use tezos_crypto_rs::{
 };
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 
+/// Tezos operation without signature/watermark, as used for forging.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct UnsignedOperation {
+    /// The branch (blockhash) this operation is applied against.
     pub branch: BlockHash,
+    /// The ordered list of operation contents.
     pub content_list: OperationContentList,
 }
 
+/// List wrapper for operation contents, as encoded by the protocol.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct OperationContentList {
+    /// The sequence of contents included in the operation.
     pub contents: Vec<OperationContent>,
 }
 
+/// Tezos operation contents.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 #[encoding(tags = "u8")]
 pub enum OperationContent {
+    /// Reveal a manager's public key.
     #[encoding(tag = 107)]
     Reveal(ManagerOperationContent<RevealContent>),
+    /// Transfer tokens and/or call a contract.
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    /// Originate a new smart contract.
     #[encoding(tag = 109)]
     Origination(ManagerOperationContent<OriginationContent>),
+    /// Set or clear a delegate.
     #[encoding(tag = 110)]
     Delegation(ManagerOperationContent<DelegationContent>),
     // SMART_ROLLUP_OPERATION_TAG_OFFSET = 200;
+    /// Cement a smart rollup commitment.
     #[encoding(tag = 202)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 2
     SmartRollupCement(ManagerOperationContent<SmartRollupCementContent>),
+    /// Publish a smart rollup commitment.
     #[encoding(tag = 203)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 3
     SmartRollupPublish(ManagerOperationContent<SmartRollupPublishContent>),
 }
 
+/// Common fields for Tezos manager operations.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct ManagerOperationContent<Op> {
+    /// Manager source account.
     pub source: PublicKeyHash,
+    /// Fee paid for inclusion (mutez).
     pub fee: Narith,
+    /// Manager counter (nonce).
     pub counter: Narith,
+    /// Gas limit for the operation (milligas).
     pub gas_limit: Narith,
+    /// Storage limit for the operation (bytes).
     pub storage_limit: Narith,
+    /// Operation-specific payload.
     pub operation: Op,
 }
 
+/// Reveal operation payload.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
+    /// Manager public key to reveal.
     pub pk: PublicKey,
+    /// Optional BLS proof (for tz4 keys).
     #[encoding(dynamic)]
     pub proof: Option<BlsSignature>,
 }
@@ -131,16 +153,23 @@ mod internal {
     }
 }
 
+/// Transaction operation payload.
 #[derive(PartialEq, Debug, Clone)]
 pub struct TransactionContent {
+    /// Amount transferred (mutez).
     pub amount: Narith,
+    /// Destination contract or implicit account.
     pub destination: Contract,
+    /// Parameters for a contract call.
     pub parameters: Parameters,
 }
 
+/// Parameters attached to a transaction.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Parameters {
+    /// Entrypoint called on the destination contract.
     pub entrypoint: Entrypoint,
+    /// Micheline-encoded parameter payload.
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
 }
@@ -156,42 +185,61 @@ impl Default for Parameters {
     }
 }
 
+/// Origination operation payload.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct OriginationContent {
+    /// Initial balance for the originated contract (mutez).
     pub balance: Narith,
+    /// Optional delegate for the contract.
     pub delegate: Option<PublicKeyHash>,
+    /// Contract script code and initial storage.
     pub script: Script,
 }
 
+/// Micheline script for contract origination.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Script {
+    /// Micheline-encoded contract code.
     #[encoding(dynamic, bytes)]
     pub code: Vec<u8>,
+    /// Micheline-encoded initial storage.
     #[encoding(dynamic, bytes)]
     pub storage: Vec<u8>,
 }
 
+/// Delegation operation payload.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct DelegationContent {
+    /// Delegate to set, or `None` to clear.
     pub delegate: Option<PublicKeyHash>,
 }
 
+/// Smart rollup cement operation payload.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct SmartRollupCementContent {
+    /// Smart rollup address.
     pub address: SmartRollupHash,
 }
 
+/// Smart rollup commitment data.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct SmartRollupCommitment {
+    /// Compressed state hash.
     pub compressed_state: SmartRollupStateHash,
+    /// Inbox level the commitment refers to (level).
     pub inbox_level: i32,
+    /// Previous commitment hash.
     pub predecessor: SmartRollupCommitmentHash,
+    /// Number of ticks executed (ticks).
     pub number_of_ticks: i64,
 }
 
+/// Smart rollup publish operation payload.
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct SmartRollupPublishContent {
+    /// Smart rollup address.
     pub address: SmartRollupHash,
+    /// Commitment being published.
     pub commitment: SmartRollupCommitment,
 }
 
