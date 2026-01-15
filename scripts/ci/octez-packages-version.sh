@@ -4,17 +4,25 @@ set -eu
 
 # Set the logic for software releases
 #
-# we export the env var RELEASETYPE with the following values:
+# We export the env var RELEASETYPE with the following values:
 # - ReleaseCandidate : branch is protected, a tag is set, and there is an
 #   associated valid release candidate version
 # - Release : branch is protected, a tag is set, and there is an
 #   associated valid release version
+# - Beta : branch is protected, a tag is set, and there is an
+#   associated beta version
+# - Rebuild : branch is protected, a tag is set, and there is an
+#   associated valid packaging revision
 # - Master : branch is protected, a tag is not a release or not set
 # - SoftRelease : branch is protected, a tag is set that is not a release
 # - TestReleaseCandidate : branch is not protected, a tag is set, and there
 #   is an associated valid release candidate version
-# - TestRelease : branch is not protected, a tag is set, and there
+# - TestRelease : A tag is set, Namespace is not tezos and there
 #   is an associated valid release version
+# - TestBeta : A tag is set, Namespace is not tezos and there
+#   is an associated valid beta version
+# - TestRebuild : A tag is set, Namespace is not tezos and there
+#   is an associated valid packaging
 # - TestBranch : branch is not protected
 
 export RELEASETYPE=
@@ -49,6 +57,13 @@ else
             export RELEASETYPE="Beta"
           else
             export RELEASETYPE="TestBeta"
+          fi
+        elif [ -n "${gitlab_packaging_revision_version:-}" ]; then
+          # protected, tag, Rebuild
+          if [ "${CI_PROJECT_NAMESPACE:-}" = "tezos" ]; then
+            export RELEASETYPE="Rebuild"
+          else
+            export RELEASETYPE="TestRebuild"
           fi
         else
           # protected, tag, Release

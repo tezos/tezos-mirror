@@ -61,7 +61,7 @@ ReleaseCandidate | TestReleaseCandidate)
 Beta | TestBeta)
   TARGETDIR="public/$PREFIX/BETA/$DISTRIBUTION"
   ;;
-Release | TestRelease)
+Release | TestRelease | Rebuild | TestRebuild)
   TARGETDIR="public/$PREFIX/$DISTRIBUTION"
   ;;
 Master)
