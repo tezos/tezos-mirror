@@ -77,7 +77,7 @@ let eth_call_and_estimate_gas_err ?private_ node parameters =
   return error_message
 
 let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
-    ?(kernels = Kernel.all) ?preimages_dir ?maximum_allowed_ticks
+    ?(kernels = Kernel.etherlink_all) ?preimages_dir ?maximum_allowed_ticks
     ?enable_fa_bridge ?rollup_history_mode ?additional_uses ~title ~tags body
     protocols =
   register_test_for_kernels

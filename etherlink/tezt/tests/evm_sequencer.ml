@@ -123,7 +123,7 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
   unit
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
-    ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
+    ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.etherlink_all)
     ?(upgrade_to = Kernel.upgrade_to) ?(additional_uses = []) scenario protocols
     =
   List.iter
@@ -7537,7 +7537,7 @@ let test_trace_transaction =
   in
   register_all
     ~__FILE__
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
     ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
     ~time_between_blocks:Nothing
@@ -7615,7 +7615,7 @@ let test_trace_transaction =
 let test_trace_transaction_on_invalid_transaction =
   register_all
     ~__FILE__
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
     ~time_between_blocks:Nothing
@@ -7703,7 +7703,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 let test_trace_transaction_call =
   register_all
     ~__FILE__
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
@@ -9606,7 +9606,7 @@ let test_deposit_and_fa_fast_withdraw =
 let test_trace_call =
   register_all
     ~__FILE__
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
@@ -11616,7 +11616,7 @@ let test_trace_empty_block =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
     ~title:"debug_traceBlockByNumber succeeds on empty block"
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
   @@ fun {client; sc_rollup_node; sequencer; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let*@ trace_result = Rpc.trace_block ~block:Rpc.Latest sequencer in
@@ -11632,7 +11632,7 @@ let test_trace_block_struct_logger =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
   @@ fun {client; sc_rollup_node; sequencer; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* trace_result =
@@ -11654,7 +11654,7 @@ let test_trace_block =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
   @@ fun {client; sc_rollup_node; sequencer; evm_version; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in
@@ -11738,7 +11738,7 @@ let test_trace_block_txs_same_caller =
     ~title:
       "debug_traceBlockByNumber succeeds on block with transactions using same \
        caller"
-    ~kernels:Kernel.all
+    ~kernels:Kernel.etherlink_all
   @@ fun {client; sc_rollup_node; sequencer; evm_version; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in

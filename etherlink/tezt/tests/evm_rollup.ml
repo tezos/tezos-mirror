@@ -520,9 +520,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       kernel_root_hash = root_hash;
     }
 
-let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
-    ?(additional_uses = []) ?commitment_period ?challenge_window
-    ?eth_bootstrap_accounts ?whitelist ?da_fee_per_byte
+let register_test ~title ~tags ?(kernels = Kernel.etherlink_all)
+    ?additional_config ?admin ?(additional_uses = []) ?commitment_period
+    ?challenge_window ?eth_bootstrap_accounts ?whitelist ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
