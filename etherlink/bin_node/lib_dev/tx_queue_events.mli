@@ -49,3 +49,7 @@ val callback_error__dont_wait__use_with_care : tztrace -> unit
 
 (** [callback_error error] advertises an RPC produced the error [error]. *)
 val callback_error : tztrace -> unit Lwt.t
+
+(** [transaction_already_present hash] advertises that [hash] already
+    exists in the tx_queue. *)
+val transaction_already_present : Ethereum_types.hash -> unit Lwt.t

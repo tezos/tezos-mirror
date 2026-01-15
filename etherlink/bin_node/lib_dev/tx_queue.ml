@@ -156,11 +156,7 @@ struct
 
     let add htbl tx_object =
       let (Hash (Hex hash)) = Tx.hash_of_tx_object tx_object in
-      (* Here we uses `add` and not `replace`. If a transaction is
-         submitted multiple times then we register it each time in the
-         hashtable. Meaning that for `find` to returns None, we must
-         call `remove` as many times as the transaction was added. *)
-      S.add htbl hash tx_object
+      S.replace htbl hash tx_object
 
     let mem htbl (Hash (Hex hash)) = S.mem htbl hash
 
@@ -986,10 +982,16 @@ struct
         state.queue ;
       return_unit
 
-    let inject state
+    let inject (state : state)
         {next_nonce; payload; tx_object; callback = caller_callback} =
       let open Lwt_result_syntax in
-      if Compare.Int.(Queue.length state.queue < state.config.max_size) then
+      let hash = Tx.hash_of_tx_object tx_object in
+      if Transaction_objects.mem state.tx_object hash then
+        (* The transaction object is already known, we have nothing to do *)
+        let*! () = Tx_queue_events.transaction_already_present hash in
+        return (Ok ())
+      else if Compare.Int.(Queue.length state.queue < state.config.max_size)
+      then
         (* Check number of txs by user in tx_queue. *)
         let nb_txs_in_queue =
           Transactions_per_addr.find

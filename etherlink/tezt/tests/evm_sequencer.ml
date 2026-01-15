@@ -12516,7 +12516,11 @@ let test_tx_queue_nonce =
   let*@? _hash = send_raw_tx ~nonce:nb_txs in
 
   Log.info "Try to send a transaction with an nonce already pending, is valid." ;
-  let* _hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+  let noop_inject =
+    Evm_node.wait_for_event observer ~event:"transaction_already_present.v0"
+    @@ Fun.const (Some ())
+  in
+  let* _hash = send_raw_tx ~nonce:(nb_txs + 1) and* () = noop_inject in
   unit
 
 let test_spawn_rpc =

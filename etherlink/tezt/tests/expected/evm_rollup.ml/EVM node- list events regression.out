@@ -2169,6 +2169,19 @@ tracer_input:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+transaction_already_present:
+  description: transaction {tx_hash} is already in the tx_queue
+  level: debug
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* transaction_already_present version 0 */
+      "transaction_already_present.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 tx_data_size_limit_reached:
   description: the transaction data size is beyond the allowed threshold
   level: info
