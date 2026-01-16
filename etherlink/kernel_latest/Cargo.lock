@@ -3485,6 +3485,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror 1.0.69",
+ "typed-arena",
 ]
 
 [[package]]

@@ -757,7 +757,13 @@ mod tests {
         ManagerOperation, OriginationContent, Parameters, TransferContent,
         TARGET_TEZOS_PROTOCOL,
     };
+    use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
+    use mir::ast::micheline::Micheline;
+    use mir::ast::Entrypoint;
+    use mir::lexer::Prim;
     use pretty_assertions::assert_eq;
+    use std::borrow::Cow;
+    use typed_arena::Arena;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
         OperationDataAndMetadata::OperationWithMetadata (
@@ -989,6 +995,63 @@ mod tests {
             "applied",
         );
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn tezos_compatibility_for_internal_event_with_metadata() {
+        let arena = Arena::new();
+
+        let source_bytes =
+            hex::decode("00005b9a5d6ff9b553b9fae37b844d7a907d8d59593e").unwrap();
+
+        let payload = Micheline::prim2(
+            &arena,
+            Prim::Pair,
+            Micheline::from(10_i128),
+            Micheline::from(source_bytes),
+        )
+        .encode();
+
+        let add_amount_annots: Annotations =
+            Annotations::from([Annotation::Field(Cow::Borrowed("addAmount"))]);
+        let source_annots: Annotations =
+            Annotations::from([Annotation::Field(Cow::Borrowed("source"))]);
+
+        let ty = Micheline::App(
+            Prim::pair,
+            arena.alloc_extend([
+                Micheline::App(Prim::int, &[], add_amount_annots),
+                Micheline::App(Prim::address, &[], source_annots),
+            ]),
+            NO_ANNS,
+        )
+        .encode();
+
+        let operation = InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(Entrypoint::from_string_unchecked("add".into())),
+                payload: Some(payload),
+                ty,
+            },
+            sender: Contract::from_b58check("KT1SHrxmgUojs2hwe4hguExy6BqteeG1rDHi")
+                .unwrap(),
+            nonce: 0,
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: 100000.into(),
+            }),
+        });
+
+        let output = operation
+            .to_bytes()
+            .expect("Internal operation with metadata should be encodable");
+
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.internal_and_metadata",
+            "event",
+        );
+
+        assert_eq!(output, expected);
     }
 
     #[test]
