@@ -537,6 +537,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -614,6 +615,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -688,6 +690,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
@@ -746,6 +749,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -764,6 +768,7 @@ mod test {
             // Code hash will be automatically computed and inserted when
             // inserting the account info into the db.
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             // PUSH1 0x42      # Value to store
             // PUSH1 0x01      # Storage slot index
             // SSTORE          # Store the value in storage
@@ -821,6 +826,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -897,6 +903,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -970,6 +977,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1050,6 +1058,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1197,6 +1206,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1361,6 +1371,7 @@ mod test {
             balance: initial_balance,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1413,6 +1424,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -2420,6 +2432,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -2443,6 +2456,7 @@ mod test {
             balance: U256::ZERO,
             nonce: 0,
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             code: Some(bytecode),
         };
 

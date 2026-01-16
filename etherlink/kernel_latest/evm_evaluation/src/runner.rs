@@ -148,6 +148,7 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
                     nonce: info.nonce,
                     balance: u256_to_alloy(&info.balance),
                     code_hash,
+                    account_id: None,
                     code: None,
                 },
             )

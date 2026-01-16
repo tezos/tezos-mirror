@@ -182,6 +182,7 @@ impl From<AccountInfoInternal> for AccountInfo {
             balance: info.balance,
             nonce: info.nonce,
             code_hash: info.code_hash,
+            account_id: None,
             code: None,
         }
     }
