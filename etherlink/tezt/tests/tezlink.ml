@@ -964,6 +964,53 @@ let test_tezlink_transfer =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
+let test_tezlink_observer_transfer =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  register_tezlink_test
+    ~title:"Test Tezlink transfer via an observer"
+    ~tags:["observer"; "transfer"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; observer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record observer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  let fee = Tez.one in
+  (* Send a transaction to the observer and wait for it to be relayed to the sequencer *)
+  let tx_hash_p = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount
+      ~fee
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _tx_hash = tx_hash_p in
+  let*@ nb_txs = produce_block sequencer in
+  Check.((nb_txs = 1) int)
+    ~error_msg:"Expected %R transaction in the block, got %L" ;
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance1
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
+  Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
+  unit
+
 let test_tezlink_transfer_and_wait =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   register_tezlink_test
@@ -3197,6 +3244,7 @@ let () =
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_tezlink_transfer [Alpha] ;
+  test_tezlink_observer_transfer [Alpha] ;
   test_tezlink_transfer_and_wait [Alpha] ;
   test_tezlink_reveal [Alpha] ;
   test_tezlink_block_info [Alpha] ;
