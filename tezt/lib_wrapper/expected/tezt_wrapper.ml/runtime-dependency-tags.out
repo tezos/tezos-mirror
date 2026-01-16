@@ -47,6 +47,7 @@ riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
 echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages.wasm
 echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages_high_target_pub_level.wasm
+echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages_with_external_message.wasm
 echo_dal_reveal_parameters: tezt/tests/kernels/echo_dal_reveal_parameters.wasm
 riscv: tezt/tests/riscv-tests/etherlink-inbox.json
 riscv: tezt/tests/riscv-tests/jstz-inbox.json

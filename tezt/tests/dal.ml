@@ -4383,6 +4383,222 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
+(* A migration test for smart rollups importing a DAL page.
+   There are 5 levels involved when a DAL page is imported by a rollup:
+   1. The publication level (P),
+   2. The attestation level (A),
+   3. The import level (I),
+   4. The commitment level (C),
+   5. The refutation level (R).
+   We have the guarantee that P < A ≤ I ≤ C < R.
+
+   In this test, we enforce that the migration level (M) is such that A < M < I. *)
+
+let test_migration_with_rollup ~migrate_from ~migrate_to =
+  let tags = ["migration"; "dal"; "rollup"; "page_import"; "page_size"] in
+  let description =
+    "rollup DAL page import across migration uses DAL parameters at \
+     publication level"
+  in
+  let {log_step} = init_logger () in
+
+  (* Must match the toy kernel hardcoded constants. *)
+  let published_level = 15 in
+  let slot_index = 1 in
+  (* Durable key written by the toy kernel. *)
+  let durable_key = "/dal/page" in
+
+  (* Pick a migration level strictly after the attestation level. *)
+  let migration_level = 25 in
+
+  (* Publishes a slot at [published_level] on [slot_index] and bakes enough so it
+     becomes attestable+attested (at least published_level + dal_lag). *)
+  let publish_and_attest_slot ~dal_lag ~slot_size dal_node node client =
+    log_step
+      "Publishing slot at level %d (slot_index=%d), then baking until attested"
+      published_level
+      slot_index ;
+    (* Publish around the expected published_level. *)
+    let _producer_promise =
+      simple_slot_producer
+        ~slot_size
+        ~slot_index
+        ~from:(published_level - 3)
+        ~into:published_level
+        dal_node
+        node
+        client
+    in
+    (* Ensure we reach (at least) the attestation level. *)
+    let* _ = Node.wait_for_level node (published_level + dal_lag + 1) in
+    unit
+  in
+
+  let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
+      dal_node =
+    let dal_lag = dal_parameters.attestation_lag in
+
+    (* Start baker. *)
+    log_step "Start baker" ;
+    let baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+      Agnostic_baker.create
+        ~dal_node_rpc_endpoint
+        ~delegates:
+          (List.map
+             (fun x -> x.Account.public_key_hash)
+             Constant.all_secret_keys)
+        node
+        client
+    in
+    let* () = Agnostic_baker.run baker in
+
+    (* Originate rollup BEFORE migration but do NOT start rollup node yet.
+       This guarantees the import happens after migration when we start it. *)
+    log_step "Originating rollup (kernel will import page after migration)" ;
+    let read_kernel ?(suffix = ".wasm") name : string =
+      let load_kernel_file name : string =
+        let open Tezt.Base in
+        let kernel_file = project_root // name in
+        read_file kernel_file
+      in
+      let hex_encode (input : string) : string =
+        match Hex.of_string input with `Hex s -> s
+      in
+      hex_encode (load_kernel_file (name ^ suffix))
+    in
+    let boot_sector =
+      read_kernel
+        ~suffix:""
+        (Uses.path Constant.WASM.echo_dal_reveal_pages_with_external_message)
+    in
+    let* rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:(Tez.of_int 999)
+        ~alias:"rollup"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:"wasm_2_0_0"
+        ~boot_sector
+        ~parameters_ty:"string"
+        client
+    in
+    (* Ensure we are before publication level then publish slot at P and bake until attested. *)
+    let* current_level = Client.level client in
+    Check.((current_level < published_level) int)
+      ~error_msg:
+        "The level is already too high, we did not had the opportunity to \
+         publish" ;
+
+    (* Publish + attest slot at P under old proto. *)
+    let old_slot_size = dal_parameters.cryptobox.slot_size in
+    let* () =
+      publish_and_attest_slot
+        ~dal_lag
+        ~slot_size:old_slot_size
+        dal_node
+        node
+        client
+    in
+
+    (* Wait for migration. *)
+    log_step
+      "Waiting for migration level M=%d (switch to next protocol)"
+      migration_level ;
+    let* _ = Node.wait_for_level node migration_level in
+
+    (* Start rollup node AFTER migration => import happens post-migration (I > M). *)
+    (* Well, this is not really true, it enforces that the import happens after
+       the L1 node has seen the migration level, but this is not really the property
+       we are interested in, which is that the import level as seen by the rollup node
+       is after the migration level. *)
+    log_step "Starting rollup node AFTER migration (enforces A < M < I)" ;
+    let sc_rollup_node =
+      Sc_rollup_node.create
+        ~name:"rollup-node"
+        ~base_dir:(Client.base_dir client)
+        ~default_operator:Constant.bootstrap1.alias
+        ~kind:"wasm_2_0_0"
+        ~dal_node
+        Sc_rollup_node.Operator
+        node
+    in
+    let* () = bake_for client in
+    let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
+    (* Let the rollup node process a bit. *)
+    log_step "Baking a few blocks before the kernel performs the DAL reveal" ;
+    let import_level = migration_level + 2 in
+    let* _ = Node.wait_for_level node import_level in
+    let* _ =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node import_level
+    in
+    log_step "Send the inbox message triggering the import" ;
+    (* The message as to start with an I to trigger the import. *)
+    let* () =
+      Client.Sc_rollup.send_message
+        ~src:Constant.bootstrap2.alias
+        ~msg:"text:[\"I\"]"
+        client
+    in
+    log_step "Baking 3 blocks after the messages" ;
+    let* _ = Node.wait_for_level node (import_level + 3) in
+    let* _ =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (import_level + 3)
+    in
+    (* Read durable storage key written by the kernel. *)
+    log_step "Reading durable storage value at key %S" durable_key ;
+    let* value_opt =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:durable_key
+           ()
+    in
+    (* Value should exist and its length must match page_size at P (old proto). *)
+    match value_opt with
+    | None ->
+        Test.fail
+          "Expected durable key %S to exist (kernel should have written the \
+           imported page)"
+          durable_key
+    | Some value ->
+        let got_len = String.length value in
+        log_step "Durable value length at %S is %d" durable_key got_len ;
+        Check.(
+          (* The pages are stored in hexa in the durable storage, so a factor 2 is expected. *)
+          (got_len = dal_parameters.cryptobox.page_size * 2)
+            int
+            ~__LOC__
+            ~error_msg:
+              ("Imported page length should equal page_size at publication \
+                level " ^ "(old proto): expected %R, got %L")) ;
+
+        log_step
+          "OK: imported page length matches old page_size; migration-safe \
+           import works" ;
+        (* Cleanup *)
+        let* () = Sc_rollup_node.terminate sc_rollup_node in
+        let* () = Agnostic_baker.terminate baker in
+        unit
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~uses:
+      [
+        Constant.octez_agnostic_baker;
+        Constant.octez_dal_node;
+        Constant.octez_smart_rollup_node;
+        Constant.WASM.echo_dal_reveal_pages_with_external_message;
+      ]
+    ~activation_timestamp:Now
+    ~operator_profiles:[slot_index]
+    ~migration_level
+    ~migrate_from
+    ~migrate_to
+    ()
+
 let get_delegate client ~protocol ~level ~tb_index =
   let* pkh_to_rounds = Operation.Consensus.get_rounds ~level ~protocol client in
   let pkh =
@@ -12155,7 +12371,8 @@ let register_migration ~migrate_from ~migrate_to =
   test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;
   test_accusation_migration_with_attestation_lag_decrease
     ~migrate_from
-    ~migrate_to
+    ~migrate_to ;
+  test_migration_with_rollup ~migrate_from ~migrate_to
 
 let () =
   Regression.register
