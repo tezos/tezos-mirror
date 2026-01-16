@@ -58,6 +58,7 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC of int
   | RC_dev of int
   | Release
+  | Rebuild of int
 
 (** Convert additional version information to a string.
 
@@ -85,6 +86,7 @@ type t = Tezos_version_parser.t = {
   product : product;
   major : int;
   minor : int;
+  build_number : int;
   additional_info : additional_info;
 }
 

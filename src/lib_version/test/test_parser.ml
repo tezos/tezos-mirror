@@ -21,19 +21,31 @@ let octez_legal_versions =
         product = Octez;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Release;
       } );
     ( "octez-v10.93+dev",
-      {product = Octez; Version.major = 10; minor = 93; additional_info = Dev}
-    );
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        build_number = 0;
+        additional_info = Dev;
+      } );
     ( "octez-v10.93-rc1",
-      {product = Octez; Version.major = 10; minor = 93; additional_info = RC 1}
-    );
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        build_number = 0;
+        additional_info = RC 1;
+      } );
     ( "octez-v10.93-rc1+dev",
       {
         product = Octez;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = RC_dev 1;
       } );
     ( "octez-v10.93-beta1",
@@ -41,6 +53,7 @@ let octez_legal_versions =
         product = Octez;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Beta 1;
       } );
     ( "octez-v10.93-beta1+dev",
@@ -48,6 +61,7 @@ let octez_legal_versions =
         product = Octez;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Beta_dev 1;
       } );
   ]
@@ -59,6 +73,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Release;
       } );
     ( "octez-evm-node-v10.93",
@@ -66,6 +81,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Release;
       } );
     ( "octez-evm-node-v10.93+dev",
@@ -73,6 +89,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Dev;
       } );
     ( "octez-evm-node-v10.93-rc1",
@@ -80,6 +97,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = RC 1;
       } );
     ( "octez-evm-node-v10.93-rc1+dev",
@@ -87,6 +105,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = RC_dev 1;
       } );
     ( "octez-evm-node-v10.93-beta1",
@@ -94,6 +113,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Beta 1;
       } );
     ( "octez-evm-node-v10.93-beta1+dev",
@@ -101,6 +121,7 @@ let octez_evm_node_legal_versions =
         product = Octez_evm_node;
         Version.major = 10;
         minor = 93;
+        build_number = 0;
         additional_info = Beta_dev 1;
       } );
   ]
@@ -119,6 +140,8 @@ let eq v1 v2 =
     | RC _, _ | RC_dev _, _ -> false
     | Release, Release -> true
     | Release, _ -> false
+    | Rebuild n1, Rebuild n2 -> n1 = n2
+    | Rebuild _, _ -> false
   in
   match (v1, v2) with
   | Some v1, Some v2 ->

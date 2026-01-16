@@ -30,6 +30,7 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC of int
   | RC_dev of int
   | Release
+  | Rebuild of int
 
 type product = Tezos_version_parser.product =
   | Octez
@@ -40,6 +41,7 @@ type t = Tezos_version_parser.t = {
   product : product;
   major : int;
   minor : int;
+  build_number : int;
   additional_info : additional_info;
 }
 
@@ -51,23 +53,24 @@ let string_of_additional_info = function
   | Beta_dev n -> Format.asprintf "~beta%d+dev" n
   | RC n -> Format.asprintf "~rc%d" n
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
-  | Release -> ""
+  | Release | Rebuild _ (* The build number is printed separatly *) -> ""
 
 let string_of_product = function
   | Octez -> "Octez"
   | Octez_evm_node -> "octez-evm-node"
   | Octez_smart_rollup_node -> "octez-smart-rollup-node"
 
-let pp f {product; major; minor; additional_info} =
+let pp f {product; major; minor; build_number; additional_info} =
   Format.fprintf
     f
-    "%s %i.%i%s"
+    "%s %i.%i%s build_number:%i"
     (string_of_product product)
     major
     minor
     (string_of_additional_info additional_info)
+    build_number
 
-let pp_simple f {product = _; major; minor; additional_info} =
+let pp_simple f {product = _; major; minor; build_number = _; additional_info} =
   Format.fprintf
     f
     "%i.%i%s"
@@ -75,7 +78,7 @@ let pp_simple f {product = _; major; minor; additional_info} =
     minor
     (string_of_additional_info additional_info)
 
-let pp_arg f {product; major; minor; additional_info} =
+let pp_arg f {product; major; minor; build_number = _; additional_info} =
   Format.fprintf
     f
     "%s-%i.%i%s"
@@ -86,12 +89,13 @@ let pp_arg f {product; major; minor; additional_info} =
 
 let to_string x = Format.asprintf "%a" pp x
 
-let to_json {product; major; minor; additional_info} commit_hash =
+let to_json {product; major; minor; build_number; additional_info} commit_hash =
   Format.sprintf
-    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \"info\": \
-     \"%s\", \"hash\": \"%s\" }"
+    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \
+     \"build_number\": \"%i\", \"info\": \"%s\", \"hash\": \"%s\" }"
     (string_of_product product)
     major
     minor
+    build_number
     (string_of_additional_info additional_info)
     commit_hash

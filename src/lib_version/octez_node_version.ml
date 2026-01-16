@@ -89,19 +89,27 @@ let additional_info_encoding =
         (obj1 (req "beta_dev" int31))
         (function Beta_dev n -> Some n | _ -> None)
         (fun n -> Beta_dev n);
+      case
+        (Tag 6)
+        ~title:"Rebuild"
+        (obj1 (req "rebuild" int31))
+        (function Rebuild n -> Some n | _ -> None)
+        (fun n -> Rebuild n);
     ]
 
 (* The encoding is defined here to keep [Version] "Data_encoding free"*)
 let version_encoding =
   let open Data_encoding in
   conv
-    (fun ({product = _; major; minor; additional_info} : Version.t) ->
-      (major, minor, additional_info))
-    (fun (major, minor, additional_info) ->
-      {product = Octez; major; minor; additional_info})
-    (obj3
+    (fun ({product = _; major; minor; build_number; additional_info} :
+           Version.t)
+       -> (major, minor, build_number, additional_info))
+    (fun (major, minor, build_number, additional_info) ->
+      {product = Octez; major; minor; build_number; additional_info})
+    (obj4
        (req "major" int31)
        (req "minor" int31)
+       (req "build_number" int31)
        (req "additional_info" additional_info_encoding))
 
 let encoding =
@@ -127,7 +135,7 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
     let open Tezos_version_parser in
     match v.additional_info with
     | Dev | Beta_dev _ | RC_dev _ -> true
-    | Beta _ | RC _ | Release -> false
+    | Beta _ | RC _ | Release | Rebuild _ -> false
   in
   let is_commit_equal =
     match (c1, c2) with
@@ -145,9 +153,16 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
         if minor_comp <> 0 then Some minor_comp
         else
           match (v1.additional_info, v2.additional_info) with
-          | Beta n1, Beta n2 | RC n1, RC n2 -> Some (Int.compare n1 n2)
-          | Beta _, (RC _ | Release) | RC _, Release -> Some (-1)
-          | Release, (RC _ | Beta _) | RC _, Beta _ -> Some 1
+          | Beta n1, Beta n2 | RC n1, RC n2 | Rebuild n1, Rebuild n2 ->
+              Some (Int.compare n1 n2)
+          | Beta _, (RC _ | Release)
+          | RC _, Release
+          | (Release | RC _ | Beta _), Rebuild _ ->
+              Some (-1)
+          | Release, (RC _ | Beta _)
+          | Rebuild _, (Release | RC _ | Beta _)
+          | RC _, Beta _ ->
+              Some 1
           | _, _ -> None
   in
   match (is_commit_equal, version_comparison) with

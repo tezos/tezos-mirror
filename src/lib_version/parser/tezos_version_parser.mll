@@ -25,7 +25,8 @@
     | Beta_dev of int
     | RC of int
     | RC_dev of int
-    | Release [@@deriving show]
+    | Release
+    | Rebuild of int [@@deriving show]
 
   type product = Octez | Octez_evm_node | Octez_smart_rollup_node
 
@@ -44,11 +45,12 @@
     product: product;
     major : int;
     minor : int;
+    build_number: int;
     additional_info : additional_info} [@@deriving show]
 
   let int s = int_of_string_opt s |> Option.value ~default: 0
 
-  let default = { product = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
+  let default = { product = Octez; major = 0 ; minor = 0 ; build_number = 0 ; additional_info = Dev }
 
 }
 
@@ -63,11 +65,16 @@ rule version_tag = parse
           | None -> 0
           | Some m -> int m
         in
+	let extra = extra lexbuf in
         Some {
         product = product_of_string product;
         major = int major;
         minor;
-        additional_info = extra lexbuf }
+	build_number =
+          (match extra with
+	  | Rebuild n -> n
+	  | _ -> 0);
+        additional_info = extra }
       }
   | _ | eof
       { None }
@@ -81,6 +88,8 @@ and extra = parse
       { (Beta (int beta)) }
   | "-beta" (num as beta) _
       { (Beta_dev (int beta)) }
+  | "-" (num as build_number) eof
+      { (Rebuild (int build_number)) }
   | eof
       { Release }
   | _
@@ -105,6 +114,10 @@ and version_commit = parse
                 product = product_of_string product;
                 major = int major;
                 minor;
+		build_number =
+		(match additional_info with
+	  	| Rebuild n -> n
+	 	| _ -> 0);
                 additional_info;
               },
             commit)
@@ -123,6 +136,8 @@ and extra_noeof = parse
       { Some (Beta (int beta)) }
   | "-beta" (num as beta) "+dev" (eof | ':')
       { Some (Beta_dev (int beta)) }
+  | "-" (num as build_number) (eof | ':')
+      { Some (Rebuild (int build_number)) }
   | "+dev" (eof | ':')
       { Some Dev }
   | (eof | ':')
