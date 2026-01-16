@@ -235,7 +235,9 @@ fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
     inspector: INSP,
     is_simulation: bool,
 ) -> EvmInspection<'a, Host, INSP> {
-    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    let mut cfg = CfgEnv::new()
+        .with_chain_id(chain_id)
+        .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
@@ -265,7 +267,9 @@ fn evm<'a, Host: Runtime>(
     spec_id: SpecId,
     is_simulation: bool,
 ) -> EvmContext<'a, Host> {
-    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    let mut cfg = CfgEnv::new()
+        .with_chain_id(chain_id)
+        .with_spec_and_mainnet_gas_params(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
 
@@ -533,6 +537,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -610,6 +615,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -684,6 +690,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut caller_account = StorageAccount::from_address(&caller).unwrap();
@@ -742,6 +749,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -760,6 +768,7 @@ mod test {
             // Code hash will be automatically computed and inserted when
             // inserting the account info into the db.
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             // PUSH1 0x42      # Value to store
             // PUSH1 0x01      # Storage slot index
             // SSTORE          # Store the value in storage
@@ -817,6 +826,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -893,6 +903,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -966,6 +977,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1046,6 +1058,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1193,6 +1206,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
         let mut storage_account = StorageAccount::from_address(&caller).unwrap();
@@ -1357,6 +1371,7 @@ mod test {
             balance: initial_balance,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -1409,6 +1424,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -2416,6 +2432,7 @@ mod test {
             balance: U256::MAX,
             nonce: 0,
             code_hash: Default::default(),
+            account_id: None,
             code: None,
         };
 
@@ -2439,6 +2456,7 @@ mod test {
             balance: U256::ZERO,
             nonce: 0,
             code_hash: bytes_hash(bytecode.original_byte_slice()),
+            account_id: None,
             code: Some(bytecode),
         };
 

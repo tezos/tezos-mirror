@@ -244,12 +244,14 @@ fn check_result(
                 nonce: expected_nonce,
                 code_hash: expected_code_hash,
                 code: expected_code,
+                ..
             } = expected_info;
             let AccountInfo {
                 balance: commited_balance,
                 nonce: commited_nonce,
                 code_hash: commited_code_hash,
                 code: commited_code,
+                ..
             } = commited_info;
 
             success = false;

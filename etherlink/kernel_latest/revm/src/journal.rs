@@ -67,7 +67,10 @@ pub struct Journal<DB> {
 impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<DB> {
     type Database = DB;
     type State = EvmState;
-    type JournalEntry = JournalEntry;
+    type JournaledAccount<'a>
+        = JournaledAccount<'a, DB>
+    where
+        DB: 'a;
 
     fn new(database: DB) -> Journal<DB> {
         Self {
@@ -356,14 +359,24 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     }
 
     #[inline]
+    fn load_account_mut_skip_cold_load(
+        &mut self,
+        address: Address,
+        skip_cold_load: bool,
+    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
+    {
+        self.inner
+            .load_account_mut_optional(&mut self.database, address, skip_cold_load)
+            .map_err(JournalLoadError::unwrap_db_error)
+    }
+
+    #[inline]
     fn load_account_mut_optional_code(
         &mut self,
         address: Address,
         load_code: bool,
-    ) -> Result<
-        StateLoad<JournaledAccount<'_, Self::JournalEntry>>,
-        <Self::Database as Database>::Error,
-    > {
+    ) -> Result<StateLoad<Self::JournaledAccount<'_>>, <Self::Database as Database>::Error>
+    {
         self.inner
             .load_account_mut_optional_code(&mut self.database, address, load_code, false)
             .map_err(JournalLoadError::unwrap_db_error)
