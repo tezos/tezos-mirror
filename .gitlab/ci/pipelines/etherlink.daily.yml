@@ -34,32 +34,6 @@ oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
-
 oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
@@ -396,15 +370,13 @@ etherlink.unit_tests:
   retry: 2
 
 etherlink.test_kernel:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -436,15 +408,13 @@ etherlink.test_kernel:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_evm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -479,15 +449,13 @@ etherlink.test_evm_compatibility:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_revm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
