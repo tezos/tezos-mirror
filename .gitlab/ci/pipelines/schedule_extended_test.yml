@@ -641,16 +641,14 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 test_sdk_rust:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
