@@ -139,6 +139,8 @@ let inject_entrapment_evidences
                     ~published_level
                     ~attested_level
                     ~shard_index:shard.Cryptobox.index
+                      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+                         Add [~lag_index] *)
                     ~slot_index
                 in
                 let*! res =
@@ -147,6 +149,7 @@ let inject_entrapment_evidences
                     ~attested_level
                     attestation
                     ~slot_index
+                    ~lag_index:(number_of_lags - 1)
                     ~shard
                     ~proof:shard_proof
                     ~tb_slot
@@ -160,6 +163,8 @@ let inject_entrapment_evidences
                         ~published_level
                         ~attested_level
                         ~slot_index
+                          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+                             Add [~lag_index] *)
                         ~shard_index:shard.Cryptobox.index
                         ~error
                     in

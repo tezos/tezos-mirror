@@ -2395,13 +2395,21 @@ module Anonymous = struct
       (Invalid_shard_index
          {given = shard_index; min = 0; max = number_of_shards - 1})
 
+  let check_lag_index_is_in_range ~number_of_lags = function
+    | None -> Result_syntax.return_unit
+    | Some lag_index ->
+        error_unless
+          Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
+          (Invalid_lag_index
+             {given = lag_index; min = 0; max = number_of_lags - 1})
+
   (* This function validates an entrapment evidence by doing the following checks:
      - the included attestation is either a standalone attestation for
        the included consensus_slot, or an attestations_aggregate whose
        committee contains the included consensus_slot
      - the included attestation contains a dal_content for
        consensus_slot, in which the included slot index is attested
-     - the included slot index and shard index are within bounds
+     - the included slot index, lag_index, and shard index are within bounds
      - the level of the faulty attestation is within the slashing period
      - the included shard is a trap
      - the delegate has not already been denounced for the same level and slot index
@@ -2413,7 +2421,13 @@ module Anonymous = struct
     let open Lwt_result_syntax in
     let (Single
            (Dal_entrapment_evidence
-              {attestation; consensus_slot; slot_index; shard_with_proof})) =
+              {
+                attestation;
+                consensus_slot;
+                slot_index;
+                lag_index_opt;
+                shard_with_proof;
+              })) =
       operation.protocol_data.contents
     in
     let*? raw_level, dal_content =
@@ -2440,7 +2454,12 @@ module Anonymous = struct
     | None ->
         tzfail
           (Invalid_accusation_no_dal_content
-             {tb_slot = consensus_slot; level = raw_level; slot_index})
+             {
+               tb_slot = consensus_slot;
+               level = raw_level;
+               slot_index;
+               lag_index_opt;
+             })
     | Some dal_content -> (
         let* dal_params = Dal.Past_parameters.parameters vi.ctxt raw_level in
         let attestation_lag = dal_params.attestation_lag in
@@ -2459,7 +2478,7 @@ module Anonymous = struct
               (* The slot couldn't have been published in this case *)
               tzfail
                 (Invalid_accusation_slot_not_published
-                   {delegate; level = raw_level; slot_index})
+                   {delegate; level = raw_level; slot_index; lag_index_opt})
           | Some level -> return level
         in
         let* dal_params =
@@ -2476,30 +2495,60 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
+        let number_of_lags = List.length dal_params.attestation_lags in
+        let*? () = check_lag_index_is_in_range ~number_of_lags lag_index_opt in
         let* () =
           let* protocol_activation_level =
             Protocol_activation_level.get vi.ctxt
           in
-          let is_attested =
+          let* is_attested =
             if Raw_level.(raw_level <= protocol_activation_level) then
+              let* () =
+                match lag_index_opt with
+                | None -> return_unit
+                | Some _ ->
+                    tzfail
+                      (Invalid_accusation_unexpected_lag_index
+                         {
+                           tb_slot = consensus_slot;
+                           level = raw_level;
+                           slot_index;
+                           lag_index_opt;
+                         })
+              in
               let attestation =
                 Dal.Attestation.of_attestations dal_content.attestations
               in
-              Dal.Attestation.is_attested attestation slot_index
+              return @@ Dal.Attestation.is_attested attestation slot_index
             else
-              let number_of_lags = List.length dal_params.attestation_lags in
-              Dal.Attestations.is_attested
-                dal_content.attestations
-                ~number_of_slots
-                ~number_of_lags
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218 *)
-                ~lag_index:0
-                slot_index
+              match lag_index_opt with
+              | None ->
+                  tzfail
+                    (Invalid_accusation_unexpected_lag_index
+                       {
+                         tb_slot = consensus_slot;
+                         level = raw_level;
+                         slot_index;
+                         lag_index_opt;
+                       })
+              | Some lag_index ->
+                  return
+                  @@ Dal.Attestations.is_attested
+                       dal_content.attestations
+                       ~number_of_slots
+                       ~number_of_lags
+                       ~lag_index
+                       slot_index
           in
           fail_unless
             is_attested
             (Invalid_accusation_slot_not_attested
-               {tb_slot = consensus_slot; level = raw_level; slot_index})
+               {
+                 tb_slot = consensus_slot;
+                 level = raw_level;
+                 slot_index;
+                 lag_index_opt;
+               })
         in
         let*! already_denounced =
           Dal.Delegate.is_already_denounced ctxt delegate level slot_index
@@ -2524,6 +2573,7 @@ module Anonymous = struct
                  delegate;
                  level = level.level;
                  slot_index;
+                 lag_index_opt;
                  shard_index = shard_with_proof.shard.index;
                })
         in
@@ -2539,6 +2589,7 @@ module Anonymous = struct
                  delegate;
                  level = level.level;
                  slot_index;
+                 lag_index_opt;
                  shard_index = shard_with_proof.shard.index;
                  shard_owner = shard_owner.delegate;
                })
@@ -2552,7 +2603,7 @@ module Anonymous = struct
                the storage is updated correctly *)
             tzfail
               (Accusation_validity_error_cannot_get_slot_headers
-                 {delegate; level = level.level; slot_index})
+                 {delegate; level = level.level; slot_index; lag_index_opt})
         | Some headers -> (
             let slot_header_opt =
               List.find
@@ -2590,13 +2641,15 @@ module Anonymous = struct
                        delegate;
                        level = level.level;
                        slot_index;
+                       lag_index_opt;
                        accusation_published_level = published_level;
                        store_published_level = header.id.published_level;
                      })
             | None ->
                 tzfail
                   (Invalid_accusation_slot_not_published
-                     {delegate; level = level.level; slot_index})))
+                     {delegate; level = level.level; slot_index; lag_index_opt})
+            ))
 
   let check_dal_entrapment_evidence vi
       (operation : Kind.dal_entrapment_evidence operation) =

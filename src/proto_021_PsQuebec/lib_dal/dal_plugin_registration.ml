@@ -113,7 +113,7 @@ module Plugin = struct
       (fun () -> DAL_publication_not_available)
 
   let inject_entrapment_evidence _cctxt ~attested_level:_ _attestation
-      ~slot_index:_ ~shard:_ ~proof:_ ~tb_slot:_ =
+      ~slot_index:_ ~lag_index:_ ~shard:_ ~proof:_ ~tb_slot:_ =
     let open Lwt_result_syntax in
     (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
     fail [DAL_accusation_not_available]

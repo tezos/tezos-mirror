@@ -3828,13 +3828,19 @@ module Forge = struct
       (Double_consensus_operation_evidence {slot; op1; op2})
 
   let dal_entrapment_evidence ctxt block ~branch ~attestation ~consensus_slot
-      ~slot_index ~shard_with_proof =
+      ~slot_index ~lag_index ~shard_with_proof =
     operation
       ctxt
       block
       ~branch
       (Dal_entrapment_evidence
-         {attestation; consensus_slot; slot_index; shard_with_proof})
+         {
+           attestation;
+           consensus_slot;
+           slot_index;
+           lag_index_opt = Some lag_index;
+           shard_with_proof;
+         })
 
   let empty_proof_of_work_nonce =
     Bytes.make Constants_repr.proof_of_work_nonce_size '\000'

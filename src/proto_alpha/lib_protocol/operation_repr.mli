@@ -337,6 +337,7 @@ and _ contents =
       attestation : 'a Kind.consensus operation;
       consensus_slot : Slot_repr.t;
       slot_index : Dal_slot_index_repr.t;
+      lag_index_opt : int option;
       shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
     }
       -> Kind.dal_entrapment_evidence contents

@@ -1140,6 +1140,7 @@ let pp_contents_and_result : type kind.
             attestation;
             consensus_slot = _;
             slot_index = _;
+            lag_index_opt = _;
             shard_with_proof = _;
           },
         Dal_entrapment_evidence_result {balance_updates} ) ->

@@ -1074,7 +1074,8 @@ let double_baking ctxt bh1 bh2 =
   }
 
 let dal_entrapment (type a) ctxt (attestation : a Kind.consensus operation)
-    ~consensus_slot dal_slot_index (shard_with_proof : Dal.Shard_with_proof.t) =
+    ~consensus_slot dal_slot_index ~lag_index
+    (shard_with_proof : Dal.Shard_with_proof.t) =
   let contents =
     Single
       (Dal_entrapment_evidence
@@ -1082,6 +1083,7 @@ let dal_entrapment (type a) ctxt (attestation : a Kind.consensus operation)
            attestation;
            consensus_slot;
            slot_index = dal_slot_index;
+           lag_index_opt = Some lag_index;
            shard_with_proof;
          })
   in

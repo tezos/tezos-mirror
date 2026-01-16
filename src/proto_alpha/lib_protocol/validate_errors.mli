@@ -175,6 +175,7 @@ module Anonymous : sig
     | Too_early_dal_denunciation of {level : Raw_level.t; current : Raw_level.t}
     | Outdated_dal_denunciation of {level : Raw_level.t; last_cycle : Cycle.t}
     | Invalid_shard_index of {given : int; min : int; max : int}
+    | Invalid_lag_index of {given : int; min : int; max : int}
     | Dal_already_denounced of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
@@ -183,22 +184,32 @@ module Anonymous : sig
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
+      }
+    | Invalid_accusation_unexpected_lag_index of {
+        tb_slot : Slot.t;
+        level : Raw_level.t;
+        slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_slot_not_attested of {
         tb_slot : Slot.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Invalid_accusation_shard_is_not_trap of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
       }
     | Invalid_accusation_wrong_shard_owner of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         shard_index : int;
         shard_owner : Signature.Public_key_hash.t;
       }
@@ -206,16 +217,19 @@ module Anonymous : sig
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_cannot_get_slot_headers of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
       }
     | Accusation_validity_error_levels_mismatch of {
         delegate : Signature.Public_key_hash.t;
         level : Raw_level.t;
         slot_index : Dal.Slot_index.t;
+        lag_index_opt : int option;
         accusation_published_level : Raw_level.t;
         store_published_level : Raw_level.t;
       }
