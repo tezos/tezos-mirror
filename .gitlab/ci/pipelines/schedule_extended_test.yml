@@ -1090,7 +1090,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${rust_toolchain_image_name_protected}:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: sanity
   tags:
   - gcp
