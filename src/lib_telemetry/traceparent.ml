@@ -30,7 +30,7 @@ let current () =
 let instrument ?origin data =
   {data; origin = Option.either (Option.map from_scope origin) (current ())}
 
-let propagate ?service_name ?attrs ?kind ?links span_name {data; origin} k =
+let propagate ?service_name ?attrs ?kind ?links ~span_name {data; origin} k =
   let trace_id, parent =
     match origin with
     | Some (tid, sid) -> (Some tid, Some sid)
@@ -40,8 +40,8 @@ let propagate ?service_name ?attrs ?kind ?links span_name {data; origin} k =
     ?service_name
     ?trace_id
     ?parent
-    ?attrs
+    ?attrs:(Option.map (fun f -> f data) attrs)
     ?kind
     ?links
-    span_name
+    (span_name data)
   @@ fun scope -> k scope data
