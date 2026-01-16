@@ -398,22 +398,22 @@ where
 
         self.set_initial_gas(context.tx());
 
-        let (type_, from) = match inputs.scheme {
-            CreateScheme::Create => ("CREATE", inputs.caller),
-            CreateScheme::Create2 { .. } => ("CREATE2", inputs.caller),
+        let (type_, from) = match inputs.scheme() {
+            CreateScheme::Create => ("CREATE", inputs.caller()),
+            CreateScheme::Create2 { .. } => ("CREATE2", inputs.caller()),
             // Impossible case on Etherlink:
-            CreateScheme::Custom { .. } => ("CUSTOM", inputs.caller),
+            CreateScheme::Custom { .. } => ("CUSTOM", inputs.caller()),
         };
 
         let mut call_trace = CallTrace::new_minimal_trace(
             type_.into(),
             from,
-            inputs.value,
-            inputs.init_code.to_vec(),
+            inputs.value(),
+            inputs.init_code().to_vec(),
             depth,
         );
 
-        call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
+        call_trace.add_gas(Some(inputs.gas_limit() + self.initial_gas));
 
         self.set_call_trace(depth, call_trace);
 

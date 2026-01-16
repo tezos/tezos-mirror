@@ -320,7 +320,8 @@ where
         context: &mut CTX,
         inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        if let Ok(Some(AccountInfo { nonce, .. })) = context.db_mut().basic(inputs.caller)
+        if let Ok(Some(AccountInfo { nonce, .. })) =
+            context.db_mut().basic(inputs.caller())
         {
             self.execution_address = inputs.created_address(nonce);
         }
