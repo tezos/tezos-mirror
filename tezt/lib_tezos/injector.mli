@@ -22,6 +22,18 @@ val init_config : t -> Account.key -> string Lwt.t
 
 val run : t -> unit Lwt.t
 
+(** Shows on stdout all events sent by the injector *)
+val log_events : ?max_length:int -> t -> unit
+
+(** See [Daemon.Make.wait_for]. *)
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
+
 module RPC : sig
   type status =
     | Pending

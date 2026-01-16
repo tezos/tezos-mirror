@@ -152,7 +152,13 @@ val stop : t -> unit Lwt.t
 val log_events : ?max_length:int -> t -> unit
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** [is_running_not_ready dal_node] returns true if the given node is
     running but its status is not ready *)

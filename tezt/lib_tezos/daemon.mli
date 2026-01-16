@@ -216,13 +216,20 @@ module Make : functor (X : PARAMETERS) -> sig
       if the daemon terminates. It should describe the constraint that [filter] applies,
       such as ["field level exists"].
 
+      If [timeout] is provided, stop waiting if [timeout] seconds have passed.
+
       It is advised to register such event handlers before starting the daemon,
       as if they occur before being registered, they will not trigger your handler.
       For instance, you can define a promise with
       [let x_event = wait_for daemon "x" (fun x -> Some x)]
       and bind it later with [let* x = x_event]. *)
   val wait_for_full :
-    ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+    ?timeout:float ->
+    ?where:string ->
+    t ->
+    string ->
+    (JSON.t -> 'a option) ->
+    'a Lwt.t
 
   (** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
 
@@ -234,7 +241,12 @@ module Make : functor (X : PARAMETERS) -> sig
       ignored. See [wait_for_full] to know what the JSON value must
       look like. *)
   val wait_for :
-    ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+    ?timeout:float ->
+    ?where:string ->
+    t ->
+    string ->
+    (JSON.t -> 'a option) ->
+    'a Lwt.t
 
   (** Add a callback to be called whenever the daemon emits an event.
 

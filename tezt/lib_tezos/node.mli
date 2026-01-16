@@ -647,10 +647,21 @@ val wait_for_request :
 
 (** See [Daemon.Make.wait_for_full]. *)
 val wait_for_full :
-  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** See [Daemon.Make.wait_for]. *)
-val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+val wait_for :
+  ?timeout:float ->
+  ?where:string ->
+  t ->
+  string ->
+  (JSON.t -> 'a option) ->
+  'a Lwt.t
 
 (** Wait for a node to receive a given number of connections.
 
