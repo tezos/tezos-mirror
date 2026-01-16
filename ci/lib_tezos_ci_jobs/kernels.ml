@@ -84,7 +84,7 @@ let job_build_kernels =
     ~stage:Build
     ~description:"Build the kernels, including the Etherlink kernel."
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     ~only_if_changed:
       [
         (* This job is used by other jobs such as [etherlink.test_kernels]
