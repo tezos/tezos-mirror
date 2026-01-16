@@ -629,6 +629,7 @@ module Anonymous = struct
         attestation : t * Tezos_crypto.Signature.t;
         consensus_slot : int;
         slot_index : int;
+        lag_index : int option;
         shard : Tezos_crypto_dal.Cryptobox.shard;
         proof : Tezos_crypto_dal.Cryptobox.shard_proof;
         protocol : Protocol.t;
@@ -658,7 +659,7 @@ module Anonymous = struct
     double_consensus_evidence ~kind:Double_preattestation_evidence
 
   let dal_entrapment_evidence_standalone_attestation ~protocol ~attestation
-      ~slot_index shard proof =
+      ~slot_index ?lag_index shard proof =
     let {kind = op_kind; contents; _}, _ = attestation in
     match op_kind with
     | Consensus {kind = Attestation _; _} ->
@@ -666,7 +667,15 @@ module Anonymous = struct
           JSON.(annotate ~origin:__LOC__ contents |=> 0 |-> "slot" |> as_int)
         in
         Dal_entrapment_evidence
-          {attestation; consensus_slot; slot_index; shard; proof; protocol}
+          {
+            attestation;
+            consensus_slot;
+            slot_index;
+            lag_index;
+            shard;
+            proof;
+            protocol;
+          }
     | _ ->
         Test.fail
           "wrong kind of denounced operation for \
@@ -708,7 +717,15 @@ module Anonymous = struct
             ("op2", op2);
           ]
     | Dal_entrapment_evidence
-        {attestation; consensus_slot; slot_index; shard; proof; protocol} ->
+        {
+          attestation;
+          consensus_slot;
+          slot_index;
+          lag_index;
+          shard;
+          proof;
+          protocol;
+        } ->
         let attestation = denunced_op_json attestation in
         `O
           ([
@@ -718,8 +735,13 @@ module Anonymous = struct
           @ (if Protocol.(number protocol > 22) then
                [("consensus_slot", json_of_int consensus_slot)]
              else [])
+          @ [("slot_index", json_of_int slot_index)]
+          @ (if Protocol.(number protocol > 24) then
+               match lag_index with
+               | None -> []
+               | Some lag_index -> [("lag_index", json_of_int lag_index)]
+             else [])
           @ [
-              ("slot_index", json_of_int slot_index);
               ( "shard_with_proof",
                 `O
                   [
@@ -1231,6 +1253,10 @@ let injection_error_unknown_branch =
 let dal_entrapment_wrong_commitment =
   rex {|DAL shard proof error: Invalid shard \(for commitment = ([\w\d]+)\).|}
 
-let dal_entrapment_of_not_published_commitment =
-  rex
-    {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+let dal_entrapment_of_not_published_commitment protocol =
+  if Protocol.number protocol >= 025 then
+    rex
+      {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), lag_index ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
+  else
+    rex
+      {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}

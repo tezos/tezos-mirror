@@ -5047,6 +5047,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       Dal.Parameters.from_protocol_parameters new_proto_parameters
     in
     let new_lag = new_dal_parameters.attestation_lag in
+    let new_lags = new_dal_parameters.attestation_lags in
     Log.info "Initializing the cryptobox" ;
     let* () = Helpers.init_prover ~__LOC__ () in
     let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
@@ -5142,6 +5143,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
         ~protocol:migrate_to
         ~attestation:attestation_new
         ~slot_index
+        ~lag_index:(List.length new_lags - 1)
         shard_denounced
         proof_denounced
     in
@@ -5176,7 +5178,8 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       in
       let* _op_hash =
         Operation.Anonymous.inject
-          ~error:Operation.dal_entrapment_of_not_published_commitment
+          ~error:
+            (Operation.dal_entrapment_of_not_published_commitment migrate_to)
           accusation
           client
       in
@@ -9845,6 +9848,7 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
   let slot_index = 0 in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
   let lag = dal_parameters.attestation_lag in
+  let lags = dal_parameters.attestation_lags in
   let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
   let commitment, proof, shards_with_proofs =
     Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
@@ -9898,6 +9902,7 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
       ~protocol
       ~attestation
       ~slot_index
+      ~lag_index:(List.length lags - 1)
       shard
       proof
   in
@@ -10510,6 +10515,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  let lags = dal_parameters.Dal.Parameters.attestation_lags in
   assert (attestation_lag <= blocks_per_cycle) ;
   let blocks_to_bake = 2 + blocks_per_cycle - attestation_lag in
   Log.info
@@ -10573,6 +10579,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
       ~protocol
       ~attestation
       ~slot_index
+      ~lag_index:(List.length lags - 1)
       shard1
       proof1
   in
@@ -10587,6 +10594,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
       ~protocol
       ~attestation
       ~slot_index
+      ~lag_index:(List.length lags - 1)
       shard2
       proof2
   in
@@ -10643,6 +10651,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let slot_index = 0 in
+  let lags = dal_parameters.Dal.Parameters.attestation_lags in
   let accused = Constant.bootstrap2 in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let* () = bake_for ~count:2 client in
@@ -10723,6 +10732,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
         ~protocol
         ~attestation
         ~slot_index
+        ~lag_index:(List.length lags - 1)
         shard
         proof
     in
@@ -10774,6 +10784,7 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
         ~protocol
         ~attestation
         ~slot_index
+        ~lag_index:(List.length lags - 1)
         shard
         proof
     in

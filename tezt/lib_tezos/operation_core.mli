@@ -418,6 +418,7 @@ module Anonymous : sig
     protocol:Protocol.t ->
     attestation:operation * Tezos_crypto.Signature.t ->
     slot_index:int ->
+    ?lag_index:int ->
     Tezos_crypto_dal.Cryptobox.shard ->
     Tezos_crypto_dal.Cryptobox.shard_proof ->
     t
@@ -819,7 +820,10 @@ val injection_error_unknown_branch : rex
 val dal_entrapment_wrong_commitment : rex
 
 (** Matches the message
-    [Invalid accusation for delegate %a, level %d, and DAL slot index %d: the DAL slot was not published.]
-    from [src/proto_alpha/lib_protocol/validate_errors.ml]
+    [Invalid accusation for delegate %a, level %d, lag_index %d and DAL slot index %d: the DAL slot was not published.]
+    or
+    [Invalid accusation for delegate %a, level %d, and DAL slot index %d: the DAL slot was not published.],
+    depending on the protocol version, from
+    [src/proto_<proto>/lib_protocol/validate_errors.ml]
 *)
-val dal_entrapment_of_not_published_commitment : rex
+val dal_entrapment_of_not_published_commitment : Protocol.t -> rex
