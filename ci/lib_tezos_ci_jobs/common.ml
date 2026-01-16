@@ -257,7 +257,7 @@ module Build = struct
     job
       ~__POS__
       ~name:"oc.build_kernels"
-      ~image:Images.rust_toolchain
+      ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
       ~stage:Stages.build
       ?rules
       ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]

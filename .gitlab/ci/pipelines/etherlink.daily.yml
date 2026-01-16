@@ -229,16 +229,14 @@ oc.build_amd64-extra-exp:
     when: on_success
 
 oc.build_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-6253f76a
   stage: build
   tags:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: kernels-sccache
