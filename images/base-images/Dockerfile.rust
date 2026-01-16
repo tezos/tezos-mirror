@@ -69,7 +69,7 @@ RUN apt-get update && \
 # install rust toolchains and compilation targets
 # nightly-2025-01-30 is installed separately as it's only used for formatting
 # set the default to the last stable toolchain installed.
-RUN rustup update 1.68.2 1.73.0 1.76.0 1.83.0 1.88.0 && \
+RUN rustup update 1.73.0 1.76.0 1.83.0 1.88.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
