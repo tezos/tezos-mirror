@@ -675,6 +675,14 @@ module Send_raw_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Send_raw_tezlink_operation = struct
+  include Send_raw_common
+
+  let method_ = "tez_sendRawTezlinkOperation"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Send_raw_transaction_sync = struct
   open Ethereum_types
 
@@ -1322,12 +1330,14 @@ let evm_unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let michelson_supported_methods = evm_supported_methods
+let michelson_supported_methods =
+  evm_supported_methods @ [(module Send_raw_tezlink_operation)]
 
 let multichain_sequencer_supported_methods : (module METHOD) list =
   [
     (module Generic_block_number);
     (module Send_raw_transaction);
+    (module Send_raw_tezlink_operation);
     (module Send_raw_transaction_sync);
     (* Private RPCs *)
     (module Produce_block);
