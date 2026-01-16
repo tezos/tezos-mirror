@@ -882,7 +882,12 @@ module History = struct
             if I.(i = s.Header.id.index) then
               let* res = aux indices' slots' in
               let Dal_attestation_repr.Accountability.
-                    {is_proto_attested; attested_shards; total_shards} =
+                    {
+                      is_proto_attested;
+                      attested_shards;
+                      total_shards;
+                      attesters = _;
+                    } =
                 status
               in
               let content =

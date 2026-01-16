@@ -99,6 +99,8 @@ module Accountability : sig
     total_shards : int;  (** The total number of (attestable) shards. *)
     attested_shards : int;
         (** The total number of shards that have been attested. *)
+    attesters : Signature.Public_key_hash.Set.t;
+        (** Who attested the shards. *)
     is_proto_attested : bool;
         (** The boolean is set to [true] IFF the [attestation_ratio] is below or
             equal to the threshold defined by the protocol. *)
@@ -114,11 +116,12 @@ module Accountability : sig
      available. *)
   val init : number_of_slots:int -> t
 
-  (** [record_number_of_attested_shards t slots number] records that, for all
-      slots declared available in [slots], the given [number] of shard indices
-      are deemed available. This function must be called at most once for a
-      given attester; otherwise the count will be flawed. *)
-  val record_number_of_attested_shards : t -> attested_slots -> int -> t
+  (** [record_number_of_attested_shards t ~delegate slots number] records that,
+      for all slots declared available in [slots], the given [number] of shard
+      indices are deemed available by [delegate]. This function must be called
+      at most once for a given attester; otherwise the count will be flawed. *)
+  val record_number_of_attested_shards :
+    t -> attested_slots -> delegate:Signature.public_key_hash -> int -> t
 
   (** [is_slot_attested t ~threshold ~number_of_shards slot] returns [true] if
       the number of shards recorded in [t] for the [slot] is above the

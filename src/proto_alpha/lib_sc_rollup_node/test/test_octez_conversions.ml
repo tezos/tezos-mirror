@@ -226,10 +226,18 @@ let gen_slot_header_with_status =
   let open Protocol.Alpha_context in
   let open QCheck2.Gen in
   let* status = bool in
+  let* attester = gen_pkh in
   let status =
     let total_shards = 1 in
-    let attested_shards = if status then total_shards else 0 in
-    Dal.Attestation.{total_shards; attested_shards; is_proto_attested = status}
+    let attested_shards, attesters =
+      if status then
+        let attester = Signature.Of_V_latest.get_public_key_hash_exn attester in
+        ( total_shards,
+          Environment.Signature.Public_key_hash.Set.singleton attester )
+      else (0, Environment.Signature.Public_key_hash.Set.empty)
+    in
+    Dal.Attestation.
+      {total_shards; attested_shards; is_proto_attested = status; attesters}
   in
   let* publisher = gen_pkh in
   let+ header = gen_slot_header in

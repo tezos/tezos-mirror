@@ -185,6 +185,7 @@ let gen_dal_slots_history () =
               attested_shards = (if is_proto_attested then 1 else 0);
               total_shards = 1;
               is_proto_attested;
+              attesters = Environment.Signature.Public_key_hash.Set.empty;
             }
         in
         let published_level =
