@@ -245,8 +245,8 @@ The specifications in this table are an estimate based on experimentation with G
 | Bandwidth (download)  | 250 KiB/s             | 350 KiB/s             | 400 KiB/s             | 600 KiB/s             |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 
-DAL producer node
-~~~~~~~~~~~~~~~~~
+DAL producer node (operator/observer)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The system resources that a DAL producer node needs depends on how much data it needs to publish to the DAL.
 This example is an estimate based on experimentation with a DAL producer node that publishes data into one slot in each block:
