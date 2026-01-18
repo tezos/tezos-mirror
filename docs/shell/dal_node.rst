@@ -83,7 +83,8 @@ A DAL node in controller mode can run in these profiles:
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx --data-dir $DATA_DIR
 
-- The ``observer`` profile contributes to the resilience of network by helping distribute data in the specified slots. To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
+- The ``observer`` profile contributes to the resilience of network by reconstructing slots from received shards and republishing missing shards. Unlike operator nodes, observer nodes do not store data long-term and therefore cannot participate in refutation games.
+  To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
 
    .. code-block:: shell
 
