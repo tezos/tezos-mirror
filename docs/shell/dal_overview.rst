@@ -148,6 +148,7 @@ A topic is defined as a pair ``(slot_index, public_key_hash)``. The first compon
 Such a set of topics ensures that the bandwidth of bakers and slot producers is bounded (for valid messages) over a cycle.
 
 A slot producer should subscribe to all relevant topics associated with their slot index. This includes every topic where a baker is assigned at least one shard for that slot index.
+Since shard assignments are derived from the consensus committee, which is known at least one cycle in advance, slot producers can determine the relevant topics ahead of time.
 On the other hand, a baker should subscribe to all topics that feature their public key address.
 
 Gossipsub also defines a notion of score which is used to only connect to peers with a good score.
