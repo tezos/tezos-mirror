@@ -199,21 +199,6 @@ let post_slot :
           (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
     Tezos_rpc.Path.(open_root / "slots")
 
-let patch_commitment :
-    < meth : [`PATCH]
-    ; input : slot_id
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.patch_service
-    ~description:"Associate a commitment to a level and a slot index."
-    ~query:Tezos_rpc.Query.empty
-    ~input:slot_id_encoding
-    ~output:Data_encoding.unit
-    Tezos_rpc.Path.(open_root / "commitments" /: Cryptobox.Commitment.rpc_arg)
-
 let get_slot_content :
     < meth : [`GET]
     ; input : unit

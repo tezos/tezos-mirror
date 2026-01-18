@@ -84,17 +84,6 @@ val post_slot :
   ; query : < padding : char ; slot_index : Types.slot_index option > >
   service
 
-(** Associate a commitment to a level and a slot index. See {!val:
-    Slot_manager.associate_slot_id_with_commitment} for more details. *)
-val patch_commitment :
-  < meth : [`PATCH]
-  ; input : Types.slot_id
-  ; output : unit
-  ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : unit >
-  service
-
 (** Retrieve the content of the slot associated with the given slot id. *)
 val get_slot_content :
   < meth : [`GET]
