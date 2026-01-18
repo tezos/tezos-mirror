@@ -185,7 +185,6 @@ Troubleshooting connections
 Follow these steps if the DAL node is running but not connected to the network:
 
 #. Upgrade your installation of Octez to the latest version.
-   The Octez DAL node version 20.3 has some issues that are resolved in later versions.
 
 #. Check if the ``config.json`` file of the ``octez-node`` daemon that the DAL node is connected to has a field named ``network``.
    If there is a ``network`` field, update the node's configuration by running this command:
