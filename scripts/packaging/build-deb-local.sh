@@ -97,9 +97,7 @@ ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBet
 Rebuild | TestRebuild)
   DEBVERSION=$VERSION
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
-  # For now, the displayed version for a rebuild is vx.y+dev
-  # This will be fixed by upcoming work.
-  EXPECTED_VERSION="Octez ${gitlab_release_major_version}.${gitlab_release_minor_version}+dev"
+  EXPECTED_VERSION="Octez ${gitlab_release_major_version}.${gitlab_release_minor_version}"
   ;;
 Master)
   DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
