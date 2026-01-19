@@ -139,7 +139,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
-  (* Here is the place where we get the constants used all over the game. *)
   let* constants =
     Protocol_plugins.get_constants_of_level node_ctxt snapshot_level_int32
   in
