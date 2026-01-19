@@ -299,6 +299,11 @@ linkcheck_ignore = [
     r'^http(s)?://localhost:\d+/?',
     r'^https://grafana\.nomadic-labs\.cloud/',
     r'^https://github\.com/jsonnet-bundler/jsonnet-bundler/',
+    r'^https://medium\.com/metastatedev/meanwhile-at-cryptium-labs-1-part-',
+    r'^https://medium\.com/protofire-blog/recommendations-to-enhance-security-'
+    + 'of-tezos-smart-contracts-d14c0e53a6d3',
+    r'^https://medium\.com/the-cryptonomic-aperiodical/the-magic-and-mystery-'
+    + 'of-the-micheline-binary-format-33bf85699bef',
     # local files, e.g. ../api/api-inline.html#*', \.\./CHANGES.html#version-*
     # (interpreted by linkcheck as external links, generating false positives)
     r'^\.\./',
@@ -335,6 +340,10 @@ linkcheck_allowed_redirects = dict(
         (
             r'https://ocaml\.org/manual/.*',
             r'https://ocaml\.org/manual/[0-9.]+/.*',
+        ),
+        (
+            r'https://dune\.readthedocs\.io/',
+            r'https://dune\.readthedocs\.io/en/stable',
         ),
         # 2. permanent redidections, maybe fix one day
         (r'https://bitheap\.org/cram/', r'https://github\.com/aiiie/cram'),

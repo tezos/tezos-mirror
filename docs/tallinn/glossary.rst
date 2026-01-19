@@ -324,7 +324,7 @@ _`Redundancy factor`
 _`Refutation game`
    A process by which the `economic protocol`_ solves a conflict between two
    `rollup committer`_\ s.
-   Note that the refutation mechanism used in Tezos `smart rollup`_\ s corresponds to the notion of `fraud proofs <https://academy.binance.com/en/glossary/fraud-proof>`__ used in other blockchain/Layer 2 ecosystems.
+   Note that the refutation mechanism used in Tezos `smart rollup`_\ s corresponds to the notion of `fraud proofs <https://www.binance.com/en/academy/glossary/fraud-proof>`__ used in other blockchain/Layer 2 ecosystems.
 
 _`Refutation period`
    When the first `rollup commitment`_ for a `rollup commitment period`_ is published, a refutation

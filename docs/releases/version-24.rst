@@ -32,6 +32,10 @@ Version 23 introduced protocol-independent baker and accuser executables, which 
 
 These executables replace protocol-dependent executables. As a result, the latter are deprecated starting from Octez v24 and will be removed in v25.
 
+.. note:
+
+	The baker sub-command ``octez-baker run dal`` (allowing to start the DAL node via the baker) is experimental in version 24. **It should not be used in production.** Instead, the DAL node should be run the usual way, by invoking the ``octez-dal-node`` binary directly.
+
 .. _octez_releases_page_v24:
 
 New Octez releases page
