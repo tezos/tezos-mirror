@@ -29,9 +29,9 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let rockylinux_package_release_matrix ?(ramfs = false) = function
-  | Partial -> [[("RELEASE", ["9"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Partial -> [[("RELEASE", ["9"; "10"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["9"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
+      [[("RELEASE", ["9"; "10"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (** These are the set of Fedora release-architecture combinations for
     which we build rpm packages in the job
@@ -189,7 +189,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ~source_version:true
            ["./scripts/ci/prepare-rpm-repo.sh"])
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ["./scripts/ci/create_rpm_repo.sh rockylinux 9"]
+      ["./scripts/ci/create_rpm_repo.sh rockylinux 9 10"]
       ~tag:Gcp_not_interruptible
   in
   let job_rpm_repo_fedora =
@@ -350,8 +350,8 @@ let register ~auto ~description pipeline_type =
 let child_pipeline_partial =
   register
     ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Rocky Linux 9 .rpm packages."
+      "A child pipeline of 'before_merging' (and thus 'merge_train') \n\
+      \       Rocky Linux 9 and 10 .rpm packages."
     ~auto:false
     Partial
 
@@ -359,6 +359,7 @@ let child_pipeline_partial_auto =
   register
     ~description:
       "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Rockylinux 9 .rpm packages. Starts automatically on certain conditions."
+       Rockylinux 9 and 10 .rpm packages. Starts automatically on certain \
+       conditions."
     ~auto:true
     Partial
