@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Nomadic-Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezosx-tezos-runtime"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# We use it from RlpHelpers we should probably have a separate crate
+tezos_ethereum.workspace = true
+rlp.workspace = true
+primitive-types.workspace = true
+thiserror.workspace = true
+num-bigint.workspace = true
+
+tezosx-interfaces.workspace = true
+
+tezos-evm-runtime.workspace = true
+tezos_crypto_rs.workspace = true
+tezos-protocol.workspace = true
+tezos-smart-rollup.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-execution.workspace = true
+tezos_data_encoding.workspace = true
+tezos-storage.workspace = true
+
+[dev-dependencies]

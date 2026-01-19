@@ -3488,11 +3488,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezosx-ethereum-runtime"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "nom",
+ "primitive-types",
+ "revm-etherlink",
+ "tezos-evm-runtime-latest",
+ "tezos-smart-rollup-host",
+ "tezos_data_encoding",
+ "tezosx-interfaces",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "tezosx-interfaces"
 version = "0.1.0"
 dependencies = [
  "primitive-types",
  "tezos-evm-runtime-latest",
+]
+
+[[package]]
+name = "tezosx-tezos-runtime"
+version = "0.1.0"
+dependencies = [
+ "num-bigint",
+ "primitive-types",
+ "rlp",
+ "tezos-evm-runtime-latest",
+ "tezos-execution-latest",
+ "tezos-protocol",
+ "tezos-smart-rollup",
+ "tezos-smart-rollup-host",
+ "tezos-storage-latest",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "tezos_ethereum_latest",
+ "tezosx-interfaces",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
