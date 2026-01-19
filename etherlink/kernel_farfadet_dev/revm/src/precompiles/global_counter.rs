@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,7 +16,7 @@ use crate::{
     precompiles::{
         constants::{
             FA_BRIDGE_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
         },
         error::CustomPrecompileError,
         guard::{guard, out_of_gas, revert},
@@ -40,7 +40,7 @@ where
 {
     guard(
         GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
-        &[WITHDRAWAL_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
+        &[XTZ_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         inputs,
     )?;
 

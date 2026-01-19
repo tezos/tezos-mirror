@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -13,7 +13,7 @@ use crate::{
     custom,
     precompiles::constants::{
         FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
+        XTZ_BRIDGE_SOL_ADDR, XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
     Error,
@@ -23,7 +23,7 @@ use super::constants::PredeployedContract;
 
 pub fn init_precompile_bytecodes<Host: Runtime>(host: &'_ mut Host) -> Result<(), Error> {
     init_precompile_bytecode(host, &Address::ZERO, &INTERNAL_FORWARDER_SOL_CONTRACT)?;
-    init_precompile_bytecode(host, &WITHDRAWAL_SOL_ADDR, &WITHDRAWAL_SOL_CONTRACT)?;
+    init_precompile_bytecode(host, &XTZ_BRIDGE_SOL_ADDR, &XTZ_BRIDGE_SOL_CONTRACT)?;
     init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, &FA_BRIDGE_SOL_CONTRACT)
 }
 

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023,2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -478,7 +478,7 @@ mod test {
     use crate::{
         precompiles::constants::{
             FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-            WITHDRAWAL_SOL_CONTRACT,
+            XTZ_BRIDGE_SOL_CONTRACT,
         },
         storage::code::CodeStorage,
         Error,
@@ -512,12 +512,12 @@ mod test {
     #[test]
     fn check_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_static(WITHDRAWAL_SOL_CONTRACT.code).unwrap();
+        let code_voucher = bytecode_from_static(XTZ_BRIDGE_SOL_CONTRACT.code).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            WITHDRAWAL_SOL_CONTRACT.code_hash,
+            XTZ_BRIDGE_SOL_CONTRACT.code_hash,
         );
     }
 

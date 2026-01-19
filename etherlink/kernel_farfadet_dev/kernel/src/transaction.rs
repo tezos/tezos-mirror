@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -8,11 +8,10 @@
 use crate::bridge::Deposit;
 use crate::fees::tx_execution_gas_limit;
 
-use crate::tick_model::constants::BASE_GAS;
 use primitive_types::{H160, U256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit};
 use revm_etherlink::precompiles::constants::{
-    FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_QUEUE_GAS_LIMIT,
+    FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_QUEUE_GAS_LIMIT, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::Error;
 use rlp::{Decodable, DecoderError, Encodable};
@@ -151,7 +150,7 @@ impl Transaction {
 
     pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, Error> {
         match &self.content {
-            TransactionContent::Deposit(_) => Ok(BASE_GAS),
+            TransactionContent::Deposit(_) => Ok(XTZ_DEPOSIT_EXECUTION_COST),
             TransactionContent::Ethereum(e) => tx_execution_gas_limit(e, fees, false),
             TransactionContent::EthereumDelayed(e) => {
                 tx_execution_gas_limit(e, fees, true)
