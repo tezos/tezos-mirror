@@ -612,7 +612,7 @@ struct
 
     let build_batch transactions =
       let module M = Map.Make (String) in
-      let module Srt = Rpc_encodings.Send_raw_transaction in
+      let module Fb = Tx.Forward_batch in
       let rev_batch, hashes =
         Seq.fold_left
           (fun (rev_batch, hashes) {hash; payload; _} ->
@@ -626,10 +626,10 @@ struct
             let txn =
               Rpc_encodings.JSONRPC.
                 {
-                  method_ = Srt.method_;
+                  method_ = Fb.method_;
                   parameters =
                     Some
-                      (Data_encoding.Json.construct Srt.input_encoding payload);
+                      (Data_encoding.Json.construct Fb.input_encoding payload);
                   id = Some (Id_string req_id);
                 }
             in
@@ -705,8 +705,6 @@ struct
     let send_transactions_batch ~evm_node_endpoint ~timeout ~keep_alive ~state
         self transactions =
       let open Lwt_result_syntax in
-      let module M = Map.Make (String) in
-      let module Srt = Rpc_encodings.Send_raw_transaction in
       if Seq.is_empty transactions then return_unit
       else
         match evm_node_endpoint with

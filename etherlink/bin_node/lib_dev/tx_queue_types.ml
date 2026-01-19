@@ -38,6 +38,11 @@ module type L2_transaction = sig
 
   module AddressMap : Map.S with type key = address
 
+  module Forward_batch :
+    Rpc_encodings.METHOD
+      with type input = Ethereum_types.hex
+       and type output = Ethereum_types.hash
+
   val make_txpool :
     pending:t Ethereum_types.NonceMap.t AddressMap.t ->
     queued:t Ethereum_types.NonceMap.t AddressMap.t ->
@@ -80,6 +85,7 @@ module Eth_transaction_object :
   let to_transaction_object_t t = Evm t
 
   module AddressMap = AddressMap
+  module Forward_batch = Rpc_encodings.Send_raw_transaction
 
   let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
     {pending; queued}
@@ -123,6 +129,7 @@ module Tezlink_operation :
   let to_transaction_object_t t = Michelson t
 
   module AddressMap = Map.Make (Signature.V2.Public_key_hash)
+  module Forward_batch = Rpc_encodings.Send_raw_tezlink_operation
 
   let make_txpool ~pending:_ ~queued:_ : Transaction_object.txqueue_content =
     {

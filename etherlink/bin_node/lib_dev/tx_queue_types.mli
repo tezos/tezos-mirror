@@ -39,6 +39,11 @@ module type L2_transaction = sig
 
   module AddressMap : Map.S with type key = address
 
+  module Forward_batch :
+    Rpc_encodings.METHOD
+      with type input = Ethereum_types.hex
+       and type output = Ethereum_types.hash
+
   val make_txpool :
     pending:t Ethereum_types.NonceMap.t AddressMap.t ->
     queued:t Ethereum_types.NonceMap.t AddressMap.t ->
