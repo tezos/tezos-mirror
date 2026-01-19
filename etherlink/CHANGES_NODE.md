@@ -14,13 +14,6 @@
 
 ### Execution changes
 
-- Fix transaction objects submitted several times remaining in the tx queue
-  past their lifespan. (!20445)
-- Fix the native execution wrongfully overwriting the kernel version stored in
-  the context of the chain, which resulted in an incorrect result for the
-  `tez_kernelVersion` RPC. Only nodes with the native execution policy set to
-  `always` were affected. (!20432)
-
 ### Storage changes
 
 ### Documentation changes
@@ -31,6 +24,36 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.52 (2026-01-16)
+
+This is a bug fix release release for addressing several issues with the
+instant confirmation experimental feature. This version is required for
+providers wanting to enable this instant confirmation, but does not provide any
+changes compared to 0.51 otherwise.
+
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
+
+### Execution changes
+
+- Fix transaction objects submitted several times remaining in the tx queue
+  past their lifespan. (!20445)
+- Fix the native execution wrongfully overwriting the kernel version stored in
+  the context of the chain, which resulted in an incorrect result for the
+  `tez_kernelVersion` RPC. Only nodes with the native execution policy set to
+  `always` were affected. (!20432)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Rework the incremental execution of included transactions in `farfadet-r1`
+  native execution to align it more closely to the execution path of regular
+  blueprints . (!20459)
 
 ## Version 0.51 (2026-01-13)
 
