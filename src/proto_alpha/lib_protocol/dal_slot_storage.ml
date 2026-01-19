@@ -75,68 +75,12 @@ let finalize_current_slot_headers ctxt =
     (Raw_context.current_level ctxt).level
     (Raw_context.Dal.candidates ctxt)
 
-let compute_slot_headers_statuses ~number_of_slots ~number_of_lags ~to_status
-    published_slot_headers =
-  let open Dal_slot_repr in
-  let fold_attested_slots (rev_attested_slot_headers, attestation)
-      (slot, slot_publisher) =
-    let attestation_status = to_status slot in
-    let rev_attested_slot_headers =
-      (slot, slot_publisher, attestation_status) :: rev_attested_slot_headers
-    in
-    let attestation =
-      if
-        attestation_status
-          .Dal_attestations_repr.Accountability.is_proto_attested
-      then
-        Dal_attestations_repr.Slot_availability.commit
-          attestation
-          ~number_of_slots
-          ~number_of_lags
-          slot.Header.id.index
-          ~lag_index:(number_of_lags - 1)
-      else attestation
-    in
-    (rev_attested_slot_headers, attestation)
-  in
-  let rev_attested_slot_headers, bitset =
-    List.fold_left
-      fold_attested_slots
-      ([], Dal_attestations_repr.Slot_availability.empty)
-      published_slot_headers
-  in
-  (List.rev rev_attested_slot_headers, bitset)
-
 let get_slot_headers_history ctxt =
   let open Lwt_result_syntax in
   let+ slots_history = Storage.Dal.Slot.History.find ctxt in
   match slots_history with
   | None -> Dal_slot_repr.History.genesis
   | Some slots_history -> slots_history
-
-let update_skip_list ctxt ~slot_headers_statuses ~published_level
-    ~number_of_slots ~attestation_lag =
-  let open Lwt_result_syntax in
-  let open Dal_slot_repr.History in
-  let* slots_history = get_slot_headers_history ctxt in
-  let*? slots_history, cache =
-    (* We expect to put exactly [number_of_slots] cells in the cache. *)
-    let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
-
-    update_skip_list
-      ~number_of_slots
-      slots_history
-      cache
-      ~published_level
-      ~attestation_lag:(Dynamic attestation_lag)
-      slot_headers_statuses
-  in
-  let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
-  let*! ctxt =
-    History_cache.(view cache |> Map.bindings)
-    |> Storage.Dal.Slot.LevelHistories.add ctxt
-  in
-  return ctxt
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/7647
    Consider if it is better to store commitments only for attestation lag
@@ -157,253 +101,415 @@ let remove_old_headers ctxt ~published_level =
   | None -> return ctxt
   | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
 
-(* Finalize DAL slot headers for a given (single) published level:
-   - Fetch headers published at [published_level].
-   - Compute their attestation status via [to_status].
-   - Update the DAL skip-list and storage, mutating [ctxt]:
-      + Prune old headers in Storage.Dal.Slot.Headers per denunciation window,
-      + Write the new skip-list head to Storage.Dal.Slot.History,
-      + Append per-level cells to Storage.Dal.Slot.LevelHistories.
-   - Return the updated [ctxt] and the attestation bitset. *)
-let finalize_slot_headers_for_published_level ctxt ~number_of_slots
-    ~number_of_lags ~attestation_lag ~to_status published_level =
-  let open Lwt_result_syntax in
-  let* published_slots = find_slot_headers ctxt published_level in
-  let*! ctxt = remove_old_headers ctxt ~published_level in
-  let* ctxt, attestation, slot_headers_statuses =
-    match published_slots with
-    | None -> return (ctxt, Dal_attestations_repr.Slot_availability.empty, [])
-    | Some published_slots ->
-        let slot_headers_statuses, attestation =
-          compute_slot_headers_statuses
-            ~number_of_slots
-            ~number_of_lags
-            ~to_status
-            published_slots
-        in
-        return (ctxt, attestation, slot_headers_statuses)
+let get_number_of_shards ctxt ~shard_assignment_level delegate =
+  let delegate_to_shard_count =
+    Raw_context.Consensus.delegate_to_shard_count ctxt
   in
-  let* ctxt =
-    update_skip_list
-      ctxt
-      ~slot_headers_statuses
-      ~published_level
-      ~number_of_slots
-      ~attestation_lag
-  in
-  return (ctxt, attestation)
+  match
+    Raw_level_repr.Map.find shard_assignment_level delegate_to_shard_count
+  with
+  | None -> 0
+  | Some map -> (
+      match Signature.Public_key_hash.Map.find delegate map with
+      | None -> 0
+      | Some n -> n)
 
-(* Handle the first block after an attestation_lag shrink (P1 -> P2).  We
-   "backfill" the missing published levels so the DAL skip-list has no gaps:
-   process the [prev_attestation_lag - curr_attestation_lag] intermediate
-   published levels in order, then the "normal" [target_published_level].
+(** [merge_attestation_history ~attestation_lag ~threshold
+    ~number_of_shards ~get_attester_shards
+    current_block_accountability stored_history] merges the current block's
+    accountability data into the stored history.
 
-   The function assumes that prev_attestation_lag > curr_attestation_lag.
+    Data sources:
+    - [current_block_accountability]: Data accumulated during THIS block only.
+      For each (level, slot), contains the set of attesters who attested this
+      block.
+    - [stored_history]: Persistent data from PREVIOUS blocks. For each (level,
+      slot), contains the attested shard counts (and their attesters) accumulated
+      over all previous blocks in the current attestation window.
+    - [get_attester_shards]: Lookup function to get the number of shards
+      assigned to a given delegate.
 
-   Semantics during backfill: do NOT proto-attest slots. *)
-let finalize_slot_headers_at_lag_migration ctxt ~target_published_level
-    ~number_of_slots ~number_of_lags ~to_status ~prev_attestation_lag
-    ~curr_attestation_lag =
-  let open Lwt_result_syntax in
-  (* During migration, backfilled published levels must not be proto-attested.
-     We enforce a conservative attestation status (no proto attest, zero
-     shards). *)
-  let to_status slot =
-    let status = to_status slot in
-    Dal_attestations_repr.Accountability.
-      {status with attested_shards = 0; is_proto_attested = false}
-  in
-  (* Process published levels from oldest to newest:
+    Returns [(updated_history, newly_attested_by_level)] where:
+    - [updated_history] is the merged history with the newly finalized level
+      dropped
+    - [newly_attested_by_level] is a map from published_level to list of
+      slot_indices for slots that crossed the attestation threshold during
+      this merge *)
+let merge_attestation_history ~attestation_lag ~threshold ~number_of_shards
+    ~get_number_of_shards current_block_accountability stored_history =
+  let open Dal_attestations_repr.Accountability in
+  (* Merge a single slot's attestation data from the current block into the
+     stored history for that slot.
 
-     - Set [current_gap = prev_attestation_lag - curr_attestation_lag]
+     - [current_attesters]: delegates who attested this slot in THIS block
+     - [stored_status]: accumulated attestation status from PREVIOUS blocks
 
-     - Start at [target_published_level - current_gap].
-
-     This is equal to [current_level - prev_attestation_lag], since
-     [target_published_level = current_level - curr_attestation_lag].
-
-     - Incrementally finalize each published level up to
-      [target_published_level] by reducing the gap
-
-     - Make sure to use the right (intermediate) attestation_lag for each
-     processed intermediate level (we'll decrease the lag from
-     [prev_attestation_lag] to [curr_attestation_lag] one by one).
-
-     Notes:
-     - [LevelHistories] is overwritten at each finalize; we collect the
-     per-level cells after each step and batch-write them once at the end.
-     - Only the final attestation bitset (for [target_published_level]) is
-     returned for inclusion in the block header. This should not be an issue, as
-     backfilled levels are non-attesting by design during migration. *)
-  let rec aux ctxt ~cells_of_pub_levels ~current_gap =
-    match Raw_level_repr.(sub target_published_level current_gap) with
-    | None ->
-        (* Defensive: not expected on our networks. *)
-        return
-          ( ctxt,
-            Dal_attestations_repr.Slot_availability.empty,
-            cells_of_pub_levels )
-    | Some published_level ->
-        (* Finalize this published level. *)
-        let* ctxt, attestation_bitset =
-          finalize_slot_headers_for_published_level
-            ~attestation_lag:(curr_attestation_lag + current_gap)
-            ctxt
-            ~number_of_slots
-            ~number_of_lags
-            ~to_status
-            published_level
-        in
-        (* Collect skip-list cells produced at this step. *)
-        let* cells_of_pub_levels =
-          let+ cells_of_this_pub_level = find_level_histories ctxt in
-          cells_of_this_pub_level :: cells_of_pub_levels
-        in
-        if Compare.Int.(current_gap = 0) then
-          (* Done: [target_published_level] processed. *)
-          return (ctxt, attestation_bitset, cells_of_pub_levels)
-        else aux ctxt ~cells_of_pub_levels ~current_gap:(current_gap - 1)
-  in
-  (* Main entry for processing several published levels at migration. *)
-  let current_gap = prev_attestation_lag - curr_attestation_lag in
-  let* ctxt, attestation_bitset, cells_of_pub_levels =
-    aux ctxt ~cells_of_pub_levels:[] ~current_gap
-  in
-  (* Persist all collected per-level cells in one write. *)
-  let*! ctxt =
-    List.(filter_map (fun e -> e) cells_of_pub_levels |> concat)
-    |> List.rev
-    |> Storage.Dal.Slot.LevelHistories.add ctxt
-  in
-  return (ctxt, attestation_bitset)
-
-let finalize_pending_slot_headers ctxt =
-  let open Lwt_result_syntax in
-  let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
-  let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
-  let curr_attestation_lag = dal.attestation_lag in
-  match Raw_level_repr.(sub raw_level curr_attestation_lag) with
-  | None -> return (ctxt, Dal_attestations_repr.Slot_availability.empty)
-  | Some published_level ->
-      (* DAL/TODO: remove after P1->P2 migration:
-
-         Detect whether we are at the first block after the lag shrink. We do
-         this by comparing the current attestation lag read from the protocol
-         parameters with the attestation lag used for the head of the DAL skip
-         list.
-
-         Normal case:
-
-         - This is the case when curr_attestation_lag = prev_attestation_lag
-
-         Migration case:
-
-         - This is the case when k = prev_attestation_lag - curr_attestation_lag
-         > 0.
-
-         => We should process [k + 1] published levels at once to avoid
-         introducing a gap of [k] levels without cells in the skip list. This
-         requires updating the context correctly, in particular the
-         [LevelHistories] entry. *)
-      let* number_of_slots =
-        let+ dal_parameters = Dal_storage.parameters ctxt published_level in
-        dal_parameters.number_of_slots
-      in
-      let number_of_lags = List.length dal.attestation_lags in
-      let* sl_history_head = get_slot_headers_history ctxt in
-      let Dal_slot_repr.History.
-            {header_id = _; attestation_lag = prev_attestation_lag} =
-        Dal_slot_repr.History.(content sl_history_head |> content_id)
-      in
-      let prev_attestation_lag =
-        Dal_slot_repr.History.attestation_lag_value prev_attestation_lag
-      in
-      let reset_dummy_genesis =
-        Dal_slot_repr.History.(equal sl_history_head genesis)
-      in
-      let published_level_to_shard_attestations =
-        let accounting = Raw_context.Dal.get_accountability ctxt in
-        Dal_attestations_repr.Accountability.get_shard_attestations accounting
-      in
-      let number_of_shards = dal.cryptobox_parameters.number_of_shards in
-      let nothing_attested =
-        Dal_attestations_repr.Accountability.
+     We only add shards from attesters who haven't attested before (to avoid
+     double-counting). For each new attester, we look up their shard count
+     using [get_attester_shards]. *)
+  let merge_slot ~shard_assignment_level slot_index
+      {attesters = current_attesters; attested_shards_count = _}
+      (level_history, newly_attested_slots) =
+    let stored_status =
+      match Dal_slot_index_repr.Map.find slot_index level_history with
+      | Some status -> status
+      | None ->
           {
             total_shards = number_of_shards;
             attested_shards = 0;
             attesters = Signature.Public_key_hash.Set.empty;
             is_proto_attested = false;
           }
+    in
+    (* Find attesters who are new (attested this block but not in previous blocks) *)
+    let new_attesters =
+      Signature.Public_key_hash.Set.diff
+        current_attesters
+        stored_status.attesters
+    in
+    if Signature.Public_key_hash.Set.is_empty new_attesters then
+      (* All current attesters already attested before; nothing to add *)
+      (level_history, newly_attested_slots)
+    else
+      (* Sum up shards from new attesters using the lookup function. *)
+      let shards_to_add =
+        Signature.Public_key_hash.Set.fold
+          (fun attester acc ->
+            acc + get_number_of_shards ~shard_assignment_level attester)
+          new_attesters
+          0
       in
-      let to_status =
-        match
-          Raw_level_repr.Map.find
-            published_level
-            published_level_to_shard_attestations
-        with
-        | None -> fun _slot -> nothing_attested
-        | Some slot_map -> (
-            fun slot ->
-              match
-                Dal_slot_index_repr.Map.find
-                  slot.Dal_slot_repr.Header.id.index
-                  slot_map
-              with
-              | None -> nothing_attested
-              | Some
-                  Dal_attestations_repr.Accountability.
-                    {attesters; attested_shards_count = attested_shards} ->
-                  let is_proto_attested =
-                    Dal_attestations_repr.Accountability.is_threshold_reached
-                      ~threshold:dal.attestation_threshold
-                      ~number_of_shards
-                      ~attested_shards
-                  in
-                  {
-                    total_shards = number_of_shards;
-                    attested_shards;
-                    attesters;
-                    is_proto_attested;
-                  })
+      let merged_shards = stored_status.attested_shards + shards_to_add in
+      let is_attested_now =
+        is_threshold_reached
+          ~threshold
+          ~number_of_shards
+          ~attested_shards:merged_shards
       in
-      if
-        Compare.Int.(
-          curr_attestation_lag = prev_attestation_lag || reset_dummy_genesis)
-      then
-        (* Normal path: process the next published level, or the first published
-           level if the previous genesis cell was the dummy value. *)
-        finalize_slot_headers_for_published_level
-          ctxt
-          published_level
-          ~number_of_slots
-          ~number_of_lags
-          ~attestation_lag:curr_attestation_lag
-          ~to_status
+      let merged_status =
+        {
+          total_shards = number_of_shards;
+          attested_shards = merged_shards;
+          attesters =
+            Signature.Public_key_hash.Set.union
+              stored_status.attesters
+              new_attesters;
+          is_proto_attested = is_attested_now;
+        }
+      in
+      let level_history =
+        Dal_slot_index_repr.Map.add slot_index merged_status level_history
+      in
+      let was_attested_before = stored_status.is_proto_attested in
+      let newly_attested_slots =
+        if (not was_attested_before) && is_attested_now then
+          slot_index :: newly_attested_slots
+        else newly_attested_slots
+      in
+      (level_history, newly_attested_slots)
+  in
+  (* Merge all slots for a single published level.
+     - [current_slot_map]: attestation data from THIS block for this level
+     - Returns updated history and newly attested slots map *)
+  let merge_level published_level current_slot_map (history, newly_attested) =
+    (* shard_assignment_level = published_level + attestation_lag - 1 *)
+    let shard_assignment_level =
+      Raw_level_repr.add published_level (attestation_lag - 1)
+    in
+    let stored_level_history =
+      match Raw_level_repr.Map.find published_level history with
+      | Some lh -> lh
+      | None -> Dal_slot_index_repr.Map.empty
+    in
+    let merged_level_history, level_newly_attested_slots =
+      Dal_slot_index_repr.Map.fold
+        (merge_slot ~shard_assignment_level)
+        current_slot_map
+        (stored_level_history, [])
+    in
+    let history =
+      Raw_level_repr.Map.add published_level merged_level_history history
+    in
+    let newly_attested =
+      if List.is_empty level_newly_attested_slots then newly_attested
       else
-        let () =
-          assert (Compare.Int.(curr_attestation_lag < prev_attestation_lag))
-        in
-        let* previous_number_of_slots =
-          match Raw_level_repr.pred published_level with
-          | None -> return number_of_slots
-          | Some pred_level ->
-              let+ past_dal_parameters =
-                Dal_storage.parameters ctxt pred_level
-              in
-              past_dal_parameters.number_of_slots
-        in
-        (* Migration path: there are missing published levels between the
-           skip-list head and [published_level] because attestation_lag has
-           shrunk at migration from [prev_attestation_lag] to
-           [curr_attestation_lag].
+        Raw_level_repr.Map.add
+          published_level
+          level_newly_attested_slots
+          newly_attested
+    in
+    (history, newly_attested)
+  in
+  (* Merge current block's accountability into stored history *)
+  Raw_level_repr.Map.fold
+    merge_level
+    (get_shard_attestations current_block_accountability)
+    (stored_history, Raw_level_repr.Map.empty)
 
-           We will backfill the missing [prev_attestation_lag -
-           curr_attestation_lag] levels with 32 cells each. *)
-        finalize_slot_headers_at_lag_migration
-          ~to_status
-          ~prev_attestation_lag
-          ~curr_attestation_lag
-          ctxt
-          ~target_published_level:published_level
-          ~number_of_slots:previous_number_of_slots
-          ~number_of_lags
+(** [newly_attested_to_bitset ~number_of_slots ~attestation_lags ~current_level
+    newly_attested_by_level] converts a map from published_level to slot_indices
+    to a [Dal_attestations_repr.t] bitset. *)
+let newly_attested_to_bitset ~number_of_slots ~attestation_lags ~current_level
+    newly_attested_by_level =
+  let number_of_lags = List.length attestation_lags in
+  Raw_level_repr.Map.fold
+    (fun published_level slot_indices bitset ->
+      let lag = Raw_level_repr.diff current_level published_level in
+      let lag_index =
+        match List.find_index (Compare.Int32.equal lag) attestation_lags with
+        | None ->
+            (* By construction, [newly_attested_by_level] contains only valid
+               level of the form [current_level + lag]), with [lag] in
+               [attestation_lags]. *)
+            assert false
+        | Some i -> i
+      in
+      List.fold_left
+        (fun bitset slot_index ->
+          Dal_attestations_repr.Slot_availability.commit
+            bitset
+            ~number_of_slots
+            ~number_of_lags
+            ~lag_index
+            slot_index)
+        bitset
+        slot_indices)
+    newly_attested_by_level
+    Dal_attestations_repr.Slot_availability.empty
+
+let update_skip_list ctxt ~stored_history ~updated_history newly_attested
+    ~current_level ~attestation_lag ~number_of_slots ~number_of_shards =
+  let open Lwt_result_syntax in
+  let* slots_history = get_slot_headers_history ctxt in
+  (* We expect to put at most [attestation_lag * number_of_slots] cells in the
+     cache. *)
+  let cache =
+    Dal_slot_repr.History.History_cache.empty
+      ~capacity:(Int64.of_int (attestation_lag * number_of_slots))
+  in
+  let find_slot ~published_level ~slot_index history =
+    match Raw_level_repr.Map.find published_level history with
+    | None -> None
+    | Some level_map -> Dal_slot_index_repr.Map.find slot_index level_map
+  in
+  let finalized_level = Raw_level_repr.sub current_level attestation_lag in
+  let newly_attested =
+    (* Make sure there is a key in [newly_attested] for [finalized_level] *)
+    match finalized_level with
+    | None -> newly_attested
+    | Some level -> (
+        match Raw_level_repr.Map.find level newly_attested with
+        | None -> Raw_level_repr.Map.add level [] newly_attested
+        | Some _ -> newly_attested)
+  in
+  let* slots_history, cache =
+    Raw_level_repr.Map.fold_es
+      (fun published_level newly_attested_slot_indices (slots_history, cache) ->
+        (* Get slot headers for this level *)
+        let* published_slots_opt = find_slot_headers ctxt published_level in
+        match published_slots_opt with
+        | None ->
+            (* No slots published at this level, nothing to update *)
+            return (slots_history, cache)
+        | Some published_slots ->
+            let is_finalized_level =
+              match finalized_level with
+              | None -> false
+              | Some level ->
+                  assert (Raw_level_repr.(level <= published_level)) ;
+                  Raw_level_repr.(level = published_level)
+            in
+            let slots =
+              List.filter_map
+                (fun (slot, slot_publisher) ->
+                  let slot_index = slot.Dal_slot_repr.Header.id.index in
+                  let is_newly_attested =
+                    List.exists
+                      (fun idx -> Dal_slot_index_repr.equal idx slot_index)
+                      newly_attested_slot_indices
+                  in
+                  (* Get/compute the new status if a cell is to be inserted, or
+                     return [None] otherwise *)
+                  let status_opt =
+                    if is_newly_attested then
+                      match
+                        find_slot ~published_level ~slot_index updated_history
+                      with
+                      | None -> (* it was just added there... *) assert false
+                      | v -> v
+                    else if is_finalized_level then
+                      (* We add a cell only if we didn't do it before. *)
+                      match
+                        find_slot ~published_level ~slot_index stored_history
+                      with
+                      | None ->
+                          Some
+                            Dal_attestations_repr.Accountability.
+                              {
+                                is_proto_attested = false;
+                                attested_shards = 0;
+                                total_shards = number_of_shards;
+                                attesters = Signature.Public_key_hash.Set.empty;
+                              }
+                      | Some status -> (
+                          if
+                            status
+                              .Dal_attestations_repr.Accountability
+                               .is_proto_attested
+                          then
+                            (* It was previously attested, then it was already
+                               inserted. *)
+                            None
+                          else
+                            (* Fetch the updated status *)
+                            match
+                              find_slot
+                                ~published_level
+                                ~slot_index
+                                updated_history
+                            with
+                            | None ->
+                                (* If it was in the previous history, it should
+                                   be in the current history. *)
+                                assert false
+                            | v -> v)
+                    else None
+                  in
+                  match status_opt with
+                  | None -> None
+                  | Some status -> Some (slot, slot_publisher, Some status))
+                published_slots
+            in
+            let actual_lag =
+              Raw_level_repr.diff current_level published_level |> Int32.to_int
+            in
+            let*? slots_history, cache =
+              Dal_slot_repr.History.update_skip_list
+                slots_history
+                cache
+                ~published_level
+                ~number_of_slots
+                ~attestation_lag:(Dynamic actual_lag)
+                ~slots
+                ~fill_unpublished_gaps:false
+            in
+            return (slots_history, cache))
+      newly_attested
+      (slots_history, cache)
+  in
+  let* published_slots_opt = find_slot_headers ctxt current_level in
+  let published_headers =
+    match published_slots_opt with None -> [] | Some v -> v
+  in
+  (* For newly published slots at [current_level], pass [status = None] so they
+     are skipped. Unpublished slots at [current_level] will have cells added with
+     [attestation_lag = 0], making their status immediately queryable. Published
+     slots will have cells added later when their attestation status is known. *)
+  let slots =
+    List.map
+      (fun (header, publisher) -> (header, publisher, None))
+      published_headers
+  in
+  let*? slots_history, cache =
+    Dal_slot_repr.History.update_skip_list
+      slots_history
+      cache
+      ~published_level:current_level
+      ~number_of_slots
+      ~attestation_lag:(Dynamic 0)
+      ~slots
+      ~fill_unpublished_gaps:true
+  in
+  let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
+  let*! ctxt =
+    Dal_slot_repr.History.History_cache.(view cache |> Map.bindings)
+    |> Storage.Dal.Slot.LevelHistories.add ctxt
+  in
+  return ctxt
+
+(** [finalize_attestation_history ctxt] merges the current block's
+    accountability with stored history, updates storage, and returns the newly
+    attested slots as a bitset. *)
+let finalize_attestation_history ctxt =
+  let open Lwt_result_syntax in
+  let {Level_repr.level = current_level; _} = Raw_context.current_level ctxt in
+  let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
+  let attestation_lag = dal.attestation_lag in
+  let threshold = dal.attestation_threshold in
+  let number_of_shards = dal.cryptobox_parameters.number_of_shards in
+  let current_block_accountability = Raw_context.Dal.get_accountability ctxt in
+  let* stored_history_opt = Storage.Dal.AttestationHistory.find ctxt in
+  let stored_history =
+    Option.value
+      ~default:Dal_attestations_repr.Accountability.empty_history
+      stored_history_opt
+  in
+  let get_number_of_shards = get_number_of_shards ctxt in
+  let updated_history, newly_attested =
+    merge_attestation_history
+      ~attestation_lag
+      ~threshold
+      ~number_of_shards
+      ~get_number_of_shards
+      current_block_accountability
+      stored_history
+  in
+  let number_of_slots = dal.number_of_slots in
+  let* ctxt =
+    update_skip_list
+      ctxt
+      ~stored_history
+      ~updated_history
+      newly_attested
+      ~current_level
+      ~attestation_lag
+      ~number_of_slots
+      ~number_of_shards
+  in
+  (* Drop finalized levels: those with [published_level <= current_level -
+     attestation_lag] *)
+  let finalized_threshold = Raw_level_repr.sub current_level attestation_lag in
+  let pruned_history =
+    match finalized_threshold with
+    | None ->
+        updated_history (* [current_level < attestation_lag], keep everything *)
+    | Some threshold_level ->
+        Raw_level_repr.Map.filter
+          (fun published_level _ ->
+            Raw_level_repr.(published_level > threshold_level))
+          updated_history
+  in
+  let*! ctxt = Storage.Dal.AttestationHistory.add ctxt pruned_history in
+  let*! ctxt =
+    match Raw_level_repr.sub current_level attestation_lag with
+    | Some published_level -> remove_old_headers ctxt ~published_level
+    | None -> Lwt.return ctxt
+  in
+  let attestation_bitset =
+    newly_attested_to_bitset
+      ~number_of_slots
+      ~attestation_lags:(List.map Int32.of_int dal.attestation_lags)
+      ~current_level
+      newly_attested
+  in
+  return (ctxt, attestation_bitset)
+
+let finalize_pending_slot_headers ctxt =
+  let open Lwt_result_syntax in
+  let* sl_history_head = get_slot_headers_history ctxt in
+  let Dal_slot_repr.History.
+        {header_id = _; attestation_lag = last_attestation_lag} =
+    Dal_slot_repr.History.(content sl_history_head |> content_id)
+  in
+  let dynamic_lag =
+    match last_attestation_lag with
+    | Dal_slot_repr.History.Legacy -> false
+    | Dynamic _ -> true
+  in
+  let reset_dummy_genesis =
+    Dal_slot_repr.History.(equal sl_history_head genesis)
+  in
+  if dynamic_lag || reset_dummy_genesis then
+    (* Normal path: use new multi-lag attestation history. *)
+    finalize_attestation_history ctxt
+  else (* DEALT WITH IN THE NEXT COMMITS *) assert false

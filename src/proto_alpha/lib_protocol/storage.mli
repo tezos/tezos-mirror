@@ -1176,12 +1176,10 @@ module Dal : sig
          and type value = Dal_slot_repr.History.t
 
     (** This single entry stores the cells of the DAL skip list constructed
-        during the block under validation. The list is expected to have exactly
-        [number_of_slots] elements, except at the migration from T to U, where
-        it is a few times longer. Its cells ordering is not specified (and not
-        relevant). A cell's binary encoding is bounded (the only part that is
-        evolving in size over time is the number of backpointers, which is
-        bounded by 64). *)
+        during the block under validation. Its cells ordering is not specified
+        (and not relevant). A cell's binary encoding is bounded (the only part
+        that is evolving in size over time is the number of backpointers, which
+        is bounded by 64). *)
     module LevelHistories :
       Single_data_storage
         with type t := Raw_context.t

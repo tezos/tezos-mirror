@@ -75,8 +75,8 @@ val find_level_histories :
    context.  *)
 val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 
-(** [finalize_pending_slot_headers ctxt] finalizes pending slot
-    headers which are old enough (i.e. registered at level [current_level -
+(** [finalize_pending_slot_headers ctxt] finalizes pending slot headers which
+    are old enough (i.e. registered at level [current_level -
     attestation_lag]). All slots marked as available are returned. All the
     pending slots at [current_level - attestation_lag] level are removed from
     the context. *)
