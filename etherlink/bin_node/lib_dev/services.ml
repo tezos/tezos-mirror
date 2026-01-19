@@ -982,9 +982,14 @@ let dispatch_request (type f) ~websocket
             build_with_input ~f module_ parameters
         | Tezosx.Get_tezos_ethereum_address.Method ->
             let f tezos_address =
-              Tezos_crypto.Signature.V2.Of_V_latest.get_public_key_hash_exn
-                tezos_address
-              |> Tezosx_mod.Tezos_runtime.ethereum_alias |> rpc_ok
+              tezos_address |> Signature.V2.Public_key_hash.to_bytes
+              |> Tezosx_mod.Ethereum_runtime.generate_alias |> rpc_ok
+            in
+            build_with_input ~f module_ parameters
+        | Tezosx.Get_ethereum_tezos_address.Method ->
+            let f ethereum_address =
+              ethereum_address |> Ethereum_types.encode_address
+              |> Tezosx_mod.Tezos_runtime.generate_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->

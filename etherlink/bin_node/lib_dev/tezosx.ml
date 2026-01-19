@@ -33,6 +33,13 @@ module Ethereum_runtime = struct
       let+ (`Hex hex) = Misc.normalize_hex address in
       Ethereum_types.Address (Hex hex)
     else tzfail (error_of_fmt "%s is not a valid Ethereum address" address)
+
+  let generate_alias bytes =
+    let (`Hex alias) =
+      let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest bytes in
+      Hex.of_bytes (Bytes.sub alias 0 20)
+    in
+    Ethereum_types.Address (Hex alias)
 end
 
 module Tezos_runtime = struct
@@ -104,15 +111,15 @@ module Tezos_runtime = struct
     in
     Rlp.encode Rlp.(List [Value balance; Value nonce; public_key])
 
-  let ethereum_alias pkh =
-    let (`Hex alias) =
-      let str = Signature.V2.Public_key_hash.to_b58check pkh in
-      let alias =
-        Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.unsafe_of_string str)
-      in
-      Hex.of_bytes (Bytes.sub alias 0 20)
+  let generate_alias bytes =
+    let blake_hash = Tezos_crypto.Blake2B.hash_bytes [bytes] in
+    let bytes = Tezos_crypto.Blake2B.to_bytes blake_hash in
+    let tezos_alias =
+      Tezos_types.Contract.of_originated
+        (Tezlink_imports.Imported_protocol.Contract_hash.of_bytes_exn
+           (Bytes.sub bytes 0 20))
     in
-    Ethereum_types.Address (Hex alias)
+    tezos_alias
 end
 
 module Foreign_address = struct
@@ -149,7 +156,10 @@ module Durable_storage_path = struct
         ^ "/info"
 
       let ethereum_alias pkh =
-        let (Address (Hex alias)) = Tezos_runtime.ethereum_alias pkh in
+        let (Address (Hex alias)) =
+          Ethereum_runtime.generate_alias
+            (Bytes.of_string (Signature.V2.Public_key_hash.to_b58check pkh))
+        in
         "/evm/world_state/eth_accounts/tezos/native/ethereum/0x" ^ alias
     end
   end

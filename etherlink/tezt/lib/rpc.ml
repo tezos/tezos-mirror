@@ -357,6 +357,12 @@ module Request = struct
       method_ = "tez_getTezosEthereumAddress";
       parameters = `String tezos_address;
     }
+
+  let tez_getEthereumTezosAddress ethereum_address =
+    {
+      method_ = "tez_getEthereumTezosAddress";
+      parameters = `String ethereum_address;
+    }
 end
 
 let net_version ?websocket evm_node =
@@ -861,6 +867,16 @@ module Tezosx = struct
         ?websocket
         evm_node
         (Request.tez_getTezosEthereumAddress tezos_address)
+    in
+    let decode_result response = JSON.(response |-> "result" |> as_string) in
+    return @@ decode_or_error decode_result response
+
+  let tez_getEthereumTezosAddress ?websocket ethereum_address evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getEthereumTezosAddress ethereum_address)
     in
     let decode_result response = JSON.(response |-> "result" |> as_string) in
     return @@ decode_or_error decode_result response

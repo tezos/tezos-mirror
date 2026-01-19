@@ -269,7 +269,10 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
           }
       in
       let address = Signature.V2.Public_key.hash manager in
-      let (Address (Hex alias)) = Tezosx.Tezos_runtime.ethereum_alias address in
+      let (Address (Hex alias)) =
+        Tezosx.Ethereum_runtime.generate_alias
+          (Bytes.of_string (Signature.V2.Public_key_hash.to_b58check address))
+      in
       let payload =
         Tezosx.Tezos_runtime.encode_account_info tezos_account_info
       in

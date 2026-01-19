@@ -408,4 +408,10 @@ module Tezosx : sig
     string ->
     Evm_node.t ->
     (string, error) result Lwt.t
+
+  val tez_getEthereumTezosAddress :
+    ?websocket:Websocket.t ->
+    string ->
+    Evm_node.t ->
+    (string, error) result Lwt.t
 end
