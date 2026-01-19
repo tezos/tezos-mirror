@@ -88,14 +88,6 @@ a different label for RPC endpoints (e.g., ``exported_endpoint``), you can confi
 
     ENDPOINT_LABEL=exported_endpoint
 
-By default, the logs are filtered using the ``job`` label. If you need to use
-a different label for filtering logs (e.g., ``service``), you can configure it with ``LOGS_LABEL``:
-
-.. code-block:: shell
-
-    LOGS_LABEL=service
-
-
 If you need hardware metrics, note that, by default, the storage stat considered is the used
 space of the whole disk. Optionnally you can enable storage monitoring with ``filecheck``:
 
