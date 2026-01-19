@@ -84,7 +84,6 @@ esac
 
 export GPG_TTY=/dev/console
 echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import --
-GPG_EMAIL=$(gpg --list-keys --with-colons "$GPG_KEY_ID" | grep uid | cut -d':' -f10)
 rpm -v --import "$GPG_PUBLIC_KEY"
 
 mkdir -p "$TARGETDIR/dists"
@@ -123,7 +122,7 @@ for release in $RELEASES; do
         echo "Error signing $file"
         exit 1
       }
-      rpm --define "_gpg_name $GPG_EMAIL" --resign "$file" || {
+      rpm --define "_gpg_name $GPG_KEY_ID" --resign "$file" || {
         echo "Error resigning $file"
         exit 1
       }
