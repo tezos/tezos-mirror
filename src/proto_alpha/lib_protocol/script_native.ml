@@ -9,6 +9,17 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+(** Returns the same error as when executing [PUSH string
+    <error_mnemonic> ; FAILWITH] in a script.
+
+    Used in native contracts that must be FA2.1-compliant, so that
+    errors that are specified in the standard will behave identically
+    to scripted FA2.1 contracts.  *)
+let standard_error ~mnemonic =
+  let open Micheline in
+  Script_interpreter_errors.Reject
+    (dummy_location, strip_locations (String (dummy_location, mnemonic)), None)
+
 module CLST_contract = struct
   open Script_native_types.CLST_types
 
@@ -139,11 +150,126 @@ module CLST_contract = struct
       ( (Script_list.of_list [op], (new_ledger, total_supply), balance_updates),
         ctxt )
 
+  let check_token_id token_id =
+    error_unless
+      Compare.Int.(
+        Script_int.(compare token_id Clst_contract_storage.token_id) = 0)
+      (standard_error ~mnemonic:"FA2_TOKEN_UNDEFINED")
+
+  (** Implementation of the [transfer] entrypoint, compliant with the
+      FA2.1 standard:
+      https://tzip.tezosagora.org/proposal/tzip-26/#entrypoint-semantics
+
+      This implementation is not optimized: the storage is updated
+      with each individual transfer. It would be more efficient to
+      keep the balances of affected accounts in memory and update the
+      storage only at the end, but this is good enough and less
+      error-prone. *)
+  let execute_transfer (ctxt, (step_constants : Script_typed_ir.step_constants))
+      (transfer : transfer) (storage : storage) :
+      ((operation Script_list.t * storage * Receipt.balance_updates) * context)
+      tzresult
+      Lwt.t =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_unless
+        Tez.(step_constants.amount = zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let execute_one from_ (ctxt, storage) (to_, (token_id, amount)) =
+      let*? () = check_token_id token_id in
+      (* Checking that [from_] is the sender here instead of in
+         [execute_from] means that we repeat the check for each new
+         transfer from the same origin. On the other hand, it lets the
+         whole execution succeed if [from_] is not the sender but its
+         associated list of transfers is empty, which satisfies the
+         atomical behavior prescribed by the standard. Moreover, once
+         operators are implemented, the transferred [amount] will be
+         relevant to determining permission. *)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8214
+         Update permission policy once operators are implemented *)
+      let from_is_sender =
+        let {destination; entrypoint} = from_ in
+        Destination.equal destination step_constants.sender
+        && Entrypoint.is_default entrypoint
+      in
+      let*? () =
+        error_unless
+          from_is_sender
+          (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
+      in
+      (* Smart contracts cannot hold tokens at all.
+
+         We do check that [from_] is implicit too, because otherwise a
+         transfer of zero would succeed and make it appear in the
+         storage, which might break invariants in some tools. *)
+      let*? () =
+        error_unless
+          (is_implicit from_.destination)
+          (Non_implicit_contract from_.destination)
+      in
+      let*? () =
+        error_unless
+          (is_implicit to_.destination)
+          (Non_implicit_contract to_.destination)
+      in
+      let* balance_from, ctxt =
+        Clst_contract_storage.get_balance_from_storage ctxt storage from_
+      in
+      let*? () =
+        error_when
+          Compare.Int.(Script_int.compare balance_from amount < 0)
+          (standard_error ~mnemonic:"FA2_INSUFFICIENT_BALANCE")
+      in
+      (* Note: Transferring 0 from or to an account that didn't have a
+         balance, will set its balance to 0. This is in accordance
+         with the FA2 standard: transfers of zero must be treated as
+         normal transfers.
+
+         And if we ever want to add an invariant that accounts with no
+         tokens are not present at all in the ledger, then it's
+         probably {!Clst_storage.set_balance_from_storage}'s job to
+         enforce it anyway. *)
+      let* storage, ctxt =
+        Clst_contract_storage.set_balance_from_storage
+          ctxt
+          storage
+          from_
+          Script_int.(abs (sub balance_from amount))
+      in
+      let* balance_to, ctxt =
+        Clst_contract_storage.get_balance_from_storage ctxt storage to_
+      in
+      let* storage, ctxt =
+        Clst_contract_storage.set_balance_from_storage
+          ctxt
+          storage
+          to_
+          Script_int.(add_n balance_to amount)
+      in
+      return (ctxt, storage)
+    in
+    let execute_from (ctxt, storage) (from_, txs) =
+      List.fold_left_es
+        (execute_one from_)
+        (ctxt, storage)
+        (Script_list.to_list txs)
+    in
+    let* ctxt, storage =
+      List.fold_left_es
+        execute_from
+        (ctxt, storage)
+        (Script_list.to_list transfer)
+    in
+    return ((Script_list.empty, storage, []), ctxt)
+
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
     match entrypoint_from_arg value with
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
     | Withdraw amount -> execute_withdraw (ctxt, step_constants) amount storage
+    | Transfer transfer ->
+        execute_transfer (ctxt, step_constants) transfer storage
 
   module Views = struct
     let balance : storage ex_view tzresult =
@@ -257,11 +383,14 @@ let () =
     `Branch
     ~id:"clst.non_implicit_contract"
     ~title:"Non implicit contract"
-    ~description:"Only implicit contracts can deposit on CLST."
+    ~description:
+      "Only implicit contracts can deposit on CLST, or be the origin or \
+       destination of token transfers."
     ~pp:(fun ppf address ->
       Format.fprintf
         ppf
-        "Only implicit contracts can deposit, %a is not implicit."
+        "Only implicit contracts can deposit on CLST, or be the origin or \
+         destination of token transfers; %a is not implicit."
         Destination.pp
         address)
     Data_encoding.(obj1 (req "address" Destination.encoding))

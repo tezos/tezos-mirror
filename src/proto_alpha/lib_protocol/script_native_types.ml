@@ -148,7 +148,15 @@ module CLST_types = struct
 
   type withdraw = nat
 
-  type arg = (deposit, withdraw) or_
+  type transfer =
+    ( address (* from_ *),
+      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
+      Script_list.t
+    (* txs *) )
+    pair
+    Script_list.t
+
+  type arg = (deposit, (withdraw, transfer) or_) or_
 
   type ledger = (address, nat) big_map
 
@@ -156,15 +164,20 @@ module CLST_types = struct
 
   type storage = ledger * total_supply
 
-  type entrypoint = Deposit of deposit | Withdraw of withdraw
+  type entrypoint =
+    | Deposit of deposit
+    | Withdraw of withdraw
+    | Transfer of transfer
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L p -> Deposit p
-    | R p -> Withdraw p
+    | R (L p) -> Withdraw p
+    | R (R p) -> Transfer p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L p
-    | Withdraw p -> R p
+    | Withdraw p -> R (L p)
+    | Transfer p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -172,11 +185,24 @@ module CLST_types = struct
   let withdraw_type : (withdraw ty_node * withdraw entrypoints_node) tzresult =
     make_entrypoint_leaf "withdraw" nat_ty
 
+  let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* token_id_and_amount =
+      pair_ty (add_name "token_id" nat_ty) (add_name "amount" nat_ty)
+    in
+    let* tx = pair_ty (add_name "to_" address_ty) token_id_and_amount in
+    let* txs = list_ty tx in
+    let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
+    let* transfer = list_ty elt in
+    make_entrypoint_leaf "transfer" transfer
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* withdraw_type in
-    let* arg_type = make_entrypoint_node deposit_type withdraw_type in
+    let* transfer_type in
+    let* r1 = make_entrypoint_node withdraw_type transfer_type in
+    let* arg_type = make_entrypoint_node deposit_type r1 in
     return (finalize_entrypoint arg_type)
 
   let storage_type : storage ty_node tzresult =
