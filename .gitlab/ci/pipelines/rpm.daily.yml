@@ -60,7 +60,7 @@ oc.docker-build-rockylinux-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -95,7 +95,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -140,7 +140,7 @@ oc.build-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
@@ -184,13 +184,13 @@ oc.build-rockylinux-data:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -209,7 +209,7 @@ rpm_repo_rockylinux:
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
+  - ./scripts/ci/create_rpm_repo.sh rockylinux 9
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -472,8 +472,8 @@ oc.install_bin_fedora_39_systemd:
     DISTRIBUTION: fedora
     RELEASE: "39"
 
-oc.install_bin_rockylinux_9.3.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-07a4c8c9
+oc.install_bin_rockylinux_9.doc:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
   stage: publishing_tests
   tags:
   - gcp
@@ -487,13 +487,13 @@ oc.install_bin_rockylinux_9.3.doc:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
+  - ./docs/introduction/install-bin-rpm.sh rockylinux 9
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_rockylinux_93_systemd:
+oc.install_bin_rockylinux_9_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -524,4 +524,4 @@ oc.install_bin_rockylinux_93_systemd:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    RELEASE: "9.3"
+    RELEASE: "9"

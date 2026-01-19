@@ -637,7 +637,7 @@ oc.docker-build-rockylinux-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -671,7 +671,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -715,7 +715,7 @@ oc.build-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
@@ -758,13 +758,13 @@ oc.build-rockylinux-data:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -782,7 +782,7 @@ rpm_repo_rockylinux:
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
+  - ./scripts/ci/create_rpm_repo.sh rockylinux 9
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
