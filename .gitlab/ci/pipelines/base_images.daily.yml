@@ -178,6 +178,8 @@ oc.base-images.rockylinux:
       - "9.3"
       - "9.6"
       - "10.0"
+      - "9"
+      - "10"
 
 oc.base-images.rust:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

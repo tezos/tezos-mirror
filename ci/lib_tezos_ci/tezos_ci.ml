@@ -1584,6 +1584,10 @@ module Images = struct
 
     let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
 
+    let rockylinux_9 = make_img "rockylinux:9.6" rpm_version
+
+    let rockylinux_10 = make_img "rockylinux:10.0" rpm_version
+
     let fedora_39 = make_img "fedora:39" rpm_version
 
     let fedora_41 = make_img "fedora:41" rpm_version

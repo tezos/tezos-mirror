@@ -519,6 +519,68 @@ container_scanning_tezos-rockylinux-10.0-master-6253f76a:
     paths:
     - gl-container-scanning-report-tezos-rockylinux-10.0-master-6253f76a.json
 
+container_scanning_tezos-rockylinux-9-master-6253f76a:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-rockylinux-9-master-6253f76a.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-rockylinux-9-master-6253f76a.json
+
+container_scanning_tezos-rockylinux-10-master-6253f76a:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10-master-6253f76a
+    REPORT: gl-container-scanning-report-tezos-rockylinux-10-master-6253f76a.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-rockylinux-10-master-6253f76a.json
+
 container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
   stage: test
@@ -541,6 +603,8 @@ container_scanning_merge_reports:
   - container_scanning_tezos-rockylinux-9.3-master-6253f76a
   - container_scanning_tezos-rockylinux-9.6-master-6253f76a
   - container_scanning_tezos-rockylinux-10.0-master-6253f76a
+  - container_scanning_tezos-rockylinux-9-master-6253f76a
+  - container_scanning_tezos-rockylinux-10-master-6253f76a
   dependencies:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
@@ -558,6 +622,8 @@ container_scanning_merge_reports:
   - container_scanning_tezos-rockylinux-9.3-master-6253f76a
   - container_scanning_tezos-rockylinux-9.6-master-6253f76a
   - container_scanning_tezos-rockylinux-10.0-master-6253f76a
+  - container_scanning_tezos-rockylinux-9-master-6253f76a
+  - container_scanning_tezos-rockylinux-10-master-6253f76a
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
