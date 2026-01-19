@@ -364,3 +364,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
   | true, Beta_release_tag -> [job_release_page]
   | _ -> []
+
+let octez_packaging_revision_jobs =
+  [(* Stage: start *) job_datadog_pipeline_trace]
