@@ -114,10 +114,9 @@ module CLST_contract = struct
 
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
-    match value with
-    | L () (* deposit *) -> execute_deposit (ctxt, step_constants) () storage
-    | R amount (* withdraw *) ->
-        execute_withdraw (ctxt, step_constants) amount storage
+    match entrypoint_from_arg value with
+    | Deposit () -> execute_deposit (ctxt, step_constants) () storage
+    | Withdraw amount -> execute_withdraw (ctxt, step_constants) amount storage
 
   module Views = struct
     let balance : storage ex_view tzresult =

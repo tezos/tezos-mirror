@@ -35,6 +35,12 @@ module CLST_types : sig
 
   type total_supply_view = (unit, nat) view_type
 
+  type entrypoint = Deposit of deposit | Withdraw of withdraw
+
+  val entrypoint_from_arg : arg -> entrypoint
+
+  val entrypoint_to_arg : entrypoint -> arg
+
   val balance_view_ty : balance_view tzresult
 
   val total_supply_view_ty : total_supply_view
