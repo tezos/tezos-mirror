@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -10,12 +10,12 @@ pub struct PredeployedContract {
     pub code_hash: FixedBytes<32>,
 }
 
-pub(crate) const WITHDRAWAL_SOL_CONTRACT: PredeployedContract = PredeployedContract {
-    code: include_bytes!("../../contracts/predeployed/withdrawal.bin"),
+pub(crate) const XTZ_BRIDGE_SOL_CONTRACT: PredeployedContract = PredeployedContract {
+    code: include_bytes!("../../contracts/predeployed/xtz_bridge.bin"),
     code_hash: FixedBytes::new([
-        0x4a, 0xf6, 0x89, 0x51, 0x1e, 0xd7, 0xfc, 0x42, 0x02, 0xe5, 0x26, 0xcb, 0x25,
-        0x6c, 0x1f, 0x91, 0xd3, 0xb4, 0x26, 0xdd, 0xd8, 0x17, 0x26, 0x04, 0xe4, 0x12,
-        0xdb, 0x32, 0x6d, 0x74, 0x8e, 0xc8,
+        0x9e, 0xdc, 0xd4, 0x33, 0xbd, 0x87, 0x5a, 0x54, 0x0e, 0xd1, 0x58, 0xec, 0x5c,
+        0xe4, 0xc9, 0xb3, 0xb0, 0xac, 0xb8, 0x3c, 0xb1, 0x52, 0xb1, 0x84, 0xd5, 0x93,
+        0xa9, 0x0d, 0xeb, 0x77, 0x5f, 0xbe,
     ]),
 };
 
@@ -40,7 +40,7 @@ pub(crate) const INTERNAL_FORWARDER_SOL_CONTRACT: PredeployedContract =
 
 pub const SYSTEM_SOL_ADDR: Address = Address::ZERO;
 
-pub const WITHDRAWAL_SOL_ADDR: Address = Address(FixedBytes::new([
+pub const XTZ_BRIDGE_SOL_ADDR: Address = Address(FixedBytes::new([
     0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 ]));
@@ -90,7 +90,7 @@ pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
 ]));
 
 pub(crate) const CUSTOMS: [Address; 7] = [
-    WITHDRAWAL_SOL_ADDR,
+    XTZ_BRIDGE_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
     TABLE_PRECOMPILE_ADDRESS,
@@ -127,6 +127,17 @@ pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;
 
 pub const FA_DEPOSIT_QUEUE_GAS_LIMIT: u64 = 0;
 
+// Rationale regarding the cost:
+// The execution cost is not meant to price the deposit operation economically.
+// Deposits are intended to be free for users.
+// This fixed cost exists solely to account for the EVM gas consumed by the
+// `handle_xtz_deposit` entrypoint and to deliberately limit any remaining gas,
+// preventing its use for unintended or malicious execution paths.
+// For this reason, the value is kept "small" but non-zero.
+// The exact max gas consuption is 164_261, which we round up as this does not
+// introduce any security concerns.
+pub const XTZ_DEPOSIT_EXECUTION_COST: u64 = 175_000;
+
 /// Overapproximation of the amount of ticks for parsing FA deposit.
 /// Also includes hashing costs.
 ///
@@ -144,7 +155,7 @@ pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 mod test {
     use super::{
         PredeployedContract, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_CONTRACT,
+        XTZ_BRIDGE_SOL_CONTRACT,
     };
 
     use crate::helpers::storage::bytes_hash;
@@ -166,8 +177,8 @@ mod test {
     }
 
     #[test]
-    fn check_withdrawal_sol_code_hash() {
-        check_code_hash_validity(&WITHDRAWAL_SOL_CONTRACT)
+    fn check_xtz_bridge_sol_code_hash() {
+        check_code_hash_validity(&XTZ_BRIDGE_SOL_CONTRACT)
     }
 
     #[test]

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -18,7 +18,7 @@ use tezos_smart_rollup_host::{
 use crate::{
     helpers::storage::{bytes_hash, concat, read_u64_le_default, write_u64_le},
     precompiles::constants::{
-        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
     },
     Error,
 };
@@ -135,9 +135,9 @@ impl CodeStorage {
 }
 
 pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, Error> {
-    if code_hash == &WITHDRAWAL_SOL_CONTRACT.code_hash {
+    if code_hash == &XTZ_BRIDGE_SOL_CONTRACT.code_hash {
         Ok(Some(Bytecode::new_legacy(Bytes::from_static(
-            WITHDRAWAL_SOL_CONTRACT.code,
+            XTZ_BRIDGE_SOL_CONTRACT.code,
         ))))
     } else if code_hash == &FA_BRIDGE_SOL_CONTRACT.code_hash {
         Ok(Some(Bytecode::new_legacy(Bytes::from_static(

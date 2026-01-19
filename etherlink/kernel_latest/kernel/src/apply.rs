@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-// SPDX-FileCopyrightText: 2023, 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023, 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 PK Lab <contact@pklab.io>
@@ -11,16 +11,14 @@ use anyhow::anyhow;
 use mir::ast::ChainId;
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
-use revm::primitives::{Address, Bytes, Log, B256};
+use revm::primitives::{Address, Bytes, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
-use revm_etherlink::inspectors::call_tracer::{
-    CallTrace, CallTracerConfig, CallTracerInput,
-};
-use revm_etherlink::inspectors::storage::store_call_trace;
+use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::{
     FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
+    XTZ_BRIDGE_SOL_ADDR, XTZ_DEPOSIT_EXECUTION_COST,
 };
 use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
@@ -53,7 +51,7 @@ use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::OperationError;
 use tezos_tracing::trace_kernel;
 
-use crate::bridge::{execute_etherlink_deposit, Deposit, DepositResult};
+use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
@@ -239,11 +237,11 @@ pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
 }
 
 pub struct TransactionResult {
-    caller: H160,
-    execution_outcome: ExecutionOutcome,
-    gas_used: U256,
-    estimated_ticks_used: u64,
-    runtime: TezosXRuntime,
+    pub caller: H160,
+    pub execution_outcome: ExecutionOutcome,
+    pub gas_used: U256,
+    pub estimated_ticks_used: u64,
+    pub runtime: TezosXRuntime,
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -445,65 +443,81 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     Ok(ExecutionResult::Valid(transaction_result))
 }
 
-fn trace_deposit<Host: Runtime>(
-    host: &mut Host,
-    amount: U256,
-    receiver: Option<H160>,
-    logs: &[Log],
-    tracer_input: Option<TracerInput>,
-) {
-    if let Some(TracerInput::CallTracer(CallTracerInput {
-        transaction_hash,
-        config: CallTracerConfig { with_logs, .. },
-    })) = tracer_input
-    {
-        let mut call_trace = CallTrace::new_minimal_trace(
-            "CALL".into(),
-            revm::primitives::Address::ZERO,
-            u256_to_alloy(&amount),
-            vec![],
-            0,
-        );
+sol! {
+    struct SolXTZDeposit {
+        address receiver;
+        uint256 inbox_level;
+        uint256 inbox_msg_id;
+    }
 
-        call_trace.add_to(receiver.map(|a| h160_to_alloy(&a)));
+    function handle_xtz_deposit(SolXTZDeposit memory deposit) external;
+}
 
-        if with_logs {
-            call_trace.add_logs(Some(logs.to_vec()));
+impl From<&Deposit> for SolXTZDeposit {
+    fn from(deposit: &Deposit) -> Self {
+        SolXTZDeposit {
+            receiver: h160_to_alloy(&deposit.receiver.to_h160().unwrap_or_default()),
+            inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level)),
+            inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id)),
         }
-
-        let _ = store_call_trace(host, &call_trace, &transaction_hash);
     }
 }
 
-fn apply_deposit<Host: Runtime>(
+pub fn pure_xtz_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
-    transaction: &Transaction,
+    block_constants: &BlockConstants,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
+    maximum_gas_limit: u64,
+    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
-) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let DepositResult {
-        outcome: execution_outcome,
-        estimated_ticks_used,
-        runtime,
-    } = execute_etherlink_deposit(host, deposit).map_err(|e| {
-        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
-    })?;
+) -> Result<ExecutionOutcome, Error> {
+    // Fees are set to zero, this is an internal call to the XTZ bridge
+    // solidity contract.
+    // It isn't required for anyone to pay for the execution cost.
+    let block_constants = BlockConstants {
+        block_fees: BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+        ..*block_constants
+    };
 
-    trace_deposit(
+    let caller = alloy_to_h160(&FEED_DEPOSIT_ADDR);
+    let mut caller_account = StorageAccount::from_address(&FEED_DEPOSIT_ADDR)?;
+    let to = Some(alloy_to_h160(&XTZ_BRIDGE_SOL_ADDR));
+    let gas_limit = XTZ_DEPOSIT_EXECUTION_COST;
+    let value = deposit.amount;
+    // We prefund the feeder address for the xtz deposit.
+    caller_account.add_balance(host, u256_to_alloy(&value))?;
+    let call_data = handle_xtz_depositCall {
+        deposit: SolXTZDeposit::from(deposit),
+    }
+    .abi_encode();
+    let effective_gas_price = block_constants.base_fee_per_gas();
+    match revm_run_transaction(
         host,
-        transaction.value(),
-        transaction.to()?,
-        execution_outcome.result.logs(),
+        &block_constants,
+        Some(transaction_hash),
+        caller,
+        to,
+        value,
+        call_data,
+        gas_limit,
+        effective_gas_price,
+        maximum_gas_limit,
+        Vec::new(),
+        None,
+        spec_id,
         tracer_input,
-    );
-
-    Ok(ExecutionResult::Valid(TransactionResult {
-        caller: H160::zero(),
-        gas_used: execution_outcome.result.gas_used().into(),
-        estimated_ticks_used,
-        execution_outcome,
-        runtime,
-    }))
+        false,
+    ) {
+        Ok(execution_outcome) => Ok(execution_outcome),
+        Err(err) => {
+            // Something went wrong, we remove the added balance for the xtz deposit.
+            caller_account.sub_balance(host, u256_to_alloy(&value))?;
+            Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                err.to_string(),
+            )))
+        }
+    }
 }
 
 sol! {
@@ -795,7 +809,15 @@ pub fn apply_transaction<Host: Runtime>(
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
-            apply_deposit(host, deposit, transaction, tracer_input)?
+            apply_tezosx_xtz_deposit(
+                host,
+                deposit,
+                block_constants,
+                transaction.tx_hash,
+                tracer_input,
+                spec_id,
+                limits,
+            )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");

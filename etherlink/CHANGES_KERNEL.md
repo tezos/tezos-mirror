@@ -9,6 +9,11 @@ Its storage version is 45.
 ### Bug fixes
 
 - Cleanup remaining leftover block indexes from V41 migration. (!20187)
+- EIP-7702 accounts will now have their code executed automatically when
+  XTZ deposits are received via the L1 bridge.
+  Note that the deposit event is now called via the XTZ Bridge
+  `0xff00000000000000000000000000000000000001` and not the "system" address
+  which was `0x0000000000000000000000000000000000000000`. (!20352)
 
 ### Internal
 

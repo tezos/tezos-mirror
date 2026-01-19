@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -2357,7 +2357,7 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
     ~receiver () =
   let label = "withdraw" in
   let* already_registered = Eth_cli.check_abi ~label () in
-  let abi = withdrawal_abi_path () in
+  let abi = predep_xtz_bridge_abi_path () in
   let* () =
     if already_registered then Eth_cli.update_abi ~label ~abi ()
     else Eth_cli.add_abi ~label ~abi ()
@@ -2368,7 +2368,7 @@ let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
       ~source_private_key:sender.Eth_account.private_key
       ~endpoint
       ~abi_label:"withdraw"
-      ~address:Solidity_contracts.Precompile.withdrawal
+      ~address:Solidity_contracts.Precompile.xtz_bridge
       ~method_call:(sf {|withdraw_base58("%s")|} receiver)
       ~value
       ~gas:16_000_000

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -468,7 +468,7 @@ mod test {
             },
             constants::{
                 CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_BRIDGE_SOL_ADDR,
-                PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
+                PRECOMPILE_BURN_ADDRESS, XTZ_BRIDGE_SOL_ADDR,
             },
             initializer::init_precompile_bytecodes,
         },
@@ -934,7 +934,7 @@ mod test {
             &block_constants,
             None,
             caller,
-            Some(WITHDRAWAL_SOL_ADDR),
+            Some(XTZ_BRIDGE_SOL_ADDR),
             Bytes::from_hex(calldata).unwrap(),
             GasData::new(10_000_000, 0, GAS_LIMIT),
             withdrawn_amount,
@@ -953,7 +953,7 @@ mod test {
         assert!(result.is_success());
         let info = storage_account.info(&mut host).unwrap();
         assert_eq!(info.balance, U256::MAX.saturating_sub(withdrawn_amount));
-        let created_account = StorageAccount::from_address(&WITHDRAWAL_SOL_ADDR).unwrap();
+        let created_account = StorageAccount::from_address(&XTZ_BRIDGE_SOL_ADDR).unwrap();
         let created_account_info = created_account.info(&mut host).unwrap();
         assert_eq!(created_account_info.balance, U256::ZERO);
         let zero_account =
