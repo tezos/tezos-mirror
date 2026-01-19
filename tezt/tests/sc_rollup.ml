@@ -899,16 +899,6 @@ let wait_for_included_and_map_ops_content rollup_node node ~timeout
   in
   map_manager_op_from_block node ~block ~find_map_op_content
 
-let wait_for_get_messages_and_map_ops_content rollup_node node
-    ~find_map_op_content =
-  let* block =
-    Sc_rollup_node.wait_for
-      rollup_node
-      "smart_rollup_node_layer_1_get_messages.v0"
-    @@ fun json -> Some JSON.(json |-> "hash" |> as_string)
-  in
-  map_manager_op_from_block node ~block ~find_map_op_content
-
 let check_batcher_message_status response status =
   Check.((response = status) string)
     ~error_msg:"Status of message is %L but expected %R."
@@ -7188,17 +7178,53 @@ let test_injector_uses_available_keys ~kind =
     else None
   in
   let wait_for_get_messages_and_get_batches_pkhs () =
-    wait_for_get_messages_and_map_ops_content
-      rollup_node
-      node
-      ~find_map_op_content
+    let* level, block =
+      Sc_rollup_node.wait_for
+        ~timeout:10.
+        rollup_node
+        "smart_rollup_node_layer_1_get_messages.v0"
+      @@ fun json ->
+      let hash = JSON.(json |-> "hash" |> as_string) in
+      let level = JSON.(json |-> "level" |> as_int32) in
+      Some (level, hash)
+    in
+    let* l = map_manager_op_from_block node ~block ~find_map_op_content in
+    return (level, l)
   in
-  let wait_for_included_and_get_batches_pkhs () =
-    wait_for_included_and_map_ops_content
-      rollup_node
-      node
-      ~timeout:30.
-      ~find_map_op_content
+  let wait_twice_for_included_and_get_batches_pkhs () =
+    let p1, r1 = Lwt.wait () in
+    let p2, r2 = Lwt.wait () in
+    let get_op_content p =
+      let* level, block = p in
+      let* l = map_manager_op_from_block node ~block ~find_map_op_content in
+      return (level, l)
+    in
+    let seen_blocks = ref None in
+    let listener =
+      Sc_rollup_node.wait_for rollup_node "included.v0" ~timeout:20.
+      @@ fun json ->
+      let level = JSON.(json |-> "level" |> as_int32) in
+      let block = JSON.(json |-> "block" |> as_string) in
+      let inj_ops = JSON.(json |-> "operations" |> as_list) in
+      (* Only count unique blocks where the injector included operations.
+         Note: The injector emits one "included.v0" event per operation ID,
+         so when multiple operations are included in the same block, we get
+         multiple events for that block. We deduplicate by tracking seen blocks. *)
+      if inj_ops <> [] && not (Some block = !seen_blocks) then
+        if Option.is_none !seen_blocks then (
+          seen_blocks := Some block ;
+          Lwt.wakeup_later r1 (level, block) ;
+          None (* Keep listening for 2nd unique block *))
+        else (
+          Lwt.wakeup_later r2 (level, block) ;
+          Some () (* Stop listening after 2nd unique block *))
+      else None
+      (* Skip events with no operations or duplicate blocks *)
+    in
+    (* The listener is exposed outside the scope of the function, otherwise the
+       timeout on [wait_for] is never catched and the test might run
+       indefinitely. *)
+    (listener, get_op_content p1, get_op_content p2)
   in
   Log.info "Checking that the batcher keys received are correct." ;
   let check_keys ~received ~expected =
@@ -7215,9 +7241,14 @@ let test_injector_uses_available_keys ~kind =
   let* keys = gen_keys_then_transfer_tez client nb_of_keys in
   let keys_pkh = List.map (fun k -> k.Account.public_key_hash) keys in
   let* () = reveal_key keys in
-
+  (* Arm listeners for the inclusion of the batches. *)
+  let ( listener_promise,
+        first_rollup_batch_inclusion_promise,
+        second_rollup_batch_inclusion_promise ) =
+    wait_twice_for_included_and_get_batches_pkhs ()
+  in
   (* test start here *)
-  let* _lvl = Client.bake_for_and_wait client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     inject_n_msgs_batches_in_rollup_node
     (* we inject_int_of_string 2 times the number of operators so the rollup node
@@ -7226,32 +7257,60 @@ let test_injector_uses_available_keys ~kind =
       ~msg_per_batch
       ~msg_size
   in
-  let* _lvl = Client.bake_for_and_wait client
+  let* () = Client.bake_for_and_wait client
   and* () =
+    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
+  in
+  let second_injection_promise =
     wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
   in
   Log.info "Inject enough batches to fill the block." ;
   let* () = inject_with_keys keys ~msg_per_batch ~msg_size in
-  Log.info "First block's batches are the one injected directly to the L1." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* used_pkhs = wait_for_get_messages_and_get_batches_pkhs () in
-  Log.info "Got pkhs." ;
+  let user_batch_promise = wait_for_get_messages_and_get_batches_pkhs () in
+  Log.info "We now bake 3 blocks." ;
+  let* () =
+    repeat 3 (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        Lwt_unix.sleep 0.5)
+  in
+  (* The run features the expected operations*)
+  let* () = second_injection_promise and* () = listener_promise in
+
+  (* We now check that all batches are found. *)
+  Log.info
+    "One block contains the batches injected by the rollup node simultaneously \
+     with direct injection." ;
+  let* level_first_rollup_batch, used_pkhs =
+    first_rollup_batch_inclusion_promise
+  in
+  check_keys ~received:used_pkhs ~expected:operators_pkh ;
+  Log.info "Another one contains the batches injected manually to the L1." ;
+  let* level_manual_injection, used_pkhs = user_batch_promise in
   check_keys ~received:used_pkhs ~expected:keys_pkh ;
   Log.info
-    "Second block's batches found are those injected by the rollup node \
-     simultaneously with direct injection. Additionally, await the  injection \
-     of N batches." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* () =
-    wait_until_n_batches_are_injected rollup_node ~nb_batches:nb_operators
-  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
+    "Last block contains batches found are those injected by the rollup node \
+     using keys that have been utilized in block up to this point." ;
+  let* level_second_rollup_batch, used_pkhs =
+    second_rollup_batch_inclusion_promise
+  in
   check_keys ~received:used_pkhs ~expected:operators_pkh ;
-  Log.info
-    "Last block's batches found are those injected by the rollup node using \
-     keys that have been utilized in block up to this point." ;
-  let* _lvl = Client.bake_for_and_wait client
-  and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
-  check_keys ~received:used_pkhs ~expected:operators_pkh ;
+
+  (* And check that all levels are different. *)
+  Log.info "Checking that all levels are different" ;
+  Check.((level_manual_injection <> level_first_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the manually injected batch \
+       and the first batch from the rollup are expected to be included at the \
+       different levels" ;
+  Check.((level_manual_injection <> level_second_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the manually injected batch \
+       and the second batch from the rollup are expected to be included at the \
+       different levels" ;
+  Check.((level_second_rollup_batch <> level_first_rollup_batch) int32)
+    ~error_msg:
+      "Since batches are supposed to fill a block, the batches from the rollup \
+       are expected to be included at the different levels" ;
   unit
 
 let test_batcher_dont_reinject_already_injected_messages ~kind =
