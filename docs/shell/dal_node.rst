@@ -83,7 +83,8 @@ A DAL node in controller mode can run in these profiles:
 
       octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=tz1QCVQinE8iVj1H2fckqx6oiM85CNJSK9Sx --data-dir $DATA_DIR
 
-- The ``observer`` profile contributes to the resilience of network by helping distribute data in the specified slots. To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
+- The ``observer`` profile contributes to the resilience of network by reconstructing slots from received shards and republishing missing shards. Unlike operator nodes, observer nodes do not store data long-term and therefore cannot participate in refutation games.
+  To run a DAL node with the ``observer`` profile, pass the ``--observer-profiles`` argument with the indexes of the slots to monitor or an empty string (as in ``--observer-profiles ''``) to use a random index, as in this example:
 
    .. code-block:: shell
 
@@ -244,8 +245,8 @@ The specifications in this table are an estimate based on experimentation with G
 | Bandwidth (download)  | 250 KiB/s             | 350 KiB/s             | 400 KiB/s             | 600 KiB/s             |
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
 
-DAL producer node
-~~~~~~~~~~~~~~~~~
+DAL producer node (operator/observer)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The system resources that a DAL producer node needs depends on how much data it needs to publish to the DAL.
 This example is an estimate based on experimentation with a DAL producer node that publishes data into one slot in each block:
@@ -279,22 +280,15 @@ Lifetime of slots and shards
 
 The life cycle of slots and shards is described by the following steps:
 
-#. The operator posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and adds the association commitment - slot to the store.
-   This is done via the RPC ``POST /commitments/<slot_data>``, which returns the corresponding commitment.
-#. The operator instructs the DAL node to compute and save the shards of the slot associated with the given commitment.
-   It is important to set the query flag ``with_proof`` to true to be able to publish the shards on the P2P network.
-   This is done via the RPC ``PUT /commitments/<commitment>/shards``.
-#. The operator instructs the DAL node to compute the proof associated with the commitment.
-   This is done via the RPC ``GET /commitments/<commitment>/proof``, which returns the corresponding commitment proof.
+#. The operator posts the slot data to some DAL node of its choice. The node computes the corresponding commitment and commitment proof, as well as the corresponding shards with their proofs.
+   This is done via the RPC ``POST /slots/<slot_data>``, which returns the commitment and its proof.
 #. The operator selects a slot index for its slot, and posts the commitment to L1, via the ``publish_commitment`` operation.
    This can be done via RPCs for injecting an operation into L1, or using the Octez client, via the following command::
 
      octez-client publish dal commitment <commitment> from <pkh> for slot <slot_index> with proof <proof>
 
-#. Once the operation is included in a final block (that is, there are at least two blocks on top of the one including the operation), and the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
-#. Attesters check, for all published slots, the availability of the shards they are assigned by interrogating their DAL node, via the RPC ``GET /profiles/<pkh>/attested_levels/<level>/attestable_slots``, where level is the level at which the slot was published plus ``attestation_lag``, and ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
-#. Attesters attach a DAL payload containing the information received at step 6 to their attestation operation, via their baker binary. (See also :doc:`dal_bakers`)
+#. Once the operation is included in a final payload (that is, there is at least one block on top of the one including the operation), the slot is considered published (see :doc:`./dal_overview`), all DAL nodes exchange the slot’s shards they have in their store on the P2P network, depending on their profile (see :ref:`dal_p2p`), and they store previously unknown shards.
+#. Attesters monitor the availability of their assigned shards on their DAL node, via the RPC ``GET /profiles/<pkh>/monitor/attestable_slots``, where ``pkh`` is the attester’s public key hash. (See also :doc:`dal_bakers`)
+#. Attesters attach a DAL payload containing the information received at the previous step to their attestation operation, via their baker binary. (See also :doc:`dal_bakers`)
 #. The protocol aggregates the received attestations, and declares each published slot as available or unavailable, depending on whether some threshold is reached, via the blocks metadata.
-#. Rollups and other users can request stored pages or shards for an attested slot from any DAL node via the RPCs ``GET /slot/pages/<commitment>`` or ``GET /shards/<commitment>`` respectively. Only nodes that store enough shards to reconstruct the slot can provide the requested pages.
-
-Step 2 can be done in parallel with steps 3-4, but before step 5.
+#. Rollups and other users can request stored pages or shards for an attested slot from any DAL node via the RPCs ``GET /slot/levels/<level>/slots/<slot_index>/pages`` or ``GET /levels/<level>/slots/<slot_index>/shards/<shard_index>/content`` respectively. Only nodes that store enough shards to reconstruct the slot can provide the requested pages.

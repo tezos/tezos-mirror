@@ -178,7 +178,7 @@ let post_slot :
   Tezos_rpc.Service.post_service
     ~description:
       "Post a slot to the DAL node, computes its commitment and commitment \
-       proof, then computes the correspoding shards with their proof. The \
+       proof, then computes the corresponding shards with their proof. The \
        result of this RPC can be directly used to publish a slot header. If \
        the sent data is smaller than the size of a DAL slot, it is padded with \
        the character provided as padding query parameter (defaults to \\000). \
@@ -198,21 +198,6 @@ let post_slot :
           (req "commitment" Cryptobox.Commitment.encoding)
           (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
     Tezos_rpc.Path.(open_root / "slots")
-
-let patch_commitment :
-    < meth : [`PATCH]
-    ; input : slot_id
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.patch_service
-    ~description:"Associate a commitment to a level and a slot index."
-    ~query:Tezos_rpc.Query.empty
-    ~input:slot_id_encoding
-    ~output:Data_encoding.unit
-    Tezos_rpc.Path.(open_root / "commitments" /: Cryptobox.Commitment.rpc_arg)
 
 let get_slot_content :
     < meth : [`GET]
