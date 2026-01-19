@@ -391,46 +391,44 @@ module History : sig
   module History_cache :
     Bounded_history_repr.S with type key = hash and type value = t
 
-  (** [update_skip_list hist cache ~published_level
-      ~number_of_slots slot_headers_with_statuses] updates the given structure
-      [hist] with the list of [slot_headers_with_statuses]. The given [cache] is
-      also updated to add successive values of [cell] to it.
+  (** [update_skip_list hist cache ~published_level ~number_of_slots
+      ~attestation_lag ~slots ~fill_unpublished_gaps]
+      add new cells to the skip list based on new slot information.
 
+      The function behavior depends on the [fill_unpublished_gaps] parameter:
 
-      This function checks the following pre-conditions before updating the
-      list:
+      - When [fill_unpublished_gaps = false]: only processes the provided slots.
+        Each slot must have [Some status] (creating Published cells).
 
+      - When [fill_unpublished_gaps = true]: fills all missing slot indices
+        (from 0 to [number_of_slots - 1]) with Unpublished cells.
+        - If a slot has [status = Some s]: creates a Published cell
+        - If a slot has [status = None]: creates an Unpublished cell instead
+
+      The [slots] parameter is a list of [(header, publisher, status_opt)] tuples
+      where:
+      - [header] is the slot header
+      - [publisher] is the contract that published the slot
+      - [status_opt] is [Some status] for published slots with attestation info,
+        or [None] to skip that slot and create an Unpublished cell
+
+      Pre-conditions:
       - The given [published_level] should match all the levels of the slots in
-      [slot_headers], if any;
-
-      - [published_level] is the successor the last inserted cell's level.
-
-      - [slot_headers_with_statuses] is sorted in increasing order w.r.t. slots
-      indices. *)
+        [slots], if any
+      - [slots] is sorted in increasing order w.r.t. slot indices *)
   val update_skip_list :
     t ->
     History_cache.t ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
     attestation_lag:attestation_lag_kind ->
-    (Header.t
-    * Contract_repr.t
-    * Dal_attestations_repr.Accountability.attestation_status)
-    list ->
+    slots:
+      (Header.t
+      * Contract_repr.t
+      * Dal_attestations_repr.Accountability.attestation_status option)
+      list ->
+    fill_unpublished_gaps:bool ->
     (t * History_cache.t) tzresult
-
-  (** Similiar to {!update_skip_list}, but no cache is provided or
-      updated. *)
-  val update_skip_list_no_cache :
-    t ->
-    published_level:Raw_level_repr.t ->
-    number_of_slots:int ->
-    attestation_lag:attestation_lag_kind ->
-    (Header.t
-    * Contract_repr.t
-    * Dal_attestations_repr.Accountability.attestation_status)
-    list ->
-    t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
   val equal : t -> t -> bool

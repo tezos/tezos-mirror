@@ -71,12 +71,14 @@ struct
     let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result =
       Hist.(
-        update_skip_list_no_cache
+        update_skip_list
           skip_list
+          (History_cache.empty ~capacity:0L)
           ~published_level:level
-          [(slot, Contract_repr.zero, mk_attested)]
           ~number_of_slots:Parameters.dal_parameters.number_of_slots
-          ~attestation_lag:Legacy)
+          ~attestation_lag:Legacy
+          ~slots:[(slot, Contract_repr.zero, Some mk_attested)]
+          ~fill_unpublished_gaps:false)
     in
     check_result result
 
@@ -93,7 +95,7 @@ struct
       ~mk_level:(fun id -> Raw_level_repr.succ id.H.published_level)
       ~mk_slot_index:(fun id -> succ_slot_index id.H.index)
       ~check_result:(fun res ->
-        let* skip_list = Assert.get_ok ~__LOC__ res in
+        let* skip_list, _cache = Assert.get_ok ~__LOC__ res in
         skip_list_ordering
           skip_list
           ~mk_level:(fun _id ->
@@ -113,7 +115,7 @@ struct
       ~mk_level:(fun id -> Raw_level_repr.succ id.H.published_level)
       ~mk_slot_index:(fun id -> id.H.index)
       ~check_result:(fun res ->
-        let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
+        let* (_skip_list : Hist.t), _cache = Assert.get_ok ~__LOC__ res in
         return_unit)
 
   (** This test attempts to add a slot on top of genesis cell zero which satisfies
@@ -125,7 +127,7 @@ struct
       ~mk_level:(fun id -> Raw_level_repr.succ id.H.published_level)
       ~mk_slot_index:(fun id -> succ_slot_index id.H.index)
       ~check_result:(fun res ->
-        let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
+        let* (_skip_list : Hist.t), _cache = Assert.get_ok ~__LOC__ res in
         return_unit)
 
   (** This test attempts to add two slots on top of genesis cell zero which satisfies
@@ -137,13 +139,13 @@ struct
       ~mk_level:(fun id -> Raw_level_repr.succ id.H.published_level)
       ~mk_slot_index:(fun id -> succ_slot_index id.H.index)
       ~check_result:(fun res ->
-        let* skip_list = Assert.get_ok ~__LOC__ res in
+        let* skip_list, _cache = Assert.get_ok ~__LOC__ res in
         skip_list_ordering
           skip_list
           ~mk_level:(fun id -> Raw_level_repr.(succ id.H.published_level))
           ~mk_slot_index:(fun id -> id.H.index)
           ~check_result:(fun res ->
-            let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
+            let* (_skip_list : Hist.t), _cache = Assert.get_ok ~__LOC__ res in
             return_unit))
 
   (* Tests of construct/verify proofs that confirm/unconfirm pages on top of
@@ -193,15 +195,20 @@ struct
       ?check_verify ?index () =
     let open Lwt_result_wrap_syntax in
     let* _slot_data, polynomial, slot = mk_slot ~level ?index () in
+    let number_of_slots = Parameters.dal_parameters.number_of_slots in
+    (* Add the published slot and fill all other slot indices with
+       [Unpublished] entries. This is needed for the search function to find
+       entries for unconfirmed slots. *)
     let*?@ skip_list, cache =
       Hist.(
         update_skip_list
-          ~number_of_slots:Parameters.dal_parameters.number_of_slots
           genesis_history
           genesis_history_cache
           ~published_level:level
-          [(slot, Contract_repr.zero, mk_attested)]
-          ~attestation_lag:Legacy)
+          ~number_of_slots
+          ~attestation_lag:Legacy
+          ~slots:[(slot, Contract_repr.zero, Some mk_attested)]
+          ~fill_unpublished_gaps:true)
     in
     let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof

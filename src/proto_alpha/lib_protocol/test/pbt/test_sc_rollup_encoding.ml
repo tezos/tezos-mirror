@@ -218,15 +218,23 @@ let gen_dal_slots_history () =
               if c <> 0 then c else Index.compare a.index b.index)
             slot_headers
         in
-        History.(
-          update_skip_list_no_cache
-            ~number_of_slots
-            history
-            ~published_level
+        let slots =
+          List.map
+            (fun (header, publisher, status) ->
+              (header, publisher, Some status))
             slot_headers
-            ~attestation_lag:Legacy)
+        in
+        History.(
+          update_skip_list
+            history
+            (History_cache.empty ~capacity:0L)
+            ~published_level
+            ~number_of_slots
+            ~attestation_lag:Legacy
+            ~slots
+            ~fill_unpublished_gaps:false)
         |> function
-        | Ok history -> loop history llist
+        | Ok (history, _cache) -> loop history llist
         | Error e ->
             return
             @@ Stdlib.failwith

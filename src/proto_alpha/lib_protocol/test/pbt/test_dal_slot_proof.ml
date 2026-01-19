@@ -118,15 +118,21 @@ struct
                 (slot, Contract_repr.Implicit slot_publisher, attestation_status))
           slots_headers
       in
+      let slots =
+        List.map
+          (fun (header, publisher, status) -> (header, publisher, Some status))
+          slots_headers
+      in
       let*?@ cell, cache =
         Dal_slot_repr.History.(
           update_skip_list
-            ~number_of_slots:Parameters.dal_parameters.number_of_slots
             cell
             cache
             ~published_level
-            slots_headers
-            ~attestation_lag:Legacy)
+            ~number_of_slots:Parameters.dal_parameters.number_of_slots
+            ~attestation_lag:Legacy
+            ~slots
+            ~fill_unpublished_gaps:false)
       in
       let slots_info =
         List.fold_left
