@@ -17,6 +17,7 @@ use crate::{
             SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
         },
     },
+    tezosx::{get_alias, store_alias},
     Error,
 };
 use revm::{
@@ -27,12 +28,14 @@ use revm::{
 use tezos_crypto_rs::{
     hash::{ContractKt1Hash, HashTrait},
     public_key::PublicKey,
-    public_key_hash::PublicKeyHash,
 };
 use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezosx_interfaces::{RuntimeId, RuntimeInterface};
+use tezosx_tezos_runtime::TezosRuntime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// Runtime host
@@ -262,37 +265,59 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
                     "insufficient balance for transfer to runtime".to_string(),
                 )
             })?;
-        let tezos_pub_key_hash = PublicKeyHash::from_b58check(destination).unwrap();
-        let mut tezos_destination_account =
-            crate::tezosx::get_tezos_account_info_or_init(self.host, &tezos_pub_key_hash)
-                .map_err(|_| {
-                    CustomPrecompileError::Revert(
-                        "destination Tezos account not found".to_string(),
-                    )
-                })?;
-        let mutez = U256::from(mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+        let runtime = TezosRuntime {};
+        let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
+            Some(alias) => runtime.decode_address(&alias).map_err(|e| {
+                CustomPrecompileError::Revert(format!(
+                    "Failed to decode alias for source address: {e:?}"
+                ))
+            })?,
+            None => {
+                let alias =
+                    runtime
+                        .generate_alias(self.host, &source.0 .0)
+                        .map_err(|e| {
+                            CustomPrecompileError::Revert(format!(
+                                "Failed to generate alias for source address: {e:?}"
+                            ))
+                        })?;
+                store_alias(
+                    self.host,
+                    &source,
+                    RuntimeId::Tezos,
+                    &runtime.encode_address(&alias).map_err(|e| {
+                        CustomPrecompileError::Revert(format!(
+                            "Failed to encode alias for source address: {e:?}"
+                        ))
+                    })?,
+                )?;
+                alias
+            }
+        };
+        let destination_contract = Contract::from_b58check(destination).map_err(|e| {
             CustomPrecompileError::Revert(format!(
-                "failed to convert amount from wei to mutez: {e:?}"
-            ))
-        })?);
-        tezos_destination_account.balance = tezos_destination_account
-            .balance
-            .checked_add(alloy_to_u256(&mutez))
-            .ok_or_else(|| {
-                CustomPrecompileError::Revert(
-                    "overflow in destination balance calculation".to_string(),
-                )
-            })?;
-        crate::tezosx::set_tezos_account_info(
-            self.host,
-            &tezos_pub_key_hash,
-            tezos_destination_account,
-        )
-        .map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "failed to update destination Tezos account: {e:?}"
+                "Failed to parse destination contract address: {e}"
             ))
         })?;
+        runtime
+            .call(
+                self.host,
+                &alias,
+                &destination_contract,
+                primitive_types::U256::from(
+                    mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
+                        CustomPrecompileError::Revert(format!(
+                            "Failed to convert amount from wei to mutez: {e:?}"
+                        ))
+                    })?,
+                ),
+                &[],
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!(
+                    "Failed to transfer tez to destination contract: {e:?}"
+                ))
+            })?;
         source_info.balance = new_source_balance;
         source_account.set_info(self.host, source_info)?;
         Ok(())

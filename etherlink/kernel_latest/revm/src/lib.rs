@@ -413,9 +413,6 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
-    use crate::tezosx::{
-        get_tezos_account_info, set_tezos_account_info, TezosAccountInfo,
-    };
     use alloy_sol_types::{
         sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,
     };
@@ -432,14 +429,16 @@ mod test {
         state::{AccountInfo, Bytecode},
     };
     use rlp::Decodable;
-    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_crypto_rs::{
         hash::{HashTrait, SecretKeyEd25519},
         public_key::PublicKey,
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_host::runtime::Runtime;
+    use tezosx_interfaces::RuntimeInterface;
+    use tezosx_tezos_runtime::TezosRuntime;
     use utilities::{
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
@@ -457,7 +456,7 @@ mod test {
         createAndRevertCall, CreateAndRevertCalls,
     };
     use crate::test::utilities::{FABridge, ITable, RevertCreate};
-    use crate::tezosx::{set_ethereum_address_mapping, ForeignAddress};
+    use crate::tezosx::store_alias;
     use crate::GasData;
     use crate::{
         helpers::legacy::FaDepositWithProxy,
@@ -599,13 +598,17 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
-        set_ethereum_address_mapping(
+        let tezos_runtime = TezosRuntime {};
+        let alias = tezos_runtime
+            .generate_alias(&mut host, &destination.0 .0)
+            .unwrap();
+        let mut alias_bytes = Vec::new();
+        alias.bin_write(&mut alias_bytes).unwrap();
+        store_alias(
             &mut host,
             &destination,
-            ForeignAddress::Tezos(
-                PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-                    .unwrap(),
-            ),
+            tezosx_interfaces::RuntimeId::Tezos,
+            &alias_bytes,
         )
         .unwrap();
 
@@ -652,9 +655,9 @@ mod test {
 
         // Check the outcome of the transaction
         match execution_result.result {
-            ExecutionResult::Revert { .. } => (),
-            ExecutionResult::Halt { .. } | ExecutionResult::Success { .. } => {
-                panic!("Simple transfer should have reverted")
+            ExecutionResult::Success { .. } => (),
+            ExecutionResult::Halt { .. } | ExecutionResult::Revert { .. } => {
+                panic!("Simple transfer should have succeeded")
             }
         }
     }
@@ -667,22 +670,17 @@ mod test {
 
         let caller = Address::from(&[1; 20]);
         let destination = Address::from(&[2; 20]);
-        let destination_pk_hash =
-            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();
-        set_ethereum_address_mapping(
+        let tezos_runtime = TezosRuntime {};
+        let alias = tezos_runtime
+            .generate_alias(&mut host, &destination.0 .0)
+            .unwrap();
+        let mut alias_bytes = Vec::new();
+        alias.bin_write(&mut alias_bytes).unwrap();
+        store_alias(
             &mut host,
             &destination,
-            ForeignAddress::Tezos(destination_pk_hash.clone()),
-        )
-        .unwrap();
-        set_tezos_account_info(
-            &mut host,
-            &destination_pk_hash,
-            TezosAccountInfo {
-                balance: primitive_types::U256::from(0),
-                nonce: 0,
-                pub_key: None,
-            },
+            tezosx_interfaces::RuntimeId::Tezos,
+            &alias_bytes,
         )
         .unwrap();
         let value_sent = U256::from(5000000000000u64);
@@ -699,7 +697,7 @@ mod test {
             .unwrap();
 
         let calldata = RuntimeGatewayCalls::transfer(transferCall {
-            implicitAddress: destination_pk_hash.to_b58check(),
+            implicitAddress: alias.to_b58check(),
         })
         .abi_encode();
 
@@ -727,10 +725,14 @@ mod test {
                 panic!("Transfer to implicit address should have succeeded")
             }
         }
-        let infos = get_tezos_account_info(&host, &destination_pk_hash)
-            .unwrap()
-            .unwrap();
-        assert_eq!(infos.balance, primitive_types::U256::from(5));
+        let destination_kt1 = match alias {
+            Contract::Originated(pkh) => pkh,
+            _ => panic!("Expected originated address alias"),
+        };
+        let balance =
+            TezosRuntime::get_originated_account_balance(&mut host, &destination_kt1)
+                .unwrap();
+        assert_eq!(balance, primitive_types::U256::from(5));
     }
 
     #[test]

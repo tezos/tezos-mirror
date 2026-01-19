@@ -48,6 +48,8 @@ tezos-evm-runtime.workspace = true
 tezos-tracing.workspace = true
 tezos-indexable-storage.workspace = true
 tezos-storage.workspace = true
+tezosx-interfaces.workspace = true
+tezosx-tezos-runtime.workspace = true
 
 tezos-smart-rollup.workspace = true
 tezos-smart-rollup-core.workspace = true

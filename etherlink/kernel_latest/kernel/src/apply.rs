@@ -24,7 +24,6 @@ use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::tezosx::TezosXRuntime;
 use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
@@ -50,6 +49,8 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::OperationError;
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::RuntimeId;
+use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
 use crate::chains::{EvmLimits, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
@@ -241,7 +242,7 @@ pub struct TransactionResult {
     pub execution_outcome: ExecutionOutcome,
     pub gas_used: U256,
     pub estimated_ticks_used: u64,
-    pub runtime: TezosXRuntime,
+    pub runtime: RuntimeId,
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -437,7 +438,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         execution_outcome,
         gas_used,
         estimated_ticks_used: 0,
-        runtime: TezosXRuntime::Ethereum,
+        runtime: RuntimeId::Ethereum,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -658,7 +659,7 @@ fn apply_fa_deposit<Host: Runtime>(
         execution_outcome,
         gas_used,
         estimated_ticks_used: 0,
-        runtime: TezosXRuntime::Ethereum,
+        runtime: RuntimeId::Ethereum,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -672,7 +673,7 @@ pub struct ExecutionInfo {
     pub object_info: TransactionObjectInfo,
     pub estimated_ticks_used: u64,
     pub execution_gas_used: U256,
-    pub runtime: TezosXRuntime,
+    pub runtime: RuntimeId,
 }
 
 pub enum ExecutionResult<T> {
@@ -833,9 +834,8 @@ pub fn apply_transaction<Host: Runtime>(
         }
         TransactionContent::TezosDelayed(op) => {
             // TODO: If we need to use storage root of tezlink pass it as parameter.
-            let context = crate::tezosx::TezosRuntimeContext::from_root(
-                &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            )?;
+            let context =
+                TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
             let skip_signature_check = false;
             let i128_timestamp: i128 = block_constants
                 .timestamp
@@ -893,7 +893,7 @@ pub fn apply_transaction<Host: Runtime>(
                         },
                         gas_used: U256::zero(),
                         estimated_ticks_used: 0,
-                        runtime: TezosXRuntime::Tezos,
+                        runtime: RuntimeId::Tezos,
                     }))
                 }
                 Err(OperationError::Validation(err)) => {

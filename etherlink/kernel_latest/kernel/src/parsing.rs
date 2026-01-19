@@ -459,10 +459,7 @@ mod delayed_chunked_transaction {
     // We consider that all messages are transmitted within a single
     // L1 operation, but in several inbox messages.
 
-    use crate::{
-        parsing::BufferTransactionChunks,
-        tezosx::{ETHEREUM_RUNTIME_TAG, TEZOS_RUNTIME_TAG},
-    };
+    use crate::parsing::BufferTransactionChunks;
     use rlp::DecoderError;
     use sha3::{Digest, Keccak256};
     use tezos_data_encoding::nom::NomReader;
@@ -470,6 +467,7 @@ mod delayed_chunked_transaction {
         transaction::TransactionHash, tx_common::EthereumTransactionCommon,
     };
     use tezos_tezlink::operation::Operation;
+    use tezosx_interfaces::RuntimeId;
 
     pub const NEW_CHUNK_TAG: u8 = 0x0;
     pub const CHUNK_TAG: u8 = 0x1;
@@ -486,21 +484,22 @@ mod delayed_chunked_transaction {
                 return Err(DecoderError::Custom("Empty transaction bytes"));
             }
 
-            let (tag, remaining) = bytes.split_first().unwrap();
-            match *tag {
-                ETHEREUM_RUNTIME_TAG => {
+            let (tag, remaining) = bytes
+                .split_first()
+                .ok_or(DecoderError::Custom("No tag for transaction"))?;
+            match RuntimeId::try_from(*tag).map_err(DecoderError::Custom)? {
+                RuntimeId::Ethereum => {
                     let tx: EthereumTransactionCommon =
                         EthereumTransactionCommon::from_bytes(remaining)?;
                     Ok(Transaction::Ethereum(tx))
                 }
-                TEZOS_RUNTIME_TAG => {
+                RuntimeId::Tezos => {
                     let tx: Operation =
                         Operation::nom_read_exact(remaining).map_err(|_| {
                             DecoderError::Custom("Failed to parse Tezos operation")
                         })?;
                     Ok(Transaction::Tezos(tx))
                 }
-                _ => Err(DecoderError::Custom("Unknown transaction tag")),
             }
         }
     }
