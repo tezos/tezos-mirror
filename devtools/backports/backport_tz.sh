@@ -29,6 +29,37 @@
 set -e
 set -u
 
+#------------------------------------------------------------------------------
+# Cleanup trap
+#------------------------------------------------------------------------------
+# When the script exits, it will attempt to restore the original git state.
+original_branch=$(git rev-parse --abbrev-ref HEAD)
+conflict=false
+
+cleanup() {
+  # On exit, return to the original branch and clean up the backport branch
+  # if it was created.
+  if [ "$conflict" = true ]; then
+    return
+  fi
+  if [ "${resume:-false}" = false ]; then
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    # Abort cherry-pick if in progress
+    if [ -f "$(git rev-parse --git-dir)/CHERRY_PICK_HEAD" ]; then
+      echo "Aborting in-progress cherry-pick..."
+      git cherry-pick --abort || true
+    fi
+    echo "Reverting changes..."
+    git checkout "$original_branch"
+    # If the backport branch was created, delete it
+    if [ -n "${branch:-}" ] && [ "$current_branch" = "$branch" ]; then
+      git branch -D "$branch"
+    fi
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
 # Self-relocation to a temporary directory to prevent modification by git
 # checkout while the script is running.
 _IN_TEMP=${_IN_TEMP:-}
@@ -49,6 +80,7 @@ VERSION=""
 MERGE_REQUEST=""
 BASE=""
 BRANCH_PREFIX=""
+branch=""
 ID=3836952 # Gitlab id for tezos/tezos repository
 
 SCRIPT_NAME=$0
@@ -232,7 +264,10 @@ prepare_backport_branch() {
 
 cherry_pick_commits() {
   step_name "Cherry picking commits"
-  git cherry-pick "${hashes[@]}" || fail "Cherry-pick failed, resolve, run git cherry-pick --continue and then run the script with $SCRIPT_NAME $ARGS --resume-after-conflict"
+  git cherry-pick "${hashes[@]}" || {
+    conflict=true
+    fail "Cherry-pick failed, resolve, run git cherry-pick --continue and then run the script with $SCRIPT_NAME $ARGS --resume-after-conflict"
+  }
   end_step_name "Commits successfully cherry picked"
 }
 
