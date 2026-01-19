@@ -620,7 +620,9 @@ let filter_best_attestations_per_slot attestations =
   let dal_attested_slot_count = function
     | None -> 0
     | Some dal_content ->
-        Dal.Attestation.number_of_attested_slots dal_content.attestation
+        (* We use weight for comparison purposes - since all attestations have
+           the same number_of_lags, the relative ordering is preserved *)
+        Dal.Attestations.weight dal_content.attestations
   in
   let slot_map =
     List.fold_left

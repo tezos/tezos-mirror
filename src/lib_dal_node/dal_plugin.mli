@@ -50,7 +50,7 @@ module type T = sig
   type block_info
 
   (* The DAL content an attester includes in its attestation operation. *)
-  type dal_attestation
+  type dal_attestations
 
   (* The slot availability information from a block's metadata. *)
   type slot_availability
@@ -92,7 +92,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot * attestation_operation * dal_attestation option) list tzresult
+    (tb_slot * attestation_operation * dal_attestations option) list tzresult
     Lwt.t
 
   (** [get_committees ctxt ~level] retrieves the DAL and Tenderbake attestation
@@ -114,16 +114,28 @@ module type T = sig
       stripped.  *)
   val slot_availability : block_info -> slot_availability tzresult
 
-  (** [is_baker_attested dal_attestation slot_index] returns [true] if [slot_index]
-      is set in the bitset of the [dal_attestation] and [false] otherwise.  *)
-  val is_baker_attested : dal_attestation -> slot_index -> bool
+  (** [is_baker_attested dal_attestations ~number_of_slots ~number_of_lags
+      ~lag_index slot_index] returns [true] if [slot_index] is set in the bitset
+      of the [dal_attestation] at the given [lag_index] and [false] otherwise.  *)
+  val is_baker_attested :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
-  (** [is_protocol_attested slot_availability slot_index] returns [true] if [slot_index]
-      is one of the attested slots in [slot_availability] and [false] otherwise.  *)
-  val is_protocol_attested : slot_availability -> slot_index -> bool
-
-  (** [number_of_attested_slots] returns the number of slots attested in the [dal_attestation]. *)
-  val number_of_attested_slots : dal_attestation -> int
+  (** [is_protocol_attested slot_availability ~number_of_slots ~number_of_lags
+      ~lag_index slot_index] returns [true] if [slot_index] is one of the
+      attested slots in [slot_availability] at the given [lag_index] and [false]
+      otherwise. *)
+  val is_protocol_attested :
+    slot_availability ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
   (** [get_round fitness] returns the block round contained in [fitness]. *)
   val get_round : Fitness.t -> int32 tzresult

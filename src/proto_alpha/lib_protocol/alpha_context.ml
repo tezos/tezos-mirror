@@ -143,16 +143,16 @@ module Dal = struct
   end
 
   module Attestations = struct
+    include Dal_attestations_repr.Accountability
     include Dal_attestations_repr
-  end
-
-  module Attestation = struct
-    include Dal_attestation_repr.Accountability
-    include Dal_attestation_repr
     include Raw_context.Dal
   end
 
-  module Slot_availability = Dal_attestation_repr.Slot_availability
+  module Attestation = struct
+    include Dal_attestation_repr
+  end
+
+  module Slot_availability = Dal_attestations_repr.Slot_availability
 
   type slot_id = Dal_slot_repr.Header.id = {
     published_level : Raw_level_repr.t;

@@ -342,7 +342,7 @@ let dal_content_map_p f unsigned_consensus_vote_batch =
         let fallback_case =
           {
             unsigned_consensus_vote with
-            dal_content = Some {attestation = Dal.Attestation.empty};
+            dal_content = Some {attestations = Dal.Attestations.empty};
           }
         in
         Lwt.catch
@@ -558,9 +558,9 @@ type event =
 
 let dal_content_encoding =
   Data_encoding.conv
-    (fun {attestation} -> attestation)
-    (fun attestation -> {attestation})
-    Dal.Attestation.encoding
+    (fun {attestations} -> attestations)
+    (fun attestations -> {attestations})
+    Dal.Attestations.encoding
 
 let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
@@ -1293,8 +1293,10 @@ let pp_timeout_kind fmt = function
         Round.pp
         at_round
 
-let pp_dal_content fmt {attestation} =
-  Z.pp_print fmt (Environment.Bitset.to_z (attestation :> Environment.Bitset.t))
+let pp_dal_content fmt {attestations} =
+  Z.pp_print
+    fmt
+    (Environment.Bitset.to_z (attestations :> Environment.Bitset.t))
 
 let pp_kind_and_dal fmt {vote_kind; dal_content; _} =
   match (vote_kind, dal_content) with

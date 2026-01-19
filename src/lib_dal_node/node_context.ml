@@ -331,6 +331,11 @@ let get_attestation_lags ctxt ~level =
   let+ params = get_proto_parameters ctxt ~level:(`Level level) in
   List.map Int32.of_int params.attestation_lags
 
+let assert_single_lag ctxt =
+  let open Result_syntax in
+  let+ params = get_proto_parameters ctxt ~level:`Head in
+  assert (List.compare_length_with params.attestation_lags 1 = 0)
+
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =
     Gossipsub.Transport_layer.connect transport_layer ?timeout point

@@ -268,18 +268,20 @@ module Raw_dal = struct
     cryptobox : Dal.t option;
     slot_fee_market : Dal_slot_repr.Slot_market.t;
         (** records the published slot headers *)
-    slot_accountability : Dal_attestation_repr.Accountability.t;
+    slot_accountability : Dal_attestations_repr.Accountability.t;
         (** records attested shards, in order to determine protocol-attested slots *)
-    attestations : Dal_attestation_repr.t Slot_repr.Map.t;
-        (** records the included DAL attestations *)
+    attestations : Dal_attestations_repr.t Slot_repr.Map.t;
+        (** records the included DAL attestations; used for computing rewards *)
   }
 
-  let init ~number_of_slots =
+  let init ~number_of_slots ~number_of_lags =
     {
       cryptobox = None;
       slot_fee_market = Dal_slot_repr.Slot_market.init ~length:number_of_slots;
       slot_accountability =
-        Dal_attestation_repr.Accountability.init ~number_of_slots;
+        Dal_attestations_repr.Accountability.init
+          ~number_of_slots
+          ~number_of_lags;
       attestations = Slot_repr.Map.empty;
     }
 end
@@ -926,6 +928,12 @@ let prepare ~level ~predecessor_timestamp ~timestamp
   let sc_rollup_current_messages =
     Sc_rollup_inbox_repr.init_witness_no_history
   in
+  let dal =
+    Raw_dal.init
+      ~number_of_slots:constants.Constants_parametric_repr.dal.number_of_slots
+      ~number_of_lags:
+        (List.length constants.Constants_parametric_repr.dal.attestation_lags)
+  in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -954,10 +962,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp
         stake_distribution_for_current_cycle = None;
         reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
-        dal =
-          Raw_dal.init
-            ~number_of_slots:
-              constants.Constants_parametric_repr.dal.number_of_slots;
+        dal;
         all_bakers_attest_first_level;
         address_registry_diff_rev = [];
       };
@@ -2253,31 +2258,20 @@ module Dal = struct
     | Some published_level ->
         Some (Raw_level_repr.add published_level (params.attestation_lag - 1))
 
-  let record_number_of_attested_shards ctxt attestation ~delegate =
+  let record_number_of_attested_shards ctxt ~delegate ~attested_level
+      attestation committee_level_to_shard_count =
     let dal = dal ctxt in
-    let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
-    let attested_level = (current_level ctxt).level in
-    let number_of_baker_shards =
-      match Raw_level_repr.pred attested_level with
-      | None -> 0
-      | Some committee_level -> (
-          match
-            Raw_level_repr.Map.find committee_level delegate_to_shard_count
-          with
-          | None -> 0
-          | Some delegate_map -> (
-              match
-                Signature.Public_key_hash.Map.find delegate delegate_map
-              with
-              | None -> 0
-              | Some n -> n))
-    in
+    let c = (constants ctxt).dal in
     let slot_accountability =
-      Dal_attestation_repr.Accountability.record_number_of_attested_shards
+      Dal_attestations_repr.Accountability.record_number_of_attested_shards
         dal.slot_accountability
+        ~number_of_slots:c.number_of_slots
+        ~attestation_lag:c.attestation_lag
+        ~lags:c.attestation_lags
         ~delegate
+        ~attested_level
         attestation
-        number_of_baker_shards
+        committee_level_to_shard_count
     in
     update_dal ctxt {dal with slot_accountability}
 
@@ -2315,20 +2309,9 @@ module Dal = struct
     let dal = dal ctxt in
     dal.attestations
 
-  let is_slot_index_attested ctxt =
+  let[@inline] get_accountability ctxt =
     let dal = dal ctxt in
-    let constants = constants ctxt in
-    let threshold =
-      constants.Constants_parametric_repr.dal.attestation_threshold
-    in
-    let number_of_shards =
-      constants.Constants_parametric_repr.dal.cryptobox_parameters
-        .number_of_shards
-    in
-    Dal_attestation_repr.Accountability.is_slot_attested
-      dal.slot_accountability
-      ~threshold
-      ~number_of_shards
+    dal.slot_accountability
 
   let assert_feature_enabled ctxt =
     let constants = constants ctxt in

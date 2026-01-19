@@ -104,7 +104,7 @@ struct
         List.filter_map
           (fun (slot, slot_publisher, skip_slot) ->
             let attestation_status =
-              Dal_attestation_repr.Accountability.
+              Dal_attestations_repr.Accountability.
                 {
                   attested_shards = (if skip_slot then 0 else 1);
                   total_shards = 1;
@@ -146,7 +146,7 @@ struct
       prove that it is confirmed, or None if the page's slot is skipped. *)
   let request_confirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
-    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    if not slot_status.Dal_attestations_repr.Accountability.is_proto_attested
     then
       (* We cannot check that a page of an unconfirmed slot is confirmed. *)
       return_none
@@ -162,7 +162,7 @@ struct
   let request_unconfirmed_page (poly, slot, _slot_publisher, slot_status) =
     let open Lwt_result_syntax in
     let open Dal_slot_repr.Header in
-    if not slot_status.Dal_attestation_repr.Accountability.is_proto_attested
+    if not slot_status.Dal_attestations_repr.Accountability.is_proto_attested
     then
       let level = slot.id.published_level in
       let* _page_info, page_id = mk_page_info ~level slot poly in

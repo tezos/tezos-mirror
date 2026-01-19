@@ -33,7 +33,7 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Bitset.t
+  type dal_attestations = Bitset.t
 
   type slot_availability = Bitset.t
 
@@ -204,9 +204,9 @@ module Plugin = struct
                  }
                in
                let tb_slot = Slot.to_int attestation.consensus_content.slot in
-               let dal_attestation : dal_attestation option =
+               let dal_attestation : dal_attestations option =
                  Option.map
-                   (fun x -> (x.attestation :> dal_attestation))
+                   (fun x -> (x.attestation :> dal_attestations))
                    attestation.dal_content
                in
                Some (tb_slot, packed_operation, dal_attestation)
@@ -253,10 +253,12 @@ module Plugin = struct
     in
     return (metadata.protocol_data.dal_attestation :> Bitset.t)
 
-  let is_baker_attested attestation slot_index =
+  let is_baker_attested attestation ~number_of_slots:_ ~number_of_lags:_
+      ~lag_index:_ slot_index =
     match Bitset.mem attestation slot_index with Ok b -> b | Error _ -> false
 
-  let is_protocol_attested slot_availability slot_index =
+  let is_protocol_attested slot_availability ~number_of_slots:_
+      ~number_of_lags:_ ~lag_index:_ slot_index =
     match Bitset.mem slot_availability slot_index with
     | Ok b -> b
     | Error _ -> false

@@ -126,7 +126,7 @@ let pack_slots_headers_by_level list =
     type t =
       Dal_slot_repr.Header.t
       * Contract_repr.t
-      * Dal_attestation_repr.Accountability.attestation_status
+      * Dal_attestations_repr.Accountability.attestation_status
 
     let compare (a, _, _) (b, _, _) =
       let open Dal_slot_repr.Header in
@@ -180,7 +180,7 @@ let gen_dal_slots_history () =
     List.rev_map
       (fun (level, slot_index, publisher, is_proto_attested) ->
         let attestation_status =
-          Dal_attestation_repr.Accountability.
+          Dal_attestations_repr.Accountability.
             {
               attested_shards = (if is_proto_attested then 1 else 0);
               total_shards = 1;

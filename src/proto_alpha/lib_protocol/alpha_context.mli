@@ -2966,12 +2966,23 @@ module Dal : sig
     val check_is_in_range : number_of_slots:int -> t -> unit tzresult
   end
 
+  (** This module re-exports definitions from {!Dal_attestations_repr} and
+      {!Raw_context.Dal}. *)
   module Attestations : sig
-    type t
+    type t = private Bitset.t
+
+    type attestation_status = {
+      total_shards : int;
+      attested_shards : int;
+      attesters : Signature.Public_key_hash.Set.t;
+      is_proto_attested : bool;
+    }
 
     val encoding : t Data_encoding.t
 
     val empty : t
+
+    val is_empty : t -> bool
 
     val commit :
       t ->
@@ -2996,76 +3007,13 @@ module Dal : sig
 
     val weight : t -> int
 
-    module Dal_dependent_signing : sig
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.weight}. *)
-      val weight :
-        consensus_pk:Bls.Public_key.t ->
-        companion_pk:Bls.Public_key.t ->
-        op:bytes ->
-        t ->
-        Z.t
-
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
-      val aggregate_pk :
-        subgroup_check:bool ->
-        consensus_pk:Bls.Public_key.t ->
-        companion_pk:Bls.Public_key.t ->
-        op:bytes ->
-        t ->
-        Bls.Public_key.t option
-
-      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_sig}. *)
-      val aggregate_sig :
-        subgroup_check:bool ->
-        consensus_pk:Bls.Public_key.t ->
-        companion_pk:Bls.Public_key.t ->
-        consensus_sig:Bls.t ->
-        companion_sig:Bls.t ->
-        op:bytes ->
-        t ->
-        Bls.t option
-    end
-
-    module Internal_for_tests : sig
-      (** See {!Dal_attestation_repr.Internal_for_tests.of_z}. *)
-      val of_z : Z.t -> t tzresult
-    end
-  end
-
-  (** This module re-exports definitions from {!Dal_attestation_repr} and
-      {!Raw_context.Dal}. *)
-  module Attestation : sig
-    type t = private Bitset.t
-
-    type shard_index = int
-
-    type attestation_status = {
-      total_shards : int;
-      attested_shards : int;
-      attesters : Signature.Public_key_hash.Set.t;
-      is_proto_attested : bool;
-    }
-
-    module Shard_map : Map.S with type key = shard_index
-
-    val encoding : t Data_encoding.t
-
-    val empty : t
-
-    val is_empty : t -> bool
-
-    val commit : t -> Slot_index.t -> t
-
-    val is_attested : t -> Slot_index.t -> bool
-
-    val occupied_size_in_bits : t -> int
-
-    val expected_size_in_bits : max_index:Slot_index.t -> int
-
-    val number_of_attested_slots : t -> int
-
     val record_number_of_attested_shards :
-      context -> t -> delegate:Signature.public_key_hash -> context
+      context ->
+      delegate:Signature.public_key_hash ->
+      attested_level:Raw_level.t ->
+      t ->
+      int Raw_level.Map.t ->
+      context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 
@@ -3107,6 +3055,16 @@ module Dal : sig
     end
   end
 
+  (** This module re-exports definitions from {!Dal_attestation_repr} and
+      {!Raw_context.Dal}. *)
+  module Attestation : sig
+    type t
+
+    val of_attestations : Attestations.t -> t
+
+    val is_attested : t -> Slot_index.t -> bool
+  end
+
   (** See {!Dal_attestation_repr.Slot_availability}. *)
   module Slot_availability : sig
     type t = private Bitset.t
@@ -3115,13 +3073,30 @@ module Dal : sig
 
     val encoding : t Data_encoding.t
 
-    val is_attested : t -> Slot_index.t -> bool
+    val is_attested :
+      t ->
+      number_of_slots:int ->
+      number_of_lags:int ->
+      lag_index:int ->
+      Slot_index.t ->
+      bool
 
-    val commit : t -> Slot_index.t -> t
+    val commit :
+      t ->
+      number_of_slots:int ->
+      number_of_lags:int ->
+      lag_index:int ->
+      Slot_index.t ->
+      t
 
-    val number_of_attested_slots : t -> int
+    val number_of_attested_slots : t -> number_of_lags:int -> int
 
-    val intersection : t -> Attestation.t -> t
+    val intersection :
+      t ->
+      Attestations.t ->
+      number_of_slots:int ->
+      attestation_lags:int list ->
+      t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -3302,7 +3277,7 @@ module Dal : sig
       published_level:Raw_level.t ->
       number_of_slots:int ->
       attestation_lag:attestation_lag_kind ->
-      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
+      (Slot.Header.t * Contract.t * Attestations.attestation_status) list ->
       t tzresult
 
     val update_skip_list :
@@ -3311,7 +3286,7 @@ module Dal : sig
       published_level:Raw_level.t ->
       number_of_slots:int ->
       attestation_lag:attestation_lag_kind ->
-      (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
+      (Slot.Header.t * Contract.t * Attestations.attestation_status) list ->
       (t * History_cache.t) tzresult
 
     val is_commitment_attested :
@@ -5004,7 +4979,7 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
-type dal_content = {attestation : Dal.Attestation.t}
+type dal_content = {attestations : Dal.Attestations.t}
 
 type 'kind operation = {
   shell : Operation.shell_header;

@@ -176,11 +176,27 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
           ~error_msg:"Expected cycle position to be 0, got %L")) ;
   let dal_content =
     if with_dal_content then
-      let attestation =
-        if attest_slot then Dal.Attestation.(commit empty dal_slot_index)
-        else Dal.Attestation.(commit empty other_slot_index)
+      let number_of_slots = blk.constants.dal.number_of_slots in
+      let number_of_lags = List.length blk.constants.dal.attestation_lags in
+      let attestations =
+        if attest_slot then
+          Dal.Attestations.(
+            commit
+              empty
+              ~number_of_slots
+              ~number_of_lags
+              ~lag_index:(number_of_lags - 1)
+              dal_slot_index)
+        else
+          Dal.Attestations.(
+            commit
+              empty
+              ~number_of_slots
+              ~number_of_lags
+              ~lag_index:(number_of_lags - 1)
+              other_slot_index)
       in
-      Some {attestation}
+      Some {attestations}
     else None
   in
   let* shard_assignment = Context.Dal.shards (B blk) () in

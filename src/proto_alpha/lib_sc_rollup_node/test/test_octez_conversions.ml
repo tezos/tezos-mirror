@@ -236,7 +236,7 @@ let gen_slot_header_with_status =
           Environment.Signature.Public_key_hash.Set.singleton attester )
       else (0, Environment.Signature.Public_key_hash.Set.empty)
     in
-    Dal.Attestation.
+    Dal.Attestations.
       {total_shards; attested_shards; is_proto_attested = status; attesters}
   in
   let* publisher = gen_pkh in
