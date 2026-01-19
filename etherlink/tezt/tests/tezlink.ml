@@ -1729,6 +1729,109 @@ let test_tezlink_origination =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
+let test_event =
+  let emit_events_contract =
+    Tezt_etherlink.Michelson_contracts.emit_events_contract ()
+  in
+  register_tezlink_test
+    ~title:"Contract emits an event"
+    ~tags:["operation"; "event"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_path = "/tezlink" in
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = tezlink_path})
+  in
+  let* deployed_emit_events_contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:(Tez.of_int 2)
+      ~alias:"emit_events_contract"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:emit_events_contract.initial_storage
+      ~prg:emit_events_contract.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _l2_level = produce_block sequencer in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:deployed_emit_events_contract
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _l2_level = produce_block sequencer in
+
+  let* first_manager_operation =
+    let path = tezlink_path ^ "/chains/main/blocks/head/operations/3/0" in
+    let* res =
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"curl_operation_hashes" res in
+    return json
+  in
+
+  let open JSON in
+  let metadata = first_manager_operation |-> "contents" |=> 0 |-> "metadata" in
+  assert (metadata |-> "operation_result" |-> "status" |> as_string = "applied") ;
+  let events = metadata |-> "internal_operation_results" in
+  let event = events |=> 0 in
+  let assert_prim ~prim ~annots json =
+    assert (json |-> "prim" |> as_string = prim) ;
+    assert (json |-> "annots" |> as_list |> List.map as_string = annots)
+  in
+  let assert_type ~annots event =
+    let ty = event |-> "type" in
+    assert_prim ty ~prim:"or" ~annots:[] ;
+    let args = ty |-> "args" in
+    assert_prim
+      (args |=> 0)
+      ~prim:"nat"
+      ~annots:(if annots then ["%int"] else []) ;
+    assert_prim
+      (args |=> 1)
+      ~prim:"string"
+      ~annots:(if annots then ["%str"] else [])
+  in
+
+  let expected_event_gas_cost =
+    (* See Michelson_v1_gas.manager_operation_int *) 100_000
+  in
+  assert_type ~annots:false event ;
+  let data = event |-> "payload" in
+  assert (data |-> "prim" |> as_string = "Right") ;
+  assert (data |-> "args" |=> 0 |-> "string" |> as_string = "right") ;
+  let tag = event |-> "tag" |> as_string in
+  assert (tag = "tag1") ;
+  assert (event |-> "result" |-> "status" |> as_string = "applied") ;
+  assert (
+    event |-> "result" |-> "consumed_milligas" |> as_int
+    = expected_event_gas_cost) ;
+
+  let event = events |=> 1 in
+  assert_type ~annots:true event ;
+  let data = event |-> "payload" in
+  assert (data |-> "prim" |> as_string = "Left") ;
+  assert (data |-> "args" |=> 0 |-> "int" |> as_string = "2") ;
+  let tag = event |-> "tag" |> as_string in
+  assert (tag = "tag2") ;
+  assert (event |-> "result" |-> "status" |> as_string = "applied") ;
+  assert (
+    event |-> "result" |-> "consumed_milligas" |> as_int
+    = expected_event_gas_cost) ;
+  unit
+
 let test_tezlink_forge_operations =
   register_tezlink_test
     ~title:"Test of the forge/operations rpc"
@@ -3108,6 +3211,7 @@ let () =
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
+  test_event [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
   test_tezlink_prevalidation_gas_limit_lower_bound [Alpha] ;
   test_tezlink_validation_gas_limit [Alpha] ;

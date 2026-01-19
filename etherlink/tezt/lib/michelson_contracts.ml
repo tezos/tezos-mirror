@@ -70,3 +70,13 @@ let big_map_counter () =
         Michelson_script.(find ["big_maps"; "counter"] tezlink_protocol |> path);
       initial_storage = "(Pair 0 { Elt 0 Unit })";
     }
+
+let emit_events_contract () =
+  Evm_node.
+    {
+      address = "KT1M6NEENHvphszZwgzoB4ZxJNcfahqSqhxd";
+      path =
+        Michelson_script.(
+          find ["mini_scenarios"; "emit_events"] tezlink_protocol |> path);
+      initial_storage = "Unit";
+    }
