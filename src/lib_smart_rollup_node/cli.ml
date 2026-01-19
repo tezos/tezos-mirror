@@ -657,7 +657,9 @@ let l1_monitor_finalized_switch :
     (bool option, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"l1-monitor-finalized"
-    ~doc:"The rollup node will only monitor finalized blocks of the L1 node"
+    ~doc:
+      "The rollup node will only monitor finalized blocks of the L1 node. This \
+       option has no effect for RISC-V rollups."
     ()
   |> Tezos_clic.map_arg ~f:(fun _ -> function
        | true -> Lwt_result_syntax.return_some true
