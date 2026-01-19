@@ -55,7 +55,7 @@ else
   # ! protected
   # This is strictly for testing
   # We embed these keys here for testing only.
-  export GPG_KEY_ID="CFC482F3CD08D36D"
+  export GPG_KEY_ID="24EA481996EB8138"
   export GPG_PASSPHRASE="07cde771b39a4ed394864baa46126b"
   GPG_PRIVATE_KEY=$(cat ./scripts/packaging/test_repo_private.key)
   export GPG_PRIVATE_KEY
