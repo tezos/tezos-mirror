@@ -16,6 +16,21 @@ Its storage version is 45.
 
 ## Version 6 (Farfadet)
 
+### 6.1 (d748ae50)
+
+This versions fixes two issues introduced in version 6.0 of Farfadet.
+
+- Fix predeployed contract initialization to allow overwriting existing
+  bytecode after kernel upgrade. (!20279)
+- Re-inject a locked FA deposit (0x82f507bc5aba0f3f6088c087c2fcd87fc7b7f33c9445e331ec3d1fdf45e4be38)
+  which was affected by the previous incorrect initialization. (!20280)
+
+This kernel requires the Octez EVM node version 0.48 or higher.
+
+Its storage version is 45.
+
+### 6.0 (d2842ae4)
+
 Important information: Rollup nodes configured to use the full history mode will require
 up to twice the disk space they are currently using in the two weeks following
 the activation of this kernel, due to how our storage backend (Irmin) performs
