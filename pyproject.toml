@@ -44,8 +44,8 @@ fire = "0.4.0"
 
 # scripts/ci/coverage.py dependencies
 python-gitlab = "2.10.1"
-sphinx-pushfeedback = "^0.1.2"
-sphinx-biel = "^0.1.2"
+sphinx-pushfeedback = "^0.1.8"
+sphinx-biel = "^0.1.8"
 
 [tool.black]
 line-length = 80
