@@ -494,6 +494,141 @@ let finalize_attestation_history ctxt =
   in
   return (ctxt, attestation_bitset)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+   CODE TO BE REVERTED IN PROTOCOL V *)
+let finalize_and_migrate_attestation_history_for_U ctxt =
+  let open Lwt_result_syntax in
+  let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
+  let min_attestation_lag =
+    match List.hd dal.attestation_lags with None -> assert false | Some v -> v
+  in
+  let {Level_repr.level = current_level; _} = Raw_context.current_level ctxt in
+  (* We have that [current_level] is the successor of the protocol activation
+     (aka migration) level.
+
+     This also means that for published level [current_level] we need to use the
+     [number_of_slots] parameter from the current protocol, while for previous
+     published levels we need to use the one from the previous protocol. *)
+  let* migration_level = Storage.Protocol_activation_level.get ctxt in
+  assert (Raw_level_repr.(succ migration_level = current_level)) ;
+  let* prev_dal_params = Dal_storage.parameters ctxt migration_level in
+  let prev_attestation_lag = prev_dal_params.attestation_lag in
+  assert (Compare.Int.(min_attestation_lag < prev_attestation_lag)) ;
+  assert (
+    Compare.Int.(
+      prev_attestation_lag
+      < (Raw_level_repr.to_int32 current_level |> Int32.to_int))) ;
+
+  (* Update the skip list as follows :
+
+     1. For all published levels between [current_level - prev_attestation_lag]
+     and [current_level - attestation_lag] (both inclusive), set the attestation
+     status of published slots to Unattested. These are levels that won't be
+     finalized by the normal path in subsequent blocks.
+
+     2. For all published levels between [current_level - prev_attestation_lag]
+     and [current_level] (both inclusive), set the attestation status of
+     non-published slots to Unpublished. *)
+  let threshold_level =
+    match Raw_level_repr.sub current_level dal.attestation_lag with
+    | None ->
+        (* we do not expect a migration in the first [attestation_lag] levels *)
+        assert false
+    | Some v -> v
+  in
+  let rec loop published_level (ctxt, slots_history, cache) =
+    if Raw_level_repr.(published_level > current_level) then
+      return (ctxt, slots_history, cache)
+    else
+      let* published_headers_opt = find_slot_headers ctxt published_level in
+      let published_headers = Option.value ~default:[] published_headers_opt in
+      let attestation_lag =
+        Dal_slot_repr.History.Dynamic
+          (Raw_level_repr.diff current_level published_level |> Int32.to_int)
+      in
+      let number_of_slots =
+        if Raw_level_repr.(published_level = current_level) then
+          dal.number_of_slots
+        else prev_dal_params.number_of_slots
+      in
+      let*? slots_history, cache =
+        if Raw_level_repr.(published_level <= threshold_level) then
+          (* set the status to unattested *)
+          let slot_headers_statuses =
+            List.map
+              (fun (slot, slot_publisher) ->
+                let status =
+                  Dal_attestations_repr.Accountability.
+                    {
+                      is_proto_attested = false;
+                      attested_shards = 0;
+                      total_shards = dal.cryptobox_parameters.number_of_shards;
+                      attesters = Signature.Public_key_hash.Set.empty;
+                    }
+                in
+                (slot, slot_publisher, status))
+              published_headers
+          in
+          let slots =
+            List.map
+              (fun (header, publisher, status) ->
+                (header, publisher, Some status))
+              slot_headers_statuses
+          in
+          Dal_slot_repr.History.update_skip_list
+            slots_history
+            cache
+            ~published_level
+            ~number_of_slots
+            ~attestation_lag
+            ~slots
+            ~fill_unpublished_gaps:true
+        else
+          (* For published slots that haven't reached the attestation
+             deadline, pass [status = None] to skip adding cells for them. *)
+          let slots =
+            List.map
+              (fun (header, publisher) -> (header, publisher, None))
+              published_headers
+          in
+          Dal_slot_repr.History.update_skip_list
+            slots_history
+            cache
+            ~published_level
+            ~number_of_slots
+            ~attestation_lag
+            ~slots
+            ~fill_unpublished_gaps:true
+      in
+      let*! ctxt = remove_old_headers ctxt ~published_level in
+      loop (Raw_level_repr.succ published_level) (ctxt, slots_history, cache)
+  in
+  let first_level =
+    match Raw_level_repr.sub current_level prev_attestation_lag with
+    | None -> assert false
+    | Some v -> v
+  in
+  let* slots_history = get_slot_headers_history ctxt in
+  (* We need to store cells for [prev_attestation_lag + 1] levels, since we
+     process levels from [current_level - prev_attestation_lag] to
+     [current_level] (inclusive). *)
+  let cache =
+    Dal_slot_repr.History.History_cache.empty
+      ~capacity:
+        (Int64.of_int
+           ((prev_attestation_lag * prev_dal_params.number_of_slots)
+           + dal.number_of_slots))
+  in
+  let* ctxt, slots_history, cache =
+    loop first_level (ctxt, slots_history, cache)
+  in
+  let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
+  let*! ctxt =
+    Dal_slot_repr.History.History_cache.(view cache |> Map.bindings)
+    |> Storage.Dal.Slot.LevelHistories.add ctxt
+  in
+  return (ctxt, Dal_attestations_repr.Slot_availability.empty)
+
 let finalize_pending_slot_headers ctxt =
   let open Lwt_result_syntax in
   let* sl_history_head = get_slot_headers_history ctxt in
@@ -512,4 +647,4 @@ let finalize_pending_slot_headers ctxt =
   if dynamic_lag || reset_dummy_genesis then
     (* Normal path: use new multi-lag attestation history. *)
     finalize_attestation_history ctxt
-  else (* DEALT WITH IN THE NEXT COMMITS *) assert false
+  else finalize_and_migrate_attestation_history_for_U ctxt
