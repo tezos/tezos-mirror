@@ -4656,6 +4656,12 @@ module Clst : sig
   val add_redemption_request :
     context -> Contract.t -> Cycle.t -> Tez.t -> context tzresult Lwt.t
 
+  val finalize :
+    context ->
+    clst_contract:Contract.t ->
+    staker:Contract.t ->
+    (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
+
   module For_RPC : sig
     val get_redeemed_balance :
       context -> Contract.t -> Tez.t option tzresult Lwt.t

@@ -123,6 +123,14 @@ let redeem_from_clst_deposits ctxt ~staker amount =
   let* ctxt = Clst.add_redemption_request ctxt staker current_cycle amount in
   return (ctxt, redeem_balance_update)
 
+let finalize ctxt ~clst_contract_hash ~staker =
+  let open Lwt_result_syntax in
+  let clst_contract = Contract.Originated clst_contract_hash in
+  let* ctxt, unstake_balance_update, finalized_amount =
+    Clst.finalize ctxt ~clst_contract ~staker
+  in
+  return (ctxt, unstake_balance_update, finalized_amount)
+
 let get_account_operator_allowance context storage ~owner ~spender =
   let open Lwt_result_syntax in
   let* operators, context =
