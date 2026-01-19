@@ -78,7 +78,7 @@ module High_watermark = struct
             (* Slot is not part of the signed payload when
                signing with a tz4 address *)
             1 + 4 + 32 + 1
-        | Ed25519 _ | Secp256k1 _ | P256 _ -> 1 + 4 + 32 + 1 + 2
+        | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> 1 + 4 + 32 + 1 + 2
       in
       let level = Bytes.get_int32_be bytes level_offset in
       let round = Bytes.get_int32_be bytes (level_offset + 4) in

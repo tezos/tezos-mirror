@@ -10,7 +10,7 @@ applied_sequencer_upgrade:
         { "sequencer": $Signature.Public_key,
           "level": $positive_bignum } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -341,7 +341,7 @@ blueprints_publisher_request_failed:
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
     $Signature.V3:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -762,7 +762,7 @@ evm_context_request_failed:
                  "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number
@@ -1003,7 +1003,7 @@ evm_events_new_event:
                  $timestamp.protocol,
                  $positive_bignum ] } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number
@@ -1072,7 +1072,7 @@ failed_sequencer_upgrade:
           "current_sequencer": $Signature.Public_key /* Some */ || null /* None */,
           "level": $positive_bignum } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -1145,7 +1145,7 @@ gcp_kms_is_ready:
     { /* gcp_kms_is_ready version 0 */
       "gcp_kms_is_ready.v0": $Signature.Public_key }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $unistring:
       /* Universal string representation
@@ -1506,10 +1506,10 @@ patched_sequencer_key:
         { "pk": $Signature.Public_key,
           "pkh": $Signature.Public_key_hash } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $Signature.Public_key_hash:
-      /* A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash (Base58Check-encoded) */
       $unistring
     $unistring:
       /* Universal string representation
@@ -1542,7 +1542,7 @@ pending_sequencer_upgrade:
           "pool_address": $unistring,
           "timestamp": $timestamp.protocol } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $timestamp.protocol:
       /* A timestamp as seen by the protocol: second-level precision, epoch based. */
@@ -2580,7 +2580,7 @@ blueprints_publisher_request_failed:
                  "rollup_head": integer ∈ [-2^31-1, 2^31] },
           "errors": any } }
     $Signature.V3:
-      /* A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 signature (Base58Check-encoded) */
       $unistring
     $positive_bignum:
       /* Positive big number
@@ -2750,7 +2750,7 @@ evm_context_request_failed:
                  "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
-      /* A Ed25519, Secp256k1, P256 or a BLS public key (Base58Check-encoded) */
+      /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key (Base58Check-encoded) */
       $unistring
     $bignum:
       /* Big number

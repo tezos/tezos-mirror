@@ -33,22 +33,27 @@ let keys =
   let keys_e = Tezos_crypto.Signature.generate_key ~algo:Ed25519 () in
   let keys_s = Tezos_crypto.Signature.generate_key ~algo:Secp256k1 () in
   let keys_b = Tezos_crypto.Signature.generate_key ~algo:Bls () in
+  let keys_m = Tezos_crypto.Signature.generate_key ~algo:Mldsa44 () in
   function
   | Tezos_crypto.Signature.P256 -> keys_p
   | Ed25519 -> keys_e
   | Secp256k1 -> keys_s
   | Bls -> keys_b
+  | Mldsa44 -> keys_m
 
 let wrong_keys =
   let keys_p = Tezos_crypto.Signature.generate_key ~algo:P256 () in
   let keys_e = Tezos_crypto.Signature.generate_key ~algo:Ed25519 () in
   let keys_s = Tezos_crypto.Signature.generate_key ~algo:Secp256k1 () in
   let keys_b = Tezos_crypto.Signature.generate_key ~algo:Bls () in
+  let keys_m = Tezos_crypto.Signature.generate_key ~algo:Mldsa44 () in
+
   function
   | Tezos_crypto.Signature.P256 -> keys_p
   | Ed25519 -> keys_e
   | Secp256k1 -> keys_s
   | Bls -> keys_b
+  | Mldsa44 -> keys_m
 
 let wrong_pk algo =
   let _, pk, _ = wrong_keys algo in
@@ -107,6 +112,7 @@ let str_of_algo = function
   | Tezos_crypto.Signature.Secp256k1 -> "Secp256k1"
   | Tezos_crypto.Signature.P256 -> "P256"
   | Tezos_crypto.Signature.Bls -> "Bls"
+  | Tezos_crypto.Signature.Mldsa44 -> "Mldsa44"
 
 let time ~yes_crypto ~algo size datas =
   Format.eprintf "generating signatures...@?" ;

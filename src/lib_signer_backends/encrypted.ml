@@ -34,6 +34,8 @@ type Tezos_crypto.Base58.data += Encrypted_secp256k1_element of Bytes.t
 
 type Tezos_crypto.Base58.data += Encrypted_bls12_381 of Bytes.t
 
+type Tezos_crypto.Base58.data += Encrypted_mldsa44 of Bytes.t
+
 type encrypted_sk = Encrypted_sk of Signature.algo
 
 type decrypted_sk = Decrypted_sk of Signature.Secret_key.t
@@ -58,8 +60,14 @@ module Raw = struct
   let nonce = Tezos_crypto.Crypto_box.zero_nonce
 
   (* Secret keys for Ed25519, secp256k1, P256 have the same size. *)
-  let encrypted_size =
-    Tezos_crypto.Crypto_box.tag_length + Tezos_crypto.Hacl.Ed25519.sk_size
+  let encrypted_size = function
+    | Encrypted_sk
+        ( Signature.Ed25519 | Signature.P256 | Signature.Secp256k1
+        | Signature.Bls ) ->
+        Tezos_crypto.Crypto_box.tag_length + Tezos_crypto.Hacl.Ed25519.sk_size
+    | Encrypted_sk Signature.Mldsa44 ->
+        Tezos_crypto.Crypto_box.tag_length
+        + Octez_ml_dsa.Ml_dsa_44.(signing_key_size + verification_key_size)
 
   let pbkdf ~salt ~password =
     Pbkdf.SHA512.pbkdf2 ~count:32768 ~dk_len:32l ~salt ~password
@@ -85,12 +93,17 @@ module Raw = struct
             sk
       | Decrypted_sk (Bls sk) ->
           Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
+      | Decrypted_sk (Mldsa44 sk) ->
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Mldsa44.Secret_key.encoding
+            sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
     let open Lwt_result_syntax in
     let salt = Bytes.sub encrypted_sk 0 salt_len in
+    let encrypted_size = encrypted_size algo in
     let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
     let key =
       Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password)
@@ -147,6 +160,19 @@ module Raw = struct
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid BLS12_381 \
+               secret key")
+    | Some bytes, Encrypted_sk Signature.Mldsa44 -> (
+        match
+          Data_encoding.Binary.of_bytes_opt
+            Signature.Mldsa44.Secret_key.encoding
+            bytes
+        with
+        | Some sk ->
+            return_some
+              (Decrypted_sk (Mldsa44 sk : Tezos_crypto.Signature.Secret_key.t))
+        | None ->
+            failwith
+              "Corrupted wallet, deciphered key is not a valid ML-DSA-44 \
                secret key")
 end
 
@@ -214,12 +240,26 @@ module Encodings = struct
         if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_secp256k1_element sk)
 
+  let mldsa44 =
+    let length =
+      Octez_ml_dsa.Ml_dsa_44.(verification_key_size + signing_key_size)
+      + Tezos_crypto.Crypto_box.tag_length + Raw.salt_len
+    in
+    Tezos_crypto.Base58.register_encoding
+      ~prefix:Tezos_crypto.Base58.Prefix.mldsa44_encrypted_secret_key
+      ~length
+      ~to_raw:(fun sk -> Bytes.to_string sk)
+      ~of_raw:(fun buf ->
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
+      ~wrap:(fun sk -> Encrypted_mldsa44 sk)
+
   let () =
     Tezos_crypto.Base58.check_encoded_prefix ed25519 "edesk" 88 ;
     Tezos_crypto.Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
     Tezos_crypto.Base58.check_encoded_prefix p256 "p2esk" 88 ;
     Tezos_crypto.Base58.check_encoded_prefix bls12_381 "BLesk" 88 ;
-    Tezos_crypto.Base58.check_encoded_prefix secp256k1_scalar "seesk" 93
+    Tezos_crypto.Base58.check_encoded_prefix secp256k1_scalar "seesk" 93 ;
+    Tezos_crypto.Base58.check_encoded_prefix mldsa44 "mdesk" 5332
 end
 
 (* we cache the password in this list to avoid
@@ -304,6 +344,8 @@ let decrypt_payload cctxt ?name encrypted_sk =
         return (Encrypted_sk Signature.P256, encrypted_sk)
     | Some (Encrypted_bls12_381 encrypted_sk) ->
         return (Encrypted_sk Signature.Bls, encrypted_sk)
+    | Some (Encrypted_mldsa44 encrypted_sk) ->
+        return (Encrypted_sk Signature.Mldsa44, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   in
   let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in
@@ -370,6 +412,7 @@ let common_encrypt sk password =
     | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
     | Decrypted_sk (P256 _) -> Encodings.p256
     | Decrypted_sk (Bls _) -> Encodings.bls12_381
+    | Decrypted_sk (Mldsa44 _) -> Encodings.mldsa44
   in
   Tezos_crypto.Base58.simple_encode encoding payload
 

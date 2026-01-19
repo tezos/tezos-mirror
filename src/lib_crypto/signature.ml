@@ -127,18 +127,21 @@ module V0 = struct
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls _ -> None
+      | V_latest.Mldsa44 _ -> None
 
     let public_key : V_latest.Public_key.t -> Public_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls _ -> None
+      | V_latest.Mldsa44 _ -> None
 
     let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls _ -> None
+      | V_latest.Mldsa44 _ -> None
 
     let signature : V_latest.t -> t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
@@ -146,6 +149,7 @@ module V0 = struct
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
       | V_latest.Bls _ -> None
+      | V_latest.Mldsa44 _ -> None
 
     let get_public_key pk =
       match public_key pk with
@@ -227,18 +231,21 @@ module V1 = struct
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let public_key : V_latest.Public_key.t -> Public_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let signature : V_latest.t -> t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
@@ -246,6 +253,7 @@ module V1 = struct
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let get_public_key pk =
       match public_key pk with
@@ -327,18 +335,21 @@ module V2 = struct
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let public_key : V_latest.Public_key.t -> Public_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
       | V_latest.Secp256k1 k -> Some (Secp256k1 k)
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let signature : V_latest.t -> t option = function
       | V_latest.Ed25519 k -> Some (Ed25519 k)
@@ -346,6 +357,7 @@ module V2 = struct
       | V_latest.P256 k -> Some (P256 k)
       | V_latest.Unknown k -> Some (Unknown k)
       | V_latest.Bls k -> Some (Bls k)
+      | V_latest.Mldsa44 _ -> None
 
     let get_public_key pk =
       match public_key pk with

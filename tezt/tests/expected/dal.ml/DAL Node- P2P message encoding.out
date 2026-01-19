@@ -70,6 +70,18 @@ Bls (tag 3)
 +---------------------------+----------+------------------------+
 
 
+Mldsa44 (tag 4)
+===============
+
++---------------------------+----------+------------------------+
+| Name                      | Size     | Contents               |
++===========================+==========+========================+
+| Tag                       | 1 byte   | unsigned 8-bit integer |
++---------------------------+----------+------------------------+
+| ML_DSA_44.Public_key_hash | 20 bytes | bytes                  |
++---------------------------+----------+------------------------+
+
+
 X_1
 ***
 
@@ -294,7 +306,8 @@ $DAL_commitment:
   /* Commitment representation for the DAL (Base58Check-encoded) */
   $unistring
 $Signature.Public_key_hash:
-  /* A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded) */
+  /* A Ed25519, Secp256k1, P256, BLS or Mldsa44 public key hash
+     (Base58Check-encoded) */
   $unistring
 $p2p_point.id:
   /* Identifier for a peer point */
