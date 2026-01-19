@@ -1323,6 +1323,7 @@ select_tezts:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   allow_failure:
@@ -1535,6 +1536,7 @@ oc.build_kernels:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
+  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -3172,6 +3174,7 @@ etherlink.build_tezt:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3271,6 +3274,7 @@ documentation.manuals:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
   dependencies:
@@ -3326,6 +3330,7 @@ documentation.docgen:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3617,6 +3622,7 @@ documentation.odoc:
     when: on_success
   needs:
   - oc.docker:ci:amd64
+  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

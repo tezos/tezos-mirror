@@ -249,7 +249,10 @@ module UID_map = Map.Make (Int)
    and corrected it to something that actually makes sense.
    In particular this prevents some cases of invalid pipelines.
 
-   Step 4: the [convert_graph] function converts the [fixed_job_graph]
+   Step 4 (optional): the [trigger] job is added as a dependency to all jobs
+   that should have this dependency.
+
+   Step 5: the [convert_graph] function converts the [fixed_job_graph]
    into a [tezos_job_graph]. This just converts all jobs to [Tezos_ci.tezos_job],
    that can be used by CIAO.
 
@@ -448,6 +451,25 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
     graph ;
   !result
 
+(* Add a dependency on [job_trigger] in all jobs that are not [Immediate] or [Manual].
+   See GRAPH TRANSFORMATIONS above (step 4). *)
+let add_dependency_on_job_trigger (job_trigger : Tezos_ci.tezos_job)
+    (graph : fixed_job_graph) : fixed_job_graph =
+  (* The actual [trigger] job is defined deep inside [code_verification.ml]
+     (look for [job_start]). CIAO only really cares about the name of the job,
+     so we hackishly redefine it here. *)
+  Fun.flip UID_map.map graph @@ fun node ->
+  match node.trigger with
+  | Immediate | Manual -> node
+  | Auto ->
+      let job =
+        {
+          node.job with
+          needs_legacy = (Job, job_trigger) :: node.job.needs_legacy;
+        }
+      in
+      {node with job}
+
 let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
   match (stage, trigger) with
   | Build, _ -> Tezos_ci.Stages.build
@@ -462,7 +484,7 @@ let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
 type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
 (* Convert jobs to [Tezos_ci] jobs.
-   See GRAPH TRANSFORMATIONS above (step 4).
+   See GRAPH TRANSFORMATIONS above (step 5).
 
    By default, [Publish] jobs are non-interruptible and other jobs are interruptible.
    Setting [interruptible_pipeline] to [false] makes all jobs non-interruptible.
@@ -635,9 +657,13 @@ let convert_graph ?(interruptible_pipeline = true)
 
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
-let convert_jobs ?interruptible_pipeline ?interruptible_publish ~with_condition
-    (jobs : (trigger * job) list) : Tezos_ci.tezos_job list =
+let convert_jobs ?interruptible_pipeline ?interruptible_publish
+    ?with_job_trigger ~with_condition (jobs : (trigger * job) list) :
+    Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
+  |> (match with_job_trigger with
+     | None -> Fun.id
+     | Some job_trigger -> add_dependency_on_job_trigger job_trigger)
   |> convert_graph
        ?interruptible_pipeline
        ?interruptible_publish
@@ -760,7 +786,17 @@ end
 let before_merging_jobs = ref []
 
 let get_before_merging_jobs () =
-  convert_jobs ~with_condition:true !before_merging_jobs
+  (* Add [trigger] as a dependency of all [jobs]. *)
+  (* The actual [trigger] job is defined deep inside [code_verification.ml]
+     (look for [job_start]). CIAO only really cares about the name of the job,
+     so we hackishly redefine it here. *)
+  let job_trigger =
+    Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
+  in
+  convert_jobs
+    ~with_job_trigger:job_trigger
+    ~with_condition:true
+    !before_merging_jobs
 
 let merge_train_jobs = ref []
 
@@ -1198,26 +1234,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         ])
 
   let register_before_merging_jobs jobs =
-    (* Add [trigger] as a dependency of all [jobs]. *)
-    let jobs =
-      (* The actual [trigger] job is defined deep inside [code_verification.ml]
-         (look for [job_start]). CIAO only really cares about the name of the job,
-         so we hackishly redefine it here. *)
-      let job_trigger =
-        Tezos_ci.job ~__POS__ ~stage:Tezos_ci.Stages.start ~name:"trigger" []
-      in
-      (* Here we re-allocate the jobs with the same UID to override [needs_legacy].
-         But only these re-allocated jobs will be in the pipeline,
-         so there is no risk of actually duplicating them. *)
-      Fun.flip List.map jobs @@ fun (trigger, job) ->
-      match trigger with
-      | Immediate | Manual -> (trigger, job)
-      | Auto ->
-          let job =
-            {job with needs_legacy = (Job, job_trigger) :: job.needs_legacy}
-          in
-          (trigger, job)
-    in
     before_merging_jobs := jobs @ !before_merging_jobs
 
   let register_merge_train_jobs jobs =
