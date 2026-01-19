@@ -281,6 +281,7 @@
         "Clst_contract_storage",
         "Script_interpreter_defs",
         "Script_interpreter_errors",
+	"Clst_events",
         "Script_native",
         "Script_interpreter",
         "Sc_rollup_management_protocol",
