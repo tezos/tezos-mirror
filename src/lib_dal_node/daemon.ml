@@ -411,10 +411,14 @@ let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
     proto_parameters ~from_level =
   let open Lwt_result_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
+  let* _block_hash, l1_savepoint_level =
+    Chain_services.Levels.savepoint cctxt ()
+  in
+  let first_valid_level = Int32.max 2l l1_savepoint_level in
   List.iter_es
     (fun i ->
       let block_level = Int32.(sub from_level (of_int i)) in
-      if block_level > 1l then
+      if block_level >= first_valid_level then
         let* slot_headers =
           Plugin.get_published_slot_headers ~block_level cctxt
         in
