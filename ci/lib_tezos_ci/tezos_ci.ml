@@ -1578,12 +1578,6 @@ module Images = struct
 
     let rpm_version = common_version
 
-    let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
-
-    let rockylinux_9_6 = make_img "rockylinux:9.6" rpm_version
-
-    let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
-
     let rockylinux_9 = make_img "rockylinux:9.6" rpm_version
 
     let rockylinux_10 = make_img "rockylinux:10.0" rpm_version

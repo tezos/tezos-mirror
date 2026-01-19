@@ -646,12 +646,6 @@ module Images : sig
 
     val ubuntu_plucky : Image.t
 
-    val rockylinux_9_3 : Image.t
-
-    val rockylinux_9_6 : Image.t
-
-    val rockylinux_10_0 : Image.t
-
     val rockylinux_9 : Image.t
 
     val rockylinux_10 : Image.t
