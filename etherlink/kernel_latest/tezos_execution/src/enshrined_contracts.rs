@@ -2,8 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::ast::BinWriter;
+use mir::{
+    ast::{BinWriter, Entrypoint, Micheline},
+    context::CtxTrait,
+};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_tezlink::operation_result::TransferError;
 
 #[derive(Debug, PartialEq)]
 pub enum EnshrinedContracts {
@@ -33,6 +37,23 @@ pub fn from_kt1(kt1: &ContractKt1Hash) -> Option<EnshrinedContracts> {
 
 pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
+}
+
+pub(crate) fn execute_enshrined_contract<'a>(
+    _contract: EnshrinedContracts,
+    _entrypoint: &Entrypoint,
+    _value: Micheline<'a>,
+    _ctx: &mut impl CtxTrait<'a>,
+) -> Result<(), TransferError> {
+    // TODO L2-708
+    Ok(())
+}
+
+pub(crate) fn get_enshrined_contract_entrypoint(
+    _contract: EnshrinedContracts,
+) -> Option<std::collections::HashMap<Entrypoint, mir::ast::Type>> {
+    // TODO L2-708
+    None
 }
 
 #[cfg(test)]
