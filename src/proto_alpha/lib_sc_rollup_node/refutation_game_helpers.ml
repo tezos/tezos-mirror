@@ -75,7 +75,6 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
       let Dal.Page.{slot_id; page_index} = page_id in
       let* page_content_opt =
         Dal_pages_request.page_content
-          constants.Rollup_constants.dal
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           ~inbox_level
@@ -144,9 +143,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
     Protocol_plugins.get_constants_of_level node_ctxt snapshot_level_int32
   in
   let dal_l1_parameters = constants.dal in
-  let dal_parameters = dal_l1_parameters.cryptobox_parameters in
-  let dal_attestation_lag = dal_l1_parameters.attestation_lag in
-  let dal_number_of_slots = dal_l1_parameters.number_of_slots in
   let* dal_activation_level, dal_attested_slots_validity_lag =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level when dal_l1_parameters.feature_enable ->
@@ -232,12 +228,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let confirmed_slots_history = dal_slots_history
 
       let get_history = get_cell_from_hash
-
-      let dal_attestation_lag = dal_attestation_lag
-
-      let dal_parameters = dal_parameters
-
-      let dal_number_of_slots = dal_number_of_slots
 
       let page_info = page_info
 

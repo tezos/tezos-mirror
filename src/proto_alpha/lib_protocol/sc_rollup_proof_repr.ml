@@ -262,6 +262,14 @@ module Dal_helpers = struct
     dal_was_activated && slot_published_after_origination && not_too_recent
     && ttl_not_expired
 
+  (* The [dal_number_of_slots] and [cryptobox_parameters] parameters to use here
+     should be those of the target page id's published_level (below).
+     This function is called twice:
+     - Via verify/valid below. The parameters are fetched from published_level.
+     - Via produce functions below. The parameters are fetched from published_level.
+
+     In both cases a function `find_parameters` is provided. That function
+     basically inspects the protocol's table via an RPC. *)
   let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
       ~dal_attestation_lag ~origination_level ~import_inbox_level
       cryptobox_parameters
@@ -407,7 +415,7 @@ let valid (type state proof output)
           Option.value ~default:metadata.origination_level disputed_level
         in
         let* dal_parameters : Constants_parametric_repr.dal =
-          find_dal_parameters import_inbox_level
+          find_dal_parameters page_id.slot_id.published_level
         in
         Dal_helpers.verify
           ~dal_number_of_slots:dal_parameters.number_of_slots
@@ -536,12 +544,6 @@ module type PVM_with_context_and_state = sig
     val page_info :
       (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
 
-    val dal_parameters : Dal_slot_repr.parameters
-
-    val dal_attestation_lag : int
-
-    val dal_number_of_slots : int
-
     val dal_activation_level : Raw_level_repr.t option
 
     val dal_attested_slots_validity_lag : int
@@ -610,15 +612,18 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
             Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
     | Needs_reveal (Request_dal_page page_id) ->
         let open Dal_with_history in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters page_id.slot_id.published_level
+        in
         let*! disputed_level = P.get_current_level P.state in
         let import_inbox_level =
           Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
-          ~dal_number_of_slots
+          ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
-          dal_parameters
+          dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
@@ -635,6 +640,9 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
              restricted_commitments_publishers;
            }) ->
         let open Dal_with_history in
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters page_id.slot_id.published_level
+        in
         let attestation_threshold_percent =
           Some attestation_threshold_percent
         in
@@ -643,10 +651,10 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
-          ~dal_number_of_slots
+          ~dal_number_of_slots:dal_parameters.number_of_slots
           ~metadata
           ~dal_activation_level
-          dal_parameters
+          dal_parameters.cryptobox_parameters
           ~import_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers

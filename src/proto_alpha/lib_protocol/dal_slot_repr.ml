@@ -1444,6 +1444,12 @@ module History = struct
 
     let proof_error reason = error @@ dal_proof_error reason
 
+    (* This function is called from [produce_proof] or [verify_proof].
+       The parameters provided to this function are those of the level at which
+       the slot of the imported page has been published.
+       This is the case since all calls to those functions are in
+       `src/proto_alpha/lib_protocol/sc_rollup_proof_repr.ml`, where the queries
+       for parameters of the publication level are. *)
     let check_page_proof dal_params proof data ({Page.page_index; _} as pid)
         commitment =
       let open Result_syntax in

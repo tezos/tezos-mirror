@@ -356,6 +356,9 @@ let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
 let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
     ~number_of_pages ~dal_activation_level ~origination_level ~inbox_level
     Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
+  (* The number_of_slots and number_of_pages used here are fetched from the
+     publication level extracted from the page_id. This computation is done in
+     [page_content_int] below. *)
   Result.is_ok (Dal.Page.Index.check_is_in_range ~number_of_pages page_index)
   && slot_id_is_valid
        chain_id
@@ -435,56 +438,67 @@ let may_be_valid_in_our_range_of_lags chain_id ~number_of_slots ~number_of_pages
   page_id_is_valid ~dal_attestation_lag:0
   || page_id_is_valid ~dal_attestation_lag:max_dal_attestation_lag
 
-let page_content_int
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt page_id
+let page_content_int ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; l1_ctxt; _} =
     node_ctxt
   in
-  let* chain_id = Layer1.get_chain_id l1_ctxt in
-  let may_be_valid_id =
-    may_be_valid_in_our_range_of_lags
-      chain_id
-      ~number_of_slots:dal_constants.number_of_slots
-      ~number_of_pages:
-        (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
-      ~dal_activation_level
-      ~origination_level
-      ~inbox_level
-      page_id
-      ~dal_attested_slots_validity_lag
-  in
-  if not may_be_valid_id then return_none
+  let Dal.Page.{slot_id = Dal.{published_level; _}; _} = page_id in
+  let published_level_int32 = Raw_level.to_int32 published_level in
+  (* A slot published at or before the rollup's origination level can never be
+     valid for import. Return early to avoid calling [get_constants_of_level]
+     with a level before genesis, which would trigger an assertion failure. *)
+  if published_level_int32 <= origination_level then return_none
   else
-    let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
-    let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
-    let published_level = Raw_level.to_int32 published_level in
-    let index = Dal.Slot_index.to_int index in
-    let slot_id = Slot_id.{slot_level = published_level; slot_index = index} in
-
-    let* status =
-      get_slot_header_attestation_info node_ctxt dal_constants slot_id
+    let* constants =
+      Protocol_plugins.get_constants_of_level node_ctxt published_level_int32
     in
-    match status with
-    | `Attested attestation_lag ->
-        if
-          not
-          @@ page_id_is_valid
-               chain_id
-               ~dal_attestation_lag:attestation_lag
-               ~number_of_slots:dal_constants.number_of_slots
-               ~number_of_pages:
-                 (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
-               ~dal_activation_level
-               ~origination_level
-               ~inbox_level
-               ~dal_attested_slots_validity_lag
-               page_id
-        then return_none
-        else get_page dal_cctxt ~inbox_level page_id
-    | `Unattested | `Unpublished -> return_none
+    let dal_constants = constants.Rollup_constants.dal in
+    let* chain_id = Layer1.get_chain_id l1_ctxt in
+    let may_be_valid_id =
+      may_be_valid_in_our_range_of_lags
+        chain_id
+        ~number_of_slots:dal_constants.number_of_slots
+        ~number_of_pages:
+          (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+        ~dal_activation_level
+        ~origination_level
+        ~inbox_level
+        page_id
+        ~dal_attested_slots_validity_lag
+    in
+    if not may_be_valid_id then return_none
+    else
+      let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
+      let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
+      let published_level = Raw_level.to_int32 published_level in
+      let index = Dal.Slot_index.to_int index in
+      let slot_id =
+        Slot_id.{slot_level = published_level; slot_index = index}
+      in
+
+      let* status =
+        get_slot_header_attestation_info node_ctxt dal_constants slot_id
+      in
+      match status with
+      | `Attested attestation_lag ->
+          if
+            not
+            @@ page_id_is_valid
+                 chain_id
+                 ~dal_attestation_lag:attestation_lag
+                 ~number_of_slots:dal_constants.number_of_slots
+                 ~number_of_pages:
+                   (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+                 ~dal_activation_level
+                 ~origination_level
+                 ~inbox_level
+                 ~dal_attested_slots_validity_lag
+                 page_id
+          then return_none
+          else get_page dal_cctxt ~inbox_level page_id
+      | `Unattested | `Unpublished -> return_none
 
 let with_errors_logging ~inbox_level slot_id f =
   let open Lwt_syntax in
@@ -501,13 +515,10 @@ let with_errors_logging ~inbox_level slot_id f =
   in
   res
 
-let page_content
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt page_id
+let page_content ~dal_activation_level ~inbox_level node_ctxt page_id
     ~dal_attested_slots_validity_lag =
   with_errors_logging ~inbox_level page_id.Dal.Page.slot_id
   @@ page_content_int
-       dal_constants
        ~dal_activation_level
        ~inbox_level
        node_ctxt

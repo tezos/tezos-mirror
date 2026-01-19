@@ -1006,15 +1006,6 @@ let make_pvm_with_context_and_state (type context state)
 
       let page_info = None
 
-      let dal_parameters =
-        Default_parameters.constants_test.dal.cryptobox_parameters
-
-      let dal_attestation_lag =
-        Default_parameters.constants_test.dal.attestation_lag
-
-      let dal_number_of_slots =
-        Default_parameters.constants_test.dal.number_of_slots
-
       let dal_activation_level =
         let constants = Default_parameters.constants_test in
         if constants.dal.feature_enable then

@@ -4214,12 +4214,6 @@ module Sc_rollup : sig
 
         val page_info : (Dal.Page.content * Dal.Page.proof) option
 
-        val dal_parameters : Dal.parameters
-
-        val dal_attestation_lag : int
-
-        val dal_number_of_slots : int
-
         val dal_activation_level : Raw_level.t option
 
         val dal_attested_slots_validity_lag : int

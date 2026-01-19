@@ -362,6 +362,7 @@ let check_staker_availability ctxt rollup staker =
     {li [Sc_rollup_not_first_conflict_between_stakers] if the provided
     commitments are not the first commitments in conflict between
     [player] and [opponent].}
+   }
 *)
 let start_game ctxt rollup ~player:(player, player_commitment_hash)
     ~opponent:(opponent, opponent_commitment_hash) =
