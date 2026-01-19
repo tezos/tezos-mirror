@@ -35,9 +35,9 @@ use tezos_tezlink::operation_result::{
 use tezos_tezlink::{
     operation::{OperationContent, Parameters, RevealContent, TransferContent},
     operation_result::{
-        produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
-        OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
-        TransferSuccess, UpdateOrigin,
+        produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, EventContent,
+        EventSuccess, OperationError, OperationResultSum, OriginationError, RevealError,
+        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 
@@ -307,8 +307,42 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
                     "{set_delegate:?}"
                 )));
             }
-            mir::ast::Operation::Emit(emit) => {
-                return Err(ApplyOperationError::UnSupportedEmit(format!("{emit:?}")));
+
+            mir::ast::Operation::Emit(mir::ast::Emit { tag, value, arg_ty }) => {
+                let tag: Option<Entrypoint> = tag
+                    .map(|t| {
+                        t.try_into().map_err(|e: mir::ast::ByteReprError| {
+                            ApplyOperationError::UnSupportedEmit(format!(
+                                "Invalid emit tag: {e:?}"
+                            ))
+                        })
+                    })
+                    .transpose()?;
+                let payload = Some(
+                    value
+                        .into_micheline_optimized_legacy(&parser.arena)
+                        .encode(),
+                );
+                let ty = match arg_ty {
+                    mir::ast::Or::Left(typ) => {
+                        typ.into_micheline_optimized_legacy(&parser.arena).encode()
+                    }
+                    mir::ast::Or::Right(mic) => mic.encode(),
+                };
+                let result = if failed.is_some() {
+                    ContentResult::Skipped
+                } else {
+                    // Same semantics as OCaml:
+                    // Gas.consumed ~since:ctxt_before_op ~until:ctxt
+                    let consumed_milligas = tc_ctx.gas.milligas_consumed_by_operation();
+                    ContentResult::Applied(EventSuccess { consumed_milligas })
+                };
+                InternalOperationSum::Event(InternalContentWithMetadata {
+                    content: EventContent { tag, payload, ty },
+                    sender: sender_account.contract(),
+                    nonce,
+                    result,
+                })
             }
         };
         log!(

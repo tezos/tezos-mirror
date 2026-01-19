@@ -9,6 +9,7 @@ use crate::operation::{
     ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
     OperationContent, OriginationContent, RevealContent, TransferContent,
 };
+use mir::ast::Entrypoint;
 use mir::gas;
 use mir::gas::interpret_cost::SigCostError;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
@@ -309,6 +310,10 @@ impl OperationKind for OriginationContent {
     type Success = OriginationSuccess;
 }
 
+impl OperationKind for EventContent {
+    type Success = EventSuccess;
+}
+
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
 #[derive(PartialEq, Debug, BinWriter)]
 pub enum TransferTarget {
@@ -404,6 +409,11 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+}
+
+#[derive(PartialEq, Debug, BinWriter)]
+pub struct EventSuccess {
+    pub consumed_milligas: Narith,
 }
 
 impl Default for TransferSuccess {
@@ -527,12 +537,37 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
     pub result: ContentResult<M>,
 }
 
+// Unlike transfers and originations, there is no event kind in Tezos external operations.
+// This structure is only used to build the
+// `InternalOperationSum::Event` receipt, so it is intentionally *not* added to
+// `sdk/rust/protocol/src/operation.rs`.
+//
+// Field mapping / encoding notes (Rust/MIR/OCaml):
+// - `ty` is `Or<Type, Vec<u8>>` in MIR, and ends up as a Micheline-encoded `Script.expr` in OCaml.
+// - `tag` corresponds to `Option<FieldAnnotation<'a>>` in MIR and `Entrypoint.t` in OCaml. We keep
+//   it as an `Option` because it is encoded as an `opt` on the OCaml side; when absent on decode,
+//   OCaml uses `Entrypoint.is_default`.
+// - `payload` corresponds to `TypedValue<'a>` in MIR and a Micheline-encoded `Script.expr` in OCaml.
+//   We keep it as an `Option` because it is encoded as an `opt` on the OCaml side; when absent on
+//   decode, OCaml uses `Script_repr.unit`.
+//
+// See: `Event` case in `internal_operation_contents` type and `event_case` value
+// in `src/proto_alpha/lib_protocol/apply_internal_results.ml`.
+#[derive(PartialEq, Debug, Clone, BinWriter)]
+pub struct EventContent {
+    pub ty: Vec<u8>,
+    pub tag: Option<Entrypoint>,
+    pub payload: Option<Vec<u8>>,
+}
+
 #[derive(PartialEq, Debug, BinWriter)]
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
     #[encoding(tag = 2)]
     Origination(InternalContentWithMetadata<OriginationContent>),
+    #[encoding(tag = 4)] // tag 3 is for delegation on L1
+    Event(InternalContentWithMetadata<EventContent>),
 }
 
 impl BalanceUpdate {
@@ -563,6 +598,9 @@ impl InternalOperationSum {
             InternalOperationSum::Origination(op_res) => {
                 op_res.result.backtrack_if_applied();
             }
+            InternalOperationSum::Event(op_res) => {
+                op_res.result.backtrack_if_applied();
+            }
         }
     }
     pub fn is_applied(&self) -> bool {
@@ -571,6 +609,9 @@ impl InternalOperationSum {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
             InternalOperationSum::Origination(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            InternalOperationSum::Event(op_res) => {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
         }
@@ -716,7 +757,13 @@ mod tests {
         ManagerOperation, OriginationContent, Parameters, TransferContent,
         TARGET_TEZOS_PROTOCOL,
     };
+    use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
+    use mir::ast::micheline::Micheline;
+    use mir::ast::Entrypoint;
+    use mir::lexer::Prim;
     use pretty_assertions::assert_eq;
+    use std::borrow::Cow;
+    use typed_arena::Arena;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
         OperationDataAndMetadata::OperationWithMetadata (
@@ -948,6 +995,63 @@ mod tests {
             "applied",
         );
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn tezos_compatibility_for_internal_event_with_metadata() {
+        let arena = Arena::new();
+
+        let source_bytes =
+            hex::decode("00005b9a5d6ff9b553b9fae37b844d7a907d8d59593e").unwrap();
+
+        let payload = Micheline::prim2(
+            &arena,
+            Prim::Pair,
+            Micheline::from(10_i128),
+            Micheline::from(source_bytes),
+        )
+        .encode();
+
+        let add_amount_annots: Annotations =
+            Annotations::from([Annotation::Field(Cow::Borrowed("addAmount"))]);
+        let source_annots: Annotations =
+            Annotations::from([Annotation::Field(Cow::Borrowed("source"))]);
+
+        let ty = Micheline::App(
+            Prim::pair,
+            arena.alloc_extend([
+                Micheline::App(Prim::int, &[], add_amount_annots),
+                Micheline::App(Prim::address, &[], source_annots),
+            ]),
+            NO_ANNS,
+        )
+        .encode();
+
+        let operation = InternalOperationSum::Event(InternalContentWithMetadata {
+            content: EventContent {
+                tag: Some(Entrypoint::from_string_unchecked("add".into())),
+                payload: Some(payload),
+                ty,
+            },
+            sender: Contract::from_b58check("KT1SHrxmgUojs2hwe4hguExy6BqteeG1rDHi")
+                .unwrap(),
+            nonce: 0,
+            result: ContentResult::Applied(EventSuccess {
+                consumed_milligas: 100000.into(),
+            }),
+        });
+
+        let output = operation
+            .to_bytes()
+            .expect("Internal operation with metadata should be encodable");
+
+        let expected = fetch_generated_data(
+            TARGET_TEZOS_PROTOCOL,
+            "operation.internal_and_metadata",
+            "event",
+        );
+
+        assert_eq!(output, expected);
     }
 
     #[test]
