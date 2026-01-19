@@ -162,7 +162,7 @@ let check_block_info ~previous_block_info ~current_block_info ~chain_id
 
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy ->
+  | Proxy _ ->
       let* _l1_level = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
       unit
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ ->
@@ -603,21 +603,20 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       kernel
   in
   let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some Nothing;
+      genesis_timestamp;
+      max_number_of_chunks = None;
+      wallet_dir = Some wallet_dir;
+    }
+  in
   let sequencer_mode =
     Evm_node.Sandbox
       {
-        initial_kernel = Some output;
+        sequencer_config;
         network = None;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
-        genesis_timestamp;
-        max_number_of_chunks = None;
-        wallet_dir = Some wallet_dir;
         funded_addresses = [];
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
         sequencer_keys =
           List.map
             (fun k -> Account.uri_of_secret_key k.Account.secret_key)
@@ -629,7 +628,13 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?patch_config
     ?websockets
     ~mode:sequencer_mode
-    Uri.(empty |> to_string)
+    ~initial_kernel:output
+    ~preimages_dir
+    ~private_rpc_port:(Port.fresh ())
+    ?tx_queue_max_lifespan
+    ?tx_queue_max_size
+    ?tx_queue_tx_per_addr_limit
+    ()
 
 (* Send the transaction but doesn't wait to be mined and does not
    produce a block after sending the transaction. *)

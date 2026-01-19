@@ -184,7 +184,9 @@ let run_new_rpc_endpoint evm_node =
       ~data_dir:(Evm_node.data_dir evm_node)
       ~mode:(Rpc Evm_node.(mode evm_node))
       ?config_file:Evm_node.(config_file evm_node)
-      (Evm_node.endpoint evm_node)
+      ?initial_kernel:(Evm_node.initial_kernel evm_node)
+      ~preimages_dir:(Evm_node.preimages_dir evm_node)
+      ()
   in
   let* () = Evm_node.run rpc_node in
   return rpc_node
@@ -226,16 +228,8 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
   let observer_mode =
     Evm_node.Observer
       {
-        initial_kernel;
-        preimages_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
         rollup_node_endpoint = Option.map Sc_rollup_node.endpoint sc_rollup_node;
-        tx_queue_max_lifespan =
-          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
-        tx_queue_max_size =
-          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
-        tx_queue_tx_per_addr_limit =
-          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
+        evm_node_endpoint = Evm_node.endpoint evm_node;
       }
   in
   let* observer =
@@ -246,7 +240,16 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
       ~end_test_on_failure:true
       ?history_mode
       ?websockets
-      (Evm_node.endpoint evm_node)
+      ?initial_kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ?tx_queue_max_lifespan:
+        (Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue)
+      ?tx_queue_max_size:
+        (Option.map (fun tx_queue -> tx_queue.max_size) tx_queue)
+      ?tx_queue_tx_per_addr_limit:
+        (Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue)
+      ()
   in
   let* () = Evm_node.wait_for_blueprint_applied observer 0 in
   return observer
@@ -671,30 +674,27 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?periodic_snapshot_path
       ()
   in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks;
+      genesis_timestamp;
+      max_number_of_chunks;
+      wallet_dir = Some (Client.base_dir client);
+    }
+  in
   let sequencer_mode =
     Evm_node.Sequencer
       {
-        initial_kernel = output;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port;
-        time_between_blocks;
+        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        sequencer_config;
         sequencer_keys =
           List.map
             (fun (k : Account.key) -> k.alias)
             (sequencer :: additional_sequencer_keys);
-        genesis_timestamp;
         max_blueprints_lag;
         max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
-        max_number_of_chunks;
-        wallet_dir = Some (Client.base_dir client);
-        tx_queue_max_lifespan =
-          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
-        tx_queue_max_size =
-          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
-        tx_queue_tx_per_addr_limit =
-          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
         dal_slots;
         sequencer_sunset_sec = Some sequencer_sunset_sec;
       }
@@ -707,7 +707,16 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?history_mode
       ?spawn_rpc
       ?websockets
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ~initial_kernel:output
+      ~preimages_dir
+      ?private_rpc_port
+      ?tx_queue_max_lifespan:
+        (Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue)
+      ?tx_queue_max_size:
+        (Option.map (fun tx_queue -> tx_queue.max_size) tx_queue)
+      ?tx_queue_tx_per_addr_limit:
+        (Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue)
+      ()
   in
   let* observers =
     Lwt_list.map_s
@@ -731,8 +740,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       (fun _l2 ->
         Evm_node.init
           ~patch_config:proxy_patch_config
-          ~mode:Proxy
-          (Sc_rollup_node.endpoint sc_rollup_node))
+          ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
+          ())
       l2_chains
   in
   let evm_version =

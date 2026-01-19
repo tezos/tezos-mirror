@@ -66,23 +66,17 @@ let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
   let funded_addresses =
     Array.to_list accounts |> List.map (fun a -> a.Eth_account.address)
   in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some time_between_blocks;
+      genesis_timestamp = None;
+      max_number_of_chunks = None;
+      wallet_dir = Some wallet_dir;
+    }
+  in
   let mode =
     Evm_node.Sandbox
-      {
-        initial_kernel;
-        network;
-        funded_addresses;
-        sequencer_keys = [];
-        preimage_dir = Some preimages_dir;
-        private_rpc_port;
-        time_between_blocks = Some time_between_blocks;
-        genesis_timestamp = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some wallet_dir;
-        tx_queue_max_lifespan = None;
-        tx_queue_max_size = None;
-        tx_queue_tx_per_addr_limit = None;
-      }
+      {sequencer_config; network; funded_addresses; sequencer_keys = []}
   in
   let () = toplog "Launching the sandbox L2 node" in
   let add_cors rpc =
@@ -128,8 +122,11 @@ let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
       ~name:"sandboxed-sequencer"
       ~mode
       ~rpc_port
+      ?initial_kernel
+      ~preimages_dir
+      ?private_rpc_port
       ~extra_arguments
-      "http://dummy_rollup_endpoint"
+      ()
       cloud
       agent
   in

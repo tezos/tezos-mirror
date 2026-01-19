@@ -235,30 +235,35 @@ let test_make_l2_kernel_installer_config chain_family =
   in
 
   (* Setup a sequencer with a private rpc port to verify the durable storage. *)
-  let sequencer =
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some Nothing;
+      genesis_timestamp = None;
+      max_number_of_chunks = None;
+      wallet_dir = Some (Client.base_dir client);
+    }
+  in
+  let sequencer_mode =
     Evm_node.Sequencer
       {
-        initial_kernel = kernel;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
+        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        sequencer_config;
         sequencer_keys = [Constant.bootstrap1.alias];
-        genesis_timestamp = None;
         max_blueprints_lag = None;
         max_blueprints_ahead = None;
         max_blueprints_catchup = None;
         catchup_cooldown = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some (Client.base_dir client);
-        tx_queue_max_lifespan = None;
-        tx_queue_tx_per_addr_limit = None;
-        tx_queue_max_size = None;
         dal_slots = None;
         sequencer_sunset_sec = None;
       }
   in
   let* sequencer =
-    Evm_node.init ~mode:sequencer (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~mode:sequencer_mode
+      ~initial_kernel:kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
 
   (* Verify the chain_family is properly set *)
@@ -404,6 +409,14 @@ let test_observer_reset =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   (* Run a valid sequencer. *)
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some Nothing;
+      genesis_timestamp = None;
+      max_number_of_chunks = None;
+      wallet_dir = Some (Client.base_dir client);
+    }
+  in
   let* valid_sequencer =
     Evm_node.init
       ~name:"valid_sequencer"
@@ -411,25 +424,20 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Sequencer
            {
-             initial_kernel = valid_kernel;
-             preimage_dir = Some preimages_dir;
-             private_rpc_port = Some (Port.fresh ());
-             time_between_blocks = Some Nothing;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             sequencer_config;
              sequencer_keys = [valid_sequencer.alias];
-             genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
              max_blueprints_catchup = None;
              catchup_cooldown = None;
-             max_number_of_chunks = None;
-             wallet_dir = Some (Client.base_dir client);
              dal_slots = None;
              sequencer_sunset_sec = None;
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
            })
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ~initial_kernel:valid_kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
   (* We start a sequencer with an invalid key, but from its perspective the
      key is valid.
@@ -456,25 +464,20 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Sequencer
            {
-             initial_kernel = invalid_kernel;
-             preimage_dir = Some preimages_dir;
-             private_rpc_port = Some (Port.fresh ());
-             time_between_blocks = Some Nothing;
+             rollup_node_endpoint = Sc_rollup_node.endpoint temp_sc_rollup_node;
+             sequencer_config;
              sequencer_keys = [invalid_sequencer.alias];
-             genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
              max_blueprints_catchup = None;
              catchup_cooldown = None;
-             max_number_of_chunks = None;
-             wallet_dir = Some (Client.base_dir client);
              dal_slots = None;
              sequencer_sunset_sec = None;
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
            })
-      (Sc_rollup_node.endpoint temp_sc_rollup_node)
+      ~initial_kernel:invalid_kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
   (* Preparing two observers, they will be the victim of our tests in 2 different
      scenarios.
@@ -490,16 +493,13 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Observer
            {
-             initial_kernel = Some invalid_kernel;
-             preimages_dir = Some preimages_dir;
-             private_rpc_port = Some (Port.fresh ());
-             rollup_node_endpoint =
-               Some (Sc_rollup_node.endpoint sc_rollup_node);
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint invalid_sequencer;
            })
-      (Evm_node.endpoint invalid_sequencer)
+      ~initial_kernel:invalid_kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
   let* observer_victim2 =
     Evm_node.init
@@ -508,16 +508,13 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Observer
            {
-             initial_kernel = Some invalid_kernel;
-             preimages_dir = Some preimages_dir;
-             private_rpc_port = Some (Port.fresh ());
-             rollup_node_endpoint =
-               Some (Sc_rollup_node.endpoint sc_rollup_node);
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint invalid_sequencer;
            })
-      (Evm_node.endpoint invalid_sequencer)
+      ~initial_kernel:invalid_kernel
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
   (* We want this observer to detect the divergence after seeing the L1 events,
      so it does not track blueprints for now. *)
@@ -829,7 +826,7 @@ let test_snapshots_import_empty ~desync =
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
   @@
-  fun ({sequencer; sc_rollup_node; l2_chains; enable_multichain; _} as setup)
+  fun ({sequencer; sc_rollup_node = _; l2_chains; enable_multichain; _} as setup)
       _protocol
     ->
   let* _snapshot_file_before, snapshot_file, block_number =
@@ -839,8 +836,8 @@ let test_snapshots_import_empty ~desync =
   (* patch sequencer config if multichain *)
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
-    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode ?spawn_rpc (Sc_rollup_node.endpoint sc_rollup_node)
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~private_rpc_port:(Port.fresh ()) ~mode ?spawn_rpc ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
@@ -941,14 +938,14 @@ let test_snapshots_reexport ~desync =
          "Import %ssequencer snapshot and re-export"
          (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
-  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  @@ fun ({sequencer; sc_rollup_node = _; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, _block_number =
     snapshots_setup ~desync setup
   in
   Log.info "Create new sequencer from snapshot." ;
   let new_sequencer =
-    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~private_rpc_port:(Port.fresh ()) ~mode ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let*! () = Evm_node.import_snapshot ~desync new_sequencer ~snapshot_file in
@@ -2253,8 +2250,8 @@ let test_delayed_deposit_from_init_rollup_node =
      delayed deposit in its state. *)
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
-    let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~private_rpc_port:(Port.fresh ()) ?spawn_rpc ~mode ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
@@ -2337,8 +2334,9 @@ let test_init_from_rollup_node_data_dir =
   let evm_node' =
     Evm_node.create
       ?spawn_rpc
+      ~private_rpc_port:(Port.fresh ())
       ~mode:(Evm_node.mode sequencer)
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
   let* () =
@@ -2430,8 +2428,9 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let sequencer =
     Evm_node.create
       ?spawn_rpc
+      ~private_rpc_port:(Port.fresh ())
       ~mode:(Evm_node.mode sequencer)
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer in
   let* () =
@@ -2454,7 +2453,15 @@ let test_init_from_rollup_node_with_delayed_inbox =
     ~error_msg:"The sequencer should have the delayed inbox in its state" ;
   (* Start a new observer, we will ask it to omit the delayed transactions. *)
   let observer =
-    Evm_node.create ~mode:(Evm_node.mode observer) (Evm_node.endpoint sequencer)
+    Evm_node.create
+      ~private_rpc_port:(Port.fresh ())
+      ~mode:
+        (Evm_node.Observer
+           {
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint sequencer;
+           })
+      ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
   let* () =
@@ -2717,17 +2724,13 @@ let test_get_balance_block_param =
       ~mode:
         (Observer
            {
-             initial_kernel = Some "evm_kernel.wasm";
-             preimages_dir = Some "/tmp";
-             private_rpc_port = None;
-             rollup_node_endpoint =
-               Some (Sc_rollup_node.endpoint sc_rollup_node);
-             tx_queue_max_lifespan = None;
-             tx_queue_tx_per_addr_limit = None;
-             tx_queue_max_size = None;
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint sequencer;
            })
       ~data_dir:(Temp.dir name)
-      (Evm_node.endpoint sequencer)
+      ~initial_kernel:"evm_kernel.wasm"
+      ~preimages_dir:"/tmp"
+      ()
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
@@ -2815,17 +2818,13 @@ let test_get_block_by_number_block_param =
       ~mode:
         (Observer
            {
-             initial_kernel = Evm_node.initial_kernel observer;
-             preimages_dir = Some "/tmp";
-             private_rpc_port = None;
-             rollup_node_endpoint =
-               Some (Sc_rollup_node.endpoint sc_rollup_node);
-             tx_queue_max_lifespan = None;
-             tx_queue_tx_per_addr_limit = None;
-             tx_queue_max_size = None;
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint sequencer;
            })
       ~data_dir:(Temp.dir name)
-      (Evm_node.endpoint sequencer)
+      ?initial_kernel:(Evm_node.initial_kernel observer)
+      ~preimages_dir:"/tmp"
+      ()
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
@@ -5409,8 +5408,8 @@ let test_force_kernel_upgrade_too_early =
   let* proxy =
     Evm_node.init
       ~patch_config
-      ~mode:Proxy
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
+      ()
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -5482,8 +5481,8 @@ let test_force_kernel_upgrade =
   let* proxy =
     Evm_node.init
       ~patch_config
-      ~mode:Proxy
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node))
+      ()
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -5921,18 +5920,17 @@ let test_sequencer_upgrade =
       _protocol
     ->
   let* observer_dont_track_rollup =
-    match Evm_node.mode observer with
-    | Observer mode ->
-        Evm_node.init
-          ~mode:
-            (Observer
-               {
-                 mode with
-                 private_rpc_port = Some (Port.fresh ());
-                 rollup_node_endpoint = None;
-               })
-          (Evm_node.endpoint sequencer)
-    | _ -> Test.fail "impossible, it's an observer"
+    Evm_node.init
+      ~mode:
+        (Observer
+           {
+             rollup_node_endpoint = None;
+             evm_node_endpoint = Evm_node.endpoint sequencer;
+           })
+      ~private_rpc_port:(Port.fresh ())
+      ?initial_kernel:(Evm_node.initial_kernel observer)
+      ~preimages_dir:(Evm_node.preimages_dir observer)
+      ()
   in
 
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
@@ -6117,15 +6115,16 @@ let test_sequencer_upgrade =
       match Evm_node.mode sequencer with
       | Sequencer config ->
           Evm_node.Sequencer
-            {
-              config with
-              sequencer_keys = [new_sequencer_key.alias];
-              private_rpc_port = Some (Port.fresh ());
-            }
+            {config with sequencer_keys = [new_sequencer_key.alias]}
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     let new_sequencer =
-      Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      Evm_node.create
+        ~mode
+        ?initial_kernel:(Evm_node.initial_kernel sequencer)
+        ~preimages_dir:(Evm_node.preimages_dir sequencer)
+        ~private_rpc_port:(Port.fresh ())
+        ()
     in
     let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
@@ -6221,8 +6220,11 @@ let test_sequencer_upgrade =
     match Evm_node.mode observer with
     | Observer mode ->
         Evm_node.init
-          ~mode:(Observer {mode with private_rpc_port = Some (Port.fresh ())})
-          (Evm_node.endpoint sequencer)
+          ~mode:(Observer mode)
+          ~private_rpc_port:(Port.fresh ())
+          ?initial_kernel:(Evm_node.initial_kernel observer)
+          ~preimages_dir:(Evm_node.preimages_dir observer)
+          ()
     | _ -> Test.fail "impossible, it's an observer"
   in
   let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade observer_bootstrap in
@@ -6341,15 +6343,11 @@ let test_duplicate_sequencer_upgrade =
       match Evm_node.mode sequencer with
       | Sequencer config ->
           Evm_node.Sequencer
-            {
-              config with
-              sequencer_keys = [new_sequencer_key.alias];
-              private_rpc_port = Some (Port.fresh ());
-            }
+            {config with sequencer_keys = [new_sequencer_key.alias]}
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     let new_sequencer =
-      Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+      Evm_node.create ~private_rpc_port:(Port.fresh ()) ~mode ()
     in
     let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
@@ -6372,10 +6370,18 @@ let test_duplicate_sequencer_upgrade =
      as well." ;
   let* observer_bootstrap =
     match Evm_node.mode observer with
-    | Observer mode ->
+    | Observer _ ->
         Evm_node.init
-          ~mode:(Observer {mode with private_rpc_port = Some (Port.fresh ())})
-          (Evm_node.endpoint new_sequencer)
+          ~preimages_dir:(Evm_node.preimages_dir observer)
+          ?initial_kernel:(Evm_node.initial_kernel observer)
+          ~private_rpc_port:(Port.fresh ())
+          ~mode:
+            (Observer
+               {
+                 rollup_node_endpoint = None;
+                 evm_node_endpoint = Evm_node.endpoint new_sequencer;
+               })
+          ()
     | _ -> Test.fail "impossible, it's an observer"
   in
   let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade observer_bootstrap in
@@ -6428,16 +6434,19 @@ let test_sequencer_diverge =
   in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let* sequencer_bis =
-    let* mode =
+    let mode =
       match Evm_node.mode sequencer with
-      | Sequencer config ->
-          return
-          @@ Evm_node.Sequencer
-               {config with private_rpc_port = Some (Port.fresh ())}
+      | Sequencer config -> Evm_node.Sequencer config
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     return
-    @@ Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    @@ Evm_node.create
+         ?spawn_rpc
+         ~private_rpc_port:(Port.fresh ())
+         ?initial_kernel:(Evm_node.initial_kernel sequencer)
+         ~preimages_dir:(Evm_node.preimages_dir sequencer)
+         ~mode
+         ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
   let* () =
@@ -7122,8 +7131,9 @@ let test_reset =
       ~data_dir:(Evm_node.data_dir sequencer)
       ?config_file:(Evm_node.config_file sequencer)
       ~rpc_port:(Evm_node.rpc_port sequencer)
+      ?private_rpc_port:(Evm_node.private_rpc_port sequencer)
       ?spawn_rpc:(Evm_node.spawn_rpc sequencer)
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ()
   in
   let* () = Evm_node.run sequencer in
   let observer =
@@ -7132,7 +7142,8 @@ let test_reset =
       ~data_dir:(Evm_node.data_dir observer)
       ?config_file:(Evm_node.config_file observer)
       ~rpc_port:(Evm_node.rpc_port observer)
-      (Evm_node.endpoint sequencer)
+      ?private_rpc_port:(Evm_node.private_rpc_port observer)
+      ()
   in
 
   let* () = Evm_node.run observer in
@@ -7184,7 +7195,7 @@ let test_preimages_endpoint =
         sc_rollup_address;
         client;
         sequencer;
-        observer;
+        observer = _;
         l2_chains;
         enable_multichain;
         _;
@@ -7194,19 +7205,19 @@ let test_preimages_endpoint =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer () in
   let* () = Evm_node.terminate sequencer in
   (* Prepares the sequencer without [preimages-dir], to force the use of
-     preimages endpoint. *)
-  let sequencer_mode_without_preimages_dir =
+     preimages endpoint. Not passing ~preimages_dir to create means it will be None. *)
+  let sequencer_mode =
     match Evm_node.mode sequencer with
-    | Evm_node.Sequencer mode ->
-        Evm_node.Sequencer {mode with preimage_dir = None}
+    | Evm_node.Sequencer config -> Evm_node.Sequencer config
     | _ -> assert false
   in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
-      ~mode:sequencer_mode_without_preimages_dir
+      ~mode:sequencer_mode
+      ~private_rpc_port:(Port.fresh ())
       ?spawn_rpc
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
@@ -7223,26 +7234,20 @@ let test_preimages_endpoint =
   in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
-  let observer_mode_without_preimages_dir () =
-    match Evm_node.mode observer with
-    | Evm_node.Observer mode ->
-        Evm_node.Observer
-          {
-            mode with
-            preimages_dir = None;
-            private_rpc_port = Some (Port.fresh ());
-          }
-    | _ -> assert false
+  let observer_mode evm_node_endpoint =
+    Evm_node.Observer {rollup_node_endpoint = None; evm_node_endpoint}
   in
   let new_observer =
     Evm_node.create
-      ~mode:(observer_mode_without_preimages_dir ())
-      (Evm_node.endpoint new_sequencer)
+      ~private_rpc_port:(Port.fresh ())
+      ~mode:(observer_mode (Evm_node.endpoint new_sequencer))
+      ()
   in
   let new_observer2 =
     Evm_node.create
-      ~mode:(observer_mode_without_preimages_dir ())
-      (Evm_node.endpoint new_observer)
+      ~private_rpc_port:(Port.fresh ())
+      ~mode:(observer_mode (Evm_node.endpoint new_observer))
+      ()
   in
 
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer in
@@ -7370,21 +7375,13 @@ let test_preimages_endpoint_retry =
         let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  (* Prepares the sequencer without [preimages-dir], to force the use of
-     preimages endpoint. *)
-  let sequencer_mode_without_preimages_dir =
+  let sequencer_mode =
     match Evm_node.mode sequencer with
-    | Evm_node.Sequencer mode ->
-        Evm_node.Sequencer {mode with preimage_dir = None}
+    | Evm_node.Sequencer config -> Evm_node.Sequencer config
     | _ -> assert false
   in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
-  let new_sequencer =
-    Evm_node.create
-      ~mode:sequencer_mode_without_preimages_dir
-      ?spawn_rpc
-      (Sc_rollup_node.endpoint sc_rollup_node)
-  in
+  let new_sequencer = Evm_node.create ~mode:sequencer_mode ?spawn_rpc () in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
     match enable_multichain with
@@ -12606,17 +12603,13 @@ let test_observer_init_from_snapshot =
       ~mode:
         (Observer
            {
-             initial_kernel = Evm_node.initial_kernel sequencer;
-             preimages_dir = Some "/tmp";
-             private_rpc_port = None;
-             rollup_node_endpoint =
-               Some (Sc_rollup_node.endpoint sc_rollup_node);
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
+             rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
+             evm_node_endpoint = Evm_node.endpoint sequencer;
            })
       ~data_dir:(Temp.dir name)
-      (Evm_node.endpoint sequencer)
+      ?initial_kernel:(Evm_node.initial_kernel sequencer)
+      ~preimages_dir:"/tmp"
+      ()
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
   let* () =
@@ -12758,7 +12751,7 @@ let test_observer_periodic_snapshot =
     ~use_multichain:Register_without_feature
     ~websockets:false
     ~kernels:[Latest]
-  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
+  @@ fun {sequencer; observer; sc_rollup_node = _; _} _protocol ->
   let* () = Evm_node.wait_for_blueprint_applied observer 0 in
   let* snapshot_file =
     let res = ref None in
@@ -12789,8 +12782,9 @@ let test_observer_periodic_snapshot =
   let* () = Evm_node.terminate sequencer in
   let new_sequencer =
     Evm_node.create
+      ~private_rpc_port:(Port.fresh ())
       ~mode:(Evm_node.mode sequencer)
-      (Sc_rollup_node.endpoint sc_rollup_node)
+      ()
   in
   let*? import_process =
     Evm_node.import_snapshot new_sequencer ~desync:false ~snapshot_file

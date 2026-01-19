@@ -890,8 +890,9 @@ module Evm_node = struct
   module Agent = struct
     (* Use for compatibility with `tezt-cloud`. *)
     let create ?(group = "Etherlink") ?(copy_binary = true)
-        ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
-        ?rpc_port ?websockets endpoint cloud agent =
+        ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ~mode
+        ?rpc_port ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
+        endpoint cloud agent =
       let* path =
         if copy_binary then Agent.copy agent ~source:path
         else
@@ -911,19 +912,34 @@ module Evm_node = struct
         | None -> Agent.next_available_port agent
         | Some port -> port
       in
-      create ?name ~path ?runner ?data_dir ~rpc_port ?mode ?websockets endpoint
+      create
+        ?name
+        ~path
+        ?runner
+        ?data_dir
+        ~rpc_port
+        ~mode
+        ?websockets
+        ?initial_kernel
+        ?preimages_dir
+        ?private_rpc_port
+        endpoint
       |> Lwt.return
 
-    let init ?patch_config ?name ?mode ?websockets ?data_dir ?rpc_port ?wait
-        ?extra_arguments ?copy_binary rollup_node cloud agent =
+    let init ?patch_config ?name ~mode ?websockets ?data_dir ?rpc_port ?wait
+        ?extra_arguments ?copy_binary ?initial_kernel ?preimages_dir
+        ?private_rpc_port rollup_node cloud agent =
       let* evm_node =
         create
           ?name
           ?copy_binary
-          ?mode
+          ~mode
           ?rpc_port
           ?websockets
           ?data_dir
+          ?initial_kernel
+          ?preimages_dir
+          ?private_rpc_port
           rollup_node
           cloud
           agent

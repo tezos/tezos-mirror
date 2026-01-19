@@ -1486,21 +1486,20 @@ let test_tezlink_sandbox () =
       ~preimages_dir
       (Uses.path Constant.WASM.evm_kernel)
   in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some Nothing;
+      genesis_timestamp = None;
+      max_number_of_chunks = None;
+      wallet_dir = Some wallet_dir;
+    }
+  in
   let sequencer_mode =
     Evm_node.Tezlink_sandbox
       {
-        initial_kernel = output;
+        sequencer_config;
         funded_addresses =
           [Constant.bootstrap1.public_key; Constant.bootstrap2.public_key];
-        preimage_dir = Some preimages_dir;
-        private_rpc_port = Some (Port.fresh ());
-        time_between_blocks = Some Nothing;
-        genesis_timestamp = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some wallet_dir;
-        tx_queue_max_lifespan = None;
-        tx_queue_max_size = None;
-        tx_queue_tx_per_addr_limit = None;
         verbose = false;
       }
   in
@@ -1509,7 +1508,10 @@ let test_tezlink_sandbox () =
     Evm_node.init
       ~mode:sequencer_mode
       ~spawn_rpc:(Port.fresh ())
-      Uri.(empty |> to_string)
+      ~initial_kernel:output
+      ~preimages_dir
+      ~private_rpc_port:(Port.fresh ())
+      ()
   in
 
   let endpoint =
