@@ -5754,12 +5754,12 @@ let test_timestamp_from_the_future =
   @@ fun {sequencer; sc_rollup_node; client; enable_dal; _} _protocol ->
   (* In this test the time between blocks is 1 second. *)
 
-  (* Producing a block 4:50 minutes after the L1 timestamp will be accepted. We
+  (* Producing a block 4:25 minutes after the L1 timestamp will be accepted. We
      do not check precisely 4:59 minutes to avoid flakiness w.r.t to blueprint
      inclusion. *)
   let* current_l1_timestamp = l1_timestamp client in
   let accepted_timestamp =
-    Tezos_base.Time.Protocol.(add current_l1_timestamp 270L |> to_notation)
+    Tezos_base.Time.Protocol.(add current_l1_timestamp 265L |> to_notation)
   in
   (* The sequencer will accept it anyway, but we need to check that the rollup
      node accepts it. *)
