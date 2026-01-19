@@ -8,14 +8,21 @@ type key_pair
 type signing_key
 type verification_key
 type signature
+external octez_libcrux_ml_dsa_44_generate_keys: bytes -> (signing_key * verification_key, string) result = "octez_libcrux_ml_dsa_44_generate_keys"
+external octez_libcrux_ml_dsa_44_generate_keys_opt: bytes -> (signing_key * verification_key) option = "octez_libcrux_ml_dsa_44_generate_keys_opt"
 external octez_libcrux_ml_dsa_44_generate_key_pair: bytes -> (key_pair, string) result = "octez_libcrux_ml_dsa_44_generate_key_pair"
 external octez_libcrux_ml_dsa_44_key_pair_get_signing_key: key_pair -> signing_key = "octez_libcrux_ml_dsa_44_key_pair_get_signing_key"
 external octez_libcrux_ml_dsa_44_key_pair_get_verification_key: key_pair -> verification_key = "octez_libcrux_ml_dsa_44_key_pair_get_verification_key"
 external octez_libcrux_ml_dsa_44_sign: signing_key -> bytes -> bytes -> bytes -> (signature, string) result = "octez_libcrux_ml_dsa_44_sign"
+external octez_libcrux_ml_dsa_44_sign_opt: signing_key -> bytes -> bytes -> signature option = "octez_libcrux_ml_dsa_44_sign_opt"
 external octez_libcrux_ml_dsa_44_verify: verification_key -> bytes -> bytes -> signature -> (unit, string) result = "octez_libcrux_ml_dsa_44_verify"
+external octez_libcrux_ml_dsa_44_verify_b: verification_key -> bytes -> signature -> bool = "octez_libcrux_ml_dsa_44_verify_b"
 external octez_libcrux_ml_dsa_44_verification_key_to_bytes: verification_key -> bytes = "octez_libcrux_ml_dsa_44_verification_key_to_bytes"
 external octez_libcrux_ml_dsa_44_verification_key_from_bytes: bytes -> (verification_key, string) result = "octez_libcrux_ml_dsa_44_verification_key_from_bytes"
+external octez_libcrux_ml_dsa_44_verification_key_from_bytes_opt: bytes -> verification_key option = "octez_libcrux_ml_dsa_44_verification_key_from_bytes_opt"
 external octez_libcrux_ml_dsa_44_signing_key_to_bytes: signing_key -> bytes = "octez_libcrux_ml_dsa_44_signing_key_to_bytes"
 external octez_libcrux_ml_dsa_44_signing_key_from_bytes: bytes -> (signing_key, string) result = "octez_libcrux_ml_dsa_44_signing_key_from_bytes"
+external octez_libcrux_ml_dsa_44_signing_key_from_bytes_opt: bytes -> signing_key option = "octez_libcrux_ml_dsa_44_signing_key_from_bytes_opt"
 external octez_libcrux_ml_dsa_44_signature_to_bytes: signature -> bytes = "octez_libcrux_ml_dsa_44_signature_to_bytes"
 external octez_libcrux_ml_dsa_44_signature_from_bytes: bytes -> (signature, string) result = "octez_libcrux_ml_dsa_44_signature_from_bytes"
+external octez_libcrux_ml_dsa_44_signature_from_bytes_opt: bytes -> signature option = "octez_libcrux_ml_dsa_44_signature_from_bytes_opt"
