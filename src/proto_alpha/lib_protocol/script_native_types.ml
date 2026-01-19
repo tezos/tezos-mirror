@@ -143,6 +143,16 @@ module CLST_types = struct
 
   type storage = ledger * total_supply
 
+  type entrypoint = Deposit of deposit | Withdraw of withdraw
+
+  let entrypoint_from_arg : arg -> entrypoint = function
+    | L p -> Deposit p
+    | R p -> Withdraw p
+
+  let entrypoint_to_arg : entrypoint -> arg = function
+    | Deposit p -> L p
+    | Withdraw p -> R p
+
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" (unit_ty ())
 
