@@ -15,6 +15,8 @@ type ('arg, 'output) view_type = {
   output_ty : 'output ty_ex_c;
 }
 
+type 'ty ty_node = {untyped : Script.node; typed : 'ty Script_typed_ir.ty_ex_c}
+
 (** Types declaration of CLST contracts (entrypoints and storage). *)
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
@@ -64,6 +66,15 @@ module CLST_types : sig
   val total_supply_view_ty : total_supply_view
 
   val is_token_view_ty : is_token_view
+
+  val transfer_event_type :
+    ( address (* from_ *),
+      address (* to_ *),
+      nat (* token_id *),
+      nat (* amount *) )
+    tup4
+    ty_node
+    tzresult
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)
@@ -97,11 +108,6 @@ type 'storage view_map = (Script_string.t, 'storage ex_view) map
 
 module Internal_for_tests : sig
   val eq_native_kind : ('arg, 'storage) kind -> ('arg', 'storage') kind -> bool
-
-  type 'ty ty_node = {
-    untyped : Script.node;
-    typed : 'ty Script_typed_ir.ty_ex_c;
-  }
 
   type ('arg, 'storage) tys = 'arg ty_node * 'arg entrypoints * 'storage ty_node
 

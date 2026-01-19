@@ -135,6 +135,11 @@ module Helpers = struct
     (ty, {root = entrypoint; original_type_expr = ty.untyped})
 end
 
+type 'a ty_node = 'a Helpers.ty_node = {
+  untyped : Script.node;
+  typed : 'a ty_ex_c;
+}
+
 type ('arg, 'output) view_type = {
   input_ty : 'arg ty_ex_c;
   output_ty : 'output ty_ex_c;
@@ -247,6 +252,17 @@ module CLST_types = struct
     {input_ty = unit_ty.typed; output_ty = nat_ty.typed}
 
   let is_token_view_ty = {input_ty = nat_ty.typed; output_ty = bool_ty.typed}
+
+  let transfer_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "from_" address_ty)
+        (add_name "to_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
+    in
+    return @@ add_name "transfer_event" x
 end
 
 type ('arg, 'storage) kind =
@@ -274,11 +290,6 @@ module Internal_for_tests = struct
   let eq_native_kind (type arg arg' storage storage')
       (kind : (arg, storage) kind) (kind' : (arg', storage') kind) =
     match (kind, kind') with CLST_kind, CLST_kind -> true
-
-  type 'a ty_node = 'a Helpers.ty_node = {
-    untyped : Script.node;
-    typed : 'a ty_ex_c;
-  }
 
   type ('arg, 'storage) tys =
     'arg Helpers.ty_node * 'arg entrypoints * 'storage Helpers.ty_node
