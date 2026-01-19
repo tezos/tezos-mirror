@@ -52,6 +52,8 @@ Data Availability Layer
   protocol-attested DAL slots, used in a block metadata's field
   ``"dal_attestation"``. The format is described in the header of the file
   ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`)
+- Increase number of slots to 160. (MR :gl:`!20457`)
+- Increase slot size to 380_832 bytes. (MR :gl:`!20457`)
 
 Adaptive Issuance
 -----------------
