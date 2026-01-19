@@ -27,14 +27,16 @@ local query = grafonnet.query;
 local base = import './base.jsonnet';
 local logs = base.logs;
 
+// Configure logs label from command line, defaults to 'job'
+local logs_label = std.extVar('logs_label');
+
 //##
 // Logs
 //##
 {
-
   // Query helper
   query(type, legendFormat):
-    query.prometheus.new('Loki', '{job="' + base.namespace + '-' + type + '"}')
+    query.prometheus.new('Loki', '{' + logs_label + '="' + base.namespace + '-' + type + '"}')
     + query.prometheus.withLegendFormat(legendFormat),
 
   nodelogs(h, w, x, y):
