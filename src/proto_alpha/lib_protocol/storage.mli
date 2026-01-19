@@ -1150,6 +1150,15 @@ module Sc_rollup : sig
 end
 
 module Dal : sig
+  (** Sliding window of attestation accountability, indexed by published
+      levels. Contains attestation information (shard counts and attester sets)
+      for published levels in the range [current_level - attestation_lag + 1,
+      current_level - 1]. *)
+  module AttestationHistory :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Dal_attestations_repr.Accountability.history
+
   module Slot : sig
     (** This is a temporary storage for slot headers proposed onto the L1. The
         size of the list is at most [number_of_slots] as declared
