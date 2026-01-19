@@ -92,14 +92,12 @@ case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBeta)
   DEBVERSION=$VERSION
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
-  EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"
+  EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~') (build: 0)"
   ;;
 Rebuild | TestRebuild)
   DEBVERSION=$VERSION
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
-  # For now, the displayed version for a rebuild is vx.y+dev
-  # This will be fixed by upcoming work.
-  EXPECTED_VERSION="Octez ${gitlab_release_major_version}.${gitlab_release_minor_version}+dev"
+  EXPECTED_VERSION="Octez ${gitlab_release_major_version}.${gitlab_release_minor_version} (build: ${gitlab_packaging_revision_version})"
   ;;
 Master)
   DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
