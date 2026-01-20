@@ -87,8 +87,17 @@ module CLST_contract = struct
         ~new_balance:new_amount
         ~diff:(Script_int.int added_amount)
     in
+    let* op_total_supply_event, ctxt =
+      Clst_events.total_supply_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~token_id:Clst_contract_storage.token_id
+        ~new_total_supply:
+          (Clst_contract_storage.get_total_supply_from_storage new_storage)
+        ~diff:(Script_int.int added_amount)
+    in
     return
-      ( Script_list.of_list [op_balance_event],
+      ( Script_list.of_list [op_balance_event; op_total_supply_event],
         new_storage,
         balance_updates,
         ctxt )
@@ -160,8 +169,17 @@ module CLST_contract = struct
         ~new_balance:new_amount
         ~diff:(Script_int.neg removed_amount)
     in
+    let* op_total_supply_event, ctxt =
+      Clst_events.total_supply_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~token_id:Clst_contract_storage.token_id
+        ~new_total_supply:
+          (Clst_contract_storage.get_total_supply_from_storage new_storage)
+        ~diff:(Script_int.neg removed_amount)
+    in
     return
-      ( Script_list.of_list [op_balance_event],
+      ( Script_list.of_list [op_balance_event; op_total_supply_event],
         new_storage,
         balance_updates,
         ctxt )

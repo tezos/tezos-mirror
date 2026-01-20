@@ -86,6 +86,11 @@ module CLST_types : sig
     tup4
     ty_node
     tzresult
+
+  val total_supply_update_event_type :
+    (nat (* token_id *), nat (* new_total_supply *), int (* diff *)) tup3
+    ty_node
+    tzresult
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)

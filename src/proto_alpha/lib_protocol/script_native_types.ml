@@ -276,6 +276,16 @@ module CLST_types = struct
         (add_name "diff" int_ty)
     in
     return @@ add_name "balance_update" x
+
+  let total_supply_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup3_ty
+        (add_name "token_id" nat_ty)
+        (add_name "new_total_supply" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "total_supply_update" x
 end
 
 type ('arg, 'storage) kind =

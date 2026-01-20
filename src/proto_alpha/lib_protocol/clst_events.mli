@@ -36,3 +36,15 @@ val balance_update_event :
   new_balance:CLST_types.nat ->
   diff:CLST_types.int ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** [total_supply_update_event] returns an internal event operation of type
+    (pair %total_supply_update
+      (nat %token_id) (pair (nat %new_total_supply) (int %diff)))
+    with tag [entrypoint]. *)
+val total_supply_update_event :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  token_id:CLST_types.nat ->
+  new_total_supply:CLST_types.nat ->
+  diff:CLST_types.int ->
+  (Script_typed_ir.operation * context) tzresult Lwt.t
