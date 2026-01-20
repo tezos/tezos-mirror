@@ -163,37 +163,18 @@ module V2_0_0 = struct
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  (* [Make (Make_backend) (Context)] creates a PVM.
-
-     The Make_backend is a functor that creates the backend of the PVM.
-     The Conext provides the tree and the proof types.
-  *)
-  module Make
-      (Make_backend : Make_wasm)
-      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
+  module Make_pvm (WASM_pvm_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
     S
-      with type context = Context.Tree.t
-       and type state = Context.tree
-       and type proof = Context.proof = struct
-    module Tree = Context.Tree
-
-    type context = Context.Tree.t
-
+      with type context = WASM_pvm_machine.context
+       and type state = WASM_pvm_machine.state
+       and type proof = WASM_pvm_machine.proof = struct
     type hash = State_hash.t
 
-    type proof = Context.proof
-
-    let proof_encoding = Context.proof_encoding
-
-    let proof_start_state proof = Context.proof_before proof
-
-    let proof_stop_state proof = Context.proof_after proof
+    include WASM_pvm_machine
 
     let parse_boot_sector s = Hex.to_string @@ `Hex s
 
     let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
-
-    type tree = Tree.tree
 
     type status =
       | Computing
@@ -201,7 +182,7 @@ module V2_0_0 = struct
       | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     module State = struct
-      type state = tree
+      type nonrec state = state
 
       module Monad : sig
         type 'a t
@@ -214,9 +195,9 @@ module V2_0_0 = struct
           val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
         end
 
-        val get : tree t
+        val get : state t
 
-        val set : tree -> unit t
+        val set : state -> unit t
 
         val lift : 'a Lwt.t -> 'a t
       end = struct
@@ -243,9 +224,6 @@ module V2_0_0 = struct
       end
     end
 
-    type state = State.state
-
-    module WASM_machine = Make_backend (Tree)
     open State
 
     let pp _state =
@@ -253,19 +231,16 @@ module V2_0_0 = struct
 
     open Monad
 
-    let initial_state ~empty = WASM_machine.initial_state current_version empty
+    let initial_state ~empty =
+      WASM_pvm_machine.initial_state current_version empty
 
     let install_boot_sector state boot_sector =
-      WASM_machine.install_boot_sector
+      WASM_pvm_machine.install_boot_sector
         ~ticks_per_snapshot
         ~outbox_validity_period
         ~outbox_message_limit
         boot_sector
         state
-
-    let state_hash state =
-      let context_hash = Tree.hash state in
-      Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
 
     let result_of m state =
       let open Lwt_syntax in
@@ -280,7 +255,7 @@ module V2_0_0 = struct
     let get_tick : Sc_rollup_tick_repr.t Monad.t =
       let open Monad.Syntax in
       let* s = get in
-      let* info = lift (WASM_machine.get_info s) in
+      let* info = lift (WASM_pvm_machine.get_info s) in
       return @@ Sc_rollup_tick_repr.of_z info.current_tick
 
     let get_tick : state -> Sc_rollup_tick_repr.t Lwt.t = result_of get_tick
@@ -288,7 +263,7 @@ module V2_0_0 = struct
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
       let* s = get in
-      let* info = lift (WASM_machine.get_info s) in
+      let* info = lift (WASM_pvm_machine.get_info s) in
       return
       @@
       match info.last_input_read with
@@ -301,7 +276,7 @@ module V2_0_0 = struct
       let open Monad.Syntax in
       let open Sc_rollup_PVM_sig in
       let* s = get in
-      let* info = lift (WASM_machine.get_info s) in
+      let* info = lift (WASM_pvm_machine.get_info s) in
       let* last_read = get_last_message_read in
       (* We do not put the machine in a stuck condition if a kind of reveal
          happens to not be supported. This is a sensible thing to do, as if
@@ -350,7 +325,7 @@ module V2_0_0 = struct
         let output =
           Wasm_2_0_0.{outbox_level = outbox_level_int32; message_index}
         in
-        let* res = WASM_machine.get_output output state in
+        let* res = WASM_pvm_machine.get_output output state in
         match res with
         | None -> return (List.rev outbox)
         | Some msg -> (
@@ -384,7 +359,7 @@ module V2_0_0 = struct
           let* s = get in
           let* s =
             lift
-              (WASM_machine.set_input_step
+              (WASM_pvm_machine.set_input_step
                  {
                    inbox_level = Raw_level_repr.to_int32_non_negative inbox_level;
                    message_counter;
@@ -396,7 +371,7 @@ module V2_0_0 = struct
       | PS.Reveal reveal_data ->
           let reveal_data_bytes = PS.reveal_response_to_bytes reveal_data in
           let* s = get in
-          let* s = lift (WASM_machine.reveal_step reveal_data_bytes s) in
+          let* s = lift (WASM_pvm_machine.reveal_step reveal_data_bytes s) in
           set s
 
     let set_input input = state_of @@ set_input_state input
@@ -404,7 +379,7 @@ module V2_0_0 = struct
     let eval_step =
       let open Monad.Syntax in
       let* s = get in
-      let* s = lift (WASM_machine.compute_step s) in
+      let* s = lift (WASM_pvm_machine.compute_step s) in
       set s
 
     let eval state = state_of eval_step state
@@ -434,9 +409,9 @@ module V2_0_0 = struct
 
     let get_proof_state_level proof =
       let open Lwt_result_syntax in
-      let proof = Context.cast_read_only proof in
+      let proof = WASM_pvm_machine.cast_read_only proof in
       let*! result =
-        Context.verify_proof proof (fun state ->
+        WASM_pvm_machine.verify_proof proof (fun state ->
             let*! current_level_opt = get_current_level state in
             Lwt.return (state, current_level_opt))
       in
@@ -447,7 +422,7 @@ module V2_0_0 = struct
     let verify_proof ~is_reveal_enabled input_given proof =
       let open Lwt_result_syntax in
       let*! result =
-        Context.verify_proof
+        WASM_pvm_machine.verify_proof
           proof
           (step_transition ~is_reveal_enabled input_given)
       in
@@ -458,7 +433,7 @@ module V2_0_0 = struct
     let produce_proof context ~is_reveal_enabled input_given state =
       let open Lwt_result_syntax in
       let*! result =
-        Context.produce_proof
+        WASM_pvm_machine.produce_proof
           context
           state
           (step_transition ~is_reveal_enabled input_given)
@@ -468,7 +443,7 @@ module V2_0_0 = struct
       | None -> tzfail WASM_proof_production_failed
 
     type output_proof = {
-      output_proof : Context.proof;
+      output_proof : WASM_pvm_machine.proof;
       output_proof_output : PS.output;
     }
 
@@ -480,7 +455,7 @@ module V2_0_0 = struct
         (fun (output_proof, output_proof_output) ->
           {output_proof; output_proof_output})
         (obj2
-           (req "output_proof" Context.proof_encoding)
+           (req "output_proof" WASM_pvm_machine.proof_encoding)
            (req "output_proof_output" PS.output_encoding))
 
     let output_info_of_output_proof s = s.output_proof_output.output_info
@@ -494,7 +469,7 @@ module V2_0_0 = struct
       let* s = get in
       let* result =
         lift
-          (WASM_machine.get_output
+          (WASM_pvm_machine.get_output
              {
                outbox_level = Raw_level_repr.to_int32_non_negative outbox_level;
                message_index;
@@ -514,7 +489,7 @@ module V2_0_0 = struct
     let verify_output_proof p =
       let open Lwt_result_syntax in
       let transition = run @@ get_output p.output_proof_output in
-      let*! result = Context.verify_proof p.output_proof transition in
+      let*! result = WASM_pvm_machine.verify_proof p.output_proof transition in
       match result with
       | Some (_state, Some message) ->
           return
@@ -525,7 +500,7 @@ module V2_0_0 = struct
     let produce_output_proof context state output_proof_output =
       let open Lwt_result_syntax in
       let*! result =
-        Context.produce_proof context state
+        WASM_pvm_machine.produce_proof context state
         @@ run
         @@ get_output output_proof_output
       in
@@ -658,14 +633,54 @@ module V2_0_0 = struct
           WASM_invalid_dissection_distribution
 
     let get_current_level = get_current_level
+  end
 
-    module Internal_for_tests = struct
-      let insert_failure state =
-        let open Lwt_syntax in
-        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
-        let* n = Tree.length state ["failures"] in
-        add n
+  (* [Make (Make_backend) (Context)] creates a PVM.
+
+     The Make_backend is a functor that creates the backend of the PVM.
+     The Conext provides the tree and the proof types.
+  *)
+  module Make
+      (Make_backend : Make_wasm)
+      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
+    S
+      with type context = Context.Tree.t
+       and type state = Context.tree
+       and type proof = Context.proof = struct
+    module Wasm_pvm_machine :
+      Wasm_2_0_0.WASM_PVM_MACHINE
+        with type context = Context.Tree.t
+         and type state = Context.Tree.tree
+         and type proof = Context.proof = struct
+      include Context
+      include Make_backend (Tree)
+
+      type state = Tree.tree
+
+      let empty_state () = assert false
+
+      type context = Context.Tree.t
+
+      let state_hash state =
+        let context_hash = Tree.hash state in
+        Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
+
+      let proof_start_state = proof_before
+
+      let proof_stop_state = proof_after
+
+      module Internal_for_tests = struct
+        let insert_failure state =
+          let open Lwt_syntax in
+          let add n =
+            Tree.add state ["failures"; string_of_int n] Bytes.empty
+          in
+          let* n = Tree.length state ["failures"] in
+          add n
+      end
     end
+
+    include Make_pvm (Wasm_pvm_machine)
   end
 
   module Protocol_implementation =

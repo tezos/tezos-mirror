@@ -1261,6 +1261,66 @@ struct
 
     let v5 = Tezos_scoru_wasm.Wasm_pvm_state.V5
 
+    module type WASM_MACHINE = sig
+      type state
+
+      val initial_state : version -> state -> state Lwt.t
+
+      val install_boot_sector :
+        ticks_per_snapshot:Z.t ->
+        outbox_validity_period:int32 ->
+        outbox_message_limit:Z.t ->
+        string ->
+        state ->
+        state Lwt.t
+
+      val compute_step : state -> state Lwt.t
+
+      val set_input_step : input -> string -> state -> state Lwt.t
+
+      val reveal_step : bytes -> state -> state Lwt.t
+
+      val get_output : output -> state -> string option Lwt.t
+
+      val get_info : state -> info Lwt.t
+    end
+
+    module type WASM_PVM_MACHINE = sig
+      include WASM_MACHINE
+
+      type context
+
+      val empty_state : unit -> state
+
+      type proof
+
+      val state_hash :
+        state -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
+
+      val proof_encoding : proof Data_encoding.t
+
+      val proof_start_state :
+        proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+      val proof_stop_state :
+        proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+      val cast_read_only : proof -> proof
+
+      val verify_proof :
+        proof -> (state -> (state * 'a) Lwt.t) -> (state * 'a) option Lwt.t
+
+      val produce_proof :
+        context ->
+        state ->
+        (state -> (state * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
+
+      module Internal_for_tests : sig
+        val insert_failure : state -> state Lwt.t
+      end
+    end
+
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct

@@ -4101,13 +4101,39 @@ module Sc_rollup : sig
 
     val decode_reveal : Wasm_2_0_0.reveal -> reveal
 
+    module type S = sig
+      include PVM.S
+
+      val parse_boot_sector : string -> string option
+
+      val pp_boot_sector : Format.formatter -> string -> unit
+
+      val get_tick : state -> Tick.t Lwt.t
+
+      type status =
+        | Computing
+        | Waiting_for_input_message
+        | Waiting_for_reveal of reveal
+
+      val get_status :
+        is_reveal_enabled:is_reveal_enabled -> state -> status Lwt.t
+
+      val get_outbox : Raw_level.t -> state -> output list Lwt.t
+    end
+
     module type Make_wasm = module type of Wasm_2_0_0.Make
+
+    module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+      S
+        with type context = WASM_machine.context
+         and type state = WASM_machine.state
+         and type proof = WASM_machine.proof
 
     module Make
         (Wasm_backend : Make_wasm)
         (C : Generic_irmin_pvm_context_sig) : sig
       include
-        PVM.S
+        S
           with type context = C.Tree.t
            and type state = C.tree
            and type proof = C.proof

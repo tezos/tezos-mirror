@@ -66,6 +66,12 @@ module V2_0_0 : sig
 
   module type Make_wasm = module type of Wasm_2_0_0.Make
 
+  module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+    S
+      with type context = WASM_machine.context
+       and type state = WASM_machine.state
+       and type proof = WASM_machine.proof
+
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
   module Make
       (Lib_scoru_Wasm : Make_wasm)
