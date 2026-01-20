@@ -59,5 +59,3 @@ let reporter :
     else Format.ikfprintf k ppf fmt
   in
   { Logs.report }
-
-let to_string_exn encoding v = Data_encoding.Binary.to_string_exn encoding v
