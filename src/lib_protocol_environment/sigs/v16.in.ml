@@ -135,8 +135,6 @@ module type T = sig
 
   module Context_binary : [%sig "v16/context_binary.mli"]
 
-  module Wasm_2_0_0 : [%sig "v16/wasm_2_0_0.mli"]
-
   module Plonk : [%sig "v16/plonk.mli"]
 
   module Dal : [%sig "v16/dal.mli"]
@@ -144,6 +142,8 @@ module type T = sig
   module Skip_list : [%sig "v16/skip_list.mli"]
 
   module Smart_rollup : [%sig "v16/smart_rollup.mli"]
+
+  module Wasm_2_0_0 : [%sig "v16/wasm_2_0_0.mli"]
 
   module Riscv : [%sig "v16/riscv.mli"]
 end
