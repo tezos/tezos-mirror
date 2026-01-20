@@ -37,25 +37,11 @@ module Events = struct
   let section = [ "brassaia"; "object_graph" ]
 
   let object_graph_iter =
-    declare_5 ~section ~level:Debug ~name:"object_graph_iter"
-      ~msg:
-        "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
-         {cache_size}"
+    declare_3 ~section ~level:Debug ~name:"object_graph_iter"
+      ~msg:"iter: depth: {depth}; rev: {rev}; cache_size: {cache_size}"
       ("depth", Data_encoding.int64)
       ("rev", Data_encoding.bool)
-      ("min", Data_encoding.(list string))
-      ("max", Data_encoding.(list string))
       ("cache_size", Data_encoding.(option int64))
-
-  let treat_key =
-    declare_1 ~section ~level:Debug ~name:"treat_key" ~msg:"Treat key {key}"
-      ("key", Data_encoding.string)
-
-  let visit_key_level =
-    declare_2 ~section ~level:Debug ~name:"visit_key_level"
-      ~msg:"Visit key {key} at level {level}"
-      ("key", Data_encoding.string)
-      ("level", Data_encoding.int64)
 
   let output =
     declare_1 ~section ~level:Debug ~name:"output" ~msg:"Output {name}"
@@ -159,11 +145,7 @@ struct
       () =
     let* () =
       Events.(emit object_graph_iter)
-        ( Int64.of_int depth,
-          rev,
-          List.map (Logging.to_string_exn X.encoding) min,
-          List.map (Logging.to_string_exn X.encoding) max,
-          Option.map Int64.of_int cache_size )
+        (Int64.of_int depth, rev, Option.map Int64.of_int cache_size)
     in
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
@@ -180,9 +162,6 @@ struct
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Stack.push (Visit (k, 0)) todo) max;
     let treat key =
-      let* () =
-        Events.(emit treat_key) (Logging.to_string_exn X.encoding key)
-      in
       node key >>= fun () ->
       if not (Set.mem key min) then
         (* the edge function is optional to prevent an unnecessary computation
@@ -212,10 +191,6 @@ struct
         | true -> Lwt.return_unit
         | false ->
             let+ () =
-              let* () =
-                Events.(emit visit_key_level)
-                  (Logging.to_string_exn X.encoding key, Int64.of_int level)
-              in
               mark key level;
               if rev then Stack.push (Treat key) todo;
               match key with
@@ -241,11 +216,7 @@ struct
     let todo = Queue.create () in
     let has_mark key = Table.mem marks key in
     List.iter (fun k -> Queue.push (Visit (k, 0)) todo) max;
-    let treat key =
-      Events.(emit__dont_wait__use_with_care treat_key)
-        (Logging.to_string_exn X.encoding key);
-      node key
-    in
+    let treat key = node key in
     let visit_predecessors key level =
       let+ keys = pred key in
       List.iter (fun k -> Queue.push (Visit (k, level + 1)) todo) keys
@@ -253,8 +224,6 @@ struct
     let visit key level =
       if has_mark key then Lwt.return_unit
       else (
-        Events.(emit__dont_wait__use_with_care visit_key_level)
-          (Logging.to_string_exn X.encoding key, Int64.of_int level);
         mark key level;
         treat key >>= fun () -> visit_predecessors key level)
     in

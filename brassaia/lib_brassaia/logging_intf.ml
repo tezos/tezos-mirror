@@ -45,6 +45,4 @@ module type Sigs = sig
     (module Clock) ->
     Logs.reporter
   (** A default {!Logs} reporter that is sensitive to the logs tags above. *)
-
-  val to_string_exn : 'a Data_encoding.t -> 'a -> string
 end
