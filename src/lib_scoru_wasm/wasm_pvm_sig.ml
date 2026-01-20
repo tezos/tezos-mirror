@@ -46,6 +46,8 @@ module type Internal_for_tests = sig
 
   type tree
 
+  val insert_failure : tree -> tree Lwt.t
+
   val get_tick_state : tree -> tick_state Lwt.t
 
   val get_module_instance_exn :

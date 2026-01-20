@@ -683,50 +683,5 @@ module V2_0_0 = struct
     include Make_pvm (Wasm_pvm_machine)
   end
 
-  module Protocol_implementation =
-    Make
-      (Wasm_2_0_0.Make)
-      (struct
-        module Tree = struct
-          include Context.Tree
-
-          type tree = Context.tree
-
-          type t = Context.t
-
-          type key = string list
-
-          type value = bytes
-        end
-
-        type tree = Context.tree
-
-        type proof = Context.Proof.tree Context.Proof.t
-
-        let verify_proof p f =
-          let open Lwt_option_syntax in
-          let*? () =
-            Result.to_option (Context_binary_proof.check_is_binary p)
-          in
-          Lwt.map Result.to_option (Context.verify_tree_proof p f)
-
-        let produce_proof _context _state _f =
-          (* Can't produce proof without full context*)
-          Lwt.return_none
-
-        let kinded_hash_to_state_hash = function
-          | `Value hash | `Node hash ->
-              State_hash.context_hash_to_state_hash hash
-
-        let proof_before proof =
-          kinded_hash_to_state_hash proof.Context.Proof.before
-
-        let proof_after proof =
-          kinded_hash_to_state_hash proof.Context.Proof.after
-
-        let cast_read_only proof =
-          Context.Proof.{proof with after = proof.before}
-
-        let proof_encoding = Context.Proof_encoding.V2.Tree2.tree_proof_encoding
-      end)
+  module Protocol_implementation = Make_pvm (Wasm_2_0_0.Wasm_pvm_machine)
 end

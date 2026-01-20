@@ -88,8 +88,7 @@ module Wasm_context = struct
   let proof_encoding = Proof_encoding.V2.Tree2.tree_proof_encoding
 end
 
-module Full_Wasm =
-  Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
 let test_metadata_size () =
   let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in

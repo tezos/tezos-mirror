@@ -4159,10 +4159,10 @@ module Sc_rollup : sig
     end
 
     module Protocol_implementation :
-      PVM.PROTO_VERIFICATION
-        with type context = Context.t
-         and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t
+      S
+        with type context = Wasm_2_0_0.Wasm_pvm_machine.context
+         and type state = Wasm_2_0_0.Wasm_pvm_machine.state
+         and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
   end
 
   module Riscv_PVM : sig

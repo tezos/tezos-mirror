@@ -76,4 +76,13 @@ module Make_pvm_machine (Context : CONTEXT_PROOF) :
   Wasm_pvm_sig.S
     with type context = Context.context
      and type proof = Context.proof
-     and type tree = Context.Tree.tree
+     and type tree = Context.Wrapped_tree.tree
+
+module Wasm_pvm_in_memory :
+  Wasm_pvm_sig.S
+    with type context = Tezos_context_memory.Context_binary.context
+     and type tree = Tezos_context_memory.Context_binary.tree
+     and type state = Tezos_context_memory.Context_binary.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t

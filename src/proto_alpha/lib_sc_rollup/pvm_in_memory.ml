@@ -52,8 +52,4 @@ end
 
 module Arith : S = Extend (Sc_rollup.ArithPVM.Make (Context_helpers.In_memory))
 
-module Wasm : S =
-  Extend
-    (Sc_rollup.Wasm_2_0_0PVM.Make
-       (Environment.Wasm_2_0_0.Make)
-       (Context_helpers.In_memory))
+module Wasm : S = Extend (Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation)

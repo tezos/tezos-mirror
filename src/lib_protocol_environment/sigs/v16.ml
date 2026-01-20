@@ -12886,6 +12886,8 @@ module type WASM_PVM_MACHINE = sig
     val insert_failure : state -> state Lwt.t
   end
 end
+
+module Wasm_pvm_machine : WASM_PVM_MACHINE
 end
 # 146 "v16.in.ml"
 

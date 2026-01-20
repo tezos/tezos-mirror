@@ -133,6 +133,12 @@ module type T = sig
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+       and type Wasm_2_0_0.Wasm_pvm_machine.context =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.context
+       and type Wasm_2_0_0.Wasm_pvm_machine.state =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.state
+       and type Wasm_2_0_0.Wasm_pvm_machine.proof =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.proof
        and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
@@ -1335,6 +1341,13 @@ struct
 
         let wrap t = PVM_tree t
       end)
+
+      let compute_step =
+        compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+    end
+
+    module Wasm_pvm_machine = struct
+      include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
 
       let compute_step =
         compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint

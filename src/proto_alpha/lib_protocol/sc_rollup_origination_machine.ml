@@ -68,9 +68,9 @@ module Arith : S = struct
 end
 
 module Wasm : S = struct
-  include Sc_rollup_wasm.V2_0_0.Make (Wasm_2_0_0.Make) (Context_no_proofs)
+  include Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
-  let empty_state = empty_tree
+  let empty_state = Wasm_2_0_0.Wasm_pvm_machine.empty_state
 end
 
 module Riscv : S = struct
