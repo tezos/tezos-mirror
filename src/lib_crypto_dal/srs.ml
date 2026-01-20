@@ -395,15 +395,21 @@ module Internal_for_tests = struct
           shards = [11; 12] |> List.map (Int.shift_left 1);
         }
     in
-    (* Mainnet parameters *)
+    (* (current and future) Mainnet parameters *)
     let default_params =
-      Print.{slot = [126_944]; page = [3967]; redundancy = [8]; shards = [512]}
+      Print.
+        {
+          slot = [126_944; 380_832];
+          page = [3967];
+          redundancy = [8];
+          shards = [512];
+        }
     in
     (* Some additionnal parameters used in tests *)
     let test_params =
       Print.
         {
-          slot = [63_472; 126_944; 253_888];
+          slot = [63_472; 126_944; 190_416; 253_888; 380_832];
           page = [3967];
           redundancy = [2; 4; 8];
           shards = [256];
