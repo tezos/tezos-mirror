@@ -77,7 +77,21 @@ module CLST_contract = struct
         ~clst_contract_hash:step_constants.self
         step_constants.amount
     in
-    return (Script_list.empty, new_storage, balance_updates, ctxt)
+    let*? entrypoint_str = Entrypoint.of_string_lax "deposit" in
+    let* op_balance_event, ctxt =
+      Clst_events.balance_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner:address
+        ~token_id:Clst_contract_storage.token_id
+        ~new_balance:new_amount
+        ~diff:(Script_int.int added_amount)
+    in
+    return
+      ( Script_list.of_list [op_balance_event],
+        new_storage,
+        balance_updates,
+        ctxt )
 
   let execute_redeem (ctxt, (step_constants : Script_typed_ir.step_constants))
       (amount : redeem) (storage : Clst_contract_storage.t) :
@@ -136,7 +150,21 @@ module CLST_contract = struct
         ~staker:account
         amount_tez
     in
-    return (Script_list.of_list [], new_storage, balance_updates, ctxt)
+    let*? entrypoint_str = Entrypoint.of_string_lax "redeem" in
+    let* op_balance_event, ctxt =
+      Clst_events.balance_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner:address
+        ~token_id:Clst_contract_storage.token_id
+        ~new_balance:new_amount
+        ~diff:(Script_int.neg removed_amount)
+    in
+    return
+      ( Script_list.of_list [op_balance_event],
+        new_storage,
+        balance_updates,
+        ctxt )
 
   let check_token_id token_id =
     error_unless
@@ -234,6 +262,24 @@ module CLST_contract = struct
           to_
           Script_int.(add_n balance_to amount)
       in
+      let* op_balance_event_source, ctxt =
+        Clst_events.balance_update_event
+          (ctxt, step_constants)
+          ~entrypoint:entrypoint_str
+          ~owner:from_
+          ~token_id:Clst_contract_storage.token_id
+          ~new_balance:balance_from
+          ~diff:(Script_int.neg amount)
+      in
+      let* op_balance_event_dest, ctxt =
+        Clst_events.balance_update_event
+          (ctxt, step_constants)
+          ~entrypoint:entrypoint_str
+          ~owner:to_
+          ~token_id:Clst_contract_storage.token_id
+          ~new_balance:balance_to
+          ~diff:(Script_int.int amount)
+      in
       let* op_transfer_event, ctxt =
         Clst_events.transfer_event
           (ctxt, step_constants)
@@ -243,7 +289,11 @@ module CLST_contract = struct
           ~token_id:Clst_contract_storage.token_id
           ~amount
       in
-      return (ctxt, storage, op_transfer_event :: ops)
+      return
+        ( ctxt,
+          storage,
+          op_balance_event_source :: op_balance_event_dest :: op_transfer_event
+          :: ops )
     in
     let execute_from (ctxt, storage, ops) (from_, txs) =
       List.fold_left_es
