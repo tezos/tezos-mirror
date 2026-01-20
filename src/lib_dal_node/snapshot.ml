@@ -235,8 +235,7 @@ module Merge = struct
       Node_context.init_cryptobox config proto_parameters profile_ctxt
     in
     (* Set crypto box share size hook. *)
-    Value_size_hooks.set_share_size
-      (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+    Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
     in
