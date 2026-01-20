@@ -34,6 +34,16 @@ class Octez < Formula
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
     ENV["DUNE_BUILD_JOBS"]="-j 12"
 
+    # Set the internal variable for CI use
+    if ENV["HOMEBREW_KISSCACHE"]
+      ENV["KISSCACHE"] = ENV["HOMEBREW_KISSCACHE"]
+      puts "--> Enabled KISSCACHE: #{ENV['KISSCACHE']}"
+    end
+    if ENV["HOMEBREW_OPAMFETCH"]
+      # Set the internal variable that your scripts/makefile expect
+      ENV["OPAMFETCH"] = ENV["HOMEBREW_OPAMFETCH"]
+      puts "--> Enabled OPAMFETCH: #{ENV['OPAMFETCH']}"
+    end
 
     (buildpath/"script.sh").write <<~EOS
       #!/bin/sh

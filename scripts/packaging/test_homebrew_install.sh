@@ -41,6 +41,12 @@ echo "installing formula from https://$BUCKET.storage.googleapis.com/$TARGETDIR/
 curl -q "https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb" -O
 # Create pre-compiled bottle from local octez formula
 # with verbose output and developer checks enabled
-HOMEBREW_DEVELOPER=1 brew install -v --formula --build-bottle ./octez.rb
+export HOMEBREW_DEVELOPER=1
+# allow to pass env vars while building the bottle
+export HOMEBREW_NO_ENV_FILTERING=1
+# do not upgrade homebrew automatically
+export HOMEBREW_NO_AUTO_UPDATE=1
+
+brew install -v --formula --build-bottle ./octez.rb
 
 octez-node --version

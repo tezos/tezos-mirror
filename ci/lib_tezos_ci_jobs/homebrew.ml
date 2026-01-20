@@ -37,8 +37,18 @@ let job_build_homebrew_formula : tezos_job =
     ~image
     ~stage
     ~dependencies:(Dependent [Job job_create_homebrew_formula])
-    ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
-    ["./scripts/packaging/test_homebrew_install.sh"]
+    ~variables:
+      [
+        ("DUNE_BUILD_JOBS", "-j 12");
+        ("HOMEBREW_KISSCACHE", "http://kisscache.kisscache.svc.cluster.local");
+        ("HOMEBREW_OPAMFETCH", "scripts/kiss-fetch.sh");
+      ]
+    [
+      (* configure cargo to use the [crates-io-proxy] internal
+         mirror instead of crates.io *)
+      "cp images/ci/.cargo/config.toml .cargo/";
+      "./scripts/packaging/test_homebrew_install.sh";
+    ]
   |> enable_networked_cargo
 
 let job_build_homebrew_formula_macosx : tezos_job =
