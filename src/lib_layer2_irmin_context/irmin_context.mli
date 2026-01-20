@@ -55,10 +55,10 @@ type ro = [`Read] t
 
 module Tree :
   Tezos_context_sigs.Context.TREE
-    with type t := rw
-     and type key := string list
-     and type value := bytes
-     and type tree := tree
+    with type t = rw
+     and type key = string list
+     and type value = bytes
+     and type tree = tree
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)

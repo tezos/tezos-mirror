@@ -67,16 +67,17 @@ val durable_storage_encoding : Durable.t Tezos_tree_encoding.t
 module Make_machine (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.Machine with type tree = T.tree and type state = T.tree
 
-module Make_machine_with_vm
-    (Wasm_vm : Wasm_vm_sig.S)
-    (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.Machine with type tree = T.tree
+module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
+    module type of Make_machine
 
 module Make_pvm_machine (Context : CONTEXT_PROOF) :
   Wasm_pvm_sig.S
     with type context = Context.context
      and type proof = Context.proof
      and type tree = Context.Wrapped_tree.tree
+
+module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
+    module type of Make_pvm_machine
 
 module Wasm_pvm_in_memory :
   Wasm_pvm_sig.S
