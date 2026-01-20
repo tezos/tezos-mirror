@@ -132,11 +132,6 @@ module V2_0_0 = struct
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
 
-  module type TreeS =
-    Context.TREE with type key = string list and type value = bytes
-
-  module type Make_wasm = module type of Wasm_2_0_0.Make
-
   module type S = sig
     include Sc_rollup_PVM_sig.S
 
@@ -633,54 +628,6 @@ module V2_0_0 = struct
           WASM_invalid_dissection_distribution
 
     let get_current_level = get_current_level
-  end
-
-  (* [Make (Make_backend) (Context)] creates a PVM.
-
-     The Make_backend is a functor that creates the backend of the PVM.
-     The Conext provides the tree and the proof types.
-  *)
-  module Make
-      (Make_backend : Make_wasm)
-      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
-    S
-      with type context = Context.Tree.t
-       and type state = Context.tree
-       and type proof = Context.proof = struct
-    module Wasm_pvm_machine :
-      Wasm_2_0_0.WASM_PVM_MACHINE
-        with type context = Context.Tree.t
-         and type state = Context.Tree.tree
-         and type proof = Context.proof = struct
-      include Context
-      include Make_backend (Tree)
-
-      type state = Tree.tree
-
-      let empty_state () = assert false
-
-      type context = Context.Tree.t
-
-      let state_hash state =
-        let context_hash = Tree.hash state in
-        Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
-
-      let proof_start_state = proof_before
-
-      let proof_stop_state = proof_after
-
-      module Internal_for_tests = struct
-        let insert_failure state =
-          let open Lwt_syntax in
-          let add n =
-            Tree.add state ["failures"; string_of_int n] Bytes.empty
-          in
-          let* n = Tree.length state ["failures"] in
-          add n
-      end
-    end
-
-    include Make_pvm (Wasm_pvm_machine)
   end
 
   module Protocol_implementation = Make_pvm (Wasm_2_0_0.Wasm_pvm_machine)

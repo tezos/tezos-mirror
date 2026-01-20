@@ -12826,7 +12826,7 @@ type info = {
   input_request : input_request;
 }
 
-module type WASM_MACHINE = sig
+module type WASM_PVM_MACHINE = sig
   type state
 
   val initial_state : version -> state -> state Lwt.t
@@ -12848,14 +12848,6 @@ module type WASM_MACHINE = sig
   val get_output : output -> state -> string option Lwt.t
 
   val get_info : state -> info Lwt.t
-end
-
-module Make
-    (Tree : Context.TREE with type key = string list and type value = bytes) :
-  WASM_MACHINE with type state = Tree.tree
-
-module type WASM_PVM_MACHINE = sig
-  include WASM_MACHINE
 
   type context
 

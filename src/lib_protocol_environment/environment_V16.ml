@@ -1267,7 +1267,7 @@ struct
 
     let v5 = Tezos_scoru_wasm.Wasm_pvm_state.V5
 
-    module type WASM_MACHINE = sig
+    module type WASM_PVM_MACHINE = sig
       type state
 
       val initial_state : version -> state -> state Lwt.t
@@ -1289,10 +1289,6 @@ struct
       val get_output : output -> state -> string option Lwt.t
 
       val get_info : state -> info Lwt.t
-    end
-
-    module type WASM_PVM_MACHINE = sig
-      include WASM_MACHINE
 
       type context
 
@@ -1325,25 +1321,6 @@ struct
       module Internal_for_tests : sig
         val insert_failure : state -> state Lwt.t
       end
-    end
-
-    module Make
-        (Tree : Context.TREE with type key = string list and type value = bytes) =
-    struct
-      type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
-
-      include Tezos_scoru_wasm.Wasm_pvm.Make_machine (struct
-        include Tree
-
-        let select = function
-          | PVM_tree t -> t
-          | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
-
-        let wrap t = PVM_tree t
-      end)
-
-      let compute_step =
-        compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
     end
 
     module Wasm_pvm_machine = struct
