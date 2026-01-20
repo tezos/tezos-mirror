@@ -157,12 +157,13 @@ module CLST_contract = struct
       (transfer : transfer) (storage : Clst_contract_storage.t) :
       entrypoint_execution_result tzresult Lwt.t =
     let open Lwt_result_syntax in
+    let*? entrypoint_str = Entrypoint.of_string_lax "transfer" in
     let*? () =
       error_unless
         Tez.(step_constants.amount = zero)
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
-    let execute_one from_ (ctxt, storage) (to_, (token_id, amount)) =
+    let execute_one from_ (ctxt, storage, ops) (to_, (token_id, amount)) =
       let*? () = check_token_id token_id in
       (* Checking that [from_] is the sender here instead of in
          [execute_from] means that we repeat the check for each new
@@ -233,21 +234,30 @@ module CLST_contract = struct
           to_
           Script_int.(add_n balance_to amount)
       in
-      return (ctxt, storage)
+      let* op_transfer_event, ctxt =
+        Clst_events.transfer_event
+          (ctxt, step_constants)
+          ~entrypoint:entrypoint_str
+          ~sender:from_
+          ~receiver:to_
+          ~token_id:Clst_contract_storage.token_id
+          ~amount
+      in
+      return (ctxt, storage, op_transfer_event :: ops)
     in
-    let execute_from (ctxt, storage) (from_, txs) =
+    let execute_from (ctxt, storage, ops) (from_, txs) =
       List.fold_left_es
         (execute_one from_)
-        (ctxt, storage)
+        (ctxt, storage, ops)
         (Script_list.to_list txs)
     in
-    let* ctxt, storage =
+    let* ctxt, storage, rev_ops =
       List.fold_left_es
         execute_from
-        (ctxt, storage)
+        (ctxt, storage, [])
         (Script_list.to_list transfer)
     in
-    return (Script_list.empty, storage, [], ctxt)
+    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
