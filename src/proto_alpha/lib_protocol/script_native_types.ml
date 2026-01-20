@@ -66,19 +66,30 @@ module Helpers = struct
     let+ typed = Script_typed_ir.or_t loc tyl tyr in
     {untyped = prim Script.T_or [untyl; untyr]; typed}
 
-  (** Entrypoints combinator *)
+  let list_ty ({untyped; typed = Ty_ex_c ty_elt} : 'a ty_node) :
+      'a Script_list.t ty_node tzresult =
+    let open Result_syntax in
+    let* ty_list = Script_typed_ir.list_t loc ty_elt in
+    return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
+
+  (** Nodes and entrypoints combinators *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
 
-  (** Generates the leaf of the entrypoint tree, i.e. an entrypoint. *)
-  let make_entrypoint_leaf (type t) name ({untyped; typed} : t ty_node) =
-    let open Result_syntax in
+  (** Annotates a node with a name. *)
+  let add_name name node =
     let untyped =
-      match untyped with
+      match node.untyped with
       | Prim (loc, prim, args, annot) ->
           Prim (loc, prim, args, ("%" ^ name) :: annot)
-      | untyped -> untyped
+      | (Int _ | String _ | Bytes _ | Seq _) as x -> x
     in
+    {node with untyped}
+
+  (** Generates the leaf of the entrypoint tree, i.e. an entrypoint. *)
+  let make_entrypoint_leaf (type t) name (node : t ty_node) =
+    let open Result_syntax in
+    let {typed; untyped} = add_name name node in
     let* name = Entrypoint.of_string_strict ~loc name in
     let at_node = Some {name; original_type_expr = untyped} in
     return ({typed; untyped}, {at_node; nested = Entrypoints_None})
