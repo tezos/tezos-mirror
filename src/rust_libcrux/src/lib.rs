@@ -16,9 +16,6 @@ use libcrux_ml_dsa::ml_dsa_44::{
 use libcrux_ml_dsa::ml_dsa_44::{generate_key_pair, sign, verify};
 use libcrux_ml_dsa::{KEY_GENERATION_RANDOMNESS_SIZE, SIGNING_RANDOMNESS_SIZE};
 
-/// Maximum context size
-const MAX_CONTEXT_SIZE: usize = 255;
-
 /// Verification key size for ML-DSA-44
 const VERIFICATION_KEY_SIZE: usize = MLDSA44VerificationKey::len();
 
@@ -27,6 +24,11 @@ const SIGNING_KEY_SIZE: usize = MLDSA44SigningKey::len();
 
 /// Signature size for ML-DSA-44
 const SIGNATURE_SIZE: usize = MLDSA44Signature::len();
+
+/// Maximum signing context size
+const MAX_CONTEXT_SIZE: usize = 255;
+
+const EMPTY_CONTEXT: &[u8] = b"";
 
 /// Try to convert a byte slice to a fixed-size array.
 ///
@@ -37,14 +39,20 @@ fn array_from_slice<const SIZE: usize>(bytes: &[u8], name: &str) -> Result<[u8; 
         .map_err(|_| format!("Invalid {name} size: expected {SIZE}, got {}", bytes.len()))
 }
 
+/// Try to convert a byte slice to a fixed-size array.
+///
+/// Returns [`None`] if the slice length does not match the expected size.
+fn array_from_slice_opt<const SIZE: usize>(bytes: &[u8]) -> Option<[u8; SIZE]> {
+    bytes.try_into().ok()
+}
+
 /// Check that the given length is less than or equal to [`MAX_CONTEXT_SIZE`].
 ///
 /// Returns an error otherwise.
 fn check_context_len(len: usize) -> Result<(), String> {
     if len > MAX_CONTEXT_SIZE {
         return Err(format!(
-            "Context too long: expected at most {} bytes, got {}",
-            MAX_CONTEXT_SIZE, len
+            "Context too long: expected at most {MAX_CONTEXT_SIZE} bytes, got {len}"
         ));
     }
     Ok(())
@@ -83,7 +91,55 @@ ocaml::custom!(SigningKey);
 ocaml::custom!(VerificationKey);
 ocaml::custom!(Signature);
 
-/// Generate a new ML-DSA-44 key pair
+/// Generate a new ML-DSA-44 key pair and return pointers to each key.
+///
+/// Returns an error if the size of `randomness` is not [`KEY_GENERATION_RANDOMNESS_SIZE`].
+///
+/// # Security
+///
+/// `randomness` must be cryptographically secure random bytes.
+#[ocaml::func]
+#[ocaml::sig("bytes -> (signing_key * verification_key, string) result")]
+pub fn octez_libcrux_ml_dsa_44_generate_keys(
+    randomness: &[u8],
+) -> Result<(Pointer<SigningKey>, Pointer<VerificationKey>), String> {
+    let randomness_bytes = array_from_slice::<KEY_GENERATION_RANDOMNESS_SIZE>(
+        randomness,
+        "key generation randomness",
+    )?;
+
+    let key_pair = generate_key_pair(randomness_bytes);
+    let signing_key = SigningKey(key_pair.signing_key).into();
+    let verification_key = VerificationKey(key_pair.verification_key).into();
+    Ok((signing_key, verification_key))
+}
+
+/// Generate a new ML-DSA-44 key pair and return pointers to each key.
+///
+/// Returns [`None`] if the size of `randomness` is not [`KEY_GENERATION_RANDOMNESS_SIZE`].
+///
+/// # Security
+///
+/// `randomness` must be cryptographically secure random bytes.
+#[ocaml::func]
+#[ocaml::sig("bytes -> (signing_key * verification_key) option")]
+pub fn octez_libcrux_ml_dsa_44_generate_keys_opt(
+    randomness: &[u8],
+) -> Option<(Pointer<SigningKey>, Pointer<VerificationKey>)> {
+    let randomness_bytes = array_from_slice_opt::<KEY_GENERATION_RANDOMNESS_SIZE>(randomness)?;
+
+    let key_pair = generate_key_pair(randomness_bytes);
+    let signing_key = SigningKey(key_pair.signing_key).into();
+    let verification_key = VerificationKey(key_pair.verification_key).into();
+    Some((signing_key, verification_key))
+}
+
+/// Generate a new ML-DSA-44 key pair.
+///
+/// Should only be used when a [`KeyPair`] needs to be manipulated in OCaml. If the goal is
+/// to immediately obtain a signing and a verification key, prefer [`octez_libcrux_ml_dsa_44_generate_keys`]
+/// or [`octez_libcrux_ml_dsa_44_generate_keys_opt`] instead as it will result in fewer calls to the FFI
+/// and eliminate the need for cloning the key pair.
 ///
 /// Returns an error if the size of `randomness` is not [`KEY_GENERATION_RANDOMNESS_SIZE`].
 ///
@@ -104,7 +160,7 @@ pub fn octez_libcrux_ml_dsa_44_generate_key_pair(
     Ok(KeyPair(key_pair).into())
 }
 
-/// Extract the signing key from a key pair
+/// Extract the signing key from a key pair by cloning it.
 #[ocaml::func]
 #[ocaml::sig("key_pair -> signing_key")]
 pub fn octez_libcrux_ml_dsa_44_key_pair_get_signing_key(
@@ -114,7 +170,7 @@ pub fn octez_libcrux_ml_dsa_44_key_pair_get_signing_key(
     SigningKey(signing_key).into()
 }
 
-/// Extract the verification key from a key pair
+/// Extract the verification key from a key pair by cloning it.
 #[ocaml::func]
 #[ocaml::sig("key_pair -> verification_key")]
 pub fn octez_libcrux_ml_dsa_44_key_pair_get_verification_key(
@@ -153,6 +209,33 @@ pub fn octez_libcrux_ml_dsa_44_sign(
     }
 }
 
+/// Sign a message using ML-DSA-44 with an empty signing context
+///
+/// Returns [`None`] if:
+/// - The size of `randomness` is not [`SIGNING_RANDOMNESS_SIZE`]
+/// - Signing fails
+///
+/// # Security
+///
+/// `randomness` must be cryptographically secure random bytes.
+#[ocaml::func]
+#[ocaml::sig("signing_key -> bytes -> bytes -> signature option")]
+pub fn octez_libcrux_ml_dsa_44_sign_opt(
+    signing_key: Pointer<SigningKey>,
+    message: &[u8],
+    randomness: &[u8],
+) -> Option<Pointer<Signature>> {
+    let randomness_bytes = array_from_slice_opt::<SIGNING_RANDOMNESS_SIZE>(randomness)?;
+    sign(
+        &signing_key.as_ref().0,
+        message,
+        EMPTY_CONTEXT,
+        randomness_bytes,
+    )
+    .ok()
+    .map(|signature| Signature(signature).into())
+}
+
 /// Verify an ML-DSA-44 signature
 ///
 /// Returns an error if:
@@ -177,6 +260,27 @@ pub fn octez_libcrux_ml_dsa_44_verify(
     .map_err(|e| format!("Verification failed: {e:?}"))
 }
 
+/// Verify an ML-DSA-44 signature with an empty signing context
+///
+/// Returns false if:
+/// - The size of `context` exceeds [`MAX_CONTEXT_SIZE`]
+/// - Verification fails
+#[ocaml::func]
+#[ocaml::sig("verification_key -> bytes -> signature -> bool")]
+pub fn octez_libcrux_ml_dsa_44_verify_b(
+    verification_key: Pointer<VerificationKey>,
+    message: &[u8],
+    signature: Pointer<Signature>,
+) -> bool {
+    verify(
+        &verification_key.as_ref().0,
+        message,
+        EMPTY_CONTEXT,
+        &signature.as_ref().0,
+    )
+    .is_ok()
+}
+
 /// Return a new byte buffer of size [`VERIFICATION_KEY_SIZE`] containing
 /// the verification key bytes.
 #[ocaml::func]
@@ -199,6 +303,19 @@ pub fn octez_libcrux_ml_dsa_44_verification_key_from_bytes(
         array_from_slice::<VERIFICATION_KEY_SIZE>(bytes, "verification key")?;
 
     Ok(VerificationKey(MLDSA44VerificationKey::new(verification_key_bytes)).into())
+}
+
+/// Create a new verification key from bytes.
+///
+/// Returns [`None`] if the size of `bytes` is not [`VERIFICATION_KEY_SIZE`].
+#[ocaml::func]
+#[ocaml::sig("bytes -> verification_key option")]
+pub fn octez_libcrux_ml_dsa_44_verification_key_from_bytes_opt(
+    bytes: &[u8],
+) -> Option<Pointer<VerificationKey>> {
+    let verification_key_bytes = array_from_slice_opt::<VERIFICATION_KEY_SIZE>(bytes)?;
+
+    Some(VerificationKey(MLDSA44VerificationKey::new(verification_key_bytes)).into())
 }
 
 /// Return a new byte buffer of size [`SIGNING_KEY_SIZE`] containing
@@ -233,6 +350,23 @@ pub fn octez_libcrux_ml_dsa_44_signing_key_from_bytes(
     Ok(signing_key)
 }
 
+/// Create a new signing key from bytes.
+///
+/// Returns [`None`] if the size of `bytes` is not [`SIGNING_KEY_SIZE`].
+#[ocaml::func]
+#[ocaml::sig("bytes -> signing_key option")]
+pub fn octez_libcrux_ml_dsa_44_signing_key_from_bytes_opt(
+    bytes: &[u8],
+) -> Option<Pointer<SigningKey>> {
+    let mut signing_key_bytes = array_from_slice_opt::<SIGNING_KEY_SIZE>(bytes)?;
+
+    let signing_key = SigningKey(MLDSA44SigningKey::new(signing_key_bytes)).into();
+
+    signing_key_bytes.zeroize();
+
+    Some(signing_key)
+}
+
 /// Return a new byte buffer of size [`SIGNATURE_SIZE`] containing
 /// the signature bytes.
 #[ocaml::func]
@@ -254,4 +388,17 @@ pub fn octez_libcrux_ml_dsa_44_signature_from_bytes(
     let signature_bytes = array_from_slice::<SIGNATURE_SIZE>(bytes, "signature")?;
 
     Ok(Signature(MLDSA44Signature::new(signature_bytes)).into())
+}
+
+/// Create a new signature from bytes.
+///
+/// Returns [`None`] if the size of `bytes` is not [`SIGNATURE_SIZE`].
+#[ocaml::func]
+#[ocaml::sig("bytes -> signature option")]
+pub fn octez_libcrux_ml_dsa_44_signature_from_bytes_opt(
+    bytes: &[u8],
+) -> Option<Pointer<Signature>> {
+    let signature_bytes = array_from_slice_opt::<SIGNATURE_SIZE>(bytes)?;
+
+    Some(Signature(MLDSA44Signature::new(signature_bytes)).into())
 }
