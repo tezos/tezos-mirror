@@ -32,7 +32,7 @@ If a block contains a valid ``DAL_publish_commitment`` operation, any subsequent
 Economics
 ---------
 
-Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the bandwidth required for bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
+Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the network bandwidth required by bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
 
 DAL attestation payloads
 ========================

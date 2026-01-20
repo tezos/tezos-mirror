@@ -11,13 +11,12 @@ and could be used for other use cases in the future.
 
 In practice, the DAL is implemented by a network of *DAL nodes*, constituting a *DAL network*.
 The DAL network employs a P2P protocol to publish blobs
-(distinct from :doc:`the P2P layer used by the Octez node <../shell/p2p>`), enabling a better bandwidth sharing between the peers (further
+(distinct from :doc:`the P2P layer used by the Octez node <../shell/p2p>`), enabling better load distribution among the peers (further
 elaborated in the P2P section below). The DAL currently supports a
-data bandwidth of 0.5MiB/s, a stark contrast to the current situation on
-L1, which has an approximate bandwidth of 32 KiB/s. This highlights
-the significant boost in bandwidth provided by the DAL.
-Furthermore, the DAL aims to put back by several orders of magnitudes the data bandwidth constraints imposed by the L1 block size, up to 100MiB/s. This
-translates into reduced fees for users when posting L2 operations
+data throughput of 10 MB/s, a stark contrast to the current situation on
+L1, which has an approximate data throughput of 32 KiB/s. This highlights
+the significant boost in data throughput provided by the DAL.
+This translates into reduced fees for users when posting L2 operations
 without compromising the fundamental principle of decentralization.
 
 The amount of data that can be transmitted over the DAL network is,
@@ -102,7 +101,7 @@ baker uses a different selection criterion.
 For smart rollups, it is necessary to divide the slot into smaller
 segments called *pages* (see
 :ref:`populating_the_reveal_channel`). The economic protocol specifies
-the size of each page as a constant, with 4KiB being a practical
+the size of each page as a constant, with 4 KiB being a practical
 size. While it might seem feasible to choose shards fitting this page
 limit and directly feed shards to the rollup, accessing the original
 data from shards involves complex cryptographic computations. We
@@ -145,7 +144,7 @@ For every topic a node subscribes to, it maintains a virtual subnetwork, or **me
 For the DAL instantiation of gossipsub, a message is defined as a 3-tuple: a shard, the shard’s index, and the shard’s proof proving that the shard corresponds to the commitment given by the message id. The associated message id consists of the shard index and the associated slot index, (published) level, slot commitment, and attestor’s public key hash.
 
 A topic is defined as a pair ``(slot_index, public_key_hash)``. The first component identifies the slot associated to any shard published under this topic, while the second component identifies the baker assigned to this shard.
-Such a set of topics ensures that the bandwidth of bakers and slot producers is bounded (for valid messages) over a cycle.
+Such a set of topics ensures that the network traffic of bakers and slot producers is bounded (for valid messages) over a cycle.
 
 A slot producer should subscribe to all relevant topics associated with their slot index. This includes every topic where a baker is assigned at least one shard for that slot index.
 Since shard assignments are derived from the consensus committee, which is known at least one cycle in advance, slot producers can determine the relevant topics ahead of time.
@@ -161,6 +160,6 @@ Regarding peer discovery, the current implementation of the DAL relies on gossip
 
 .. warning::
 
-	Attention must be paid to the security implications for bakers in the DAL network. Since a baker's bandwidth is proportional to their stake, it can become relatively straightforward to identify the IP address of their DAL node, particularly for those with substantial stakes. To mitigate this risk, bakers are advised to operate their DAL node using an IP address different from their L1 node. This separation helps in preventing the unintentional exposure of the L1 node's IP address.
+	Attention must be paid to the security implications for bakers in the DAL network. Since a baker's network traffic is proportional to their stake, it can become relatively straightforward to identify the IP address of their DAL node, particularly for those with substantial stakes. To mitigate this risk, bakers are advised to operate their DAL node using an IP address different from their L1 node. This separation helps in preventing the unintentional exposure of the L1 node's IP address.
 
-	Plans are underway to address these concerns. One proposed solution is to enable bakers to divide their bandwidth across multiple DAL nodes, enhancing both security and operational flexibility.
+	Plans are underway to address these concerns. One proposed solution is to enable bakers to spread their network load across multiple DAL nodes, enhancing both security and operational flexibility.
