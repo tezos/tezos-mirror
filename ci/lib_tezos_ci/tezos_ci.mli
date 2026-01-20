@@ -652,6 +652,10 @@ module Images : sig
 
     val rockylinux_10_0 : Image.t
 
+    val rockylinux_9 : Image.t
+
+    val rockylinux_10 : Image.t
+
     val fedora_39 : Image.t
 
     val fedora_41 : Image.t
