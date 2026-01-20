@@ -181,7 +181,7 @@ let test_transfer_to_bad_sc_rollup_address () =
         ( check_proto_error ~loc:__LOC__ ~exp:"Invalid_destination_b58check"
         @@ function
           | [
-              Script_interpreter.Bad_contract_parameter _;
+              Script_interpreter_errors.Bad_contract_parameter _;
               Script_tc_errors.Invalid_constant (_loc, _expr, ty);
               Destination_repr.Invalid_destination_b58check _;
             ] ->
@@ -209,7 +209,7 @@ let test_transfer_to_unknown_sc_rollup_address () =
         ( check_proto_error ~loc:__LOC__ ~exp:"Sc_rollup_does_not_exist"
         @@ function
           | [
-              Script_interpreter.Bad_contract_parameter _;
+              Script_interpreter_errors.Bad_contract_parameter _;
               Script_tc_errors.Invalid_constant _;
               Sc_rollup_errors.Sc_rollup_does_not_exist _;
             ] ->
@@ -233,7 +233,7 @@ let test_transfer_to_wrongly_typed_sc_rollup () =
       ~expect_apply_failure:
         ( check_proto_error ~loc:__LOC__ ~exp:"Inconsistent_types" @@ function
           | [
-              Script_interpreter.Bad_contract_parameter _;
+              Script_interpreter_errors.Bad_contract_parameter _;
               Script_tc_errors.Invalid_constant _;
               Script_tc_errors.Inconsistent_types _;
               Script_tc_errors.Inconsistent_types _;
@@ -259,7 +259,7 @@ let test_transfer_non_zero_amount () =
         ( check_proto_error ~loc:__LOC__ ~exp:"Rollup_invalid_transaction_amount"
         @@ function
           | [
-              Script_interpreter.Runtime_contract_error _;
+              Script_interpreter_errors.Runtime_contract_error _;
               Script_interpreter_defs.Rollup_invalid_transaction_amount;
             ] ->
               return_unit
@@ -283,7 +283,7 @@ let test_transfer_non_zero_amount_via_entrypoint () =
         ( check_proto_error ~loc:__LOC__ ~exp:"Rollup_invalid_transaction_amount"
         @@ function
           | [
-              Script_interpreter.Runtime_contract_error _;
+              Script_interpreter_errors.Runtime_contract_error _;
               Script_interpreter_defs.Rollup_invalid_transaction_amount;
             ] ->
               return_unit
@@ -344,8 +344,8 @@ let test_transfer_zero_amount_ticket () =
       ~expect_apply_failure:
         ( check_proto_error ~loc:__LOC__ ~exp:"Script_rejected" @@ function
           | [
-              Script_interpreter.Runtime_contract_error _;
-              Script_interpreter.Reject _;
+              Script_interpreter_errors.Runtime_contract_error _;
+              Script_interpreter_errors.Reject _;
             ] ->
               return_unit
           | _ -> raise Unexpected_error )

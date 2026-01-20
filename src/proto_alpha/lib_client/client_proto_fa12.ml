@@ -771,8 +771,8 @@ let extract_error trace =
   TzTrace.fold
     (fun _ error ->
       match error with
-      | Environment.Ecoproto_error (Script_interpreter.Reject (loc, param, _))
-        -> (
+      | Environment.Ecoproto_error
+          (Script_interpreter_errors.Reject (loc, param, _)) -> (
           match root param with
           | Prim (_, Script.D_Pair, [String (_, error); res], _) ->
               parse_error (error, res)

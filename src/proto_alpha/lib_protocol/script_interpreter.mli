@@ -36,20 +36,6 @@
 open Alpha_context
 open Script_typed_ir
 
-type error += Reject of Script.location * Script.expr * execution_trace option
-
-type error += Overflow of Script.location * execution_trace option
-
-type error += Runtime_contract_error of Contract_hash.t
-
-type error += Bad_contract_parameter of Contract.t (* `Permanent *)
-
-type error += Cannot_serialize_failure
-
-type error += Cannot_serialize_storage
-
-type error += Michelson_too_many_recursive_calls
-
 (** The result from script interpretation. *)
 type execution_result = {
   script : Script_ir_translator.ex_script;
