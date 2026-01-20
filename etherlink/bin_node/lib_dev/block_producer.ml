@@ -680,11 +680,6 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then
       let proto_timestamp = Time.System.to_protocol timestamp in
-      let* () =
-        Evm_context.next_block_info
-          proto_timestamp
-          head_info.next_blueprint_number
-      in
       let* delayed_hashes, remaining_cumulative_size =
         head_info_and_delayed_transactions
           ~with_delayed_transactions:true
