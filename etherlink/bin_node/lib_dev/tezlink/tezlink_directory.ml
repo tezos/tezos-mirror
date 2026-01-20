@@ -77,15 +77,22 @@ let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_mock.version
 
-let make_contract_info contract_balance counter_z contract_script =
+let make_contract_info contract_balance counter_opt contract_script =
   let open Lwt_result_syntax in
   let open Imported_protocol_plugin.Contract_services in
-  let*? counter = Protocol_types.Counter.of_z counter_z in
+  let*? counter =
+    let open Result_syntax in
+    match counter_opt with
+    | None -> return_none
+    | Some counter_z ->
+        let* counter = Protocol_types.Counter.of_z counter_z in
+        return_some counter
+  in
   return
     {
       balance = contract_balance;
       delegate = None;
-      counter = Some counter;
+      counter;
       script = contract_script;
       revealed = None;
     }
@@ -355,7 +362,7 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.manager_key chain block contract)
-  |> register_with_conversion
+  |> opt_register_with_conversion
        ~service:Tezos_services.counter
        ~impl:(fun ((((), chain), block), contract) () () ->
          let*? chain = check_chain chain in

@@ -440,10 +440,10 @@ let test_tezlink_contract_info =
   (* call the balance rpc and check the result *)
   let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
   let balance = JSON.(valid_info |-> "balance" |> as_int) in
-  let counter = JSON.(valid_info |-> "counter" |> as_int) in
+  let counter = JSON.(valid_info |-> "counter" |> as_int_opt) in
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
-  Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = None) (option int) ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_list_entrypoints =

@@ -50,7 +50,10 @@ module type S = sig
     Signature.V2.Public_key.t option tzresult Lwt.t
 
   val counter :
-    [`Main] -> block_param -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Z.t option tzresult Lwt.t
 
   val big_map_get :
     [`Main] ->

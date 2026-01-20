@@ -74,10 +74,7 @@ let manager read c =
     (Data_encoding.Binary.of_bytes_exn Manager.encoding)
 
 let counter read c =
-  Durable_storage.inspect_durable_and_decode_default
-  (* FIXME: #7960
-     This default should be the global counter *)
-    ~default:Z.zero
+  Durable_storage.inspect_durable_and_decode_opt
     read
     (Path.counter c)
     (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
