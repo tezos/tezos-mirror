@@ -81,6 +81,7 @@ type 'uri start_rollup_node = {
   wallet : string;
   endpoint : 'uri;
   operator : string;
+  kind : string;
   mode : string;
   address : string;
   data_dir_path : string option;

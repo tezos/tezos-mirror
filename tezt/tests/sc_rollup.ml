@@ -243,6 +243,13 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
            when debugging from the temp test directory *)
         Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
   in
+  let* () =
+    if Sc_rollup_node.monitors_finalized rollup_node then
+      (* For rollup nodes that only monitor finalized blocks we start by baking
+         two blocks so that they can see the origination block. *)
+      repeat 2 (fun () -> Client.bake_for_and_wait tezos_client)
+    else unit
+  in
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
 (*
@@ -291,6 +298,7 @@ let test_rollup_node_configuration ~kind =
       ~default_operator:Constant.bootstrap2.alias
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~config_file
   in
   let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
@@ -1240,16 +1248,16 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
   let rollup_node_2 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
   in
   let rollup_node_3 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
   in
   let rollup_node_4 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
   in
   let rollup_node_5 =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
   in
   let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_2 in
   let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_3 in
@@ -1576,7 +1584,13 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~inbox_file =
       ~error_msg:"State hash has not changed (%L <> %R)" ;
     unit
   in
-  Lwt_list.iter_s test_message (read_riscv_test_inbox inbox_file)
+  let* () = Lwt_list.iter_s test_message (read_riscv_test_inbox inbox_file) in
+  if Sc_rollup_node.monitors_finalized sc_rollup_node then
+    (* Allow RISC-V rollup node to see latest messages for regression *)
+    let* () = bake_levels 2 client in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+    unit
+  else unit
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ?boot_sector ~internal ~kind ?preimages_dir =
@@ -1631,6 +1645,11 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
               ~arg:(sf "Pair 0x%s %S" message sc_rollup)
           in
           Client.bake_for_and_wait client
+    in
+    let* () =
+      if Sc_rollup_node.monitors_finalized sc_rollup_node then
+        bake_levels 2 client
+      else unit
     in
     let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
 
@@ -1904,6 +1923,7 @@ let mode_publish mode publishes _protocol sc_rollup_node sc_rollup node client =
       mode
       node'
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~operators
       ~default_operator:Constant.bootstrap3.alias
   in
@@ -2119,6 +2139,7 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
@@ -2612,6 +2633,7 @@ let commitment_before_lcc_not_published protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () = Sc_rollup_node.run sc_rollup_node' sc_rollup [] in
@@ -2730,6 +2752,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
       Operator
       node
       ~base_dir:(Client.base_dir client')
+      ~kind:(Sc_rollup_node.kind sc_rollup_node)
       ~default_operator:bootstrap2_key
   in
   let* () =
@@ -3131,6 +3154,7 @@ let test_can_stake ~kind =
       Operator
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
   in
   let* () =
     Client.transfer
@@ -3828,6 +3852,7 @@ let bailout_mode_fail_to_start_without_operator ~kind =
       Bailout
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~operators:
         [
           (Sc_rollup_node.Cementing, Constant.bootstrap1.alias);
@@ -3958,6 +3983,7 @@ let bailout_mode_recover_bond_starting_no_commitment_staked ~kind =
       Bailout
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~default_operator:operator
       ~operators:[(Recovering, Constant.bootstrap2.public_key_hash)]
       ~data_dir:(Sc_rollup_node.data_dir sc_rollup_node)
@@ -4284,9 +4310,10 @@ let test_timeout =
    The rollup node must be able to catch up from the genesis
    of the rollup when paired with a node in archive mode.
 *)
-let test_late_rollup_node =
+let test_late_rollup_node ~kind =
   test_full_scenario
     ~commitment_period:3
+    ~kind
     {
       tags = ["late"];
       variant = None;
@@ -4303,6 +4330,7 @@ let test_late_rollup_node =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:
         Constant.bootstrap1.alias (* Same as other rollup_node *)
   in
@@ -4333,10 +4361,11 @@ let test_late_rollup_node =
    on the given rollup. This same alternative rollup node must be able to
    catch up a second time when it is stopped midway.
 *)
-let test_late_rollup_node_2 =
+let test_late_rollup_node_2 ~kind =
   test_full_scenario
     ~commitment_period:3
     ~challenge_window:10
+    ~kind
     {
       tags = ["late"; "gc"];
       variant = None;
@@ -4353,6 +4382,7 @@ let test_late_rollup_node_2 =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap2.alias
   in
   Log.info
@@ -4404,7 +4434,7 @@ let test_interrupt_rollup_node =
 let remote_signer_uri signer ~yes =
   if yes then Some (Signer.uri signer) else None
 
-let test_remote_signer ~hardcoded_remote_signer =
+let test_remote_signer ~hardcoded_remote_signer ~kind =
   let default_operator = Constant.bootstrap2 in
   let operators =
     [
@@ -4423,6 +4453,7 @@ let test_remote_signer ~hardcoded_remote_signer =
           (if hardcoded_remote_signer then "hardcoded" else "relocatable");
     }
     ~uses:(fun _ -> [Constant.octez_signer])
+    ~kind
     ~commitment_period:3
     ~challenge_window:5
     ~mode:Operator
@@ -4451,6 +4482,7 @@ let test_remote_signer ~hardcoded_remote_signer =
         (List.map (fun (p, k) -> (p, k.Account.public_key_hash)) operators)
       ?remote_signer:client_remote_signer
       ~base_dir
+      ~kind
       Operator
       node
   in
@@ -5352,15 +5384,22 @@ let test_rpcs ~kind
     ~error_msg:"Injected %L messages but should have injected %R" ;
   (* Head block hash endpoint test *)
   let* level = Node.get_level node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:10. sc_rollup_node level in
+  let* _ = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
   let* l1_block_hash = Client.RPC.call client @@ RPC.get_chain_block_hash () in
+  let* l1_finalized_block_hash =
+    Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"head~2" ()
+  in
   let* l2_block_hash =
     Sc_rollup_node.RPC.call ~rpc_hooks sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_hash ()
   in
   let l2_block_hash = JSON.as_string l2_block_hash in
-  Check.((l1_block_hash = l2_block_hash) string)
-    ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
+  if Sc_rollup_node.monitors_finalized sc_rollup_node then
+    Check.((l1_finalized_block_hash = l2_block_hash) string)
+      ~error_msg:"Finalized head on L1 is %L where as head on L2 is %R"
+  else
+    Check.((l1_block_hash = l2_block_hash) string)
+      ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
   let* l1_block_hash_5 =
     Client.RPC.call client @@ RPC.get_chain_block_hash ~block:"5" ()
   in
@@ -5703,13 +5742,14 @@ let test_recover_bond_of_stakers =
   unit
 
 let test_injector_auto_discard =
+  let kind = "arith" in
   test_full_scenario
     {
       variant = None;
       tags = ["injector"];
       description = "Injector discards repeatedly failing operations";
     }
-    ~kind:"arith"
+    ~kind
   @@ fun _protocol _sc_rollup_node sc_rollup tezos_node client ->
   let* operator = Client.gen_and_show_keys client in
   (* Change operator and only batch messages *)
@@ -5718,6 +5758,7 @@ let test_injector_auto_discard =
       Batcher
       tezos_node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~operators:[(Sc_rollup_node.Batching, operator.alias)]
   in
   let nb_attempts = 5 in
@@ -5958,7 +5999,7 @@ let test_bootstrap_private_smart_rollup_originated =
       ~error_msg:"Expected %R whitelist for bootstrapped smart rollups , got %L") ;
   unit
 
-let test_rollup_node_missing_preimage_exit_at_initialisation =
+let test_rollup_node_missing_preimage_exit_at_initialisation ~kind =
   register_test
     ~supports:(From_protocol 016)
     ~__FILE__
@@ -5974,6 +6015,7 @@ let test_rollup_node_missing_preimage_exit_at_initialisation =
   let rollup_node =
     Sc_rollup_node.create
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap1.alias
       Operator
       node
@@ -6229,6 +6271,7 @@ let test_rollup_whitelist_update ~kind =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:Constant.bootstrap3.alias
   in
   let* () = Sc_rollup_node.run rollup_node2 rollup_addr [] in
@@ -6455,6 +6498,7 @@ let custom_mode_empty_operation_kinds ~kind =
       (Custom [])
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind
       ~default_operator:Constant.bootstrap1.alias
   in
   let* () = Sc_rollup_node.run ~wait_ready:false sc_rollup_node sc_rollup []
@@ -7532,6 +7576,7 @@ let start_rollup_node_with_encrypted_key ~kind =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:encrypted_account.alias
   in
   let* () = Sc_rollup_node.run ~wait_ready:false rollup_node sc_rollup [] in
@@ -7835,7 +7880,7 @@ let register_protocol_independent () =
   with_kind "arith" ;
   let kind = "wasm_2_0_0" in
   start_rollup_node_with_encrypted_key protocols ~kind ;
-  test_rollup_node_missing_preimage_exit_at_initialisation protocols ;
+  test_rollup_node_missing_preimage_exit_at_initialisation protocols ~kind ;
   test_rollup_node_configuration protocols ~kind ;
   test_client_wallet protocols ~kind ;
   test_reveals_fails_on_wrong_hash protocols ;

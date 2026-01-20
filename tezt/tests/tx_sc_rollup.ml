@@ -71,7 +71,7 @@ let rec bake_until cond client sc_rollup_node =
     in
     bake_until cond client sc_rollup_node
 
-let setup_classic ~commitment_period ~challenge_window protocol =
+let setup_classic ~kind ~commitment_period ~challenge_window protocol =
   let* node, client = setup_l1 ~commitment_period ~challenge_window protocol in
   let bootstrap1_key = Constant.bootstrap1.alias in
   let sc_rollup_node =
@@ -79,6 +79,7 @@ let setup_classic ~commitment_period ~challenge_window protocol =
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:bootstrap1_key
   in
   let* {boot_sector; _} =
@@ -101,7 +102,7 @@ let setup_classic ~commitment_period ~challenge_window protocol =
   let* () = Client.bake_for_and_wait client in
   return (client, sc_rollup_node, sc_rollup_address, [])
 
-let setup_bootstrap ~commitment_period ~challenge_window protocol =
+let setup_bootstrap ~kind ~commitment_period ~challenge_window protocol =
   let sc_rollup_address = "sr163Lv22CdE8QagCwf48PWDTquk6isQwv57" in
   let* {
          bootstrap_smart_rollup = bootstrap_tx_kernel;
@@ -129,6 +130,7 @@ let setup_bootstrap ~commitment_period ~challenge_window protocol =
       node
       ~data_dir:smart_rollup_node_data_dir
       ~base_dir:(Client.base_dir client)
+      ~kind
       ~default_operator:bootstrap1_key
   in
   let* () = Client.bake_for_and_wait client in
@@ -336,7 +338,7 @@ let test_tx_kernel_e2e =
         Constant.WASM.tx_kernel;
       ])
     ~title:(Printf.sprintf "wasm_2_0_0 - tx kernel should run e2e (kernel_e2e)")
-    (tx_kernel_e2e setup_classic)
+    (tx_kernel_e2e (setup_classic ~kind:"wasm_2_0_0"))
 
 let test_bootstrapped_tx_kernel_e2e =
   register_test
@@ -352,7 +354,7 @@ let test_bootstrapped_tx_kernel_e2e =
     ~title:
       (Printf.sprintf
          "wasm_2_0_0 - bootstrapped tx kernel should run e2e (kernel_e2e)")
-    (tx_kernel_e2e setup_bootstrap)
+    (tx_kernel_e2e (setup_bootstrap ~kind:"wasm_2_0_0"))
 
 let register ~protocols =
   test_tx_kernel_e2e protocols ;

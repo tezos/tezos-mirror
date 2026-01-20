@@ -709,6 +709,7 @@ let test_originate_before_migration ~kind ~migrate_from ~migrate_to =
         Operator
         tezos_node
         ~base_dir:(Client.base_dir tezos_client)
+        ~kind
         ~default_operator:Constant.bootstrap4.alias
     in
     let* migration_level = Node.get_level tezos_node in

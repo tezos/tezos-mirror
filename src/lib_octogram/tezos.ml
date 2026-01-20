@@ -1486,6 +1486,7 @@ type 'uri start_rollup_node = {
   wallet : string;
   endpoint : 'uri;
   operator : string;
+  kind : string;
   mode : string;
   address : string;
   data_dir_path : string option;
@@ -1530,6 +1531,7 @@ module Start_rollup_node = struct
                wallet;
                endpoint;
                operator;
+               kind;
                mode;
                address;
                data_dir_path;
@@ -1544,22 +1546,22 @@ module Start_rollup_node = struct
               wallet,
               endpoint,
               operator,
+              kind,
               mode,
               address,
-              data_dir_path,
-              rpc_port ),
-            (metrics_port, kernel_log_path) ))
+              data_dir_path ),
+            (rpc_port, metrics_port, kernel_log_path) ))
         (fun ( ( name,
                  path_rollup_node,
                  path_client,
                  wallet,
                  endpoint,
                  operator,
+                 kind,
                  mode,
                  address,
-                 data_dir_path,
-                 rpc_port ),
-               (metrics_port, kernel_log_path) )
+                 data_dir_path ),
+               (rpc_port, metrics_port, kernel_log_path) )
            ->
           {
             name;
@@ -1568,6 +1570,7 @@ module Start_rollup_node = struct
             wallet;
             endpoint;
             operator;
+            kind;
             mode;
             address;
             data_dir_path;
@@ -1583,11 +1586,14 @@ module Start_rollup_node = struct
               (req "wallet" string)
               (req "endpoint" uri_encoding)
               (req "operator" string)
+              (req "kind" string)
               (req "mode" string)
               (req "address" string)
-              (opt "data_dir_path" string)
-              (opt "rpc_port" string))
-           (obj2 (opt "metrics_port" string) (opt "kernel_log_path" string))))
+              (opt "data_dir_path" string))
+           (obj3
+              (opt "rpc_port" string)
+              (opt "metrics_port" string)
+              (opt "kernel_log_path" string))))
 
   let r_encoding =
     Data_encoding.(
@@ -1627,6 +1633,7 @@ module Start_rollup_node = struct
     let rpc_port = Option.map run args.rpc_port in
     let metrics_port = Option.map run args.metrics_port in
     let kernel_log_path = Option.map run args.kernel_log_path in
+    let kind = run args.kind in
     {
       name;
       path_rollup_node;
@@ -1634,6 +1641,7 @@ module Start_rollup_node = struct
       wallet;
       endpoint;
       operator;
+      kind;
       mode;
       address;
       data_dir_path;
@@ -1671,7 +1679,8 @@ module Start_rollup_node = struct
           (mode_of_string args.mode)
           ~default_operator:args.operator
           l1_endpoint
-          ~base_dir:args.wallet)
+          ~base_dir:args.wallet
+          ~kind:args.kind)
     in
     let kernel_log_args =
       match args.kernel_log_path with

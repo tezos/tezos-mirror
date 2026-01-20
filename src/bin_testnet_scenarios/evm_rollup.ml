@@ -79,6 +79,7 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
       ?runner
       ?name:rollup_node_name
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:operator.Account.alias
       ?loser_mode
       config.mode

@@ -210,6 +210,7 @@ let test_make_l2_kernel_installer_config chain_family =
       Batcher
       node
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
   in
 
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
@@ -360,6 +361,7 @@ let test_observer_reset =
       Batcher
       node
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let valid_config = Temp.file "valid_config.yaml" in
@@ -442,6 +444,7 @@ let test_observer_reset =
       Batcher
       node
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
   in
   let* () =
     Sc_rollup_node.run temp_sc_rollup_node sc_rollup_address [Log_kernel_debug]
@@ -7460,7 +7463,11 @@ let test_store_smart_rollup_address =
       client
   in
   let other_rollup_node =
-    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+    Sc_rollup_node.create
+      Observer
+      node
+      ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
   in
   let* () = Sc_rollup_node.run other_rollup_node other_rollup_address [] in
   (* Try to run the sequencer with an invalid smart rollup address. *)

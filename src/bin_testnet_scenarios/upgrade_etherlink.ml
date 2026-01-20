@@ -90,6 +90,7 @@ let run_and_bootstrap_rollup_node ~rollup_node_snapshot ~rollup network
   let rollup_node =
     Sc_rollup_node.create
       ~base_dir:(Client.base_dir yes_wallet)
+      ~kind:"wasm_2_0_0"
       ~default_operator:"baker_58"
       ~gc_frequency:1_000_000
       Batcher

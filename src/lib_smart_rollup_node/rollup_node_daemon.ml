@@ -411,7 +411,8 @@ let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
   return_unit
 
 let daemonize state =
-  if state.configuration.l1_monitor_finalized then
+  if state.configuration.l1_monitor_finalized || state.node_ctxt.kind = Riscv
+  then
     Layer1.iter_finalized_heads
       ~name:"daemon"
       state.node_ctxt.l1_ctxt

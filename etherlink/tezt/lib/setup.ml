@@ -581,6 +581,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       Operator
       node
       ~base_dir:(Client.base_dir client2)
+      ~kind:"wasm_2_0_0"
       ?dal_node
       ?history_mode:rollup_history_mode
       ?remote_signer

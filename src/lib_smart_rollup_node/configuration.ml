@@ -763,7 +763,14 @@ let encoding default_display : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31)
-             (dft "l1_monitor_finalized" bool default_l1_monitor_finalized))
+             (dft
+                "l1_monitor_finalized"
+                bool
+                default_l1_monitor_finalized
+                ~description:
+                  "When set to true, the rollup node only monitors L1 head \
+                   which are finalized. This option has no effect for RISC-V \
+                   rollups."))
           (merge_objs
              (obj7
                 (dft

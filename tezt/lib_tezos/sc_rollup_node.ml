@@ -211,6 +211,7 @@ module Parameters = struct
     metrics_port : int;
     rpc_host : string;
     rpc_port : int;
+    kind : string;
     mutable mode : mode;
     dal_node : Dal_node.t option;
     loser_mode : string option;
@@ -308,6 +309,16 @@ let endpoint node = rpc_endpoint node
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = sc_node.persistent_state.base_dir
+
+let kind sc_node = sc_node.persistent_state.kind
+
+let monitors_finalized sc_node =
+  (* Rollup nodes that monitors finalized L1 heads are the ones for RISC-V
+     rollups. *)
+  (* TODO: TZX-59
+     Add an argument to pass `--l1-monitor-finalized` and also use this as
+     a condition here. *)
+  kind sc_node = "riscv"
 
 let string_of_purpose = function
   | Operating -> "operating"
@@ -482,8 +493,9 @@ let check_event ?timeout ?where sc_node name promise =
   | Error () ->
       Format.ksprintf
         failwith
-        "Timeout waiting for event %s of %s"
+        "Timeout waiting for event %s%s of %s"
         name
+        (match where with None -> "" | Some cond -> " where " ^ cond)
         sc_node.name
 
 let wait_for_ready sc_node =
@@ -559,7 +571,14 @@ let unsafe_wait_sync ?timeout sc_node =
         in
         return level.level
   in
-  wait_for_level ?timeout sc_node node_level
+  let level =
+    if monitors_finalized sc_node then
+      (* Rollup nodes that only monitors finalized blocks are synchronized when
+         they're at head - 2. *)
+      node_level - 2
+    else node_level
+  in
+  wait_for_level ?timeout sc_node level
 
 let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
@@ -575,7 +594,7 @@ let handle_event sc_node {name; value; timestamp = _} =
   | _ -> ()
 
 let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
-    ~base_dir ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
+    ~base_dir ~kind ?remote_signer ?event_pipe ?metrics_addr ?metrics_port
     ?(rpc_host = Constant.default_host) ?rpc_port ?(operators = [])
     ?default_operator ?(dal_node : Dal_node.t option) ?loser_mode
     ?(allow_degraded = false) ?(gc_frequency = 1) ?(history_mode = Full)
@@ -609,6 +628,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
         metrics_port;
         rpc_host;
         rpc_port;
+        kind;
         operators;
         default_operator;
         mode;
@@ -627,7 +647,7 @@ let create_with_endpoint ?runner ?path ?name ?color ?data_dir ?config_file
   on_event sc_node (handle_event sc_node) ;
   sc_node
 
-let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir
+let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir ~kind
     ?remote_signer ?event_pipe ?metrics_addr ?metrics_port ?rpc_host ?rpc_port
     ?operators ?default_operator ?dal_node ?loser_mode ?allow_degraded
     ?gc_frequency ?history_mode ?password_file mode (node : Node.t) =
@@ -639,6 +659,7 @@ let create ?runner ?path ?name ?color ?data_dir ?config_file ~base_dir
     ?data_dir
     ?config_file
     ~base_dir
+    ~kind
     ?remote_signer
     ?event_pipe
     ?metrics_addr

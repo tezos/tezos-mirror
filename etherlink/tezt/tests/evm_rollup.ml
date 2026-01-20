@@ -398,6 +398,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       Operator
       node
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:rollup_operator_key
       ?dal_node
   in
@@ -781,6 +782,7 @@ let test_evm_node_connection =
       Observer
       tezos_node
       ~base_dir:(Client.base_dir tezos_client)
+      ~kind:"wasm_2_0_0"
       ~default_operator:Constant.bootstrap1.alias
   in
   let evm_node = Evm_node.create (Sc_rollup_node.endpoint sc_rollup_node) in

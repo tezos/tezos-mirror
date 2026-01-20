@@ -49,6 +49,7 @@ let setup_l2_node ?preimages_dir ?(mode = Sc_rollup_node.Operator) ?runner ?name
       ?name
       ?loser_mode
       ~base_dir:(Client.base_dir client)
+      ~kind:"wasm_2_0_0"
       ?default_operator:operator
       ?metrics_port
       mode

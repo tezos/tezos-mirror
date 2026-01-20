@@ -764,7 +764,7 @@ module Sc_rollup_node = struct
   module Agent = struct
     let create ?(group = "Etherlink")
         ?(path = Uses.path Constant.octez_smart_rollup_node) ?name
-        ?default_operator ?operators ?dal_node ~base_dir cloud agent mode
+        ?default_operator ?operators ?dal_node ~base_dir ~kind cloud agent mode
         l1_node =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
@@ -808,6 +808,7 @@ module Sc_rollup_node = struct
         ~metrics_addr
         ~metrics_port
         ~base_dir
+        ~kind
         mode
         l1_node
       |> Lwt.return
