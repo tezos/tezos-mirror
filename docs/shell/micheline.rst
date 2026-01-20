@@ -288,10 +288,18 @@ Micheline node while the second parses a list of expressions separated
 by semicolons. They both take an optional boolean parameter named
 ``check``; setting it to ``false`` disables indentation checking.
 
-Other tools and resources
--------------------------
+Tools and resources
+-------------------
 
-The following links are not part of the Octez OCaml code base but are
+Besides the direct use of the OCaml libraries described above, the following tools from the Octez suite can be used to convert Micheline and Michelson values to and from other representations:
+
+* ``octez-client convert data`` and ``octez-client convert script`` can convert Micheline expressions, and respectively Michelson scripts, from Micheline, JSON or binary to Micheline, JSON, binary or OCaml representations
+
+* ``octez-client hash data`` and ``octez-client unpack michelson data`` can do serialization and deserialization of Michelson values to/from binary representation, in a way compatible with the Michelson ``PACK`` and ``UNPACK`` instructions.
+
+* :ref:`octez-codec <octez-codec>` can convert Micheline expressions between JSON and binary form
+
+The following tools and links are not part of the Octez code base but are
 reimplementations of parts of ``lib_micheline`` in other tools and
 languages:
 
@@ -303,8 +311,3 @@ languages:
   available as part of the Mi-Cho-Coq framework:
   https://gitlab.com/nomadic-labs/mi-cho-coq/-/blob/master/src/michocoq/micheline_parser.vy
   it is incomplete as it does not support annotations.
-
-- An online converter between Micheline files and their JSON encoding
-  (improperly called "Michelson")
-  developed as part of Cryptonomic hackathon and documented here:
-  https://scalac.io/blog/we-hakked-tezos-and-created-a-micheline-michelson-translator/
