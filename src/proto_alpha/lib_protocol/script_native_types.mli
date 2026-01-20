@@ -21,6 +21,8 @@ type 'ty ty_node = {untyped : Script.node; typed : 'ty Script_typed_ir.ty_ex_c}
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
 
+  type int = Script_int.z Script_int.num
+
   (** Michelson representation for tuples. *)
   type ('a, 'b, 'c) tup3 = 'a * ('b * 'c)
 
@@ -72,6 +74,15 @@ module CLST_types : sig
       address (* to_ *),
       nat (* token_id *),
       nat (* amount *) )
+    tup4
+    ty_node
+    tzresult
+
+  val balance_update_event_type :
+    ( address (* owner *),
+      nat (* token_id *),
+      nat (* new_balance *),
+      int (* diff *) )
     tup4
     ty_node
     tzresult

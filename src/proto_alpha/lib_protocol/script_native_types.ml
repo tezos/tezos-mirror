@@ -169,6 +169,8 @@ module CLST_types = struct
 
   type nat = Script_int.n Script_int.num
 
+  type int = Script_int.z Script_int.num
+
   type deposit = unit
 
   type redeem = nat
@@ -263,6 +265,17 @@ module CLST_types = struct
         (add_name "amount" nat_ty)
     in
     return @@ add_name "transfer_event" x
+
+  let balance_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "owner" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "new_balance" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "balance_update" x
 end
 
 type ('arg, 'storage) kind =

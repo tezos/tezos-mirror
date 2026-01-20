@@ -22,3 +22,17 @@ val transfer_event :
   token_id:CLST_types.nat ->
   amount:CLST_types.nat ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** [balance_update_event] returns an internal event operation of type
+    (pair %balance_update
+      (address %owner)
+      (pair (nat %token_id) (pair (nat %new_balance) (int %diff))))
+    with tag [entrypoint]. *)
+val balance_update_event :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  owner:address ->
+  token_id:CLST_types.nat ->
+  new_balance:CLST_types.nat ->
+  diff:CLST_types.int ->
+  (Script_typed_ir.operation * context) tzresult Lwt.t
