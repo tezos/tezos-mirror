@@ -495,17 +495,7 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Debian_repository.child_pipeline_partial
     in
-    let job_rpm_repository_trigger_partial : tezos_job =
-      (* Same as [job_rpm_repository_trigger_auto] but manual,
-         so that one can trigger it without triggering the whole main pipeline.
-         See comment near the definition of [job_rpm_repository_trigger_auto]. *)
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~dependencies:(Dependent [])
-        ~stage:Stages.manual
-        Rpm_repository.child_pipeline_partial
-    in
+
     let job_homebrew_repository_trigger : tezos_job =
       (* We leave the possibility to run this pipeline manually, in particular
          to generate the formula on scheduled pipelines *)
@@ -593,7 +583,6 @@ let jobs pipeline_type =
         else
           [
             job_homebrew_repository_trigger;
-            job_rpm_repository_trigger_partial;
             job_debian_repository_trigger_partial;
             job_base_images_trigger;
             security_scan_trigger;

@@ -1107,19 +1107,6 @@ trigger:homebrew:
     include: .gitlab/ci/pipelines/homebrew.yml
     strategy: depend
 
-trigger:rpm_repository_partial:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging-rpm_repository_partial
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/rpm_repository_partial.yml
-    strategy: depend
-
 trigger:debian_repository_partial:
   stage: manual
   variables:
