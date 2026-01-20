@@ -298,16 +298,6 @@ let jobs pipeline_type =
         Debian_repository.child_pipeline_partial_auto
     in
 
-    (* rpm counterpart of the debian tests *)
-    let job_rpm_repository_trigger_auto =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:No ~changes:changeset_rpm_packages ())
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        Rpm_repository.child_pipeline_partial_auto
-    in
-
     let job_homebrew_trigger_auto =
       trigger_job
         ~__POS__
@@ -467,11 +457,7 @@ let jobs pipeline_type =
     let jobs_packaging =
       match pipeline_type with
       | Before_merging | Merge_train ->
-          [
-            job_debian_repository_trigger_auto;
-            job_rpm_repository_trigger_auto;
-            job_homebrew_trigger_auto;
-          ]
+          [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
       | Schedule_extended_test -> []
     in
     jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_install_octez
