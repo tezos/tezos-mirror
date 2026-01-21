@@ -459,7 +459,7 @@ module Deposit = struct
       kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
   end
 
-  module Ebisu = struct
+  module Farfadet = struct
     (*
       event QueuedDeposit(
         uint256 indexed ticketHash,
@@ -478,7 +478,7 @@ module Deposit = struct
   end
 
   let filter whitelist =
-    mk_filter fa_bridge_address [Dionysus.topic; Ebisu.topic] whitelist
+    mk_filter fa_bridge_address [Dionysus.topic; Farfadet.topic] whitelist
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
