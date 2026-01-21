@@ -62,16 +62,16 @@ When it comes to installing software, especially for critical
 applications like Tezos/Octez, it’s crucial to ensure a secure and
 stable environment. While compiling from source can provide
 customization options, it often introduces complexities and risks.
-Instead, opting for binary packages such as Deb or RPM packages from a trusted source simplifies
+Instead, opting for binary packages such as Deb packages from a trusted source simplifies
 installation and enhances security.
 
-Deb or RPM packages compiled for a specific platform should be always preferred
-over statically compiled binaries. Deb or RPM packages can also be used to
+Deb packages compiled for a specific platform should be always preferred
+over statically compiled binaries. Deb packages can also be used to
 simplify the creation of `OCI <https://opencontainers.org/>`__ images or simply
 deployed on bare metal using provisioning tools such as
 `Ansible <https://docs.ansible.com/>`__.
 
-Using the official Deb or RPM packages offers several advantages:
+Using the official Deb packages offers several advantages:
 
 -  **Security**: Packages are pre-compiled and thoroughly tested,
    reducing the risk of vulnerabilities introduced during compilation.
@@ -158,6 +158,11 @@ If runnning Octez as services, see also how to :ref:`restart them <services_upgr
 
 RPM Octez packages
 ~~~~~~~~~~~~~~~~~~
+
+.. warning::
+
+	RPM packages are no longer provided starting with Octez version 24.
+	Please choose another installation method.
 
 If you're using Fedora or Rocky Linux, you can install RPM packages with Octez binaries from the
 Octez from our DNF repository. Currently we support the latest LTS release for
