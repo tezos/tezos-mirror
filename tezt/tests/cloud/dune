@@ -5,6 +5,7 @@
  (name main)
  (libraries
   octez-evm-node-libs.evm_node_rust_deps
+  tezt-migration-registry
   bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
@@ -12,7 +13,10 @@
   tezt-cloud
   tezt_etherlink
   etherlink_benchmark_lib
-  octez-libs.stdlib-unix)
+  octez-libs.stdlib-unix
+  octez-protocol-alpha-libs.test-migration
+  octez-protocol-024-PtTALLiN-libs.test-migration
+  octez-protocol-023-PtSeouLo-libs.test-migration)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
@@ -23,4 +27,7 @@
   -open Tezt_wrapper.Base
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_cloud))
+  -open Tezt_cloud
+  -open Tezos_alpha_test_migration
+  -open Tezos_024_PtTALLiN_test_migration
+  -open Tezos_023_PtSeouLo_test_migration))

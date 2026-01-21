@@ -5,6 +5,7 @@ This is a package containing some libraries related to the Tezos 023-PtSeouLo pr
 It contains the following libraries:
 
 - {{!module-Tezos_023_PtSeouLo_test_helpers}Tezos_023_PtSeouLo_test_helpers}: Protocol testing framework
+- {{!module-Tezos_023_PtSeouLo_test_migration}Tezos_023_PtSeouLo_test_migration}: Protocol migration testing checks
 - {{!module-Tezos_agnostic_baker_023_PtSeouLo}Tezos_agnostic_baker_023_PtSeouLo}: Protocol specific library for the Agnostic Baker
 - {{!module-Tezos_baking_023_PtSeouLo}Tezos_baking_023_PtSeouLo}: Base library for `tezos-baker/accuser`
 - {{!module-Tezos_baking_023_PtSeouLo_commands}Tezos_baking_023_PtSeouLo_commands}: Protocol-specific commands for baking

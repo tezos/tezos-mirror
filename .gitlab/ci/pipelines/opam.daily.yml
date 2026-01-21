@@ -143,6 +143,7 @@ opam:all_6:
     matrix:
     - package:
       - tezt-tezos
+      - tezt-migration-registry
       - tezos-protocol-genesis
       - tezos-protocol-demo-noops
       - tezos-openapi
@@ -152,7 +153,6 @@ opam:all_6:
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
-      - octez-libs
       - octez-lib-upnp
       - octez-l2-libs
       - efunc_core
@@ -764,6 +764,7 @@ opam:all_7:
       - octez-protocol-compiler-compat
       - octez-ml-dsa
       - octez-lwt-domain
+      - octez-libs
       - octez-libcrux-ml-dsa
       - octez-lib-upnp-args
       - octez-internal-libs

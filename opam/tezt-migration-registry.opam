@@ -10,16 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-evm-node-libs"
-  "tezt-migration-registry"
-  "bls12-381"
-  "octez-libs"
-  "tezt-tezos"
-  "tezt-cloud"
-  "tezt-etherlink"
-  "octez-protocol-alpha-libs"
-  "octez-protocol-024-PtTALLiN-libs"
-  "octez-protocol-023-PtSeouLo-libs"
+  "tezt-tezos" { = version }
+  "tezt" { >= "4.1.0" & < "5.0.0" }
+  "octez-libs" { = version }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
@@ -27,4 +21,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezt tests using Tezt cloud"
+synopsis: "Octez Protocol migration checks registration"

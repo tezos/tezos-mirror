@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_023_PtSeouLo_test_migration)
+ (public_name octez-protocol-023-PtSeouLo-libs.test-migration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt-migration-registry
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.test-helpers
+  octez-libs.base-test-helpers
+  tezos-protocol-023-PtSeouLo.parameters
+  octez-protocol-023-PtSeouLo-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_023_PtSeouLo_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_023_PtSeouLo_parameters
+  -open Tezos_protocol_plugin_023_PtSeouLo))

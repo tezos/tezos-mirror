@@ -782,9 +782,9 @@ let run_stresstest stresstesters tps seed =
     (fun i {agent; client; accounts; _} ->
       let* filename =
         (* The list of account is too big to be passed by ssh,
-                   so we generate the account list locally,
-                   copy it the the agent,
-                   and pass the filename to stresstest invocation directly *)
+           so we generate the account list locally,
+           copy it to the agent,
+           and pass the filename to stresstest invocation directly *)
         let sources =
           `A
             (List.map
@@ -793,7 +793,7 @@ let run_stresstest stresstesters tps seed =
                accounts)
         in
         (* As we run in parrallel, and as Temp.file does not return a unique file name,
-                   we need a different base filename name for each stresstester *)
+           we need a different base filename name for each stresstester *)
         let base = sf "stresstest-%i-sources.json" i in
         let source = Temp.file ?runner:None base in
         let destination = Temp.file ?runner:(Agent.runner agent) base in
@@ -1222,6 +1222,20 @@ let get_migration_level_offsets (migration : Protocol_migration.t) ~snapshot
   let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
   Lwt.return migration
 
+let do_migration_checks (state : Tezt_migration_registry.Register.state option)
+    level =
+  match state with
+  | None -> Lwt.return_none
+  | Some state -> (
+      match
+        Tezt_migration_registry.Register.get
+          (sf "%s: checks" (Protocol.name state.next_protocol))
+      with
+      | None -> Lwt.return_none
+      | Some checks ->
+          let* state = checks state level in
+          Lwt.return_some state)
+
 let may_export_snapshot (t : bootstrap)
     (migration : Protocol_migration.t option) level =
   match migration with
@@ -1492,26 +1506,52 @@ let register (module Cli : Scenarios_cli.Layer1) =
                 Lwt.return_true
           else Lwt.return stresstesting_started
   in
+  let state_opt =
+    Option.bind migration_level (fun migration_level ->
+        match Tezt_cloud_cli.artifacts_dir with
+        | None ->
+            Test.fail
+              "An artifacts directory should be provided for migration tests."
+        | Some artifacts_dir ->
+            let artifacts_dir_path =
+              Artifact_helpers.local_path [artifacts_dir; "migration"]
+            in
+            let next_protocol = Network.next_protocol configuration.network in
+            Some
+              (Tezt_migration_registry.Register.init_state
+                 migration_level
+                 t.bootstrap.node
+                 configuration.network
+                 next_protocol
+                 artifacts_dir_path))
+  in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop stresstesting_started with_producers level =
+    (let rec loop state_opt stresstesting_started with_producers level =
        let level = succ level in
        toplog "Loop at level %d" level ;
        let* stresstesting_started =
          may_start_stresstesting t stresstesting_started migration_level level
        in
-       if should_terminate level then
+       if should_terminate level then (
+         Log.warn
+           "Experiment has reached the termination level, the experiment will \
+            stop after the snapshot export." ;
          let* () =
            may_export_snapshot t.bootstrap configuration.migration level
          in
-         Lwt.return_unit
+         Lwt.return_unit)
        else
+         let* state_opt = do_migration_checks state_opt level in
          let* () =
            if with_producers then
              let* _ = Node.wait_for_level t.bootstrap.node level in
              Lwt.return_unit
            else may_produce_slot t migration_level level
          in
-         loop stresstesting_started with_producers level
+         loop state_opt stresstesting_started with_producers level
      in
-     loop (migration_level = None) (List.compare_length_with t.producers 0 = 0))
+     loop
+       state_opt
+       (migration_level = None)
+       (List.compare_length_with t.producers 0 = 0))

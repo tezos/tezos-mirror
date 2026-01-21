@@ -23,7 +23,7 @@ octez-l2-libs	all	6
 octez-lib-upnp	all	6
 octez-lib-upnp-args	all	7
 octez-libcrux-ml-dsa	all	7
-octez-libs	all	6
+octez-libs	all	7
 octez-lwt-domain	all	7
 octez-ml-dsa	all	7
 octez-node	exec	1
@@ -114,4 +114,5 @@ tezos-protocol-alpha	all	5
 tezos-protocol-demo-counter	all	5
 tezos-protocol-demo-noops	all	6
 tezos-protocol-genesis	all	6
+tezt-migration-registry	all	6
 tezt-tezos	all	6

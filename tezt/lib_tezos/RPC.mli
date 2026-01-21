@@ -1551,3 +1551,10 @@ val get_chain_block_context_clst_exchange_rate :
     [block] defaults to ["head"]. *)
 val get_chain_block_context_contract_clst_balance :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/main/blocks/head/context/raw/json/contracts/address_registry/next]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_address_registry :
+  ?chain:string -> ?block:string -> unit -> int t

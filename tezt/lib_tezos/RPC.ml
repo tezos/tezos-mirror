@@ -2134,3 +2134,21 @@ let get_chain_block_context_contract_clst_balance ?(chain = "main")
       "clst_balance";
     ]
     Fun.id
+
+let get_chain_block_context_address_registry ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "contracts";
+      "address_registry";
+      "next";
+    ]
+  @@ fun json -> JSON.as_string json |> int_of_string

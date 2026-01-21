@@ -107,6 +107,8 @@ val registered_octez_shell_libs : Manifest.Sub_lib.container
 
 val tezt_performance_regression : Manifest.target
 
+val tezt_migration_registry : Manifest.target
+
 val tezt_tezos : Manifest.target
 
 val tezt_cloud : Manifest.target
@@ -170,4 +172,6 @@ module Protocol : sig
   val client : t -> Manifest.target option
 
   val test_helpers_exn : t -> Manifest.target
+
+  val test_migration_exn : t -> Manifest.target
 end
