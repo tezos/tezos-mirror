@@ -499,13 +499,13 @@ let dal_checks_and_warnings state =
   else return_unit
 
 let only_if_dal_feature_enabled state ~default_value f =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let open Constants in
   let Parametric.{dal = {feature_enable; _}; _} =
     state.global_state.constants.parametric
   in
   if feature_enable then
-    let*! () = dal_checks_and_warnings state in
+    let* () = dal_checks_and_warnings state in
     Option.fold
       ~none:(return default_value)
       ~some:f
@@ -513,11 +513,11 @@ let only_if_dal_feature_enabled state ~default_value f =
   else return default_value
 
 let process_dal_rpc_result state delegate level round =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   function
   | None -> return_none
   | Some Tezos_dal_node_services.Types.Not_in_committee ->
-      let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
+      let* () = Events.(emit not_in_dal_committee (delegate, level)) in
       return_none
   | Some (Attestable_slots {slots; published_level}) ->
       let number_of_slots =
@@ -533,7 +533,7 @@ let process_dal_rpc_result state delegate level round =
           slots
       in
       let dal_content = {attestation = dal_attestation} in
-      let*! () =
+      let* () =
         Events.(
           emit
             attach_dal_attestation
@@ -542,7 +542,7 @@ let process_dal_rpc_result state delegate level round =
       return_some dal_content
 
 let may_get_dal_content state consensus_vote =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let {delegate; vote_consensus_content; _} = consensus_vote in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
@@ -553,7 +553,7 @@ let may_get_dal_content state consensus_vote =
     state
     ~default_value:None
     (fun _dal_node_rpc_ctxt ->
-      let*! dal_attestable_slots =
+      let* dal_attestable_slots =
         (Dal_attestable_slots_worker.get_dal_attestable_slots
            state.global_state.dal_attestable_slots_worker
            ~delegate_id
@@ -1162,13 +1162,10 @@ let update_to_level state level_update =
            can change at level boundaries (e.g. migrations, reorganisations, key/profile
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
-        let*! () =
-          Dal_attestable_slots_worker.update_streams_subscriptions
-            state.global_state.dal_attestable_slots_worker
-            dal_node_rpc_ctxt
-            ~delegate_ids:next_level_delegate_ids
-        in
-        return_unit)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids:next_level_delegate_ids)
   in
   return (new_state, new_action)
 

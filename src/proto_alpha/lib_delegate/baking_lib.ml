@@ -86,7 +86,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       ~constants
       delegates
   in
-  let* () =
+  let*! () =
     Baking_actions.only_if_dal_feature_enabled
       state
       ~default_value:()
@@ -101,13 +101,10 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
         in
         (* Ensures the DAL attestable slots cache is populated in time for the
            first block’s attestation. *)
-        let*! () =
-          Dal_attestable_slots_worker.update_streams_subscriptions
-            state.global_state.dal_attestable_slots_worker
-            dal_node_rpc_ctxt
-            ~delegate_ids
-        in
-        return_unit)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids)
   in
   return state
 
