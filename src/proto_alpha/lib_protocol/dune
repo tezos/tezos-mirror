@@ -211,6 +211,7 @@
   Slash_percentage
   Delegate_slashed_deposits_storage
   Staking
+  Clst_finalization
   Delegate_cycles
   Vote_storage
   Ticket_storage
@@ -522,6 +523,7 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -834,6 +836,7 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -1130,6 +1133,7 @@
   slash_percentage.ml slash_percentage.mli
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
+  clst_finalization.ml clst_finalization.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli

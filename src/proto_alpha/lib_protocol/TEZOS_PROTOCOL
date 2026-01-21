@@ -194,6 +194,7 @@
         "Slash_percentage",
         "Delegate_slashed_deposits_storage",
         "Staking",
+        "Clst_finalization",
         "Delegate_cycles",
 
         "Vote_storage",
