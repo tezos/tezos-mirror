@@ -467,6 +467,10 @@ let test_clst ~contracts ?endpoint client =
   Log.info "Test CLST parameters retrieval" ;
   let* _ =
     Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_clst_contract_hash ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_clst_total_supply ()
   in
   let bootstrap = List.hd contracts in
