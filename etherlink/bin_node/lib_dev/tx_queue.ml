@@ -140,6 +140,175 @@ module Address_nonce = struct
     | None -> return next_nonce
 end
 
+module Batch_injector = struct
+  module Types = struct
+    type state = {timeout : float; keep_alive : bool}
+
+    type parameters = {timeout : float; keep_alive : bool}
+  end
+
+  module Name = struct
+    type t = unit
+
+    let encoding = Data_encoding.unit
+
+    let base = ["evm_node_worker"; "tx_queue"; "batch_injector"]
+
+    let pp _fmt () = ()
+
+    let equal () () = true
+  end
+
+  module Request = struct
+    type ('a, 'b) t =
+      | Forward_batch : {
+          batch : Rpc_encodings.JSONRPC.request list;
+          base : Uri.t;
+        }
+          (* -> (Rpc_encodings.JSONRPC.response Batch.batched_request, tztrace) t *)
+          -> (Rpc_encodings.JSONRPC.response list, tztrace) t
+
+    let name (type a b) (t : (a, b) t) =
+      match t with Forward_batch _ -> "Forward_batch"
+
+    type view = View : _ t -> view
+
+    let view req = View req
+
+    let endpoint_encoding =
+      let open Data_encoding in
+      conv (function uri -> Uri.to_string uri) (fun _ -> assert false) string
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            Json_only
+            ~title:"Forward_batch"
+            (obj3
+               (req "request" (constant "forward_batch"))
+               (req "batch" (list Rpc_encodings.JSONRPC.request_encoding))
+               (req "base" endpoint_encoding))
+            (function
+              | View (Forward_batch {batch; base}) -> Some ((), batch, base))
+            (fun _ -> assert false);
+        ]
+
+    let pp fmt (View r) =
+      match r with
+      | Forward_batch {batch; base} ->
+          Format.fprintf
+            fmt
+            "Forward_batch to %a with %d requests"
+            Uri.pp
+            base
+            (List.length batch)
+  end
+
+  module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
+
+  type worker = Worker.infinite Worker.queue Worker.t
+
+  module Handlers = struct
+    type self = worker
+
+    let on_request : type r request_error.
+        worker ->
+        (r, request_error) Request.t ->
+        (r, request_error) result Lwt.t =
+     fun w request ->
+      let state = Worker.state w in
+      match request with
+      | Request.Forward_batch {batch; base} ->
+          protect @@ fun () ->
+          let open Lwt_result_syntax in
+          let* batch_response =
+            Rollup_services.call_service
+              ~keep_alive:state.keep_alive
+              ~base
+              ~timeout:state.timeout
+              (Batch.dispatch_batch_service ~path:Resto.Path.root)
+              ()
+              ()
+              (Batch batch)
+          in
+          let responses =
+            match batch_response with
+            | Batch.Singleton r -> [r]
+            | Batch rs -> rs
+          in
+          return responses
+
+    type launch_error = tztrace
+
+    let on_launch _self () (params : Types.parameters) =
+      let open Lwt_result_syntax in
+      let state : Types.state =
+        {timeout = params.timeout; keep_alive = params.keep_alive}
+      in
+      return state
+
+    let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
+        (_errs : b) : [`Continue | `Shutdown] tzresult Lwt.t =
+      Lwt_result_syntax.return `Continue
+
+    let on_completion _ _ _ _ = Lwt.return_unit
+
+    let on_no_request _ = Lwt.return_unit
+
+    let on_close _ = Lwt.return_unit
+  end
+
+  let table = Worker.create_table Queue
+
+  let worker_promise, worker_waker = Lwt.task ()
+
+  type error += No_worker
+
+  let worker =
+    lazy
+      (match Lwt.state worker_promise with
+      | Lwt.Return worker -> Ok worker
+      | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
+      | Lwt.Sleep -> Error (TzTrace.make No_worker))
+
+  let handle_request_error rq =
+    let open Lwt_syntax in
+    let* rq in
+    match rq with
+    | Ok res -> return_ok res
+    | Error (Worker.Request_error errs) -> Lwt.return_error errs
+    | Error (Closed None) -> Lwt.return_error [No_worker]
+    | Error (Closed (Some errs)) -> Lwt.return_error errs
+    | Error (Any exn) -> Lwt.return_error [Exn exn]
+
+  let start ~timeout ~keep_alive =
+    let open Lwt_result_syntax in
+    let+ worker =
+      Worker.launch table () {timeout; keep_alive} (module Handlers)
+    in
+    Lwt.wakeup worker_waker worker
+
+  (** Forward a batch to the injector *)
+  let forward_batch ~base (batch : Rpc_encodings.JSONRPC.request list) =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait
+      worker
+      (Request.Forward_batch {batch; base})
+    |> handle_request_error
+
+  (** Shutdown the injector worker *)
+  let shutdown () =
+    let open Lwt_syntax in
+    let w = Lazy.force worker in
+    let* () =
+      match w with Error _ -> Lwt.return_unit | Ok w -> Worker.shutdown w
+    in
+    return_ok ()
+end
+
 module Tx_container
     (Tx : Tx_queue_types.L2_transaction)
     (ChainName : sig
@@ -713,19 +882,7 @@ struct
             let*! () =
               Tx_queue_events.injecting_transactions (List.length batch)
             in
-            let* batch_response =
-              Rollup_services.call_service
-                ~keep_alive
-                ~base
-                ~timeout
-                (Batch.dispatch_batch_service ~path:Resto.Path.root)
-                ()
-                ()
-                (Batch batch)
-            in
-            let responses =
-              match batch_response with Singleton r -> [r] | Batch rs -> rs
-            in
+            let* responses = Batch_injector.forward_batch ~base batch in
             check_missed_transactions ~self ~hashes ~responses
         | Websocket ws_client ->
             let timeout =
@@ -1417,6 +1574,13 @@ struct
     bind_worker @@ fun w ->
     let*! () = Tx_queue_events.shutdown () in
     let*! () = Worker.shutdown w in
+    (* Also shutdown injector worker if it's running *)
+    let* () =
+      let w_injector = Lazy.force Batch_injector.worker in
+      match w_injector with
+      | Ok _w -> Batch_injector.shutdown ()
+      | Error _ -> return_unit
+    in
     return_unit
 
   let clear () =
@@ -1474,13 +1638,18 @@ struct
          {validate_tx; validation_state = initial_validation_state})
     |> handle_request_error
 
-  let start ~config ~keep_alive ~timeout () =
+  let start ~config ~keep_alive ~timeout ~start_injector_worker () =
     let open Lwt_result_syntax in
     let timeout = min timeout 5. in
     let* worker =
       Worker.launch table () {config; keep_alive; timeout} (module Handlers)
     in
     Lwt.wakeup worker_waker worker ;
+    (* Start injector worker only for RPC endpoints *)
+    let* () =
+      if start_injector_worker then Batch_injector.start ~timeout ~keep_alive
+      else return_unit
+    in
     let*! () = Tx_queue_events.is_ready () in
     return_unit
 end

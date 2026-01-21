@@ -253,7 +253,12 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   let* tx_container =
     let start, tx_container = Tx_queue.tx_container ~chain_family in
     let* () =
-      start ~config:configuration.tx_queue ~keep_alive ~timeout:rpc_timeout ()
+      start
+        ~config:configuration.tx_queue
+        ~keep_alive
+        ~timeout:rpc_timeout
+        ~start_injector_worker:false
+        ()
     in
     return tx_container
   in

@@ -11,15 +11,17 @@
     interface based on the use of callbacks. *)
 
 (** [tx_container ~chain_family] is a pair [(start, container)] where
-    [start ~config ~max_transaction_batch_length ()] starts the
+    [start ~config ~keep_alive ~timeout ~start_injector_worker ()] starts the
     worker, meaning it is possible to call {!inject}, {!confirm} and
-    {!beacon} and [container] is a wrapper of the Tx_queue to be
-    compatible with the Tx_container signature for the services. *)
+    {!beacon}, [~start_injector_worker] starts a second worker that ensures
+    batch are injected sequentially. And [container] is a wrapper of the
+    Tx_queue to be compatible with the Tx_container signature for the services. *)
 val tx_container :
   chain_family:'f L2_types.chain_family ->
   (config:Configuration.tx_queue ->
   keep_alive:bool ->
   timeout:float ->
+  start_injector_worker:bool ->
   unit ->
   unit tzresult Lwt.t)
   * 'f Services_backend_sig.tx_container

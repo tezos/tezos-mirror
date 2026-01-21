@@ -423,7 +423,12 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
   let*? () =
-    start_container ~config ~keep_alive:true ~timeout:parameters.timeout ()
+    start_container
+      ~config
+      ~keep_alive:true
+      ~timeout:parameters.timeout
+      ~start_injector_worker:true
+      ()
   in
   let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =

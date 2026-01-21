@@ -1209,6 +1209,7 @@ let start db ~config ~notify_ws_change ~first_block =
         }
       ~keep_alive:true
       ~timeout
+      ~start_injector_worker:true
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;

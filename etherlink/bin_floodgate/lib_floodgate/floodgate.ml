@@ -762,7 +762,14 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   let config : Configuration.tx_queue =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
-  let* () = start_container ~config ~keep_alive:true ~timeout:10. () in
+  let* () =
+    start_container
+      ~config
+      ~keep_alive:true
+      ~timeout:10.
+      ~start_injector_worker:true
+      ()
+  in
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
 
   Misc.background_task ~name:"chain_monitor" (fun () ->
