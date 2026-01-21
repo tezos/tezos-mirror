@@ -196,8 +196,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Seoul Protocol Reference <active/index>
-   Tallinn Protocol Reference <tallinn/index>
+   Tallinn Protocol Reference <active/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -224,7 +223,6 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/023_seoul
    protocols/024_tallinn
    protocols/alpha
    protocols/history

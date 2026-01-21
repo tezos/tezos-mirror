@@ -86,6 +86,9 @@ phases required to agree on the next block.
   observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
   when the attesting baker participates in the DAL.
 
+.. _consensus_operations_aggregate:
+.. _consensus_operations_aggregate_tallinn:
+
 Starting in protocol S, blocks are also able to include these operations in an aggregated form, using operations ``Attestations_aggregate`` and ``Preattestations_aggregate``.
 If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
 its attestation can be aggregated with all the other tz4 pre/attestations,

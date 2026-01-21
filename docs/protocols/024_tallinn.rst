@@ -1,3 +1,5 @@
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
+
 Protocol Tallinn
 =================
 
@@ -6,7 +8,7 @@ to Seoul (see :ref:`naming_convention`).
 For the list of changes brought by Seoul with respect to Rio, see :doc:`./023_seoul`.
 
 For a higher-level overview of the most salient new features see the
-`announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
+`announcement blog <https://research-development.nomadic-labs.com/tallinn-announcement.html>`__.
 
 An overview of breaking changes and deprecations introduced in
 protocol Tallinn can be found :ref:`here<tallinn_breaking_changes>`. These
@@ -15,7 +17,7 @@ tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_024_PtTALLiN` of
 the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../tallinn/index>`.
+:doc:`this page <../active/index>`.
 
 
 Environment Version
