@@ -3464,3 +3464,19 @@ val threshold_bls_signatures :
 val signing_delay_env_var : string
 
 val fixed_seed_env_var : string
+
+(** Run [octez-client clst deposit <amount> for <source>]. *)
+val clst_deposit :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
+
+(** Same as [clst_deposit], but do not wait for the process to exit. *)
+val spawn_clst_deposit :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t
+
+(** Run [octez-client clst withdraw <amount> for <source>]. *)
+val clst_withdraw :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
+
+(** Same as [clst_withdraw], but do not wait for the process to exit. *)
+val spawn_clst_withdraw :
+  ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t
