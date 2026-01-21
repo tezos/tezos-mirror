@@ -693,6 +693,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       transport_layer
       cctxt
       ~last_finalized_level:head_level
+      ~l1_current_level:head_level
       ~network_name
       ~disable_shard_validation
       ~ignore_pkhs

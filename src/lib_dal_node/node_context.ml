@@ -41,6 +41,7 @@ type t = {
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   mutable last_finalized_level : int32;
+  mutable l1_current_level : int32;
   (* the highest finalized level the DAL node is aware of (except at start-up, where
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
@@ -53,8 +54,8 @@ type t = {
 
 let init config ~identity ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
-    cctxt ~last_finalized_level ?(disable_shard_validation = false) ~ignore_pkhs
-    () =
+    cctxt ~last_finalized_level ~l1_current_level
+    ?(disable_shard_validation = false) ~ignore_pkhs () =
   {
     config;
     identity;
@@ -72,6 +73,7 @@ let init config ~identity ~network_name profile_ctxt cryptobox
     transport_layer;
     profile_ctxt;
     last_finalized_level;
+    l1_current_level;
     l1_crawler_status = Unknown;
     l1_crawler_status_input = Lwt_watcher.create_input ();
     disable_shard_validation;
@@ -243,6 +245,10 @@ let get_cryptobox ctxt = ctxt.cryptobox
 let set_last_finalized_level ctxt level = ctxt.last_finalized_level <- level
 
 let get_last_finalized_level ctxt = ctxt.last_finalized_level
+
+let set_l1_current_head_level ctxt level = ctxt.l1_current_level <- level
+
+let get_l1_current_head_level ctxt = ctxt.l1_current_level
 
 let get_shards_proofs_precomputation ctxt = ctxt.shards_proofs_precomputation
 

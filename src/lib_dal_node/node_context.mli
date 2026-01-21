@@ -42,6 +42,7 @@ val init :
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
   last_finalized_level:int32 ->
+  l1_current_level:int32 ->
   ?disable_shard_validation:bool ->
   ignore_pkhs:Signature.Public_key_hash.Set.t ->
   unit ->
@@ -155,6 +156,12 @@ val set_last_finalized_level : t -> int32 -> unit
 (** Get the node's last finalized level. This level may be equal or higher than
     the node's last processed level. *)
 val get_last_finalized_level : t -> int32
+
+(** Update the node's L1 current head level. *)
+val set_l1_current_head_level : t -> int32 -> unit
+
+(** Get the node's L1 current head level. *)
+val get_l1_current_head_level : t -> int32
 
 (** Returns true if and only if the node's profile is bootstrap. *)
 val is_bootstrap_node : t -> bool
