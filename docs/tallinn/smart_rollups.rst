@@ -143,6 +143,7 @@ the Layer 1 pushes one final internal message “End of
 level”. Similarly to “Start of level“, this internal message does not
 come with any payload.
 
+.. _reveal_data_channel_smart_rollups:
 .. _reveal_data_channel_smart_rollups_tallinn:
 
 Reveal data channel
@@ -207,6 +208,7 @@ implements the exact same semantics as the PVM. The PVM is only ever
 used by the rollup node when it needs to produce a proof during the
 last step of the refutation mechanism.
 
+.. _commitments:
 .. _commitments_tallinn:
 
 Commitments
@@ -252,6 +254,7 @@ There is no need to synchronize between operators: if two honest
 operators publish the same commitment for a given commitment period,
 the commitment will be published with two stakes on it.
 
+.. _withdrawal_period:
 .. _withdrawal_period_tallinn:
 
 A commitment is optimistically trusted but it can be refuted until it
@@ -281,6 +284,7 @@ contain a white-list update. This message can only be executed for a
 rollup that is private since its origination (see
 :ref:`private_rollups_tallinn`).
 
+.. _bonds:
 .. _bonds_tallinn:
 
 Bonds
@@ -372,6 +376,7 @@ published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
 concurrent committers to avoid the rollup getting stuck.
 
+.. _private_rollups:
 .. _private_rollups_tallinn:
 
 Private rollups

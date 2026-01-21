@@ -7,6 +7,7 @@ The content of a Tezos block is made up of a block header and a payload consisti
 This page first describes the protocol-specific part of the block header, and then explains what operations are.
 For the protocol-independent part of the block header, see :ref:`shell_header`.
 
+.. _proto_block_header:
 .. _proto_block_header_tallinn:
 
 Protocol-specific block header
@@ -41,6 +42,7 @@ or available only on test networks, is given in the
 :package-api:`OCaml Documentation
 <tezos-protocol-024-PtTALLiN/Tezos_raw_protocol_024_PtTALLiN/Operation_repr/index.html>`.
 
+.. _validation_passes:
 .. _validation_passes_tallinn:
 
 Validation Passes
@@ -62,6 +64,7 @@ Each kind of operation belongs to exactly one validation pass, except for the :r
 In the sequel, we describe the different classes of operations, and
 the different kinds of operations belonging to each class.
 
+.. _consensus_operations:
 .. _consensus_operations_tallinn:
 
 Consensus Operations
@@ -90,6 +93,7 @@ which helps reducing the size and validation time of blocks without compromising
 security. A valid block can include at most one aggregated preattestation
 and at most one aggregated attestation.
 
+.. _voting_operations:
 .. _voting_operations_tallinn:
 
 Voting Operations
@@ -111,6 +115,7 @@ voting operations:
 Further details on each operation's implementation and semantics are
 provided in the dedicated entry for :doc:`on-chain governance<voting>`.
 
+.. _anonymous_operations:
 .. _anonymous_operations_tallinn:
 
 Anonymous Operations
@@ -176,6 +181,7 @@ key.
 
 The DAL also adds the anonymous operation ``DAL_entrapment_evidence``, see :doc:`./dal_support`.
 
+.. _manager_operations:
 .. _manager_operations_tallinn:
 
 Manager Operations
@@ -273,6 +279,7 @@ handled with dedicated manager operations.
   determine if it is called by a smart rollup using the ``SENDER``
   Michelson instruction.
 
+.. _manager_operations_batches:
 .. _manager_operations_batches_tallinn:
 
 Manager Operation Batches
@@ -291,6 +298,7 @@ Batches satisfy the following properties:
   interleaving other operations. Either all the operations in the
   batch succeed, or none is applied.
 
+.. _failing_noop:
 .. _failing_noop_tallinn:
 
 Failing_noop operation

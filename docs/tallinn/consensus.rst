@@ -50,6 +50,7 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_tallinn:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,12 +80,14 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_tallinn:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_tallinn:
 
 Unlike Emmy*, Tenderbake has `two types of
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_tallinn:
 
 Transaction and block finality
@@ -122,6 +126,7 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
+.. _time_between_blocks:
 .. _time_between_blocks_tallinn:
 
 Time between blocks
@@ -140,6 +145,7 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake:
 .. _active_stake_tallinn:
 
 Validator selection
@@ -277,6 +283,7 @@ included during that cycle has been ``673,456`` slots. Given that this number is
 bigger than the minimum required (``1,008,000 * 2 / 3``), it receives an attesting
 reward of ``1,008,000 * 0.000571 = 575.568`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_tallinn:
 
 Slashing
@@ -325,6 +332,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _fitness_section:
 .. _fitness_section_tallinn:
 
 Fitness
@@ -366,6 +374,7 @@ inner sequences). So the first fitness is smaller than the second one,
 because of the third component, the empty bitstring being smaller than
 any other bitstring.
 
+.. _cs_constants:
 .. _cs_constants_tallinn:
 
 Consensus related protocol parameters

@@ -17,6 +17,7 @@ addresses:
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
 
+.. _user_accounts:
 .. _user_accounts_tallinn:
 
 User accounts
@@ -36,6 +37,7 @@ briefly described below from a user point of view.
 The sizes of public keys, secret keys and signatures may differ between the
 different schemes but addresses are always 20 bytes long.
 
+.. _tz1_accounts:
 .. _tz1_accounts_tallinn:
 
 ``tz1``: Ed25519
@@ -50,6 +52,7 @@ because it offers better security guarantees than EcDSA and has good performance
 on most hardware. It may not be available in all wallets or on all dedicated
 chips which is why Tezos supports multiple schemes.
 
+.. _tz2_accounts:
 .. _tz2_accounts_tallinn:
 
 ``tz2``: Secp256k1
@@ -62,6 +65,7 @@ with the `Secp256k1 curve <https://www.secg.org/sec2-v2.pdf>`_. Secp256k1 is
 notably the cryptographic scheme used by Bitcoin and Ethereum. This means that
 private keys and addresses used on Bitcoin can also be used on Tezos.
 
+.. _tz3_accounts:
 .. _tz3_accounts_tallinn:
 
 ``tz3``: P-256
@@ -76,6 +80,7 @@ Secp256r1. This is one of the curves for EcDSA recommended by NIST. It is also
 often the only cryptographic scheme supported by HSMs (Hardware Security
 Modules) of cloud providers.
 
+.. _tz4_accounts:
 .. _tz4_accounts_tallinn:
 
 ``tz4``: BLS

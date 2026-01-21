@@ -91,6 +91,7 @@ of a multisig ``stake`` operation would look like this:
 (the source and destination are both the address of the multisig account, because staking is implemented by a pseudo-operation consisting in sending a transaction to oneself).
 
 
+.. _native_multisig_rpc_cli:
 .. _native_multisig_rpc_cli_tallinn:
 
 Octez CLI commands and RPC endpoints

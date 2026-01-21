@@ -110,6 +110,7 @@ might be introduced, a different selection mechanism may be used, the quorum
 requirement might differ, etc.
 
 
+.. _voting_power:
 .. _voting_power_tallinn:
 
 Voting Power
