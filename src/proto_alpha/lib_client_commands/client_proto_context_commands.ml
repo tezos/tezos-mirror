@@ -2219,6 +2219,144 @@ let commands_rw () =
             entrypoint,
             replace_by_fees,
             successor_level ));
+    (* Start: CLST client commands *)
+    command
+      ~group
+      ~desc:"Deposit the given amount of tez into the CLST contract."
+      (args13
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         safety_guard_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["clst"; "deposit"]
+      @@ tez_param ~name:"qty" ~desc:"amount deposited from source"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             safety_guard,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           (cctxt : Protocol_client_context.full)
+         ->
+        let open Lwt_result_syntax in
+        let* clst_contract_hash =
+          get_clst_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
+        in
+        let contract = Contract.Implicit source in
+        let arg = None in
+        let entrypoint = Some (Entrypoint.of_string_strict_exn "deposit") in
+        transfer_command
+          amount
+          contract
+          (Contract.Originated clst_contract_hash)
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            safety_guard,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    command
+      ~group
+      ~desc:"Withdraw the given amount of tez from the CLST contract."
+      (args13
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         force_switch
+         gas_limit_arg
+         safety_guard_arg
+         storage_limit_arg
+         counter_arg
+         no_print_source_flag
+         fee_parameter_args
+         replace_by_fees_arg
+         successor_level_arg)
+      (prefixes ["clst"; "withdraw"]
+      @@ tez_param ~name:"qty" ~desc:"amount in tez to withdraw from CLST"
+      @@ prefix "for"
+      @@ Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the recipient contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             force,
+             gas_limit,
+             safety_guard,
+             storage_limit,
+             counter,
+             no_print_source,
+             fee_parameter,
+             replace_by_fees,
+             successor_level )
+           amount
+           source
+           cctxt
+         ->
+        let open Lwt_result_syntax in
+        let* clst_contract_hash =
+          get_clst_contract_hash cctxt ~chain:cctxt#chain ~block:cctxt#block
+        in
+        let contract = Contract.Implicit source in
+        let arg = Some (Int64.to_string (Tez.to_mutez amount)) in
+        let entrypoint = Some (Entrypoint.of_string_strict_exn "withdraw") in
+        transfer_command
+          Tez.zero
+          contract
+          (Contract.Originated clst_contract_hash)
+          cctxt
+          ( fee,
+            dry_run,
+            verbose_signing,
+            simulation,
+            force,
+            gas_limit,
+            safety_guard,
+            storage_limit,
+            counter,
+            arg,
+            no_print_source,
+            fee_parameter,
+            entrypoint,
+            replace_by_fees,
+            successor_level ));
+    (* End: CLST client commands *)
     command
       ~group
       ~desc:"Set delegate parameters"

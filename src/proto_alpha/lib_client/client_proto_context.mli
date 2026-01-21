@@ -1075,3 +1075,9 @@ val is_delegate :
   ?block:Block_services.block ->
   public_key_hash ->
   bool tzresult Lwt.t
+
+val get_clst_contract_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract_hash.t tzresult Lwt.t
