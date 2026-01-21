@@ -583,6 +583,107 @@ let () =
   return_unit
 
 let () =
+  register_test ~title:"Simple deposit-redeem-finalize flow" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, sender =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+
+  (* First deposit 100_000_000 mutez *)
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* Then redeem 30_000_000 mutez *)
+  let redeemed_amount_mutez = 30_000_000L in
+  let redeemed_amount = Tez.of_mutez_exn redeemed_amount_mutez in
+  let* redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) sender redeemed_amount_mutez
+  in
+  let* b = Block.bake ~operation:redeem_tx b in
+  let redemption_cycle = Block.current_cycle b in
+
+  (* Wait for the redemption request to be finalizable *)
+  let* b = Block.bake_until_cycle_end b in
+  let finalization_delay =
+    b.constants.consensus_rights_delay + Protocol.Constants_repr.slashing_delay
+    + 1
+  in
+  let* b = Block.bake_until_n_cycle_end finalization_delay b in
+
+  (* Finalize, and look at the balance, and ensure it is:
+     <amount before finalization> + <redeemed amount>
+  *)
+  let* balance_before_finalization = Context.Contract.balance (B b) sender in
+  let* finalize_tx = Op.clst_finalize ~fee:Tez.zero (Context.B b) sender in
+  let* b, full_metadata = Block.bake_with_metadata b ~operation:finalize_tx in
+  let* balance_after_finalization = Context.Contract.balance (B b) sender in
+
+  let*?@ expected_balance =
+    Tez.(balance_before_finalization +? redeemed_amount)
+  in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ expected_balance balance_after_finalization
+  in
+
+  (* Check the balance updates, showing that the redeemed tez have been moved to
+     CLST balance before being sent to the sender.
+
+     Note that for some reasons, internal operations (that sends the tez from
+     the contract to the staker) updates appear before the transfer from the
+     redeemed deposits to CLST balance, hence we cannot rely on their order and
+     need to check them separately. *)
+  let* clst_contract_hash = get_clst_hash (Context.B b) in
+  let expected_balance_updates_container_to_contract =
+    [
+      (* First, tez are moved from the unstaked deposits to CLST balance *)
+      Alpha_context.Receipt.(
+        item
+          (CLST_redeemed_deposits (sender, redemption_cycle))
+          (Debited redeemed_amount)
+          Block_application);
+      Receipt.(
+        item
+          (Contract (Originated clst_contract_hash))
+          (Credited redeemed_amount)
+          Block_application);
+    ]
+  in
+  let* () =
+    check_balance_updates
+      full_metadata
+      expected_balance_updates_container_to_contract
+  in
+  let expected_balance_updates_contract_to_staker =
+    [
+      (* Then transfered to the staker *)
+      Alpha_context.Receipt.(
+        item
+          (Contract (Originated clst_contract_hash))
+          (Debited redeemed_amount)
+          Block_application);
+      Receipt.(
+        item (Contract sender) (Credited redeemed_amount) Block_application);
+    ]
+  in
+  let* () =
+    check_balance_updates
+      full_metadata
+      expected_balance_updates_contract_to_staker
+  in
+  return_unit
+
+let () =
   register_test ~title:"Test allowance entrypoint and get_allowance view"
   @@ fun () ->
   let open Lwt_result_wrap_syntax in
