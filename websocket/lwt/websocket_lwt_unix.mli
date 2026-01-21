@@ -27,6 +27,8 @@ include
      and type IO.ic := Cohttp_lwt_unix.IO.ic
      and type IO.oc := Cohttp_lwt_unix.IO.oc
 
+exception HTTP_Error of string
+
 type conn
 
 val read : conn -> Websocket.Frame.t Lwt.t
