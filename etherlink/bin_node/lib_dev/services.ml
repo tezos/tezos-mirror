@@ -1355,13 +1355,19 @@ let dispatch_request (type f) ~websocket
                              (fun Broadcast.{result; _} -> result)
                              receipt)
                       in
-                      return
-                      @@
+                      let close_stream_and_return k =
+                        let lwt_promess =
+                          Lwt.finalize k (fun () ->
+                              Lwt_watcher.shutdown stopper ;
+                              Lwt.return_unit)
+                        in
+                        return lwt_promess
+                      in
+                      close_stream_and_return @@ fun () ->
                       match hash with
                       | Error reason -> rpc_error reason
                       | Ok hash -> (
                           let* receipt = receipt_from_stream hash in
-                          Lwt_watcher.shutdown stopper ;
                           match receipt with
                           | Some (Ok receipt) -> rpc_ok receipt
                           | Some (Error reason) ->
