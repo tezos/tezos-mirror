@@ -314,6 +314,32 @@ etherlink.lint_wasm_runtime:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
+etherlink.lint_solidity_artifacts:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - make -C etherlink/kernel_latest/revm/contracts/predeployed bytecode
+  - forge --version
+  - git status
+  - git diff-index --quiet HEAD --
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 etherlink.unit_tests:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
