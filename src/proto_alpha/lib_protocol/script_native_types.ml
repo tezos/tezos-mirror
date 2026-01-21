@@ -35,6 +35,8 @@ module Helpers = struct
 
   let nat_ty () = {untyped = prim Script.T_nat []; typed = Ty_ex_c nat_t}
 
+  let bool_ty () = {untyped = prim Script.T_bool []; typed = Ty_ex_c bool_t}
+
   let address_ty () =
     {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
 
@@ -175,6 +177,8 @@ module CLST_types = struct
 
   type total_supply_view = (unit, nat) view_type
 
+  type is_token_view = (nat, bool) view_type
+
   let balance_view_ty =
     let open Result_syntax in
     let* {typed = input_ty; _} = pair_ty (address_ty ()) (nat_ty ()) in
@@ -182,6 +186,9 @@ module CLST_types = struct
 
   let total_supply_view_ty =
     {input_ty = (unit_ty ()).typed; output_ty = (nat_ty ()).typed}
+
+  let is_token_view_ty =
+    {input_ty = (nat_ty ()).typed; output_ty = (bool_ty ()).typed}
 end
 
 type ('arg, 'storage) kind =

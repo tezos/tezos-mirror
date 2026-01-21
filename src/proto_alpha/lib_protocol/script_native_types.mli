@@ -35,6 +35,8 @@ module CLST_types : sig
 
   type total_supply_view = (unit, nat) view_type
 
+  type is_token_view = (nat, bool) view_type
+
   type entrypoint = Deposit of deposit | Withdraw of withdraw
 
   val entrypoint_from_arg : arg -> entrypoint
@@ -44,6 +46,8 @@ module CLST_types : sig
   val balance_view_ty : balance_view tzresult
 
   val total_supply_view_ty : total_supply_view
+
+  val is_token_view_ty : is_token_view
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)
