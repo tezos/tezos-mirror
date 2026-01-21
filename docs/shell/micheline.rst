@@ -293,11 +293,11 @@ Tools and resources
 
 Besides the direct use of the OCaml libraries described above, the following tools from the Octez suite can be used to convert Micheline and Michelson values to and from other representations:
 
-* ``octez-client convert data`` and ``octez-client convert script`` can convert Micheline expressions, and respectively Michelson scripts, from Micheline, JSON or binary to Micheline, JSON, binary or OCaml representations
+* ``octez-client convert data`` and ``octez-client convert script`` can convert Micheline expressions, and respectively Michelson scripts, from Micheline, JSON or binary to Micheline, JSON, binary or OCaml representations.
 
-* ``octez-client hash data`` and ``octez-client unpack michelson data`` can do serialization and deserialization of Michelson values to/from binary representation, in a way compatible with the Michelson ``PACK`` and ``UNPACK`` instructions.
+* ``octez-client hash data`` and ``octez-client unpack michelson data`` can do serialization and deserialization of Michelson values to/from binary representation, in a way compatible with the Michelson `PACK <https://tezos.gitlab.io/michelson-reference/#instr-PACK>`__ and `UNPACK <https://tezos.gitlab.io/michelson-reference/#instr-UNPACK>`__ instructions.
 
-* :ref:`octez-codec <octez-codec>` can convert Micheline expressions between JSON and binary form
+* :ref:`octez-codec <octez-codec>` can convert Micheline expressions between JSON and binary form.
 
 The following tools and links are not part of the Octez code base but are
 reimplementations of parts of ``lib_micheline`` in other tools and
