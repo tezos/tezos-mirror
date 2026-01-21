@@ -1305,14 +1305,13 @@ let dispatch_request (type f) ~websocket
                     (fun () -> Lwt_unix.with_timeout timeout f)
                     (function
                       | Lwt_unix.Timeout ->
-                          return
-                          @@ rpc_error
-                               (Rpc_errors.transaction_rejected
-                                  (Format.sprintf
-                                     "The transaction was added to the mempool \
-                                      but wasn't processed in %d seconds"
-                                     (int_of_float timeout))
-                                  None)
+                          rpc_error
+                            (Rpc_errors.transaction_rejected
+                               (Format.sprintf
+                                  "The transaction was added to the mempool \
+                                   but wasn't processed in %d seconds"
+                                  (int_of_float timeout))
+                               None)
                       | exn -> Lwt.fail exn)
             in
             let f (raw_tx, timeout, block_parameter) =
@@ -1338,7 +1337,6 @@ let dispatch_request (type f) ~websocket
                           rpc_error
                             (Rpc_errors.transaction_rejected reason None))
                   | _ -> (
-                      wait_or_timeout timeout @@ fun () ->
                       let transaction_result_stream, stopper =
                         Broadcast.create_transaction_result_stream ()
                       in
@@ -1355,13 +1353,20 @@ let dispatch_request (type f) ~websocket
                              (fun Broadcast.{result; _} -> result)
                              receipt)
                       in
-                      return
-                      @@
+                      let close_stream_and_return k =
+                        let lwt_promess =
+                          Lwt.finalize k (fun () ->
+                              Lwt_watcher.shutdown stopper ;
+                              Lwt.return_unit)
+                        in
+                        return lwt_promess
+                      in
+                      close_stream_and_return @@ fun () ->
+                      wait_or_timeout timeout @@ fun () ->
                       match hash with
                       | Error reason -> rpc_error reason
                       | Ok hash -> (
                           let* receipt = receipt_from_stream hash in
-                          Lwt_watcher.shutdown stopper ;
                           match receipt with
                           | Some (Ok receipt) -> rpc_ok receipt
                           | Some (Error reason) ->
@@ -1375,7 +1380,6 @@ let dispatch_request (type f) ~websocket
                                    "Transaction receipt not found"
                                    (Some hash)))))
               | Ethereum_types.Block_parameter.Latest -> (
-                  wait_or_timeout timeout @@ fun () ->
                   (* Use normal execution infos *)
                   let wait_confirmation, wait_confirmation_wakener =
                     Lwt.wait ()
@@ -1408,8 +1412,8 @@ let dispatch_request (type f) ~websocket
                         rpc_error
                         @@ Rpc_errors.transaction_rejected reason (Some hash)
                   in
-                  return
-                  @@
+                  return @@ wait_or_timeout timeout
+                  @@ fun () ->
                   match hash_res with
                   | Error reason -> rpc_error reason
                   | Ok hash -> wait_confirmation_and_get_receipt hash)
