@@ -17,7 +17,7 @@ let ubuntu_releases = ["noble"; "jammy"; "plucky"]
 
 let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
 
-let rockylinux_releases = ["9.3"; "9.6"; "10.0"; "9"; "10"]
+let rockylinux_releases = ["9"; "10"]
 
 let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
 

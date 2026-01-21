@@ -259,7 +259,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-07a4c8c9
   stage: build
   tags:
   - gcp
@@ -379,7 +379,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
@@ -465,7 +465,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -521,7 +521,7 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
@@ -577,7 +577,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -633,11 +633,12 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
+      - "10"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -667,11 +668,12 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
+      - "10"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -715,7 +717,8 @@ oc.build-rockylinux:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
+      - "10"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
@@ -758,13 +761,14 @@ oc.build-rockylinux-data:
   parallel:
     matrix:
     - RELEASE:
-      - "9.3"
+      - "9"
+      - "10"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -782,7 +786,7 @@ rpm_repo_rockylinux:
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
+  - ./scripts/ci/create_rpm_repo.sh rockylinux 9 10
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -820,7 +824,7 @@ oc.docker-build-fedora-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
@@ -855,7 +859,7 @@ oc.docker-systemd-tests-rpm-fedora:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-6253f76a
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-07a4c8c9
   parallel:
     matrix:
     - RELEASE:
@@ -955,7 +959,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-07a4c8c9
   stage: publish
   tags:
   - gcp_not_interruptible

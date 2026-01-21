@@ -1559,8 +1559,8 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    (* !20289 merge commit: https://gitlab.com/tezos/tezos/-/commit/6253f76a *)
-    let common_version = "master-6253f76a"
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2273908328 pipeline. *)
+    let common_version = "master-07a4c8c9"
 
     let debian_version = common_version
 
@@ -1577,12 +1577,6 @@ module Images = struct
     let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
 
     let rpm_version = common_version
-
-    let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
-
-    let rockylinux_9_6 = make_img "rockylinux:9.6" rpm_version
-
-    let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
 
     let rockylinux_9 = make_img "rockylinux:9.6" rpm_version
 

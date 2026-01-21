@@ -43,7 +43,7 @@ DISTRIBUTION=${1}
 shift
 # The release of the linux distribution for which
 # we are creating the rpm repository
-# E.g. '39', '9.3'
+# E.g. '39', '9'
 RELEASES=$*
 
 # If it's a protected branch the value of $bucket will
