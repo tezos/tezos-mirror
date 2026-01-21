@@ -87,6 +87,8 @@ let slots_range ~number_of_slots ~lower ~upper =
 let slots_range_opt ~number_of_slots ~lower ~upper =
   Option.of_result @@ slots_range ~number_of_slots ~lower ~upper
 
+let all_slots ~number_of_slots = Misc.(0 --> (number_of_slots - 1))
+
 let is_succ t ~succ = Compare.Int.(t + 1 = succ)
 
 module Index = struct
