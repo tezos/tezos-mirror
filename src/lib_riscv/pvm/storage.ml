@@ -14,11 +14,29 @@ end
 module State = struct
   type t = Api.state
 
+  let live_count = Atomic.make 0
+
+  let get_live_count () = Atomic.get live_count
+
+  let track state =
+    Atomic.incr live_count ;
+    Gc.finalise_last (fun () -> Atomic.decr live_count) state ;
+    state
+
   let equal state1 state2 = Api.octez_riscv_storage_state_equal state1 state2
 end
 
 module Mutable_state = struct
   type t = Api.mut_state
+
+  let live_count = Atomic.make 0
+
+  let get_live_count () = Atomic.get live_count
+
+  let track state =
+    Atomic.incr live_count ;
+    Gc.finalise_last (fun () -> Atomic.decr live_count) state ;
+    state
 
   let equal state1 state2 =
     Api.octez_riscv_storage_mut_state_equal state1 state2
@@ -43,9 +61,11 @@ let close repo =
   Api.octez_riscv_storage_close repo ;
   Lwt.return_unit
 
-let checkout repo id = Lwt.return (Api.octez_riscv_storage_checkout repo id)
+let checkout repo id =
+  Lwt.return
+    (Option.map Mutable_state.track (Api.octez_riscv_storage_checkout repo id))
 
-let empty () = Api.octez_riscv_storage_mut_state_empty ()
+let empty () = Mutable_state.track (Api.octez_riscv_storage_mut_state_empty ())
 
 let commit ?message:_ repo state =
   Lwt.return (Api.octez_riscv_storage_commit repo state)
