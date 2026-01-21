@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 //! Tezos account state and storage
 
-use crate::context;
+use crate::{context, enshrined_contracts::EnshrinedContracts};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
@@ -238,14 +239,19 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
         Contract::Originated(self.kt1.clone())
     }
 }
+#[derive(Debug, PartialEq)]
+pub enum Code {
+    Code(Vec<u8>),
+    Enshrined(EnshrinedContracts),
+}
 
 pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
-    fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, tezos_storage::error::Error> {
+    fn code(&self, host: &impl Runtime) -> Result<Code, tezos_storage::error::Error> {
         let code_path = context::code::code_path(self)?;
         let code = host.store_read_all(&code_path)?;
-        Ok(code)
+        Ok(Code::Code(code))
     }
 
     fn set_code_size(
@@ -676,6 +682,10 @@ mod test {
             .code(&host)
             .expect("Read the code of the KT1 should succeed");
 
-        assert_eq!(code, read_code, "Set/Read code have inconsistent behavior");
+        assert_eq!(
+            Code::Code(code),
+            read_code,
+            "Set/Read code have inconsistent behavior"
+        );
     }
 }

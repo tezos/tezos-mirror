@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
@@ -54,6 +55,7 @@ extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
+mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
 mod validate;
@@ -469,14 +471,9 @@ fn transfer<'a, Host: Runtime, C: Context>(
     }
 }
 
-fn get_contract_entrypoint<C: Context>(
-    host: &impl Runtime,
-    context: &C,
-    address: &AddressHash,
-) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-    let contract = contract_from_address(address.clone()).ok()?;
-    let contract_account = context.originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+fn get_originated_contract_entrypoint(
+    code: Vec<u8>,
+) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
     let parser = Parser::new();
     let micheline = Micheline::decode_raw(&parser.arena, &code).ok()?;
     // TODO (Linear issue L2-383): handle gas consumption here.
@@ -496,6 +493,20 @@ fn get_contract_entrypoint<C: Context>(
         })
         .collect();
     Some(entrypoints)
+}
+
+fn get_contract_entrypoint<C: Context>(
+    host: &impl Runtime,
+    context: &C,
+    address: &AddressHash,
+) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    let contract = contract_from_address(address.clone()).ok()?;
+    let contract_account = context.originated_from_contract(&contract).ok()?;
+    let code = contract_account.code(host).ok()?;
+    match code {
+        Code::Code(code) => get_originated_contract_entrypoint(code),
+        Code::Enshrined(_) => todo!(),
+    }
 }
 
 // Handles manager transfer operations.
@@ -759,7 +770,7 @@ fn apply_balance_changes(
 }
 
 /// Executes the entrypoint logic of an originated smart contract and returns the new storage.
-fn execute_smart_contract<'a>(
+fn execute_smart_contract_originated<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
     entrypoint: &Entrypoint,
@@ -790,6 +801,24 @@ fn execute_smart_contract<'a>(
         .encode();
 
     Ok((internal_operations, new_storage))
+}
+
+fn execute_smart_contract<'a>(
+    code: account_storage::Code,
+    storage: Vec<u8>,
+    entrypoint: &Entrypoint,
+    value: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut impl CtxTrait<'a>,
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
+    // Parse and typecheck the contract
+    match code {
+        Code::Code(code) => execute_smart_contract_originated(
+            code, storage, entrypoint, value, parser, ctx,
+        ),
+        Code::Enshrined(_) => todo!(),
+        // TODO POC
+    }
 }
 
 pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
@@ -1057,7 +1086,7 @@ fn apply_operation<Host: Runtime, C: Context>(
 #[cfg(test)]
 mod tests {
     use crate::account_storage::{
-        TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
+        Code, TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
     };
     use crate::context::Context;
     use crate::{
@@ -3118,7 +3147,8 @@ mod tests {
             .code(&host)
             .expect("Should have found a code for the KT1");
         assert_eq!(
-            smart_contract_code, code,
+            smart_contract_code,
+            Code::Code(code),
             "Current code for smart contract is not the same as the one originated"
         );
         let smart_contract_storage = smart_contract_account
