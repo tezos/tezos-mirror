@@ -36,7 +36,9 @@ module CLST_types : sig
 
   type redeem = nat
 
-  type clst_entrypoints = (deposit, redeem) or_
+  type finalize = unit
+
+  type clst_entrypoints = ((deposit, redeem) or_, finalize) or_
 
   type transfer =
     ( address (* from_ *),
@@ -105,6 +107,7 @@ module CLST_types : sig
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
+    | Finalize of finalize
     | Transfer of transfer
     | Approve of approve
     | Update_operators of update_operators

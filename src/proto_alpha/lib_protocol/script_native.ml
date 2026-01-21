@@ -191,6 +191,37 @@ module CLST_contract = struct
         Script_int.(compare token_id Clst_contract_storage.token_id) = 0)
       (standard_error ~mnemonic:"FA2_TOKEN_UNDEFINED")
 
+  let execute_finalize (ctxt, (step_constants : step_constants)) ()
+      (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let* account, typed_account =
+      match step_constants.sender with
+      | Contract (Implicit pkh as implicit) ->
+          return (implicit, Typed_implicit pkh)
+      | sender -> tzfail (Non_implicit_contract sender)
+    in
+    let* ctxt, balance_updates, finalized_amount =
+      Clst_contract_storage.finalize
+        ctxt
+        ~clst_contract_hash:step_constants.self
+        ~staker:account
+    in
+    let gas_counter, outdated_ctxt =
+      Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+    in
+    let* op, outdated_ctxt, gas_counter =
+      Script_interpreter_defs.transfer
+        (outdated_ctxt, step_constants)
+        gas_counter
+        finalized_amount
+        Micheline.dummy_location
+        typed_account
+        ()
+    in
+    let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
+    return (Script_list.of_list [op], storage, balance_updates, ctxt)
+
   (** Implementation of the [transfer] entrypoint, compliant with the
       FA2.1 standard:
       https://tzip.tezosagora.org/proposal/tzip-26/#entrypoint-semantics
@@ -464,6 +495,7 @@ module CLST_contract = struct
     match entrypoint_from_arg value with
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
+    | Finalize () -> execute_finalize (ctxt, step_constants) () storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
     | Approve approvals ->

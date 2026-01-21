@@ -86,6 +86,9 @@ val redeem_from_clst_deposits :
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
 
+(** [finalize context ~clst_cotnract_hash ~staker] finalizes all finalizable redemption
+    requests from [staker], moving redeemed frozen deposits to
+    [clst_contract_hash] spendable balance. *)
 val finalize :
   context ->
   clst_contract_hash:Contract_hash.t ->
