@@ -657,6 +657,7 @@ let with_reconnect : type a. t -> (conn -> a Lwt.t) -> a Lwt.t =
       (function
         | Unix.(Unix_error (ECONNREFUSED, _, _))
         | Connection_closed | Lwt_io.Channel_closed _
+        | Websocket_lwt_unix.HTTP_Error "404 Not Found"
           when client.keep_alive ->
             client.current <- None ;
             (* We don't use a custom event here because some tests explicitly
