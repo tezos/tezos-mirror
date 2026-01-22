@@ -42,6 +42,7 @@ type error +=
       from_status_opt : Types.header_status option;
       to_status : Types.header_status;
     }
+  | Missing_configuration_file of {file : string}
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)

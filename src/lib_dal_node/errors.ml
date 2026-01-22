@@ -42,6 +42,7 @@ type error +=
       from_status_opt : Types.header_status option;
       to_status : Types.header_status;
     }
+  | Missing_configuration_file of {file : string}
 
 let () =
   register_error_kind
@@ -202,7 +203,17 @@ let () =
           Some (slot_id, from_status_opt, to_status)
       | _ -> None)
     (fun (slot_id, from_status_opt, to_status) ->
-      Unexpected_slot_status_transition {slot_id; from_status_opt; to_status})
+      Unexpected_slot_status_transition {slot_id; from_status_opt; to_status}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.configuration_file_missing"
+    ~title:"missing configuration file"
+    ~description:"missing configuration file"
+    ~pp:(fun ppf file ->
+      Format.fprintf ppf "Configuration file %s is missing" file)
+    Data_encoding.(obj1 (req "file" Data_encoding.string))
+    (function Missing_configuration_file {file} -> Some file | _ -> None)
+    (fun file -> Missing_configuration_file {file})
 
 (** This part defines and handles more elaborate errors for the DAL node. *)
 
