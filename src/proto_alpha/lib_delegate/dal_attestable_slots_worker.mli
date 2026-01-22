@@ -47,10 +47,11 @@ val get_dal_attestable_slots :
   attestation_level:int32 ->
   Tezos_dal_node_services.Types.attestable_slots option Lwt.t
 
-(** [create ~attestation_lag ~number_of_slots] creates a new worker state. This
-    does not start any background thread, as streams are opened via
+(** [create ~attestation_lag ~attestation_lags ~number_of_slots] creates a new worker
+    state. This does not start any background thread, as streams are opened via
     [update_streams_subscriptions]. *)
-val create : attestation_lag:int -> number_of_slots:int -> t
+val create :
+  attestation_lag:int -> attestation_lags:int list -> number_of_slots:int -> t
 
 (** [shutdown_worker state] stops all active delegate subscriptions and clears
     the worker’s in-memory state. The worker will no longer hold any references

@@ -70,6 +70,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let dal_attestable_slots_worker =
     Dal_attestable_slots_worker.create
       ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
   let* state =

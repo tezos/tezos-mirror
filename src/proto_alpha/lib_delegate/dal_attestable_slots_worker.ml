@@ -94,6 +94,7 @@ module Level_map =
 
 type t = {
   attestation_lag : int;
+  attestation_lags : int list;
   number_of_slots : int;
   streams : stream_handle Delegate_id.Table.t;
       (** Active per-delegate subscriptions. *)
@@ -351,9 +352,10 @@ let get_dal_attestable_slots state ~delegate_id ~attestation_level =
           return_none
       | Some slots -> return_some slots)
 
-let create ~attestation_lag ~number_of_slots =
+let create ~attestation_lag ~attestation_lags ~number_of_slots =
   {
     attestation_lag;
+    attestation_lags;
     number_of_slots;
     streams = create_delegate_table ();
     cache =
