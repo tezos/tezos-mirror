@@ -12,7 +12,7 @@ check-forge:
 
 $(FORGE_WITNESS): check-forge $(SRC) Makefile
 	@mkdir -p _build
-	@forge build --via-ir $(shell pwd) --out $(shell pwd)/_build --no-cache --force --use 0.8.29
+	@forge build --via-ir $(shell pwd) --out $(shell pwd)/_build --no-cache --force --use 0.8.29 --no-metadata
 	@touch $@
 
 %.bin: %.sol $(FORGE_WITNESS)
