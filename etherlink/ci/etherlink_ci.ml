@@ -503,6 +503,7 @@ let register () =
       (Auto, job_build_evm_node_static Amd64 Test);
       (Auto, job_build_evm_node_static Arm64 Test);
       (Auto, job_lint_wasm_runtime);
+      (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
       (Auto, job_test_kernel);
       (Auto, job_test_firehose);

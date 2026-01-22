@@ -1,7 +1,7 @@
 SRC := $(wildcard *.sol)
 BYTECODE := $(SRC:.sol=.bin)
 FORGE_WITNESS := _build/.forge
-REQUIRED_FORGE_VERSION := 1.3.5
+REQUIRED_FORGE_VERSION := 1.5.0
 
 # Different versions of forge can compile the same solidity contract
 # differently; we force a specific version of forge because the EVM
