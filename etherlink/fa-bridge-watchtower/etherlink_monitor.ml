@@ -459,7 +459,7 @@ module Deposit = struct
       kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
   end
 
-  module Ebisu = struct
+  module Farfadet = struct
     (*
       event QueuedDeposit(
         uint256 indexed ticketHash,
@@ -478,7 +478,7 @@ module Deposit = struct
   end
 
   let filter whitelist =
-    mk_filter fa_bridge_address [Dionysus.topic; Ebisu.topic] whitelist
+    mk_filter fa_bridge_address [Dionysus.topic; Farfadet.topic] whitelist
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
@@ -896,6 +896,7 @@ let reconnection_delay = 10.
 
 let is_connection_exception = function
   | Unix.(Unix_error (ECONNREFUSED, _, _))
+  | Websocket_lwt_unix.HTTP_Error "404 Not Found"
   | Websocket_client.Connection_closed | Lwt_io.Channel_closed _ ->
       true
   | _ -> false
@@ -904,7 +905,14 @@ let is_connection_error trace =
   List.exists
     (function
       | Exn e -> is_connection_exception e
-      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+      | RPC_client_errors.(
+          Request_failed
+            {
+              error =
+                ( Connection_failed _
+                | Unexpected_status_code {code = `Not_found; _} );
+              _;
+            }) ->
           true
       | _ -> false)
     trace
@@ -1010,6 +1018,11 @@ let start db ~config ~notify_ws_change ~first_block =
       match stopped with
       | Error e ->
           let*! () = Event.(emit monitor_error) e in
+          Format.eprintf "connection error: %b@." (is_connection_error e) ;
+          (match e with
+          | Exn e :: _ ->
+              Format.eprintf "exn: %s@." (Printexc.to_string_default e)
+          | _ -> ()) ;
           if is_connection_error e && !connected_once then return_unit
           else fail e
       | Ok () -> return_unit
