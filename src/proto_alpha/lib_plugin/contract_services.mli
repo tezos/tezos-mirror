@@ -188,6 +188,9 @@ val single_sapling_get_diff :
   unit ->
   (Sapling.root * Sapling.diff) shell_tzresult Lwt.t
 
+val clst_contract_hash :
+  'a #RPC_context.simple -> 'a -> Contract_hash.t shell_tzresult Lwt.t
+
 val clst_balance :
   'a #RPC_context.simple ->
   'a ->

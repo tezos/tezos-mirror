@@ -17,6 +17,9 @@
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
+./octez-client rpc get /chains/main/blocks/head/context/clst/contract_hash
+"[CONTRACT_HASH]"
+
 ./octez-client rpc get /chains/main/blocks/head/context/clst/total_supply
 "0"
 

@@ -139,6 +139,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Client_keys.register ~protocols ;
   Client_run_view.register ~protocols ;
   Client_simulation_flag.register ~protocols ;
+  Clst.register ~protocols ;
   Comparable_datatype.register ~protocols ;
   Consensus_key.register ~protocols ;
   Companion_key.register ~protocols ;

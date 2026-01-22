@@ -4915,3 +4915,19 @@ let threshold_bls_signatures ~pk ~msg client id_signatures =
 let signing_delay_env_var = "TEZOS_SIGN_DELAY_I_KNOW_WHAT_I_AM_DOING"
 
 let fixed_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"
+
+let spawn_clst_deposit ?(wait = "none") ?burn_cap amount ~src client =
+  spawn_command client
+  @@ ["--wait"; wait; "clst"; "deposit"; Tez.to_string amount; "for"; src]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let clst_deposit ?wait ?burn_cap amount ~src client =
+  spawn_clst_deposit ?wait ?burn_cap amount ~src client |> Process.check
+
+let spawn_clst_withdraw ?(wait = "none") ?burn_cap amount ~src client =
+  spawn_command client
+  @@ ["--wait"; wait; "clst"; "withdraw"; Tez.to_string amount; "for"; src]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let clst_withdraw ?wait ?burn_cap amount ~src client =
+  spawn_clst_withdraw ?wait ?burn_cap amount ~src client |> Process.check

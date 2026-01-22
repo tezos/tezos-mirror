@@ -390,6 +390,13 @@ module S = struct
   end
 
   module CLST = struct
+    let contract_hash =
+      RPC_service.get_service
+        ~description:"Returns the CLST contract hash."
+        ~query:RPC_query.empty
+        ~output:Contract_hash.encoding
+        RPC_path.(open_root / "context" / "clst" / "contract_hash")
+
     let balance_service =
       RPC_service.get_service
         ~description:
@@ -407,6 +414,8 @@ module S = struct
         RPC_path.(open_root / "context" / "clst" / "total_supply")
 
     let register () =
+      register0 ~chunked:false contract_hash (fun ctxt () () ->
+          Contract.get_clst_contract_hash ctxt) ;
       register1 ~chunked:false balance_service (fun ctxt contract () () ->
           let open Lwt_result_syntax in
           let* balance, _ = Clst_storage.get_balance ctxt contract in
@@ -912,6 +921,9 @@ let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
     block
     (Contract.Originated id)
     Sapling_services.{offset_commitment; offset_nullifier}
+
+let clst_contract_hash ctxt block =
+  RPC_context.make_call0 S.CLST.contract_hash ctxt block () ()
 
 let clst_balance ctxt block contract =
   RPC_context.make_call1 S.CLST.balance_service ctxt block contract () ()

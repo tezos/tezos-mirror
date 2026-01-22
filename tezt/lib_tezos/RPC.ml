@@ -2086,6 +2086,13 @@ let get_chain_block_context_destination_index ?(chain = "main")
     ]
   @@ JSON.as_int_opt
 
+let get_chain_block_context_clst_contract_hash ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "clst"; "contract_hash"]
+    JSON.as_string
+
 let get_chain_block_context_clst_total_supply ?(chain = "main")
     ?(block = "head") () =
   make
