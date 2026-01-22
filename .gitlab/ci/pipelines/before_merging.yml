@@ -888,31 +888,6 @@ trigger:debian_repository_partial_auto:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     strategy: depend
 
-trigger:rpm_repository_partial_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: before_merging-rpm_repository_partial_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
-    - manifest/**/*.ml*
-    - rpm-deps-build.Dockerfile
-    - scripts/ci/build-packages-dependencies.sh
-    - scripts/ci/build-rpm-packages.sh
-    - scripts/ci/create_rpm_repo.sh
-    - scripts/ci/prepare-apt-rpm-repo.sh
-    - scripts/packaging/build-rpm-local.sh
-    - scripts/packaging/octez/rpm/*
-    - scripts/packaging/tests/rpm/*
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - trigger
-  trigger:
-    include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
-    strategy: depend
-
 trigger:homebrew_auto:
   stage: test
   variables:
@@ -1105,19 +1080,6 @@ trigger:homebrew:
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/homebrew.yml
-    strategy: depend
-
-trigger:rpm_repository_partial:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging-rpm_repository_partial
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/rpm_repository_partial.yml
     strategy: depend
 
 trigger:debian_repository_partial:
