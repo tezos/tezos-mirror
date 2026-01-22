@@ -152,7 +152,7 @@ module Merge = struct
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
         let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-        let file_layout = Store.Slots.file_layout in
+        let* file_layout = Store.Slots.get_file_layout ~slot_id in
         kvs_copy_value src_store dst_store file_layout (slot_id, slot_size) ())
       (fun () ->
         let open Lwt_syntax in
@@ -181,7 +181,7 @@ module Merge = struct
            but for now we'll scan for existing files. *)
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
-        let file_layout = Store.Shards_disk.file_layout in
+        let* file_layout = Store.Shards_disk.get_file_layout ~slot_id in
         let*! count_result =
           Key_value_store.Read.count_values src_store file_layout slot_id
         in

@@ -23,19 +23,24 @@ end
 module Shards_disk : sig
   (** Low-level access to shards stored on disk. *)
 
-  (** [file_layout ~root_dir slot_id] returns the Key_value_store layout
-      for the given [slot_id] in the root directory.
+  (** [get_file_layout slot_id] returns a function to be used as the
+      [file_layout] of the Key_value_store for the given [slot_id] in the root
+      directory. This function might fail if there is no layout registered for the
+      given [slot_id].
 
       Beware that cryptographic parameters must be initialized via
       {!Node_context.init_cryptobox} or {!Value_size_hooks.set_share_size} before
       using this function. *)
-  val file_layout :
-    root_dir:string ->
+  val get_file_layout :
+    slot_id:Types.slot_id ->
+    (root_dir:string ->
     Types.slot_id ->
-    (int, Cryptobox.share) Key_value_store.layout
+    (int, Cryptobox.share) Key_value_store.layout)
+    tzresult
+    Lwt.t
 
   (** [add_file_layout] adds a new file layout that will be used starting at the
-      given level. This aims to be called when a new protocol is activated,
+      given level. This should be called when a new protocol is activated,
       introducing a new layout related to DAL protocol parameters changes. *)
   val add_file_layout :
     int32 -> Cryptobox.parameters -> (unit, [> `Fail of string]) result
@@ -74,7 +79,7 @@ module Shards : sig
     t ->
     Types.slot_id ->
     number_of_shards:int ->
-    (Types.slot_id * int * share tzresult) Seq_s.t
+    (Types.slot_id * int * share tzresult) Seq_s.t tzresult Lwt.t
 
   (** [count_values store slot_id] returns the number of shards
       which are stored for the given slot id. *)
@@ -90,12 +95,17 @@ module Slots : sig
 
   type t
 
-  (** [file_layout ~root_dir (slot_id, slot_size)] returns the Key_value_store
-      layout for the given slot_id and slot_size in the root directory. *)
-  val file_layout :
-    root_dir:string ->
+  (** [get_file_layout slot_id] returns a function to be used as the
+      [file_layout] of the Key_value_store for the given [slot_id] in the root
+      directory. This function might fail if there is no layout registered for the
+      given [slot_id]. *)
+  val get_file_layout :
+    slot_id:Types.slot_id ->
+    (root_dir:string ->
     Types.slot_id * int ->
-    (unit, bytes) Key_value_store.layout
+    (unit, bytes) Key_value_store.layout)
+    tzresult
+    Lwt.t
 
   (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
       given slot id to the given slot content. *)

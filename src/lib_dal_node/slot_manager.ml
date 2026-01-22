@@ -208,27 +208,36 @@ let polynomial_from_shards cryptobox shards =
       Error (Errors.other [Merging_failed msg])
 
 let read_minimal_shards_for_reconstruction ?from_bytes cryptobox store slot_id =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
   let needed = number_of_shards / redundancy_factor in
-  let* rev_shards, count_elts =
-    Store.Shards.read_all
-      ?from_bytes
-      (Store.shards store)
-      slot_id
-      ~number_of_shards
-    |> Seq_s.fold_left
-         (fun (acc, count_elts) elt ->
-           match elt with
-           | _, index, Ok share ->
-               (Cryptobox.{index; share} :: acc, count_elts + 1)
-           | _ -> (acc, count_elts))
-         ([], 0)
+  let*! res =
+    let* seq =
+      Store.Shards.read_all
+        ?from_bytes
+        (Store.shards store)
+        slot_id
+        ~number_of_shards
+    in
+    let*! shards =
+      Seq_s.fold_left
+        (fun (acc, count_elts) elt ->
+          match elt with
+          | _, index, Ok share ->
+              (Cryptobox.{index; share} :: acc, count_elts + 1)
+          | _ -> (acc, count_elts))
+        ([], 0)
+        seq
+    in
+    return shards
   in
-  if needed > count_elts then return_none
-  else List.take_n needed rev_shards |> List.to_seq |> return_some
+  match res with
+  | Ok (rev_shards, count_elts) ->
+      if needed > count_elts then return_none
+      else List.take_n needed rev_shards |> List.to_seq |> return_some
+  | Error _ -> return_none
 
 let get_slot_content_from_shards cryptobox shards =
   let open Lwt_result_syntax in
@@ -424,7 +433,7 @@ let try_fetch_slot_from_backup ctxt cryptobox ~slot_size slot_id
     | Some (`Shards shard_bytes) -> (
         (* We got the raw shards KVS file. We could reuse the KVS to decode the
            bytes into a list of shards. *)
-        let*! shards_opt =
+        let* shards_opt =
           read_minimal_shards_for_reconstruction
             ~from_bytes:shard_bytes
             cryptobox
@@ -674,8 +683,12 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
             if reconstruct_if_missing then
               (* The slot could not be obtained from the slot store, attempt a
              reconstruction. *)
-              let*! shards_opt =
-                read_minimal_shards_for_reconstruction cryptobox store slot_id
+              let* shards_opt =
+                Errors.other_lwt_result
+                @@ read_minimal_shards_for_reconstruction
+                     cryptobox
+                     store
+                     slot_id
               in
               match shards_opt with
               | None -> return_none

@@ -545,11 +545,15 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       ~number_of_received_shards:number_of_already_stored_shards
       ~number_of_shards
   in
-  let shards =
-    Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
-    |> Seq_s.filter_map (function
-         | _, index, Ok share -> Some Cryptobox.{index; share}
-         | _ -> None)
+  let* shards =
+    let* seq =
+      Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
+    in
+    Seq_s.filter_map
+      (function
+        | _, index, Ok share -> Some Cryptobox.{index; share} | _ -> None)
+      seq
+    |> return
   in
   let*? shards =
     Seq_s.take
