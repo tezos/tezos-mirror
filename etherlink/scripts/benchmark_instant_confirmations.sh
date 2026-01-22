@@ -12,8 +12,12 @@ GAS_LIMIT_BUFFER=${GAS_LIMIT_BUFFER:-200000}
 # Curl timeout = RPC timeout + 5s buffer (in seconds)
 CURL_TIMEOUT=$(((SEND_SYNC_TIMEOUT_MS / 1000) + 5))
 
-if [[ "$#" -ne 2 ]]; then
-  echo "Usage: $0 <private_key> <nb_transactions>"
+if [[ "$#" -lt 2 ]] || [[ "$#" -gt 3 ]]; then
+  echo "Usage: $0 <private_key> <nb_transactions> [percentile]"
+  echo "Arguments:"
+  echo "  private_key           Private key for signing transactions"
+  echo "  nb_transactions       Number of transfer transactions to benchmark"
+  echo "  percentile            Percentile for trimmed mean (50-100, default: 80)"
   echo "Environment variables:"
   echo "  NODE_URL              RPC endpoint (default: http://localhost:8545)"
   echo "  SEND_SYNC_TIMEOUT_MS  Timeout for eth_sendRawTransactionSync (default: 5000)"
@@ -22,6 +26,13 @@ fi
 
 PRIVATE_KEY="$1"
 NB_TX="$2"
+PERCENTILE="${3:-80}"
+
+# Validate percentile
+if ! [[ "$PERCENTILE" =~ ^[0-9]+$ ]] || ((PERCENTILE < 50)) || ((PERCENTILE > 100)); then
+  echo "Error: percentile must be a number between 50 and 100" >&2
+  exit 1
+fi
 
 if [[ ! -f "$ERC20_BIN" ]]; then
   echo "Error: $ERC20_BIN not found" >&2
@@ -177,11 +188,11 @@ echo "=== Results ==="
 if ((${#latencies[@]} > 0)); then
   mapfile -t sorted < <(printf '%s\n' "${latencies[@]}" | sort -n)
   count=${#sorted[@]}
-  p80_idx=$(((count * 80) / 100))
-  if ((p80_idx >= count)); then p80_idx=$((count - 1)); fi
+  p_idx=$(((count * PERCENTILE) / 100))
+  if ((p_idx >= count)); then p_idx=$((count - 1)); fi
   sum=0
-  for ((j = 0; j <= p80_idx; j++)); do sum=$((sum + sorted[j])); done
-  echo "P80-trimmed mean: $((sum / (p80_idx + 1)))ms (P80 cutoff: ${sorted[p80_idx]}ms)"
+  for ((j = 0; j <= p_idx; j++)); do sum=$((sum + sorted[j])); done
+  echo "P${PERCENTILE}-trimmed mean: $((sum / (p_idx + 1)))ms (P${PERCENTILE} cutoff: ${sorted[p_idx]}ms)"
   echo "Min: ${sorted[0]}ms, Max: ${sorted[count - 1]}ms"
 fi
 
