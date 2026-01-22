@@ -415,3 +415,36 @@ let () =
           (Script_int.to_int64 total_supply)
       in
       return total_supply)
+
+let () =
+  register_test ~title:"Test is_token view" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, _ = Context.init1 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let* is_token_0 =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"is_token"
+      ~input:
+        Environment.Micheline.(Int (dummy_location, Z.zero) |> strip_locations)
+      b
+  in
+  let () =
+    match is_token_0 |> Environment.Micheline.root with
+    | Environment.Micheline.Prim (_, Script.D_True, [], []) -> ()
+    | _ -> Test.fail "Unexpected output"
+  in
+  let* is_token_positive =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"is_token"
+      ~input:
+        Environment.Micheline.(Int (dummy_location, Z.one) |> strip_locations)
+      b
+  in
+  let () =
+    match is_token_positive |> Environment.Micheline.root with
+    | Environment.Micheline.Prim (_, Script.D_False, [], []) -> ()
+    | _ -> Test.fail "Unexpected output"
+  in
+  return_unit

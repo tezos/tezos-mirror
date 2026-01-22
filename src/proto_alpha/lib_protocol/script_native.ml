@@ -143,12 +143,26 @@ module CLST_contract = struct
       return
         (Ex_view {name; ty = CLST_types.total_supply_view_ty; implementation})
 
+    let is_token : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "is_token" in
+      let implementation (ctxt, _step_constants) (token_id : nat)
+          (_storage : storage) =
+        let open Lwt_result_syntax in
+        let is_token =
+          Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
+        in
+        return (is_token, ctxt)
+      in
+      return (Ex_view {name; ty = CLST_types.is_token_view_ty; implementation})
+
     let view_map : storage Script_native_types.view_map tzresult =
       let open Result_syntax in
       let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
       let* (Ex_view {name = get_total_supply_name; _} as get_total_supply) =
         total_supply
       in
+      let* (Ex_view {name = is_token_name; _} as is_token) = is_token in
       let view_map =
         Script_map.update
           get_balance_name
@@ -158,6 +172,7 @@ module CLST_contract = struct
       let view_map =
         Script_map.update get_total_supply_name (Some get_total_supply) view_map
       in
+      let view_map = Script_map.update is_token_name (Some is_token) view_map in
       return view_map
   end
 end
