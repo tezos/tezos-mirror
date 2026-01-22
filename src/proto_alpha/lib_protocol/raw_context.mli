@@ -498,6 +498,8 @@ end
 module Dal : sig
   type cryptobox = Dal.t
 
+  val make_cryptobox : Dal.parameters -> cryptobox tzresult
+
   val make : t -> (t * cryptobox) tzresult
 
   (** [record_number_of_attested_shards ctxt attestation ~delegate

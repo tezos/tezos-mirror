@@ -2917,6 +2917,8 @@ module Dal : sig
 
   val make : context -> (context * cryptobox) tzresult
 
+  val make_cryptobox : Parameters.t -> cryptobox tzresult
+
   val assert_feature_enabled : t -> unit tzresult
 
   val only_if_feature_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a

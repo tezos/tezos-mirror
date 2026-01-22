@@ -2224,6 +2224,13 @@ end
 module Dal = struct
   type cryptobox = Dal.t
 
+  let make_cryptobox params =
+    let open Result_syntax in
+    match Dal.make params with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail explanation) ->
+        tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation})
+
   let make ctxt =
     let open Result_syntax in
     (* Dal.make takes some time (on the order of 10ms) so we memoize
