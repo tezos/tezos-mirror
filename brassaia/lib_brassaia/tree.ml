@@ -27,7 +27,7 @@ module Events = struct
     declare_2 ~section ~level:Debug ~name:"tree_function"
       ~msg:"Tree.{function} {path}"
       ("function", Data_encoding.string)
-      ("path", Data_encoding.string)
+      ("path", Path.encoding)
 
   let tree_export =
     declare_1 ~section ~level:Debug ~name:"tree_export"
@@ -1763,10 +1763,7 @@ module Make (P : Backend.S) = struct
 
   let find_tree (t : t) path =
     let cache = true in
-    let* () =
-      Events.(emit tree_function)
-        ("find_tree", Logging.to_string_exn Path.encoding path)
-    in
+    let* () = Events.(emit tree_function) ("find_tree", path) in
     match (t, Path.rdecons path) with
     | v, None -> Lwt.return_some v
     | _, Some (path, file) -> (
@@ -1837,10 +1834,7 @@ module Make (P : Backend.S) = struct
 
   let kind t path =
     let cache = true in
-    let* () =
-      Events.(emit tree_function)
-        ("kind", Logging.to_string_exn Path.encoding path)
-    in
+    let* () = Events.(emit tree_function) ("kind", path) in
     match (t, Path.rdecons path) with
     | `Contents _, None -> Lwt.return_some `Contents
     | `Node _, None -> Lwt.return_some `Node
@@ -1854,19 +1848,13 @@ module Make (P : Backend.S) = struct
             | Some (`Node _) -> Lwt.return_some `Node))
 
   let length t ?(cache = true) path =
-    let* () =
-      Events.(emit tree_function)
-        ("length", Logging.to_string_exn Path.encoding path)
-    in
+    let* () = Events.(emit tree_function) ("length", path) in
     sub ~cache "length" t path >>= function
     | None -> Lwt.return 0
     | Some n -> Node.length ~cache:true n
 
   let seq t ?offset ?length ?(cache = true) path =
-    let* () =
-      Events.(emit tree_function)
-        ("seq", Logging.to_string_exn Path.encoding path)
-    in
+    let* () = Events.(emit tree_function) ("seq", path) in
     sub ~cache "seq.sub" t path >>= function
     | None -> Lwt.return Seq.empty
     | Some n -> Node.seq ?offset ?length ~cache n >|= get_ok "seq"
@@ -1877,8 +1865,7 @@ module Make (P : Backend.S) = struct
   let empty () = `Node (Node.empty ())
 
   let singleton path c =
-    Events.(emit__dont_wait__use_with_care tree_function)
-      ("singleton", Logging.to_string_exn Path.encoding path);
+    Events.(emit__dont_wait__use_with_care tree_function) ("singleton", path);
     let env = Env.empty () in
     let base_tree = `Contents (Contents.of_value ~env c) in
     Path.fold_right path
@@ -1993,10 +1980,7 @@ module Make (P : Backend.S) = struct
 
   let update t k f =
     let cache = true in
-    let* () =
-      Events.(emit tree_function)
-        ("update", Logging.to_string_exn Path.encoding k)
-    in
+    let* () = Events.(emit tree_function) ("update", k) in
     update_tree ~cache t k ~f_might_return_empty_node:false ~f:(fun t ->
         let+ old_contents =
           match t with
@@ -2010,36 +1994,25 @@ module Make (P : Backend.S) = struct
         | Some c -> of_contents c |> Option.some)
 
   let add t k c =
-    let* () =
-      Events.(emit tree_function) ("add", Logging.to_string_exn Path.encoding k)
-    in
+    let* () = Events.(emit tree_function) ("add", k) in
     update_tree ~cache:true t k
       ~f:(fun _ -> Lwt.return_some (of_contents c))
       ~f_might_return_empty_node:false
 
   let add_tree t k v =
-    let* () =
-      Events.(emit tree_function)
-        ("add_tree", Logging.to_string_exn Path.encoding k)
-    in
+    let* () = Events.(emit tree_function) ("add_tree", k) in
     update_tree ~cache:true t k
       ~f:(fun _ -> Lwt.return_some v)
       ~f_might_return_empty_node:true
 
   let remove t k =
-    let* () =
-      Events.(emit tree_function)
-        ("remove", Logging.to_string_exn Path.encoding k)
-    in
+    let* () = Events.(emit tree_function) ("remove", k) in
     update_tree ~cache:true t k
       ~f:(fun _ -> Lwt.return_none)
       ~f_might_return_empty_node:false
 
   let update_tree t k f =
-    let* () =
-      Events.(emit tree_function)
-        ("update_tree", Logging.to_string_exn Path.encoding k)
-    in
+    let* () = Events.(emit tree_function) ("update_tree", k) in
     update_tree ~cache:true t k ~f:(Lwt.wrap1 f) ~f_might_return_empty_node:true
 
   let import repo = function
