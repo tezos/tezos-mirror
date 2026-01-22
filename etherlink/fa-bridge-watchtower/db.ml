@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2025-2026 Functori, <contact@functori.com>                  *)
 (* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -10,7 +10,7 @@ open Sqlite.Request
 open Caqti_type.Std
 
 (** Current version for migrations. *)
-let version = 1
+let version = 2
 
 module Contract = Tezos_raw_protocol_alpha.Alpha_context.Contract
 
