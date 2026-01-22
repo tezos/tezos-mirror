@@ -377,34 +377,3 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       rockylinux_jobs @ fedora_jobs @ test_fedora_packages_jobs
       @ test_rockylinux_packages_jobs
   | Release -> rockylinux_jobs @ fedora_jobs
-
-let register ~auto ~description pipeline_type =
-  let pipeline_name =
-    match (pipeline_type, auto) with
-    | Partial, false -> "rpm_repository_partial"
-    | Partial, true -> "rpm_repository_partial_auto"
-    | Full, _ -> "rpm_repository_full"
-    | Release, _ -> "rpm_repository_release"
-  in
-  let jobs = jobs pipeline_type in
-  Pipeline.register_child
-    pipeline_name
-    ~description
-    ~jobs:(job_datadog_pipeline_trace :: jobs)
-
-let child_pipeline_partial =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') \n\
-      \       Rocky Linux 9 and 10 .rpm packages."
-    ~auto:false
-    Partial
-
-let child_pipeline_partial_auto =
-  register
-    ~description:
-      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
-       Rockylinux 9 and 10 .rpm packages. Starts automatically on certain \
-       conditions."
-    ~auto:true
-    Partial
