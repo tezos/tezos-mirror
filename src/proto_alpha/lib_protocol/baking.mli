@@ -54,6 +54,12 @@ val attesting_rights :
   attested_level:Level.t ->
   (context * ordered_slots Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
+(** For a given level computes the number of DAL shards assigned to delegates. *)
+val delegate_to_shard_count :
+  context ->
+  Level.t ->
+  (context * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
+
 (** Computes attesting rights for a given level.
 
    @return map from allocated first slots to their owner's public key, consensus
