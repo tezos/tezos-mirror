@@ -730,7 +730,7 @@ module History = struct
        [search], i.e. primarily by the slot effective attestation level
        [published_level + lag] (where [lag] is derived from the attestation-lag
        kind), and then by [published_level] and [slot_index] as tie-breakers. *)
-    let next ~prev_cell ~prev_cell_ptr ~number_of_slots:_number_of_slots elt =
+    let next ~prev_cell ~prev_cell_ptr elt =
       let open Result_syntax in
       let prev_cid = content prev_cell |> Content.content_id in
       let elt_cid = Content.content_id elt in
@@ -893,7 +893,7 @@ module History = struct
        Note that if the given skip list contains the genesis cell, its content is
        reset with the given content. This ensures the invariant that
        there are no gaps in the successive cells of the list. *)
-    let add_cell (t, cache) next_cell_content ~number_of_slots =
+    let add_cell (t, cache) next_cell_content =
       let open Result_syntax in
       let prev_cell_ptr = hash t in
       let Header.{published_level; _} =
@@ -903,12 +903,7 @@ module History = struct
         if Raw_level_repr.equal published_level genesis_level then
           (* If this is the first real cell of DAL, replace dummy genesis. *)
           return (Skip_list.genesis next_cell_content)
-        else
-          Skip_list.next
-            ~prev_cell:t
-            ~prev_cell_ptr
-            next_cell_content
-            ~number_of_slots
+        else Skip_list.next ~prev_cell:t ~prev_cell_ptr next_cell_content
       in
       let new_head_hash = hash new_head in
       let* cache = History_cache.remember new_head_hash new_head cache in
@@ -998,7 +993,7 @@ module History = struct
           ~attestation_lag
           slot_headers_with_statuses
       in
-      List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
+      List.fold_left_e add_cell (t, cache) slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in

@@ -157,8 +157,7 @@ let finalisation ctxt =
          - disallow proofs involving pages of slots that have been confirmed at the
            level where the game started.
       *)
-      let number_of_slots = Constants.dal_number_of_slots ctxt in
       let+ ctxt, slot_availability =
-        Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
+        Dal.Slot.finalize_pending_slot_headers ctxt
       in
       (ctxt, slot_availability))

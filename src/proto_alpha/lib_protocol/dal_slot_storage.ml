@@ -73,10 +73,6 @@ let update_skip_list ctxt ~slot_headers_statuses ~published_level
   let open Dal_slot_repr.History in
   let* slots_history = get_slot_headers_history ctxt in
   let*? slots_history, cache =
-    (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/7126
-
-       Handle DAL parameters (number_of_slots) evolution.
-    *)
     (* We expect to put exactly [number_of_slots] cells in the cache. *)
     let cache = History_cache.empty ~capacity:(Int64.of_int number_of_slots) in
 
@@ -231,7 +227,7 @@ let finalize_slot_headers_at_lag_migration ctxt ~target_published_level
   in
   return (ctxt, attestation_bitset)
 
-let finalize_pending_slot_headers ctxt ~number_of_slots =
+let finalize_pending_slot_headers ctxt =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
@@ -259,6 +255,10 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
          introducing a gap of [k] levels without cells in the skip list. This
          requires updating the context correctly, in particular the
          [LevelHistories] entry. *)
+      let* number_of_slots =
+        let+ dal_parameters = Dal_storage.parameters ctxt published_level in
+        dal_parameters.number_of_slots
+      in
       let* sl_history_head = get_slot_headers_history ctxt in
       let Dal_slot_repr.History.
             {header_id = _; attestation_lag = prev_attestation_lag} =
@@ -291,6 +291,15 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
         let () =
           assert (Compare.Int.(curr_attestation_lag < prev_attestation_lag))
         in
+        let* previous_number_of_slots =
+          match Raw_level_repr.pred published_level with
+          | None -> return number_of_slots
+          | Some pred_level ->
+              let+ past_dal_parameters =
+                Dal_storage.parameters ctxt pred_level
+              in
+              past_dal_parameters.number_of_slots
+        in
         (* Migration path: there are missing published levels between the
            skip-list head and [published_level] because attestation_lag has
            shrunk at migration from [prev_attestation_lag] to
@@ -303,4 +312,4 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
           ~curr_attestation_lag
           ctxt
           ~target_published_level:published_level
-          ~number_of_slots
+          ~number_of_slots:previous_number_of_slots
