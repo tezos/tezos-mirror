@@ -25,7 +25,6 @@ codec: octez-codec
 dac_client: octez-dac-client
 dac_node: octez-dac-node
 dal_node: octez-dal-node
-dsn_node: octez-dsn-node
 evm_node: octez-evm-node
 node: octez-node
 protocol_compiler: octez-protocol-compiler

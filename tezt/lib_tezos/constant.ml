@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024, 2026 Trilitech <contact@trili.tech>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -57,8 +57,6 @@ let etherlink_governance_observer =
     ~tag:"etherlink_governance_observer"
     ~path:"./etherlink-governance-observer"
     ()
-
-let octez_dsn_node = Uses.make ~tag:"dsn_node" ~path:"./octez-dsn-node" ()
 
 let octez_signer = Uses.make ~tag:"signer" ~path:"./octez-signer" ()
 
