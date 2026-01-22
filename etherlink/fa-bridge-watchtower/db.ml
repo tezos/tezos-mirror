@@ -20,10 +20,16 @@ let quantity_hum_encoding =
     Ethereum_types.quantity_of_z
     Data_encoding.z
 
-type deposit = {
-  nonce : Ethereum_types.quantity;
+type token_info = {
   proxy : Ethereum_types.Address.t;
   ticket_hash : Ethereum_types.hash;
+}
+
+type token = FA of token_info | XTZ
+
+type deposit = {
+  nonce : Ethereum_types.quantity;
+  token : token;
   receiver : Ethereum_types.Address.t;
   amount : Ethereum_types.quantity;
 }
@@ -112,6 +118,20 @@ module Types = struct
         Ok (Address (Hex address)))
       octets
 
+  let address_option_blob =
+    custom
+      ~encode:(function
+        | None -> Ok ""
+        | Some (Ethereum_types.Address (Hex address)) ->
+            Result.of_option ~error:"not a valid address"
+            @@ Hex.to_string (`Hex address))
+      ~decode:(function
+        | "" -> Ok None
+        | address ->
+            let (`Hex address) = Hex.of_string address in
+            Ok (Some (Address (Hex address))))
+      octets
+
   let hash =
     custom
       ~encode:(fun (Ethereum_types.Hash (Hex hash)) ->
@@ -119,6 +139,20 @@ module Types = struct
       ~decode:(fun hash ->
         let (`Hex hash) = Hex.of_string hash in
         Ok (Hash (Hex hash)))
+      octets
+
+  let hash_option_blob =
+    custom
+      ~encode:(function
+        | None -> Ok ""
+        | Some (Ethereum_types.Hash (Hex hash)) ->
+            Result.of_option ~error:"not a valid hash"
+            @@ Hex.to_string (`Hex hash))
+      ~decode:(function
+        | "" -> Ok None
+        | hash ->
+            let (`Hex hash) = Hex.of_string hash in
+            Ok (Some (Hash (Hex hash))))
       octets
 
   let block_hash =
@@ -130,14 +164,35 @@ module Types = struct
         Ok (Block_hash (Hex hash)))
       octets
 
+  let native_deposit =
+    custom ~encode:(fun b -> Ok b) ~decode:(fun b -> Ok b) bool
+
   let deposit =
-    product (fun nonce proxy ticket_hash receiver amount ->
-        {nonce; proxy; ticket_hash; receiver; amount})
+    product (fun nonce proxy ticket_hash receiver amount native_deposit ->
+        if native_deposit then {nonce; token = XTZ; receiver; amount}
+        else
+          let proxy =
+            match proxy with
+            | Some proxy -> proxy
+            | None -> Stdlib.failwith "FA deposit is missing the proxy"
+          in
+          let ticket_hash =
+            match ticket_hash with
+            | Some ticket_hash -> ticket_hash
+            | None -> Stdlib.failwith "FA deposit is missing the ticket_hash"
+          in
+          {nonce; token = FA {proxy; ticket_hash}; receiver; amount})
     @@ proj level (fun d -> d.nonce)
-    @@ proj address (fun d -> d.proxy)
-    @@ proj hash (fun d -> d.ticket_hash)
+    @@ proj address_option_blob (fun d ->
+           match d.token with XTZ -> None | FA {proxy; _} -> Some proxy)
+    @@ proj hash_option_blob (fun d ->
+           match d.token with
+           | XTZ -> None
+           | FA {ticket_hash; _} -> Some ticket_hash)
     @@ proj address (fun d -> d.receiver)
     @@ proj amount (fun d -> d.amount)
+    @@ proj native_deposit (fun d ->
+           match d.token with XTZ -> true | FA _ -> false)
     @@ proj_end
 
   let log_info =
@@ -298,17 +353,17 @@ module Deposits = struct
       (t2 deposit log_info ->. unit)
       @@ {sql|
       REPLACE INTO deposits
-      (nonce, proxy, ticket_hash, receiver, amount,
+      (nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       |sql}
 
     let unclaimed_ignore_whitelist =
       (unit ->* deposit)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit
       FROM deposits
       where exec_transactionHash IS NULL
       ORDER BY nonce DESC
@@ -318,7 +373,7 @@ module Deposits = struct
       (unit ->* deposit)
       @@ {sql|
       SELECT
-       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount
+       d.nonce, d.proxy, d.ticket_hash, d.receiver, d.amount, d.native_deposit
       FROM deposits d
       JOIN whitelist w
       ON (
@@ -333,7 +388,7 @@ module Deposits = struct
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed
       FROM deposits
@@ -345,7 +400,7 @@ module Deposits = struct
       (unit ->* t2 deposit log_info)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed
       FROM deposits d
@@ -362,7 +417,7 @@ module Deposits = struct
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
@@ -375,7 +430,7 @@ module Deposits = struct
       (t2 int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
@@ -393,7 +448,7 @@ module Deposits = struct
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, proxy, ticket_hash, receiver, amount,
+       nonce, proxy, ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
@@ -407,7 +462,7 @@ module Deposits = struct
       (t3 address int int ->* deposit_log)
       @@ {sql|
       SELECT
-       nonce, d.proxy, d.ticket_hash, receiver, amount,
+       nonce, d.proxy, d.ticket_hash, receiver, amount, native_deposit,
        log_transactionHash, log_transactionIndex, log_logIndex, log_blockHash,
        log_blockNumber, log_removed,
        exec_transactionHash, exec_transactionIndex, exec_blockHash,
