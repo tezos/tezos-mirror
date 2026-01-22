@@ -126,6 +126,12 @@ module type HEADER = sig
     tzresult
     Lwt.t
 
+  val tezlink_block_metadata :
+    Tezos_types.level * Tezos_shell_services.Block_services.version ->
+    (Tezos_shell_services.Block_services.version
+    * Block_services.block_metadata)
+    tzresult
+
   val protocols : Tezlink_protocols.protocols
 end
 
@@ -226,6 +232,11 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
       }
     in
     return (version, block_info)
+
+  let tezlink_block_metadata (level_info, version) =
+    let open Result_syntax in
+    let+ metadata = make_metadata ~level_info in
+    (version, metadata)
 end
 
 module Current_block_header = struct
@@ -583,6 +594,14 @@ let register_dynamic_block_services ~l2_chain_id
            let*? `Main = check_chain chain in
            let*? _block = check_block block in
            return Block_header.protocols)
+    |> register_with_conversion
+         ~service:(import_service S.metadata)
+         ~impl:(fun {chain; block} q () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* level = Backend.current_level chain block ~offset:0l in
+           Lwt_result_syntax.return (level, q#version))
+         ~convert_output:Block_header.tezlink_block_metadata
     |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
            make_env chain block)
   in
