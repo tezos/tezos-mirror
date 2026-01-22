@@ -435,18 +435,17 @@ module Packaging = struct
 
   let build_dependency_image =
     Image.mk_external
-      ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      ~image_path:
+        "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
   let make_variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
-         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
+         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION" )
        (* this second variable is for a read only registry and we want it to be
             tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
+         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION" )
     :: add
 
   let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
@@ -514,4 +513,30 @@ module Packaging = struct
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       script
+
+  let make_job_merge_build_dependencies ~distribution ~dependencies ~matrix =
+    job_docker_authenticated
+      ~__POS__
+      ~name:(Format.sprintf "oc.docker-build-merge-manifest.%s" distribution)
+      ~stage:Stages.images
+      ~dependencies
+      ~variables:
+        (make_variables
+           [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
+      ~parallel:(Matrix matrix)
+      ["scripts/ci/docker-merge-base-images.sh"]
+
+  let make_job_merge_systemd_test_dependencies ~distribution ~dependencies
+      ~matrix =
+    job_docker_authenticated
+      ~__POS__
+      ~name:(Format.sprintf "oc.docker-systemd-merge-manifest.%s" distribution)
+      ~stage:Stages.images
+      ~dependencies
+      ~variables:
+        (make_variables
+           ~kind:"systemd-tests"
+           [("DISTRIBUTION", distribution); ("IMAGE_NAME", "$DEP_IMAGE")])
+      ~parallel:(Matrix matrix)
+      ["scripts/ci/docker-merge-base-images.sh"]
 end
