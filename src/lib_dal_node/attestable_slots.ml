@@ -108,7 +108,7 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
   let published_level = slot_id.slot_level in
   let*? lag = get_attestation_lag ctxt ~level:published_level in
   let attested_level = Int32.(add published_level lag) in
-  let attestation_level = Int32.pred attested_level in
+  let committee_level = Int32.pred attested_level in
   let*? should_drop = published_just_before_migration ctxt ~published_level in
   if should_drop then return_none
   else
@@ -117,10 +117,10 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
     in
     let shards_store = Store.shards (get_store ctxt) in
     (* For retrieving the assigned shard indexes, we consider the committee
-       at [attestation_level], because the (DAL) attestations in the blocks
+       at [committee_level], because the (DAL) attestations in the blocks
        at level [attested_level] refer to the predecessor level. *)
     let* shard_indices =
-      fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+      fetch_assigned_shard_indices ctxt ~pkh ~level:committee_level
     in
     let number_of_assigned_shards = List.length shard_indices in
     check_is_attestable_slot_or_trap
@@ -220,11 +220,11 @@ let get_backfill_payload ctxt ~pkh =
   in
   List.fold_left_es
     (fun acc published_level ->
-      let attestation_level =
+      let committee_level =
         Int32.(pred (add published_level attestation_lag))
       in
       let* committee =
-        Node_context.fetch_committees ctxt ~level:attestation_level
+        Node_context.fetch_committees ctxt ~level:committee_level
       in
       if is_not_in_committee committee ~pkh then
         (* If not in committee, record and skip per-slot checks. *)
@@ -232,8 +232,8 @@ let get_backfill_payload ctxt ~pkh =
           E.
             {
               acc with
-              no_shards_attestation_levels =
-                attestation_level :: acc.no_shards_attestation_levels;
+              no_shards_committee_levels =
+                committee_level :: acc.no_shards_committee_levels;
             }
       else
         let*? proto_params =
@@ -267,7 +267,7 @@ let get_backfill_payload ctxt ~pkh =
           in
           let shards_store = Store.shards store in
           let* shard_indices =
-            fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+            fetch_assigned_shard_indices ctxt ~pkh ~level:committee_level
           in
           let number_of_assigned_shards = List.length shard_indices in
           let* new_slot_ids, new_trap_slot_ids =
@@ -299,9 +299,9 @@ let get_backfill_payload ctxt ~pkh =
               {
                 slot_ids = List.append new_slot_ids acc.slot_ids;
                 trap_slot_ids = List.append new_trap_slot_ids acc.trap_slot_ids;
-                no_shards_attestation_levels = acc.no_shards_attestation_levels;
+                no_shards_committee_levels = acc.no_shards_committee_levels;
               })
-    {slot_ids = []; trap_slot_ids = []; no_shards_attestation_levels = []}
+    {slot_ids = []; trap_slot_ids = []; no_shards_committee_levels = []}
     published_levels
 
 (** [create_new_stream_with_backfill stream backfill_payload_opt] builds a new

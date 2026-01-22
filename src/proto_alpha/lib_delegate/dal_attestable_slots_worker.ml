@@ -157,7 +157,7 @@ let update_cache_no_shards_assigned state ~delegate_id ~attestation_level =
     merges a DAL [Backfill] event for [~delegate_id] into the in-memory cache. *)
 let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   let module E = Types.Attestable_event in
-  let E.{slot_ids; trap_slot_ids; no_shards_attestation_levels} =
+  let E.{slot_ids; trap_slot_ids; no_shards_committee_levels} =
     backfill_payload
   in
   List.iter
@@ -182,7 +182,7 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   List.iter
     (fun attestation_level ->
       update_cache_no_shards_assigned state ~delegate_id ~attestation_level)
-    no_shards_attestation_levels
+    no_shards_committee_levels
 
 (** [consume_backfill_stream state stream_handle ~delegate_id] consumes the initial [Backfill]
     event from a freshly opened DAL monitoring stream. This function is meant to be called

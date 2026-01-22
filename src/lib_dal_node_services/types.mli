@@ -421,8 +421,8 @@ module Attestable_event : sig
         (** All slots that should be marked attestable for this delegate *)
     trap_slot_ids : slot_id list;
         (* All slots that should be marked as traps for this delegate *)
-    no_shards_attestation_levels : level list;
-        (** All attestation levels where this delegate has no shards *)
+    no_shards_committee_levels : level list;
+        (** All committee levels where this delegate has no shards *)
   }
 
   (** DAL attestability items emitted on a per-delegate stream.

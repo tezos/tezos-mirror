@@ -807,7 +807,7 @@ module Attestable_event = struct
   type backfill_payload = {
     slot_ids : slot_id list;
     trap_slot_ids : slot_id list;
-    no_shards_attestation_levels : level list;
+    no_shards_committee_levels : level list;
   }
 
   type t =
@@ -819,14 +819,14 @@ module Attestable_event = struct
   let backfill_payload_encoding =
     let open Data_encoding in
     conv
-      (fun {slot_ids; trap_slot_ids; no_shards_attestation_levels} ->
-        (slot_ids, trap_slot_ids, no_shards_attestation_levels))
-      (fun (slot_ids, trap_slot_ids, no_shards_attestation_levels) ->
-        {slot_ids; trap_slot_ids; no_shards_attestation_levels})
+      (fun {slot_ids; trap_slot_ids; no_shards_committee_levels} ->
+        (slot_ids, trap_slot_ids, no_shards_committee_levels))
+      (fun (slot_ids, trap_slot_ids, no_shards_committee_levels) ->
+        {slot_ids; trap_slot_ids; no_shards_committee_levels})
       (obj3
          (req "slot_ids" (list slot_id_encoding))
          (req "trap_slot_ids" (list slot_id_encoding))
-         (req "no_shards_attestation_levels" (list int32)))
+         (req "no_shards_committee_levels" (list int32)))
 
   let encoding =
     let open Data_encoding in
