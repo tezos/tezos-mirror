@@ -511,12 +511,7 @@ let load =
           else try_decode json older_versions)
   in
   fun ~config_file ->
-    let* json =
-      let*! json = Lwt_utils_unix.Json.read_file config_file in
-      match json with
-      | Ok json -> return json
-      | Error (Exn _ :: _ as e) | Error e -> fail e
-    in
+    let* json = Lwt_utils_unix.Json.read_file config_file in
     let* config = try_decode json config_versions in
     (* We save the config so that its format is that of the latest version. *)
     let* () = save ~config_file config in
