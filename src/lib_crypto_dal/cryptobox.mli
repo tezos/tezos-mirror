@@ -566,8 +566,6 @@ module Internal_for_tests : sig
   val precomputation_equal :
     shards_proofs_precomputation -> shards_proofs_precomputation -> bool
 
-  val encoded_share_size : t -> int
-
   (** [ensure_validity parameters] returns true if the [parameters] are valid.
      See implementation file for details. *)
   val ensure_validity : parameters -> bool

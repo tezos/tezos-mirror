@@ -669,8 +669,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     Node_context.init_cryptobox config proto_parameters profile_ctxt
   in
   (* Set crypto box share size hook. *)
-  Value_size_hooks.set_share_size
-    (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
+  Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
   let*! () =
     if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
     else Lwt.return_unit
