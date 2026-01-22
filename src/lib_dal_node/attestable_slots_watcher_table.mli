@@ -36,10 +36,10 @@ val get_or_init :
 val notify_attestable_slot :
   t -> Signature.public_key_hash -> slot_id:slot_id -> unit
 
-(** [notify_no_shards_assigned t pkh ~attestation_level] pushes a [No_shards_assigned] event for
-    [~attestation_level] to the stream for [pkh], if present. *)
+(** [notify_no_shards_assigned t pkh ~committee_level] pushes a [No_shards_assigned] event for
+    [~committee_level] to the stream for [pkh], if present. *)
 val notify_no_shards_assigned :
-  t -> Signature.public_key_hash -> attestation_level:level -> unit
+  t -> Signature.public_key_hash -> committee_level:level -> unit
 
 (** [notify_slot_has_trap t pkh ~slot_id] pushed a [Slot_has_trap] event for [~slot_id] to the
     stream for [pkh], if present. *)

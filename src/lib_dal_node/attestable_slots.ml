@@ -165,7 +165,7 @@ let is_not_in_committee committee ~pkh =
   in
   List.is_empty assigned_shard_indices
 
-let may_notify_not_in_committee ctxt committee ~attestation_level =
+let may_notify_not_in_committee ctxt committee ~committee_level =
   let module T = Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
     Node_context.get_attestable_slots_watcher_table ctxt
@@ -177,7 +177,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
         T.notify_no_shards_assigned
           attestable_slots_watcher_table
           pkh
-          ~attestation_level)
+          ~committee_level)
     subscribers
 
 (** [get_backfill_payload ctxt ~pkh] computes a compact “backfill” payload for

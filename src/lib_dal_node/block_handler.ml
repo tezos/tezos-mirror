@@ -755,7 +755,7 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
   let* () =
     if not proto_parameters.feature_enable then return_unit
     else
-      let attestation_level =
+      let committee_level =
         Int32.(
           pred @@ add level (of_int proto_parameters.Types.attestation_lag))
       in
@@ -764,12 +764,12 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
          We therefore need the committee at `block_level + 2`. So, as long as
          `attestation_lag > 2`, there should be no issue. *)
       let* (committee : (int trace * int) Signature.Public_key_hash.Map.t) =
-        Node_context.fetch_committees ctxt ~level:attestation_level
+        Node_context.fetch_committees ctxt ~level:committee_level
       in
       Attestable_slots.may_notify_not_in_committee
         ctxt
         committee
-        ~attestation_level ;
+        ~committee_level ;
       return_unit
   in
   Gossipsub.Worker.Validate_message_hook.set_batch

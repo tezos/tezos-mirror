@@ -812,7 +812,7 @@ module Attestable_event = struct
 
   type t =
     | Attestable_slot of {slot_id : slot_id}
-    | No_shards_assigned of {attestation_level : level}
+    | No_shards_assigned of {committee_level : level}
     | Slot_has_trap of {slot_id : slot_id}
     | Backfill of {backfill_payload : backfill_payload}
 
@@ -846,13 +846,11 @@ module Attestable_event = struct
           (Tag 1)
           (obj2
              (req "kind" (constant "no_shards_assigned"))
-             (req "attestation_level" int32))
+             (req "committee_level" int32))
           (function
-            | No_shards_assigned {attestation_level} ->
-                Some ((), attestation_level)
+            | No_shards_assigned {committee_level} -> Some ((), committee_level)
             | _ -> None)
-          (fun ((), attestation_level) ->
-            No_shards_assigned {attestation_level});
+          (fun ((), committee_level) -> No_shards_assigned {committee_level});
         case
           ~title:"slot_has_trap"
           (Tag 2)

@@ -430,8 +430,8 @@ module Attestable_event : sig
   type t =
     | Attestable_slot of {slot_id : slot_id}
         (** the [slot_id] is now attestable for the delegate *)
-    | No_shards_assigned of {attestation_level : level}
-        (** the delegate has no assigned shards at [attestation_level] *)
+    | No_shards_assigned of {committee_level : level}
+        (** the delegate has no assigned shards at [committee_level] *)
     | Slot_has_trap of {slot_id : slot_id}
         (** the [slot_id] is a trap for the delegate *)
     | Backfill of {backfill_payload : backfill_payload}

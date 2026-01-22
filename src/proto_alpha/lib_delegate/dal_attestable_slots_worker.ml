@@ -233,8 +233,11 @@ let rec consume_stream state stream_handle ~delegate_id =
       [@profiler.aggregate_f
         {verbosity = Debug} "update_cache_with_attestable_slot"] ;
       consume_stream state ~delegate_id stream_handle
-  | Some (No_shards_assigned {attestation_level}) ->
-      update_cache_no_shards_assigned state ~delegate_id ~attestation_level ;
+  | Some (No_shards_assigned {committee_level}) ->
+      update_cache_no_shards_assigned
+        state
+        ~delegate_id
+        ~attestation_level:committee_level ;
       consume_stream state ~delegate_id stream_handle
   | Some (Slot_has_trap {slot_id}) ->
       (* In case of a trap, we know the slot is not attestable, so we record an explicit [false] bit. *)
