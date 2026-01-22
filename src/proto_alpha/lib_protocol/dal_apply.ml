@@ -57,7 +57,8 @@ let validate_attestation ctxt level slot consensus_key attestation =
   in
   let number_of_shards = Constants.dal_number_of_shards ctxt in
   fail_when
-    Compare.Int.(Slot.to_int slot >= number_of_shards)
+    (Compare.Int.(Slot.to_int slot >= number_of_shards)
+    && not (Dal.Attestation.is_empty attestation))
     (let attester = pkh_of_consensus_key consensus_key in
      Dal_data_availibility_attester_not_in_committee {attester; level; slot})
 
