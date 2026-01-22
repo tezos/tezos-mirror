@@ -653,7 +653,9 @@ module Get_uncle_by_block_number_and_index = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-module Send_raw_transaction = struct
+(* Shared types and encodings between eth_sendRawTransaction and tez_sendRawTezlinkOperation and 
+   all future RPCs used to relay transactions when the Tx_queue gets a Tick. *)
+module Send_raw_common = struct
   open Ethereum_types
 
   type input = hex
@@ -663,8 +665,20 @@ module Send_raw_transaction = struct
   let input_encoding = Data_encoding.tup1 hex_encoding
 
   let output_encoding = hash_encoding
+end
+
+module Send_raw_transaction = struct
+  include Send_raw_common
 
   let method_ = "eth_sendRawTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Send_raw_tezlink_operation = struct
+  include Send_raw_common
+
+  let method_ = "tez_sendRawTezlinkOperation"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -1316,12 +1330,14 @@ let evm_unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let michelson_supported_methods = evm_supported_methods
+let michelson_supported_methods =
+  evm_supported_methods @ [(module Send_raw_tezlink_operation)]
 
 let multichain_sequencer_supported_methods : (module METHOD) list =
   [
     (module Generic_block_number);
     (module Send_raw_transaction);
+    (module Send_raw_tezlink_operation);
     (module Send_raw_transaction_sync);
     (* Private RPCs *)
     (module Produce_block);

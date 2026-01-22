@@ -846,40 +846,59 @@ let wait_confirmation_callback wait_confirmation_wakener =
   in
   Lwt.return_unit
 
+let spawn_wait_confirmation (config : Configuration.t)
+    ~evm_node_private_endpoint hash wait_confirmation_wakener =
+  let open Lwt_result_syntax in
+  let tx_confirmed =
+    Injector.inject_wait_transaction_confirmation
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~base:evm_node_private_endpoint
+      ~hash
+  in
+  Lwt.dont_wait
+    (fun () ->
+      let*! tx_confirmed in
+      Lwt.wakeup wait_confirmation_wakener tx_confirmed ;
+      Lwt.return_unit)
+    (fun exn ->
+      Lwt.wakeup wait_confirmation_wakener Result_syntax.(fail [Exn exn]))
+
+let inject_on_rpc (config : Configuration.t) ~evm_node_private_endpoint
+    ?wait_confirmation_wakener inject =
+  let open Lwt_result_syntax in
+  let* res =
+    inject
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~base:evm_node_private_endpoint
+  in
+  match res with
+  | Ok hash ->
+      Option.iter
+        (spawn_wait_confirmation config ~evm_node_private_endpoint hash)
+        wait_confirmation_wakener ;
+      rpc_ok hash
+  | Error reason -> rpc_error (Rpc_errors.internal_error reason)
+
 let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
     ?wait_confirmation_wakener =
   let open Lwt_result_syntax in
   let on_rpc raw_tx transaction_object Mode.{evm_node_private_endpoint; _} =
-    let* res =
+    let inject ~keep_alive ~timeout ~base =
       Injector.inject_transaction
         ~wait_confirmation:false
-        ~keep_alive:config.keep_alive
-        ~timeout:config.rpc_timeout
-        ~base:evm_node_private_endpoint
+        ~keep_alive
+        ~timeout
+        ~base
         ~tx_object:transaction_object
         ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
     in
-    let on_wait_confirmation hash wait_confirmation_wakener =
-      let tx_confirmed =
-        Injector.inject_wait_transaction_confirmation
-          ~keep_alive:config.keep_alive
-          ~timeout:config.rpc_timeout
-          ~base:evm_node_private_endpoint
-          ~hash
-      in
-      Lwt.dont_wait
-        (fun () ->
-          let*! tx_confirmed in
-          Lwt.wakeup wait_confirmation_wakener tx_confirmed ;
-          Lwt.return_unit)
-        (fun exn ->
-          Lwt.wakeup wait_confirmation_wakener Result_syntax.(fail [Exn exn]))
-    in
-    match res with
-    | Ok hash ->
-        Option.iter (on_wait_confirmation hash) wait_confirmation_wakener ;
-        rpc_ok hash
-    | Error reason -> rpc_error (Rpc_errors.internal_error reason)
+    inject_on_rpc
+      config
+      ~evm_node_private_endpoint
+      ?wait_confirmation_wakener
+      inject
   in
   let f raw_tx =
     let txn = Ethereum_types.hex_to_bytes raw_tx in
@@ -915,7 +934,68 @@ let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
             | Error reason ->
                 rpc_error (Rpc_errors.transaction_rejected reason None))
           ~on_stateful_michelson:(fun _ ->
-            failwith "Unsupported JSONRPC method in Tezlink: sendRawTransaction")
+            failwith
+              "Unsupported JSONRPC method in Tezlink: eth_sendRawTransaction")
+  in
+  f
+
+let send_raw_tezlink_operation (type f) (config : Configuration.t)
+    (mode : f Mode.t) ?wait_confirmation_wakener =
+  let open Lwt_result_syntax in
+  let on_rpc raw_op op Mode.{evm_node_private_endpoint; _} =
+    let inject ~keep_alive ~timeout ~base =
+      Injector.inject_tezlink_operation
+        ~keep_alive
+        ~timeout
+        ~base
+        ~op
+        ~raw_op:(Ethereum_types.hex_to_real_bytes raw_op)
+    in
+    inject_on_rpc
+      config
+      ~evm_node_private_endpoint
+      ?wait_confirmation_wakener
+      inject
+  in
+  let f raw_tx =
+    let txn = Ethereum_types.hex_to_bytes raw_tx in
+    let* is_valid = Prevalidator.prevalidate_raw_transaction_tezlink txn in
+    match is_valid with
+    | Error err ->
+        let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_tx in
+        rpc_error (Rpc_errors.transaction_rejected err None)
+    | Ok {next_nonce; transaction_object} ->
+        Octez_telemetry.Trace.(
+          add_attrs (fun () ->
+              Telemetry.Attributes.
+                [
+                  Transaction.hash
+                  @@ Tezos_types.Operation.hash_operation transaction_object;
+                ])) ;
+        process_based_on_mode
+          mode
+          ~on_rpc:(on_rpc raw_tx transaction_object)
+          ~on_stateful_evm:(fun _ ->
+            failwith
+              "Unsupported JSONRPC method in Etherlink: tez_sendRawTransaction")
+          ~on_stateful_michelson:(fun (module Tx_container) ->
+            let* tx_hash =
+              match wait_confirmation_wakener with
+              | None -> Tx_container.add ~next_nonce transaction_object ~raw_tx
+              | Some wait_confirmation_wakener ->
+                  let callback =
+                    wait_confirmation_callback wait_confirmation_wakener
+                  in
+                  Tx_container.add
+                    ~next_nonce
+                    transaction_object
+                    ~raw_tx
+                    ~callback
+            in
+            match tx_hash with
+            | Ok tx_hash -> rpc_ok tx_hash
+            | Error reason ->
+                rpc_error (Rpc_errors.transaction_rejected reason None))
   in
   f
 
@@ -1293,6 +1373,9 @@ let dispatch_request (type f) ~websocket
             else
               let f raw_tx = send_raw_transaction config mode raw_tx in
               build_with_input ~f module_ parameters
+        | Send_raw_tezlink_operation.Method ->
+            let f raw_tx = send_raw_tezlink_operation config mode raw_tx in
+            build_with_input ~f module_ parameters
         | Send_raw_transaction_sync.Method ->
             let wait_or_timeout timeout f =
               match timeout with
