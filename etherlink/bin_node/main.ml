@@ -671,6 +671,14 @@ let rollup_address_param =
        to an admin contract"
     Params.string
 
+let show_activation_timestamp_param =
+  Tezos_clic.switch
+    ~long:"show-activation-timestamp"
+    ~doc:
+      "Show the activation timestamp at which the kernel upgrade will be \
+       activated"
+    ()
+
 let rollup_address_arg =
   let open Lwt_result_syntax in
   let open Tezos_clic in
@@ -1879,7 +1887,9 @@ let make_upgrade_command =
   command
     ~group:Groups.kernel
     ~desc:"Create bytes payload for the upgrade entrypoint."
-    (merge_options wallet_command_args (args1 rollup_address_param))
+    (merge_options
+       wallet_command_args
+       (args2 rollup_address_param show_activation_timestamp_param))
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
     @@ Params.kernel_root_hash
     @@ prefixes ["at"; "activation"; "timestamp"]
@@ -1894,15 +1904,17 @@ let make_upgrade_command =
             unit `h`,`m`, or `s`."
          Params.timestamp
     @@ stop)
-    (fun ((password_filename, wallet_dir), rollup_addr_opt)
+    (fun ( (password_filename, wallet_dir),
+           (rollup_addr_opt, show_activation_timestamp) )
          (`Hex root_hash)
          timestamp
          ()
        ->
-      Format.printf
-        "Activation timestamp: %a\n%!"
-        Time.Protocol.pp_hum
-        timestamp ;
+      if show_activation_timestamp then
+        Format.printf
+          "Activation timestamp: %a\n%!"
+          Time.Protocol.pp_hum
+          timestamp ;
       let payload =
         Evm_node_lib_dev_encoding.Evm_events.Upgrade.(
           to_bytes @@ {hash = Hash (Hex root_hash); timestamp})

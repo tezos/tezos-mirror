@@ -819,7 +819,7 @@ Kernel commands:
   
   make upgrade payload with root hash <kernel-id> at activation timestamp
       <activation_timestamp> [-f --password-filename <filename>] [-d --wallet-dir <path>]
-      [--rollup <sr1...>]
+      [--rollup <sr1...>] [--show-activation-timestamp]
     Create bytes payload for the upgrade entrypoint.
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
       kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu", "farfadet"
@@ -837,6 +837,8 @@ Kernel commands:
       `$HOME/.tezos-client` otherwise.
     --rollup <sr1...>: A rollup address or alias used to create the string that must be passed
       to an admin contract
+    --show-activation-timestamp: Show the activation timestamp at which the kernel upgrade
+      will be activated
   
   make sequencer upgrade payload with pool address <pool_address> at activation timestamp
       <activation_timestamp> for <sequencer-key> [-f --password-filename <filename>]
