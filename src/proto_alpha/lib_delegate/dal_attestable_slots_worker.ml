@@ -30,9 +30,9 @@ module Events = struct
       ~name:"no_attestable_slot_at_level"
       ~level:Warning
       ~msg:
-        "No attestable slots found for attestation level {attestation_level} \
-         in cache"
-      ("attestation_level", Data_encoding.int32)
+        "No attestable slots found for published level {published_level} in \
+         cache"
+      ("published_level", Data_encoding.int32)
 
   let no_attestable_slot_at_level_for_delegate =
     declare_2
@@ -40,9 +40,9 @@ module Events = struct
       ~name:"no_attestable_slot_at_level_for_delegate"
       ~level:Warning
       ~msg:
-        "No attestable slots found for attestation level {attestation_level} \
-         and {delegate_id} in cache"
-      ("attestation_level", Data_encoding.int32)
+        "No attestable slots found for published level {published_level} and \
+         {delegate_id} in cache"
+      ("published_level", Data_encoding.int32)
       ("delegate_id", Delegate_id.encoding)
 
   let monitor_attestable_slots_failed =
@@ -82,7 +82,7 @@ type stream_handle = {
   stopper : Tezos_rpc.Context.stopper;
 }
 
-type slots_by_delegate = Types.attestable_slots Delegate_id.Table.t
+type slots_by_delegate = bool array Delegate_id.Table.t
 
 module Level_map =
   Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
@@ -92,67 +92,66 @@ module Level_map =
       let hash = Hashtbl.hash
     end)
 
+(** Set of levels for committee tracking. *)
+module LevelSet = Set.Make (Int32)
+
 type t = {
   attestation_lag : int;
   attestation_lags : int list;
   number_of_slots : int;
   streams : stream_handle Delegate_id.Table.t;
       (** Active per-delegate subscriptions. *)
-  cache : slots_by_delegate Level_map.t;
-      (** Bounded FIFO cache of attestable slots, keyed by attestation levels. *)
+  slots_cache : slots_by_delegate Level_map.t;
+      (** Bounded FIFO cache of attestable slots, keyed by published levels.
+          Attestable slots are represented by a list of booleans, with
+          slots_cache[published_level][delegate][slot_index] = whether slot at
+          [slot_index] is attestable by [delegate] for [published_level]. *)
+  committee_cache : LevelSet.t Delegate_id.Table.t;
+      (** Cache of committee_level where delegates are NOT in the committee. *)
   subscriptions_lock : Lwt_mutex.t;  (** Lock for streams subscriptions. *)
 }
 
 let create_delegate_table () = Delegate_id.Table.create 10
 
-(** [get_slots_by_delegate state ~attestation_level] returns the per-delegate
-    cache bucket for the given [~attestation_level]. If none exists yet, it
-    creates an empty one, stores it in [state.cache], and returns it. *)
-let get_slots_by_delegate state ~attestation_level =
-  match Level_map.find_opt state.cache attestation_level with
-  | Some slots_by_delegate -> slots_by_delegate
-  | None ->
-      let slots_by_delegate = create_delegate_table () in
-      Level_map.replace state.cache attestation_level slots_by_delegate ;
-      slots_by_delegate
-
-(** [update_cache_with_attestable_slot state ?is_trap ~delegate_id ~slot_id] adds [~slot_id]
-    to the cache, using the keys [attestation_level] = [slot_level] + [attestation_lag] - 1
-    and [~delegate_id]. The bit associated to [~slot_id] and [~delegate_id] is set to the
-    opposite of [?is_trap]. *)
-let update_cache_with_attestable_slot ?(is_trap = false) state ~delegate_id
-    ~slot_id =
-  let Types.Slot_id.{slot_level; slot_index} = slot_id in
-  let attestation_level =
-    Int32.(pred @@ add slot_level (of_int state.attestation_lag))
-  in
-  let slots_by_delegate = get_slots_by_delegate state ~attestation_level in
-  let value = not is_trap in
-  let attestable_slots =
-    match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
-    | Some (Types.Attestable_slots {slots; published_level}) ->
-        let slots_array = Array.of_list slots in
-        slots_array.(slot_index) <- value ;
-        let slots = Array.to_list slots_array in
-        Types.Attestable_slots {slots; published_level}
-    | Some Not_in_committee ->
-        (* We should never reach this point, as the delegate should not have any attestable
-           slot, as they are not in the committee. *)
-        Types.Not_in_committee
+(** [get_or_create_bit_array state ~published_level ~delegate_id] returns 
+    the bitset for the given [~delegate_id] at the given [~published_level],
+    creating empty entries (all false) if needed. *)
+let get_or_create_bit_array state ~published_level ~delegate_id =
+  let slots_by_delegate =
+    match Level_map.find_opt state.slots_cache published_level with
+    | Some slots_by_delegate -> slots_by_delegate
     | None ->
-        let slots = Array.make state.number_of_slots false in
-        slots.(slot_index) <- value ;
-        Types.Attestable_slots
-          {slots = Array.to_list slots; published_level = slot_level}
+        let slots_by_delegate = create_delegate_table () in
+        Level_map.replace state.slots_cache published_level slots_by_delegate ;
+        slots_by_delegate
   in
-  Delegate_id.Table.replace slots_by_delegate delegate_id attestable_slots
+  match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
+  | Some slots_array -> slots_array
+  | None ->
+      let slots_array = Array.make state.number_of_slots false in
+      Delegate_id.Table.replace slots_by_delegate delegate_id slots_array ;
+      slots_array
 
-(** [update_cache_no_shards_assigned state ~delegate_id ~attestation_level] adds a
-    [Not_in_committee] element into the cache, using [~delegate_id] and [~attestation_level]
-    as keys. *)
-let update_cache_no_shards_assigned state ~delegate_id ~attestation_level =
-  let slots_by_delegate = get_slots_by_delegate state ~attestation_level in
-  Delegate_id.Table.replace slots_by_delegate delegate_id Types.Not_in_committee
+(** [update_slots_cache state ~delegate_id ~slot_id ~is_trap] adds [~slot_id] to the
+    cache, using the keys [published_level] = [slot_level] and [~delegate_id]. The bit
+    associated to [~slot_id] and [~delegate_id] is set to the opposite of [~is_trap]. *)
+let update_slots_cache state ~delegate_id ~slot_id ~is_trap =
+  let Types.Slot_id.{slot_level; slot_index} = slot_id in
+  let bitset =
+    get_or_create_bit_array state ~published_level:slot_level ~delegate_id
+  in
+  bitset.(slot_index) <- not is_trap
+
+(** [update_committee_cache state ~delegate_id ~committee_level] records that
+    the [~delegate_id] is NOT in the committee at the given [~committee_level]. *)
+let update_committee_cache state ~delegate_id ~committee_level =
+  let level_set =
+    match Delegate_id.Table.find_opt state.committee_cache delegate_id with
+    | Some set -> set
+    | None -> LevelSet.empty
+  in
+  let level_set = LevelSet.add committee_level level_set in
+  Delegate_id.Table.replace state.committee_cache delegate_id level_set
 
 (** [update_cache_backfill_payload state ~delegate_id ~backfill_payload]
     merges a DAL [Backfill] event for [~delegate_id] into the in-memory cache. *)
@@ -163,26 +162,25 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   in
   List.iter
     (fun slot_id ->
-      (update_cache_with_attestable_slot
+      (update_slots_cache
          state
          ~delegate_id
          ~slot_id
-       [@profiler.record_f
-         {verbosity = Debug} "update_cache_with_attestable_slot"]))
+         ~is_trap:false
+       [@profiler.record_f {verbosity = Debug} "update_slots_cache"]))
     slot_ids ;
   List.iter
     (fun slot_id ->
-      (update_cache_with_attestable_slot
+      (update_slots_cache
          state
-         ~is_trap:true
          ~delegate_id
          ~slot_id
-       [@profiler.record_f
-         {verbosity = Debug} "update_cache_with_attestable_slot"]))
+         ~is_trap:true
+       [@profiler.record_f {verbosity = Debug} "update_slots_cache"]))
     trap_slot_ids ;
   List.iter
-    (fun attestation_level ->
-      update_cache_no_shards_assigned state ~delegate_id ~attestation_level)
+    (fun committee_level ->
+      update_committee_cache state ~delegate_id ~committee_level)
     no_shards_committee_levels
 
 (** [consume_backfill_stream state stream_handle ~delegate_id] consumes the initial [Backfill]
@@ -227,26 +225,18 @@ let rec consume_stream state stream_handle ~delegate_id =
       Delegate_id.Table.remove state.streams delegate_id ;
       return_unit
   | Some (E.Attestable_slot {slot_id}) ->
-      update_cache_with_attestable_slot
+      update_slots_cache
         state
         ~delegate_id
         ~slot_id
-      [@profiler.aggregate_f
-        {verbosity = Debug} "update_cache_with_attestable_slot"] ;
+        ~is_trap:false
+      [@profiler.aggregate_f {verbosity = Debug} "update_slots_cache"] ;
       consume_stream state ~delegate_id stream_handle
   | Some (No_shards_assigned {committee_level}) ->
-      update_cache_no_shards_assigned
-        state
-        ~delegate_id
-        ~attestation_level:committee_level ;
+      update_committee_cache state ~delegate_id ~committee_level ;
       consume_stream state ~delegate_id stream_handle
   | Some (Slot_has_trap {slot_id}) ->
-      (* In case of a trap, we know the slot is not attestable, so we record an explicit [false] bit. *)
-      update_cache_with_attestable_slot
-        state
-        ~is_trap:true
-        ~delegate_id
-        ~slot_id ;
+      update_slots_cache state ~delegate_id ~slot_id ~is_trap:true ;
       consume_stream state ~delegate_id stream_handle
   | Some (Backfill _backfill_payload) ->
       (* This case should never be reached as the [Backfill] is always the first element of the
@@ -329,16 +319,16 @@ let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
   in
   subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add
 
-let get_dal_attestable_slots state ~delegate_id ~attestation_level =
+let get_dal_attestable_slots state ~delegate_id ~published_level =
   let open Lwt_syntax in
   () [@profiler.stop] ;
   ()
   [@profiler.record
     {verbosity = Notice}
-      (Format.sprintf "attestation_level : %ld" attestation_level)] ;
-  match Level_map.find_opt state.cache attestation_level with
+      (Format.sprintf "published_level : %ld" published_level)] ;
+  match Level_map.find_opt state.slots_cache published_level with
   | None ->
-      let* () = Events.(emit no_attestable_slot_at_level attestation_level) in
+      let* () = Events.(emit no_attestable_slot_at_level published_level) in
       return_none
   | Some slots_by_delegate -> (
       match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
@@ -347,10 +337,15 @@ let get_dal_attestable_slots state ~delegate_id ~attestation_level =
             Events.(
               emit
                 no_attestable_slot_at_level_for_delegate
-                (attestation_level, delegate_id))
+                (published_level, delegate_id))
           in
           return_none
-      | Some slots -> return_some slots)
+      | Some slots -> return_some @@ Array.to_list slots)
+
+let is_not_in_committee state ~delegate_id ~committee_level =
+  match Delegate_id.Table.find_opt state.committee_cache delegate_id with
+  | None -> false
+  | Some level_set -> LevelSet.mem committee_level level_set
 
 let create ~attestation_lag ~attestation_lags ~number_of_slots =
   {
@@ -358,9 +353,10 @@ let create ~attestation_lag ~attestation_lags ~number_of_slots =
     attestation_lags;
     number_of_slots;
     streams = create_delegate_table ();
-    cache =
+    slots_cache =
       (* a [2 * lag] size should be enough; we use more for safety *)
       Level_map.create (3 * attestation_lag);
+    committee_cache = create_delegate_table ();
     subscriptions_lock = Lwt_mutex.create ();
   }
 
@@ -373,7 +369,8 @@ let shutdown_worker state =
       |> List.of_seq
     in
     Delegate_id.Table.clear state.streams ;
-    Level_map.clear state.cache ;
+    Level_map.clear state.slots_cache ;
+    Delegate_id.Table.clear state.committee_cache ;
     return stoppers
   in
   List.iter (fun stopper -> stopper ()) stoppers ;
