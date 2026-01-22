@@ -510,12 +510,20 @@ let load =
           if List.is_empty older_versions then tzfail (Exn e)
           else try_decode json older_versions)
   in
-  fun ~config_file ->
-    let* json = Lwt_utils_unix.Json.read_file config_file in
-    let* config = try_decode json config_versions in
-    (* We save the config so that its format is that of the latest version. *)
-    let* () = save ~config_file config in
-    return config
+  fun ?on_file_not_found ~config_file () ->
+    let*! file_exists = Lwt_unix.file_exists config_file in
+    if not file_exists then
+      match on_file_not_found with
+      | None ->
+          Lwt_result_syntax.tzfail
+          @@ Errors.Missing_configuration_file {file = config_file}
+      | Some handler -> handler ()
+    else
+      let* json = Lwt_utils_unix.Json.read_file config_file in
+      let* config = try_decode json config_versions in
+      (* We save the config so that its format is that of the latest version. *)
+      let* () = save ~config_file config in
+      return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 

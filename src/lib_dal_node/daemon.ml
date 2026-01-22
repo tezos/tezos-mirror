@@ -461,15 +461,15 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
           ignore_l1_config_peers;
           _;
         } as config) =
-    let*! result = Configuration_file.load ~config_file in
-    match result with
-    | Ok configuration -> return (configuration_override configuration)
-    | Error _ ->
-        let*! () = Event.emit_config_file_not_found ~path:config_file in
-        (* Store the default configuration if no configuration were found. *)
-        let configuration = configuration_override Configuration_file.default in
-        let* () = Configuration_file.save ~config_file configuration in
-        return configuration
+    let on_file_not_found () =
+      let*! () = Event.emit_config_file_not_found ~path:config_file in
+      (* Store the default configuration if no configuration were found. *)
+      let configuration = configuration_override Configuration_file.default in
+      let* () = Configuration_file.save ~config_file configuration in
+      return configuration
+    in
+    let* loaded = Configuration_file.load ~on_file_not_found ~config_file () in
+    return (configuration_override loaded)
   in
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in

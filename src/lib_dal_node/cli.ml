@@ -1004,7 +1004,7 @@ module Config = struct
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
       let open Lwt_result_syntax in
-      let* configuration = Configuration_file.load ~config_file in
+      let* configuration = Configuration_file.load ~config_file () in
       Configuration_file.save
         ~config_file
         (configuration_override configuration)

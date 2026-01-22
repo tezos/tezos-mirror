@@ -111,7 +111,15 @@ val default_config_file : string -> string
 (** [save config] writes config file in [config.data_dir] *)
 val save : config_file:string -> t -> unit tzresult Lwt.t
 
-val load : config_file:string -> t tzresult Lwt.t
+(** [load ~on_file_not_found ~config_file ()] load config file from
+    [config.data_dir] if it exists. If not it calls the provided on_file_not_found function.
+    If no such function is provided, an error is returned.
+*)
+val load :
+  ?on_file_not_found:(unit -> t tzresult Lwt.t) ->
+  config_file:string ->
+  unit ->
+  t tzresult Lwt.t
 
 (** [identity_file config] returns the absolute path to the
     "identity.json" file of the DAL node, based on the configuration
