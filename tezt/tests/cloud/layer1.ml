@@ -1383,7 +1383,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
-  let* configuration, _migration_level, termination_level =
+  let* configuration, migration_level, termination_level =
     match configuration.migration with
     | None -> return (configuration, None, None)
     | Some migration ->
@@ -1431,37 +1431,44 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
-  let produce_slot (t : 'network t) level =
-    Lwt_list.iter_p
-      (fun (producer : Dal_node_helpers.producer) ->
-        let index = producer.slot_index in
-        toplog "Producing DAL commitment for slot %d" index ;
-        let content =
-          Format.asprintf "%d:%d" level index
-          |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
-        in
-        let* _ = Node.wait_for_level producer.node level in
-        let fee = 800 in
-        let* _commitment =
-          (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+  let may_produce_slot (t : 'network t) migration_level level =
+    let produce_slot (t : 'network t) level =
+      Lwt_list.iter_p
+        (fun (producer : Dal_node_helpers.producer) ->
+          let index = producer.slot_index in
+          toplog "Producing DAL commitment for slot %d" index ;
+          let content =
+            Format.asprintf "%d:%d" level index
+            |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
+          in
+          let* _ = Node.wait_for_level producer.node level in
+          let fee = 800 in
+          let* _commitment =
+            (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
              - tz1: fees of 513µtz and 1333 gas consumed
              - tz2: fees of 514µtz and 1318 gas consumed
              - tz3: fees of 543µtz and 1607 gas consumed
              - tz4: fees of 700µtz and 2837 gas consumed
              We added a (quite small) margin to it. *)
-          Dal_common.Helpers.publish_and_store_slot
-            ~fee
-            ~gas_limit:3000
-            ~dont_wait:true
-            producer.client
-            producer.dal_node
-            producer.account
-            ~force:true
-            ~index
-            content
-        in
-        Lwt.return_unit)
-      t.producers
+            Dal_common.Helpers.publish_and_store_slot
+              ~fee
+              ~gas_limit:3000
+              ~dont_wait:true
+              producer.client
+              producer.dal_node
+              producer.account
+              ~force:true
+              ~index
+              content
+          in
+          Lwt.return_unit)
+        t.producers
+    in
+    match migration_level with
+    | None -> produce_slot t level
+    | Some migration_level when level > migration_level - 100 ->
+        produce_slot t level
+    | Some _ -> Lwt.return_unit
   in
   let should_terminate level =
     match termination_level with
@@ -1503,7 +1510,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
            if with_producers then
              let* _ = Node.wait_for_level t.bootstrap.node level in
              Lwt.return_unit
-           else produce_slot t level
+           else may_produce_slot t migration_level level
          in
          loop stresstesting_started with_producers level
      in
