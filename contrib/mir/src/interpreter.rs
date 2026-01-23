@@ -124,7 +124,9 @@ impl<'a> ContractScript<'a> {
         let result = stack.pop().expect("empty execution stack");
         match result {
             V::Pair(p) => {
-                let (mut operation_list, mut storage) = *p;
+                let (operation_list, storage) = *p;
+                let mut operation_list = TypedValue::unwrap_rc(operation_list);
+                let mut storage = TypedValue::unwrap_rc(storage);
                 // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
                 let mut storage_big_maps = vec![];
                 storage.view_big_maps_mut(&mut storage_big_maps);
@@ -144,7 +146,7 @@ impl<'a> ContractScript<'a> {
                 match operation_list {
                     V::List(vec) => Ok((
                         vec.into_iter()
-                            .map(|x| (*irrefutable_match!(x; V::Operation))),
+                            .map(|x| *irrefutable_match!(TypedValue::unwrap_rc(x); V::Operation)),
                         storage,
                     )),
                     v => panic!("expected `list operation`, got {v:?}"),
@@ -959,7 +961,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::IF_NONE)?;
             match pop!(V::Option) {
                 Some(x) => {
-                    stack.push(*x);
+                    stack.push(TypedValue::unwrap_rc(*x));
                     interpret(when_some, ctx, arena, stack)?
                 }
                 None => interpret(when_none, ctx, arena, stack)?,
@@ -970,7 +972,7 @@ fn interpret_one<'a>(
             let lst = irrefutable_match!(&mut stack[0]; V::List);
             match lst.uncons() {
                 Some(x) => {
-                    stack.push(x);
+                    stack.push(TypedValue::unwrap_rc(x));
                     interpret(when_cons, ctx, arena, stack)?
                 }
                 None => {
@@ -984,11 +986,11 @@ fn interpret_one<'a>(
             let or = *pop!(V::Or);
             match or {
                 Or::Left(x) => {
-                    stack.push(x);
+                    stack.push(TypedValue::unwrap_rc(x));
                     interpret(when_left, ctx, arena, stack)?
                 }
                 Or::Right(x) => {
-                    stack.push(x);
+                    stack.push(TypedValue::unwrap_rc(x));
                     interpret(when_right, ctx, arena, stack)?;
                 }
             }
@@ -1064,11 +1066,11 @@ fn interpret_one<'a>(
                 ctx.gas().consume(interpret_cost::LOOP)?;
                 match *pop!(V::Or) {
                     Or::Left(x) => {
-                        stack.push(x);
+                        stack.push(TypedValue::unwrap_rc(x));
                         interpret(nested, ctx, arena, stack)?;
                     }
                     Or::Right(x) => {
-                        stack.push(x);
+                        stack.push(TypedValue::unwrap_rc(x));
                         ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
                         break;
                     }
@@ -1082,7 +1084,7 @@ fn interpret_one<'a>(
                     let lst = pop!(V::List);
                     for i in lst {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(i);
+                        stack.push(TypedValue::unwrap_rc(i));
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1090,7 +1092,7 @@ fn interpret_one<'a>(
                     let set = pop!(V::Set);
                     for v in set {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(v);
+                        stack.push(TypedValue::unwrap_rc(v));
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1098,7 +1100,7 @@ fn interpret_one<'a>(
                     let map = pop!(V::Map);
                     for (k, v) in map {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(V::new_pair(k, v));
+                        stack.push(V::Pair(Box::new((k, v))));
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1112,9 +1114,9 @@ fn interpret_one<'a>(
                     .into_iter()
                     .map(|elem| {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(elem);
+                        stack.push(TypedValue::unwrap_rc(elem));
                         interpret(nested, ctx, arena, stack)?;
-                        Ok(pop!())
+                        Ok(Rc::new(pop!()))
                     })
                     .collect::<Result<_, InterpretError>>()?;
                 stack.push(V::List(result));
@@ -1125,7 +1127,7 @@ fn interpret_one<'a>(
                 let result = match option {
                     Some(elem) => {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(*elem);
+                        stack.push(TypedValue::unwrap_rc(*elem));
                         interpret(nested, ctx, arena, stack)?;
                         Some(pop!())
                     }
@@ -1138,10 +1140,10 @@ fn interpret_one<'a>(
                 let mut map = pop!(V::Map);
                 for (key, val) in map.iter_mut() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
-                    let val_temp = std::mem::replace(val, V::Unit);
-                    stack.push(V::new_pair(key.clone(), val_temp));
+                    let val_temp = std::mem::replace(val, Rc::new(V::Unit));
+                    stack.push(V::Pair(Box::new((key.clone(), val_temp))));
                     interpret(nested, ctx, arena, stack)?;
-                    *val = pop!();
+                    *val = Rc::new(pop!());
                 }
                 stack.push(V::Map(map));
             }
@@ -1166,12 +1168,12 @@ fn interpret_one<'a>(
         I::Car => {
             ctx.gas().consume(interpret_cost::CAR)?;
             let (l, _) = *pop!(V::Pair);
-            stack.push(l);
+            stack.push(TypedValue::unwrap_rc(l));
         }
         I::Cdr => {
             ctx.gas().consume(interpret_cost::CDR)?;
             let (_, r) = *pop!(V::Pair);
-            stack.push(r);
+            stack.push(TypedValue::unwrap_rc(r));
         }
         I::Pair => {
             ctx.gas().consume(interpret_cost::PAIR)?;
@@ -1191,8 +1193,8 @@ fn interpret_one<'a>(
         I::Unpair => {
             ctx.gas().consume(interpret_cost::UNPAIR)?;
             let (l, r) = *pop!(V::Pair);
-            stack.push(r);
-            stack.push(l);
+            stack.push(TypedValue::unwrap_rc(r));
+            stack.push(TypedValue::unwrap_rc(l));
         }
         I::UnpairN(n) => {
             ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
@@ -1200,8 +1202,8 @@ fn interpret_one<'a>(
                 if n == 0 {
                     stack.push(p);
                 } else if let V::Pair(p) = p {
-                    fill(n - 1, stack, p.1);
-                    stack.push(p.0);
+                    fill(n - 1, stack, TypedValue::unwrap_rc(p.1));
+                    stack.push(TypedValue::unwrap_rc(p.0));
                 } else {
                     unreachable_state();
                 }
@@ -1240,7 +1242,7 @@ fn interpret_one<'a>(
             let mut lst = pop!(V::List);
             // NB: this is slightly better than lists on average, but needs to
             // be benchmarked.
-            lst.cons(elt);
+            lst.cons(Rc::new(elt));
             stack.push(V::List(lst));
         }
         I::Concat(overload) => match overload {
@@ -1267,7 +1269,10 @@ fn interpret_one<'a>(
 
                 let mut total_len = Checked::zero();
                 for val in &list {
-                    let s = irrefutable_match!(val; V::String);
+                    let s = match val.as_ref() {
+                        V::String(s) => s,
+                        _ => unreachable_state(),
+                    };
                     total_len += s.len()
                 }
                 ctx.gas()
@@ -1275,8 +1280,11 @@ fn interpret_one<'a>(
 
                 let mut result = String::with_capacity(total_len.ok_or(OutOfGas)?);
                 for val in list {
-                    let s = irrefutable_match!(val; V::String);
-                    result.push_str(&s);
+                    let s = match val.as_ref() {
+                        V::String(s) => s,
+                        _ => unreachable_state(),
+                    };
+                    result.push_str(s);
                 }
                 stack.push(V::String(result))
             }
@@ -1287,7 +1295,10 @@ fn interpret_one<'a>(
 
                 let mut total_len = Checked::zero();
                 for val in &list {
-                    let bs = irrefutable_match!(val; V::Bytes);
+                    let bs = match val.as_ref() {
+                        V::Bytes(bs) => bs,
+                        _ => unreachable_state(),
+                    };
                     total_len += bs.len()
                 }
                 ctx.gas()
@@ -1295,7 +1306,10 @@ fn interpret_one<'a>(
 
                 let mut result = Vec::with_capacity(total_len.ok_or(OutOfGas)?);
                 for val in &list {
-                    let bs = irrefutable_match!(val; V::Bytes);
+                    let bs = match val.as_ref() {
+                        V::Bytes(bs) => bs,
+                        _ => unreachable_state(),
+                    };
                     result.extend_from_slice(bs);
                 }
                 stack.push(V::Bytes(result))
@@ -1349,7 +1363,8 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
-                stack.push(V::new_option(result.cloned()));
+                let result = result.map(|v| TypedValue::unwrap_rc(Rc::clone(v)));
+                stack.push(V::new_option(result));
             }
             overloads::Get::BigMap => {
                 let key = pop!();
@@ -1375,7 +1390,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key, set.len())?)?;
                 if new_present {
-                    set.insert(key)
+                    set.insert(Rc::new(key))
                 } else {
                     set.remove(&key)
                 };
@@ -1388,17 +1403,17 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
                     None => map.remove(&key),
-                    Some(val) => map.insert(key, *val),
+                    Some(val) => map.insert(Rc::new(key), *val),
                 };
             }
             overloads::Update::BigMap => {
                 let key = pop!();
-                let opt_new_val = pop!(V::Option);
+                let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
-                map.update(key, opt_new_val.map(|x| *x));
+                map.update(key, opt_new_val);
             }
         },
         I::GetAndUpdate(overload) => match overload {
@@ -1410,20 +1425,21 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
                 let opt_old_val = match opt_new_val {
                     None => map.remove(&key),
-                    Some(val) => map.insert(key, *val),
+                    Some(val) => map.insert(Rc::new(key), *val),
                 };
+                let opt_old_val = opt_old_val.map(|v| TypedValue::unwrap_rc(v));
                 stack.push(V::new_option(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
-                let opt_new_val = pop!(V::Option);
+                let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
-                map.update(key, opt_new_val.map(|x| *x));
+                map.update(key, opt_new_val);
                 stack.push(V::new_option(opt_old_val));
             }
         },
@@ -1507,7 +1523,8 @@ fn interpret_one<'a>(
             ));
         }
         I::SetDelegate => {
-            let opt_keyhash = pop!(V::Option).map(|kh| irrefutable_match!(*kh; V::KeyHash));
+            let opt_keyhash = pop!(V::Option)
+                .map(|kh| irrefutable_match!(TypedValue::unwrap_rc(*kh); V::KeyHash));
             let counter: u128 = ctx.operation_counter();
             ctx.gas().consume(interpret_cost::SET_DELEGATE)?;
             stack.push(V::new_operation(
@@ -1658,8 +1675,8 @@ fn interpret_one<'a>(
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
             let amounts = pop!(V::Pair);
-            let amount_left = irrefutable_match!(amounts.0; V::Nat);
-            let amount_right = irrefutable_match!(amounts.1; V::Nat);
+            let amount_left = irrefutable_match!(TypedValue::unwrap_rc(amounts.0); V::Nat);
+            let amount_right = irrefutable_match!(TypedValue::unwrap_rc(amounts.1); V::Nat);
 
             ctx.gas()
                 .consume(interpret_cost::split_ticket(&amount_left, &amount_right)?)?;
@@ -1683,8 +1700,8 @@ fn interpret_one<'a>(
         }
         I::JoinTickets => {
             let tickets = pop!(V::Pair);
-            let mut ticket_left = irrefutable_match!(tickets.0; V::Ticket);
-            let ticket_right = irrefutable_match!(tickets.1; V::Ticket);
+            let mut ticket_left = irrefutable_match!(TypedValue::unwrap_rc(tickets.0); V::Ticket);
+            let ticket_right = irrefutable_match!(TypedValue::unwrap_rc(tickets.1); V::Ticket);
             ctx.gas()
                 .consume(interpret_cost::join_tickets(&ticket_left, &ticket_right)?)?;
             if ticket_left.content == ticket_right.content
@@ -1811,10 +1828,10 @@ fn interpret_one<'a>(
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
-                let (g1, g2) = irrefutable_match!(elt; V::Pair).as_ref();
+                let (g1, g2) = irrefutable_match!(elt.as_ref(); V::Pair).as_ref();
                 (
-                    irrefutable_match!(g1; V::Bls12381G1).as_ref(),
-                    irrefutable_match!(g2; V::Bls12381G2).as_ref(),
+                    irrefutable_match!(g1.as_ref(); V::Bls12381G1).as_ref(),
+                    irrefutable_match!(g2.as_ref(); V::Bls12381G2).as_ref(),
                 )
             });
             let res = bls::pairing::pairing_check(it);
@@ -1824,8 +1841,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter: u128 = ctx.operation_counter();
             let opt_keyhash = pop!(V::Option)
-                .as_ref()
-                .map(|keyhash| irrefutable_match!(keyhash.as_ref(); V::KeyHash).clone());
+                .map(|keyhash| irrefutable_match!(TypedValue::unwrap_rc(*keyhash); V::KeyHash));
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
@@ -1932,10 +1948,14 @@ fn get_nth_field_ref<'a, 'b>(
     loop {
         match (m, val) {
             (0, val_) => break val_,
-            (1, V::Pair(p)) => break &mut p.0,
+            (1, V::Pair(p)) => {
+                let (l, _) = p.as_mut();
+                break Rc::make_mut(l);
+            }
 
             (_, V::Pair(p)) => {
-                val = &mut p.1;
+                let (_, r) = p.as_mut();
+                val = Rc::make_mut(r);
                 m -= 2;
             }
             _ => unreachable_state(),
@@ -1946,6 +1966,7 @@ fn get_nth_field_ref<'a, 'b>(
 #[cfg(test)]
 mod interpreter_tests {
     use std::collections::{BTreeMap, BTreeSet, HashMap};
+    use std::rc::Rc;
 
     use super::*;
     use super::{Lambda, Or};
@@ -1985,6 +2006,23 @@ mod interpreter_tests {
     ) -> Result<(), InterpretError<'a>> {
         let temp = Box::leak(Box::default());
         super::interpret_one(i, ctx, temp, stack)
+    }
+
+    fn rc_set<'a, I>(values: I) -> BTreeSet<Rc<TypedValue<'a>>>
+    where
+        I: IntoIterator<Item = TypedValue<'a>>,
+    {
+        values.into_iter().map(Rc::new).collect()
+    }
+
+    fn rc_map<'a, I>(values: I) -> BTreeMap<Rc<TypedValue<'a>>, Rc<TypedValue<'a>>>
+    where
+        I: IntoIterator<Item = (TypedValue<'a>, TypedValue<'a>)>,
+    {
+        values
+            .into_iter()
+            .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+            .collect()
     }
 
     #[test]
@@ -2861,7 +2899,7 @@ mod interpreter_tests {
     #[test]
     fn test_iter_list_many() {
         let mut stack = stk![
-            V::List(vec![].into()),
+            V::List(MichelsonList::new()),
             V::List((1..5).map(V::int).collect())
         ];
         assert!(interpret_one(
@@ -2877,7 +2915,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_iter_list_zero() {
-        let mut stack = stk![V::Unit, V::List(vec![].into())];
+        let mut stack = stk![V::Unit, V::List(MichelsonList::new())];
         assert!(interpret_one(
             &Iter(overloads::Iter::List, vec![Drop(None)]),
             &mut Ctx::default(),
@@ -2890,12 +2928,8 @@ mod interpreter_tests {
     #[test]
     fn test_iter_set_many() {
         let mut stack = stk![
-            V::List(vec![].into()),
-            V::Set(
-                vec![(V::int(1)), (V::int(2)), (V::int(3)),]
-                    .into_iter()
-                    .collect()
-            )
+            V::List(MichelsonList::new()),
+            V::Set(rc_set([V::int(1), V::int(2), V::int(3)]))
         ];
         assert!(interpret_one(
             &Iter(overloads::Iter::Set, vec![Cons]),
@@ -2929,16 +2963,12 @@ mod interpreter_tests {
     #[test]
     fn test_iter_map_many() {
         let mut stack = stk![
-            V::List(vec![].into()),
-            V::Map(
-                vec![
-                    (V::int(1), V::nat(1)),
-                    (V::int(2), V::nat(2)),
-                    (V::int(3), V::nat(3)),
-                ]
-                .into_iter()
-                .collect()
-            )
+            V::List(MichelsonList::new()),
+            V::Map(rc_map([
+                (V::int(1), V::nat(1)),
+                (V::int(2), V::nat(2)),
+                (V::int(3), V::nat(3)),
+            ]))
         ];
         assert!(interpret_one(
             &Iter(overloads::Iter::Map, vec![Cons]),
@@ -3022,28 +3052,20 @@ mod interpreter_tests {
         test(
             overloads::Map::Map,
             2,
-            stk![V::Map(
-                vec![
-                    (V::int(1), V::String("a".into())),
-                    (V::int(2), V::String("b".into()))
-                ]
-                .into_iter()
-                .collect()
-            )],
-            stk![V::Map(
-                vec![
-                    (
-                        V::int(1),
-                        V::new_option(Some(V::new_pair(V::int(1), V::String("a".into()))))
-                    ),
-                    (
-                        V::int(2),
-                        V::new_option(Some(V::new_pair(V::int(2), V::String("b".into()))))
-                    )
-                ]
-                .into_iter()
-                .collect()
-            )],
+            stk![V::Map(rc_map([
+                (V::int(1), V::String("a".into())),
+                (V::int(2), V::String("b".into()))
+            ]))],
+            stk![V::Map(rc_map([
+                (
+                    V::int(1),
+                    V::new_option(Some(V::new_pair(V::int(1), V::String("a".into()))))
+                ),
+                (
+                    V::int(2),
+                    V::new_option(Some(V::new_pair(V::int(2), V::String("b".into()))))
+                )
+            ]))],
             interpret_cost::MAP_MAP,
         );
     }
@@ -3084,7 +3106,7 @@ mod interpreter_tests {
         test(
             overloads::Map::List,
             stk![
-                V::List(vec![].into()),
+                V::List(MichelsonList::new()),
                 V::List(vec![V::int(1), V::int(2)].into())
             ],
             stk![
@@ -3097,15 +3119,11 @@ mod interpreter_tests {
         test(
             overloads::Map::Map,
             stk![
-                V::List(vec![].into()),
-                V::Map(
-                    vec![
-                        (V::int(1), V::String("a".into())),
-                        (V::int(2), V::String("b".into()))
-                    ]
-                    .into_iter()
-                    .collect()
-                )
+                V::List(MichelsonList::new()),
+                V::Map(rc_map([
+                    (V::int(1), V::String("a".into())),
+                    (V::int(2), V::String("b".into()))
+                ]))
             ],
             stk![
                 V::List(
@@ -3115,11 +3133,7 @@ mod interpreter_tests {
                     ]
                     .into()
                 ),
-                V::Map(
-                    vec![(V::int(1), V::Unit), (V::int(2), V::Unit)]
-                        .into_iter()
-                        .collect()
-                )
+                V::Map(rc_map([(V::int(1), V::Unit), (V::int(2), V::Unit)]))
             ],
         );
     }
@@ -3455,7 +3469,7 @@ mod interpreter_tests {
     #[test]
     fn if_cons_nil() {
         let code = vec![IfCons(vec![Swap, Drop(None)], vec![Push(V::int(0))])];
-        let mut stack = stk![V::List(vec![].into())];
+        let mut stack = stk![V::List(MichelsonList::new())];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&code, &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::int(0)]);
@@ -3593,7 +3607,7 @@ mod interpreter_tests {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&[Nil], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::List(vec![].into())]);
+        assert_eq!(stack, stk![V::List(MichelsonList::new())]);
         assert_eq!(
             ctx.gas().milligas(),
             Gas::default().milligas() - interpret_cost::NIL - interpret_cost::INTERPRET_RET,
@@ -3616,7 +3630,7 @@ mod interpreter_tests {
     fn push_map() {
         let mut stack = stk![];
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (V::int(1), V::String("foo".to_owned())),
             (V::int(2), V::String("bar".to_owned())),
         ]);
@@ -3634,7 +3648,7 @@ mod interpreter_tests {
     #[test]
     fn get_map() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (V::int(1), V::String("foo".to_owned())),
             (V::int(2), V::String("bar".to_owned())),
         ]);
@@ -3704,7 +3718,7 @@ mod interpreter_tests {
     #[test]
     fn get_map_none() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (V::int(1), V::String("foo".to_owned())),
             (V::int(2), V::String("bar".to_owned())),
         ]);
@@ -3825,7 +3839,7 @@ mod interpreter_tests {
     #[test]
     fn mem_map() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (TypedValue::int(1), TypedValue::String("foo".to_owned())),
             (TypedValue::int(2), TypedValue::String("bar".to_owned())),
         ]);
@@ -3889,7 +3903,7 @@ mod interpreter_tests {
     #[test]
     fn mem_map_absent() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (TypedValue::int(1), TypedValue::String("foo".to_owned())),
             (TypedValue::int(2), TypedValue::String("bar".to_owned())),
         ]);
@@ -3904,7 +3918,7 @@ mod interpreter_tests {
     #[test]
     fn mem_set() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::int(1), TypedValue::int(2)]);
+        let set = rc_set([TypedValue::int(1), TypedValue::int(2)]);
         let mut stack = stk![TypedValue::Set(set), TypedValue::int(1)];
         assert_eq!(
             interpret(&[Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
@@ -3922,7 +3936,7 @@ mod interpreter_tests {
     #[test]
     fn mem_set_absent() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::int(1), TypedValue::int(2)]);
+        let set = rc_set([TypedValue::int(1), TypedValue::int(2)]);
         let mut stack = stk![TypedValue::Set(set), TypedValue::int(100500)];
         assert_eq!(
             interpret(&[Mem(overloads::Mem::Set)], &mut ctx, &mut stack),
@@ -3986,10 +4000,7 @@ mod interpreter_tests {
             interpret(&[Update(overloads::Update::Set)], &mut ctx, &mut stack),
             Ok(())
         );
-        assert_eq!(
-            stack,
-            stk![TypedValue::Set(BTreeSet::from([TypedValue::int(1)])),]
-        );
+        assert_eq!(stack, stk![TypedValue::Set(rc_set([TypedValue::int(1)])),]);
         assert_eq!(
             ctx.gas().milligas(),
             Gas::default().milligas()
@@ -4001,7 +4012,7 @@ mod interpreter_tests {
     #[test]
     fn update_set_remove() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::int(1)]);
+        let set = rc_set([TypedValue::int(1)]);
         let mut stack = stk![
             TypedValue::Set(set),
             TypedValue::Bool(false),
@@ -4023,7 +4034,7 @@ mod interpreter_tests {
     #[test]
     fn update_set_insert_when_exists() {
         let mut ctx = Ctx::default();
-        let set = BTreeSet::from([TypedValue::int(1)]);
+        let set = rc_set([TypedValue::int(1)]);
         let mut stack = stk![
             TypedValue::Set(set.clone()),
             TypedValue::Bool(true),
@@ -4078,10 +4089,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![V::Map(BTreeMap::from([(
-                V::int(1),
-                V::String("foo".to_owned())
-            )])),]
+            stk![V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),]
         );
         assert_eq!(
             ctx.gas().milligas(),
@@ -4094,7 +4102,7 @@ mod interpreter_tests {
     #[test]
     fn update_map_update() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let map = rc_map([(V::int(1), V::String("bar".to_owned()))]);
         let mut stack = stk![
             V::Map(map),
             V::new_option(Some(V::String("foo".to_owned()))),
@@ -4106,10 +4114,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![V::Map(BTreeMap::from([(
-                V::int(1),
-                V::String("foo".to_owned())
-            )])),]
+            stk![V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),]
         );
         assert_eq!(
             ctx.gas().milligas(),
@@ -4122,7 +4127,7 @@ mod interpreter_tests {
     #[test]
     fn update_map_remove() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let map = rc_map([(V::int(1), V::String("bar".to_owned()))]);
         let mut stack = stk![V::Map(map), V::new_option(None), V::int(1)];
         assert_eq!(
             interpret(&[Update(overloads::Update::Map)], &mut ctx, &mut stack),
@@ -4182,7 +4187,7 @@ mod interpreter_tests {
     #[test]
     fn size_set() {
         let mut ctx = Ctx::default();
-        let set = (1..=3).map(TypedValue::nat).collect();
+        let set = rc_set((1..=3).map(TypedValue::nat));
         let mut stack = stk![TypedValue::Set(set)];
         assert_eq!(
             interpret(&[Size(overloads::Size::Set)], &mut ctx, &mut stack),
@@ -4194,7 +4199,7 @@ mod interpreter_tests {
     #[test]
     fn size_map() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([
+        let map = rc_map([
             (TypedValue::nat(1), TypedValue::nat(1)),
             (TypedValue::nat(2), TypedValue::nat(2)),
         ]);
@@ -4226,7 +4231,7 @@ mod interpreter_tests {
         assert_eq!(
             stack,
             stk![
-                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),
                 V::new_option(None),
             ]
         );
@@ -4239,7 +4244,7 @@ mod interpreter_tests {
     #[test]
     fn get_and_update_map_update() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let map = rc_map([(V::int(1), V::String("bar".to_owned()))]);
         let mut stack = stk![
             V::Map(map),
             V::new_option(Some(V::String("foo".to_owned()))),
@@ -4256,7 +4261,7 @@ mod interpreter_tests {
         assert_eq!(
             stack,
             stk![
-                V::Map(BTreeMap::from([(V::int(1), V::String("foo".to_owned()))])),
+                V::Map(rc_map([(V::int(1), V::String("foo".to_owned()))])),
                 V::new_option(Some(V::String("bar".into())))
             ]
         );
@@ -4269,7 +4274,7 @@ mod interpreter_tests {
     #[test]
     fn get_and_update_map_remove() {
         let mut ctx = Ctx::default();
-        let map = BTreeMap::from([(V::int(1), V::String("bar".to_owned()))]);
+        let map = rc_map([(V::int(1), V::String("bar".to_owned()))]);
         let mut stack = stk![V::Map(map), V::new_option(None), V::int(1)];
         assert_eq!(
             interpret_one(
@@ -4623,7 +4628,7 @@ mod interpreter_tests {
 
     #[test]
     fn concat_list_of_0_strings() {
-        let mut stack = stk![TypedValue::List(vec![].into()),];
+        let mut stack = stk![TypedValue::List(MichelsonList::new()),];
         assert_eq!(
             interpret(
                 &[Concat(overloads::Concat::ListOfStrings)],
@@ -4658,7 +4663,7 @@ mod interpreter_tests {
 
     #[test]
     fn concat_list_of_0_bytes() {
-        let mut stack = stk![TypedValue::List(vec![].into())];
+        let mut stack = stk![TypedValue::List(MichelsonList::new())];
         assert_eq!(
             interpret(
                 &[Concat(overloads::Concat::ListOfBytes)],

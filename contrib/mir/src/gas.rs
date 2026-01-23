@@ -278,6 +278,7 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
+    use std::rc::Rc;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
@@ -583,9 +584,11 @@ pub mod interpret_cost {
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair = |l: &(_, _), r: &(_, _)| {
+        let cmp_pair = |l: &(Rc<TypedValue>, Rc<TypedValue>),
+                        r: &(Rc<TypedValue>, Rc<TypedValue>)| {
             let c = Checked::from(10u32);
-            (c + compare(&l.0, &r.0)? + compare(&l.1, &r.1)?).as_gas_cost()
+            (c + compare(l.0.as_ref(), r.0.as_ref())? + compare(l.1.as_ref(), r.1.as_ref())?)
+                .as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
         const ADDRESS_SIZE: u64 = 20 + 31; // hash size + max entrypoint size
@@ -626,7 +629,9 @@ pub mod interpret_cost {
                 (None, None) => cmp_option,
                 (None, Some(_)) => cmp_option,
                 (Some(_), None) => cmp_option,
-                (Some(l), Some(r)) => cmp_option + compare(l, r)?,
+                (Some(l), Some(r)) => {
+                    cmp_option + compare(l.as_ref().as_ref(), r.as_ref().as_ref())?
+                }
             }
             .as_gas_cost()?,
             (V::Option(_), _) => incomparable(),
@@ -650,8 +655,8 @@ pub mod interpret_cost {
             (V::KeyHash(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
-                (Or::Left(x), Or::Left(y)) => cmp_or + compare(x, y)?,
-                (Or::Right(x), Or::Right(y)) => cmp_or + compare(x, y)?,
+                (Or::Left(x), Or::Left(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
+                (Or::Right(x), Or::Right(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
                 (Or::Left(_), Or::Right(_)) => cmp_or,
                 (Or::Right(_), Or::Left(_)) => cmp_or,
             }

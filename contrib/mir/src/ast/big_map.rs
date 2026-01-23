@@ -10,6 +10,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
     mem,
+    rc::Rc,
 };
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
@@ -666,25 +667,28 @@ impl<'a> TypedValue<'a> {
             #[cfg(feature = "bls")]
             Bls12381G2(_) => {}
             Pair(p) => {
-                p.0.collect_big_maps(put_res);
-                p.1.collect_big_maps(put_res);
+                let (l, r) = p.as_mut();
+                Rc::make_mut(l).collect_big_maps(put_res);
+                Rc::make_mut(r).collect_big_maps(put_res);
             }
             Or(p) => match p.as_mut() {
-                Left(l) => l.collect_big_maps(put_res),
-                Right(r) => r.collect_big_maps(put_res),
+                Left(l) => Rc::make_mut(l).collect_big_maps(put_res),
+                Right(r) => Rc::make_mut(r).collect_big_maps(put_res),
             },
             Option(p) => {
                 if let Some(x) = p {
-                    x.collect_big_maps(put_res)
+                    Rc::make_mut(x).collect_big_maps(put_res)
                 }
             }
-            List(l) => l.iter_mut().for_each(|v| v.collect_big_maps(put_res)),
+            List(l) => l
+                .iter_mut()
+                .for_each(|v| Rc::make_mut(v).collect_big_maps(put_res)),
             Set(_) => {
                 // Elements are comparable and so have no big maps
             }
             Map(m) => m.iter_mut().for_each(|(_k, v)| {
                 // Key is comparable as so has no big map, skipping it
-                v.collect_big_maps(put_res)
+                Rc::make_mut(v).collect_big_maps(put_res)
             }),
             BigMap(m) => put_res(m),
             Ticket(_) => {

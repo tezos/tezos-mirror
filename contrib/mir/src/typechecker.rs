@@ -2488,15 +2488,23 @@ pub fn typecheck_value<'a>(
             TV::new_option(Some(v))
         }
         (T::Option(_), V::App(Prim::None, [], _)) => TV::new_option(None),
-        (T::List(ty), V::Seq(vs)) => TV::List(
+        (T::List(ty), V::Seq(vs)) => TV::List(MichelsonList::from(
             vs.iter()
-                .map(|v| typecheck_value(v, ctx, ty))
-                .collect::<Result<_, TcError>>()?,
-        ),
-        (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
+                .map(|v| typecheck_value(v, ctx, ty).map(Rc::new))
+                .collect::<Result<Vec<_>, TcError>>()?,
+        )),
+        (T::Set(ty), V::Seq(vs)) => {
+            let set = typecheck_set(ctx, t, ty, vs)?;
+            TV::Set(set.into_iter().map(Rc::new).collect())
+        }
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
+            let map = typecheck_map(ctx, t, tk, tv, vs)?;
+            TV::Map(
+                map.into_iter()
+                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                    .collect(),
+            )
         }
         // All valid instantiations of big map are mentioned in
         // https://tezos.gitlab.io/michelson-reference/#type-big_map
@@ -2672,13 +2680,13 @@ pub fn typecheck_value<'a>(
                 ),
             ) {
                 Ok(TV::Pair(b)) => {
-                    let address = irrefutable_match!(b.0; TV::Address);
-                    let c = irrefutable_match!(b.1; TV::Pair);
+                    let address = irrefutable_match!(TypedValue::unwrap_rc(b.0); TV::Address);
+                    let c = irrefutable_match!(TypedValue::unwrap_rc(b.1); TV::Pair);
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
                         content_type: content_type.clone(),
-                        content: c.0,
-                        amount: irrefutable_match!(c.1; TV::Nat),
+                        content: TypedValue::unwrap_rc(c.0),
+                        amount: irrefutable_match!(TypedValue::unwrap_rc(c.1); TV::Nat),
                     })
                 }
                 _ => return Err(invalid_value_for_type!()),
@@ -3007,6 +3015,7 @@ mod typecheck_tests {
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use std::collections::HashMap;
+    use std::rc::Rc;
     use Instruction::*;
     use Option::None;
 
@@ -4938,10 +4947,12 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Set(BTreeSet::from([
-                TypedValue::int(1),
-                TypedValue::int(2)
-            ]))))
+            Ok(Push(TypedValue::Set(
+                [TypedValue::int(1), TypedValue::int(2)]
+                    .into_iter()
+                    .map(Rc::new)
+                    .collect()
+            )))
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
     }
@@ -5013,10 +5024,15 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Map(BTreeMap::from([
-                (TypedValue::int(1), TypedValue::String("foo".to_owned())),
-                (TypedValue::int(2), TypedValue::String("bar".to_owned()))
-            ]))))
+            Ok(Push(TypedValue::Map(
+                [
+                    (TypedValue::int(1), TypedValue::String("foo".to_owned())),
+                    (TypedValue::int(2), TypedValue::String("bar".to_owned()))
+                ]
+                .into_iter()
+                .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+                .collect()
+            )))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
     }
