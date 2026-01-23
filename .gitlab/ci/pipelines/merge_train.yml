@@ -2736,54 +2736,6 @@ etherlink.test_kernel:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-etherlink.test_firehose:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - etherlink/firehose/**/*
-    - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: true
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C etherlink/firehose check
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
 etherlink.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test

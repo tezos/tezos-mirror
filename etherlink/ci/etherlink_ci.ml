@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2026 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -24,12 +25,6 @@ module Files = struct
   let node = ["etherlink/**/*"]
 
   let kernel = ["etherlink.mk"; "etherlink/**/*.rs"]
-
-  let firehose =
-    [
-      "etherlink/firehose/**/*";
-      "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
-    ]
 
   let evm_compatibility =
     [
@@ -56,7 +51,7 @@ module Files = struct
 
   let tzt = ["tzt_reference_test_suite/**/*"]
 
-  (* [firehose], [evm_compatibility] and [revm_compatibility] are already included
+  (* [evm_compatibility] and [revm_compatibility] are already included
      in [node @ kernel] *)
   let all =
     sdks @ rust_toolchain_image @ lib_wasm_runtime_rust @ node @ kernel @ mir
@@ -220,20 +215,6 @@ let job_test_kernel =
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
-
-let job_test_firehose =
-  CI.job
-    "test_firehose"
-    ~__POS__
-    ~stage:Test
-    ~description:"Check and test etherlink firehose."
-    ~image:Images.rust_toolchain
-    ~only_if_changed:Files.(rust_toolchain_image @ firehose)
-    ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
-    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
-    ~cargo_cache:true
-    ~sccache:(Cacio.sccache ())
-    ["make -C etherlink/firehose check"]
 
 let job_test_evm_compatibility =
   CI.job
@@ -473,7 +454,6 @@ let register () =
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
          returns an equivalent job for [Before_merging] and [Merge_train]. *)
       (Auto, job_test_kernel);
-      (Auto, job_test_firehose);
       (Auto, job_test_evm_compatibility);
       (Auto, job_test_revm_compatibility);
       (Auto, job_mir_unit);
@@ -506,7 +486,6 @@ let register () =
       (Auto, job_lint_solidity_artifacts);
       (Auto, job_unit_tests);
       (Auto, job_test_kernel);
-      (Auto, job_test_firehose);
       (Auto, job_test_evm_compatibility);
       (Auto, job_test_revm_compatibility);
       (Auto, job_tezt `scheduled);
