@@ -74,7 +74,7 @@ v}
     save space when attestations have few bits set, at the cost of additional
     complexity. *)
 
-type t
+type t = private Bitset.t
 
 (** The size of the encoding is not bounded. However, the size of a DAL
     attestations bitset is checked during validation of an attestation; and
@@ -132,7 +132,7 @@ type attestation = t
     results in block metadata. *)
 module Slot_availability : sig
   (** The slot availability type. Currently identical to {!t}. *)
-  type t
+  type t = private Bitset.t
 
   (** [empty] is the empty slot availability. *)
   val empty : t
@@ -177,17 +177,23 @@ end
 
 (** This module is used to record the shard attestations.
 
-   For each attester, a list of shards is associated. For each
-   attested slot (see {!type:t}) we record that those shards were
-   deemed available.
+    For each attester, a number of shards is associated. For each slot (see
+    {!type:t}) we record that that number of shards were deemed available.
 
-   This information will be used at the end of block finalisation to
-   have the protocol declaring whether the slot is available.  *)
+    This information will be used at the end of block finalisation to have the
+    protocol declaring whether the slot is available. *)
 module Accountability : sig
   type attested_slots = t
 
   (** The data-structure used to record the shards attestations. *)
   type t
+
+  (** The recorded information for one slot: who attested, and the current total
+      shard count (the sum of the shards assigned to these attesters). *)
+  type slot_attestation_info = {
+    attesters : Signature.Public_key_hash.Set.t;
+    attested_shards_count : int;
+  }
 
   type attestation_status = {
     total_shards : int;  (** The total number of (attestable) shards. *)
@@ -200,39 +206,63 @@ module Accountability : sig
             equal to the threshold defined by the protocol. *)
   }
 
-  (** DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3145
+  (** [init ~number_of_slots ~number_of_lags] initialises a new accountability
+      data-structure with [number_of_slots] slots and [number_of_lags] lags, and
+      where for every slot and lag, no shard is available. *)
+  val init : number_of_slots:int -> number_of_lags:int -> t
 
-     Consider using the [Bounded] module. In particular, change the
-     semantics of [is_slot_attested] accordingly. *)
-
-  (** [init ~number_of_slots] initialises a new accountability data-structure
-     with [number_of_slots] slots and where for every slot, no shard is
-     available. *)
-  val init : number_of_slots:int -> t
-
-  (** [record_number_of_attested_shards t ~delegate slots number] records that,
-      for all slots declared available in [slots], the given [number] of shard
-      indices are deemed available by [delegate]. This function must be called
-      at most once for a given attester; otherwise the count will be flawed. *)
+  (** [record_number_of_attested_shards t ~number_of_slots ~attestation_lag
+      ~lags ~attested_level attested_slots powers] records that, for all slots
+      declared available in [attested_slots], a number of shard indices are
+      deemed available, this number being given by the [powers] map. This
+      function must be called at most once for a given attester; otherwise the
+      count will be flawed. *)
   val record_number_of_attested_shards :
-    t -> attested_slots -> delegate:Signature.public_key_hash -> int -> t
-
-  (** [is_slot_attested t ~threshold ~number_of_shards slot] returns [true] if
-      the number of shards recorded in [t] for the [slot] is above the
-      [threshold] with respect to the total number of shards specified by
-      [number_of_shards]. Returns [false] otherwise or if the [index] is out of
-      the interval [0; number_of_slots - 1] where [number_of_slots] is the value
-      provided to the [init] function.
-
-      Whether the slot is attested by the protocol or not, the function also
-      returns the ratio of attested shards w.r.t. total shards, as a rational
-      number. *)
-  val is_slot_attested :
     t ->
-    threshold:int ->
-    number_of_shards:int ->
-    Dal_slot_index_repr.t ->
-    attestation_status
+    number_of_slots:int ->
+    attestation_lag:int ->
+    lags:int list ->
+    delegate:Signature.public_key_hash ->
+    attested_level:Raw_level_repr.t ->
+    attested_slots ->
+    int Raw_level_repr.Map.t ->
+    t
+
+  (** [attestation_status t ~threshold ~number_of_shards ~published_level
+      ~slot_index] returns the current attestation status of a slot; a slot is
+      attested if the number of shards recorded in [t] for the [slot] is above
+      the [threshold] with respect to the total number of shards specified by
+      [number_of_shards]. *)
+
+  (** [is_threshold_reached ~threshold ~number_of_shards ~attested_shards]
+      returns [true] if [attested_shards] is sufficient to meet the attestation
+      threshold. The threshold is a percentage (e.g., 50 for 50%). *)
+  val is_threshold_reached :
+    threshold:int -> number_of_shards:int -> attested_shards:int -> bool
+
+  (** [get_shard_attestations t] returns the internal level map from the accountability
+      data structure. The map is indexed by published level, and for each level
+      contains a slot map with slot attestation information. *)
+  val get_shard_attestations :
+    t -> slot_attestation_info Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
+
+  (** The following type is used to persist attestation accountability
+      across blocks in a sliding window indexed by absolute published level.
+
+      This is separate from {!type:t} which is used during block application
+      to accumulate attestations within a single block.
+
+      Maps published level to slot index to attestation status and it represents
+      a sliding window of attestation statuses.
+
+      Invariant: Does not contain entries for published levels equal or smaller
+      than [current_level - attestation_lag + 1]. *)
+  type history =
+    attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
+
+  val history_encoding : history Data_encoding.t
+
+  val empty_history : history
 end
 
 (** {!type-t}-dependent combination of public keys or signatures. *)

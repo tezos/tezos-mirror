@@ -131,7 +131,9 @@ let number_of_attested_slots t ~number_of_lags =
   let prefix_ones =
     Misc.(0 --> (number_of_lags - 1))
     |> List.filter (fun i ->
-           match Bitset.mem t i with Ok b -> b | Error _ -> assert false)
+           match Bitset.mem t i with
+           | Ok b -> b
+           | Error _ -> (* unreachable: [i] is non-negative *) assert false)
     |> List.length
   in
   total_bits - prefix_ones
@@ -167,7 +169,8 @@ module Slot_availability = struct
     let prefix_mask =
       match Bitset.fill ~length:number_of_lags with
       | Ok mask -> mask
-      | Error _ -> assert false
+      | Error _ ->
+          (* unreachable: [number_of_lags] is non-negative *) assert false
     in
     let common_prefix =
       Bitset.inter (Bitset.inter sa attestations) prefix_mask
@@ -241,23 +244,151 @@ module Slot_availability = struct
     build_result 0 ~sa_count:0 ~att_count:0 empty number_of_lags
 end
 
-type shard_index = int
-
-module Shard_map = Map.Make (struct
-  type t = shard_index
-
-  let compare = Compare.Int.compare
-end)
-
 module Accountability = struct
   type attested_slots = t
 
-  module SlotMap = Map.Make (Compare.Int)
+  module SlotMap = Dal_slot_index_repr.Map
+  module PublishedLevelMap = Raw_level_repr.Map
+  (* the keys represent published levels *)
+
+  type slot_attestation_info = {
+    attesters : Signature.Public_key_hash.Set.t;
+    attested_shards_count : int;
+  }
 
   type t = {
-    shard_attestations : (Signature.Public_key_hash.Set.t * int) SlotMap.t;
+    shard_attestations : slot_attestation_info SlotMap.t PublishedLevelMap.t;
     number_of_slots : int;
+    number_of_lags : int;
   }
+
+  let init ~number_of_slots ~number_of_lags =
+    {
+      shard_attestations = PublishedLevelMap.empty;
+      number_of_slots;
+      number_of_lags;
+    }
+
+  let get_shard_attestations t = t.shard_attestations
+
+  let record_number_of_attested_shards t ~number_of_slots ~attestation_lag ~lags
+      ~delegate ~attested_level delegate_attested_slots
+      committee_level_to_shard_count =
+    let update published_level_map ~published_level ~slot_index
+        number_of_delegate_shards =
+      PublishedLevelMap.update
+        published_level
+        (function
+          | None ->
+              Some
+                (SlotMap.singleton
+                   slot_index
+                   {
+                     attesters = Signature.Public_key_hash.Set.singleton delegate;
+                     attested_shards_count = number_of_delegate_shards;
+                   })
+          | Some slot_map ->
+              Some
+                (SlotMap.update
+                   slot_index
+                   (function
+                     | None ->
+                         Some
+                           {
+                             attesters =
+                               Signature.Public_key_hash.Set.singleton delegate;
+                             attested_shards_count = number_of_delegate_shards;
+                           }
+                     | Some
+                         ({
+                            attesters;
+                            attested_shards_count =
+                              old_number_of_attested_shards;
+                          } as v) ->
+                         if Signature.Public_key_hash.Set.mem delegate attesters
+                         then Some v
+                         else
+                           Some
+                             {
+                               attesters =
+                                 Signature.Public_key_hash.Set.add
+                                   delegate
+                                   attesters;
+                               attested_shards_count =
+                                 old_number_of_attested_shards
+                                 + number_of_delegate_shards;
+                             })
+                   slot_map))
+        published_level_map
+    in
+    let number_of_lags = List.length lags in
+    let _number_of_lags, published_level_map =
+      List.fold_left
+        (fun (lag_index, published_level_map) lag ->
+          let published_level_opt = Raw_level_repr.sub attested_level lag in
+          match published_level_opt with
+          | None -> (lag_index + 1, published_level_map)
+          | Some published_level ->
+              let committee_level =
+                Raw_level_repr.add published_level (attestation_lag - 1)
+              in
+              let published_level_map =
+                List.fold_left
+                  (fun published_level_map slot_index ->
+                    let attested =
+                      is_attested
+                        delegate_attested_slots
+                        ~number_of_slots
+                        ~number_of_lags
+                        ~lag_index
+                        slot_index
+                    in
+                    let number_of_delegate_shards =
+                      match
+                        Raw_level_repr.Map.find
+                          committee_level
+                          committee_level_to_shard_count
+                      with
+                      | None -> 0
+                      | Some v -> v
+                    in
+                    if attested && Compare.Int.(number_of_delegate_shards > 0)
+                    then
+                      update
+                        published_level_map
+                        ~published_level
+                        ~slot_index
+                        number_of_delegate_shards
+                    else published_level_map)
+                  published_level_map
+                  (Dal_slot_index_repr.all_slots ~number_of_slots)
+              in
+              (lag_index + 1, published_level_map))
+        (0, t.shard_attestations)
+        lags
+    in
+    {t with shard_attestations = published_level_map}
+
+  (* Given a slot encoded as [number_of_shards] shards and for which
+     [number_of_attested_shards] are attested by the bakers. The slot is
+     declared as attested_slots IFF at least [threshold] % of the total shards
+     are attested by bakers.
+
+     On rationals, the condition above means:
+
+       number_of_attested_shards / number_of_shards >= threshold / 100,
+
+     which is equivalent, on rationals, to:
+
+       number_of_attested_shards >= (threshold * number_of_shards) / 100
+
+     Below we do the computation of the right-hand side,
+     [threshold_number_of_shards], on integers.  Therefore, the real threshold
+     is actually smaller, namely [100 * threshold_number_of_shards /
+     number_of_shards]. For instance, for protocol T parameters, it is 63.87%
+     instead of 64%. *)
+  let is_threshold_reached ~threshold ~number_of_shards ~attested_shards =
+    Compare.Int.(attested_shards >= threshold * number_of_shards / 100)
 
   type attestation_status = {
     total_shards : int;
@@ -266,83 +397,53 @@ module Accountability = struct
     is_proto_attested : bool;
   }
 
-  let init ~number_of_slots =
-    {shard_attestations = SlotMap.empty; number_of_slots}
+  type history =
+    attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
 
-  (* This function must be called at most once for a given attester; otherwise
-     the count will be flawed. *)
-  let record_number_of_attested_shards t baker_attested_slots ~delegate
-      number_of_baker_shards =
-    let rec iter slot_index map =
-      if Compare.Int.(slot_index >= t.number_of_slots) then map
-      else
-        let map =
-          match Bitset.mem baker_attested_slots slot_index with
-          | Error _ ->
-              (* impossible, as [slot_index] is non-negative *)
-              map
-          | Ok true ->
-              (* slot is attested by baker *)
-              SlotMap.update
-                slot_index
-                (function
-                  | None ->
-                      Some
-                        ( Signature.Public_key_hash.Set.singleton delegate,
-                          number_of_baker_shards )
-                  | Some (delegate_set, old_number_of_attested_shards) ->
-                      Some
-                        ( Signature.Public_key_hash.Set.add delegate delegate_set,
-                          old_number_of_attested_shards + number_of_baker_shards
-                        ))
-                map
-          | Ok false ->
-              (* slot is not attested by baker, nothing to update *)
-              map
-        in
-        iter (slot_index + 1) map
-    in
-    let shard_attestations = iter 0 t.shard_attestations in
-    {t with shard_attestations}
+  let attestation_status_encoding =
+    let open Data_encoding in
+    conv
+      (fun {total_shards; attested_shards; attesters; is_proto_attested} ->
+        ( total_shards,
+          attested_shards,
+          Signature.Public_key_hash.Set.elements attesters,
+          is_proto_attested ))
+      (fun (total_shards, attested_shards, attesters_list, is_proto_attested) ->
+        {
+          total_shards;
+          attested_shards;
+          attesters = Signature.Public_key_hash.Set.of_list attesters_list;
+          is_proto_attested;
+        })
+      (obj4
+         (req "total_shards" int31)
+         (req "attested_shards" int31)
+         (req "attesters" (list Signature.Public_key_hash.encoding))
+         (req "is_proto_attested" bool))
 
-  (* Given a slot encoded as [number_of_shards] shards and for which
-     [number_of_attested_shards] are attested by the bakers. The slot is
-     declated as attested_slots IFF at least [threshold] % of the total shards
-     are attested by bakers.
+  let level_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun m -> Dal_slot_index_repr.Map.bindings m)
+      (fun bindings ->
+        List.fold_left
+          (fun m (k, v) -> Dal_slot_index_repr.Map.add k v m)
+          Dal_slot_index_repr.Map.empty
+          bindings)
+      (list (tup2 Dal_slot_index_repr.encoding attestation_status_encoding))
 
-     On rationals, the condition above means:
+  let history_encoding =
+    let open Data_encoding in
+    conv
+      (fun m -> Raw_level_repr.Map.bindings m)
+      (fun bindings ->
+        List.fold_left
+          (fun m (k, v) -> Raw_level_repr.Map.add k v m)
+          Raw_level_repr.Map.empty
+          bindings)
+      (list (tup2 Raw_level_repr.encoding level_info_encoding))
 
-     number_of_attested_shards / number_of_shards >= threshold / 100,
-
-     which is equivalent, on rationals, to:
-
-     number_of_attested_shards >= (threshold * number_of_shards) / 100
-
-     Note that the last reformulation translates to integers. *)
-  let compute_proto_attestation_status ~number_of_attested_shards ~threshold
-      ~number_of_shards =
-    Compare.Int.(
-      number_of_attested_shards >= threshold * number_of_shards / 100)
-
-  let is_slot_attested t ~threshold ~number_of_shards slot_index =
-    let index = Dal_slot_index_repr.to_int slot_index in
-    let attesters, number_of_attested_shards =
-      match SlotMap.find index t.shard_attestations with
-      | None -> (Signature.Public_key_hash.Set.empty, 0)
-      | Some v -> v
-    in
-    let is_proto_attested =
-      compute_proto_attestation_status
-        ~number_of_attested_shards
-        ~threshold
-        ~number_of_shards
-    in
-    {
-      is_proto_attested;
-      attested_shards = number_of_attested_shards;
-      total_shards = number_of_shards;
-      attesters;
-    }
+  let empty_history = Raw_level_repr.Map.empty
 end
 
 module Dal_dependent_signing = struct
@@ -350,9 +451,9 @@ module Dal_dependent_signing = struct
     Blake2B.Make
       (Base58)
       (struct
-        let name = "Dal attestation hash"
+        let name = "DAL attestations hash"
 
-        let title = "Dal attestation hash"
+        let title = "DAL attestations hash"
 
         let b58check_prefix = "\056\012\165" (* dba(53) *)
 
