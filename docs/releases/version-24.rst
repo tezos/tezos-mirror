@@ -69,14 +69,14 @@ Update Instructions
 This section contains update instructions specialized for the current release, handling only a few installation types that are most common or that require special handling for this version.
 For full instructions on updating your Octez suite for any types of installation, refer to :doc:`../introduction/howtoget`.
 
+If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+
 RPM Octez packages
 ~~~~~~~~~~~~~~~~~~
 
-.. code-block:: shell
+**RPM packages are no longer provided starting with Octez version 24.**
 
-  dnf -y update octez-node  octez-client octez-baker octez-dal-node octez-smart-rollup-node
-
-If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_rpm>`
+Please choose another installation method.
 
 From sources
 ~~~~~~~~~~~~
