@@ -52,9 +52,6 @@ let variables : variables =
       "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );
     ( "client_libs_dependencies_image_name",
       "${GCP_CI_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
-    ( "client_libs_dependencies_image_name_protected",
-      "${GCP_PROTECTED_CI_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies"
-    );
     ("GIT_STRATEGY", "fetch");
     ("GIT_DEPTH", "1");
     ("GET_SOURCES_ATTEMPTS", "2");

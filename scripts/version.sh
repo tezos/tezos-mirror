@@ -110,4 +110,3 @@ export rust_sdk_bindings_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezo
 export jsonnet_image_name="${GCP_CI_REGISTRY}/tezos/tezos/jsonnet"
 export jsonnet_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/jsonnet"
 export client_libs_dependencies_image_name="${GCP_CI_REGISTRY}/tezos/tezos/client-libs-dependencies"
-export client_libs_dependencies_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/client-libs-dependencies"
