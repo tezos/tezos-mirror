@@ -121,6 +121,12 @@ val load :
   unit ->
   t tzresult Lwt.t
 
+(* Helper to exit with a proper code when a configuration error occurs *)
+val exit_on_configuration_error :
+  emit:(error_trace:tztrace -> experimental_features Lwt.t) ->
+  'a tzresult Lwt.t ->
+  'a tzresult Lwt.t
+
 (** [identity_file config] returns the absolute path to the
     "identity.json" file of the DAL node, based on the configuration
     [config]. *)

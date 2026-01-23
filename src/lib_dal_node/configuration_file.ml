@@ -528,3 +528,12 @@ let load =
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
 let peers_file {data_dir; _} = Filename.concat data_dir "peers.json"
+
+let exit_on_configuration_error ~emit result_p : 'a tzresult Lwt.t =
+  let open Lwt_syntax in
+  let* result = result_p in
+  match result with
+  | Ok _ -> result_p
+  | Error error_trace ->
+      let* () = emit ~error_trace in
+      Lwt_exit.exit_and_raise Errors.Exit_codes.invalid_configuration_file_code
