@@ -3,6 +3,13 @@
 Changelog
 '''''''''
 
+Version 24.1
+============
+
+- Fixed a regression in the snapshot import mechanism, which made the process slower than usual. (MR :gl:`!20501`)
+
+- Fixed a downstream ``opam`` dependency issue that can prevent bakers and operators from building from sources in certain setups. Now the opam cache is the default archive provider when building Octez from sources. (MR :gl:`!20554`)
+
 Version 24.0
 ============
 
