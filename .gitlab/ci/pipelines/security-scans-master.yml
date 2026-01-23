@@ -539,7 +539,7 @@ container_scanning_tezos-rockylinux-9-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -570,7 +570,7 @@ container_scanning_tezos-rockylinux-10-master-6253f76a:
   image: aquasec/trivy:latest
   stage: test
   tags:
-  - gcp
+  - gcp_dev
   needs: []
   dependencies: []
   timeout: 60 minutes
