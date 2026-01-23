@@ -254,6 +254,19 @@ fn filter_inbox_message<'a, Host: Runtime>(
             Ok(())
         }
 
+        #[cfg(feature = "proto-alpha")]
+        InboxMessage::Internal(
+            _msg @ (InternalInboxMessage::EndOfLevel
+            | InternalInboxMessage::InfoPerLevel(..)
+            | InternalInboxMessage::ProtocolMigration(..)
+            | InternalInboxMessage::DalAttestedSlots(..)),
+        ) => {
+            #[cfg(feature = "debug")]
+            debug_msg!(host, "InboxMetadata: {}\n", _msg);
+            Ok(())
+        }
+
+        #[cfg(not(feature = "proto-alpha"))]
         InboxMessage::Internal(
             _msg @ (InternalInboxMessage::EndOfLevel
             | InternalInboxMessage::InfoPerLevel(..)

@@ -26,6 +26,8 @@ use tezos_data_encoding::enc;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
+#[cfg(feature = "proto-alpha")]
+use tezos_data_encoding::types::Zarith;
 
 #[derive(Debug, PartialEq, Eq, NomReader, HasEncoding, BinWriter)]
 enum InboxMessageRepr<Expr: Michelson> {
@@ -124,7 +126,56 @@ impl Display for InfoPerLevel {
     }
 }
 
-/// Internal inbox message - known to be sent by the protocol
+/// A publisher and their attested slots as a bitset.
+#[cfg(feature = "proto-alpha")]
+#[derive(Debug, PartialEq, Eq, Clone, NomReader, HasEncoding, BinWriter)]
+pub struct PublisherSlots {
+    /// The publisher's public key hash.
+    pub publisher: PublicKeyHash,
+    /// Bitset where bit i is set if slot index i is attested by this publisher.
+    pub slots_bitset: Zarith,
+}
+
+/// DAL attested slots message - contains information about which slots were
+/// attested for a given published level, grouped by publisher.
+///
+/// The slots for each publisher are encoded as a bitset (Z.t in OCaml),
+/// where bit i is set if slot index i is attested.
+///
+/// This type is currently only available with the proto-alpha feature.
+#[cfg(feature = "proto-alpha")]
+#[derive(Debug, PartialEq, Eq, Clone, NomReader, HasEncoding, BinWriter)]
+pub struct DalAttestedSlots {
+    /// The level at which the slots were published.
+    pub published_level: i32,
+    /// The number of DAL slots (used for interpreting the bitset).
+    pub number_of_slots: u16,
+    /// The size of each DAL slot in bytes (encoded as int31 in OCaml, but int32 compatible).
+    pub slot_size: i32,
+    /// The size of each DAL page in bytes.
+    pub page_size: u16,
+    /// List of publishers and their attested slots.
+    /// Max ~184 entries (bounded by number of DAL slots).
+    #[encoding(dynamic)]
+    pub slots_by_publisher: Vec<PublisherSlots>,
+}
+
+#[cfg(feature = "proto-alpha")]
+impl Display for DalAttestedSlots {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DalAttestedSlots {{published_level: {}, number_of_slots: {}, slot_size: {}, page_size: {}, slots_by_publisher: {} entries}}",
+            self.published_level,
+            self.number_of_slots,
+            self.slot_size,
+            self.page_size,
+            self.slots_by_publisher.len()
+        )
+    }
+}
+
+/// Internal inbox message - known to be sent by the protocol.
 #[derive(Debug, PartialEq, Eq, NomReader, HasEncoding, BinWriter)]
 pub enum InternalInboxMessage<Expr: Michelson> {
     /// Transfer message
@@ -144,6 +195,10 @@ pub enum InternalInboxMessage<Expr: Michelson> {
     /// [InfoPerLevel]. It contains the new protocol name.
     #[encoding(tag = 4)]
     ProtocolMigration(String),
+    /// DAL attested slots message, pushed at each level
+    #[cfg(feature = "proto-alpha")]
+    #[encoding(tag = 5)]
+    DalAttestedSlots(DalAttestedSlots),
 }
 
 impl<Expr: Michelson> Display for InternalInboxMessage<Expr> {
@@ -156,6 +211,8 @@ impl<Expr: Michelson> Display for InternalInboxMessage<Expr> {
             Self::ProtocolMigration(proto) => {
                 write!(f, "ProtocolMigration {{protocol: {}}}", proto)
             }
+            #[cfg(feature = "proto-alpha")]
+            Self::DalAttestedSlots(dal) => write!(f, "{}", dal),
         }
     }
 }
@@ -247,10 +304,20 @@ mod test {
     use super::ExternalMessageFrame;
     use super::InboxMessage;
     use super::InternalInboxMessage;
+    #[cfg(feature = "proto-alpha")]
+    use super::{DalAttestedSlots, PublisherSlots};
     use crate::michelson::Michelson;
     use crate::michelson::MichelsonUnit;
+    #[cfg(feature = "proto-alpha")]
+    use crate::public_key_hash::PublicKeyHash;
     use crate::smart_rollup::SmartRollupAddress;
+    #[cfg(feature = "proto-alpha")]
+    use num_bigint::BigInt;
     use tezos_data_encoding::enc::BinWriter;
+    #[cfg(feature = "proto-alpha")]
+    use tezos_data_encoding::nom::NomReader;
+    #[cfg(feature = "proto-alpha")]
+    use tezos_data_encoding::types::Zarith;
 
     #[test]
     fn test_encode_decode_sol() {
@@ -359,5 +426,194 @@ mod test {
         let parsed = ExternalMessageFrame::parse(&output).unwrap();
 
         assert_eq!(framed, parsed);
+    }
+
+    /// Helper to create a bitset from a list of slot indices.
+    /// Sets bit i for each index i in the list.
+    #[cfg(feature = "proto-alpha")]
+    fn make_bitset(indices: &[u32]) -> Zarith {
+        let mut value = BigInt::from(0);
+        for &idx in indices {
+            value |= BigInt::from(1) << idx;
+        }
+        Zarith(value)
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    #[test]
+    fn test_encode_decode_dal_attested_slots_empty() {
+        let dal_attested = DalAttestedSlots {
+            published_level: 100,
+            number_of_slots: 16,
+            slot_size: 126944,
+            page_size: 4096,
+            slots_by_publisher: Vec::new(),
+        };
+
+        let inbox_message: InboxMessage<MichelsonUnit> =
+            InboxMessage::Internal(InternalInboxMessage::DalAttestedSlots(dal_attested));
+
+        assert_encode_decode_inbox_message(inbox_message);
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    #[test]
+    fn test_encode_decode_dal_attested_slots_with_slots_by_publisher() {
+        let pkh = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("valid pkh");
+
+        // Slots 0, 1, 2 attested -> bitset = 0b111 = 7
+        let slots_by_publisher = vec![PublisherSlots {
+            publisher: pkh,
+            slots_bitset: make_bitset(&[0, 1, 2]),
+        }];
+
+        let dal_attested = DalAttestedSlots {
+            published_level: 42,
+            number_of_slots: 16,
+            slot_size: 126944,
+            page_size: 4096,
+            slots_by_publisher,
+        };
+
+        let inbox_message: InboxMessage<MichelsonUnit> =
+            InboxMessage::Internal(InternalInboxMessage::DalAttestedSlots(dal_attested));
+
+        assert_encode_decode_inbox_message(inbox_message);
+    }
+
+    #[cfg(feature = "proto-alpha")]
+    #[test]
+    fn test_dal_attested_slots_roundtrip() {
+        let pkh1 = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("valid pkh");
+        let pkh2 = PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
+            .expect("valid pkh");
+
+        let slots_by_publisher = vec![
+            PublisherSlots {
+                publisher: pkh1,
+                slots_bitset: make_bitset(&[0, 5, 10]),
+            },
+            PublisherSlots {
+                publisher: pkh2,
+                slots_bitset: make_bitset(&[1, 2]),
+            },
+        ];
+
+        let original = DalAttestedSlots {
+            published_level: 12345,
+            number_of_slots: 16,
+            slot_size: 126944,
+            page_size: 4096,
+            slots_by_publisher,
+        };
+
+        let mut encoded = Vec::new();
+        original
+            .bin_write(&mut encoded)
+            .expect("encoding should work");
+
+        let (remaining, decoded) =
+            DalAttestedSlots::nom_read(&encoded).expect("decoding should work");
+
+        assert!(remaining.is_empty(), "all bytes should be consumed");
+        assert_eq!(original, decoded);
+    }
+
+    /// Golden test: verify Rust can decode and encode bytes matching the OCaml protocol.
+    /// These bytes were generated by the OCaml test in
+    /// src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml
+    /// (test_dal_attested_slots_encoding).
+    ///
+    /// This test verifies both directions:
+    /// 1. Decoding: OCaml bytes → Rust structure
+    /// 2. Encoding: Rust structure → bytes matching OCaml
+    ///
+    /// Message parameters:
+    /// - published_level: 8
+    /// - number_of_slots: 16
+    /// - slot_size: 126944
+    /// - page_size: 4096
+    /// - slots_by_publisher: { tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx -> [slot 4] }
+    #[cfg(feature = "proto-alpha")]
+    #[test]
+    fn test_decode_dal_attested_slots_from_ocaml() {
+        // Bytes generated by OCaml protocol's dal_attested_slots_serialized function
+        let ocaml_bytes: &[u8] = &[
+            0x00, // Internal message tag
+            0x05, // Dal_attested_slots tag (5)
+            0x00, 0x00, 0x00, 0x08, // published_level = 8 (int32 big-endian)
+            0x00, 0x10, // number_of_slots = 16 (uint16 big-endian)
+            0x00, 0x01, 0xef, 0xe0, // slot_size = 126944 (int32 big-endian)
+            0x10, 0x00, // page_size = 4096 (uint16 big-endian)
+            0x00, 0x00, 0x00,
+            0x16, // map byte length = 22 (uint32, dynamic encoding)
+            // Map contents (22 bytes):
+            // PublicKeyHash for tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx (21 bytes)
+            0x00, // Ed25519 tag
+            0x02, 0x29, 0x8c, 0x03, 0xed, 0x7d, 0x45, 0x4a, 0x10, 0x1e, 0xb7, 0x02, 0x2b,
+            0xc9, 0x5f, 0x7e, 0x5f, 0x41, 0xac, 0x78,
+            // Zarith bitset for slot 4: bit 4 set = 0b10000 = 16 = 0x10 (1 byte)
+            0x10,
+        ];
+
+        let parsed = InboxMessage::<MichelsonUnit>::parse(ocaml_bytes);
+        assert!(
+            parsed.is_ok(),
+            "should parse OCaml-generated bytes: {:?}",
+            parsed.err()
+        );
+
+        let (remaining, message) = parsed.unwrap();
+        assert!(remaining.is_empty(), "all bytes should be consumed");
+
+        let InboxMessage::Internal(InternalInboxMessage::DalAttestedSlots(dal)) = message
+        else {
+            panic!("expected DalAttestedSlots message");
+        };
+
+        assert_eq!(dal.published_level, 8);
+        assert_eq!(dal.number_of_slots, 16);
+        assert_eq!(dal.slot_size, 126944);
+        assert_eq!(dal.page_size, 4096);
+        assert_eq!(dal.slots_by_publisher.len(), 1);
+
+        // Verify the publisher and their attested slots
+        let pkh = PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("valid pkh");
+        let publisher_slots = &dal.slots_by_publisher[0];
+        assert_eq!(publisher_slots.publisher, pkh);
+        // Slot 4 attested means bit 4 is set
+        assert!(
+            publisher_slots.slots_bitset.0.bit(4),
+            "slot 4 should be attested"
+        );
+        assert!(
+            !publisher_slots.slots_bitset.0.bit(0),
+            "slot 0 should not be attested"
+        );
+        assert!(
+            !publisher_slots.slots_bitset.0.bit(3),
+            "slot 3 should not be attested"
+        );
+        assert!(
+            !publisher_slots.slots_bitset.0.bit(5),
+            "slot 5 should not be attested"
+        );
+
+        // Test serialization: re-encode the decoded message and verify it matches OCaml bytes
+        let re_encoded_message: InboxMessage<MichelsonUnit> =
+            InboxMessage::Internal(InternalInboxMessage::DalAttestedSlots(dal));
+        let mut re_encoded_bytes = Vec::new();
+        re_encoded_message
+            .serialize(&mut re_encoded_bytes)
+            .expect("re-encoding should succeed");
+
+        assert_eq!(
+            re_encoded_bytes, ocaml_bytes,
+            "Re-encoded bytes should match original OCaml bytes.\nExpected: {:02x?}\nGot:      {:02x?}",
+            ocaml_bytes, re_encoded_bytes
+        );
     }
 }
