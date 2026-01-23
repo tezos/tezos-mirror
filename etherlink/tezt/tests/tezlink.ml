@@ -692,6 +692,112 @@ let test_tezlink_chain_id =
   check_chain_id ~expected_chain_id ~chain_id ;
   unit
 
+let test_tezlink_contracts_rpc =
+  register_tezlink_test
+    ~title:"Test of the contracts rpc"
+    ~tags:["rpc"; "contracts"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* Helper to get contracts as a list of strings. *)
+  let contracts_rpc () =
+    let* contracts =
+      Client.RPC.call ~hooks ~endpoint client
+      @@ RPC.get_chain_block_context_contracts ()
+    in
+    Lwt.return JSON.(as_list contracts |> List.map as_string)
+  in
+  (* Helper to deploy a faucet contract. *)
+  let deploy_contract ~id ~initial_balance =
+    let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
+    let* contract =
+      Client.originate_contract
+        ~endpoint
+        ~amount:(Tez.of_int initial_balance)
+        ~alias:(Format.sprintf "faucet_%d" id)
+        ~src:Constant.bootstrap1.public_key_hash
+        ~init:faucet.initial_storage
+        ~prg:faucet.path
+        ~burn_cap:Tez.one
+        client
+    in
+    let*@ _ = produce_block sequencer in
+    return contract
+  in
+  (* Helper to check that two list of contracts are equal. *)
+  let check_contracts_eq expected actual =
+    let sort = List.fast_sort String.compare in
+    Check.(
+      (sort expected = sort actual)
+        (list string)
+        ~error_msg:"Expected contracts %L, got %R")
+  in
+  (* Helper to check that the balance of a given account is as expected. *)
+  let check_balance account expected =
+    let* balance =
+      Client.get_balance_for
+        ~endpoint
+        ~account:account.Account.public_key_hash
+        client
+    in
+    Tez.(
+      Check.(
+        (balance = of_int expected)
+          typ
+          ~error_msg:"Wrong balance: expected %R, got %L")) ;
+    unit
+  in
+  (* 1. Contracts & funded implicit accounts appear in /contracts RPC result's *)
+  let* contracts_before = contracts_rpc () in
+  let* fresh_account = Client.gen_and_show_keys client in
+  let*@ _ = produce_block sequencer in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:fresh_account.alias
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* faucet1 = deploy_contract ~id:1 ~initial_balance:0 in
+  let* faucet2 = deploy_contract ~id:2 ~initial_balance:1 in
+
+  let expected_contracts =
+    fresh_account.public_key_hash :: faucet1 :: faucet2 :: contracts_before
+  in
+  let* contracts_after = contracts_rpc () in
+  check_contracts_eq expected_contracts contracts_after ;
+
+  (* 2. Empty implicit accounts remain in /contracts RPC result.
+     Unlike L1, Tezlink does not deallocate implicit accounts when their
+     balance reaches zero. *)
+  let*! () =
+    Client.reveal ~endpoint ~fee:(Tez.of_int 1) ~src:fresh_account.alias client
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = check_balance fresh_account 9 in
+
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 8)
+      ~fee:(Tez.of_int 1)
+      ~giver:fresh_account.alias
+      ~receiver:Constant.bootstrap1.alias
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* () = check_balance fresh_account 0 in
+
+  let* contracts_final = contracts_rpc () in
+  check_contracts_eq expected_contracts contracts_final ;
+  unit
+
 let test_tezlink_header =
   register_tezlink_test
     ~title:"Test of the header rpc"
@@ -3387,6 +3493,7 @@ let () =
   test_tezlink_expected_issuance [Alpha] ;
   test_tezlink_monitor_heads [Alpha] ;
   test_tezlink_version [Alpha] ;
+  test_tezlink_contracts_rpc [Alpha] ;
   test_tezlink_header [Alpha] ;
   test_tezlink_constants [Alpha] ;
   test_tezlink_storage_rpc [Alpha] ;
