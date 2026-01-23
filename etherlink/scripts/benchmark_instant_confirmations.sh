@@ -41,7 +41,7 @@ fi
 
 current_millis() { perl -MTime::HiRes -e 'printf("%d\n", int(Time::HiRes::time() * 1000));'; }
 
-RPC_RESPONSE="" RPC_LATENCY_MS=0 RPC_ID=0
+RPC_RESPONSE="" RPC_LATENCY_MS=0 RPC_ID=0 TX_HASH=""
 rpc_call() {
   local method="$1" params="${2:-[]}" start_ms err curl_exit
   RPC_ID=$((RPC_ID + 1))
@@ -111,13 +111,13 @@ NONCE=$(printf "%d" "$(echo "$RPC_RESPONSE" | jq -r '.result')")
 echo "Starting nonce: $NONCE"
 
 send_sync() {
-  local raw_tx="$1" desc="$2" tx status
+  local raw_tx="$1" desc="$2" status
   echo "Sending $desc (nonce $NONCE)..." >&2
   rpc_call "eth_sendRawTransactionSync" "[\"$raw_tx\",\"$SEND_SYNC_TIMEOUT_MS\",\"pending\"]"
   NONCE=$((NONCE + 1))
 
-  tx=$(echo "$RPC_RESPONSE" | jq -r '.result.transactionHash // empty')
-  if [[ -z "$tx" ]]; then
+  TX_HASH=$(echo "$RPC_RESPONSE" | jq -r '.result.transactionHash // empty')
+  if [[ -z "$TX_HASH" ]]; then
     echo "Error: $desc did not return transaction hash" >&2
     echo "  Response: ${RPC_RESPONSE:0:500}" >&2
     # Check for stale/timeout in result
@@ -127,7 +127,7 @@ send_sync() {
     fi
     exit 1
   fi
-  echo "Hash: $tx"
+  echo "Hash: $TX_HASH"
 }
 
 # Deploy ERC-20
@@ -168,7 +168,7 @@ echo "Transfer gas limit: $TRANSFER_GAS_LIMIT"
 # Benchmark
 mkdir -p "$OUTPUT_DIR"
 CSV_FILE="$OUTPUT_DIR/results.csv"
-echo "index,latency_ms" > "$CSV_FILE"
+echo "index,latency_ms,tx_hash" > "$CSV_FILE"
 latencies=()
 
 echo "Running $NB_TX transfers..."
@@ -178,7 +178,7 @@ for ((i = 1; i <= NB_TX; i++)); do
     "$CONTRACT" "transfer(address,uint256)" "$RECIPIENT" "$TRANSFER_AMOUNT")
   send_sync "$RAW_TX" "Transfer #$i"
   latencies+=("$RPC_LATENCY_MS")
-  echo "$i,$RPC_LATENCY_MS" >> "$CSV_FILE"
+  echo "$i,$RPC_LATENCY_MS,$TX_HASH" >> "$CSV_FILE"
   echo "Transfer #$i: ${RPC_LATENCY_MS}ms"
 done
 
