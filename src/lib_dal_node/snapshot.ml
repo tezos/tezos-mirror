@@ -217,7 +217,11 @@ module Merge = struct
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
       ~min_published_level ~max_published_level ~slots ~dst_root_dir =
     let open Lwt_result_syntax in
-    let* config = Configuration_file.load ~config_file () in
+    let* config =
+      Configuration_file.exit_on_configuration_error
+        ~emit:Event.emit_configuration_loading_failed
+      @@ Configuration_file.load ~config_file ()
+    in
     let endpoint = Option.value ~default:config.endpoint endpoint in
     let config = Configuration_file.{config with endpoint} in
     let cctxt = Rpc_context.make config.Configuration_file.endpoint in

@@ -468,7 +468,11 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       let* () = Configuration_file.save ~config_file configuration in
       return configuration
     in
-    let* loaded = Configuration_file.load ~on_file_not_found ~config_file () in
+    let* loaded =
+      Configuration_file.exit_on_configuration_error
+        ~emit:Event.emit_configuration_loading_failed
+      @@ Configuration_file.load ~on_file_not_found ~config_file ()
+    in
     return (configuration_override loaded)
   in
   let*! () = Event.emit_configuration_loaded () in

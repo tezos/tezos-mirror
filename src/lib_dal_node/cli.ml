@@ -949,6 +949,10 @@ module Config = struct
        $ verbose $ ignore_l1_config_peers $ disable_amplification
        $ batching_configuration))
 
+  let print_trace ~error_trace =
+    Format.eprintf "Failure: %a" Error_monad.pp_print_trace error_trace ;
+    Lwt.return_unit
+
   module Init = struct
     let man =
       [
@@ -973,9 +977,10 @@ module Config = struct
 
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
-      Configuration_file.save
-        ~config_file
-        (configuration_override Configuration_file.default)
+      Configuration_file.exit_on_configuration_error ~emit:print_trace
+      @@ Configuration_file.save
+           ~config_file
+           (configuration_override Configuration_file.default)
 
     let term = mk_term action
 
@@ -1004,7 +1009,10 @@ module Config = struct
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
       let open Lwt_result_syntax in
-      let* configuration = Configuration_file.load ~config_file () in
+      let* configuration =
+        Configuration_file.exit_on_configuration_error ~emit:print_trace
+        @@ Configuration_file.load ~config_file ()
+      in
       Configuration_file.save
         ~config_file
         (configuration_override configuration)
