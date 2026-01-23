@@ -2956,6 +2956,35 @@ module Dal : sig
     val check_is_in_range : number_of_slots:int -> t -> unit tzresult
   end
 
+  module Attestations : sig
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val empty : t
+
+    val commit :
+      t ->
+      number_of_slots:int ->
+      number_of_lags:int ->
+      lag_index:int ->
+      Slot_index.t ->
+      t
+
+    val is_attested :
+      t ->
+      number_of_slots:int ->
+      number_of_lags:int ->
+      lag_index:int ->
+      Slot_index.t ->
+      bool
+
+    val occupied_size_in_bits : t -> int
+
+    val expected_max_size_in_bits :
+      number_of_slots:int -> number_of_lags:int -> int
+  end
+
   (** This module re-exports definitions from {!Dal_attestation_repr} and
       {!Raw_context.Dal}. *)
   module Attestation : sig

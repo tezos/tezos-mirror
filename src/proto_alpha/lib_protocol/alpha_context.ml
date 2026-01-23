@@ -142,6 +142,10 @@ module Dal = struct
     include Dal_slot_index_repr
   end
 
+  module Attestations = struct
+    include Dal_attestations_repr
+  end
+
   module Attestation = struct
     include Dal_attestation_repr.Accountability
     include Dal_attestation_repr
