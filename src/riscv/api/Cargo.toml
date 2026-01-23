@@ -16,6 +16,7 @@ octez-riscv.workspace = true
 octez-riscv-data.workspace = true
 ocaml-sys.workspace = true
 ocaml-boxroot-sys.workspace = true
+parking_lot.workspace = true
 
 [build-dependencies]
 ocaml-build.workspace = true
