@@ -101,7 +101,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs ?(limit_dune_build_jobs = false) pipeline_type =
+let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let make_job_docker_systemd_tests =
     make_job_docker_systemd_tests
       ~base_image:
@@ -127,9 +127,11 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~distribution:"ubuntu"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
   in
-
   let make_job_docker_build_debian_dependencies =
     make_docker_build_dependencies
+      ?rules:
+        (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+         else None)
       ~base_image:
         Images.Base_images.(
           sf "%s/$DISTRIBUTION:$RELEASE-%s" path_prefix debian_version)
@@ -145,6 +147,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-debian-dependencies"
       ~distribution:"debian"
       ~matrix:(debian_package_release_matrix pipeline_type)
+      ()
   in
   let job_docker_build_ubuntu_dependencies : tezos_job =
     make_job_docker_build_debian_dependencies
@@ -152,6 +155,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-ubuntu-dependencies"
       ~distribution:"ubuntu"
       ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ()
   in
   let make_job_build_debian_packages =
     make_job_build_packages ~limit_dune_build_jobs
