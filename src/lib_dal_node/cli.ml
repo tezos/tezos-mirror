@@ -961,9 +961,8 @@ module Config = struct
           "This command creates a configuration file with the parameters \
            provided on the command-line, if no configuration file exists \
            already in the specified or default location. Otherwise, the \
-           command-line parameters override the existing ones, and old \
-           parameters are lost. This configuration is then used by the run \
-           command.";
+           command fails, use reset instead. This configuration is then used \
+           by the run command.";
       ]
 
     let info =
@@ -980,6 +979,33 @@ module Config = struct
       Configuration_file.exit_on_configuration_error ~emit:print_trace
       @@ Configuration_file.save
            ~allow_overwrite:false
+           ~config_file
+           (configuration_override Configuration_file.default)
+
+    let term = mk_term action
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  module Reset = struct
+    let man =
+      [
+        `S "DESCRIPTION";
+        `P
+          "This command replace the existing configuration file in the \
+           specified or default location with the parameters provided on the \
+           command-line. This configuration is then used by the run command.";
+      ]
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~exits ~doc:"Configuration reset" ~man ~version "reset"
+
+    let action =
+      mk_action @@ fun ~config_file ~configuration_override ->
+      Configuration_file.exit_on_configuration_error ~emit:print_trace
+      @@ Configuration_file.save
+           ~allow_overwrite:true
            ~config_file
            (configuration_override Configuration_file.default)
 
@@ -1035,7 +1061,7 @@ module Config = struct
         ~version
         "config"
     in
-    Cmdliner.Cmd.group ~default info [Init.cmd; Update.cmd]
+    Cmdliner.Cmd.group ~default info [Init.cmd; Reset.cmd; Update.cmd]
 end
 
 module Snapshot = struct
