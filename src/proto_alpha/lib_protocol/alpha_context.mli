@@ -2995,6 +2995,41 @@ module Dal : sig
       number_of_slots:int -> number_of_lags:int -> int
 
     val weight : t -> int
+
+    module Dal_dependent_signing : sig
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.weight}. *)
+      val weight :
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
+        op:bytes ->
+        t ->
+        Z.t
+
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_pk}. *)
+      val aggregate_pk :
+        subgroup_check:bool ->
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
+        op:bytes ->
+        t ->
+        Bls.Public_key.t option
+
+      (** See {!Dal_attestation_repr.Dal_dependent_signing.aggregate_sig}. *)
+      val aggregate_sig :
+        subgroup_check:bool ->
+        consensus_pk:Bls.Public_key.t ->
+        companion_pk:Bls.Public_key.t ->
+        consensus_sig:Bls.t ->
+        companion_sig:Bls.t ->
+        op:bytes ->
+        t ->
+        Bls.t option
+    end
+
+    module Internal_for_tests : sig
+      (** See {!Dal_attestation_repr.Internal_for_tests.of_z}. *)
+      val of_z : Z.t -> t tzresult
+    end
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
