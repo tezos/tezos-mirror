@@ -120,6 +120,8 @@ val occupied_size_in_bits : t -> int
     maximum size (in bits) of a [t] value. *)
 val expected_max_size_in_bits : number_of_slots:int -> number_of_lags:int -> int
 
+val weight : t -> int
+
 (** Type alias for use in submodules. *)
 type attestation = t
 

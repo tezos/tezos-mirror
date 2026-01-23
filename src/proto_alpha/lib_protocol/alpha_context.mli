@@ -2983,6 +2983,8 @@ module Dal : sig
 
     val expected_max_size_in_bits :
       number_of_slots:int -> number_of_lags:int -> int
+
+    val weight : t -> int
   end
 
   (** This module re-exports definitions from {!Dal_attestation_repr} and
