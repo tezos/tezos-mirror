@@ -314,11 +314,11 @@ mod tests {
 
         for i in 0..10 {
             // subkey of prefix
-            let subkey = format!("{}/{}", prefix, i);
+            let subkey = format!("{prefix}/{i}");
             // not subkey as not a sub-path
-            let almost_subkey = format!("{}{}", prefix, i);
+            let almost_subkey = format!("{prefix}{i}");
             // completely different prefix
-            let not_subkey = format!("/different/prefix/{}", i);
+            let not_subkey = format!("/different/prefix/{i}");
 
             state
                 .store
@@ -362,11 +362,11 @@ mod tests {
 
         for i in 0..10 {
             // subkey of prefix
-            let subkey = format!("{}/{}", prefix, i);
+            let subkey = format!("{prefix}/{i}");
             // not subkey as not a sub-path
-            let almost_subkey = format!("{}{}", prefix, i);
+            let almost_subkey = format!("{prefix}{i}");
             // completely different prefix
-            let not_subkey = format!("/different/prefix/{}", i);
+            let not_subkey = format!("/different/prefix/{i}");
 
             state
                 .store
@@ -408,11 +408,11 @@ mod tests {
 
         for i in 0..10 {
             // subkey of prefix
-            let subkey = format!("{}/{}", prefix, i);
+            let subkey = format!("{prefix}/{i}");
             // not subkey as not a sub-path
-            let almost_subkey = format!("{}{}", prefix, i);
+            let almost_subkey = format!("{prefix}{i}");
             // completely different prefix
-            let not_subkey = format!("/different/prefix/{}", i);
+            let not_subkey = format!("/different/prefix/{i}");
 
             state
                 .store

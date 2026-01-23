@@ -97,7 +97,7 @@ pub struct DefaultSink;
 impl DebugSink for DefaultSink {
     fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
         let output = String::from_utf8_lossy(buffer);
-        eprint!("{}", output);
+        eprint!("{output}");
         Ok(())
     }
 }

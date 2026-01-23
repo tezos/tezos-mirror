@@ -44,7 +44,7 @@ fn main() -> Result<(), ClientError> {
             output::save_kernel(output, &kernel).map_err(ClientError::SaveInstaller)?;
 
             if display_root_hash {
-                println!("ROOT_HASH: {}", root_hash_hex);
+                println!("ROOT_HASH: {root_hash_hex}");
             };
         }
         Commands::MergeSetupFiles {

@@ -62,7 +62,7 @@ pub(crate) mod annots {
     impl fmt::Display for Annotation {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Annotation(s) = self;
-            write!(f, "{}", s)
+            write!(f, "{s}")
         }
     }
 

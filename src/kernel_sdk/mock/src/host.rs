@@ -206,7 +206,7 @@ unsafe impl SmartRollupCore for MockHost {
         // only `Reveal_hash` supported for now.
         let hash = from_raw_parts(hash_addr, hash_len)
             .try_into()
-            .unwrap_or_else(|_| panic!("Hash is not {} bytes", PREIMAGE_HASH_SIZE));
+            .unwrap_or_else(|_| panic!("Hash is not {PREIMAGE_HASH_SIZE} bytes"));
 
         let bytes = self
             .state
