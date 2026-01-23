@@ -25,6 +25,8 @@
 
 module Types = Tezos_dal_node_services.Types
 
+let exits = Errors.Exit_codes.all
+
 let env_value_starts_with_yes ~env_var =
   match Sys.getenv_opt env_var with
   | None -> false
@@ -707,10 +709,10 @@ let wrap_with_error main_promise =
   let open Lwt_syntax in
   let* r = Lwt_exit.wrap_and_exit main_promise in
   match r with
-  | Ok () -> Lwt_exit.exit_and_wait 0
+  | Ok () -> Lwt_exit.exit_and_wait Errors.Exit_codes.ok
   | Error err ->
       let* () = Lwt_io.eprint (Format.asprintf "%a" pp_print_trace err) in
-      Lwt_exit.exit_and_wait 1
+      Lwt_exit.exit_and_wait Errors.Exit_codes.some_error
 
 (** [wrap_action action] is the main entry point wrapper for DAL node commands.
     It sets up the exception filter to handle all exceptions except runtime ones,
@@ -731,7 +733,7 @@ module Run = struct
 
   let info =
     let version = Tezos_version_value.Bin_version.octez_version_string in
-    Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
+    Cmdliner.Cmd.info ~exits ~doc:"Run the Octez DAL node" ~man ~version "run"
 
   let action =
    fun data_dir
@@ -962,7 +964,12 @@ module Config = struct
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Configuration initialisation"
+        ~man
+        ~version
+        "init"
 
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
@@ -987,7 +994,12 @@ module Config = struct
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Configuration update" ~man ~version "update"
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Configuration update"
+        ~man
+        ~version
+        "update"
 
     let action =
       mk_action @@ fun ~config_file ~configuration_override ->
@@ -1007,6 +1019,7 @@ module Config = struct
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info
+        ~exits
         ~doc:"Manage the Octez DAL node configuration"
         ~man
         ~version
@@ -1060,7 +1073,7 @@ module Snapshot = struct
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Export snapshot" ~man ~version "export"
+      Cmdliner.Cmd.info ~exits ~doc:"Export snapshot" ~man ~version "export"
 
     let action min_published_level max_published_level slots data_dir endpoint
         config_file file_path =
@@ -1107,7 +1120,7 @@ module Snapshot = struct
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Import snapshot" ~man ~version "import"
+      Cmdliner.Cmd.info ~exits ~doc:"Import snapshot" ~man ~version "import"
 
     let action min_published_level max_published_level slots data_dir endpoint
         config_file no_check file_path =
@@ -1148,7 +1161,12 @@ module Snapshot = struct
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Snapshot management" ~man ~version "snapshot"
+      Cmdliner.Cmd.info
+        ~exits
+        ~doc:"Snapshot management"
+        ~man
+        ~version
+        "snapshot"
     in
     Cmdliner.Cmd.group ~default info [Export.cmd; Import.cmd]
 end
@@ -1179,7 +1197,12 @@ module Debug = struct
 
         let info =
           let version = Tezos_version_value.Bin_version.octez_version_string in
-          Cmdliner.Cmd.info ~doc:"Print SQL statements" ~man ~version "schemas"
+          Cmdliner.Cmd.info
+            ~exits
+            ~doc:"Print SQL statements"
+            ~man
+            ~version
+            "schemas"
 
         let action () =
           Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
@@ -1199,6 +1222,7 @@ module Debug = struct
         let info =
           let version = Tezos_version_value.Bin_version.octez_version_string in
           Cmdliner.Cmd.info
+            ~exits
             ~doc:"Print DAL node store debug information"
             ~man
             ~version
@@ -1211,7 +1235,12 @@ module Debug = struct
       let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
       let info =
         let version = Tezos_version_value.Bin_version.octez_version_string in
-        Cmdliner.Cmd.info ~doc:"Print debug information" ~man ~version "print"
+        Cmdliner.Cmd.info
+          ~exits
+          ~doc:"Print debug information"
+          ~man
+          ~version
+          "print"
       in
       Cmdliner.Cmd.group ~default info [Store.cmd]
   end
@@ -1220,7 +1249,7 @@ module Debug = struct
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
-      Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
+      Cmdliner.Cmd.info ~exits ~doc:"Debug commands" ~man ~version "debug"
     in
     Cmdliner.Cmd.group ~default info [Print.cmd]
 end
@@ -1326,7 +1355,7 @@ let commands =
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
     let version = Tezos_version_value.Bin_version.octez_version_string in
-    Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
+    Cmdliner.Cmd.info ~exits ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
   Cmdliner.Cmd.group
     ~default

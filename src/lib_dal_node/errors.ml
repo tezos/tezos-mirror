@@ -258,3 +258,15 @@ let to_tzresult r =
   let open Lwt_result_syntax in
   let*! r in
   match r with Ok s -> return s | Error e -> error_to_tzresult e
+
+module Exit_codes = struct
+  include Cmdliner.Cmd.Exit
+
+  let invalid_configuration_file =
+    Cmdliner.Cmd.Exit.info 1 ~doc:"$(status): configuration file invalid"
+
+  let invalid_configuration_file_code =
+    Cmdliner.Cmd.Exit.info_code invalid_configuration_file
+
+  let all = defaults @ [invalid_configuration_file]
+end
