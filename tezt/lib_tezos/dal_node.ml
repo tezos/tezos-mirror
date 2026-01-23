@@ -134,7 +134,7 @@ let mk_backup_uris_args sources =
 let mk_trust_slots_backup_uris flag =
   if flag then ["--trust-slots-backup-uris"] else []
 
-let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
+let spawn_config_init_or_reset ~subcommand ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
@@ -142,7 +142,7 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   spawn_command dal_node @@ ["config"]
   @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
   @ [
-      "init";
+      subcommand;
       "--data-dir";
       data_dir dal_node;
       "--rpc-addr";
@@ -185,6 +185,10 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some Full -> ["--history-mode"; "full"]
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
+
+let spawn_config_init = spawn_config_init_or_reset ~subcommand:"init"
+
+let spawn_config_reset = spawn_config_init_or_reset ~subcommand:"reset"
 
 let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
@@ -244,6 +248,25 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_init
+      ?expected_pow
+      ?peers
+      ?attester_profiles
+      ?operator_profiles
+      ?observer_profiles
+      ?bootstrap_profile
+      ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
+      ?batching_time_interval
+      dal_node
+  in
+  Process.check process
+
+let reset_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
+  let process =
+    spawn_config_reset
       ?expected_pow
       ?peers
       ?attester_profiles

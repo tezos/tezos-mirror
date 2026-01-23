@@ -206,6 +206,38 @@ val init_config :
   t ->
   unit Lwt.t
 
+val spawn_config_reset :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  Process.t
+
+(** Run [octez-dal-node config init].
+
+    [expected_pow] allows to change the PoW difficulty. Default value is 0.
+*)
+val reset_config :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  unit Lwt.t
+
 val spawn_config_update :
   ?expected_pow:float ->
   ?peers:string list ->
