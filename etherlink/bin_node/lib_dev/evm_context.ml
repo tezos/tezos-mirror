@@ -35,6 +35,8 @@ type future_block_info = {
   timestamp : Time.Protocol.t;
   next_tx_index : int32;
   applied_sequencer_upgrade : bool;
+  da_fee_per_byte : Ethereum_types.quantity;
+  base_fee_per_gas : Z.t;
 }
 
 type session_state = {
@@ -948,18 +950,51 @@ module State = struct
       let* evm_state, applied_sequencer_upgrade =
         handle_sequencer_upgrade ctxt conn ~timestamp ~data_dir ~config
       in
+      let* da_fee_per_byte =
+        Etherlink_durable_storage.da_fee_per_byte (read_from_state evm_state)
+      in
+      let* (Ethereum_types.Qty base_fee_per_gas) =
+        Etherlink_durable_storage.base_fee_per_gas (read_from_state evm_state)
+      in
       ctxt.session.evm_state <- evm_state ;
       ctxt.session.future_block_info <-
-        Some {timestamp; next_tx_index = 0l; applied_sequencer_upgrade} ;
+        Some
+          {
+            timestamp;
+            next_tx_index = 0l;
+            applied_sequencer_upgrade;
+            da_fee_per_byte;
+            base_fee_per_gas;
+          } ;
       return_unit)
     else (
       ctxt.session.future_block_info <- None ;
       return_unit)
 
+  let compute_execution_gas ~tx ~da_fee_per_byte ~base_fee_per_gas ~gas_used =
+    match tx with
+    | Broadcast.Common (Evm raw_tx) -> (
+        match Transaction_object.decode raw_tx with
+        | Ok transaction_object ->
+            let input_hex = Transaction_object.input transaction_object in
+            let da_fees =
+              Fees.gas_used_for_da_fees
+                ~da_fee_per_byte
+                ~base_fee_per_gas
+                (Ethereum_types.hex_to_real_bytes input_hex)
+            in
+            Z.sub gas_used da_fees
+        | Error _ -> gas_used)
+    | Common (Michelson _) | Delayed _ ->
+        (* TODO: Update computation for Michelson case *)
+        gas_used
+
   let execute_single_transaction ctxt (tx : Broadcast.transaction) hash =
     let open Lwt_result_syntax in
     match ctxt.session.future_block_info with
-    | Some ({timestamp; next_tx_index; _} as future_block_info) ->
+    | Some
+        ({timestamp; next_tx_index; da_fee_per_byte; base_fee_per_gas; _} as
+         future_block_info) ->
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
@@ -978,6 +1013,16 @@ module State = struct
             hash
             tx
         in
+        Octez_telemetry.Trace.add_attrs (fun () ->
+            let (Ethereum_types.Qty gas_used) = receipt.gasUsed in
+            let execution_gas =
+              compute_execution_gas
+                ~tx
+                ~da_fee_per_byte
+                ~base_fee_per_gas
+                ~gas_used
+            in
+            [Telemetry.Attributes.Transaction.execution_gas execution_gas]) ;
         ctxt.session.evm_state <- evm_state ;
         ctxt.session.future_block_info <-
           Some {future_block_info with next_tx_index = Int32.succ next_tx_index} ;

@@ -39,6 +39,9 @@ module Attributes : sig
   module Transaction : sig
     (** Hex-encoded hash of the transaction being processed *)
     val hash : Ethereum_types.hash -> Opentelemetry.key_value
+
+    (** Integer representation of the execution gas (gas_used minus DA fees gas) *)
+    val execution_gas : Z.t -> Opentelemetry.key_value
   end
 
   (** Tags to add to a span or event handling a given block.  *)

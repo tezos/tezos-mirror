@@ -63,6 +63,9 @@ module Attributes = struct
     let hash hash =
       ( "etherlink.transaction.hash",
         `String (Ethereum_types.hash_to_string hash) )
+
+    let execution_gas qty =
+      ("etherlink.transaction.execution_gas", `Int (Z.to_int qty))
   end
 
   module Block = struct
