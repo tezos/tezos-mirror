@@ -61,18 +61,25 @@ let minimum_ethereum_transaction_size =
 module Types = struct
   type nonrec parameters = parameters
 
+  type preconfirmation_state =
+    | Potential_next_block_timestamp of Time.Protocol.t
+
+  type preconfirmation =
+    | Disabled
+    | Awaiting_first_timestamp
+    | Enabled of preconfirmation_state
+
   type state = {
     signer : Signer.map;
     maximum_number_of_chunks : int;
     tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
-    preconfirmation_stream_enabled : bool;
+    mutable preconfirmation_state : preconfirmation;
     mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
     mutable validation_state : Validation_types.validation_state option;
-    mutable next_block_timestamp : Time.System.t option;
   }
 end
 
@@ -106,7 +113,7 @@ module Request = struct
         force : force;
       }
         -> ([`Block_produced of int | `No_block], tztrace) t
-    | Propose_next_block_timestamp : Time.System.t -> (unit, tztrace) t
+    | Propose_next_block_timestamp : Time.Protocol.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
         -> (preconfirmed_transactions_result, tztrace) t
@@ -188,7 +195,7 @@ module Request = struct
           ~title:"Propose_next_block_timestamp"
           (obj2
              (req "request" (constant "propose_next_block_timestamp"))
-             (req "timestamp" Time.System.encoding))
+             (req "timestamp" Time.Protocol.encoding))
           (function
             | View (Propose_next_block_timestamp timestamp) ->
                 Some ((), timestamp)
@@ -507,7 +514,16 @@ let compute_next_block_timestamp ~now =
   let now_plus =
     Ptime.add_span now t_500 |> WithExceptions.Option.get ~loc:__LOC__
   in
-  Time.System.(max now_plus now')
+  Time.System.(max now_plus now') |> Time.System.to_protocol
+
+let preconfirmation_stream_enabled state =
+  match state.Types.preconfirmation_state with Disabled -> false | _ -> true
+
+let set_preconfirmation_state (state : Types.state) preconfirmation_state =
+  match state.preconfirmation_state with
+  | Types.Disabled -> ()
+  | Awaiting_first_timestamp | Enabled _ ->
+      state.preconfirmation_state <- Enabled preconfirmation_state
 
 let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
   let open Lwt_result_syntax in
@@ -524,22 +540,21 @@ let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
       chunks
       delayed_transactions
   in
-  state.next_block_timestamp <-
-    Some
-      (compute_next_block_timestamp
-         ~now:(Time.System.of_protocol_exn timestamp)) ;
+  set_preconfirmation_state
+    state
+    (Types.Potential_next_block_timestamp
+       (compute_next_block_timestamp
+          ~now:(Time.System.of_protocol_exn timestamp))) ;
   Blueprints_publisher.publish
     Z.zero
     (Blueprints_publisher_types.Request.Blueprint
        {chunks = genesis_chunks; inbox_payload = genesis_payload})
 
-let choose_block_timestamp next_block_timestamp (force : force) =
-  match force with
-  | With_timestamp t -> t
-  | _ -> (
-      match Option.map Time.System.to_protocol next_block_timestamp with
-      | Some ts -> ts
-      | None -> Misc.now ())
+let choose_block_timestamp preconfirmation_state (force : force) =
+  match (force, preconfirmation_state) with
+  | With_timestamp t, _ -> t
+  | _, Types.Enabled (Potential_next_block_timestamp t) -> t
+  | _, _ -> Misc.now ()
 
 let produce_block (state : Types.state) ~force ~with_delayed_transactions =
   let open Lwt_result_syntax in
@@ -554,7 +569,7 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
        ensuring consistency between preconfirmation and block creation.
   *)
   let now = Ptime_clock.now () in
-  let timestamp = choose_block_timestamp state.next_block_timestamp force in
+  let timestamp = choose_block_timestamp state.preconfirmation_state force in
   let*! head_info = Evm_context.head_info () in
   let* () =
     when_ (not state.sunset) @@ fun () ->
@@ -583,11 +598,13 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
     let signer = state.signer in
     if is_going_to_upgrade_kernel then (
       let* result = produce_empty_block ~signer ~timestamp head_info in
-      state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
+      set_preconfirmation_state
+        state
+        (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
       return result)
     else
       let* delayed_hashes, transactions_and_objects =
-        if state.preconfirmation_stream_enabled then
+        if preconfirmation_stream_enabled state then
           let* delayed_hashes =
             match (state.selected_delayed_txns, state.validated_txns) with
             | [], [] ->
@@ -637,7 +654,8 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
           ~transactions_and_objects
           ~delayed_hashes
           ~tx_container
-          ~clear_pending_queue_after:(not state.preconfirmation_stream_enabled)
+          ~clear_pending_queue_after:
+            (not (preconfirmation_stream_enabled state))
           head_info
       in
       let* result =
@@ -646,7 +664,9 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
             produce_empty_block ~signer ~timestamp head_info
         | result, _ -> return result
       in
-      state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
+      set_preconfirmation_state
+        state
+        (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
       let* () = clear_preconfirmation_data ~state in
       return result
 
@@ -679,7 +699,6 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let* current_size, opt_delayed_hashes =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then
-      let proto_timestamp = Time.System.to_protocol timestamp in
       let* delayed_hashes, remaining_cumulative_size =
         head_info_and_delayed_transactions
           ~with_delayed_transactions:true
@@ -688,7 +707,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
       in
       return
         ( Int.sub maximum_cumulative_size remaining_cumulative_size,
-          Some (proto_timestamp, delayed_hashes) )
+          Some delayed_hashes )
     else return (0, None)
   in
   let* validation_state =
@@ -733,9 +752,9 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     | `Keep latest_validation_state ->
         let* () =
           match opt_delayed_hashes with
-          | Some (next_block_timestamp, delayed_hashes) ->
+          | Some delayed_hashes ->
               notify_next_block_with_delayed
-                ~next_block_timestamp
+                ~next_block_timestamp:timestamp
                 ~delayed_hashes
                 ~number:head_info.next_blueprint_number
                 ~state
@@ -795,17 +814,20 @@ module Handlers = struct
         produce_block state ~force ~with_delayed_transactions
     | Request.Propose_next_block_timestamp timestamp ->
         protect @@ fun () ->
-        state.next_block_timestamp <- Some timestamp ;
+        set_preconfirmation_state
+          state
+          (Potential_next_block_timestamp timestamp) ;
         Lwt_result_syntax.return_unit
     | Request.Preconfirm_transactions transactions -> (
         let open Lwt_result_syntax in
         protect @@ fun () ->
         (* If we are before the first created block and block producer
           is not aware of its future timestamp, preconfirmation are disabled *)
-        match state.next_block_timestamp with
-        | Some timestamp ->
-            preconfirm_transactions ~state ~transactions ~timestamp
-        | None -> tzfail IC_disabled)
+        match state.preconfirmation_state with
+        | Disabled -> tzfail IC_disabled
+        | Awaiting_first_timestamp -> tzfail IC_disabled
+        | Enabled (Potential_next_block_timestamp timestamp) ->
+            preconfirm_transactions ~state ~transactions ~timestamp)
 
   type launch_error = error trace
 
@@ -826,11 +848,12 @@ module Handlers = struct
           maximum_number_of_chunks;
           tx_container;
           sequencer_sunset_sec;
-          preconfirmation_stream_enabled;
+          preconfirmation_state =
+            (if preconfirmation_stream_enabled then Awaiting_first_timestamp
+             else Disabled);
           validation_state = None;
           selected_delayed_txns = [];
           validated_txns = [];
-          next_block_timestamp = None;
         }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
