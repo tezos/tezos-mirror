@@ -40,3 +40,9 @@ val signal_signed :
   signals:(int * int32) list ->
   smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
   unit Lwt.t
+
+(** [report_ready_and_statuses ~operations ~ready_opertions]
+    advertizes the number of operations ready to be published among
+    the currrently injected DAL operations. *)
+val report_ready_operations :
+  operations:int -> ready_operations:int -> unit Lwt.t

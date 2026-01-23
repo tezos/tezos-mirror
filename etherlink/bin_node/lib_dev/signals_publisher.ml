@@ -139,6 +139,11 @@ module Worker = struct
     let ready_injections =
       List.filter_map (is_signal_injection_ready ~finalized_level) statuses
     in
+    let*! () =
+      Signals_publisher_events.report_ready_operations
+        ~operations:(List.length statuses)
+        ~ready_operations:(List.length ready_injections)
+    in
     unless (List.is_empty ready_injections) (fun () ->
         let* () =
           List.iter_es

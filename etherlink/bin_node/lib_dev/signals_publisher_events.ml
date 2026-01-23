@@ -64,6 +64,17 @@ let signal_signed =
         pp_print_list ~pp_sep:pp_print_space (fun fmt (k, v) ->
             fprintf fmt "(%d, %ld)" k v))
 
+let report_ready_operations =
+  declare_2
+    ~section
+    ~name:"signal_publisher_report_ready_operations"
+    ~msg:
+      "among {operations} injected DAL operations, {ready_operations} are \
+       ready to be signaled"
+    ~level:Info
+    ("operations", Data_encoding.uint16)
+    ("ready_operations", Data_encoding.uint16)
+
 let publisher_is_ready () = emit publisher_ready ()
 
 let publisher_shutdown () = emit publisher_shutdown ()
@@ -75,3 +86,6 @@ let commited_or_included_injection_id ~injector_op_hash ~published_level =
 
 let signal_signed ~signals ~smart_rollup_address =
   emit signal_signed (signals, smart_rollup_address)
+
+let report_ready_operations ~operations ~ready_operations =
+  emit report_ready_operations (operations, ready_operations)

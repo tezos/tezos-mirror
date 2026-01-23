@@ -2028,6 +2028,16 @@ signal_publisher_is_ready:
     { /* signal_publisher_is_ready version 0 */
       "signal_publisher_is_ready.v0": any }
   
+signal_publisher_report_ready_operations:
+  description: among {operations} injected DAL operations, {ready_operations} are ready to be signaled
+  level: info
+  section: evm_node.dev.signal_publisher
+  json format:
+    { /* signal_publisher_report_ready_operations version 0 */
+      "signal_publisher_report_ready_operations.v0":
+        { "operations": integer ∈ [0, 2^16-1],
+          "ready_operations": integer ∈ [0, 2^16-1] } }
+  
 signal_publisher_shutting_down:
   description: stopping the signals publisher worker
   level: info
