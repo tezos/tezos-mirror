@@ -215,7 +215,7 @@ let () =
       Format.fprintf
         ppf
         "The attester %a, with slot %a, is not part of the DAL committee for \
-         the level %a."
+         the level %a, and included a non-empty DAL attestation."
         Signature.Public_key_hash.pp
         attester
         Slot_repr.pp

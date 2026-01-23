@@ -656,8 +656,8 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
-(* Check that if an attester includes some DAL content but they have no assigned
-   shards, then an error is returned at block validation.
+(* Check that if an attester includes some non-empty DAL content but they have
+   no assigned shards, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
    default test parameters, [consensus_committee_size = 25 < 64 =
@@ -703,7 +703,12 @@ let test_attester_with_no_assigned_shards () =
     in
     let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
     if in_committee && not has_assigned_shards then
-      let dal_content = {attestation = Dal.Attestation.empty} in
+      let slot_index =
+        Stdlib.Option.get
+          (Dal.Slot_index.of_int_opt ~number_of_slots:dal.number_of_slots 0)
+      in
+      let attestation = Dal.Attestation.(commit empty slot_index) in
+      let dal_content = {attestation} in
       let* op = Op.attestation ~manager_pkh:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
       let expect_apply_failure = function

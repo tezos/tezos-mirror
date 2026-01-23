@@ -1742,14 +1742,19 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           new_account.public_key_hash
           ~level
       in
+      let attested_slots =
+        (* Starting with 025, an empty DAL payload is allowed. *)
+        if Protocol.number protocol >= 025 then Slots [0] else Slots []
+      in
       let* _op, `OpHash _oph =
         inject_dal_attestation_exn
           ~protocol
-          ~error:Operation.dal_data_availibility_attester_not_in_committee
+          ~error:
+            (Operation.dal_data_availibility_attester_not_in_committee protocol)
           ~nb_slots
           ~level
           ~signer:new_account
-          (Slots [])
+          attested_slots
           client
       in
       (* Bake with all the bootstrap accounts, but not with the new account. *)
