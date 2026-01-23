@@ -327,7 +327,7 @@ module Make (X : PARAMETERS) = struct
       | None -> None
       | Some runner ->
           (* If the daemon shuts down, the command will fail. A proposition is
-             to use "tail --retry --folow" instead.
+             to use "tail --retry --follow" instead.
 
              However, it seems that "tail" can be blocking.
 

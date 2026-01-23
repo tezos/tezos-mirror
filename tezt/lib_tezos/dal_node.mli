@@ -237,6 +237,9 @@ val update_config :
 module Config_file : sig
   (** DAL node configuration files. *)
 
+  (**   *)
+  val filename : t -> string
+
   (** Read the configuration file ([config.json]) of a DAL node. *)
   val read : t -> JSON.t
 
