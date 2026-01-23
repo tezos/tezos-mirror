@@ -108,8 +108,12 @@ val store_path : t -> string
     from a data dir. *)
 val default_config_file : string -> string
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : config_file:string -> t -> unit tzresult Lwt.t
+(** [save ~allow_overwrite ~config_file] writes config file in [config.data_dir] if it doesn't exists or allow_overwrite is true.
+
+    If the file exists and allow_overwrite is false, the function returns an error.
+*)
+val save :
+  allow_overwrite:bool -> config_file:string -> t -> unit tzresult Lwt.t
 
 (** [load ~on_file_not_found ~config_file ()] load config file from
     [config.data_dir] if it exists. If not it calls the provided on_file_not_found function.

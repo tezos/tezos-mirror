@@ -465,7 +465,12 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       let*! () = Event.emit_config_file_not_found ~path:config_file in
       (* Store the default configuration if no configuration were found. *)
       let configuration = configuration_override Configuration_file.default in
-      let* () = Configuration_file.save ~config_file configuration in
+      let* () =
+        Configuration_file.save
+          ~allow_overwrite:false
+          ~config_file
+          configuration
+      in
       return configuration
     in
     let* loaded =

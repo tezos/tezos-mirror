@@ -979,6 +979,7 @@ module Config = struct
       mk_action @@ fun ~config_file ~configuration_override ->
       Configuration_file.exit_on_configuration_error ~emit:print_trace
       @@ Configuration_file.save
+           ~allow_overwrite:false
            ~config_file
            (configuration_override Configuration_file.default)
 
@@ -1014,6 +1015,7 @@ module Config = struct
         @@ Configuration_file.load ~config_file ()
       in
       Configuration_file.save
+        ~allow_overwrite:true
         ~config_file
         (configuration_override configuration)
 

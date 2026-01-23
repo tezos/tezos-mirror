@@ -101,6 +101,16 @@ open struct
       ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
 
+  let config_save_fail =
+    declare_1
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"config_save_fail"
+      ~msg:"saving configuration failed with error {error} "
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
+
   let dal_node_sqlite3_store_init =
     declare_0
       ~section
@@ -1426,6 +1436,9 @@ let emit_configuration_loaded () = emit configuration_loaded ()
 
 let emit_configuration_loading_failed ~error_trace =
   emit config_load_fail error_trace
+
+let emit_configuration_saving_failed ~error_trace =
+  emit config_save_fail error_trace
 
 let emit_upgrading_configuration ~from ~into =
   emit upgrading_configuration (from, into)
