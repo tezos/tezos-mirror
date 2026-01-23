@@ -241,7 +241,7 @@ Note that:
 Quickstart baker
 ~~~~~~~~~~~~~~~~
 
-Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as currentnet as follows (after :ref:`starting an Octez node <quickstart_node>`)::
+Putting together all the above instructions, you may want to quickly start a baker daemon on a testnet such as :ref:`currentnet <network_aliases>` as follows (after :ref:`starting an Octez node <quickstart_node>`)::
 
     octez-client gen keys mybaker
     BAKER_ADDRESS=$(octez-client show address mybaker | grep Hash | cut -d' ' -f2)

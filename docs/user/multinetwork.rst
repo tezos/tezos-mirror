@@ -107,6 +107,8 @@ In this case, you can pass to the ``--network`` option the corresponding predefi
 For instance, for running on weeklynet, you may use ``--network https://teztnets.com/weeklynet``.
 Note that this also works for builtin networks, albeit a bit longer.
 
+.. _network_aliases:
+
 There are also the following *predefined network aliases*:
 
 - ``currentnet``: designates the test network running the same protocol as mainnet
