@@ -723,13 +723,14 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
 
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
-    ?blocks_per_cycle ?delay_increment_per_round ?redundancy_factor ?slot_size
-    ?number_of_shards ?number_of_slots ?attestation_lag ?attestation_threshold
-    ?traps_fraction ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?incentives_enable ?dal_rewards_weight ?activation_timestamp
-    ?bootstrap_profile ?event_sections_levels ?operator_profiles ?history_mode
-    ?prover ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready
-    ?env ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ?blocks_per_cycle ?delay_increment_per_round ?consensus_committee_size
+    ?redundancy_factor ?slot_size ?number_of_shards ?number_of_slots
+    ?attestation_lag ?attestation_threshold ?traps_fraction ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
+    ?event_sections_levels ?operator_profiles ?history_mode ?prover
+    ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready ?env
+    ?disable_shard_validation ?disable_amplification ?ignore_pkhs
     ?batching_time_interval variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -751,6 +752,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?minimal_block_delay
         ?delay_increment_per_round
         ?blocks_per_cycle
+        ?consensus_committee_size
         ?redundancy_factor
         ?slot_size
         ?number_of_slots
@@ -1662,9 +1664,10 @@ let test_all_available_slots _protocol parameters cryptobox node client
    as a baker, and bakes blocks until it reaches a level where the new account
    is in the TB committee but not in the DAL committee).*)
 let test_slots_attestation_operation_dal_committee_membership_check protocol
-    parameters _cryptobox node client _bootstrap_key =
+    parameters _cryptobox node client dal_node =
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
+  let client = Client.with_dal_node client ~dal_node in
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
   let number_of_shards = parameters.cryptobox.number_of_shards in
   Log.info "number_of_shards = %d" number_of_shards ;
@@ -1728,11 +1731,13 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           String.equal member.Dal.Committee.attester new_account.public_key_hash)
         committee
     then (
-      Log.info "Bake another block to change the DAL committee" ;
+      Log.info
+        "The new account is in the DAL committee. Bake another block to change \
+         the DAL committee" ;
       let* () = bake_for client in
       iter ())
     else (
-      Log.info "The new account is not in the DAL committee" ;
+      Log.info "The new account is NOT in the DAL committee" ;
       Log.info "We check that the new account is in the Tenderbake committee" ;
       let* () =
         check_in_TB_committee
@@ -1757,24 +1762,41 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           attested_slots
           client
       in
-      (* Bake with all the bootstrap accounts, but not with the new account. *)
-      let* () =
-        let bootstrap_accounts =
-          Array.to_list Account.Bootstrap.keys
-          |> List.map (fun a -> a.Account.public_key_hash)
-        in
-        bake_for ~delegates:(`For bootstrap_accounts) client
-      in
+      Log.info "Bake a block and check the DAL attestation of the new baker." ;
+      let* () = bake_for client in
       let* json =
         Node.RPC.call node
         @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
       in
-      let num_ops = JSON.as_list json |> List.length in
+      let ops = JSON.as_list json in
       Check.(
-        (num_ops = Array.length Account.Bootstrap.keys)
+        (List.length ops = 1 + Array.length Account.Bootstrap.keys)
           int
           ~error_msg:"Expected %R operations, found %L") ;
-      unit)
+      let ops_contents =
+        List.map (fun op -> JSON.(op |-> "contents" |> as_list) |> List.hd) ops
+      in
+      let content =
+        List.find_opt
+          (fun contents ->
+            let delegate =
+              JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
+            in
+            delegate = new_account.public_key_hash)
+          ops_contents
+      in
+      match content with
+      | None ->
+          Test.fail "Did not find an attestation operation for the new delegate"
+      | Some contents ->
+          let kind = JSON.(contents |-> "kind" |> as_string) in
+          let expected_kind =
+            if Protocol.number protocol <= 024 then "attestation"
+            else "attestation_with_dal"
+          in
+          Check.(
+            (kind = expected_kind) string ~error_msg:"Expected %R, found %L") ;
+          unit)
   in
   iter ()
 
@@ -11850,7 +11872,7 @@ let register ~protocols =
     "Use all available slots"
     test_all_available_slots
     protocols ;
-  scenario_with_layer1_node
+  scenario_with_layer1_and_dal_nodes
     "slots attestation operation dal committee membership check"
     test_slots_attestation_operation_dal_committee_membership_check
     (* We need to set the prevalidator's event level to [`Debug]
