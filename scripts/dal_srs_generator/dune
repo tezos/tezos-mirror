@@ -1,0 +1,4 @@
+(executable
+ (name dal_srs_generator)
+ (libraries bls12-381.archive octez-libs.crypto-dal )
+ (modes native))
