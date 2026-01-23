@@ -2672,6 +2672,11 @@ let test_dal_node_invalid_config () =
          ~error_msg:
            "Invalid config file should be left untouched, got %L expected %R."
   in
+  let check_updated_contents ~expected_config ~new_contents =
+    Lwt.return
+    @@ Check.((new_contents = expected_config) string)
+         ~error_msg:"Config file is not what we expected, got %L expected %R."
+  in
   let run =
    fun dal_node ->
     Process.spawn
@@ -2705,12 +2710,34 @@ let test_dal_node_invalid_config () =
       ()
   in
   let* () =
-    (* config init overwrite config if file exists *)
+    (* config init cannot overwrite config if file exists *)
     test
       ~command:Dal_node.spawn_config_init
       ~contents:illformed_json_config
+      ~exit_code:1
+      ~msg:(rex "overwriting is forbidden")
+      ~check_contents:(check_contents ~initial_config:illformed_json_config)
+      ()
+  in
+  let* () =
+    (* config reset succeed if file  exists *)
+    test
+      ~command:Dal_node.spawn_config_reset
+      ~contents:correct_config_file
       ~exit_code:0
-      ~check_contents:(check_contents ~initial_config:correct_config_file)
+      ~check_contents:
+        (check_updated_contents ~expected_config:correct_config_file)
+      ()
+  in
+  let* () =
+    (* config reset also succeed if existing file is broken *)
+    test
+      ~command:Dal_node.spawn_config_reset
+      ~contents:illformed_json_config
+      ~exit_code:0
+      ~msg:(rex "")
+      ~check_contents:
+        (check_updated_contents ~expected_config:correct_config_file)
       ()
   in
   let* () =
