@@ -95,7 +95,7 @@ export GCP_PUBLIC_REGISTRY='us-central1-docker.pkg.dev/nl-gitlab-runner/registry
 ## Image names
 ##
 
-# By default, points to the versions in GCP_CI_REGISTRY. Thus by default,
+# By default, points to the versions in GCP_REGISTRY. Thus by default,
 # local image builds use images produced either locally, or on the
 # CI's protected refs. CI image builds pushes to and pulls from protected
 # (resp. unprotected) images on protected (resp. unprotected) refs.
@@ -104,9 +104,5 @@ export ci_image_name="${GCP_CI_REGISTRY}/tezos/tezos/ci"
 export ci_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/ci"
 
 export rust_toolchain_image_name="${GCP_CI_REGISTRY}/tezos/tezos/rust-toolchain"
-export rust_toolchain_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rust-toolchain"
-export rust_sdk_bindings_image_name="${GCP_CI_REGISTRY}/tezos/tezos/rust-sdk-bindings"
-export rust_sdk_bindings_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rust-sdk-bindings"
+
 export jsonnet_image_name="${GCP_CI_REGISTRY}/tezos/tezos/jsonnet"
-export jsonnet_image_name_protected="${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/jsonnet"
-export client_libs_dependencies_image_name="${GCP_CI_REGISTRY}/tezos/tezos/client-libs-dependencies"
