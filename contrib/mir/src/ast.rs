@@ -491,9 +491,19 @@ impl<'a> TypedValue<'a> {
         Self::Pair(Rc::new(l), Rc::new(r))
     }
 
+    /// Convenience function to construct a new [Self::Pair] from Rc values.
+    pub fn new_pair_rc(l: Rc<Self>, r: Rc<Self>) -> Self {
+        Self::Pair(l, r)
+    }
+
     /// Convenience function to construct a new [Self::Option].
     pub fn new_option(x: Option<Self>) -> Self {
         Self::Option(x.map(Rc::new))
+    }
+
+    /// Convenience function to construct a new [Self::Option] from Rc values.
+    pub fn new_option_rc(x: Option<Rc<Self>>) -> Self {
+        Self::Option(x)
     }
 
     /// Convenience function to construct a new [Self::Or].
@@ -502,6 +512,11 @@ impl<'a> TypedValue<'a> {
             Or::Left(v) => Or::Left(Rc::new(v)),
             Or::Right(v) => Or::Right(Rc::new(v)),
         })
+    }
+
+    /// Convenience function to construct a new [Self::Or] from Rc values.
+    pub fn new_or_rc(x: Or<Rc<Self>, Rc<Self>>) -> Self {
+        Self::Or(x)
     }
 
     /// Convenience function to construct a new [Self::Operation]. Allocates a new [Box].

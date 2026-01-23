@@ -263,6 +263,15 @@ fn interpret_one<'a>(
     // and binds those to `x, y, z` in the surrounding scope
     // `pop!(T::Bar, x, y, z)` is roughly equivalent to `let T::Bar(x, y, z) =
     // pop!() else {panic!()}` but with a clear error message.
+    macro_rules! pop_rc {
+        ($($args:tt)*) => {
+            crate::irrefutable_match::irrefutable_match!(
+                stack.pop().unwrap_or_else(|| unreachable_state());
+                $($args)*
+                )
+        };
+    }
+
     macro_rules! pop {
         ($($args:tt)*) => {
             crate::irrefutable_match::irrefutable_match!(
@@ -914,7 +923,7 @@ fn interpret_one<'a>(
         I::Dug(dug_height) => {
             ctx.gas().consume(interpret_cost::dug(*dug_height)?)?;
             if *dug_height > 0 {
-                let e = pop!();
+                let e = pop_rc!();
                 stack.insert(*dug_height as usize, e);
             }
         }
@@ -971,7 +980,7 @@ fn interpret_one<'a>(
             let lst = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::List);
             match lst.uncons() {
                 Some(x) => {
-                    stack.push(TypedValue::unwrap_rc(x));
+                    stack.push(x);
                     interpret(when_cons, ctx, arena, stack)?
                 }
                 None => {
@@ -985,11 +994,11 @@ fn interpret_one<'a>(
             let or = pop!(V::Or);
             match or {
                 Or::Left(x) => {
-                    stack.push(TypedValue::unwrap_rc(x));
+                    stack.push(x);
                     interpret(when_left, ctx, arena, stack)?
                 }
                 Or::Right(x) => {
-                    stack.push(TypedValue::unwrap_rc(x));
+                    stack.push(x);
                     interpret(when_right, ctx, arena, stack)?;
                 }
             }
@@ -1065,11 +1074,11 @@ fn interpret_one<'a>(
                 ctx.gas().consume(interpret_cost::LOOP)?;
                 match pop!(V::Or) {
                     Or::Left(x) => {
-                        stack.push(TypedValue::unwrap_rc(x));
+                        stack.push(x);
                         interpret(nested, ctx, arena, stack)?;
                     }
                     Or::Right(x) => {
-                        stack.push(TypedValue::unwrap_rc(x));
+                        stack.push(x);
                         ctx.gas().consume(interpret_cost::LOOP_EXIT)?;
                         break;
                     }
@@ -1083,7 +1092,7 @@ fn interpret_one<'a>(
                     let lst = pop!(V::List);
                     for i in lst {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(TypedValue::unwrap_rc(i));
+                        stack.push(i);
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1091,7 +1100,7 @@ fn interpret_one<'a>(
                     let set = pop!(V::Set);
                     for v in set {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(TypedValue::unwrap_rc(v));
+                        stack.push(v);
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1113,9 +1122,9 @@ fn interpret_one<'a>(
                     .into_iter()
                     .map(|elem| {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(TypedValue::unwrap_rc(elem));
+                        stack.push(elem);
                         interpret(nested, ctx, arena, stack)?;
-                        Ok(Rc::new(pop!()))
+                        Ok(pop!())
                     })
                     .collect::<Result<_, InterpretError>>()?;
                 stack.push(V::List(result));
@@ -1142,7 +1151,7 @@ fn interpret_one<'a>(
                     let val_temp = std::mem::replace(val, Rc::new(V::Unit));
                     stack.push(V::Pair(key.clone(), val_temp));
                     interpret(nested, ctx, arena, stack)?;
-                    *val = Rc::new(pop!());
+                    *val = pop_rc!();
                 }
                 stack.push(V::Map(map));
             }
@@ -1176,17 +1185,16 @@ fn interpret_one<'a>(
         }
         I::Pair => {
             ctx.gas().consume(interpret_cost::PAIR)?;
-            let l = pop!();
-            let r = pop!();
-            stack.push(V::new_pair(l, r));
+            let l = pop_rc!();
+            let r = pop_rc!();
+            stack.push(V::new_pair_rc(l, r));
         }
         I::PairN(n) => {
             ctx.gas().consume(interpret_cost::pair_n(*n as usize)?)?;
             let res = stack
                 .drain_top(*n as usize)
                 .rev()
-                .map(TypedValue::unwrap_rc)
-                .reduce(|acc, e| V::new_pair(e, acc))
+                .reduce(|acc, e| V::new_pair_rc(e, acc).into())
                 .unwrap();
             stack.push(res);
         }
@@ -1198,7 +1206,7 @@ fn interpret_one<'a>(
         }
         I::UnpairN(n) => {
             ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
-            fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: TypedValue<'a>) {
+            fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: Rc<TypedValue<'a>>) {
                 if n == 0 {
                     stack.push(p);
                 } else if let V::Pair(l, r) = p.as_ref() {
@@ -1208,14 +1216,14 @@ fn interpret_one<'a>(
                     unreachable_state();
                 }
             }
-            let p = pop!();
+            let p = pop_rc!();
             stack.reserve(*n as usize);
             fill(n - 1, stack, p);
         }
         I::ISome => {
             ctx.gas().consume(interpret_cost::SOME)?;
-            let v = pop!();
-            stack.push(V::new_option(Some(v)));
+            let v = pop_rc!();
+            stack.push(V::new_option_rc(Some(v)));
         }
         I::None => {
             ctx.gas().consume(interpret_cost::NONE)?;
@@ -1238,11 +1246,11 @@ fn interpret_one<'a>(
         }
         I::Cons => {
             ctx.gas().consume(interpret_cost::CONS)?;
-            let elt = pop!();
+            let elt = pop_rc!();
             let mut lst = pop!(V::List);
             // NB: this is slightly better than lists on average, but needs to
             // be benchmarked.
-            lst.cons(Rc::new(elt));
+            lst.cons(elt);
             stack.push(V::List(lst));
         }
         I::Concat(overload) => match overload {
@@ -1363,8 +1371,7 @@ fn interpret_one<'a>(
                 ctx.gas()
                     .consume(interpret_cost::map_get(&key, map.len())?)?;
                 let result = map.get(&key);
-                let result = result.map(|v| TypedValue::unwrap_rc(Rc::clone(v)));
-                stack.push(V::new_option(result));
+                stack.push(V::new_option_rc(result.cloned()));
             }
             overloads::Get::BigMap => {
                 let key = pop!();
@@ -1427,7 +1434,7 @@ fn interpret_one<'a>(
                     None => map.remove(&key),
                     Some(val) => map.insert(Rc::new(key), val),
                 };
-                let opt_old_val = opt_old_val.map(|v| TypedValue::unwrap_rc(v));
+                let opt_old_val = opt_old_val.map(TypedValue::unwrap_rc);
                 stack.push(V::new_option(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
@@ -1584,13 +1591,13 @@ fn interpret_one<'a>(
         }
         I::Left => {
             ctx.gas().consume(interpret_cost::LEFT)?;
-            let left = pop!();
-            stack.push(V::new_or(Or::Left(left)));
+            let left = pop_rc!();
+            stack.push(V::new_or_rc(Or::Left(left)));
         }
         I::Right => {
             ctx.gas().consume(interpret_cost::RIGHT)?;
-            let right = pop!();
-            stack.push(V::new_or(Or::Right(right)));
+            let right = pop_rc!();
+            stack.push(V::new_or_rc(Or::Right(right)));
         }
         I::Lambda(lam) => {
             ctx.gas().consume(interpret_cost::LAMBDA)?;
