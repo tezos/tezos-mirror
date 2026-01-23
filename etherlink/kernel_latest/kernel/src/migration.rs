@@ -743,6 +743,27 @@ fn migrate_to<Host: Runtime>(
             }
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V47 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const REGULAR_GOVERNANCE_KT: &[u8] =
+                    b"KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH";
+                const SECURITY_GOVERNANCE_KT: &[u8] =
+                    b"KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H";
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn";
+
+                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(
+                    &KERNEL_SECURITY_GOVERNANCE,
+                    SECURITY_GOVERNANCE_KT,
+                )?;
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 

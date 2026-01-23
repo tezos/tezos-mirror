@@ -2,15 +2,21 @@
 
 ## Version NEXT
 
-Its storage version is 45.
+Its storage version is 47.
 
 ### Features
+
+- Update the Layer 1 governance contracts to take into account protocol T L1
+  block time that is reduced from 8s to 6s. (!20574)
+    - [`KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH`](https://better-call.dev/mainnet/KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH) for the slow upgrade governance
+    - [`KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H`](https://better-call.dev/mainnet/KT1JGCdHEyvE3RkmzR7hRYK7vC42QF6zK34H) for the fast upgrade governance
+    - [`KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn`](https://better-call.dev/mainnet/KT1CSqkafD5ZCHFvmsozrCBeSy2XJQzutJRn) for the sequencer governance
 
 ### Bug fixes
 
 - Cleanup remaining leftover block indexes from V41 migration. (!20187)
-- EIP-7702 accounts will now have their code executed automatically when
-  XTZ deposits are received via the L1 bridge.
+- EIP-7702 accounts and smart contracts will now have their code executed
+  automatically when XTZ deposits are received via the L1 bridge.
   Note that the deposit event is now called via the XTZ Bridge
   `0xff00000000000000000000000000000000000001` and not the "system" address
   which was `0x0000000000000000000000000000000000000000`. (!20352)
