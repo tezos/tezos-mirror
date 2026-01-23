@@ -69,10 +69,10 @@ pub fn process_withdrawals(host: &mut impl Runtime, withdrawals: Vec<Withdrawal>
         // TODO: need to make sure withdrawals will never hit this limit
         // - part of the 'verify' step
         if let Err(err) = host.write_output(encoded.as_slice()) {
-            panic!("Failed to write outbox message {:?}\n", err);
+            panic!("Failed to write outbox message {err:?}\n");
         } else {
             #[cfg(feature = "debug")]
-            debug_msg!(host, "Withdrawal executed: {:?}\n", output);
+            debug_msg!(host, "Withdrawal executed: {output:?}\n");
         }
     }
 }

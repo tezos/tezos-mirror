@@ -419,7 +419,7 @@ mod tests {
                 // iterator buffer. Instead, we push a string containing a representation
                 // of the verifiable operation that has been parsed. This is quite hacky
                 // but it works for the purposes of testing.
-                let as_string = format!("{:?}", next_operation);
+                let as_string = format!("{next_operation:?}");
                 verifiable_operations.push(as_string);
             };
 
@@ -429,7 +429,7 @@ mod tests {
             let mut rest_iterator =  IteratorState::load(&mut host, 3).unwrap();
             let mut verifiable_operations_iter = verifiable_operations.into_iter();
             while let Some(next_operation)  = rest_iterator.next(&mut host).unwrap() {
-                let as_string = format!("{:?}", next_operation);
+                let as_string = format!("{next_operation:?}");
                 if let Some(verifiable_operation) = verifiable_operations_iter.next() {
                 assert_eq!(verifiable_operation, as_string);
                 } else {

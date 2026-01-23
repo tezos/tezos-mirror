@@ -214,7 +214,7 @@ impl<'a> VerifiableOperation<'a> {
     }
 
     /// Parse an operation, remembering the parsed slice.
-    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
         map(
             pair(consumed(Operation::nom_read), Ed25519Signature::nom_read),
             |((parsed, operation), signature)| Self {

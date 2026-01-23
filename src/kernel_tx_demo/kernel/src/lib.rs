@@ -429,8 +429,8 @@ mod test {
     }
 
     fn ticket_amount(mock_host: &MockHost, account: &ContractTz1Hash, ticket_id: u64) -> u64 {
-        let ticket_path = OwnedPath::try_from(format!("/accounts/{}/{}", account, ticket_id))
-            .expect("Invalid path");
+        let ticket_path =
+            OwnedPath::try_from(format!("/accounts/{account}/{ticket_id}")).expect("Invalid path");
 
         mock_host
             .store_read(&ticket_path, 0, MAX_FILE_CHUNK_SIZE)
