@@ -5,6 +5,7 @@ ARG BASE_IMAGE=debian:sid-slim
 FROM ${RUST_IMAGE}:${RUST_TAG} AS kernel_build
 ARG EVM_CONFIG=etherlink/config/dev.yaml
 ARG CI_COMMIT_SHA
+ENV EVM_KERNEL_SKIP_BYTECODE="yes"
 WORKDIR /build
 COPY kernels.mk etherlink.mk /build/
 COPY src/kernel_sdk /build/src/kernel_sdk
