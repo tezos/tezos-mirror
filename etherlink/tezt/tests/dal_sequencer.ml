@@ -194,15 +194,18 @@ let test_more_than_one_slot_per_l1_level =
   let inbox_counter_p =
     count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
   in
+  let nb_transac = 5 in
   let sends =
-    List.init 3 (fun i () ->
+    List.init nb_transac (fun i () ->
         build_transaction_with_large_data
           ~source_private_key:Eth_account.bootstrap_accounts.(i).private_key
           sequencer
           ())
   in
   let* n, _txs = send_transactions_to_sequencer ~sends sequencer in
-  Check.((n = 3) int) ~error_msg:"Expected three transactions in the block" ;
+  Check.((n = nb_transac) int)
+    ~error_msg:
+      (Format.sprintf "Expected %d transactions in the block" nb_transac) ;
   let* () = bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ()
   and* _smart_rollup_address, signals =
     Evm_node.wait_for_signal_signed sequencer
