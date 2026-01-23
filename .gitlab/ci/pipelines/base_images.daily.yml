@@ -9,7 +9,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp_dev
+  - gcp
   needs: []
   dependencies: []
   allow_failure: true
@@ -31,7 +31,7 @@ oc.base-images.debian:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   rules:
   - changes:
     - images/base-images/Dockerfile.debian
@@ -69,7 +69,7 @@ oc.base-images.ubuntu:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   rules:
   - changes:
     - images/base-images/Dockerfile.debian
@@ -107,7 +107,7 @@ oc.base-images.fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   rules:
   - changes:
     - images/base-images/Dockerfile.rpm
@@ -145,7 +145,7 @@ oc.base-images.rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   rules:
   - changes:
     - images/base-images/Dockerfile.rpm
@@ -213,14 +213,14 @@ oc.base-images.rust:
     - RELEASE:
       - trixie
       TAGS:
-      - gcp_very_high_cpu_dev
-      - gcp_dev_arm64
+      - gcp_very_high_cpu
+      - gcp_arm64
 
 oc.base-images.rust.merge:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.base-images.rust
   dependencies: []
@@ -247,7 +247,7 @@ oc.base-images.debian-homebrew:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   rules:
   - changes:
     - images/base-images/Dockerfile.debian-homebrew

@@ -12,7 +12,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev
+  - gcp
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -39,7 +39,7 @@ oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev
+  - gcp
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -65,7 +65,7 @@ oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -96,7 +96,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_ramfs_dev
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   needs:
@@ -141,7 +141,7 @@ oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   rules:
   - when: always
   needs:
@@ -186,7 +186,7 @@ oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
@@ -236,7 +236,7 @@ oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
@@ -293,7 +293,7 @@ oc.build_arm64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   rules:
   - when: manual
     allow_failure: true
@@ -348,7 +348,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp_dev
+  - gcp
   needs: []
   dependencies: []
   allow_failure: true
@@ -369,7 +369,7 @@ oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_dev
+  - gcp
   rules:
   - when: always
   dependencies:
@@ -399,7 +399,7 @@ oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
-  - gcp_dev_arm64
+  - gcp_arm64
   rules:
   - when: always
   dependencies:
@@ -428,7 +428,7 @@ docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp_not_interruptible_dev
+  - gcp_not_interruptible
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -455,7 +455,7 @@ publish_kernel_sdk:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: manual
   tags:
-  - gcp_dev
+  - gcp
   rules:
   - when: manual
     allow_failure: true

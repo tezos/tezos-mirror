@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp_dev
+  - gcp
   needs: []
   dependencies: []
   allow_failure: true
@@ -76,7 +76,7 @@ oc.docker-build-rockylinux-dependencies:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu_dev
+      - gcp_very_high_cpu
 
 oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -109,7 +109,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu_dev
+      - gcp_very_high_cpu
 
 oc.build-rockylinux:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -151,7 +151,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu_ramfs_dev
+      - gcp_very_high_cpu_ramfs
 
 oc.build-rockylinux-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -193,13 +193,13 @@ oc.build-rockylinux-data:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu_dev
+      - gcp_very_high_cpu
 
 rpm_repo_rockylinux:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible_dev
+  - gcp_not_interruptible
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
@@ -231,7 +231,7 @@ oc.install_bin_rockylinux_9.3.doc:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/rockylinux:9.3-master-6253f76a
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - rpm_repo_rockylinux
   dependencies: []
@@ -251,7 +251,7 @@ oc.install_bin_rockylinux_93_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker-systemd-tests-rpm-rockylinux
   - rpm_repo_rockylinux

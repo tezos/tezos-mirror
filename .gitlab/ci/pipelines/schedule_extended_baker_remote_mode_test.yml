@@ -11,7 +11,7 @@ oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev
+  - gcp
   dependencies: []
   timeout: 90 minutes
   before_script:
@@ -38,7 +38,7 @@ oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
-  - gcp_dev
+  - gcp
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -64,7 +64,7 @@ oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu_dev
+  - gcp_very_high_cpu
   needs:
   - oc.docker:rust-toolchain:amd64
   dependencies:
@@ -115,7 +115,7 @@ tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt_dev
+  - gcp_tezt
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -180,7 +180,7 @@ tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt_dev
+  - gcp_tezt
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -243,7 +243,7 @@ tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt_dev
+  - gcp_tezt
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -307,7 +307,7 @@ tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt_dev
+  - gcp_tezt
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -371,7 +371,7 @@ tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
-  - gcp_tezt_dev
+  - gcp_tezt
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
@@ -435,7 +435,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -483,7 +483,7 @@ oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -538,7 +538,7 @@ oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -591,7 +591,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp_dev
+  - gcp
   needs: []
   dependencies: []
   allow_failure: true

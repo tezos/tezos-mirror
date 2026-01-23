@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
   stage: start
   tags:
-  - gcp_dev
+  - gcp
   needs: []
   dependencies: []
   allow_failure: true
@@ -77,7 +77,7 @@ oc.docker-systemd_tests_debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_dev
+      - gcp_very_high_cpu
 
 oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -111,7 +111,7 @@ oc.docker-build-debian-dependencies:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_dev
+      - gcp_very_high_cpu
 
 oc.build-debian:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -154,7 +154,7 @@ oc.build-debian:
       - bookworm
       - trixie
       TAGS:
-      - gcp_very_high_cpu_ramfs_dev
+      - gcp_very_high_cpu_ramfs
 
 oc.build-data_packages:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
@@ -190,7 +190,7 @@ apt_repo_debian:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:trixie-master-6253f76a
   stage: publish
   tags:
-  - gcp_not_interruptible_dev
+  - gcp_not_interruptible
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -222,7 +222,7 @@ oc.lintian_debian:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.build-debian
   dependencies:
@@ -247,7 +247,7 @@ oc.install_bin_debian_bookworm:
   image: ${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - apt_repo_debian
   dependencies: []
@@ -268,7 +268,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
@@ -300,7 +300,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
-  - gcp_dev
+  - gcp
   needs:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
