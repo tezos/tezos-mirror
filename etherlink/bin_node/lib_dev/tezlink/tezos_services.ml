@@ -630,6 +630,27 @@ let balance :
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.balance
 
+let list :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Tezos_types.Contract.t list )
+    Tezos_rpc.Service.t =
+  (* NOTE: This service is redefined (instead of using import_service) to
+     override the L1 description. On L1, empty implicit accounts are
+     deallocated and excluded from this RPC. On Tezlink, implicit accounts
+     are never deallocated, so they remain in the result even with zero
+     balance. *)
+  Tezos_rpc.Service.get_service
+    ~description:
+      "All existing contracts (including empty implicit contracts that had \
+       activity)."
+    ~query:Tezos_rpc.Query.empty
+    ~output:(Data_encoding.list Tezos_types.Contract.encoding)
+    Tezos_rpc.Path.(open_root / "context" / "contracts")
+
 let manager_key :
     ( [`GET],
       tezlink_rpc_context,
