@@ -94,6 +94,7 @@ let job_script_snapshot_alpha_and_link =
       "Test that Alpha can be snapshotted using snapshot_alpha_and_link.sh."
     ~image:Tezos_ci.Images.CI.build
     ~cpu:Very_high
+    ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
     ~only_if_changed:
       [
         "src/proto_alpha/**/*";
