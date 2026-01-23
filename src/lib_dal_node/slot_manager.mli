@@ -215,7 +215,7 @@ val store_slot_headers :
     [slot_id] setting it to [status], if the previous status was not present in
     the store or was {!`Waiting_attestation}. *)
 val update_slot_header_status :
-  Store.t -> Types.slot_id -> Types.header_status -> unit
+  Store.t -> Types.slot_id -> Types.header_status -> unit tzresult
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently

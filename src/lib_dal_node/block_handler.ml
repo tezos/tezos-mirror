@@ -498,15 +498,17 @@ let process_commitments ctxt cctxt store proto_parameters block_level
     slot_headers
 
 let update_slot_headers_statuses store ~attested_level skip_list_cells =
-  List.iter
+  let open Result_syntax in
+  List.iter_e
     (fun (_hash, _cell, slot_index, cell_attestation_lag, status_opt) ->
       let slot_level =
         Int32.(sub attested_level (of_int cell_attestation_lag))
       in
       let slot_id = Types.Slot_id.{slot_level; slot_index} in
-      Option.iter
-        (Slot_manager.update_slot_header_status store slot_id)
-        status_opt)
+      match status_opt with
+      | None -> return_unit
+      | Some status ->
+          Slot_manager.update_slot_header_status store slot_id status)
     skip_list_cells
 
 (* The [Plugin] is that for the predecessor of the block level, it corresponds
@@ -543,7 +545,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     (Plugin.slot_availability
        block_info [@profiler.record_f {verbosity = Notice} "slot_availability"])
   in
-  let () =
+  let*? () =
     update_slot_headers_statuses
       store
       ~attested_level:block_level

@@ -665,22 +665,58 @@ module Statuses_cache = struct
 
   let get_slot_status = Slot_map.find_opt
 
-  let update_slot_header_status t slot_id status =
-    assert (status <> `Waiting_attestation) ;
-    (match get_slot_status t slot_id with
-    | None -> add_status t status slot_id
-    | Some `Unpublished -> assert (status = `Unpublished)
-    | Some `Waiting_attestation -> (
-        match status with
-        | `Attested _lag -> add_status t status slot_id
-        | `Unattested -> add_status t status slot_id
-        | `Unpublished | `Waiting_attestation -> assert false)
-    | Some (`Attested _lag) ->
-        (* If a status was already inserted, then its value was either
-           [Unpublished] or [Waiting_attestation]. *)
-        assert false
-    | Some `Unattested -> assert false) ;
-    match status with
+  let update_slot_header_status t slot_id to_status =
+    let open Result_syntax in
+    let* () =
+      match to_status with
+      | `Waiting_attestation ->
+          tzfail
+            (Errors.Unexpected_slot_status_transition
+               {
+                 slot_id;
+                 from_status_opt = None;
+                 to_status = `Waiting_attestation;
+               })
+      | _ -> return_unit
+    in
+    let* () =
+      let from_status_opt = get_slot_status t slot_id in
+      match from_status_opt with
+      | None ->
+          add_status t to_status slot_id ;
+          return_unit
+      | Some from_status -> (
+          let fail_transition () =
+            tzfail
+              (Errors.Unexpected_slot_status_transition
+                 {slot_id; from_status_opt; to_status})
+          in
+          match from_status with
+          | `Unpublished -> (
+              match to_status with
+              | `Unpublished ->
+                  (* No-op: status already Unpublished *)
+                  return_unit
+              | `Attested _ | `Unattested | `Waiting_attestation ->
+                  fail_transition ())
+          | `Waiting_attestation -> (
+              match to_status with
+              | `Attested _lag ->
+                  add_status t to_status slot_id ;
+                  return_unit
+              | `Unattested ->
+                  add_status t to_status slot_id ;
+                  return_unit
+              | `Unpublished -> fail_transition ()
+              | `Waiting_attestation -> return_unit (* No-op, already waiting *)
+              )
+          | `Attested _lag ->
+              (* If a status was already inserted, then its value was either
+                 [Unpublished] or [Waiting_attestation]. *)
+              fail_transition ()
+          | `Unattested -> fail_transition ())
+    in
+    (match to_status with
     | `Attested _lag -> Dal_metrics.slot_attested ~set:true slot_id.slot_index
     | `Unattested ->
         (* per the invariant stated above, the function can only be called once
@@ -689,7 +725,8 @@ module Statuses_cache = struct
         (* TODO: is the right way to update the metric here?? *)
         Dal_metrics.slot_attested ~set:false slot_id.slot_index
     | `Unpublished | `Waiting_attestation ->
-        Dal_metrics.slot_attested ~set:false slot_id.slot_index
+        Dal_metrics.slot_attested ~set:false slot_id.slot_index) ;
+    return_unit
 end
 
 module Commitment_indexed_cache =
