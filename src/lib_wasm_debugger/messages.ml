@@ -166,6 +166,34 @@ let pp_input ppf bytes =
           predecessor_timestamp
           Block_hash.pp
           predecessor
+    | Internal (Dal_attested_slots {published_level; slots_by_publisher; _}) ->
+        let pp_slot_indexes =
+          Format.pp_print_list
+            ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+            Dal.Slot_index.pp
+        in
+        let pp_publisher ppf (pkh, slots) =
+          Format.fprintf
+            ppf
+            "%a -> [%a]"
+            Environment.Signature.Public_key_hash.pp
+            pkh
+            pp_slot_indexes
+            slots
+        in
+        let pp_slots_by_publisher =
+          Format.pp_print_list
+            ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+            pp_publisher
+        in
+        Format.fprintf
+          ppf
+          "Dal_attested_slots {published_level = %a; slots_by_publisher = {%a}}"
+          Raw_level.pp
+          published_level
+          pp_slots_by_publisher
+          (Environment.Signature.Public_key_hash.Map.bindings
+             slots_by_publisher)
     | External msg -> Format.fprintf ppf "%a" Hex.pp (Hex.of_string msg)
   in
   match

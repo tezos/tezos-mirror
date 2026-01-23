@@ -241,6 +241,8 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
 val add_all_messages :
   protocol_migration_message:
     Sc_rollup_inbox_message_repr.internal_inbox_message option ->
+  dal_attested_slots_messages:
+    Sc_rollup_inbox_message_repr.internal_inbox_message list ->
   predecessor_timestamp:Time.t ->
   predecessor:Block_hash.t ->
   History.t ->

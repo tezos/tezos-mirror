@@ -727,16 +727,19 @@ let finalize_inbox_level_no_history inbox witness =
   let witness = add_protocol_internal_message_no_history eol witness in
   archive_no_history inbox witness
 
-let add_all_messages ~protocol_migration_message ~predecessor_timestamp
-    ~predecessor history inbox messages =
+let add_all_messages ~protocol_migration_message ~dal_attested_slots_messages
+    ~predecessor_timestamp ~predecessor history inbox messages =
   let open Result_syntax in
   let* payloads = List.map_e Sc_rollup_inbox_message_repr.serialize messages in
   let is_first_block = Option.is_some protocol_migration_message in
   let payloads_history =
     (* Must remember every [payloads] and internal messages pushed by the
-       protocol: SOL/Info_per_level/EOL. *)
+       protocol: SOL/Info_per_level/EOL and optionally Protocol_migration
+       and Dal_attested_slots. *)
     let capacity =
-      (List.length payloads + 3 + if is_first_block then 1 else 0)
+      List.length payloads + 3
+      + (if is_first_block then 1 else 0)
+      + List.length dal_attested_slots_messages
       |> Int64.of_int
     in
     Sc_rollup_inbox_merkelized_payload_hashes_repr.History.empty ~capacity
@@ -768,6 +771,19 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
     | [] -> return (payloads_history, witness)
     | payloads -> add_messages payloads_history payloads witness
   in
+
+  (* Add [Dal_attested_slots] if present, before finalization (EOL). *)
+  let* payloads_history, witness =
+    List.fold_left_e
+      (fun (payloads_history, witness) dal_message ->
+        let* message =
+          Sc_rollup_inbox_message_repr.serialize (Internal dal_message)
+        in
+        add_message message payloads_history witness)
+      (payloads_history, witness)
+      dal_attested_slots_messages
+  in
+
   let* payloads_history, history, witness, inbox =
     finalize_inbox_level payloads_history history inbox witness
   in
@@ -786,8 +802,11 @@ let add_all_messages ~protocol_migration_message ~predecessor_timestamp
         ~some:(fun x -> [Internal x])
         protocol_migration_message
     in
+    let dal_slots =
+      List.map (fun x -> Internal x) dal_attested_slots_messages
+    in
     let eol = Internal End_of_level in
-    [sol] @ [info_per_level] @ migration @ messages @ [eol]
+    [sol] @ [info_per_level] @ migration @ messages @ dal_slots @ [eol]
   in
 
   return (payloads_history, history, inbox, witness, messages)

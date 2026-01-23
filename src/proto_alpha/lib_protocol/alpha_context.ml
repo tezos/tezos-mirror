@@ -97,12 +97,13 @@ module Sc_rollup = struct
         ~protocol_migration_message:
           Inbox_message.protocol_migration_serialized_message
 
-    let add_all_messages ~first_block =
+    let add_all_messages ~first_block ~dal_attested_slots_messages =
       add_all_messages
         ~protocol_migration_message:
           (if first_block then
              Some Inbox_message.protocol_migration_internal_message
            else None)
+        ~dal_attested_slots_messages
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests

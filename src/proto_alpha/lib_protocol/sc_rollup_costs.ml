@@ -85,6 +85,7 @@ let cost_serialize_internal_inbox_message
   | End_of_level -> Saturation_repr.zero
   | Protocol_migration _ -> Saturation_repr.zero
   | Info_per_level _ -> Saturation_repr.zero
+  | Dal_attested_slots _ -> Saturation_repr.zero
 
 let cost_deserialize_output_proof ~bytes_len =
   cost_Sc_rollup_deserialize_output_proof_benchmark bytes_len

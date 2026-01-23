@@ -795,6 +795,7 @@ let test_messages_are_correctly_added_in_history
   let*?@ payloads_history, _history, _inbox, witness, messages =
     Inbox.add_all_messages
       ~first_block:false
+      ~dal_attested_slots_messages:[]
       ~predecessor_timestamp
       ~predecessor
       (Inbox.History.empty ~capacity:0L)
@@ -861,8 +862,69 @@ let merkelized_payload_hashes_tests =
       test_invalid_merkelized_payload_hashes_proof_fails;
   ]
 
+(* Test that verifies the binary encoding of Dal_attested_slots messages.
+   This encoding must match what the Rust kernel SDK expects to parse.
+   The test generates a known message and verifies the binary format. *)
+let test_dal_attested_slots_encoding () =
+  let open Lwt_result_syntax in
+  (* Create a slots_by_publisher map with one publisher having slot 4 attested *)
+  let pkh =
+    Environment.Signature.Public_key_hash.of_b58check_exn
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+  in
+  let slot_index =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Dal_slot_index_repr.of_int_opt ~number_of_slots:16 4
+  in
+  let slots_by_publisher =
+    Environment.Signature.Public_key_hash.Map.singleton pkh [slot_index]
+  in
+  let published_level = Raw_level_repr.of_int32_exn 8l in
+  let msg =
+    Sc_rollup_inbox_message_repr.dal_attested_slots_serialized
+      ~published_level
+      ~number_of_slots:16
+      ~slot_size:126944
+      ~page_size:4096
+      ~slots_by_publisher
+  in
+  let bytes = Sc_rollup_inbox_message_repr.unsafe_to_string msg in
+  (* Print hex for use in Rust golden test - only printed if test is run with -v *)
+  Format.printf
+    "@[<v>Dal_attested_slots encoding (for Rust golden test):@,\
+     Hex: %a@,\
+     Length: %d bytes@]@."
+    Hex.pp
+    (Hex.of_string bytes)
+    (String.length bytes) ;
+  (* Verify the structure of the encoding:
+     - Byte 0: 0x00 (Internal message tag)
+     - Byte 1: 0x05 (Dal_attested_slots tag)
+     - Bytes 2-5: published_level (int32, big-endian) = 8
+     - Bytes 6-7: number_of_slots (uint16) = 16
+     - Bytes 8-11: slot_size (int32) = 126944
+     - Bytes 12-13: page_size (uint16) = 4096
+     - Bytes 14-17: map byte length (uint32, dynamic encoding)
+     - Remaining: map contents (pkh + bitset pairs)
+  *)
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[0]) 0x00 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[1]) 0x05 in
+  (* published_level = 8 in big-endian *)
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[2]) 0x00 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[3]) 0x00 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[4]) 0x00 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[5]) 0x08 in
+  (* number_of_slots = 16 in big-endian *)
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[6]) 0x00 in
+  let* () = Assert.equal_int ~loc:__LOC__ (Char.code bytes.[7]) 0x10 in
+  return_unit
+
 let inbox_tests =
   [
+    Tztest.tztest
+      "Dal_attested_slots encoding matches expected format"
+      `Quick
+      test_dal_attested_slots_encoding;
     Tztest.tztest_qcheck2
       ~count:1000
       ~name:"produce inclusion proof and verifies it."

@@ -3463,6 +3463,14 @@ module Sc_rollup : sig
           predecessor : Block_hash.t;
         }
       | Protocol_migration of string
+      | Dal_attested_slots of {
+          published_level : Raw_level.t;
+          number_of_slots : int;
+          slot_size : int;
+          page_size : int;
+          slots_by_publisher :
+            Dal.Slot_index.t list Signature.Public_key_hash.Map.t;
+        }
 
     val protocol_migration_internal_message : internal_inbox_message
 
@@ -3485,6 +3493,11 @@ module Sc_rollup : sig
     module Hash : S.HASH
 
     val hash_serialized_message : serialized -> Hash.t
+
+    val dal_attested_slots_messages_of_cells :
+      (published_level:Raw_level.t -> (int * int * int) tzresult Lwt.t) ->
+      (Dal.Slots_history.Pointer_hash.t * Dal.Slots_history.t) list ->
+      internal_inbox_message list tzresult Lwt.t
   end
 
   module Inbox_merkelized_payload_hashes : sig
@@ -3652,6 +3665,7 @@ module Sc_rollup : sig
 
     val add_all_messages :
       first_block:bool ->
+      dal_attested_slots_messages:Inbox_message.internal_inbox_message list ->
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       History.t ->
@@ -3760,6 +3774,9 @@ module Sc_rollup : sig
     end
 
     val add_external_messages : context -> string list -> context tzresult Lwt.t
+
+    val add_internal_message :
+      context -> Inbox_message.internal_inbox_message -> context tzresult Lwt.t
 
     val add_deposit :
       context ->

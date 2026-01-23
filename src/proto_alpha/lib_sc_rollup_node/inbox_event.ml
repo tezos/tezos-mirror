@@ -40,7 +40,23 @@ module Simple = struct
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("number_of_messages", Data_encoding.int32)
+
+  let get_dal_attested_slots_messages_failed =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_layer_1_get_dal_attested_slots_messages_failed"
+      ~msg:
+        "Failed to get the DAL attested slots messages for block {hash}: \
+         {error}"
+      ~level:Warning
+      ~pp1:Block_hash.pp_short
+      ("hash", Block_hash.encoding)
+      ~pp2:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 let get_messages hash level number_of_messages =
   Simple.(emit get_messages (hash, level, Int32.of_int number_of_messages))
+
+let get_dal_attested_slots_messages_failed hash error =
+  Simple.(emit get_dal_attested_slots_messages_failed (hash, error))

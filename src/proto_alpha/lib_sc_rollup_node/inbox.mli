@@ -38,11 +38,12 @@ open Sc_rollup
 
 include Protocol_plugin_sig.INBOX
 
-(** [add_messages ~is_first_block ~predecessor_timestamp
-    ~predecessor inbox messages] adds [messages] to the [inbox] using
-    {!Sc_rollup.Inbox.add_all_messages}. *)
+(** [add_messages ~is_first_block ~dal_attested_slots_messages
+    ~predecessor_timestamp ~predecessor inbox messages] adds [messages] to the
+    [inbox] using {!Sc_rollup.Inbox.add_all_messages}. *)
 val add_messages :
   is_first_block:bool ->
+  dal_attested_slots_messages:Inbox_message.internal_inbox_message list ->
   predecessor_timestamp:Timestamp.time ->
   predecessor:Block_hash.t ->
   Inbox.t ->
@@ -55,14 +56,16 @@ val add_messages :
   Lwt.t
 
 (** [payloads_history_of_messages ~is_first_block ~predecessor
-    ~predecessor_timestamp messages] builds the payloads history for
-    the list of [messages]. This allows to not store payloads
-    histories (which contain merkelized skip lists) but simply
+    ~predecessor_timestamp ~dal_attested_slots_messages messages] builds the
+    payloads history for the list of [messages]. This allows to not store
+    payloads histories (which contain merkelized skip lists) but simply
     messages. *)
 val payloads_history_of_messages :
   is_first_block:bool ->
   predecessor:Block_hash.t ->
   predecessor_timestamp:Timestamp.time ->
+  dal_attested_slots_messages:
+    Sc_rollup.Inbox_message.internal_inbox_message list ->
   string list ->
   Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
 

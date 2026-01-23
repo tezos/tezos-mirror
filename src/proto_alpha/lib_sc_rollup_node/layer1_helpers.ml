@@ -303,3 +303,40 @@ let get_balance_mutez cctxt ?block pkh =
       (Implicit pkh)
   in
   Protocol.Alpha_context.Tez.to_mutez balance
+
+let get_dal_attested_slots_messages fetch_dal_params
+    (cctxt : #Client_context.full) block_hash =
+  let open Lwt_result_syntax in
+  let open Protocol.Alpha_context in
+  let cctxt =
+    new Protocol_client_context.wrap_full (cctxt :> Client_context.full)
+  in
+  let* cells =
+    Plugin.RPC.Dal.skip_list_cells_of_level
+      cctxt
+      (cctxt#chain, `Hash (block_hash, 0))
+      ()
+  in
+  (* Wrap [fetch_dal_params] to convert from shell tzresult to protocol
+     tzresult *)
+  let fetch_dal_params_wrapped ~published_level =
+    Environment.Error_monad.catch_s (fun () ->
+        let open Lwt_syntax in
+        let* shell_result = fetch_dal_params ~published_level in
+        match shell_result with
+        | Ok params -> Lwt.return params
+        | Error _trace ->
+            Lwt.fail
+              (Failure
+                 (Format.asprintf
+                    "Failed to retrieve DAL parameters for level %a"
+                    Raw_level.pp
+                    published_level)))
+  in
+  let*! protocol_result =
+    Sc_rollup.Inbox_message.dal_attested_slots_messages_of_cells
+      fetch_dal_params_wrapped
+      cells
+  in
+  (* Convert protocol tzresult back to shell tzresult *)
+  Environment.wrap_tzresult protocol_result |> Lwt.return

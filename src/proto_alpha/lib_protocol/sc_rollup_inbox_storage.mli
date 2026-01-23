@@ -61,3 +61,10 @@ val add_level_info :
 (** [finalize_inbox_level ctxt] ends the internal representation for the block.
 *)
 val finalize_inbox_level : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+(** [add_internal_message ctxt msg] adds internal message [msg]
+    to the smart rollups' inbox. *)
+val add_internal_message :
+  Raw_context.t ->
+  Sc_rollup_inbox_message_repr.internal_inbox_message ->
+  Raw_context.t tzresult Lwt.t
