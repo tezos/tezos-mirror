@@ -192,7 +192,14 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?batching_time_interval dal_node =
   spawn_command dal_node
-  @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
+  @@ [
+       "config";
+       "update";
+       "--data-dir";
+       data_dir dal_node;
+       "--expected-pow";
+       string_of_float expected_pow;
+     ]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
      else ["--attester-profiles"; String.concat "," attester_profiles])

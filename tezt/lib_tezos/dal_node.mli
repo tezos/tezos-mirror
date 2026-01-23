@@ -206,6 +206,20 @@ val init_config :
   t ->
   unit Lwt.t
 
+val spawn_config_update :
+  ?expected_pow:float ->
+  ?peers:string list ->
+  ?attester_profiles:string list ->
+  ?operator_profiles:int list ->
+  ?observer_profiles:int list ->
+  ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
+  t ->
+  Process.t
+
 val update_config :
   ?expected_pow:float ->
   ?peers:string list ->
