@@ -33,3 +33,1615 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.638
 
 Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 8
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 8
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 8
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 9
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 9
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 9
+
+Depositing Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(450))))) to [PUBLIC_KEY_HASH]
+
+Processing MessageData 3 at level 9
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 10
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 10
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 10
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 11
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 11
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 11
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 12
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 12
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 12
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 13
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 13
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 13
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 14
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 14
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 14
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 15
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 15
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 15
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 16
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 16
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 16
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 17
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 17
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 17
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 18
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Processing MessageData 1 at level 18
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 18
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Found cached DAL payload, processing
+
+Process parsed batch ParsedBatch { operations: [VerifiableOperation { parsed: [OPERATION_BYTES], operation: Operation { signer: PublicKey(PublicKeyEd25519("[PUBLIC_KEY]")), counter: 0, contents: Transfer(OperationTransfer { destination: ContractTz1Hash("[PUBLIC_KEY_HASH]"), ticket: TicketId([TICKET_HASH]), amount: TicketAmount { amount: 60 } }) }, signature: Ed25519Signature("[SIGNATURE]") }, VerifiableOperation { parsed: [OPERATION_BYTES], operation: Operation { signer: PublicKey(PublicKeyEd25519("[PUBLIC_KEY]")), counter: 0, contents: Withdraw(OperationWithdraw { destination: ContractKt1Hash("[CONTRACT_HASH]"), ticket: Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(60))))), entrypoint: Entrypoint { name: "receive_tickets" } }) }, signature: Ed25519Signature("[SIGNATURE]") }] }
+
+Transferring 60 of 0 to [PUBLIC_KEY_HASH]
+
+withdrawing Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(60))))) from [PUBLIC_KEY_HASH] to [CONTRACT_HASH]@Entrypoint { name: "receive_tickets" }
+
+Withdrawal executed: AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(60))))), destination: Originated(ContractKt1Hash("[CONTRACT_HASH]")), entrypoint: Entrypoint { name: "receive_tickets" } }] })
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 19
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 19
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 19
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 20
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 20
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 20
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 21
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 21
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 21
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 22
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 0
+
+Processing MessageData 1 at level 22
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 22
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Finished filtering
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Filtering inbox messages...
+
+Processing MessageData 0 at level 23
+
+InboxMetadata: StartOfLevel
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Revealed dal page with size 128
+
+Processing MessageData 1 at level 23
+
+InboxMetadata: InfoPerLevel {predecessor_timestamp: [TIMESTAMP], predecessor: [BLOCK_HASH]}
+
+Processing MessageData 2 at level 23
+
+InboxMetadata: EndOfLevel
+
+Finished filtering
+
+Reboot for cached mesages
+
+======
+TX: Entry
+======
+
+TX: Metadata RollupMetadata { raw_rollup_address: [SMART_ROLLUP_ADDRESS_BYTES], origination_level: 7 }
+
+Found cached DAL payload, processing
+
+Process parsed batch ParsedBatch { operations: [VerifiableOperation { parsed: [OPERATION_BYTES], operation: Operation { signer: PublicKey(PublicKeyEd25519("[PUBLIC_KEY]")), counter: 1, contents: Transfer(OperationTransfer { destination: ContractTz1Hash("[PUBLIC_KEY_HASH]"), ticket: TicketId([TICKET_HASH]), amount: TicketAmount { amount: 90 } }) }, signature: Ed25519Signature("[SIGNATURE]") }, VerifiableOperation { parsed: [OPERATION_BYTES], operation: Operation { signer: PublicKey(PublicKeyEd25519("[PUBLIC_KEY]")), counter: 1, contents: Withdraw(OperationWithdraw { destination: ContractKt1Hash("[CONTRACT_HASH]"), ticket: Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(40))))), entrypoint: Entrypoint { name: "receive_tickets" } }) }, signature: Ed25519Signature("[SIGNATURE]") }] }
+
+Transferring 90 of 0 to [PUBLIC_KEY_HASH]
+
+withdrawing Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(40))))) from [PUBLIC_KEY_HASH] to [CONTRACT_HASH]@Entrypoint { name: "receive_tickets" }
+
+Withdrawal executed: AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("[CONTRACT_HASH]"))), MichelsonPair(MichelsonString("Hello, Ticket!"), MichelsonInt(Zarith(40))))), destination: Originated(ContractKt1Hash("[CONTRACT_HASH]")), entrypoint: Entrypoint { name: "receive_tickets" } }] })
+
