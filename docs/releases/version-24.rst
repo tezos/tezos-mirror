@@ -90,6 +90,10 @@ Please choose another installation method.
 From sources
 ~~~~~~~~~~~~
 
+.. note::
+
+	For building v24 from sources, please make sure that you have installed opam 2.3 or later.
+
 .. code-block:: shell
 
   git fetch
