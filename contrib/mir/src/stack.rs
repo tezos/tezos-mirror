@@ -5,6 +5,7 @@
 //! Utilities and types for representing a stack.
 
 use std::ops::{Index, IndexMut};
+use std::rc::Rc;
 use std::slice::SliceIndex;
 
 use crate::ast::*;
@@ -13,7 +14,7 @@ use crate::ast::*;
 pub type TypeStack = Stack<Type>;
 
 /// Stack of [TypedValue]s. Named `IStack` for "interpeter stack".
-pub type IStack<'a> = Stack<TypedValue<'a>>;
+pub type IStack<'a> = Stack<Rc<TypedValue<'a>>>;
 
 /// Possibly failed type stack. Stacks are considered failed after
 /// always-failing instructions. A failed stack can be unified (in terms of
@@ -74,6 +75,11 @@ impl<T> Stack<T> {
         Stack(data)
     }
 
+    /// Construct a `Stack` from elements.
+    fn stack_from_elems(data: Vec<T>) -> Self {
+        Stack::stack_from_vec(data)
+    }
+
     /// Convert stack index to vec index.
     fn vec_index(&self, i: usize) -> usize {
         let len = self.len();
@@ -101,7 +107,8 @@ impl<T> Stack<T> {
     /// # Panics
     ///
     /// If `i` is larger than the length of the stack.
-    pub fn insert(&mut self, i: usize, e: T) {
+    pub fn insert(&mut self, i: usize, e: impl Into<T>) {
+        let e = e.into();
         if i > 0 {
             // We subtract one from the index because since our stack is inverted, the insertion
             // point is to the right of the index, instead of the left of it, as considered by the
@@ -115,8 +122,8 @@ impl<T> Stack<T> {
     }
 
     /// Push an element onto the top of the stack.
-    pub fn push(&mut self, elt: T) {
-        self.0.push(elt)
+    pub fn push(&mut self, elt: impl Into<T>) {
+        self.0.push(elt.into())
     }
 
     /// Pop an element off the top of the stack.
@@ -164,10 +171,10 @@ impl<T> Stack<T> {
         self.0.reserve(additional)
     }
 
-    /// Borrow the stack content as an immutable slice. Note that stack top is
+    /// Borrow the stack content as immutable references. Note that stack top is
     /// the _rightmost_ element.
-    pub fn as_slice(&self) -> &[T] {
-        self.0.as_slice()
+    pub fn as_slice(&self) -> Vec<&T> {
+        self.0.iter().collect()
     }
 
     /// Split off the top `size` elements of the stack into a new `Stack`.
@@ -223,13 +230,30 @@ pub struct TopIsLast<T>(pub Stack<T>);
 impl<T> From<Vec<T>> for TopIsFirst<T> {
     fn from(mut data: Vec<T>) -> Self {
         data.reverse();
-        Self(Stack::stack_from_vec(data))
+        Self(Stack::stack_from_elems(data))
+    }
+}
+
+impl<T> From<Vec<T>> for TopIsFirst<Rc<T>> {
+    fn from(mut data: Vec<T>) -> Self {
+        data.reverse();
+        Self(Stack::stack_from_vec(
+            data.into_iter().map(Rc::new).collect(),
+        ))
     }
 }
 
 impl<T> From<Vec<T>> for TopIsLast<T> {
     fn from(data: Vec<T>) -> Self {
-        Self(Stack::stack_from_vec(data))
+        Self(Stack::stack_from_elems(data))
+    }
+}
+
+impl<T> From<Vec<T>> for TopIsLast<Rc<T>> {
+    fn from(data: Vec<T>) -> Self {
+        Self(Stack::stack_from_vec(
+            data.into_iter().map(Rc::new).collect(),
+        ))
     }
 }
 
@@ -312,24 +336,28 @@ impl<T> IntoIterator for Stack<T> {
 mod tests {
     use super::*;
 
+    type IntStack = Stack<i32>;
+
     #[test]
     fn stk_macro() {
-        assert_eq!(stk![1, 2, 3, 4].as_slice(), [1, 2, 3, 4]);
-        assert_eq!(stk![1; 5].as_slice(), [1, 1, 1, 1, 1]);
+        let stk: IntStack = stk![1, 2, 3, 4];
+        assert_eq!(stk.as_slice(), vec![&1, &2, &3, &4]);
+        let stk: IntStack = stk![1; 5];
+        assert_eq!(stk.as_slice(), vec![&1; 5]);
     }
 
     #[test]
     fn conversion_from_vec() {
         assert_eq!(
-            TopIsLast::from(vec![1, 2, 3, 4]).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            TopIsLast::<i32>::from(vec![1, 2, 3, 4]).0.as_slice(),
+            vec![&1, &2, &3, &4] // NB: top is right
         );
-        assert_eq!(TopIsLast::from(vec![1, 2, 3, 4]).0.pop(), Some(4));
+        assert_eq!(TopIsLast::<i32>::from(vec![1, 2, 3, 4]).0.pop(), Some(4));
         assert_eq!(
-            TopIsFirst::from(vec![1, 2, 3, 4]).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            TopIsFirst::<i32>::from(vec![1, 2, 3, 4]).0.as_slice(),
+            vec![&4, &3, &2, &1] // NB: top is right
         );
-        assert_eq!(TopIsFirst::from(vec![1, 2, 3, 4]).0.pop(), Some(1));
+        assert_eq!(TopIsFirst::<i32>::from(vec![1, 2, 3, 4]).0.pop(), Some(1));
     }
 
     #[test]
@@ -337,11 +365,11 @@ mod tests {
         let s: &[u32] = &[1, 2, 3, 4];
         assert_eq!(
             TopIsLast::from(s).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from(s).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
@@ -350,11 +378,11 @@ mod tests {
         let a: [u32; 4] = [1, 2, 3, 4];
         assert_eq!(
             TopIsLast::from(a).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from(a).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
@@ -363,17 +391,17 @@ mod tests {
         let it = 1..=4;
         assert_eq!(
             TopIsLast::from_iter(it.clone()).0.as_slice(),
-            [1, 2, 3, 4] // NB: top is right
+            vec![&1, &2, &3, &4] // NB: top is right
         );
         assert_eq!(
             TopIsFirst::from_iter(it).0.as_slice(),
-            [4, 3, 2, 1] // NB: top is right
+            vec![&4, &3, &2, &1] // NB: top is right
         );
     }
 
     #[test]
     fn push() {
-        let mut stk = Stack::new();
+        let mut stk: IntStack = Stack::new();
         stk.push(1);
         stk.push(2);
         stk.push(3);
@@ -382,7 +410,7 @@ mod tests {
 
     #[test]
     fn pop() {
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         assert_eq!(stk.pop(), Some(3));
         assert_eq!(stk.pop(), Some(2));
         assert_eq!(stk.pop(), Some(1));
@@ -391,7 +419,7 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         stk.remove(1);
         assert_eq!(stk, stk![1, 2, 4]);
 
@@ -404,22 +432,22 @@ mod tests {
 
     #[test]
     fn insert() {
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         stk.insert(2, 10);
         assert_eq!(stk, stk![1, 10, 2, 3]);
 
-        let mut stk = stk![];
+        let mut stk: IntStack = stk![];
         stk.insert(0, 10);
         assert_eq!(stk, stk![10]);
 
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         stk.insert(3, 10);
         assert_eq!(stk, stk![10, 1, 2, 3]);
     }
 
     #[test]
     fn len() {
-        let mut stk = stk![1, 2, 3];
+        let mut stk: IntStack = stk![1, 2, 3];
         assert_eq!(stk.len(), 3);
         stk.push(42);
         assert_eq!(stk.len(), 4);
@@ -427,14 +455,14 @@ mod tests {
 
     #[test]
     fn drop_top() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         stk.drop_top(3);
         assert_eq!(stk, stk![1]);
     }
 
     #[test]
     fn drain_top() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let drained = stk.drain_top(3);
         assert_eq!(drained.collect::<Vec<_>>(), vec![4, 3, 2]);
         assert_eq!(stk, stk![1]);
@@ -442,7 +470,7 @@ mod tests {
 
     #[test]
     fn drain_top_0() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let drained = stk.drain_top(0);
         assert!(drained.collect::<Vec<_>>().is_empty());
         assert_eq!(stk, stk![1, 2, 3, 4]);
@@ -451,26 +479,26 @@ mod tests {
     #[test]
     #[should_panic(expected = "size too large in drop_top")]
     fn drop_top_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         stk.drop_top(42);
     }
 
     #[test]
     #[should_panic(expected = "size too large in drain_top")]
     fn drain_top_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4];
+        let mut stk: IntStack = stk![1, 2, 3, 4];
         let _ = stk.drain_top(42);
     }
 
     #[test]
     fn as_slice() {
-        let stk = stk![1, 2, 3, 4];
-        assert!(matches!(stk.as_slice(), [1, 2, 3, 4]));
+        let stk: IntStack = stk![1, 2, 3, 4];
+        assert_eq!(stk.as_slice(), vec![&1, &2, &3, &4]);
     }
 
     #[test]
     fn split_off() {
-        let mut stk = stk![1, 2, 3, 4, 5];
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
         let stk2 = stk.split_off(3);
         assert_eq!(stk2, stk![3, 4, 5]);
         assert_eq!(stk, stk![1, 2]);
@@ -479,14 +507,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "size too large in split_off")]
     fn split_off_out_of_bounds() {
-        let mut stk = stk![1, 2, 3, 4, 5];
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
         stk.split_off(42);
     }
 
     #[test]
     fn append() {
-        let mut stk1 = stk![1, 2, 3];
-        let mut stk2 = stk![4, 5];
+        let mut stk1: IntStack = stk![1, 2, 3];
+        let mut stk2: IntStack = stk![4, 5];
         stk1.append(&mut stk2);
         assert_eq!(stk1, stk![1, 2, 3, 4, 5]);
         assert_eq!(stk2, stk![]);
@@ -494,7 +522,7 @@ mod tests {
 
     #[test]
     fn index() {
-        let stk = stk![1, 2, 3, 4, 5];
+        let stk: IntStack = stk![1, 2, 3, 4, 5];
         assert_eq!(stk[0], 5);
         assert_eq!(stk[4], 1);
     }
@@ -502,13 +530,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "out of bounds stack access")]
     fn index_out_of_bounds() {
-        let stk = stk![1, 2, 3, 4, 5];
+        let stk: IntStack = stk![1, 2, 3, 4, 5];
         assert_eq!(stk[7], 5); // panics
     }
 
     #[test]
     fn index_mut() {
-        let mut stk = stk![1, 2, 3, 4, 5];
+        let mut stk: IntStack = stk![1, 2, 3, 4, 5];
         stk[2] = 42;
         assert_eq!(stk, stk![1, 2, 42, 4, 5]);
     }

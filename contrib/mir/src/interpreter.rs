@@ -121,7 +121,7 @@ impl<'a> ContractScript<'a> {
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/8061
         // Handle errors instead of panicking.
-        let result = stack.pop().expect("empty execution stack");
+        let result = TypedValue::unwrap_rc(stack.pop().expect("empty execution stack"));
         match result {
             V::Pair(p) => {
                 let (operation_list, storage) = *p;
@@ -267,7 +267,7 @@ fn interpret_one<'a>(
     macro_rules! pop {
         ($($args:tt)*) => {
             crate::irrefutable_match::irrefutable_match!(
-                stack.pop().unwrap_or_else(|| unreachable_state());
+                TypedValue::unwrap_rc(stack.pop().unwrap_or_else(|| unreachable_state()));
                 $($args)*
                 )
         };
@@ -653,19 +653,19 @@ fn interpret_one<'a>(
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G1 => {
                 ctx.gas().consume(interpret_cost::NEG_G1)?;
-                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G1).as_mut();
+                let v = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bls12381G1).as_mut();
                 *v = -(v as &bls::G1);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381G2 => {
                 ctx.gas().consume(interpret_cost::NEG_G2)?;
-                let v = irrefutable_match!(&mut stack[0]; V::Bls12381G2).as_mut();
+                let v = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bls12381G2).as_mut();
                 *v = -(v as &bls::G2);
             }
             #[cfg(feature = "bls")]
             overloads::Neg::Bls12381Fr => {
                 ctx.gas().consume(interpret_cost::NEG_FR)?;
-                let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
+                let v = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
             }
         },
@@ -770,13 +770,13 @@ fn interpret_one<'a>(
         I::And(overload) => match overload {
             overloads::And::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bool);
                 ctx.gas().consume(interpret_cost::AND_BOOL)?;
                 *o2 &= o1;
             }
             overloads::And::NatNat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Nat);
                 ctx.gas().consume(interpret_cost::and_num(&o1, o2)?)?;
                 *o2 &= o1;
             }
@@ -791,7 +791,7 @@ fn interpret_one<'a>(
             }
             overloads::And::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
                 ctx.gas().consume(interpret_cost::and_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the smallest length among the
@@ -808,19 +808,19 @@ fn interpret_one<'a>(
         I::Or(overload) => match overload {
             overloads::Or::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bool);
                 ctx.gas().consume(interpret_cost::OR_BOOL)?;
                 *o2 |= o1;
             }
             overloads::Or::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Nat);
                 ctx.gas().consume(interpret_cost::or_num(&o1, o2)?)?;
                 *o2 |= o1;
             }
             overloads::Or::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
                 ctx.gas().consume(interpret_cost::or_bytes(&o1, o2)?)?;
 
                 // The resulting vector length is the largest length among the
@@ -837,19 +837,19 @@ fn interpret_one<'a>(
         I::Xor(overloads) => match overloads {
             overloads::Xor::Bool => {
                 let o1 = pop!(V::Bool);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bool);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bool);
                 ctx.gas().consume(interpret_cost::XOR_BOOL)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Nat => {
                 let o1 = pop!(V::Nat);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Nat);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Nat);
                 ctx.gas().consume(interpret_cost::xor_nat(&o1, o2)?)?;
                 *o2 ^= o1;
             }
             overloads::Xor::Bytes => {
                 let mut o1 = pop!(V::Bytes);
-                let o2 = irrefutable_match!(&mut stack[0]; V::Bytes);
+                let o2 = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
 
                 // The resulting vector length is the largest length among the
                 // operands, so to reuse memory we put the largest vector to
@@ -864,7 +864,7 @@ fn interpret_one<'a>(
         },
         I::Not(overload) => match overload {
             overloads::Not::Bool => {
-                let o = irrefutable_match!(&mut stack[0]; V::Bool);
+                let o = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bool);
                 ctx.gas().consume(interpret_cost::NOT_BOOL)?;
                 *o = !*o;
             }
@@ -879,7 +879,7 @@ fn interpret_one<'a>(
                 stack.push(V::Int(!BigInt::from(o)))
             }
             overloads::Not::Bytes => {
-                let o = irrefutable_match!(&mut stack[0]; V::Bytes);
+                let o = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
                 ctx.gas().consume(interpret_cost::not_bytes(o)?)?;
                 for b in o.iter_mut() {
                     *b = !*b
@@ -969,7 +969,7 @@ fn interpret_one<'a>(
         }
         I::IfCons(when_cons, when_nil) => {
             ctx.gas().consume(interpret_cost::IF_CONS)?;
-            let lst = irrefutable_match!(&mut stack[0]; V::List);
+            let lst = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::List);
             match lst.uncons() {
                 Some(x) => {
                     stack.push(TypedValue::unwrap_rc(x));
@@ -1186,6 +1186,7 @@ fn interpret_one<'a>(
             let res = stack
                 .drain_top(*n as usize)
                 .rev()
+                .map(TypedValue::unwrap_rc)
                 .reduce(|acc, e| V::new_pair(e, acc))
                 .unwrap();
             stack.push(res);
@@ -1378,15 +1379,15 @@ fn interpret_one<'a>(
         },
         I::GetN(n) => {
             ctx.gas().consume(interpret_cost::get_n(*n as usize)?)?;
-            let res = get_nth_field_ref(*n, &mut stack[0]);
+            let res = get_nth_field_ref(*n, Rc::make_mut(&mut stack[0]));
             // this is a bit hacky, but borrow rules leave few other options
-            stack[0] = std::mem::replace(res, V::Unit);
+            stack[0] = Rc::new(std::mem::replace(res, V::Unit));
         }
         I::Update(overload) => match overload {
             overloads::Update::Set => {
                 let key = pop!();
                 let new_present = pop!(V::Bool);
-                let set = irrefutable_match!(&mut stack[0]; V::Set);
+                let set = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Set);
                 ctx.gas()
                     .consume(interpret_cost::set_update(&key, set.len())?)?;
                 if new_present {
@@ -1398,7 +1399,7 @@ fn interpret_one<'a>(
             overloads::Update::Map => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(&mut stack[0]; V::Map);
+                let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
@@ -1409,7 +1410,7 @@ fn interpret_one<'a>(
             overloads::Update::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
-                let map = irrefutable_match!(&mut stack[0]; V::BigMap);
+                let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
@@ -1420,7 +1421,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::Map => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
-                let map = irrefutable_match!(&mut stack[0]; V::Map);
+                let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Map);
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
                 let opt_old_val = match opt_new_val {
@@ -1433,7 +1434,7 @@ fn interpret_one<'a>(
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
                 let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
-                let map = irrefutable_match!(&mut stack[0]; V::BigMap);
+                let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
@@ -1463,7 +1464,7 @@ fn interpret_one<'a>(
         I::UpdateN(n) => {
             ctx.gas().consume(interpret_cost::update_n(*n as usize)?)?;
             let new_val = pop!();
-            let field = get_nth_field_ref(*n, &mut stack[0]);
+            let field = get_nth_field_ref(*n, Rc::make_mut(&mut stack[0]));
             *field = new_val;
         }
         I::ChainId => {
@@ -1668,9 +1669,8 @@ fn interpret_one<'a>(
         }
         I::ReadTicket => {
             ctx.gas().consume(interpret_cost::READ_TICKET)?;
-            stack.push(unwrap_ticket(
-                irrefutable_match!(&stack[0]; V::Ticket).as_ref().clone(),
-            ));
+            let ticket = irrefutable_match!(stack[0].as_ref(); V::Ticket);
+            stack.push(unwrap_ticket(ticket.as_ref().clone()));
         }
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
@@ -1714,27 +1714,27 @@ fn interpret_one<'a>(
             }
         }
         I::Blake2b => {
-            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
             ctx.gas().consume(interpret_cost::blake2b(msg)?)?;
             *msg = blake2b_256(msg).to_vec();
         }
         I::Keccak => {
-            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
             ctx.gas().consume(interpret_cost::keccak(msg)?)?;
             *msg = keccak256(msg).to_vec();
         }
         I::Sha256 => {
-            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
             ctx.gas().consume(interpret_cost::sha256(msg)?)?;
             *msg = sha256(msg).to_vec();
         }
         I::Sha3 => {
-            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
             ctx.gas().consume(interpret_cost::sha3(msg)?)?;
             *msg = sha3_256(msg).to_vec();
         }
         I::Sha512 => {
-            let msg = irrefutable_match!(&mut stack[0]; V::Bytes);
+            let msg = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::Bytes);
             ctx.gas().consume(interpret_cost::sha512(msg)?)?;
             *msg = sha512(msg).to_vec();
         }
@@ -1868,7 +1868,7 @@ fn interpret_one<'a>(
             name,
             return_type: _,
         } => {
-            let input = stack.pop().unwrap_or_else(|| unreachable_state());
+            let input = TypedValue::unwrap_rc(stack.pop().unwrap_or_else(|| unreachable_state()));
             let Address {
                 hash,
                 entrypoint: _,
@@ -1908,7 +1908,8 @@ fn interpret_one<'a>(
                 ) {
                     let mut stk = stk![TypedValue::new_pair(input, storage)];
                     interpret(code.as_ref(), ctx, arena, &mut stk)?;
-                    let result = stk.pop().unwrap_or_else(|| unreachable_state());
+                    let result =
+                        TypedValue::unwrap_rc(stk.pop().unwrap_or_else(|| unreachable_state()));
                     stack.push(V::new_option(Some(result)));
                 } else {
                     stack.push(V::Option(None));
@@ -3009,8 +3010,8 @@ mod interpreter_tests {
         fn test(
             overload: overloads::Map,
             collection_length: u32,
-            mut input_stack: Stack<TypedValue<'_>>,
-            expected_stack: Stack<TypedValue<'_>>,
+            mut input_stack: IStack<'_>,
+            expected_stack: IStack<'_>,
             expected_map_gas_cost: u32,
         ) {
             let mut ctx = Ctx::default();
@@ -3072,7 +3073,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_map_empty_collection() {
-        fn test(overload: overloads::Map, mut stack: Stack<TypedValue<'_>>) {
+        fn test(overload: overloads::Map, mut stack: IStack<'_>) {
             let expected_stack = stack.clone();
             assert!(
                 interpret_one(&Map(overload, vec![ISome]), &mut Ctx::default(), &mut stack,)
@@ -3088,11 +3089,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_map_in_order() {
-        fn test(
-            overload: overloads::Map,
-            mut input_stack: Stack<TypedValue<'_>>,
-            expected_stack: Stack<TypedValue<'_>>,
-        ) {
+        fn test(overload: overloads::Map, mut input_stack: IStack<'_>, expected_stack: IStack<'_>) {
             assert!(interpret_one(
                 &Map(overload, vec![Cons, Unit]),
                 &mut Ctx::default(),
@@ -3197,7 +3194,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_string_value() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         assert_eq!(
             interpret(
                 &[Push(V::String("foo".to_owned()))],
@@ -3211,7 +3208,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_unit_value() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         assert_eq!(
             interpret(&[Push(V::Unit)], &mut Ctx::default(), &mut stack),
             Ok(())
@@ -3221,7 +3218,7 @@ mod interpreter_tests {
 
     #[test]
     fn unit_instruction() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(&[Unit], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::Unit]);
@@ -3233,7 +3230,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_pair() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Push(V::new_pair(
@@ -3259,7 +3256,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_option() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[Push(V::new_option(Some(V::int(-5))))],
@@ -3276,7 +3273,7 @@ mod interpreter_tests {
 
     #[test]
     fn car() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
@@ -3302,7 +3299,7 @@ mod interpreter_tests {
 
     #[test]
     fn cdr() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(
             &[
@@ -3526,7 +3523,7 @@ mod interpreter_tests {
 
     #[test]
     fn none() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert!(interpret(&[Instruction::None], &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, stk![V::new_option(None)]);
@@ -3540,8 +3537,9 @@ mod interpreter_tests {
     fn compare() {
         macro_rules! test {
             ($expr:tt, $res:tt) => {
-                let mut stack = stk!$expr;
-                let expected_cost = interpret_cost::compare(&stack[0], &stack[1]).unwrap()
+                let mut stack: IStack<'_> = stk!$expr;
+                let expected_cost = interpret_cost::compare(stack[0].as_ref(), stack[1].as_ref())
+                    .unwrap()
                     + interpret_cost::INTERPRET_RET;
                 let mut ctx = Ctx::default();
                 assert!(interpret(&[Compare], &mut ctx, &mut stack).is_ok());
@@ -3569,7 +3567,7 @@ mod interpreter_tests {
 
     #[test]
     fn amount() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         ctx.amount = 100500;
         assert_eq!(interpret(&[Amount], &mut ctx, &mut stack), Ok(()));
@@ -3582,7 +3580,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_int_list() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert_eq!(
             interpret(
@@ -3604,7 +3602,7 @@ mod interpreter_tests {
 
     #[test]
     fn nil() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         assert_eq!(interpret(&[Nil], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::List(MichelsonList::new())]);
@@ -3628,7 +3626,7 @@ mod interpreter_tests {
 
     #[test]
     fn push_map() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let mut ctx = Ctx::default();
         let map = rc_map([
             (V::int(1), V::String("foo".to_owned())),
@@ -3948,7 +3946,7 @@ mod interpreter_tests {
     #[test]
     fn empty_set() {
         let mut ctx = Ctx::default();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         assert_eq!(interpret(&[EmptySet], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Set(BTreeSet::new())]);
         assert_eq!(
@@ -3960,7 +3958,7 @@ mod interpreter_tests {
     #[test]
     fn empty_map() {
         let mut ctx = Ctx::default();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         assert_eq!(interpret(&[EmptyMap], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![TypedValue::Map(BTreeMap::new())]);
         assert_eq!(
@@ -3972,7 +3970,7 @@ mod interpreter_tests {
     #[test]
     fn empty_big_map() {
         let mut ctx = Ctx::default();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         assert_eq!(
             interpret_one(&EmptyBigMap(Type::Int, Type::Unit), &mut ctx, &mut stack),
             Ok(())
@@ -4680,7 +4678,7 @@ mod interpreter_tests {
         expected = "Unreachable state reached during interpreting, possibly broken typechecking!"
     )]
     fn trigger_unreachable_state() {
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         interpret(
             &[Add(overloads::Add::NatInt)],
             &mut Ctx::default(),
@@ -4695,9 +4693,9 @@ mod interpreter_tests {
         let ctx = &mut Ctx::default();
         ctx.chain_id = chain_id.clone();
         let start_milligas = ctx.gas().milligas();
-        let stk = &mut stk![];
-        assert_eq!(interpret(&[Instruction::ChainId], ctx, stk), Ok(()));
-        assert_eq!(stk, &stk![V::ChainId(chain_id)]);
+        let mut stk = Stack::new();
+        assert_eq!(interpret(&[Instruction::ChainId], ctx, &mut stk), Ok(()));
+        assert_eq!(stk, stk![V::ChainId(chain_id)]);
         assert_eq!(
             start_milligas - ctx.gas().milligas(),
             interpret_cost::CHAIN_ID + interpret_cost::INTERPRET_RET
@@ -4716,13 +4714,16 @@ mod interpreter_tests {
 
     #[test]
     fn self_instr() {
-        let stk = &mut stk![];
+        let mut stk = Stack::new();
         let ctx = &mut Ctx::default();
         ctx.self_address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap();
-        assert_eq!(interpret(&[ISelf(Entrypoint::default())], ctx, stk), Ok(()));
+        assert_eq!(
+            interpret(&[ISelf(Entrypoint::default())], ctx, &mut stk),
+            Ok(())
+        );
         assert_eq!(
             stk,
-            &stk![V::Contract(
+            stk![V::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap()
             )]
         );
@@ -4806,16 +4807,20 @@ mod interpreter_tests {
 
     #[test]
     fn self_instr_ep() {
-        let stk = &mut stk![];
+        let mut stk = Stack::new();
         let ctx = &mut Ctx::default();
         ctx.self_address = "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT".try_into().unwrap();
         assert_eq!(
-            interpret(&[ISelf(Entrypoint::try_from("foo").unwrap())], ctx, stk),
+            interpret(
+                &[ISelf(Entrypoint::try_from("foo").unwrap())],
+                ctx,
+                &mut stk
+            ),
             Ok(())
         );
         assert_eq!(
             stk,
-            &stk![V::Contract(
+            stk![V::Contract(
                 "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT%foo"
                     .try_into()
                     .unwrap()
@@ -5437,7 +5442,7 @@ mod interpreter_tests {
             let mut stack = stk![V::Bytes(input)];
             assert_eq!(interpret_one(&i, &mut Ctx::default(), &mut stack), Ok(()));
             assert_eq!(stack.len(), 1);
-            let out = irrefutable_match!(&stack[0]; V::Bytes);
+            let out = irrefutable_match!(stack[0].as_ref(); V::Bytes);
             assert_eq!(out, &hex::decode(expected_output).unwrap());
         }
         macro_rules! test {
@@ -5480,7 +5485,7 @@ mod interpreter_tests {
     fn balance() {
         let mut ctx = Ctx::default();
         ctx.balance = 70;
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Balance], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Mutez(70),]);
@@ -5723,7 +5728,7 @@ mod interpreter_tests {
     fn level() {
         let mut ctx = Ctx::default();
         ctx.level = 70u32.into();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Level], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
@@ -5737,7 +5742,7 @@ mod interpreter_tests {
     fn min_block_time() {
         let mut ctx = Ctx::default();
         ctx.min_block_time = 70u32.into();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[MinBlockTime], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(70),]);
@@ -5752,7 +5757,7 @@ mod interpreter_tests {
         let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         let mut ctx = Ctx::default();
         ctx.self_address = addr.hash.clone();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[SelfAddress], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
@@ -5767,7 +5772,7 @@ mod interpreter_tests {
         let addr = super::Address::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap();
         let mut ctx = Ctx::default();
         ctx.sender = addr.hash.clone();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Sender], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::Address(addr),]);
@@ -5782,7 +5787,7 @@ mod interpreter_tests {
         let addr = super::PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         let mut ctx = Ctx::default();
         ctx.source = addr.clone();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Source], &mut ctx, &mut stack), Ok(()));
         assert_eq!(
@@ -5802,7 +5807,7 @@ mod interpreter_tests {
     fn now() {
         let mut ctx = Ctx::default();
         ctx.now = 7000i32.into();
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Now], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::timestamp(7000),]);
@@ -5870,7 +5875,7 @@ mod interpreter_tests {
         let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
-        let mut stack = stk![];
+        let mut stack = Stack::new();
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[TotalVotingPower], &mut ctx, &mut stack), Ok(()));
         assert_eq!(stack, stk![V::nat(80)]);
