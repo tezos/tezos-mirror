@@ -18,6 +18,7 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
+.. _def_context:
 .. _def_context_tallinn:
 
 _`Context`
@@ -44,6 +45,7 @@ _`Fitness` (a.k.a. score, weight)
 _`Height`
     See level_.
 
+.. _def_level:
 .. _def_level_tallinn:
 
 _`Level` (a.k.a. block height)
@@ -53,6 +55,7 @@ _`Level` (a.k.a. block height)
 _`Mempool`
    A pool (set) of operation_\ s maintained by a node_ and not yet included in a block_.
 
+.. _def_metadata:
 .. _def_metadata_tallinn:
 
 _`Metadata`
@@ -101,6 +104,7 @@ _`Weight`
 Protocol terms
 --------------
 
+.. _def_accuser:
 .. _def_accuser_tallinn:
 
 _`Accuser`
@@ -113,6 +117,7 @@ _`Accuser`
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
+.. _def_account:
 .. _def_account_tallinn:
 
 _`Account`
@@ -185,6 +190,7 @@ _`Burn`
 _`Constant`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
+.. _def_cycle:
 .. _def_cycle_tallinn:
 
 _`Cycle`
@@ -212,6 +218,7 @@ _`Data Availability Layer`
     The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
     See :doc:`../shell/dal`.
 
+.. _def_delegate:
 .. _def_delegate_tallinn:
 
 _`Delegate`
@@ -226,6 +233,7 @@ _`Delegation`
     its `baking rights`_ and `attesting rights`_; it also increases its `voting power`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
+.. _def_double_signing:
 .. _def_double_signing_tallinn:
 
 _`Double signing`
@@ -245,6 +253,7 @@ _`Failing Noop`
     :ref:`sign arbitrary messages<failing_noop_tallinn>` which have no
     computational semantics.
 
+.. _def_fee:
 .. _def_fee_tallinn:
 
 _`Fee`
@@ -257,6 +266,7 @@ _`Fee`
 
     See also `burn`_.
 
+.. _def_gas:
 .. _def_gas_tallinn:
 
 _`Gas`
@@ -284,6 +294,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
+.. _def_minimal_stake:
 .. _def_minimal_stake_tallinn:
 
 _`Minimal stake`
@@ -299,6 +310,7 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
+.. _def_origination:
 .. _def_origination_tallinn:
 
 _`Origination`
@@ -365,6 +377,7 @@ _`Rollup outbox`
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
+.. _def_round:
 .. _def_round_tallinn:
 
 _`Round`
@@ -393,6 +406,7 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
+.. _def_staker:
 .. _def_staker_tallinn:
 
 _`Staker`
@@ -416,6 +430,7 @@ _`Trap`
    A DAL shard_ that is treated specially by the protocol for a particular attester to ensure that attesters are honestly downloading and attesting to data.
    If a DAL attester attests to a trap, that attester will not receive DAL rewards.
 
+.. _def_user_account:
 .. _def_user_account_tallinn:
 
 _`User account`

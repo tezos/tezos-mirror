@@ -57,6 +57,7 @@ Moreover, to participate in consensus and governance, the delegate
 needs to be :ref:`active<active_delegate_tallinn>` and to meet
 :ref:`minimal balance requirements<minimal_baking_power_tallinn>`.
 
+.. _security_deposit:
 .. _security_deposit_tallinn:
 
 Delegates and delegators may :doc:`stake<staking>` their tez. Staked
@@ -66,6 +67,7 @@ mentioned above, staked tez are weighted higher than non-staked tez
 when computing the baking power.
 
 
+.. _consensus_key:
 .. _consensus_key_tallinn:
 
 Consensus key
@@ -104,6 +106,7 @@ including client commands that are helpful for handling consensus keys.
 Active delegates and deactivation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_tallinn:
 
 A delegate can be marked as active or not. An inactive delegate stops
@@ -135,6 +138,7 @@ Tezos being proof-of-stake, the delegates' rights are selected at
 random based on their :doc:`baking power<baking_power>`. Let us detail
 the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_tallinn:
 
 Random seed
@@ -146,7 +150,9 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _rights:
 .. _rights_tallinn:
+.. _slots:
 .. _slots_tallinn:
 
 Slot selection
@@ -178,6 +184,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_tallinn:
 
 Proof-of-stake parameters

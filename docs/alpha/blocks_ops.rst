@@ -83,6 +83,8 @@ phases required to agree on the next block.
   observed. These operations also hold information on :doc:`DAL attestations <../shell/dal_bakers>`
   when the attesting baker participates in the DAL.
 
+.. _consensus_operations_aggregate_alpha:
+
 Starting in protocol S, blocks are also able to include these operations in an aggregated form, using operations ``Attestations_aggregate`` and ``Preattestations_aggregate``.
 If the attesting baker uses a tz4 consensus key, thanks to the BLS signature scheme,
 its attestation can be aggregated with all the other tz4 pre/attestations,
@@ -149,10 +151,10 @@ conflicting :ref:`consensus operations<consensus_operations_alpha>`:
   preattested, or respectively attested, two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
   provided, consists of the two offending preattestations, respectively attestations.
-  
+
   Beside the two offending operations, there is a ``slot`` field containing the delegate's slot used in the offending operations.
   More precisely, each offending operation may be either a standalone operation for this slot, or an :ref:`aggregate operation<consensus_operations_alpha>` containing this slot in its committee.
-  
+
   In protocols older than S, there were two operations, ``Double_preattestation_evidence`` and ``Double_attestation_evidence``, instead of ``Double_consensus_operation_evidence``, which did not exist.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of

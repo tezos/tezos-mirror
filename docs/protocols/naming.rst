@@ -49,6 +49,7 @@ Here is the list of protocol names and links to the corresponding changelogs:
 * :doc:`021 Quebec <021_quebec>`
 * :doc:`022 Rio <022_rio>`
 * :doc:`023 Seoul <023_seoul>`
+* :doc:`024 Tallinn <024_tallinn>`
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol

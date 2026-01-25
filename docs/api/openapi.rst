@@ -62,19 +62,6 @@ and specific to the Tallinn protocol proposal can be found at:
 
 - `tallinn-mempool-openapi <../_static/tallinn-mempool-openapi.html>`__ (version 24.1)
 
-Seoul RPCs
-----------
-
-The OpenAPI specifications for RPCs which are specific to the Seoul (``PtSeouLo``)
-protocol can be found at:
-
-- `seoul-openapi <../_static/seoul-openapi.html>`__ (version 24.1)
-
-The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Seoul protocol proposal can be found at:
-
-- `seoul-mempool-openapi <../_static/seoul-mempool-openapi.html>`__ (version 24.1)
-
 Alpha RPCs
 ----------
 
@@ -105,14 +92,6 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Tallinn
 (``PtTALLiN``) protocol proposal can be found at:
 
 - `tallinn-smart-rollup-node-openapi <../_static/tallinn-smart-rollup-node-openapi.html>`__ (version 24.1)
-
-Seoul RPCs
-----------
-
-The OpenAPI specifications for the RPCs of the smart rollup node for the Seoul
-(``PtSeouLo``) protocol can be found at:
-
-- `seoul-smart-rollup-node-openapi <../_static/seoul-smart-rollup-node-openapi.html>`__ (version 24.1)
 
 Alpha RPCs
 ----------

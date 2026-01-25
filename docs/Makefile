@@ -16,16 +16,14 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = seoul tallinn
+NAMED_PROTOS  = tallinn
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
 tallinn_long   = PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-seoul_short    = PtSeouLo
 tallinn_short    = PtTALLiN
 alpha_short   = alpha
 
@@ -144,17 +142,18 @@ redirectcheck:
 .PHONY: xrefscheck
 xrefscheck:
 	$(CHECKXREFS) tallinn
-	$(CHECKXREFS) seoul
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
 installcheck:
 	scripts/test_install_scripts.sh install-bin-noble
 	scripts/test_install_scripts.sh install-bin-jammy
+	scripts/test_install_scripts.sh install-bin-bookworm
+	scripts/test_install_scripts.sh install-bin-trixie
 	scripts/test_install_scripts.sh install-bin-rc-jammy
 	scripts/test_install_scripts.sh install-bin-rc-noble
-	scripts/test_install_scripts.sh install-bin-bookworm
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
+	scripts/test_install_scripts.sh install-bin-rc-trixie
 	scripts/test_install_scripts.sh install-opam-scratch
 	scripts/test_install_scripts.sh install-opam-jammy
 	scripts/test_install_scripts.sh compile-release-sources-bullseye
@@ -227,7 +226,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/seoul" || true
+	@ln -s active "$(BUILDDIR)/tallinn" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -317,5 +316,5 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html tallinn/octez-*.html seoul/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html tallinn/octez-*.html
 	@-rm -Rf ../openapi-tmp

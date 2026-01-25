@@ -35,6 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters_tallinn`).
 
+.. _prevalidator_filters:
 .. _prevalidator_filters_tallinn:
 
 Prevalidator filters
@@ -55,6 +56,7 @@ The interface of the prevalidator plugin is described at the
 following filtering strategies are implemented in the
 :package-api:`pre_filter<octez-protocol-alpha-libs/Tezos_protocol_plugin_alpha/Mempool/index.html#val-pre_filter>`.
 
+.. _fees_filter:
 .. _fees_filter_tallinn:
 
 Fees filter
@@ -69,6 +71,7 @@ can be configured via the ``minimal_fees``,
 :ref:`filter RPCs<active_filter_rpc_tallinn>`) parameters of the filter
 configuration of your node.
 
+.. _consensus_filter:
 .. _consensus_filter_tallinn:
 
 Consensus filter
@@ -99,6 +102,7 @@ enable fine-grained operations ordering. This extra information is similar to
 the one used by the baker's operations selection mechanism, that decides which
 operations will be included in the next block.
 
+.. _active_filter_rpc:
 .. _active_filter_rpc_tallinn:
 
 Filters RPCs

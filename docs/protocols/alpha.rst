@@ -1,13 +1,23 @@
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
+
 Protocol Alpha
 ==============
 
-This page documents the changes brought by protocol Alpha with respect
+This page lists the changes brought by protocol Alpha with respect
 to Tallinn (see :ref:`naming_convention`).
+For the list of changes brought by Tallinn with respect to Seoul, see :doc:`./024_tallinn`.
 
-For changes brought by Tallinn with respect to Seoul, see :doc:`./023_seoul`.
+For a higher-level overview of the most salient new features see the
+`announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
-The code can be found in directory :src:`src/proto_alpha` of the ``master``
-branch of Octez.
+An overview of breaking changes and deprecations introduced in
+protocol Alpha can be found :ref:`here <alpha_breaking_changes>`. These
+changes are also listed below in their respective topical section,
+tagged with **Breaking change** or **Deprecation**.
+
+The code is available in directory :src:`src/proto_alpha` of
+the ``master`` branch of Octez and the full documentation in
+:doc:`this page <../alpha/index>`.
 
 Environment Version
 -------------------

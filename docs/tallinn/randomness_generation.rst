@@ -46,6 +46,7 @@ if a malicious participant can make sure she is the last revealer, then she
 can choose whether to reveal its committed value, effectively choosing between
 two different predetermined seeds.
 
+.. _vdf:
 .. _vdf_tallinn:
 
 Verifiable Delay Function
@@ -77,6 +78,7 @@ cheaper and based on a weaker security assumption (low order assumption).
 Protocol
 --------
 
+.. _randomness_generation:
 .. _randomness_generation_tallinn:
 
 Randomness generation overview
@@ -142,6 +144,7 @@ A *VDF revelation* is an operation. A reward ``seed_nonce_revelation_tip``
 is given for the first correct VDF revelation,
 subsequent VDF revelation operations being discarded.
 
+.. _rg_constants:
 .. _rg_constants_tallinn:
 
 Randomness generation parameters

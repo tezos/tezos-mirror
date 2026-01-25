@@ -19,6 +19,7 @@ each delegate's :ref:`voting power<voting_power_tallinn>` instead, which
 is computed in a similar but simpler way.
 
 
+.. _RPC_path_shortcut:
 .. _RPC_path_shortcut_tallinn:
 
 .. note::
@@ -33,6 +34,7 @@ is computed in a similar but simpler way.
   :ref:`changelog<delegates_RPCs_normalization>` for more information.
 
 
+.. _baking_power_overview:
 .. _baking_power_overview_tallinn:
 
 Overview
@@ -92,6 +94,7 @@ An **external delegator** (resp. **external staker**) is a delegator
 (resp. staker) that is not the delegate itself.
 
 
+.. _total_staked:
 .. _total_staked_tallinn:
 
 Staked tez
@@ -173,6 +176,7 @@ an account, called the **full balance**.
   full_balance = staked + delegated
 
 
+.. _total_delegated:
 .. _total_delegated_tallinn:
 
 Delegated tez to a baker
@@ -225,6 +229,7 @@ For a given delegate, we define the following:
 
   total_delegated = own_delegated + external_delegated
 
+.. _min_delegated:
 .. _min_delegated_tallinn:
 
 Min-delegated-in-current-cycle
@@ -391,6 +396,7 @@ here we use tez for simplicity.
     (min: ``900``, level: ``200``).
 
 
+.. _overstaking:
 .. _overstaking_tallinn:
 
 Overstaking
@@ -475,6 +481,7 @@ We finally have everything we need to compute the baking power
   baking_power = total_staked_after_limits + (total_delegated_after_limits / 3)
 
 
+.. _minimal_baking_power:
 .. _minimal_baking_power_tallinn:
 
 Minimal power and own staked requirements
