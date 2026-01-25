@@ -595,6 +595,21 @@ let test_intersection_basic () =
   let sa = commit_slots_sa sa ~lag_index:2 [5; 10; 15] in
   let sa = commit_slots_sa sa ~lag_index:3 [0; 10] in
 
+  let count =
+    Dal_attestations_repr.Slot_availability.number_of_attested_slots
+      sa
+      ~number_of_lags
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Int.equal
+      "Wrong number of attested slots"
+      Format.pp_print_int
+      9
+      count
+  in
+
   let att = Dal_attestations_repr.empty in
   let att = commit_slots_att att ~lag_index:0 [10; 20] in
   let att = commit_slots_att att ~lag_index:1 [2; 7] in
@@ -613,6 +628,21 @@ let test_intersection_basic () =
   let* () = check_slots result ~lag_index:1 [] in
   let* () = check_slots result ~lag_index:2 [5; 10] in
   let* () = check_slots result ~lag_index:3 [] in
+
+  let count =
+    Dal_attestations_repr.Slot_availability.number_of_attested_slots
+      result
+      ~number_of_lags
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Int.equal
+      "Wrong number of attested slots"
+      Format.pp_print_int
+      2
+      count
+  in
 
   return_unit
 
@@ -659,6 +689,21 @@ let test_intersection_empty () =
 
   if result <> Dal_attestations_repr.Slot_availability.empty then
     Test.fail "Intersection expected to be empty" ;
+
+  let count =
+    Dal_attestations_repr.Slot_availability.number_of_attested_slots
+      result
+      ~number_of_lags
+  in
+  let* () =
+    Assert.equal
+      ~loc:__LOC__
+      Int.equal
+      "Wrong number of attested slots"
+      Format.pp_print_int
+      0
+      count
+  in
 
   return_unit
 

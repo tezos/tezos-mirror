@@ -125,7 +125,7 @@ let number_of_attested_slots t ~number_of_lags =
   let total_bits = Bitset.cardinal t in
   (* Count prefix 1s: how many of the first number_of_lags bits are set *)
   let prefix_ones =
-    Misc.(0 --> number_of_lags)
+    Misc.(0 --> (number_of_lags - 1))
     |> List.filter (fun i ->
            match Bitset.mem t i with Ok b -> b | Error _ -> assert false)
     |> List.length
