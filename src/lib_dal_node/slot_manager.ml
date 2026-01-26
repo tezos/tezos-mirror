@@ -248,7 +248,19 @@ let http_request_path_from_kind backup_uri published_level slot_index slot_size
   in
   Uri.with_path
     backup_uri
-    String.(concat "/" ["v0"; kind; "by_published_level"; filename])
+    String.(
+      concat
+        "/"
+        [
+          (let initial_path = Uri.path backup_uri in
+           match String.remove_suffix ~suffix:"/" initial_path with
+           | Some path -> path
+           | None -> initial_path);
+          "v0";
+          kind;
+          "by_published_level";
+          filename;
+        ])
 
 let local_filename_from_kind backup_uri published_level slot_index slot_size
     store_kind =
