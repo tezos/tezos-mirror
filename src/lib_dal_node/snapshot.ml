@@ -255,8 +255,6 @@ module Merge = struct
         ~default:(Stdlib.List.init proto_parameters.number_of_slots Fun.id)
         slots
     in
-    (* Set crypto box share size hook. *)
-    Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
     in

@@ -29,8 +29,7 @@ module Shards_disk : sig
       given [slot_id].
 
       Beware that cryptographic parameters must be initialized via
-      {!Node_context.init_cryptobox} or {!Value_size_hooks.set_share_size} before
-      using this function. *)
+      {!Node_context.init_cryptobox} before using this function. *)
   val get_file_layout :
     slot_id:Types.slot_id ->
     (root_dir:string ->

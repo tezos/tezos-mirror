@@ -682,8 +682,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let*? cryptobox, _ =
     Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
   in
-  (* Set crypto box share size hook. *)
-  Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
   let*! () =
     if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
     else Lwt.return_unit
