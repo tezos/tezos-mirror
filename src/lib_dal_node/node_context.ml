@@ -180,9 +180,7 @@ let set_proto_plugins ctxt proto_plugins = ctxt.proto_plugins <- proto_plugins
 let get_proto_parameters ~level ctxt =
   let open Result_syntax in
   let level =
-    match level with
-    | `Last_proto -> ctxt.l1_current_level
-    | `Level level -> level
+    match level with `Head -> ctxt.l1_current_level | `Level level -> level
   in
   let* _plugin, parameters = get_plugin_and_parameters_for_level ctxt ~level in
   return parameters

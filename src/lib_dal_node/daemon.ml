@@ -394,7 +394,7 @@ let update_and_register_profiles ctxt =
   let profile_ctxt = Node_context.get_profile_ctxt ctxt in
   let gs_worker = Node_context.get_gs_worker ctxt in
   let*? proto_parameters =
-    Node_context.get_proto_parameters ctxt ~level:`Last_proto
+    Node_context.get_proto_parameters ctxt ~level:`Head
   in
   let profile_ctxt =
     Profile_manager.register_profile

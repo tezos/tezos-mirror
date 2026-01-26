@@ -396,9 +396,7 @@ let reply_receiver_job {process; query_store; _} node_context =
 
 let determine_amplification_delays node_ctxt =
   let open Result_syntax in
-  let+ parameters =
-    Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
-  in
+  let+ parameters = Node_context.get_proto_parameters ~level:`Head node_ctxt in
   (* TODO https://gitlab.com/tezos/tezos/-/issues/8138
      This comment is valid for protocol S and T bakers, not later ones.
 

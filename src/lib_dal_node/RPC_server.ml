@@ -161,7 +161,7 @@ module Node = struct
     |> Store.last_processed_level |> Store.Last_processed_level.load
 
   let get_protocol_parameters ctxt level () =
-    let level = match level with None -> `Last_proto | Some l -> `Level l in
+    let level = match level with None -> `Head | Some l -> `Level l in
     Node_context.get_proto_parameters ~level ctxt |> Lwt.return
 end
 
@@ -175,7 +175,7 @@ module Profile_handlers = struct
           |> lwt_map_error (fun e -> `Other e)
         in
         let* proto_parameters =
-          Node_context.get_proto_parameters ctxt ~level:`Last_proto
+          Node_context.get_proto_parameters ctxt ~level:`Head
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
