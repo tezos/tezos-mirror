@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, B256};
+use alloy_primitives::{Address, Bytes, Keccak256};
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy,
     precompiles::constants::ALWAYS_REVERT_SOL_CONTRACT,
@@ -45,18 +45,12 @@ impl RuntimeInterface for EthereumRuntime {
         // TODO: Launch a real EVM invocation to set up the contract properly.
         let mut account = StorageAccount::from_address(&alias)?;
         let mut info = account.info(host)?;
-        let code_hash = B256::from_hex(
-            "0xa85256e50449f7b9fe36c643b8948b3278486baf964070f84d5c3d51760d020d",
-        )
-        .map_err(|e| {
-            EthereumRuntimeError::Custom(format!("Failed to compute code hash: {e}"))
-        })?;
-        info.code_hash = code_hash;
+        info.code_hash = ALWAYS_REVERT_SOL_CONTRACT.code_hash;
         account.set_info(host, info)?;
         CodeStorage::add(
             host,
-            &Bytes::from_hex(ALWAYS_REVERT_SOL_CONTRACT).unwrap(),
-            Some(code_hash),
+            &Bytes::from_static(ALWAYS_REVERT_SOL_CONTRACT.code),
+            Some(ALWAYS_REVERT_SOL_CONTRACT.code_hash),
         )
         .map_err(|e| {
             EthereumRuntimeError::Custom(format!("Failed to store code: {e}"))
