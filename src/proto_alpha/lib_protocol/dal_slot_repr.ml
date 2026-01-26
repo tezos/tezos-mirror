@@ -23,14 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = Dal.parameters = {
-  redundancy_factor : int;
-  page_size : int;
-  slot_size : int;
-  number_of_shards : int;
-}
+module Parameters = struct
+  type t = Dal.parameters = {
+    redundancy_factor : int;
+    page_size : int;
+    slot_size : int;
+    number_of_shards : int;
+  }
 
-let parameters_encoding = Dal.parameters_encoding
+  module Comp = struct
+    type nonrec t = t
+
+    let compare a b =
+      let open Compare in
+      or_else (Int.compare a.redundancy_factor b.redundancy_factor) @@ fun () ->
+      or_else (Int.compare a.page_size b.page_size) @@ fun () ->
+      or_else (Int.compare a.slot_size b.slot_size) @@ fun () ->
+      Int.compare a.number_of_shards b.number_of_shards
+  end
+
+  include Compare.Make (Comp)
+
+  let parameters_encoding = Dal.parameters_encoding
+end
 
 module Commitment = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3389

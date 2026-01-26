@@ -2902,12 +2902,16 @@ end
 
 (** This module exposes definitions for the data-availability layer. *)
 module Dal : sig
-  type parameters = Dal.parameters = {
-    redundancy_factor : int;
-    page_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
+  module Parameters : sig
+    type t = Dal.parameters = {
+      redundancy_factor : int;
+      page_size : int;
+      slot_size : int;
+      number_of_shards : int;
+    }
+
+    val equal : t -> t -> bool
+  end
 
   type cryptobox
 
@@ -3084,7 +3088,7 @@ module Dal : sig
   module Page : sig
     type content = bytes
 
-    val pages_per_slot : parameters -> int
+    val pages_per_slot : Parameters.t -> int
 
     module Index : sig
       type t = int

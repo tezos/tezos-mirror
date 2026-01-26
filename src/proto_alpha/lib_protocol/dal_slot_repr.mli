@@ -23,18 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** To verify the proof of a page membership in its associated slot, the
+module Parameters : sig
+  (** To verify the proof of a page membership in its associated slot, the
      Cryptobox module needs the following Dal parameters. These are part of the
      protocol's parameters. See {!Dal.Config.default}. *)
-type parameters = Dal.parameters = {
-  redundancy_factor : int;
-  page_size : int;
-  slot_size : int;
-  number_of_shards : int;
-}
+  type t = Dal.parameters = {
+    redundancy_factor : int;
+    page_size : int;
+    slot_size : int;
+    number_of_shards : int;
+  }
 
-(** An encoding for values of type {!parameters}. *)
-val parameters_encoding : parameters Data_encoding.t
+  val equal : t -> t -> bool
+
+  (** An encoding for values of type {!parameters}. *)
+  val parameters_encoding : t Data_encoding.t
+end
 
 (** Slot header representation for the data-availability layer.
 
@@ -505,7 +509,7 @@ module History : sig
       cell in the skip list so that refutation games use the correct value,
       in particular across protocol migrations that decrease the lag. *)
   val produce_proof :
-    parameters ->
+    Parameters.t ->
     page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
     attestation_threshold_percent:int option ->
     restricted_commitments_publishers:Contract_repr.t list option ->
@@ -530,7 +534,7 @@ module History : sig
       In both cases, the attestation lag used for the target cell in the skip
       list is returned, alongside the page's bytes if the slot is attested. *)
   val verify_proof :
-    parameters ->
+    Parameters.t ->
     page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
     Page.t ->
     t ->
