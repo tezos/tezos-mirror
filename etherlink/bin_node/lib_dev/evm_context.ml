@@ -6,6 +6,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception
+  Divergence of {
+    level : Ethereum_types.quantity;
+    computed_block_hash : Ethereum_types.block_hash;
+    expected_block_hash : Ethereum_types.block_hash;
+  }
+
+exception Unsync
+
 open Evm_context_types
 
 type init_status = Loaded | Created
@@ -1179,8 +1188,8 @@ module State = struct
 
       This function expects its connection to the store [conn] to be wrapped in
       a SQL transaction. *)
-  let rec apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
-      delayed_transactions sequencer_block_hash fail_on_divergence =
+  let apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
+      delayed_transactions sequencer_block_hash =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction conn ;
 
@@ -1253,45 +1262,19 @@ module State = struct
         | false, Some _, Some sequencer_block_hash
           when sequencer_block_hash <> block_hash ->
             let*! () = Events.assemble_block_diverged next in
-            let*! evm_state = Pvm.State.get ctxt.session.context in
-            ctxt.session.evm_state <- evm_state ;
-            ctxt.session.future_block_info <- None ;
-            if fail_on_divergence then
-              tzfail
-                (Node_error.Diverged
-                   {
-                     level = next;
-                     expected_block_hash = sequencer_block_hash;
-                     found_block_hash = Some block_hash;
-                     must_exit = true;
-                   })
-            else
-              apply_blueprint_store_unsafe
-                ctxt
-                conn
-                timestamp
-                chunks
-                payload
-                delayed_transactions
-                None
-                fail_on_divergence
+            Lwt.fail
+              (Divergence
+                 {
+                   level = L2_types.block_number block;
+                   expected_block_hash = sequencer_block_hash;
+                   computed_block_hash = block_hash;
+                 })
         (* When observer, future info is present but no sequencer hash was received:
             Should not happen but if it does we re-apply the full blueprint
             as we have no way of checking the assemble validity *)
         | false, Some _, None ->
             let*! () = Events.seq_block_hash_missing next in
-            let*! evm_state = Pvm.State.get ctxt.session.context in
-            ctxt.session.evm_state <- evm_state ;
-            ctxt.session.future_block_info <- None ;
-            apply_blueprint_store_unsafe
-              ctxt
-              conn
-              timestamp
-              chunks
-              payload
-              delayed_transactions
-              None
-              fail_on_divergence
+            Lwt.fail Unsync
         (* Any other case is standard procedure *)
         | _ ->
             ctxt.session.future_block_info <- None ;
@@ -1428,9 +1411,9 @@ module State = struct
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
-  let rec apply_blueprint ?(events = []) ?expected_block_hash
-      ?(fail_on_divergence = false) ctxt conn timestamp chunks payload
-      delayed_transactions : 'a L2_types.block tzresult Lwt.t =
+  let rec apply_blueprint ?(events = []) ?expected_block_hash ctxt conn
+      timestamp chunks payload delayed_transactions :
+      'a L2_types.block tzresult Lwt.t =
     let open Lwt_result_syntax in
     let+ current_block, _execution_gas =
       Misc.with_timing_f_e (fun (block, execution_gas) ->
@@ -1452,7 +1435,6 @@ module State = struct
           payload
           delayed_transactions
           expected_block_hash
-          fail_on_divergence
       in
       let kernel_upgrade =
         match ctxt.session.pending_upgrade with
@@ -2391,22 +2373,52 @@ module Handlers = struct
              kernel"
         in
         let ctxt = Worker.state self in
-        State.Transaction.run ctxt @@ fun ctxt conn ->
-        let* block =
+        let fail_on_divergence =
+          match ctxt.configuration.observer with
+          | Some config -> config.fail_on_divergence
+          | None -> true
+        in
+        let apply_blueprint ?expected_block_hash ctxt conn =
           State.apply_blueprint
             ?events
             ?expected_block_hash
-            ?fail_on_divergence:
-              (Option.map
-                 (fun (config : Configuration.observer) ->
-                   config.fail_on_divergence)
-                 ctxt.configuration.observer)
             ctxt
             conn
             timestamp
             chunks
             payload
             delayed_transactions
+        in
+        let retry_apply_blueprint ctxt conn =
+          let*! evm_state = Pvm.State.get ctxt.session.context in
+          ctxt.session.evm_state <- evm_state ;
+          ctxt.session.future_block_info <- None ;
+          apply_blueprint ?expected_block_hash:None ctxt conn
+        in
+        let* block =
+          Lwt.catch
+            (fun () ->
+              State.Transaction.run ctxt @@ fun ctxt conn ->
+              apply_blueprint ?expected_block_hash ctxt conn)
+            (function
+              | Divergence _ when not fail_on_divergence ->
+                  State.Transaction.run ctxt retry_apply_blueprint
+              | Unsync -> State.Transaction.run ctxt retry_apply_blueprint
+              | Divergence
+                  {
+                    level = Qty level;
+                    computed_block_hash = block_hash;
+                    expected_block_hash;
+                  } ->
+                  tzfail
+                    (Node_error.Diverged
+                       {
+                         level;
+                         expected_block_hash;
+                         found_block_hash = Some block_hash;
+                         must_exit = true;
+                       })
+              | exn -> Lwt.reraise exn)
         in
         let tx_hashes =
           match block with
@@ -2459,6 +2471,7 @@ module Handlers = struct
         State.set_next_block_info ctxt conn timestamp number
     | Execute_single_transaction {tx; hash} ->
         let ctxt = Worker.state self in
+        State.Transaction.run ctxt @@ fun ctxt _conn ->
         State.execute_single_transaction ctxt tx hash
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
