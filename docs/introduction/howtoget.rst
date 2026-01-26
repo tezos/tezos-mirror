@@ -303,7 +303,7 @@ To make sure you use the most recent version of Octez, run::
 
     docker pull tezos/tezos-bare:latest
 
-For instance, to run a node on the ``currentnet`` :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
+For instance, to run a node on :ref:`currentnet <network_aliases>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
     mkdir $HOME/rolling-data-directory
     docker run -it --rm \
@@ -399,7 +399,7 @@ and in the shell do::
     octez-client gen keys mybaker
     octez-client show address mybaker
     # Note down the address of mybaker
-    # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
 
