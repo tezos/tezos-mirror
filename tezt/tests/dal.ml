@@ -2003,8 +2003,22 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
-    =
+(** This function checks that the status of the slot at
+    [(~slot_level, ~slot_index)] on [dal_node] matches [?expected_status].
+
+    [?check_attested_lag] controls how the lag value is compared when both
+    the actual and expected statuses are [Attested]. This is particularly
+    relevant for multi-lag configurations where a slot can be attested at
+    different lags (e.g., with [attestation_lags = [2; 3; 5]], a slot could be
+    attested at lag 2, 3, or 5). The possible values are:
+
+    - [`Exact] (default): The actual lag must equal the expected lag exactly;
+    - [`At_most]: The actual lag must be less than or equal to the expected lag.
+
+    For non-[Attested] statuses, [?check_attested_lag] has no effect and exact
+    equality is always used. *)
+let check_slot_status ~__LOC__ ?expected_status ?(check_attested_lag = `Exact)
+    dal_node ~slot_level ~slot_index =
   match expected_status with
   | None -> unit
   | Some expected_status ->
@@ -2014,16 +2028,33 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
       let prefix =
         sf "Unexpected slot status at level %d, index %d " slot_level slot_index
       in
-      Check.(status = expected_status)
-        ~__LOC__
-        Dal.Check.slot_id_status_typ
-        ~error_msg:(prefix ^ "(got = %L, expected = %R)") ;
+      let status_matches =
+        match (status, expected_status, check_attested_lag) with
+        | Dal_RPC.Attested lag, Dal_RPC.Attested expected_lag, `At_most ->
+            lag <= expected_lag
+        | _ -> status = expected_status
+      in
+      if not status_matches then
+        Test.fail
+          ~__LOC__
+          "%s(got = %a, expected = %a)"
+          prefix
+          Dal_RPC.pp_slot_id_status
+          status
+          Dal_RPC.pp_slot_id_status
+          expected_status ;
       unit
 
-let check_slots_statuses ~__LOC__ ?expected_status dal_node ~slot_level
-    slots_info =
+let check_slots_statuses ~__LOC__ ?expected_status ?check_attested_lag dal_node
+    ~slot_level slots_info =
   let test (slot_index, _commitment) =
-    check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
+    check_slot_status
+      ~__LOC__
+      ?expected_status
+      ?check_attested_lag
+      dal_node
+      ~slot_level
+      ~slot_index
   in
   Lwt_list.iter_s test slots_info
 
