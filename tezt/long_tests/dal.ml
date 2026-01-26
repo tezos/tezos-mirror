@@ -291,6 +291,11 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     let* {dal_attestation; _} =
       Node.RPC.(call node1 @@ get_chain_block_metadata ())
     in
+    let dal_attestation =
+      Option.map
+        (Dal.Slot_availability.decode protocol dal_parameters)
+        dal_attestation
+    in
     Check.((Some [|true|] = dal_attestation) (option (array bool)))
       ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
     unit

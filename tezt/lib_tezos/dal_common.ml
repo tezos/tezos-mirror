@@ -129,6 +129,83 @@ module Parameters = struct
     else 1 + (default_block_storage / blocks_per_cycle)
 end
 
+(* Encoding/decoding of the multi-lag Attestations format used in attestation
+   operations (Dal_attestations_repr.t).
+
+   Note that:
+   - [number_of_lags = List.length attestation_lags]
+   - [lag_index i] corresponds to [attestation_lags[i]]
+
+   Encoding format:
+   - Prefix: first [number_of_lags] bits indicate which lag indices have non-empty
+     attestations
+   - Data: for each non-empty lag (in order), [number_of_slots] bits representing
+     which slots are attested for that lag *)
+module Attestations = struct
+  (* Encode using the multi-lag format (Dal_attestations_repr.t encoding).
+     For a single bool array, we encode it as lag_index 0 attestations.
+
+     Format:
+     - Prefix: first [number_of_lags] bits indicate which lag indices have
+       non-empty attestations (bit 0 = 1 since we have data at lag_index 0)
+     - Data: [number_of_slots] bits for the slot attestations
+
+     For single-lag: number_of_lags = 1, prefix = 0b1 (bit 0 set).
+     Then data bits follow at offset 1. *)
+  let encode_single_lag_after_025 dal_attestation =
+    let number_of_lags = 1 in
+    (* Check if any slot is attested *)
+    let has_attestation = Array.exists Fun.id dal_attestation in
+    if not has_attestation then "0"
+    else
+      (* Prefix: bit 0 is set (lag_index 0 has data) *)
+      let prefix = Z.one in
+      (* Add data bits at offset number_of_lags *)
+      let result =
+        Array.fold_left
+          (fun (slot_idx, z) is_attested ->
+            let z' =
+              if is_attested then
+                Z.logor z (Z.shift_left Z.one (number_of_lags + slot_idx))
+              else z
+            in
+            (slot_idx + 1, z'))
+          (0, prefix)
+          dal_attestation
+        |> snd
+      in
+      Z.to_string result
+
+  let encode protocol dal_attestation =
+    if Protocol.number protocol < 025 then
+      let aux (acc, n) b =
+        let bit = if b then 1 else 0 in
+        (acc lor (bit lsl n), n + 1)
+      in
+      Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
+    else encode_single_lag_after_025 dal_attestation
+
+  let rec decode protocol str =
+    if Protocol.number protocol < 025 then (
+      (* the same code as for [Attestations.decode] *)
+      let attestation = Z.of_string str in
+      let length = Z.numbits attestation in
+      let array = Array.make length false in
+      List.iter
+        (fun i -> if Z.testbit attestation i then array.(i) <- true)
+        (range 0 (length - 1)) ;
+      array)
+    else
+      let z = Z.of_string str in
+      Z.shift_right z 1 |> Z.to_string |> decode Protocol.T024
+end
+
+(* Decoding of the multi-lag Slot_availability.t bitset format. It has the same
+   format as Attestations. *)
+module Slot_availability = struct
+  let decode protocol _parameters = Attestations.decode protocol
+end
+
 module Committee = struct
   type member = {attester : string; indexes : int list}
 

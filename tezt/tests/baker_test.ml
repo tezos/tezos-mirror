@@ -554,7 +554,7 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
                 match committee_json |-> "dal_attestation" |> as_string_opt with
                 | Some dal_attestation_as_string ->
                     let delegate = metadata_json |-> "delegate" |> as_string in
-                    (delegate, Z.of_string dal_attestation_as_string) :: acc
+                    (delegate, dal_attestation_as_string) :: acc
                 | None -> acc)
               []
               (contents |-> "committee" |> as_list)
@@ -570,7 +570,7 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
                 let delegate =
                   contents |-> "metadata" |-> "delegate" |> as_string
                 in
-                Some (delegate, Z.of_string dal_attestation_as_string)
+                Some (delegate, dal_attestation_as_string)
             | None -> None)
           attestations
       in
@@ -585,10 +585,10 @@ let check_dal ~expected ~attestations_aggregates ~attestations =
           expected
         |> List.sort cmp
       in
-      let eq (d, dal) (d', dal') = String.equal d d' && Z.equal dal dal' in
+      let eq (d, dal) (d', dal') = String.equal d d' && String.equal dal dal' in
       if not (List.equal eq sorted_found sorted_expected) then
         let pp_tuple fmt (delegate, dal_attestation) =
-          Format.fprintf fmt "(%s, %a)" delegate Z.pp_print dal_attestation
+          Format.fprintf fmt "(%s, %s)" delegate dal_attestation
         in
         let pp = Format.(pp_print_list ~pp_sep:pp_print_cut pp_tuple) in
         Test.fail
@@ -1012,7 +1012,9 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     "Injecting consensus for bootstrap1 at level %d round %d@."
     base_level
     round ;
-  let dal_attestation = Array.init 16 (fun _ -> true) in
+  let dal_attestation =
+    Dal_common.Attestations.encode protocol @@ Array.init 16 (fun _ -> true)
+  in
   let* () =
     Operation.Consensus.(
       let* slot =
@@ -1176,7 +1178,6 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       [(consensus_key3, Some companion_key3); (bootstrap6, None)]
   in
   let* _ = Node.wait_for_branch_switch ~level:(base_level + 1) node in
-  let dal_attestation_as_int = z_of_bool_vector dal_attestation in
   let* () =
     check_consensus_operations
       ~expected_attestations_committee:[bootstrap1; bootstrap2; bootstrap3]
@@ -1185,11 +1186,11 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
       ~expected_preattestations:[bootstrap4; bootstrap5]
       ~expected_dal_attestations:
         [
-          (bootstrap1, dal_attestation_as_int);
-          (bootstrap2, dal_attestation_as_int);
-          (bootstrap3, dal_attestation_as_int);
-          (bootstrap4, dal_attestation_as_int);
-          (bootstrap6, dal_attestation_as_int);
+          (bootstrap1, dal_attestation);
+          (bootstrap2, dal_attestation);
+          (bootstrap3, dal_attestation);
+          (bootstrap4, dal_attestation);
+          (bootstrap6, dal_attestation);
         ]
       client
   in

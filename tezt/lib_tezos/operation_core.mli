@@ -272,7 +272,7 @@ module Consensus : sig
     level:int ->
     round:int ->
     block_payload_hash:string ->
-    ?dal_attestation:bool array ->
+    ?dal_attestation:string ->
     unit ->
     t
 
@@ -372,7 +372,7 @@ module Consensus : sig
     round:int ->
     block_payload_hash:string ->
     ?branch:string ->
-    ?dal_attestation:bool array ->
+    ?dal_attestation:string ->
     ?companion_key:Account.key ->
     Account.key ->
     Client.t ->

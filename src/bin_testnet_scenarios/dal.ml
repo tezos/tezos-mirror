@@ -101,12 +101,14 @@ let publish_at_levels node dal_node client ~slot_size ~last_level publisher
    L1 at level [level] matches the slot indexes classified as attestable by
    the DAL node.  Returns a pair of (number of published slot headers, number
    of attested slot indexes) at the given level. *)
-let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
+let check_attestations node dal_node dal_parameters ~published_level =
   let module Map = Map.Make (struct
     type t = Dal_RPC.slot_id_status
 
     let compare = Stdlib.compare
   end) in
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
   let slot_indices = List.init number_of_slots Fun.id in
   let* map, num_published =
     Lwt_list.fold_left_s
@@ -151,7 +153,10 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
   let proto_attestation =
     match metadata.dal_attestation with
     | None -> Array.make number_of_slots false
-    | Some x ->
+    | Some str ->
+        let x =
+          Dal.Slot_availability.decode Protocol.Alpha dal_parameters str
+        in
         let len = Array.length x in
         if len < number_of_slots then (
           let a = Array.make number_of_slots false in
@@ -265,12 +270,7 @@ let scenario_without_rollup_node node dal_node client _network_name
     Lwt_list.fold_left_s
       (fun (total_published, total_attested) level ->
         let* published, attested =
-          check_attestations
-            node
-            dal_node
-            ~lag
-            ~number_of_slots
-            ~published_level:level
+          check_attestations node dal_node dal_parameters ~published_level:level
         in
         return (total_published + published, total_attested + attested))
       (0, 0)
@@ -332,7 +332,6 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
   in
   let cryptobox = dal_parameters.cryptobox in
   let lag = dal_parameters.attestation_lag in
-  let number_of_slots = dal_parameters.number_of_slots in
 
   let originate =
     Cli.get ~default:None (fun _ -> Some (Some ())) "originate"
@@ -439,7 +438,7 @@ let scenario_with_rollup_node node dal_node client network_name proto_parameters
         Node.wait_for_level node (attested_level + 2)
       in
       let* _ =
-        check_attestations node dal_node ~lag ~number_of_slots ~published_level
+        check_attestations node dal_node dal_parameters ~published_level
       in
       check_slots_attested (published_level + 1)
   in
