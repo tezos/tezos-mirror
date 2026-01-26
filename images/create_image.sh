@@ -20,6 +20,8 @@ script_dir="$(dirname "$images_dir")/scripts"
 
 #shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
+#shellcheck source=scripts/ci/docker_registry.inc.sh
+. "$script_dir"/ci/docker_registry.inc.sh
 
 if [ "${1:-}" = "--help" ]; then
   usage
@@ -40,6 +42,9 @@ fi
 image_base=${image_base:-${GCP_REGISTRY}/tezos/tezos/${image_base}}
 image_tag=${image_tag:-master}
 image_name="${image_base}:${image_tag}"
+
+# Apply the correct registry based on image type
+image_name=$(ensure_correct_image_registry "$image_name")
 
 images_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$images_dir")"

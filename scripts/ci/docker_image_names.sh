@@ -30,6 +30,8 @@ else
   # default docker image name prefix. For example it is used to prefix the images
   # tezos/tezos , tezos/tezos-bare, tezos/tezos-debug
   docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  # Apply the correct registry based on image type
+  docker_image_name=$(ensure_correct_image_registry "$docker_image_name")
 fi
 
 docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | sanitizeTag)
