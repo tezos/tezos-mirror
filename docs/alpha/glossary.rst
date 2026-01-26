@@ -427,7 +427,7 @@ _`User account`
     If *registered*, a user account can act as a delegate_.
 
     The address of a user account always starts with the
-    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
+    letters ``tz`` followed by ``1``, ``2``, ``3``, ``4`` or ``5`` (depending on the
     signature scheme) and finally the hash of the public key.
     See :doc:`./accounts` for a more detailed explanation on addresses.
 

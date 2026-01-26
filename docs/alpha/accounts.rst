@@ -97,6 +97,18 @@ consensus operations to reduce the size signatures take in each block. Such bake
 also wish to participate in the DAL are strongly advised to register a :ref:`companion key <companion_key>`,
 that is used to sign the DAL specific attestation and aggregate it with the regular attestation. See :doc:`./native_multisig` for more details.
 
+.. _tz5_accounts_alpha:
+
+``tz5``: ML-DSA-44
+''''''''''''''''''
+
+Addresses that start with the ``tz5`` prefix are hashes of ML-DSA-44 public keys and
+signatures must be produced by using the `ML-DSA-44 signature scheme
+<https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>`_ . One
+particularity of ML-DSA-44 is that it is secure against classical and
+quantum computer attacks.
+
+
 Smart contracts
 ~~~~~~~~~~~~~~~
 

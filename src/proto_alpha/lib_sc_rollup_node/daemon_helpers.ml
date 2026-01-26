@@ -219,7 +219,7 @@ let process_included_l1_operation (type kind) ~catching_up
       | Loser {loser; reason}
         when Node_context.is_operator
                node_ctxt
-               (Tezos_crypto.Signature.Of_V2.public_key_hash loser) ->
+               (Tezos_crypto.Signature.Of_V3.public_key_hash loser) ->
           let result =
             match reason with
             | Conflict_resolved -> Sc_rollup_node_errors.Conflict_resolved
@@ -233,11 +233,11 @@ let process_included_l1_operation (type kind) ~catching_up
           let stakers =
             match operation with
             | Sc_rollup_refute {opponent; _} ->
-                [source; Tezos_crypto.Signature.Of_V2.public_key_hash opponent]
+                [source; Tezos_crypto.Signature.Of_V3.public_key_hash opponent]
             | Sc_rollup_timeout {stakers = {alice; bob}; _} ->
                 [
-                  Tezos_crypto.Signature.Of_V2.public_key_hash alice;
-                  Tezos_crypto.Signature.Of_V2.public_key_hash bob;
+                  Tezos_crypto.Signature.Of_V3.public_key_hash alice;
+                  Tezos_crypto.Signature.Of_V3.public_key_hash bob;
                 ]
             | _ -> assert false
           in
@@ -264,7 +264,7 @@ let process_included_l1_operation (type kind) ~catching_up
           fail_when
             Tezos_crypto.Signature.Public_key_hash.(
               operating_pkh
-              = Tezos_crypto.Signature.Of_V2.public_key_hash staker)
+              = Tezos_crypto.Signature.Of_V3.public_key_hash staker)
             Sc_rollup_node_errors.Exit_bond_recovered_bailout_mode
       | _ -> return_unit)
   | ( Sc_rollup_execute_outbox_message {output_proof; _},
@@ -309,7 +309,7 @@ let process_included_l1_operation (type kind) ~catching_up
           else
             let whitelist_update =
               List.map
-                Tezos_crypto.Signature.Of_V2.public_key_hash
+                Tezos_crypto.Signature.Of_V3.public_key_hash
                 whitelist_update
             in
             let*? () =
@@ -385,7 +385,7 @@ let process_l1_block_operations ~catching_up node_ctxt (head : Layer1.header) =
       =
     let open Lwt_result_syntax in
     let* () = accu in
-    let source = Tezos_crypto.Signature.Of_V2.public_key_hash source in
+    let source = Tezos_crypto.Signature.Of_V3.public_key_hash source in
     process_l1_operation ~catching_up node_ctxt head ~source operation result
   in
   let apply_internal (type kind) accu ~source:_

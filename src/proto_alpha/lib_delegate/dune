@@ -62,11 +62,11 @@
  (action
   (write-file
    %{targets}
-   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\nmodule Mldsa44 = Tezos_crypto.Signature.Mldsa44\n  include Tezos_crypto.Signature.V3")))
 
 (rule
  (targets client_keys.ml)
- (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v3")))
 
 (library
  (name tezos_baking_alpha_commands)

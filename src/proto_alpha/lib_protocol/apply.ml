@@ -1489,7 +1489,7 @@ let apply_manager_operation : type kind.
                 ctxt
                 source
                 bls_pk
-          | (Ed25519 _ | Secp256k1 _ | P256 _), Companion ->
+          | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Companion ->
               (* Should not happen if operation has been validated *)
               tzfail
                 (Validate_errors.Manager.Update_companion_key_not_tz4

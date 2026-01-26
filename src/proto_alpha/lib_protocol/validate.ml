@@ -3102,16 +3102,17 @@ module Manager = struct
                gas_cost_for_sig_check)
         in
         return_unit
-    | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof ->
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof ->
         result_error
           (Validate_errors.Manager.Unused_bls_proof
              {kind = Manager_pk; source; public_key})
-    | (Ed25519 _ | Secp256k1 _ | P256 _), None -> return_unit
+    | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None -> return_unit
 
   let check_update_consensus_key vi remaining_gas source
       (public_key : Signature.Public_key.t) proof
       (kind : Operation_repr.consensus_key_kind) =
     let open Result_syntax in
+    let* () = Delegate.Consensus_key.check_not_tz5 kind public_key in
     if Constants.allow_tz4_delegate_enable vi.ctxt then
       match (public_key, proof, kind) with
       | Bls _bls_public_key, None, kind ->
@@ -3141,15 +3142,19 @@ module Manager = struct
                  gas_cost_for_sig_check)
           in
           return_unit
-      | (Ed25519 _ | Secp256k1 _ | P256 _), _, Operation_repr.Companion ->
+      | ( (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _),
+          _,
+          Operation_repr.Companion ) ->
           result_error
             (Validate_errors.Manager.Update_companion_key_not_tz4
                {source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _), Some _proof, Consensus ->
+      | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), Some _proof, Consensus
+        ->
           result_error
             (Validate_errors.Manager.Unused_bls_proof
                {kind = Consensus_pk; source; public_key})
-      | (Ed25519 _ | Secp256k1 _ | P256 _), None, Consensus -> return_unit
+      | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _), None, Consensus ->
+          return_unit
     else
       let* () = Delegate.Consensus_key.check_not_tz4 kind public_key in
       match kind with
@@ -3197,6 +3202,7 @@ module Manager = struct
         let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
         return_unit
     | Delegation (Some pkh) ->
+        let* () = Delegate.check_not_tz5 pkh in
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
         else Delegate.check_not_tz4 pkh
     | Update_consensus_key {public_key; proof; kind} ->

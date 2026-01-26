@@ -321,6 +321,41 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
     in
     return_unit
 
+let test_tz5_consensus_key () =
+  let open Lwt_result_syntax in
+  let* genesis, contract = Context.init_with_constants1 constants in
+  let account1_pkh = Context.Contract.pkh contract in
+  let consensus_account = Account.new_account ~algo:Mldsa44 () in
+  let delegate = account1_pkh in
+  let consensus_pk = consensus_account.pk in
+  let* operation =
+    Op.update_consensus_key
+      (B genesis)
+      (Contract.Implicit delegate)
+      consensus_pk
+  in
+  let tz5_pk = match consensus_pk with Mldsa44 pk -> pk | _ -> assert false in
+  let expect_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Delegate_consensus_key.Invalid_consensus_key_update_tz5 (pk, kind));
+      ]
+      when Signature.Mldsa44.Public_key.(pk = tz5_pk) && kind = Consensus ->
+        return_unit
+    | err ->
+        failwith
+          "Error trace:@,\
+          \ %a does not match the \
+           [Delegate_consensus_key.Invalid_consensus_key_update_tz5] error"
+          Error_monad.pp_print_trace
+          err
+  in
+  let* inc = Incremental.begin_construction genesis in
+  let* (_i : Incremental.t) =
+    Incremental.validate_operation ~expect_failure inc operation
+  in
+  return_unit
+
 let test_consensus_key_with_unused_proof () =
   let open Lwt_result_syntax in
   let* genesis, contract = Context.init_with_constants1 constants in
@@ -452,6 +487,7 @@ let tests =
         "tz4 consensus key (allow_tz4_delegate_enable:true)"
         `Quick
         (test_tz4_consensus_key ~allow_tz4_delegate_enable:true);
+      tztest "tz5 consensus key" `Quick test_tz5_consensus_key;
       tztest
         "consensus key update with unused proof"
         `Quick

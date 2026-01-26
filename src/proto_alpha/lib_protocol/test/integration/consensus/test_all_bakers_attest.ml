@@ -197,20 +197,20 @@ let test_activation_threshold =
         ~bootstrap_info_list:
           [
             (* bakers *)
-            make "baker_big" ~algo:Not_Bls ~balance:big;
-            make "baker_small_1" ~algo:Not_Bls ~balance:small;
-            make "baker_small_2" ~algo:Not_Bls ~balance:small;
+            make "baker_big" ~algo:Not_Bls_or_Mldsa44 ~balance:big;
+            make "baker_small_1" ~algo:Not_Bls_or_Mldsa44 ~balance:small;
+            make "baker_small_2" ~algo:Not_Bls_or_Mldsa44 ~balance:small;
             make "tz4_baker_big" ~algo:Bls ~balance:big;
             make "tz4_baker_small" ~algo:Bls ~balance:small;
             make
               "non_tz4_with_tz4_ck_baker_big"
-              ~algo:Not_Bls
+              ~algo:Not_Bls_or_Mldsa44
               ~consensus_key:(Some Bls)
               ~balance:big;
             make
               "tz4_with_non_tz4_ck_baker_big"
               ~algo:Bls
-              ~consensus_key:(Some Not_Bls)
+              ~consensus_key:(Some Not_Bls_or_Mldsa44)
               ~balance:big;
             (* delegators *)
             make
@@ -414,8 +414,8 @@ let test_activation_threshold_with_deactivated_baker =
         ~bootstrap_info_list:
           [
             (* bakers *)
-            make "baker_1" ~algo:Not_Bls ~balance;
-            make "baker_2" ~algo:Not_Bls ~balance;
+            make "baker_1" ~algo:Not_Bls_or_Mldsa44 ~balance;
+            make "baker_2" ~algo:Not_Bls_or_Mldsa44 ~balance;
             make "tz4_baker" ~algo:Bls ~balance;
           ]
         []
@@ -497,19 +497,19 @@ let test_activation_level level =
         ~abaab_activation_levels:[Some level]
         ~bootstrap_info_list:
           [
-            make "big_1" ~algo:Not_Bls ~balance:big;
+            make "big_1" ~algo:Not_Bls_or_Mldsa44 ~balance:big;
             make "big_2" ~algo:Bls ~balance:big;
-            make "small_1" ~algo:Not_Bls ~balance:small;
+            make "small_1" ~algo:Not_Bls_or_Mldsa44 ~balance:small;
             make
               "small_2"
-              ~algo:Not_Bls
+              ~algo:Not_Bls_or_Mldsa44
               ~consensus_key:(Some Bls)
               ~balance:small;
             make "small_3" ~algo:Bls ~balance:small;
             make
               "small_4"
               ~algo:Bls
-              ~consensus_key:(Some Not_Bls)
+              ~consensus_key:(Some Not_Bls_or_Mldsa44)
               ~balance:small;
           ]
         []

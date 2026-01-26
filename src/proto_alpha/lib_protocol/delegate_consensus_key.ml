@@ -30,6 +30,8 @@ type error +=
       (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_tz4 of
       (Bls.Public_key.t * Operation_repr.consensus_key_kind)
+  | Invalid_consensus_key_update_tz5 of
+      (Mldsa44.Public_key.t * Operation_repr.consensus_key_kind)
   | Invalid_consensus_key_update_another_delegate of
       (Signature.Public_key_hash.t * Operation_repr.consensus_key_kind)
 
@@ -92,6 +94,25 @@ let () =
         (req "kind" Operation_repr.consensus_key_kind_encoding))
     (function Invalid_consensus_key_update_tz4 c -> Some c | _ -> None)
     (fun c -> Invalid_consensus_key_update_tz4 c) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.consensus_key.tz5"
+    ~title:"Consensus key cannot be a tz5"
+    ~description:"Consensus key cannot be a tz5 (ML-DSA-44 public key)."
+    ~pp:(fun ppf (pk, kind) ->
+      Format.fprintf
+        ppf
+        "The key %a cannot be set as a %a key because it is a ML-DSA-44 key."
+        Mldsa44.Public_key_hash.pp
+        (Mldsa44.Public_key.hash pk)
+        Operation_repr.pp_consensus_key_kind
+        kind)
+    Data_encoding.(
+      obj2
+        (req "delegate_pk" Mldsa44.Public_key.encoding)
+        (req "kind" Operation_repr.consensus_key_kind_encoding))
+    (function Invalid_consensus_key_update_tz5 c -> Some c | _ -> None)
+    (fun c -> Invalid_consensus_key_update_tz5 c) ;
   register_error_kind
     `Permanent
     ~id:"delegate.consensus_key.another_delegate"
@@ -191,7 +212,13 @@ let check_not_tz4 kind : Signature.Public_key.t -> unit tzresult =
   let open Result_syntax in
   function
   | Bls pk -> tzfail (Invalid_consensus_key_update_tz4 (pk, kind))
-  | Ed25519 _ | Secp256k1 _ | P256 _ -> return_unit
+  | Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _ -> return_unit
+
+let check_not_tz5 kind : Signature.Public_key.t -> unit tzresult =
+  let open Result_syntax in
+  function
+  | Mldsa44 pk -> tzfail (Invalid_consensus_key_update_tz5 (pk, kind))
+  | Ed25519 _ | Secp256k1 _ | P256 _ | Bls _ -> return_unit
 
 let check_is_not_another_delegate ctxt kind pkh delegate =
   let open Lwt_result_syntax in

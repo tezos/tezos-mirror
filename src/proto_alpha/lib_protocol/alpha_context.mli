@@ -2385,6 +2385,8 @@ end
 module Delegate : sig
   val check_not_tz4 : Signature.public_key_hash -> unit tzresult
 
+  val check_not_tz5 : Signature.public_key_hash -> unit tzresult
+
   val frozen_deposits_limit :
     context -> public_key_hash -> Tez.t option tzresult Lwt.t
 
@@ -2477,6 +2479,9 @@ module Delegate : sig
 
   module Consensus_key : sig
     val check_not_tz4 :
+      Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
+
+    val check_not_tz5 :
       Operation_repr.consensus_key_kind -> Signature.public_key -> unit tzresult
 
     val active_pubkey :

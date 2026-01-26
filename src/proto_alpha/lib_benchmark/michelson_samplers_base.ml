@@ -78,7 +78,7 @@ end) : S = struct
     Script_int.abs (Script_int.of_zint i)
 
   let signature rng_state =
-    let i = Random.State.int rng_state 5 in
+    let i = Random.State.int rng_state 6 in
     match i with
     | 0 -> (
         let open Tezos_crypto.Signature.Ed25519 in
@@ -106,6 +106,12 @@ end) : S = struct
         let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
         let _, _, sk = generate_key ~seed () in
         Tezos_crypto.Signature.of_bls (sign sk msg)
+    | 4 ->
+        let open Tezos_crypto.Signature.Mldsa44 in
+        let msg = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
+        let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
+        let _, _, sk = generate_key ~seed () in
+        Tezos_crypto.Signature.of_mldsa44 (sign sk msg)
     | _ ->
         let open Tezos_crypto.Signature in
         let bytes =

@@ -77,6 +77,12 @@ Feature flags
 - Added ``native_contracts_enable``, that enables enshrined contracts in the
   protocol. The flag is disabled by default on the mainnet. (MR :gl:`!19709`)
 
+Cryptography
+------------
+
+- Support for ML-DSA-44 signatures and introduction of a new account type whose
+  address has the prefix ``tz5`` (whose keys are ML-DSA-44 key pairs). ``tz5``
+  accounts are forbidden to be delegates, and ``tz5`` keys cannot be set as consensus keys. (MR :gl:`!20251`)
 
 
 Bug Fixes

@@ -395,7 +395,7 @@ module Plugin = struct
                    (Resto.Path.to_string
                       Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
         in
-        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
+        let delegate = Tezos_crypto.Signature.Of_V3.public_key_hash delegate in
         return
         @@ Tezos_crypto.Signature.Public_key_hash.Map.add
              delegate

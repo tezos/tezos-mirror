@@ -209,7 +209,9 @@ manager operations are the only fee-paying and
 - The ``Update_consensus_key`` operation allows users to register a
   :ref:`consensus key<consensus_key_alpha>`, which is a dedicated key
   for signing blocks and consensus-related operations.
-  When the new consensus key is a tz4 (BLS key), the optional ``proof`` field must contain a proof of possession, which is the signature of the public key itself.
+  When the new consensus key is a tz4 (BLS key), the optional ``proof`` field
+  must contain a proof of possession, which is the signature of the public key
+  itself. Note that consensus keys cannot be ML-DSA-44 public keys.
 - The ``Update_companion_key`` operation allows users to register a
   :ref:`companion key<companion_key>`, which is a dedicated key (introduced in protocol S)
   for signing the DAL specific part of consensus operations,

@@ -6306,6 +6306,11 @@ end = struct
     let ( == ) a b = compare_asymmetric a b == 0
   end
 
+  let signature_version_number ~protocol_number =
+    if N.(protocol_number <= 022) then 1
+    else if N.(protocol_number <= 024) then 2
+    else 3
+
   let only_if condition make = if condition then Some (make ()) else None
 
   let conditional_list =
@@ -7186,9 +7191,12 @@ let hash = Protocol.hash
                  {|  module Bls = Tezos_crypto.Signature.Bls
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module P256 = Tezos_crypto.Signature.P256
-  module Secp256k1 = Tezos_crypto.Signature.Secp256k1
+  module Secp256k1 = Tezos_crypto.Signature.Secp256k1%s
   include Tezos_crypto.Signature.V%d|}
-                 (if N.(number <= 022) then 1 else 2));
+                 (if N.(number <= 024) then ""
+                  else {|
+module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
+                 (signature_version_number ~protocol_number:number));
           ]
     in
     let dune_client_keys_version_rule =
@@ -7202,7 +7210,7 @@ let hash = Protocol.hash
               S
                 (sf
                    {|include Tezos_client_base.Client_keys_v%d|}
-                   (if N.(number <= 022) then 1 else 2));
+                   (signature_version_number ~protocol_number:number));
             ])
     in
     let parameters =
@@ -8041,7 +8049,7 @@ let hash = Protocol.hash
                     (sf
                        "include module type of \
                         Tezos_benchmark.Crypto_samplers.V%d"
-                       (if N.(number <= 022) then 1 else 2));
+                       (signature_version_number ~protocol_number:number));
                 ];
             Dune.targets_rule
               ["crypto_samplers.ml"]
@@ -8052,7 +8060,7 @@ let hash = Protocol.hash
                   S
                     (sf
                        "include Tezos_benchmark.Crypto_samplers.V%d"
-                       (if N.(number <= 022) then 1 else 2));
+                       (signature_version_number ~protocol_number:number));
                 ];
           ]
     in

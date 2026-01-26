@@ -1830,9 +1830,10 @@ module Encoding = struct
 
      The JSON encoding is the same as in the previous protocols.
 
-     To support BLS signatures, we extract the prefix of the signature and fit
-     it inside the field [contents] while keeping the 64 bytes suffix in the
-     same place as the other signature kinds (i.e. at the end).
+     To support BLS and MLDSA44 signatures, we extract the prefix of the
+     signature and fit it inside the field [contents] while keeping the 64
+     bytes suffix in the same place as the other signature kinds (i.e. at the
+     end).
 
      For instance the binary protocol data for a transfer operation signed by a
      Ed25519 key would look like:
@@ -1859,10 +1860,26 @@ module Encoding = struct
      | 6C |  ... | 00 | ff |   03 (BLS)    | (96 bytes BLS signature) |
      +----+------+----+----+---------------+--------------------------+
 
-     NOTE: BLS only supports the tagged format and Ed25519, Secp256k1 and P256
-     signatures only support the untagged one. The latter restriction is only
-     here to guarantee unicity of the binary representation for signatures.
-  *)
+     The same transfer signed by a ML-DSA-44 key would be instead:
+
+     +----------------+------------------------------+------------------+
+     |  Transaction   |      signature prefix        | signature suffix |
+     +----+------+----+----+----+--------------------+------------------+
+     | 6C |  ... | 00 | ff | 04 | (first 2356 bytes) | (last 64 bytes)  |
+     +----+------+----+----+----+--------------------+------------------+
+
+     Which can also be viewed with an equivalent schema:
+
+     +----------------+----+----------------+----------------------------------+
+     |  Transaction   | ff | signature tag  |        signature                 |
+     +----+------+----+----+----------------+----------------------------------+
+     | 6C |  ... | 00 | ff |   04 (MLDSA44) | (2420 bytes ML-DSA-44 signature) |
+     +----+------+----+----+----------------+----------------------------------+
+
+     NOTE: BLS and ML-DSA-44 only support the tagged format and Ed25519,
+     Secp256k1 and P256 signatures only support the untagged one. The latter
+     restriction is only here to guarantee unicity of the binary representation
+     for signatures. *)
   let protocol_data_encoding =
     def "operation.alpha.contents_and_signature"
     @@ splitted

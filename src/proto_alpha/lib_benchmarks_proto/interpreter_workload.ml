@@ -190,6 +190,7 @@ type instruction_name =
   | N_ICheck_signature_secp256k1
   | N_ICheck_signature_p256
   | N_ICheck_signature_bls
+  | N_ICheck_signature_mldsa44
   | N_IHash_key
   | N_IPack
   | N_IUnpack
@@ -397,6 +398,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICheck_signature_secp256k1 -> "N_ICheck_signature_secp256k1"
   | N_ICheck_signature_p256 -> "N_ICheck_signature_p256"
   | N_ICheck_signature_bls -> "N_ICheck_signature_bls"
+  | N_ICheck_signature_mldsa44 -> "N_ICheck_signature_mldsa44"
   | N_IHash_key -> "N_IHash_key"
   | N_IPack -> "N_IPack"
   | N_IUnpack -> "N_IUnpack"
@@ -632,6 +634,7 @@ let all_instructions =
     N_ICheck_signature_secp256k1;
     N_ICheck_signature_p256;
     N_ICheck_signature_bls;
+    N_ICheck_signature_mldsa44;
     N_IHash_key;
     N_IPack;
     N_IUnpack;
@@ -1070,6 +1073,9 @@ module Instructions = struct
   let check_signature_bls _pk _signature message =
     ir_sized_step N_ICheck_signature_bls (unary "message" message)
 
+  let check_signature_mldsa44 _pk _signature message =
+    ir_sized_step N_ICheck_signature_mldsa44 (unary "message" message)
+
   let hash_key = ir_sized_step N_IHash_key nullary
 
   let pack (micheline_size : Size.micheline_size) =
@@ -1480,7 +1486,12 @@ let extract_ir_sized_step : type bef_top bef res_top res.
           let pk = Size.of_int (Signature.Bls.Public_key.size pk) in
           let signature = Size.of_int Signature.Bls.size in
           let message = Size.bytes message in
-          Instructions.check_signature_bls pk signature message)
+          Instructions.check_signature_bls pk signature message
+      | Signature.Mldsa44 pk ->
+          let pk = Size.of_int (Signature.Mldsa44.Public_key.size pk) in
+          let signature = Size.of_int Signature.Mldsa44.size in
+          let message = Size.bytes message in
+          Instructions.check_signature_mldsa44 pk signature message)
   | IHash_key (_, _), _ -> Instructions.hash_key
   | IPack (_, ty, _), (v, _) -> (
       let script_res =

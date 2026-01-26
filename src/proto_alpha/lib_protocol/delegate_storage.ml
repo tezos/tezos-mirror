@@ -87,6 +87,7 @@ module Contract = struct
   type error +=
     | (* `Temporary *) Active_delegate
     | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
+    | (* `Permanent *) Tz5_cannot_be_a_delegate of Mldsa44.Public_key_hash.t
 
   let () =
     register_error_kind
@@ -114,7 +115,29 @@ module Contract = struct
           delegate)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
       (function Empty_delegate_account c -> Some c | _ -> None)
-      (fun c -> Empty_delegate_account c)
+      (fun c -> Empty_delegate_account c) ;
+    register_error_kind
+      `Branch
+      ~id:"delegate.tz5_cannot_be_a_delegate"
+      ~title:"Tz5 cannot be a delegate"
+      ~description:
+        "Tz5 (ML-DSA-44) account is forbidden to be registered as a delegate."
+      ~pp:(fun ppf implicit ->
+        Format.fprintf
+          ppf
+          "The account %a cannot be registered as a delegate because it is an \
+           ML-DSA-44 public key hash."
+          Mldsa44.Public_key_hash.pp
+          implicit)
+      Data_encoding.(obj1 (req "delegate" Mldsa44.Public_key_hash.encoding))
+      (function Tz5_cannot_be_a_delegate d -> Some d | _ -> None)
+      (fun d -> Tz5_cannot_be_a_delegate d)
+
+  let check_not_tz5 : Signature.Public_key_hash.t -> unit tzresult =
+    let open Result_syntax in
+    function
+    | Mldsa44 tz5 -> tzfail (Tz5_cannot_be_a_delegate tz5)
+    | Ed25519 _ | Secp256k1 _ | P256 _ | Bls _ -> return_unit
 
   let set_self_delegate c delegate =
     let open Lwt_result_syntax in
@@ -124,6 +147,7 @@ module Contract = struct
       let* () = fail_unless is_inactive Active_delegate in
       Stake_storage.set_active c delegate
     else
+      let*? () = check_not_tz5 delegate in
       let contract = Contract_repr.Implicit delegate in
       let* pk =
         Contract_manager_storage.get_manager_key
@@ -224,6 +248,7 @@ module Contract = struct
         let* c = Contract_delegate_storage.delete c contract in
         return c
     | Some delegate ->
+        let*? () = check_not_tz5 delegate in
         let* () =
           let*! is_delegate_registered = registered c delegate in
           fail_when

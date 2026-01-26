@@ -123,23 +123,34 @@ let script_nat_size n = Script_int.to_zint n |> z_size
 
 let script_int_size n = Script_int.to_zint n |> z_size
 
+(* Return the size of the OCaml object in memory corresponding to the
+   {signature}. The in memory size is retrieved with a call to
+   Obj.reachable_words function. *)
 let signature_size (Script_signature.Signature_tag x) =
   match x with
-  (* By Obj.reachable_words. *)
   | Ed25519 _ | Secp256k1 _ | P256 _ | Unknown _ -> !!96
   | Bls _ -> !!128
+  | Mldsa44 _ -> !!2448
 
+(* Return the size of the OCaml object in memory corresponding to the
+   {public_key_hash}. The in memory size is retrieved with a call to
+   Obj.reachable_words function. *)
 let key_hash_size (_x : Signature.public_key_hash) = !!64
 (* By Obj.reachable_words. *)
 
+(* Return the addition of a constant and the size of the OCaml object in memory
+   corresponding to the {public key}. The in memory size is retrieved with a
+   call to Obj.reachable_words function. *)
 let public_key_size (x : public_key) =
   h1w
   +?
   match x with
+  (* By Obj.reachable_words. *)
   | Ed25519 _ -> 64
   | Secp256k1 _ -> 72
   | P256 _ -> 96
   | Bls _ -> 64
+  | Mldsa44 _ -> 1328
 
 let mutez_size = h2w
 

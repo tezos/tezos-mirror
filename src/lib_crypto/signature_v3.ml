@@ -598,7 +598,7 @@ type signature =
   | Mldsa44 of Mldsa44.t
   | Unknown of Bytes.t
 
-type prefix = Bls_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t | Mldsa44_prefix of Bytes.t
 
 type splitted = {prefix : prefix option; suffix : Bytes.t}
 
@@ -773,35 +773,44 @@ let of_mldsa44 s = Mldsa44 s
 
 let zero = of_ed25519 Ed25519.zero
 
-(* NOTE: At the moment, only BLS signatures can be encoded with a tag. We impose
-   this restriction so that there is only one valid binary representation for a
-   same signature (modulo malleability).
-
-   We reserve the tags 0, 1, 2 and 255 for tags of the other signatures if we
+(* We reserve the tags 0, 1, 2 and 255 for tags of the other signatures if we
    decide to unify signature representation one day.*)
 let prefix_encoding =
   let open Data_encoding in
   def
-    "bls_signature_prefix"
-    ~description:"The prefix of a BLS signature, i.e. the first 32 bytes."
+    "signature_prefix"
+    ~description:
+      "The prefix of a BLS or Mldsa44 signature, i.e. the signature with the \
+       last 64 bytes removed."
   @@ union
        [
          case
            (Tag 3)
            ~title:"Bls_prefix"
            (Fixed.bytes (Bls.size - Ed25519.size))
-           (function Bls_prefix x -> Some x)
+           (function Bls_prefix x -> Some x | Mldsa44_prefix _ -> None)
            (function x -> Bls_prefix x);
+         case
+           (Tag 4)
+           ~title:"Mldsa44_prefix"
+           (Fixed.bytes (Mldsa44.size - Ed25519.size))
+           (function Mldsa44_prefix x -> Some x | Bls_prefix _ -> None)
+           (function x -> Mldsa44_prefix x);
        ]
 
 let split_signature = function
-  | (Ed25519 _ | Secp256k1 _ | P256 _ | Mldsa44 _) as s ->
+  | (Ed25519 _ | Secp256k1 _ | P256 _) as s ->
       {prefix = None; suffix = to_bytes s}
   | Bls s ->
       let s = Bls.to_bytes s in
       let prefix = Bytes.sub s 0 32 in
       let suffix = Bytes.sub s 32 64 in
       {prefix = Some (Bls_prefix prefix); suffix}
+  | Mldsa44 s ->
+      let s = Mldsa44.to_bytes s in
+      let prefix = Bytes.sub s 0 (Mldsa44.size - 64) in
+      let suffix = Bytes.sub s (Mldsa44.size - 64) 64 in
+      {prefix = Some (Mldsa44_prefix prefix); suffix}
   | Unknown s ->
       assert (Compare.Int.(Bytes.length s = 64)) ;
       {prefix = None; suffix = s}
@@ -813,6 +822,9 @@ let of_splitted {prefix; suffix} =
   | Some (Bls_prefix prefix) ->
       let+ s = Bls.of_bytes_opt (Bytes.cat prefix suffix) in
       Bls s
+  | Some (Mldsa44_prefix prefix) ->
+      let+ s = Mldsa44.of_bytes_opt (Bytes.cat prefix suffix) in
+      Mldsa44 s
 
 let bytes_of_watermark = function
   | Block_header chain_id ->

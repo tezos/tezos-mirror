@@ -38,7 +38,7 @@ module No_codegen = Encoding_benchmarks_helpers.Make (struct
 end)
 (* ------------------------------------------------------------------------- *)
 
-module Make_elliptic_curve_encoding_benchmarks (A : sig
+module Make_signature_encoding_benchmarks (A : sig
   val algo : Tezos_crypto.Signature.algo
 end) =
 struct
@@ -209,20 +209,24 @@ struct
   let () = Registration.register_simple_with_num signature_from_b58check
 end
 
-module Ed25519 = Make_elliptic_curve_encoding_benchmarks (struct
+module Ed25519 = Make_signature_encoding_benchmarks (struct
   let algo = Tezos_crypto.Signature.Ed25519
 end)
 
-module Secp256k1 = Make_elliptic_curve_encoding_benchmarks (struct
+module Secp256k1 = Make_signature_encoding_benchmarks (struct
   let algo = Tezos_crypto.Signature.Secp256k1
 end)
 
-module P256 = Make_elliptic_curve_encoding_benchmarks (struct
+module P256 = Make_signature_encoding_benchmarks (struct
   let algo = Tezos_crypto.Signature.P256
 end)
 
-module Bls = Make_elliptic_curve_encoding_benchmarks (struct
+module Bls = Make_signature_encoding_benchmarks (struct
   let algo = Tezos_crypto.Signature.Bls
+end)
+
+module Mldsa44 = Make_signature_encoding_benchmarks (struct
+  let algo = Tezos_crypto.Signature.Mldsa44
 end)
 
 let chain_id_encoding =
