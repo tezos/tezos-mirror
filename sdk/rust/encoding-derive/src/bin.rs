@@ -27,7 +27,7 @@ pub fn generate_bin_write_for_data(
         #[allow(clippy::redundant_closure_call)]
         impl #impl_generics tezos_data_encoding::enc::BinWriter for #name #ty_generics #where_clause {
             fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
-                #bin_write(self, out)
+                (#bin_write)(self, out)
             }
         }
     }
@@ -115,12 +115,12 @@ fn generate_struct_bin_write(encoding: &StructEncoding) -> TokenStreamWithConstr
     TokenStreamWithConstraints {
         stream: quote_spanned! {
             encoding.name.span()=>
-                (|data: &Self, out: &mut Vec<u8>| {
+                |data: &Self, out: &mut Vec<u8>| {
                     #(
                         tezos_data_encoding::enc::field(#field_name, #field_bin_write)(&data.#field, out)?;
                     )*
                     Ok(())
-                })
+                }
         },
         constraints,
     }
@@ -146,11 +146,11 @@ fn generate_enum_bin_write(encoding: &EnumEncoding) -> TokenStreamWithConstraint
     TokenStreamWithConstraints {
         stream: quote_spanned! {
             tag_type.span()=>
-                (|data: &Self, out| {
+                |data: &Self, out| {
                     match data {
                         #(#tags_bin_write),*
                     }
-                })
+                }
         },
         constraints,
     }
