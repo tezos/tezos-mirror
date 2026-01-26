@@ -92,7 +92,7 @@ impl fmt::Display for BinError {
                 write!(f, " in context of: ")?;
             }
             first = false;
-            write!(f, "{}", kind)?;
+            write!(f, "{kind}")?;
         }
         Ok(())
     }

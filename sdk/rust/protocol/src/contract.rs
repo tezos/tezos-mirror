@@ -34,8 +34,8 @@ pub enum Contract {
 impl Display for Contract {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Implicit(pkh) => write!(f, "{}", pkh),
-            Self::Originated(kt1) => write!(f, "{}", kt1),
+            Self::Implicit(pkh) => write!(f, "{pkh}"),
+            Self::Originated(kt1) => write!(f, "{kt1}"),
         }
     }
 }

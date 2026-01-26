@@ -163,7 +163,7 @@ fn generate_tag_bin_write(
 ) -> TokenStreamWithConstraints {
     let tag_name = tag.name;
     let tag_id = &tag.id;
-    let name = format!("{}::{}", enum_name, tag_name);
+    let name = format!("{enum_name}::{tag_name}");
     match &tag.encoding {
         Encoding::Unit(span) => {
             quote_spanned!(*span=>

@@ -95,7 +95,7 @@ fn make_type_encoding<'a>(ty: &'a syn::Type, meta: &mut Vec<syn::Meta>) -> Resul
             paren_token: _,
             elems,
         }) if elems.is_empty() => Ok(Encoding::Unit(ty.span())),
-        _ => Err(error_spanned(ty, format!("Unsupported type: {:?}", ty))),
+        _ => Err(error_spanned(ty, format!("Unsupported type: {ty:?}"))),
     }
 }
 

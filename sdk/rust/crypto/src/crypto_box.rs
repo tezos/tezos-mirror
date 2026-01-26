@@ -156,7 +156,7 @@ impl Debug for PrecomputedKey {
 impl From<FromHexError> for CryptoError {
     fn from(e: FromHexError) -> Self {
         CryptoError::InvalidKey {
-            reason: format!("{}", e),
+            reason: format!("{e}"),
         }
     }
 }

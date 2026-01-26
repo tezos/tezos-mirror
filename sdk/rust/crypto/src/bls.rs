@@ -90,7 +90,7 @@ impl BlsSignature {
         match signature.aggregate_verify(true, &messages, dst, &public_keys, true) {
             BLST_ERROR::BLST_SUCCESS => Ok(true),
             BLST_ERROR::BLST_VERIFY_FAIL => Ok(false),
-            err => Err(CryptoError::AlgorithmError(format!("BLS_ERROR: {:?}", err))),
+            err => Err(CryptoError::AlgorithmError(format!("BLS_ERROR: {err:?}"))),
         }
     }
 
@@ -104,11 +104,11 @@ impl BlsSignature {
         let sigs = sigs.iter().collect::<Vec<_>>();
 
         let aggregate = AggregateSignature::aggregate(sigs.as_slice(), true)
-            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {:?}", e)))?;
+            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
         aggregate
             .validate()
-            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {:?}", e)))?;
+            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
         Ok(Self(aggregate.to_signature().compress().to_vec()))
     }
@@ -127,7 +127,7 @@ impl SecretKeyBls {
     /// Derive the public key for the current secret key.
     pub fn derive_pk(&self) -> Result<PublicKeyBls, CryptoError> {
         let sk = SecretKey::from_bytes(&self.0)
-            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {:?}", e)))?;
+            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
         let pk = sk.sk_to_pk();
 
@@ -137,7 +137,7 @@ impl SecretKeyBls {
     /// Sign the given data.
     pub fn sign(&self, message: impl AsRef<[u8]>) -> Result<BlsSignature, CryptoError> {
         let sk = SecretKey::from_bytes(&self.0)
-            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {:?}", e)))?;
+            .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
         let pk = sk.sk_to_pk();
         let msg = prepend_public_key(message.as_ref(), &PublicKeyBls(pk.to_bytes().to_vec()));
@@ -159,7 +159,7 @@ fn prepend_public_key(msg: &[u8], pk: &PublicKeyBls) -> Vec<u8> {
 /// Generate a keypair from initial key material.
 pub fn keypair_from_ikm(ikm: [u8; 32]) -> Result<(SecretKeyBls, PublicKeyBls), CryptoError> {
     let sk = SecretKey::key_gen(&ikm, &[])
-        .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {:?}", e)))?;
+        .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
     let pk = sk.sk_to_pk();
 

@@ -18,8 +18,8 @@ pub enum BinaryReaderError {
 impl fmt::Display for BinaryReaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BinaryReaderError::Error(error) => write!(f, "{}", error),
-            BinaryReaderError::UnknownTag(tag) => write!(f, "Unknown tag: {}", tag),
+            BinaryReaderError::Error(error) => write!(f, "{error}"),
+            BinaryReaderError::UnknownTag(tag) => write!(f, "Unknown tag: {tag}"),
         }
     }
 }
