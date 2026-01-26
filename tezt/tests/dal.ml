@@ -7614,6 +7614,7 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:1
       @@ Helpers.make_slot ~slot_size "content"
     in
+    Log.info "Published a slot at level %d" published_level ;
     let* () = wait_for_producer in
     Log.info "Producer reached expected level" ;
     let* () =
@@ -7748,7 +7749,7 @@ module Garbage_collection = struct
      [Auto].
      The slot producer will send shards from one slot; once a node receives it,
      a request is sent for a received shard, to make sure for reception. After
-     25 blocks baked, we check via RPC that attester deleted its shards and the
+     180 blocks baked, we check via RPC that attester deleted its shards and the
      others did not.
   *)
   let test_gc_with_all_profiles = test_gc_common ~include_observer:true
@@ -7797,8 +7798,8 @@ module Garbage_collection = struct
         let* () = Dal_node.init_config ~operator_profiles:[1] dal_node in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
-          "The first level with stored cells is 1 + lag = %d. We bake till \
-           that level is final, that is until level %d."
+          "The first level with stored cells is 2, the last is is 1 + lag = \
+           %d. We bake till that level is final, that is until level %d."
           (lag + 1)
           (lag + 3) ;
         let wait_for_dal_node =
@@ -7809,13 +7810,12 @@ module Garbage_collection = struct
         let* () = bake_for client ~count:(lag + 2) in
         let* () = wait_for_dal_node in
         Log.info
-          "Check that the skip list store contains the right files for level \
+          "Check that the skip list store contains the right entries for level \
            lag + 1." ;
         let* () =
           let expected_levels =
             if Protocol.number protocol >= 025 then
-              (* also include level 0; unclear why, but it should not matter *)
-              ["0"; "1"]
+              List.map string_of_int (List.init lag (fun i -> i + 2))
             else ["1"]
           in
           check_skip_list_store dal_node ~number_of_slots ~expected_levels
@@ -7833,12 +7833,17 @@ module Garbage_collection = struct
           "Check that the skip list store contains cells for [non_gc_period] \
            levels." ;
         (* Example: say head level = 21. The node GCs the cells at level 19 - 10
-           = 9, and it injects at level 19. So we have cells for level 10 to
+           = 9, and it injects at level 19. So we have cells for levels 10 to
            19, that is, 10 levels. *)
         let expected_levels =
-          (* The first published level with stored cells is [last_final_level -
-             non_gc_period + 1 - lag = 2]. *)
-          List.init non_gc_period (fun i -> string_of_int (i + 2))
+          if Protocol.number protocol < 025 then
+            (* The first published level with stored cells is [last_final_level
+               - non_gc_period + 1 - lag = 2]. *)
+            List.init non_gc_period (fun i -> string_of_int (i + 2))
+          else
+            (* The first published level with stored cells is [last_final_level
+               - non_gc_period + 1 - lag = 2]. The last is [last_final_level] *)
+            List.init (non_gc_period + lag) (fun i -> string_of_int (i + 2))
         in
         check_skip_list_store dal_node ~number_of_slots ~expected_levels)
       protocols
