@@ -47,6 +47,12 @@ Consensus
 Data Availability Layer
 -----------------------
 
+- Introduced a new format for the bitset representing baker-attested DAL slots,
+  used in the DAL payload of consensus attestation operation, and
+  protocol-attested DAL slots, used in a block metadata's field
+  ``"dal_attestation"``. The format is described in the header of the file
+  ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`)
+
 Adaptive Issuance
 -----------------
 
