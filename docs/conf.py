@@ -310,7 +310,6 @@ linkcheck_ignore = [
     # flaky servers, to remove one day if they got more predictable
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
-    r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
     r'^https://gitlab\.com/tezos/tezos/-/merge_requests/',
 ]
 linkcheck_allowed_redirects = dict(

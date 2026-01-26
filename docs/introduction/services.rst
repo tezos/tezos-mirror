@@ -97,7 +97,7 @@ If you intend to bake on a testnet, you can simply create a key as follows, fund
    Hash: tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39
    Public Key: edpkuGRKH8oZDP2PH2EULw9PGzJHdf5g2zCiHnaYG7tapeePUNAWeC
 
-   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
    $ sudo su tezos -c "octez-client register key mybaker as delegate"
    $ sudo su tezos -c "octez-client stake 6000 for mybaker"
    $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39"
@@ -179,7 +179,7 @@ the configuration commands below:
    # Configure the baker to use the remote signer
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 \
       import secret key mybaker remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
-   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.currentnet.teztnets.com
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 register key mybaker as delegate"
    $ sudo su tezos -c "octez-client -R tcp://localhost:7732 stake 6000 for mybaker"
    $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"

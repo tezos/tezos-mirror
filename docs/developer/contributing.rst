@@ -57,7 +57,7 @@ first and always make sure
 to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
 the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
-Stretch*), the network you are connected to (e.g. *Ghostnet*), the
+Stretch*), the network you are connected to (e.g. *Shadownet*), the
 binary or component (e.g. *octez-node crashes* or *rpc X returns Y
 while Z was expected*).
 

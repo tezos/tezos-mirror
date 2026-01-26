@@ -193,7 +193,7 @@ Follow these steps if the DAL node is running but not connected to the network:
 
       octez-node config update --network <network>
 
-   Use ``mainnet``, ``ghostnet``, or ``sandbox`` as the value for the ``--network`` argument.
+   Use ``mainnet``, ``shadownet``, or ``sandbox`` as the value for the ``--network`` argument.
 
 #. Verify that the node is connected to a bootstrap peer by running this command with the address and RPC port of your DAL node:
 

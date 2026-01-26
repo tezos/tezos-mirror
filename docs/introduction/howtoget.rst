@@ -301,26 +301,26 @@ To make sure you use the most recent version of Octez, run::
 
     docker pull tezos/tezos-bare:latest
 
-For instance, to run a node on the Ghostnet :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
+For instance, to run a node on the ``currentnet`` :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
     mkdir $HOME/rolling-data-directory
     docker run -it --rm \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       tezos/tezos-bare:latest \
-      octez-node config init --network ghostnet --rpc-addr 127.0.0.1 \
+      octez-node config init --network https://teztnets.com/currentnet --rpc-addr 127.0.0.1 \
         --history-mode rolling
 
 (You may use another location than ``$HOME``, but note that option ``--volume`` requires absolute paths.)
 
 Then, download and import a snapshot, and finally run the node::
 
-    wget -O $HOME/rolling <snapshot-url>
+    wget -O $HOME/rolling https://snapshots.tzinit.org/currentnet/rolling
     docker run -it --rm \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       --volume "$HOME/rolling:/rolling:ro" \
       tezos/tezos-bare:latest \
       octez-node snapshot import /rolling
-    docker run --name octez-local-node -d \
+    docker run --name octez-local-node -it \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       tezos/tezos-bare:latest \
       octez-node run
@@ -349,15 +349,15 @@ First, you have to make some choices:
 - choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
 - specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
 
-For instance, to configure and run the node on the active protocol on Shadownet from a snapshot, in Rolling history mode::
+For instance, to configure and run the node on the active protocol on :ref:`currentnet <network_aliases>` from a snapshot, in Rolling history mode::
 
     wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
     export LIQUIDITY_BAKING_VOTE=pass
     docker compose -f bake.yml run --rm -it node octez-node config init \
-       --network https://teztnets.com/shadownet --history-mode rolling \
+       --network https://teztnets.com/currentnet --history-mode rolling \
        --data-dir /var/run/tezos/node/data \
        --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
-    wget -O $HOME/rolling https://snapshots.tzinit.org/shadownet/rolling
+    wget -O $HOME/rolling https://snapshots.tzinit.org/currentnet/rolling
     docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
       node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
     docker compose -f bake.yml up node
