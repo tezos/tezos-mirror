@@ -5256,10 +5256,9 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
   if profile <> Dal_RPC.Bootstrap then
     let expected_levels =
       if Protocol.number protocol >= 025 then
-        (* also include level 0; unclear why, but it should not matter *)
-        List.init
-          (last_finalized_level + 1 - dal_parameters.attestation_lag)
-          (fun i -> string_of_int i)
+        (* first level with cells is level 2; not very clear why, but it should
+           not matter *)
+        List.init (last_finalized_level - 1) (fun i -> string_of_int (i + 2))
       else
         List.init
           (last_finalized_level - dal_parameters.attestation_lag)
