@@ -279,6 +279,10 @@ module Tezt_cloud_cli : sig
 
   val binaries_path : string
 
+  val machine_type : string
+
+  val disk_type : string option
+
   val teztale_artifacts : bool
 
   val faketime : string option

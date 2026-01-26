@@ -139,6 +139,117 @@ let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
   let () = toplog "Added prometheus source" in
   return evm_node
 
+let benchmark_tags (module Cli : Scenarios_cli.Etherlink) =
+  let env = "etherlink-capacity-benchmark" in
+  let network = Option.value Cli.network ~default:"sandbox" in
+  let kernel =
+    match Cli.kernel with
+    | `Mainnet -> network
+    | `Custom ("evm_kernel.wasm" | "./evm_kernel.wasm") -> "master"
+    | `Custom s -> String.map (function '/' -> '_' | c -> c) s
+  in
+  let evm_node_version =
+    match Cli.evm_node_version with `Latest -> "latest" | `V v -> "v" ^ v
+  in
+  let version = String.concat "/" [evm_node_version; kernel] in
+  let machine_tags =
+    if Tezt_cloud_cli.localhost then [("machine", "local")]
+    else
+      [
+        ("machine_type", Tezt_cloud_cli.machine_type);
+        ("disk_type", Tezt_cloud_cli.disk_type |> Option.value ~default:"pd-ssd");
+      ]
+  in
+  [
+    ("environment", env);
+    ("network", network);
+    ("kernel", kernel);
+    ("evm-node-version", evm_node_version);
+    ("version", version);
+    ("benchmark.type", "uniswapv2");
+    ("benchmark.swap_hops", parameters.swap_hops |> string_of_int);
+    ( "benchmark.tokens",
+      parameters.contracts |> Option.value ~default:2 |> string_of_int );
+    ( "benchmark.accounts",
+      parameters.accounts |> Option.value ~default:150 |> string_of_int );
+    ( "benchmark.time_between_blocks",
+      let (`Auto t | `Manual t) = parameters.time_between_blocks in
+      string_of_float t );
+    ("benchmarks.iterations", parameters.iterations |> string_of_int);
+  ]
+  @ machine_tags
+  |> List.map (fun (k, v) -> String.concat ":" [k; v])
+
+let send_capacity_metric cli ~name ~value =
+  let timestamp = Ptime_clock.now () in
+  let tags = benchmark_tags cli in
+  [
+    {
+      Datadog.metric = name;
+      type_ = Gauge;
+      metadata = None;
+      points = [{timestamp; value}];
+      resources = [];
+      source_type_name = None;
+      tags;
+      unit = Some "MGas/s";
+    };
+  ]
+  |> Datadog.send |> Runnable.run
+
+let send_sampled_benchmark_metrics (module Cli : Scenarios_cli.Etherlink)
+    gasometer =
+  let rec sample acc data_points =
+    match data_points with
+    | [] ->
+        List.rev_map
+          (fun (count, total, timestamp) ->
+            (* Average in sample period *)
+            let value = total /. float_of_int count in
+            let timestamp = Ptime.of_float_s timestamp |> Option.get in
+            Datadog.{timestamp; value})
+          acc
+    | {timestamp; gas_per_sec; _} :: l -> (
+        match acc with
+        | (count, total, cur_timestamp) :: acc
+          when timestamp < cur_timestamp +. Cli.datadog_sample_period ->
+            sample ((count + 1, total +. gas_per_sec, cur_timestamp) :: acc) l
+        | _ -> sample ((1, gas_per_sec, floor timestamp) :: acc) l)
+  in
+  let points = sample [] gasometer.datapoints in
+  let tags = benchmark_tags (module Cli) in
+  [
+    {
+      Datadog.metric = "etherlink_sampled_capacity";
+      type_ = Gauge;
+      metadata = None;
+      points;
+      resources = [];
+      source_type_name = None;
+      tags;
+      unit = Some "MGas/s";
+    };
+  ]
+  |> Datadog.send |> Runnable.run
+
+let export_datadog_metrics (module Cli : Scenarios_cli.Etherlink)
+    {median : float; p90 : float; wall : float; gasometer} =
+  let* () =
+    send_capacity_metric
+      (module Cli)
+      ~name:"etherlink_median_capacity"
+      ~value:median
+  and* () =
+    send_capacity_metric (module Cli) ~name:"etherlink_p90_capacity" ~value:p90
+  and* () =
+    send_capacity_metric
+      (module Cli)
+      ~name:"etherlink_wall_clock_capacity"
+      ~value:wall
+  and* () = send_sampled_benchmark_metrics (module Cli) gasometer in
+  toplog "Results exported to datadog." ;
+  unit
+
 (* Set default values for CLI arguments. *)
 let () =
   parameters.time_between_blocks <- `Auto 0.5 ;
@@ -148,6 +259,23 @@ let () =
   parameters.timeout <- 15. ;
   parameters.swap_hops <- 2 ;
   ()
+
+let gen_report report_path network kernel {p90; gasometer; _} =
+  let network = Option.value network ~default:"sandbox" in
+  let kernel =
+    match kernel with
+    | `Mainnet -> network
+    | `Custom ("evm_kernel.wasm" | "./evm_kernel.wasm") -> "master"
+    | `Custom s -> String.map (function '/' -> '_' | c -> c) s
+  in
+  let csv_filename = sf "%s/p90_results_%s_%s.csv" report_path network kernel in
+  let png_filename = sf "%s/p90_results_%s_%s.png" report_path network kernel in
+  save_capacity ~csv_filename p90 ;
+  let* () = plot_capacity ~csv_filename ~network ~kernel png_filename in
+  Log.report "Capacity graph generated in %s" png_filename ;
+  let graph_filename = sf "%s/graph_%s_%s.png" report_path network kernel in
+  let* () = plot_gas_and_capacity ~gasometer ~output_filename:graph_filename in
+  unit
 
 let register (module Cli : Scenarios_cli.Etherlink) =
   let () = toplog "Parsing CLI done" in
@@ -208,12 +336,17 @@ let register (module Cli : Scenarios_cli.Etherlink) =
       ~rpc_node:sequencer
   in
   let () = toplog "Setup UniswapV2 benchmark complete" in
-  let* () =
+  let* monitor_result =
     monitor_gasometer sequencer @@ fun () ->
     let* () =
       Lwt_list.iter_s (Uniswap.step env) (List.init parameters.iterations succ)
     in
     shutdown ()
+  in
+  let* () =
+    if Cli.datadog_export then
+      export_datadog_metrics (module Cli) monitor_result
+    else unit
   in
   let total_confirmed = !(env.total_confirmed) in
   let total_sent = nb_accounts * parameters.iterations in
@@ -223,4 +356,6 @@ let register (module Cli : Scenarios_cli.Etherlink) =
       "Less than half operations confirmed (%d/%d)"
       total_confirmed
       total_sent ;
-  unit
+  if Cli.gen_report then
+    gen_report Cli.report_path Cli.network Cli.kernel monitor_result
+  else unit

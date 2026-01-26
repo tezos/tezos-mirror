@@ -386,6 +386,20 @@ let deploy_gld_tokens infos ~sequencer ~rpc_node ~sender nb =
     (List.init nb Fun.id)
 
 let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
+  let* () =
+    (* Enable logs for tx queue *)
+    let open Tezos_base_unix.Internal_event_unix in
+    let verbosity =
+      match Cli.Logs.level with
+      | Quiet -> Tezos_event_logging.Internal_event.Fatal
+      | Error -> Error
+      | Warn -> Warning
+      | Report -> Notice
+      | Info -> Info
+      | Debug -> Debug
+    in
+    init ~config:(make_with_defaults ~verbosity ()) ()
+  in
   let* accounts = floodgate_accounts sequencer accounts in
   let sender = accounts.(0) in
   (* Compile contracts *)

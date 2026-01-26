@@ -266,17 +266,21 @@ let test_erc20_capacity () =
   let* gas_limit = transfer_gas_limit env (List.hd erc20s) in
   Log.debug "Transfer gas limit: %a@." Z.pp_print gas_limit ;
   let env = {env with gas_limit} in
-  monitor_gasometer sequencer @@ fun () ->
-  let* stop_profile =
-    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  let* _ =
+    monitor_gasometer sequencer @@ fun () ->
+    let* stop_profile =
+      if parameters.profiling then profile sequencer
+      else return (fun () -> unit)
+    in
+    let* () =
+      Lwt_list.iter_s (step env erc20s) (List.init parameters.iterations succ)
+    in
+    Lwt.cancel follower ;
+    Lwt.cancel tx_queue ;
+    let*? () = Tx_container.shutdown () in
+    let* () = Evm_node.terminate sequencer in
+    stop_profile ()
   in
-  let* () =
-    Lwt_list.iter_s (step env erc20s) (List.init parameters.iterations succ)
-  in
-  Lwt.cancel follower ;
-  Lwt.cancel tx_queue ;
-  let*? () = Tx_container.shutdown () in
-  let* () = Evm_node.terminate sequencer in
-  stop_profile ()
+  unit
 
 let register () = test_erc20_capacity () [Protocol.Alpha]

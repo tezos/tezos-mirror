@@ -1436,6 +1436,14 @@ module type Etherlink = sig
 
   val evm_node_version : [`Latest | `V of string]
 
+  val gen_report : bool
+
+  val report_path : string
+
+  val datadog_export : bool
+
+  val datadog_sample_period : float
+
   include Etherlink_benchmark_lib.Benchmark_utils.PARAMETERS
 end
 
@@ -1488,6 +1496,55 @@ module Etherlink () : Etherlink = struct
       ~description:"Choose the EVM node version to use for the benchmark"
       ~placeholder:"<latest|vX.Y>"
       `Latest
+
+  let gen_report =
+    Clap.flag
+      ~section
+      ~set_long:"gen-report"
+      ~unset_long:"no-gen-report"
+      ~description:
+        "Save benchmark result in csv file in current directory and generate a \
+         graphical report."
+      false
+
+  let report_path =
+    Clap.default_string
+      ~section
+      ~long:"report-path"
+      ~description:"Path in which to generate reports"
+      ~placeholder:"<path>"
+      "."
+
+  let datadog_export =
+    Clap.flag
+      ~section
+      ~set_long:"datadog-export"
+      ~unset_long:"no-datadog-export"
+      ~description:
+        "Export capacity result to datadog. Environment variable DD_API_KEY \
+         must be set."
+      false
+
+  let () =
+    if
+      datadog_export
+      && Option.is_none (Sys.getenv_opt "DD_API_KEY")
+      && Option.is_none (Sys.getenv_opt "DATADOG_API_KEY")
+    then
+      failwith
+        "Environment variable DD_API_KEY or DATADOG_API_KEY must be set when \
+         using --datadog-export."
+
+  let datadog_sample_period =
+    Clap.default_int
+      ~section
+      ~long:"datadog-sample-period"
+      ~description:
+        "Number of seconds for the sampling period for metrics to send to \
+         datadog"
+      ~placeholder:"<sec>"
+      5
+    |> float_of_int
 
   include Etherlink_benchmark_lib.Benchmark_utils.Parameters ()
 end

@@ -295,16 +295,22 @@ let test_snailtracer () =
       spp;
     }
   in
-  monitor_gasometer sequencer @@ fun () ->
-  let* stop_profile =
-    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  let* _ =
+    monitor_gasometer sequencer @@ fun () ->
+    let* stop_profile =
+      if parameters.profiling then profile sequencer
+      else return (fun () -> unit)
+    in
+    let* () =
+      Lwt_list.iter_s (step env) (List.init parameters.iterations succ)
+    in
+    Lwt.cancel follower ;
+    Lwt.cancel tx_queue ;
+    let*? () = Tx_container.shutdown () in
+    let* () = Evm_node.terminate sequencer in
+    stop_profile ()
   in
-  let* () = Lwt_list.iter_s (step env) (List.init parameters.iterations succ) in
-  Lwt.cancel follower ;
-  Lwt.cancel tx_queue ;
-  let*? () = Tx_container.shutdown () in
-  let* () = Evm_node.terminate sequencer in
-  stop_profile ()
+  unit
 
 let test_full_image_raytracing () =
   let width = parameters.width in

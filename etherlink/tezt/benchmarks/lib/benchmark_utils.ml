@@ -429,26 +429,60 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
   in
   confirmed
 
-type gasometer = {mutable gas : Z.t; mutable time : Ptime.Span.t}
+type gas_info = {level : int; timestamp : float; gas : Z.t; gas_per_sec : float}
 
-let empty_gasometer () = {gas = Z.zero; time = Ptime.Span.zero}
+type gasometer = {mutable datapoints : gas_info list; mutable total_gas : Z.t}
 
-let capacity_mgas_sec {gas; time} =
+let empty_gasometer () = {datapoints = []; total_gas = Z.zero}
+
+let capacity_mgas_sec ~gas ~time =
   let s = Ptime.Span.to_float_s time in
-  let mega_gas = Z.to_float gas /. 1_000_000. in
-  mega_gas /. s
+  if s > 0. then
+    let mega_gas = Z.to_float gas /. 1_000_000. in
+    mega_gas /. s
+  else 0.
 
-let pp_capacity fmt g = Format.fprintf fmt "%.3f MGas/s" (capacity_mgas_sec g)
+let pp_capacity fmt capacity = Format.fprintf fmt "%.3f MGas/s" capacity
+
+let current_target =
+  (* Use max int to always get the latest gas constants independently of what is
+   set by the kernel. *)
+  let c = Evm_node_lib_dev.Gas_price.gas_constants ~storage_version:max_int in
+  Z.to_float c.target /. 1_000_000.
+
+let capacity_color ~bg capacity =
+  if capacity < current_target then
+    if bg then Log.Color.BG.red else Log.Color.FG.red
+  else if capacity < 2. *. current_target (* current capacity *) then
+    if bg then Log.Color.BG.yellow else Log.Color.FG.yellow
+  else if bg then Log.Color.BG.green
+  else Log.Color.FG.green
+
+let get_percentile p data =
+  let sorted_data = List.sort Float.compare data in
+  let data_array = Array.of_list sorted_data in
+  let n = Array.length data_array in
+  if n = 0 then 0.0
+  else
+    let index = p /. 100.0 *. float_of_int (n - 1) in
+    let i = int_of_float index in
+    let f = index -. float_of_int i in
+    if i >= n - 1 then data_array.(n - 1)
+    else (data_array.(i) *. (1. -. f)) +. (data_array.(i + 1) *. f)
+
+(** We measure capacity percentiles as the proportion of blocks which execute
+    with a speed in MGas/s above the returned value.  *)
+let get_capacity_percentile p = get_percentile (100. -. p)
 
 let blueprint_application_event = "blueprint_application.v0"
 
 let install_gasometer evm_node =
   let gasometer = empty_gasometer () in
   let () =
-    Evm_node.on_event evm_node @@ fun {name; value; _} ->
+    Evm_node.on_event evm_node @@ fun {name; value; timestamp; _} ->
     if name = blueprint_application_event then (
       let open JSON in
-      let level = value |-> "level" |> as_string in
+      let level_str = value |-> "level" |> as_string in
       let process_time =
         value |-> "process_time" |> as_float |> Ptime.Span.of_float_s
         |> Option.get
@@ -457,45 +491,143 @@ let install_gasometer evm_node =
         value |-> "execution_gas" |> as_string |> Z.of_string
       in
       let ignored = execution_gas < Z.of_int 100_000 in
-      let block_speed = {gas = execution_gas; time = process_time} in
+      let block_capacity =
+        capacity_mgas_sec ~gas:execution_gas ~time:process_time
+      in
       Log.info
         "Level %s: %a gas consumed in %a: %a"
-        level
+        level_str
         Z.pp_print
         execution_gas
         Ptime.Span.pp
         process_time
-        (fun fmt (ignored, speed) ->
+        (fun fmt (ignored, capacity) ->
           if ignored then Format.pp_print_string fmt "(ignored)"
-          else pp_capacity fmt speed)
-        (ignored, block_speed) ;
+          else pp_capacity fmt capacity)
+        (ignored, block_capacity) ;
       if not ignored then (
-        gasometer.gas <- Z.add gasometer.gas execution_gas ;
-        gasometer.time <- Ptime.Span.add gasometer.time process_time ;
-        let capacity = capacity_mgas_sec gasometer in
-        let color =
-          if capacity < 10. then Log.Color.FG.red else Log.Color.FG.green
+        let level = int_of_string level_str in
+        let info =
+          {level; gas = execution_gas; timestamp; gas_per_sec = block_capacity}
         in
-        Log.info ~color ~prefix:"Current capacity" "%a" pp_capacity gasometer))
+        gasometer.datapoints <- info :: gasometer.datapoints ;
+        gasometer.total_gas <- Z.add gasometer.total_gas execution_gas ;
+        let capacities =
+          List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+        in
+        let median = get_capacity_percentile 50. capacities in
+        let color = capacity_color ~bg:false median in
+        Log.info
+          ~color
+          ~prefix:"Current median capacity"
+          "%a"
+          pp_capacity
+          median))
   in
   gasometer
 
-let monitor_gasometer evm_node f =
-  let gasometer = install_gasometer evm_node in
-  let* () = f () in
-  let capacity = capacity_mgas_sec gasometer in
-  let color =
-    if capacity < 10. then Log.Color.BG.red
-    else if capacity < 12. then Log.Color.BG.yellow
-    else Log.Color.BG.green
-  in
+let log_capcity evm_node what capacity =
+  let color = capacity_color ~bg:true capacity in
   Log.report
     ~color
-    ~prefix:(Format.sprintf "Capacity of %s" (Evm_node.name evm_node))
+    ~prefix:(Format.sprintf "%s capacity of %s" what (Evm_node.name evm_node))
     "%a"
     pp_capacity
-    gasometer ;
-  unit
+    capacity
+
+type monitor_result = {
+  median : float;
+  p90 : float;
+  wall : float;
+  gasometer : gasometer;
+}
+
+let monitor_gasometer evm_node f =
+  let gasometer = install_gasometer evm_node in
+  let start_time = Ptime_clock.now () in
+  let* () = f () in
+  let end_time = Ptime_clock.now () in
+  let wall_time = Ptime.diff end_time start_time in
+  let capacities =
+    List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+  in
+  let median = get_capacity_percentile 50. capacities in
+  let p90 = get_capacity_percentile 90. capacities in
+  let wall_clock_capacity =
+    capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time
+  in
+  log_capcity evm_node "Median" median ;
+  log_capcity evm_node "90th percentile" p90 ;
+  log_capcity evm_node "Wall clock" wall_clock_capacity ;
+  return {median; p90; wall = wall_clock_capacity; gasometer}
+
+let save_capacity ~csv_filename capacity =
+  let y, m, d = Ptime.to_date @@ Ptime_clock.now () in
+  let date_str = Printf.sprintf "%04d-%02d-%02d" y m d in
+  let csv_line = Printf.sprintf "%s,%.2f\n" date_str capacity in
+  let oc = open_out_gen [Open_append; Open_creat] 0o644 csv_filename in
+  output_string oc csv_line ;
+  close_out oc
+
+let plot_capacity ~csv_filename ~network ~kernel output_filename =
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Capacity over Time for %s with %s kernel';
+      set xlabel 'Date';
+      set ylabel 'Capacity (MGas/s)';
+      set timefmt '%%Y-%%m-%%d';
+      set xdata time;
+      set xtics rotate by -45;
+      set grid;
+      set datafile separator ',';
+      plot '%s' using 1:2 with linespoints title 'capacity';
+      |}
+      output_filename
+      network
+      kernel
+      csv_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
+
+let plot_gas_and_capacity ~gasometer ~output_filename =
+  let data_filename = Temp.file "gas_data.dat" in
+  let oc = open_out data_filename in
+  (* The datapoints are stored in reverse order of arrival. *)
+  let datapoints = List.rev gasometer.datapoints in
+  List.iter
+    (fun {level; gas; gas_per_sec; _} ->
+      Printf.fprintf
+        oc
+        "%d %.3f %.3f\n"
+        level
+        (Z.to_float gas /. 1_000_000.)
+        gas_per_sec)
+    datapoints ;
+  close_out oc ;
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Gas and Capacity per Block';
+      set xlabel 'Block Number';
+      set ylabel 'Capacity (MGas/s)';
+      set y2label 'Gas/Block (MGas)';
+      set ytics nomirror;
+      set y2tics;
+      set y2range [0:*];
+      set grid;
+      set key top left;
+      plot '%s' using 1:3 with linespoints title 'Capacity' axes x1y1,
+           '' using 1:2 with linespoints title 'Gas/Block' axes x1y2;
+      |}
+      output_filename
+      data_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
 
 let get_mem_mb pid =
   Lwt_process.with_process_in ("ps", [|"ps"; "-p"; pid; "-o"; "rss="|])
