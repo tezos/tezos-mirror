@@ -127,7 +127,7 @@ module Statuses_cache : sig
   (** [update_slot_header_status store slot_id status] updates the status of the
       [slot_id] to [status]. *)
   val update_slot_header_status :
-    t -> Types.slot_id -> Types.header_status -> unit
+    t -> Types.slot_id -> Types.header_status -> unit tzresult
 
   (** [get_slot_status cache ~slot_id] returns the status associated
       to the given [slot_id], if any. *)

@@ -223,7 +223,7 @@ module Peer = struct
   let pp fmt {peer_id; maybe_reachable_point} =
     Format.fprintf
       fmt
-      "{peer_id=%a;@,maybe_reachable_point=%a}"
+      "{ peer_id=%a;@,maybe_reachable_point=%a }"
       P2p_peer.Id.pp
       peer_id
       P2p_point.Id.pp
@@ -330,6 +330,9 @@ module Slot_id = struct
   let equal left right = compare left right = 0
 
   let hash = Stdlib.Hashtbl.hash
+
+  let pp fmt {slot_level; slot_index} =
+    Format.fprintf fmt "{ level=%ld; index=%d }" slot_level slot_index
 
   module Comparable = struct
     type nonrec t = t

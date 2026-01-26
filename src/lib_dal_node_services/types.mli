@@ -47,6 +47,8 @@ module Slot_id : sig
 
   val hash : t -> int
 
+  val pp : Format.formatter -> t -> unit
+
   module Comparable : Stdlib.Set.OrderedType with type t = t
 
   module Set : Set.S with type elt = t

@@ -37,6 +37,11 @@ type error +=
       current_chain_id : Chain_id.t;
       stored_chain_id : Chain_id.t;
     }
+  | Unexpected_slot_status_transition of {
+      slot_id : Types.Slot_id.t;
+      from_status_opt : Types.header_status option;
+      to_status : Types.header_status;
+    }
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)
