@@ -1,11 +1,15 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
 //! Tezos account state and storage
 
-use crate::context;
+use crate::{
+    context,
+    enshrined_contracts::{self, EnshrinedContracts},
+};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
@@ -238,14 +242,24 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
         Contract::Originated(self.kt1.clone())
     }
 }
+#[derive(Debug, PartialEq)]
+pub enum Code {
+    Code(Vec<u8>),
+    Enshrined(EnshrinedContracts),
+}
 
 pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
     fn kt1(&self) -> &ContractKt1Hash;
 
-    fn code(&self, host: &impl Runtime) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let code_path = context::code::code_path(self)?;
-        let code = host.store_read_all(&code_path)?;
-        Ok(code)
+    fn code(&self, host: &impl Runtime) -> Result<Code, tezos_storage::error::Error> {
+        match enshrined_contracts::from_kt1(self.kt1()) {
+            Some(c) => Ok(Code::Enshrined(c)),
+            None => {
+                let code_path = context::code::code_path(self)?;
+                let code = host.store_read_all(&code_path)?;
+                Ok(Code::Code(code))
+            }
+        }
     }
 
     fn set_code_size(
@@ -273,6 +287,9 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            return Ok(vec![]);
+        }
         let storage_path = context::code::storage_path(self)?;
         let storage = host.store_read_all(&storage_path)?;
         Ok(storage)
@@ -292,6 +309,9 @@ pub trait TezosOriginatedAccount: TezlinkAccount + Sized {
         host: &mut impl Runtime,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
+        if enshrined_contracts::is_enshrined(self.kt1()) {
+            return Ok(0);
+        }
         let path = context::code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         let storage_size = data.len() as u64;
@@ -676,6 +696,10 @@ mod test {
             .code(&host)
             .expect("Read the code of the KT1 should succeed");
 
-        assert_eq!(code, read_code, "Set/Read code have inconsistent behavior");
+        assert_eq!(
+            Code::Code(code),
+            read_code,
+            "Set/Read code have inconsistent behavior"
+        );
     }
 }

@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+use account_storage::Code;
 use account_storage::Manager;
 use account_storage::TezlinkAccount;
+use enshrined_contracts::get_enshrined_contract_entrypoint;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
@@ -54,6 +56,7 @@ extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
+mod enshrined_contracts;
 mod gas;
 pub mod mir_ctx;
 mod validate;
@@ -469,14 +472,9 @@ fn transfer<'a, Host: Runtime, C: Context>(
     }
 }
 
-fn get_contract_entrypoint<C: Context>(
-    host: &impl Runtime,
-    context: &C,
-    address: &AddressHash,
-) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-    let contract = contract_from_address(address.clone()).ok()?;
-    let contract_account = context.originated_from_contract(&contract).ok()?;
-    let code = contract_account.code(host).ok()?;
+fn get_originated_contract_entrypoint(
+    code: Vec<u8>,
+) -> Option<HashMap<Entrypoint, mir::ast::Type>> {
     let parser = Parser::new();
     let micheline = Micheline::decode_raw(&parser.arena, &code).ok()?;
     // TODO (Linear issue L2-383): handle gas consumption here.
@@ -496,6 +494,20 @@ fn get_contract_entrypoint<C: Context>(
         })
         .collect();
     Some(entrypoints)
+}
+
+fn get_contract_entrypoint<C: Context>(
+    host: &impl Runtime,
+    context: &C,
+    address: &AddressHash,
+) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    let contract = contract_from_address(address.clone()).ok()?;
+    let contract_account = context.originated_from_contract(&contract).ok()?;
+    let code = contract_account.code(host).ok()?;
+    match code {
+        Code::Code(code) => get_originated_contract_entrypoint(code),
+        Code::Enshrined(contract) => get_enshrined_contract_entrypoint(contract),
+    }
 }
 
 // Handles manager transfer operations.
@@ -759,7 +771,7 @@ fn apply_balance_changes(
 }
 
 /// Executes the entrypoint logic of an originated smart contract and returns the new storage.
-fn execute_smart_contract<'a>(
+fn execute_smart_contract_originated<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
     entrypoint: &Entrypoint,
@@ -790,6 +802,68 @@ fn execute_smart_contract<'a>(
         .encode();
 
     Ok((internal_operations, new_storage))
+}
+
+/// A type-unifying wrapper for internal operation iterators.
+///
+/// ### Why this exists
+/// `impl Iterator` is an opaque type resolved at compile-time. If a function
+/// needs to return iterators that _could_ have different implementation, because
+/// their type is opaque, then the typechecker refuses.
+///
+/// ### How it works
+/// This enum allows us to unify two distinct iterator types into a single named type
+/// without the overhead of dynamic dispatch (`Box<dyn Iterator>`). The `Box` solution
+/// was tried, but it involved propagating lifetimes in other modules far and wide.
+///
+/// - `Active(I)`: Wraps the complex iterator chain produced by the logic.
+/// - `Empty`: Represents a no-op state without requiring a heap allocation.
+///
+/// The change is very local, as the enum doesn't need to be propagated to the
+/// rest of the code, it's hidden behind an opaque type.
+enum InternalOperationIterator<I> {
+    Active(I),
+    Empty,
+}
+
+impl<'a, I> Iterator for InternalOperationIterator<I>
+where
+    I: Iterator<Item = OperationInfo<'a>>,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Active(iter) => iter.next(),
+            Self::Empty => None,
+        }
+    }
+}
+
+fn execute_smart_contract<'a>(
+    code: account_storage::Code,
+    storage: Vec<u8>,
+    entrypoint: &Entrypoint,
+    value: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut impl CtxTrait<'a>,
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
+    match code {
+        Code::Code(code) => {
+            // Parse and typecheck the contract
+            let (iter, storage) = execute_smart_contract_originated(
+                code, storage, entrypoint, value, parser, ctx,
+            )?;
+            Ok((InternalOperationIterator::Active(iter), storage))
+        }
+        Code::Enshrined(contract) => {
+            // TODO POC
+            enshrined_contracts::execute_enshrined_contract(
+                contract, entrypoint, value, ctx,
+            )?;
+            Ok((InternalOperationIterator::<_>::Empty, vec![]))
+        }
+    }
 }
 
 pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
@@ -1057,7 +1131,7 @@ fn apply_operation<Host: Runtime, C: Context>(
 #[cfg(test)]
 mod tests {
     use crate::account_storage::{
-        TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
+        Code, TezlinkImplicitAccount, TezosImplicitAccount, TezosOriginatedAccount,
     };
     use crate::context::Context;
     use crate::{
@@ -3118,7 +3192,8 @@ mod tests {
             .code(&host)
             .expect("Should have found a code for the KT1");
         assert_eq!(
-            smart_contract_code, code,
+            smart_contract_code,
+            Code::Code(code),
             "Current code for smart contract is not the same as the one originated"
         );
         let smart_contract_storage = smart_contract_account

@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::account_storage::{
-    TezlinkAccount, TezosImplicitAccount, TezosOriginatedAccount,
+    Code, TezlinkAccount, TezosImplicitAccount, TezosOriginatedAccount,
 };
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
@@ -255,23 +255,31 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     )> {
         let account = self.tc_ctx.context.originated_from_kt1(&contract).ok()?;
         let serialized_script = account.code(self.tc_ctx.host).ok()?;
-        let MichelineContractScript {
-            code: _,
-            parameter_ty: _,
-            storage_ty,
-            views,
-        } = Micheline::decode_raw(arena, &serialized_script)
-            .ok()?
-            .split_script()
-            .ok()?;
-        let view = views.get(view_name)?;
-        let owned_view = MichelineView {
-            input_type: view.input_type.clone(),
-            output_type: view.output_type.clone(),
-            code: view.code.clone(),
-        };
-        let storage = account.storage(self.tc_ctx.host).ok()?;
-        Some((owned_view, (storage_ty.clone(), storage)))
+        match serialized_script {
+            Code::Code(serialized_script) => {
+                let MichelineContractScript {
+                    code: _,
+                    parameter_ty: _,
+                    storage_ty,
+                    views,
+                } = Micheline::decode_raw(arena, &serialized_script)
+                    .ok()?
+                    .split_script()
+                    .ok()?;
+                let view = views.get(view_name)?;
+                let owned_view = MichelineView {
+                    input_type: view.input_type.clone(),
+                    output_type: view.output_type.clone(),
+                    code: view.code.clone(),
+                };
+                let storage = account.storage(self.tc_ctx.host).ok()?;
+                Some((owned_view, (storage_ty.clone(), storage)))
+            }
+            Code::Enshrined(_) => {
+                // Current enshrined contracts have no views
+                None
+            }
+        }
     }
 }
 
