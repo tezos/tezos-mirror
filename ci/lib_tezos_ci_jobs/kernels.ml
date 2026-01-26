@@ -73,8 +73,8 @@ let job_test_kernels =
     ~__POS__
     ~stage:Test
     ~description:"Run 'make check' and 'make test' for kernels."
-    ~only_if_changed:Files.(test_kernels @ rust_toolchain)
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:Files.test_kernels
+    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     ["make -f kernels.mk check"; "make -f kernels.mk test"]
 
 let job_build_kernels =
@@ -84,7 +84,7 @@ let job_build_kernels =
     ~stage:Build
     ~description:"Build the kernels, including the Etherlink kernel."
     ~cpu:Very_high
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     ~only_if_changed:
       [
         (* This job is used by other jobs such as [etherlink.test_kernels]

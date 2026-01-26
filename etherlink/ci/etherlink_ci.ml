@@ -12,14 +12,6 @@ open Tezos_ci
 module Files = struct
   let sdks = ["src/kernel_sdk/**/*"; "sdk/rust/**/*"]
 
-  let rust_toolchain_image =
-    [
-      "images/rust-toolchain/**/*";
-      "images/create_image.sh";
-      "images/scripts/install_datadog_static.sh";
-      "scripts/version.sh";
-    ]
-
   let lib_wasm_runtime_rust = ["src/lib_wasm_runtime/**/*.rs"]
 
   let node = ["etherlink/**/*"]
@@ -53,9 +45,7 @@ module Files = struct
 
   (* [evm_compatibility] and [revm_compatibility] are already included
      in [node @ kernel] *)
-  let all =
-    sdks @ rust_toolchain_image @ lib_wasm_runtime_rust @ node @ kernel @ mir
-    @ tzt
+  let all = sdks @ lib_wasm_runtime_rust @ node @ kernel @ mir @ tzt
 end
 
 module CI = Cacio.Make (struct
@@ -208,8 +198,8 @@ let job_test_kernel =
     ~__POS__
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
-    ~image:Images.rust_toolchain
-    ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks @ mir)
+    ~image:Images.Base_images.rust_toolchain_trixie
+    ~only_if_changed:Files.(kernel @ sdks @ mir)
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
@@ -222,8 +212,8 @@ let job_test_evm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test EVM compatibility."
-    ~image:Images.rust_toolchain
-    ~only_if_changed:Files.(rust_toolchain_image @ evm_compatibility)
+    ~image:Images.Base_images.rust_toolchain_trixie
+    ~only_if_changed:Files.evm_compatibility
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
@@ -243,8 +233,8 @@ let job_test_revm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test REVM compatibility."
-    ~image:Images.rust_toolchain
-    ~only_if_changed:Files.(rust_toolchain_image @ revm_compatibility)
+    ~image:Images.Base_images.rust_toolchain_trixie
+    ~only_if_changed:Files.revm_compatibility
     ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true

@@ -1337,25 +1337,19 @@ audit_riscv_deps:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
   rules:
   - changes:
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
     - kernels.mk
-    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_*/**/*
     - src/riscv/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1388,7 +1382,7 @@ test_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.build_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1410,9 +1404,6 @@ oc.build_kernels:
     - dune-workspace
     - etherlink.mk
     - etherlink/**/*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
     - irmin/**/*
     - kernels.mk
     - lwt_domain/**/*
@@ -1428,10 +1419,8 @@ oc.build_kernels:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1626,7 +1615,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${rust_toolchain_image_name_protected}:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: sanity
   tags:
   - gcp
@@ -2682,7 +2671,7 @@ etherlink.unit_tests:
   retry: 2
 
 etherlink.test_kernel:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
@@ -2694,18 +2683,12 @@ etherlink.test_kernel:
     - contrib/mir/**/Cargo.lock
     - etherlink.mk
     - etherlink/**/*.rs
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -2737,7 +2720,7 @@ etherlink.test_kernel:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_evm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
@@ -2746,16 +2729,10 @@ etherlink.test_evm_compatibility:
     - etherlink.mk
     - etherlink/kernel_latest/evm_evaluation/**/*
     - etherlink/kernel_latest/revm/**/*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
     when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -2790,7 +2767,7 @@ etherlink.test_evm_compatibility:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_revm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
   stage: test
   tags:
   - gcp
@@ -2799,16 +2776,10 @@ etherlink.test_revm_compatibility:
     - etherlink.mk
     - etherlink/kernel_latest/revm/**/*
     - etherlink/kernel_latest/revm_evaluation/**/*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
     when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
   - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
