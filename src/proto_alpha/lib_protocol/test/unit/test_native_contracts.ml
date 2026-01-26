@@ -33,6 +33,41 @@ let test_unparse_ty loc ctxt expected ty =
   if actual = expected then Ok ctxt
   else Alcotest.failf "Unexpected error: unparsing %s" loc
 
+let pp_expr fmt x =
+  Data_encoding.Json.pp
+    fmt
+    (Data_encoding.Json.construct Script.expr_encoding x)
+
+let pp_node fmt x =
+  let expr, locations = Micheline.extract_locations x in
+  let pp_locations =
+    Format.pp_print_list
+      ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "; ")
+      (fun fmt (n1, n2) -> Format.fprintf fmt "(%d, %d)" n1 n2)
+  in
+  Format.fprintf fmt "%a@,Locations: %a" pp_expr expr pp_locations locations
+
+(** Folds [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an]
+    except when the pair on the right has an annotation, which would
+    be lost.
+
+    This mirrors the behavior of
+    {!Script_ir_unparser}.unparse_ty_and_entrypoints_uncarbonated *)
+let rec fold_pairs =
+  let open Micheline in
+  let open Michelson_v1_primitives in
+  function
+  | Prim (loc, T_pair, [tl; tr], annot) -> (
+      let tl = fold_pairs tl in
+      let tr = fold_pairs tr in
+      match tr with
+      | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, annot)
+      | _ -> Prim (loc, T_pair, [tl; tr], annot))
+  | Prim (loc, name, args, annot) ->
+      Prim (loc, name, List.map fold_pairs args, annot)
+  | Seq (loc, ts) -> Seq (loc, List.map fold_pairs ts)
+  | x -> x
+
 let test_unparse_parameter_ty ctxt expected ty entrypoints =
   let open Result_syntax in
   let* actual, ctxt =
@@ -42,8 +77,21 @@ let test_unparse_parameter_ty ctxt expected ty entrypoints =
       ty
       ~entrypoints
   in
+  let actual = Script.strip_annotations actual in
+  let expected = Script.strip_annotations (fold_pairs expected) in
   if actual = expected then Ok ctxt
-  else Alcotest.failf "Unexpected error: unparsing parameter"
+  else
+    Alcotest.failf
+      "@[<v 2>Unexpected unparsing at %s:@,\
+       @[<v 2>Expected:@,\
+       %a@]@,\
+       @[<v 2>Actual:@,\
+       %a@]],"
+      __LOC__
+      pp_node
+      expected
+      pp_node
+      actual
 
 let location = function
   | Environment.Micheline.Prim (loc, _, _, _)
