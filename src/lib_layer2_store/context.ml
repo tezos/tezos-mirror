@@ -47,30 +47,59 @@ module Hash = Smart_rollup_context_hash
 
 type hash = Hash.t
 
-type ('a, 'repo, 'state, 'mut_state, 'loaded_state) container = {
-  index : ('a, 'repo) index;
-  pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
-  impl_name : string;
-  state : 'loaded_state;
-  equality_witness : ('repo, 'state, 'mut_state) equality_witness;
-}
+(** Existential wrapper around a context index (repository handle). The
+    [index_access] parameter tracks read/write permissions on the
+    underlying store. The PVM context implementation, its name, and the
+    equality witness are bundled so that type-safe casts can be performed
+    when unwrapping. *)
+type 'index_access index =
+  | Index : {
+      index : ('index_access, 'repo) Context_sigs.index;
+          (** The raw index (repository handle). *)
+      pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
+          (** First-class module for the PVM context backend. *)
+      impl_name : string;
+          (** Name of the backend (e.g. ["irmin"], ["riscv"]). *)
+      equality_witness : ('repo, 'state, 'mut_state) equality_witness;
+          (** Witnesses used for type-safe downcasts. *)
+    }
+      -> 'index_access index
 
-type 'a index =
-  | Index : ('a, 'repo, 'state, 'mut_state, unit) container -> 'a index
+(** Existential wrapper around a full context (index + mutable PVM state).
+    The type is parameterized by a row-polymorphic object type with two
+    fields: [index] tracks permissions on the store and [state] tracks
+    permissions on the PVM state. This allows enforcing, at the type level,
+    that read-only code paths cannot mutate the state. *)
+type _ t' =
+  | Context : {
+      index : ('index_access, 'repo) Context_sigs.index;
+          (** The raw index (repository handle). *)
+      pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
+          (** First-class module for the PVM context backend. *)
+      impl_name : string;  (** Name of the backend. *)
+      state : 'mut_state;  (** The current mutable PVM state. *)
+      state_access : 'state_access Access_mode.t;
+          (** Runtime witness of the state access permission. *)
+      equality_witness : ('repo, 'state, 'mut_state) equality_witness;
+          (** Witnesses used for type-safe downcasts. *)
+    }
+      -> < index : 'index_access ; state : 'state_access > t'
 
-type 'a t =
-  | Context : ('a, 'repo, 'state, 'mut_state, 'mut_state) container -> 'a t
+type 'a t = 'a t'
+  constraint
+    'a =
+    < index : [< `Read | `Write > `Read] ; state : [< `Read | `Write > `Read] >
 
-type ro = [`Read] t
+type ro = < index : [`Read] ; state : [`Read] > t
 
-type rw = [`Read | `Write] t
+type rw = < index : [`Read | `Write] ; state : [`Read | `Write] > t
 
 type ro_index = [`Read] index
 
 type rw_index = [`Read | `Write] index
 
 let make_index ~index ~pvm_context_impl ~equality_witness ~impl_name =
-  Index {index; state = (); pvm_context_impl; equality_witness; impl_name}
+  Index {index; pvm_context_impl; equality_witness; impl_name}
 
 let load : type state mut_state repo.
     (repo, state, mut_state) pvm_context_impl ->
@@ -89,7 +118,10 @@ let load : type state mut_state repo.
     ~impl_name
     ~equality_witness
 
-let index (type a) (Context o : a t) : a index = Index {o with state = ()}
+let index
+    (Context {index; pvm_context_impl; impl_name; equality_witness; _} :
+      < index : 'a ; state : _ > t) : 'a index =
+  Index {index; pvm_context_impl; impl_name; equality_witness}
 
 let close (type a)
     (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a index) :
@@ -101,26 +133,65 @@ let readonly (type a)
       a index) : ro_index =
   Index {o with index = Pvm_Context_Impl.readonly index}
 
-let checkout (type a)
-    (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
-      a index) hash : a t option Lwt.t =
+let readonly_context
+    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      _ t) : ro =
+  Context
+    {o with index = Pvm_Context_Impl.readonly index; state_access = Read_only}
+
+let access_mode_state (Context {state_access; _}) = state_access
+
+let checkout
+    (Index
+       {
+         index;
+         pvm_context_impl = (module Pvm_Context_Impl);
+         impl_name;
+         equality_witness;
+       } :
+      'a index) hash : < index : 'a ; state : [`Read | `Write] > t option Lwt.t
+    =
   let open Lwt_syntax in
   let+ ctx =
     Pvm_Context_Impl.checkout index (Pvm_Context_Impl.hash_of_context_hash hash)
   in
   match ctx with
   | None -> None
-  | Some {index; state} -> Some (Context {o with index; state})
+  | Some {index; state} ->
+      Some
+        (Context
+           {
+             index;
+             pvm_context_impl = (module Pvm_Context_Impl);
+             impl_name;
+             equality_witness;
+             state;
+             state_access = Read_write;
+           })
 
-let empty (type a)
-    (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
-      a index) : a t =
+let empty
+    (Index
+       {
+         index;
+         pvm_context_impl = (module Pvm_Context_Impl);
+         impl_name;
+         equality_witness;
+       } :
+      'a index) : < index : 'a ; state : [`Read | `Write] > t =
   let {Context_sigs.index; state} = Pvm_Context_Impl.empty index in
-  Context {o with index; state}
+  Context
+    {
+      index;
+      pvm_context_impl = (module Pvm_Context_Impl);
+      impl_name;
+      equality_witness;
+      state;
+      state_access = Read_write;
+    }
 
 let commit ?message
     (Context {pvm_context_impl = (module Pvm_Context_Impl); index; state; _} :
-      [> `Write] t) =
+      < index : [> `Write] ; state : _ > t) =
   let open Lwt_syntax in
   let+ hash = Pvm_Context_Impl.commit ?message {index; state} in
   Pvm_Context_Impl.context_hash_of_hash hash
@@ -159,14 +230,18 @@ let export_snapshot (type a)
     index
     (Pvm_Context_Impl.hash_of_context_hash hash)
 
-type pvmstate =
+type 'access pvmstate' =
   | PVMState : {
+      mode : 'access Access_mode.t;
       pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
       impl_name : string;
       pvmstate : 'mut_state;
       equality_witness : ('repo, 'state, 'mut_state) equality_witness;
     }
-      -> pvmstate
+      -> 'access pvmstate'
+
+type 'access pvmstate = 'access pvmstate'
+  constraint 'access = [< `Read | `Write > `Read]
 
 type imm_pvmstate =
   | Imm_PVMState : {
@@ -177,16 +252,17 @@ type imm_pvmstate =
     }
       -> imm_pvmstate
 
-let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
-  PVMState {pvm_context_impl; impl_name; pvmstate; equality_witness}
+let make_pvmstate mode ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate
+    =
+  PVMState {mode; pvm_context_impl; impl_name; pvmstate; equality_witness}
 
 (** State of the PVM that this rollup node deals with *)
 module PVMState = struct
-  type value = pvmstate
+  type 'access value = 'access pvmstate
 
   type immutable_value = imm_pvmstate
 
-  let empty : type a. a index -> value =
+  let empty : type a. a index -> [`Read | `Write] value =
    fun (Index
           {
             pvm_context_impl = (module Pvm_Context_Impl);
@@ -195,17 +271,19 @@ module PVMState = struct
             _;
           }) ->
     make_pvmstate
+      Access_mode.Read_write
       ~pvm_context_impl:(module Pvm_Context_Impl)
       ~equality_witness
       ~pvmstate:(Pvm_Context_Impl.PVMState.empty ())
       ~impl_name
 
-  let find : type a. a t -> value option Lwt.t =
+  let find : < state : 'a ; index : _ > t -> 'a value option Lwt.t =
    fun (Context
           {
             pvm_context_impl = (module Pvm_Context_Impl);
             index;
             state;
+            state_access;
             equality_witness;
             impl_name;
             _;
@@ -217,6 +295,7 @@ module PVMState = struct
     | Some pvmstate ->
         Some
           (make_pvmstate
+             state_access
              ~pvm_context_impl:(module Pvm_Context_Impl)
              ~equality_witness
              ~pvmstate
@@ -231,12 +310,15 @@ module PVMState = struct
           "Could not retrieve PVM state from context, this shouldn't happen."
     | Some pvm_state -> return pvm_state
 
-  let lookup : value -> string list -> bytes option Lwt.t =
+  let lookup : _ value -> string list -> bytes option Lwt.t =
    fun (PVMState {pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _})
        path ->
     Pvm_Context_Impl.PVMState.lookup pvmstate path
 
-  let set : type a. a t -> value -> unit Lwt.t =
+  let set :
+      < state : [`Read | `Write] ; index : _ > t ->
+      [`Read | `Write] value ->
+      unit Lwt.t =
    fun (Context
           ({pvm_context_impl = (module Pvm_Context_Impl); index; state; _} as o1))
        (PVMState o2) ->
@@ -245,19 +327,21 @@ module PVMState = struct
         Pvm_Context_Impl.PVMState.set {index; state} o2.pvmstate
     | _ -> err_implementation_mismatch ~expected:o1.impl_name ~got:o2.impl_name
 
-  let copy : value -> value =
+  let copy : _ value -> [`Read | `Write] value =
    fun (PVMState
           ({pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _} as o)) ->
     PVMState
       {
         o with
+        mode = Read_write;
         pvmstate =
           pvmstate |> Pvm_Context_Impl.to_imm |> Pvm_Context_Impl.from_imm;
       }
 
-  let imm_copy : value -> immutable_value =
+  let imm_copy : _ value -> immutable_value =
    fun (PVMState
           {
+            mode = _;
             pvm_context_impl = (module Pvm_Context_Impl);
             pvmstate;
             impl_name;
@@ -271,7 +355,7 @@ module PVMState = struct
         equality_witness;
       }
 
-  let mut_copy : immutable_value -> value =
+  let mut_copy : immutable_value -> [`Read | `Write] value =
    fun (Imm_PVMState
           {
             pvm_context_impl = (module Pvm_Context_Impl);
@@ -281,20 +365,32 @@ module PVMState = struct
           }) ->
     PVMState
       {
+        mode = Read_write;
         pvm_context_impl = (module Pvm_Context_Impl);
         pvmstate = Pvm_Context_Impl.from_imm pvmstate;
         impl_name;
         equality_witness;
       }
     |> copy
+
+  let readonly : 'a value -> [`Read] value =
+   fun (PVMState o) -> PVMState {o with mode = Read_only}
+
+  let access_mode (PVMState s) = s.mode
+
+  let maybe_readonly (type a) (mode : a Access_mode.t)
+      (s : [`Read | `Write] pvmstate') : a pvmstate' =
+    match mode with Read_write -> s | Read_only -> readonly s
 end
 
 module Internal_for_tests = struct
-  let get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t =
+  let get_a_tree :
+      (module Context_sigs.S) -> string -> [`Read | `Write] pvmstate Lwt.t =
    fun (module Pvm_Context_Impl) key ->
     let open Lwt_syntax in
     let+ state = Pvm_Context_Impl.Internal_for_tests.get_a_tree key in
     make_pvmstate
+      Read_write
       ~pvm_context_impl:(module Pvm_Context_Impl)
       ~equality_witness:Pvm_Context_Impl.equality_witness
       ~impl_name:Pvm_Context_Impl.impl_name
@@ -332,9 +428,9 @@ module Wrapper = struct
 
     val to_node_context : ('a, repo) Context_sigs.index -> 'a index
 
-    val of_node_pvmstate : pvmstate -> mut_state
+    val of_node_pvmstate : _ pvmstate -> mut_state
 
-    val to_node_pvmstate : mut_state -> pvmstate
+    val to_node_pvmstate : mut_state -> Access_mode.rw pvmstate
 
     val from_imm : state -> mut_state
 
@@ -372,7 +468,7 @@ module Wrapper = struct
 
   (* PVMState *)
   let of_node_pvmstate : type repo state mut_state.
-      (repo, state, mut_state) equality_witness -> pvmstate -> mut_state =
+      (repo, state, mut_state) equality_witness -> _ pvmstate -> mut_state =
    fun eqw (PVMState {equality_witness; pvmstate; _}) ->
     match equiv equality_witness eqw with
     | _, _, Some Refl -> pvmstate
@@ -381,9 +477,10 @@ module Wrapper = struct
   let to_node_pvmstate : type mut_state.
       (module Context_sigs.S with type mut_state = mut_state) ->
       mut_state ->
-      pvmstate =
+      _ pvmstate =
    fun (module C) pvmstate ->
     make_pvmstate
+      Read_write
       ~pvmstate
       ~pvm_context_impl:(module C)
       ~equality_witness:C.equality_witness
@@ -406,10 +503,10 @@ module Wrapper = struct
     let to_node_context : ('a, repo) Context_sigs.index -> 'a index =
      fun ctxt -> to_node_context (module C) ctxt
 
-    let of_node_pvmstate : pvmstate -> mut_state =
+    let of_node_pvmstate : _ pvmstate -> mut_state =
      fun c -> of_node_pvmstate C.equality_witness c
 
-    let to_node_pvmstate : mut_state -> pvmstate = to_node_pvmstate (module C)
+    let to_node_pvmstate : mut_state -> _ pvmstate = to_node_pvmstate (module C)
 
     let from_imm : state -> mut_state = C.from_imm
 
