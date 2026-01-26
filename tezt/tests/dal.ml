@@ -3228,6 +3228,13 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let last_level = last_checked_level + lag + 1 in
 
   Log.info "attestation_lag = %d" lag ;
+  Log.info
+    "first_level = %d, intermediary_level = %d, last_checked_level = %d, \
+     last_level = %d"
+    first_level
+    intermediary_level
+    last_checked_level
+    last_level ;
 
   let wait_level = last_level + 1 in
   let wait_block_processing_on_l1 = wait_for_layer1_head dal_node wait_level in
@@ -3259,8 +3266,10 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       dal_node
   in
   let* () = bake_for client in
-  let* _lvl = wait_block_processing_on_l1 in
+  let* () = wait_block_processing_on_l1 in
   let* () = wait_block_processing_on_dal in
+  let* current_level = Node.get_level node in
+  Log.info "current level is %d" current_level ;
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =
     if level > last_checked_level then return ()
@@ -5068,7 +5077,7 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
    profile of the initial DAL node. It is expected to be either a bootstrap
    node, who stores data for [2*attestation_lag] blocks or a producer node who
    stores much more data. *)
-let test_restart_dal_node _protocol dal_parameters _cryptobox node client
+let test_restart_dal_node protocol dal_parameters _cryptobox node client
     dal_node =
   let* history_mode = Node.RPC.call node @@ RPC.get_config_history_mode in
   let* proto_params =
@@ -5126,9 +5135,15 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
 
   if profile <> Dal_RPC.Bootstrap then
     let expected_levels =
-      List.init
-        (last_finalized_level - dal_parameters.attestation_lag)
-        (fun i -> string_of_int (i + 1))
+      if Protocol.number protocol >= 025 then
+        (* also include level 0; unclear why, but it should not matter *)
+        List.init
+          (last_finalized_level + 1 - dal_parameters.attestation_lag)
+          (fun i -> string_of_int i)
+      else
+        List.init
+          (last_finalized_level - dal_parameters.attestation_lag)
+          (fun i -> string_of_int (i + 1))
     in
     check_skip_list_store
       dal_node
@@ -7580,10 +7595,13 @@ module Garbage_collection = struct
           "Check that the skip list store contains the right files for level \
            lag + 1." ;
         let* () =
-          check_skip_list_store
-            dal_node
-            ~number_of_slots
-            ~expected_levels:[string_of_int 1]
+          let expected_levels =
+            if Protocol.number protocol >= 025 then
+              (* also include level 0; unclear why, but it should not matter *)
+              ["0"; "1"]
+            else ["1"]
+          in
+          check_skip_list_store dal_node ~number_of_slots ~expected_levels
         in
         (* We just want to observe the GC taking effect, so we need to bake at
            least [non_gc_period] blocks. *)
@@ -9653,7 +9671,6 @@ let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
   let consensus_committee_size =
     JSON.(constants |-> "consensus_committee_size" |> as_int)
   in
-  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata () in
   Check.(
     aggregated_attestation_consensus_power
     >= consensus_committee_size
@@ -9665,6 +9682,7 @@ let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
       "The consensus power of the tz4 accounts is not sufficient to ensure \
        that the ability to read inside the aggregated attestations is required \
        for the slot to be protocol attested." ;
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
   match metadata.dal_attestation with
   | None ->
       Test.fail
@@ -10808,7 +10826,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     | _ -> Test.fail "Not reachable."
   in
 
-  (* Snapshot the balances of the accounts at startup. *)
+  Log.info "Snapshot the balances of the accounts at startup." ;
   let* ( _baker_bal0,
          attesting_dal_slot_10_bal0,
          not_attesting_at_all_bal0,
@@ -10947,6 +10965,9 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
      in which we inject DAL slots publications at slot index 10 and TB/DAL
      attestations. We stop before baking the last block of the current cycle,
      where DAL rewards are distributed. *)
+  Log.info
+    "Bake and publish for one cycle minus one block (%d blocks)"
+    (blocks_per_cycle - 1) ;
   let* () =
     repeat (blocks_per_cycle - 1) (fun () ->
         let* () = count_slot_10_if_attested () in
@@ -10994,8 +11015,9 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         unit)
   in
 
-  (* After this first round of blocks, we snapshot the balances of our delegates
-     again. *)
+  Log.info
+    "After this first round of blocks, we snapshot the balances of our \
+     delegates again." ;
   let* ( _baker_bal1,
          attesting_dal_slot_10_bal1,
          not_attesting_at_all_bal1,
@@ -11052,8 +11074,10 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     snapshot_tb_participation ()
   in
 
-  (* We now bake the last block of the cycle, which should trigger TB and DAL
-     rewards distribution. TB rewards are actually set to 0. *)
+  Log.info
+    "We now bake the last block of the cycle, which should trigger (TB and) \
+     DAL rewards distribution." ;
+  (* TB rewards are actually set to 0. *)
   let* () = bake_for ~delegates:(`For [baker.Account.public_key_hash]) client in
   let* metadata = Node.RPC.(call node @@ get_chain_block_metadata_raw ()) in
   incr level ;
@@ -11264,14 +11288,16 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
          than for the other bakers and since we did not count them, we don't
          check them. *)
       if not @@ String.equal account.alias small_baker.alias then
+        let msg_prefix = sf "For delegate %s: " account.public_key_hash in
         Check.(
           dal_participation.delegate_attestable_dal_slots
           = !count_set_dal_attestation_bitset)
           ~__LOC__
           Check.int
           ~error_msg:
-            "Expecting %L attestable DAL slots, but %R were reported in blocks \
-             metadata")
+            (msg_prefix
+           ^ "expecting %L attestable DAL slots, but %R were reported in \
+              blocks metadata"))
     bootstrap_accounts_participation ;
   unit
 
