@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+# SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_ethereum_farfadet_r2"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+thiserror.workspace = true
+anyhow.workspace = true
+
+primitive-types.workspace = true
+ethereum.workspace = true
+ethbloom.workspace = true
+revm.workspace = true
+
+rlp.workspace = true
+hex.workspace = true
+
+bytes.workspace = true
+
+sha3.workspace = true
+tezos_crypto_rs.workspace = true
+libsecp256k1.workspace = true
+
+tezos-smart-rollup-encoding.workspace = true
+
+# Useful to keep the same types between the execution and evaluation
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+benchmark = []
+serde = ["dep:serde"]
+evaluation = ["serde"]
