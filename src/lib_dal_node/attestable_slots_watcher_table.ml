@@ -65,11 +65,11 @@ let notify_attestable_slot t pkh ~slot_id =
         SlotIdSet.add watcher.notified_slots slot_id ;
         Lwt_watcher.notify watcher.stream (Attestable_slot {slot_id}))
 
-let notify_no_shards_assigned t pkh ~attestation_level =
+let notify_no_shards_assigned t pkh ~committee_level =
   match Signature.Public_key_hash.Table.find t pkh with
   | None -> ()
   | Some watcher ->
-      Lwt_watcher.notify watcher.stream (No_shards_assigned {attestation_level})
+      Lwt_watcher.notify watcher.stream (No_shards_assigned {committee_level})
 
 let notify_slot_has_trap t pkh ~slot_id =
   match Signature.Public_key_hash.Table.find t pkh with

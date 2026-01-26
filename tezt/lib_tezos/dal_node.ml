@@ -712,7 +712,7 @@ module Proxy = struct
               [
                 ("slot_ids", list slot_id_to_json slot_ids);
                 ("trap_slot_ids", list slot_id_to_json []);
-                ("no_shards_attestation_levels", list int []);
+                ("no_shards_committee_levels", list int []);
               ] );
         ]
     in
@@ -974,7 +974,7 @@ module Mockup_for_baker = struct
                [
                  ("slot_ids", list slot_id_to_json slot_ids);
                  ("trap_slot_ids", list slot_id_to_json []);
-                 ("no_shards_attestation_levels", list int []);
+                 ("no_shards_committee_levels", list int []);
                ] );
          ])
 

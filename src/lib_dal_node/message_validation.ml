@@ -111,7 +111,7 @@ let gossipsub_message_id_commitment_validation ctxt proto_parameters message_id
       else `Invalid
 
 let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
-  let attestation_level =
+  let committee_level =
     Int32.(
       pred
       @@ add
@@ -122,11 +122,11 @@ let gossipsub_message_id_topic_validation ctxt proto_parameters message_id =
     Node_context.get_fetched_assigned_shard_indices
       ctxt
       ~pkh:message_id.Types.Message_id.pkh
-      ~level:attestation_level
+      ~level:committee_level
   in
   match shard_indices_opt with
   | None ->
-      (* If DAL committees of [attestation_level] are fetched each time the
+      (* If DAL committees of [committee_level] are fetched each time the
          corresponding published/finalized_level is processed, this should not
          happen. *)
       `Unknown

@@ -807,26 +807,26 @@ module Attestable_event = struct
   type backfill_payload = {
     slot_ids : slot_id list;
     trap_slot_ids : slot_id list;
-    no_shards_attestation_levels : level list;
+    no_shards_committee_levels : level list;
   }
 
   type t =
     | Attestable_slot of {slot_id : slot_id}
-    | No_shards_assigned of {attestation_level : level}
+    | No_shards_assigned of {committee_level : level}
     | Slot_has_trap of {slot_id : slot_id}
     | Backfill of {backfill_payload : backfill_payload}
 
   let backfill_payload_encoding =
     let open Data_encoding in
     conv
-      (fun {slot_ids; trap_slot_ids; no_shards_attestation_levels} ->
-        (slot_ids, trap_slot_ids, no_shards_attestation_levels))
-      (fun (slot_ids, trap_slot_ids, no_shards_attestation_levels) ->
-        {slot_ids; trap_slot_ids; no_shards_attestation_levels})
+      (fun {slot_ids; trap_slot_ids; no_shards_committee_levels} ->
+        (slot_ids, trap_slot_ids, no_shards_committee_levels))
+      (fun (slot_ids, trap_slot_ids, no_shards_committee_levels) ->
+        {slot_ids; trap_slot_ids; no_shards_committee_levels})
       (obj3
          (req "slot_ids" (list slot_id_encoding))
          (req "trap_slot_ids" (list slot_id_encoding))
-         (req "no_shards_attestation_levels" (list int32)))
+         (req "no_shards_committee_levels" (list int32)))
 
   let encoding =
     let open Data_encoding in
@@ -846,13 +846,11 @@ module Attestable_event = struct
           (Tag 1)
           (obj2
              (req "kind" (constant "no_shards_assigned"))
-             (req "attestation_level" int32))
+             (req "committee_level" int32))
           (function
-            | No_shards_assigned {attestation_level} ->
-                Some ((), attestation_level)
+            | No_shards_assigned {committee_level} -> Some ((), committee_level)
             | _ -> None)
-          (fun ((), attestation_level) ->
-            No_shards_assigned {attestation_level});
+          (fun ((), committee_level) -> No_shards_assigned {committee_level});
         case
           ~title:"slot_has_trap"
           (Tag 2)

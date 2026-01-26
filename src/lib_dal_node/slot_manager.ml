@@ -802,12 +802,12 @@ let shards_to_attesters committee =
 let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
-  let attestation_level =
+  let committee_level =
     Int32.(
       pred
       @@ add slot_id.slot_level (of_int proto_parameters.Types.attestation_lag))
   in
-  let* committee = level_committee ~level:attestation_level in
+  let* committee = level_committee ~level:committee_level in
   let attester_of_shard = shards_to_attesters committee in
   let ignore_pkhs = Node_context.get_ignore_pkhs ctxt in
   shards

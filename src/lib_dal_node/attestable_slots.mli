@@ -40,11 +40,11 @@ val attested_just_after_migration :
 val may_notify_attestable_slot_or_trap :
   Node_context.t -> slot_id:Types.slot_id -> unit tzresult Lwt.t
 
-(** [may_notify_not_in_committee ctxt committee ~attestation_level] checks, for each
-    subscribed [pkh], whether the delegate is in the [committee] for [~attestation_level].
+(** [may_notify_not_in_committee ctxt committee ~committee_level] checks, for each
+    subscribed [pkh], whether the delegate is in the [committee] for [~committee_level].
     If so, it emits an event to that [pkh]'s stream. *)
 val may_notify_not_in_committee :
-  Node_context.t -> Committee_cache.committee -> attestation_level:int32 -> unit
+  Node_context.t -> Committee_cache.committee -> committee_level:int32 -> unit
 
 (** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
     [Types.Attestable_event.t] values. The stream

@@ -157,7 +157,7 @@ let update_cache_no_shards_assigned state ~delegate_id ~attestation_level =
     merges a DAL [Backfill] event for [~delegate_id] into the in-memory cache. *)
 let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   let module E = Types.Attestable_event in
-  let E.{slot_ids; trap_slot_ids; no_shards_attestation_levels} =
+  let E.{slot_ids; trap_slot_ids; no_shards_committee_levels} =
     backfill_payload
   in
   List.iter
@@ -182,7 +182,7 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   List.iter
     (fun attestation_level ->
       update_cache_no_shards_assigned state ~delegate_id ~attestation_level)
-    no_shards_attestation_levels
+    no_shards_committee_levels
 
 (** [consume_backfill_stream state stream_handle ~delegate_id] consumes the initial [Backfill]
     event from a freshly opened DAL monitoring stream. This function is meant to be called
@@ -233,8 +233,11 @@ let rec consume_stream state stream_handle ~delegate_id =
       [@profiler.aggregate_f
         {verbosity = Debug} "update_cache_with_attestable_slot"] ;
       consume_stream state ~delegate_id stream_handle
-  | Some (No_shards_assigned {attestation_level}) ->
-      update_cache_no_shards_assigned state ~delegate_id ~attestation_level ;
+  | Some (No_shards_assigned {committee_level}) ->
+      update_cache_no_shards_assigned
+        state
+        ~delegate_id
+        ~attestation_level:committee_level ;
       consume_stream state ~delegate_id stream_handle
   | Some (Slot_has_trap {slot_id}) ->
       (* In case of a trap, we know the slot is not attestable, so we record an explicit [false] bit. *)
