@@ -441,7 +441,8 @@ module Packaging = struct
   let make_variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
-         "${GCP_CI_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION" )
+         "${GCP_CI_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION"
+       )
        (* this second variable is for a read only registry and we want it to be
             tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
