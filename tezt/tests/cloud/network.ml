@@ -82,8 +82,8 @@ let default_protocol : t -> Protocol.t = function
   | `Tallinnnet -> T024
 
 let block_time : t -> int = function
-  | `Mainnet -> 8
-  | `Shadownet -> 8
+  | `Mainnet -> 6
+  | `Shadownet -> 6
   | `Ghostnet -> 4
   | `Seoulnet -> 4
   | `Tallinnnet -> 4
@@ -95,7 +95,8 @@ let block_time : t -> int = function
            (to_string network))
 
 let next_protocol : t -> Protocol.t = function
-  | `Mainnet | `Ghostnet | `Shadownet | `Seoulnet -> T024
+  | `Mainnet | `Ghostnet | `Shadownet -> Alpha
+  | `Seoulnet -> T024
   | _ -> Alpha
 
 let public_rpc_endpoint testnet =
