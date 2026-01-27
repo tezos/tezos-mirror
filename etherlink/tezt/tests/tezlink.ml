@@ -967,6 +967,83 @@ let test_tezlink_hash_rpc =
       ~error_msg:"Block hash should be equal") ;
   unit
 
+let test_tezlink_script_rpc =
+  register_tezlink_test
+    ~title:"Test of the script rpc"
+    ~tags:["rpc"; "script"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let foreign_endpoint =
+    {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
+  (* Helper to get the script of a contract. Returns None if 404. *)
+  let script_rpc contract =
+    let* response =
+      RPC_core.call_raw foreign_endpoint
+      @@ RPC.get_chain_block_context_contract_script ~id:contract ()
+    in
+    parse_rpc_response ~origin:"script_rpc" response
+  in
+  (* 1. Script of a non-existent KT1 should return 404. *)
+  let fake_kt1 = "KT1J8Hr3BP8bpbfmgGpRPoC9nAMSYtStZG43" in
+  let* script = script_rpc fake_kt1 in
+  Check.(
+    (script = None)
+      (option json)
+      ~error_msg:"Expected None for non-existent KT1, got %L") ;
+
+  (* 2. Script of an implicit account (tz1) should return 404 *)
+  let* script = script_rpc Constant.bootstrap1.public_key_hash in
+  Check.(
+    (script = None)
+      (option json)
+      ~error_msg:"Expected None for implicit account, got %L") ;
+
+  (* 3. Script of a non-existent tz1 should return 404 *)
+  let fake_tz1 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let* script = script_rpc fake_tz1 in
+  Check.(
+    (script = None)
+      (option json)
+      ~error_msg:"Expected None for non-existent tz1, got %L") ;
+
+  (* 4. Script of an originated contract should return its script *)
+  let concat_hello = Tezt_etherlink.Michelson_contracts.concat_hello () in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"concat_hello_script_test"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:concat_hello.initial_storage
+      ~prg:concat_hello.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+
+  let* script = script_rpc contract in
+  Check.(
+    (script <> None)
+      (option json)
+      ~error_msg:"Expected Some script for originated contract, got None") ;
+
+  (* 5. Verify script contains both code and storage fields *)
+  let script_json = Option.get script in
+  let code = JSON.(script_json |-> "code") in
+  let storage = JSON.(script_json |-> "storage") in
+  Check.(
+    (JSON.is_null code = false)
+      bool
+      ~error_msg:"Expected script to contain 'code' field") ;
+  Check.(
+    (JSON.is_null storage = false)
+      bool
+      ~error_msg:"Expected script to contain 'storage' field") ;
+
+  unit
+
 let test_tezlink_raw_json_cycle =
   register_tezlink_test
     ~title:"Test Tezlink raw json cycle rpc"
@@ -3315,6 +3392,7 @@ let () =
   test_tezlink_storage_rpc [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
+  test_tezlink_script_rpc [Alpha] ;
   test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
