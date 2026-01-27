@@ -116,6 +116,14 @@ let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
   in
   scenario setup protocol
 
+(** Helper to parse RPC response. Returns [Some json] if 200, [None] if 404,
+    fails otherwise. *)
+let parse_rpc_response ~origin response =
+  match response.RPC_core.code with
+  | 200 -> Lwt.return_some (JSON.parse ~origin response.body)
+  | 404 -> Lwt.return_none
+  | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
+
 let test_describe_endpoint =
   register_tezlink_regression_test
     ~tags:["evm"; "rpc"; "describe"]
@@ -615,10 +623,7 @@ let test_tezlink_storage_rpc =
       RPC_core.call_raw foreign_endpoint
       @@ RPC.get_chain_block_context_contract_storage ~id:contract ()
     in
-    match response.RPC_core.code with
-    | 200 -> Lwt.return_some (JSON.parse ~origin:"storage_rpc" response.body)
-    | 404 -> Lwt.return_none
-    | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
+    parse_rpc_response ~origin:"storage_rpc" response
   in
   (* 1. Storage of a non-existent KT1 should return 404 *)
   let fake_kt1 = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
