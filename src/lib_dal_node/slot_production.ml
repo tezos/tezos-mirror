@@ -104,7 +104,7 @@ let produce_commitment_and_proof =
           else return_unit
         in
         let* proto_parameters =
-          (Node_context.get_proto_parameters ctxt ~level:`Last_proto
+          (Node_context.get_proto_parameters ctxt ~level:`Head
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e))
           [@profiler.wrap_f

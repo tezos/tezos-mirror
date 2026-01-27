@@ -732,6 +732,12 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
   let open Lwt_result_syntax in
   let level = finalized_shell_header.Block_header.level in
   let () = Node_context.set_last_finalized_level ctxt level in
+  let () =
+    match Crawler.last_seen_head l1_crawler with
+    | None -> ()
+    | Some (_, current_head) ->
+        Node_context.set_l1_current_head_level ctxt current_head.level
+  in
   let* () =
     let block_level, proto_level =
       match Crawler.last_seen_head l1_crawler with

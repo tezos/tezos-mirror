@@ -42,6 +42,7 @@ val init :
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
   last_finalized_level:int32 ->
+  l1_current_level:int32 ->
   ?disable_shard_validation:bool ->
   ignore_pkhs:Signature.Public_key_hash.Set.t ->
   unit ->
@@ -96,12 +97,12 @@ val may_add_plugin :
 val set_proto_plugins : t -> Proto_plugins.t -> unit
 
 (** [get_proto_parameters ~level ctxt] returns the DAL node's protocol
-    parameters. When [level] is [`Last_proto], it returns the last known
-    parameters. If [level] is [`Level level], then the protocol parameters for
-    that level are returned. The parameters returned are obtained via
-    {!get_plugin_and_parameters_for_level}. *)
+    parameters. When [level] is [`Head], it returns the protocol parameters
+    associated to L1's current head. If [level] is [`Level level], then the
+    protocol parameters for that level are returned. The parameters returned are
+    obtained via {!get_plugin_and_parameters_for_level}. *)
 val get_proto_parameters :
-  level:[`Last_proto | `Level of int32] -> t -> Types.proto_parameters tzresult
+  level:[`Head | `Level of int32] -> t -> Types.proto_parameters tzresult
 
 (** Reconstruct the given slot id by calling the [reconstruct]
     function unless a reconstruction for the given slot id is alredy
@@ -155,6 +156,12 @@ val set_last_finalized_level : t -> int32 -> unit
 (** Get the node's last finalized level. This level may be equal or higher than
     the node's last processed level. *)
 val get_last_finalized_level : t -> int32
+
+(** Update the node's L1 current head level. *)
+val set_l1_current_head_level : t -> int32 -> unit
+
+(** Get the node's L1 current head level. *)
+val get_l1_current_head_level : t -> int32
 
 (** Returns true if and only if the node's profile is bootstrap. *)
 val is_bootstrap_node : t -> bool
