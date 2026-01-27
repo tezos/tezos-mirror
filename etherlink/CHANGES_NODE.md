@@ -14,6 +14,9 @@
 
 ### Execution changes
 
+- Fix memory leak in blueprints follower caused by telemetry context
+  accumulation in recursive stream loop. (!20616)
+
 ### Storage changes
 
 ### Documentation changes
