@@ -160,32 +160,31 @@ let prepare_and_run_sequencer rollup_node =
   (* Create an evm node and patch the sequencer key. *)
   let sequencer =
     Evm_node.create
+      ~preimages_dir:(Sc_rollup_node.data_dir rollup_node ^ "/wasm_2_0_0")
+      ~private_rpc_port:8546
       ~mode:
         (Evm_node.Sequencer
            {
-             initial_kernel = "";
-             preimage_dir =
-               Some (Sc_rollup_node.data_dir rollup_node ^ "/wasm_2_0_0");
-             private_rpc_port = Some 8546;
-             time_between_blocks = Some Nothing;
+             rollup_node_endpoint = Sc_rollup_node.endpoint rollup_node;
+             sequencer_config =
+               {
+                 time_between_blocks = Some Nothing;
+                 genesis_timestamp = None;
+                 max_number_of_chunks = None;
+                 wallet_dir = None;
+               };
              sequencer_keys =
                [
                  "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
                ];
-             genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
              max_blueprints_catchup = None;
              catchup_cooldown = None;
-             max_number_of_chunks = None;
-             wallet_dir = None;
-             tx_queue_max_lifespan = None;
-             tx_queue_max_size = None;
-             tx_queue_tx_per_addr_limit = None;
              dal_slots = None;
              sequencer_sunset_sec = None;
            })
-      (Sc_rollup_node.endpoint rollup_node)
+      ()
   in
   let process = Evm_node.spawn_init_config sequencer in
   let* () = Process.check process in

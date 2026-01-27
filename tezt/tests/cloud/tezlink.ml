@@ -659,16 +659,16 @@ index 3453eabc..1967b769 100644
 -import { DefaultNetworks, MAINNET, type Network, isDefault } from "@umami/tezos";
 +import { DefaultNetworks, TEZLINK, type Network, isDefault } from "@umami/tezos";
  import { remove } from "lodash";
- 
+
  type State = {
 @@ -9,7 +9,7 @@ type State = {
- 
+
  const initialState: State = {
    available: DefaultNetworks,
 -  current: MAINNET,
 +  current: TEZLINK,
  };
- 
+
  export const networksSlice = createSlice({
 diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
 index 1d28850f..39a15d9b 100644
@@ -677,7 +677,7 @@ index 1d28850f..39a15d9b 100644
 @@ -16,6 +16,23 @@ export const GHOSTNET: Network = {
    buyTezUrl: "https://faucet.ghostnet.teztnets.com/",
  };
- 
+
 +export const TEZOS_SHADOWNET: Network = {
 +  name: "shadownet",
 +  rpcUrl: "https://shadownet.tezos.ecadinfra.com",
@@ -696,7 +696,7 @@ index 1d28850f..39a15d9b 100644
 +};
 +
  export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
- 
+
 -export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET];
 +export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET, TEZOS_SHADOWNET, TEZLINK];
     |}
@@ -770,29 +770,26 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
       (Uses.path Constant.WASM.evm_kernel)
       agent
   in
-  let private_rpc_port = Agent.next_available_port agent |> Option.some in
+  let private_rpc_port = Agent.next_available_port agent in
   let spawn_rpc = Agent.next_available_port agent in
+  let sequencer_config : Evm_node.sequencer_config =
+    {
+      time_between_blocks = Some time_between_blocks;
+      genesis_timestamp = None;
+      max_number_of_chunks = None;
+      wallet_dir = Some wallet_dir;
+    }
+  in
   let mode =
-    Evm_node.Tezlink_sandbox
-      {
-        initial_kernel = output;
-        funded_addresses = [];
-        preimage_dir = Some preimages_dir;
-        private_rpc_port;
-        time_between_blocks = Some time_between_blocks;
-        genesis_timestamp = None;
-        max_number_of_chunks = None;
-        wallet_dir = Some wallet_dir;
-        tx_queue_max_lifespan = None;
-        tx_queue_max_size = None;
-        tx_queue_tx_per_addr_limit = None;
-        verbose;
-      }
+    Evm_node.Tezlink_sandbox {sequencer_config; funded_addresses = []; verbose}
   in
   let () = toplog "Launching the sandbox L2 node" in
   let rpc_port = proxy_internal_port sequencer_proxy in
   let* evm_node =
     Tezos.Evm_node.Agent.init
+      ~initial_kernel:output
+      ~preimages_dir
+      ~private_rpc_port
       ~patch_config:(fun json ->
         JSON.update
           "public_rpc"
@@ -824,7 +821,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
       ~rpc_port
-      "http://dummy_rollup_endpoint"
+      ()
       cloud
       agent
   in

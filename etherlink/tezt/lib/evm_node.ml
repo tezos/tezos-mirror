@@ -32,6 +32,14 @@ type history_mode = Archive | Rolling of int | Full of int
 
 type tez_contract = {address : string; path : string; initial_storage : string}
 
+(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+type sequencer_config = {
+  time_between_blocks : time_between_blocks option;
+  genesis_timestamp : Client.timestamp option;
+  max_number_of_chunks : int option;
+  wallet_dir : string option;
+}
+
 type l2_setup = {
   l2_chain_id : int;
   l2_chain_family : string;
@@ -68,63 +76,32 @@ let default_l2_setup ~l2_chain_id =
 
 type mode =
   | Observer of {
-      initial_kernel : string option;
-      preimages_dir : string option;
-      private_rpc_port : int option;
       rollup_node_endpoint : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
+      evm_node_endpoint : string;
     }
   | Sequencer of {
-      initial_kernel : string;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
+      rollup_node_endpoint : string;
+      sequencer_config : sequencer_config;
       sequencer_keys : string list;
-      genesis_timestamp : Client.timestamp option;
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string option;
+      sequencer_config : sequencer_config;
       network : string option;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
-      initial_kernel : string;
+      sequencer_config : sequencer_config;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       verbose : bool;
     }
-  | Proxy
+  | Proxy of string
   | Rpc of mode
 
 module Per_level_map = Map.Make (Int)
@@ -150,10 +127,15 @@ module Parameters = struct
     rpc_addr : string;
     rpc_port : int;
     websockets : bool;
-    endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
     spawn_rpc : int option;
+    initial_kernel : string option;
+    preimages_dir : string option;
+    private_rpc_port : int option;
+    tx_queue_max_lifespan : int option;
+    tx_queue_max_size : int option;
+    tx_queue_tx_per_addr_limit : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -171,28 +153,19 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ -> true
-  | Observer _ | Proxy | Rpc _ -> false
+  | Observer _ | Proxy _ | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Proxy | Rpc _ -> false
+  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Proxy _ | Rpc _ -> false
   | Observer _ -> true
 
-let initial_kernel t =
-  let rec from_mode = function
-    | Sandbox {initial_kernel; _} | Observer {initial_kernel; _} ->
-        initial_kernel
-    | Tezlink_sandbox {initial_kernel; _} | Sequencer {initial_kernel; _} ->
-        Some initial_kernel
-    | Rpc mode -> from_mode mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_mode t.persistent_state.mode
+let initial_kernel t = t.persistent_state.initial_kernel
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ | Observer _ -> true
-  | Proxy | Rpc _ -> false
+  | Proxy _ | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
   let rpc_port =
@@ -739,111 +712,17 @@ let wait_for_inclusion ?timeout ?hash evm_node =
       if String.equal expected_hash found_hash then Some found_hash else None
   | None -> Some found_hash
 
-let mode_with_new_private_rpc (mode : mode) =
-  match mode with
-  | Observer
-      {
-        initial_kernel;
-        preimages_dir;
-        private_rpc_port = Some _;
-        rollup_node_endpoint;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-      } ->
-      Observer
-        {
-          initial_kernel;
-          preimages_dir;
-          private_rpc_port = Some (Port.fresh ());
-          rollup_node_endpoint;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-        }
-  | Sequencer
-      {
-        initial_kernel;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        sequencer_keys;
-        genesis_timestamp;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        max_number_of_chunks;
-        wallet_dir;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-        dal_slots;
-        sequencer_sunset_sec;
-      } ->
-      Sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          sequencer_keys;
-          genesis_timestamp;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          dal_slots;
-          sequencer_sunset_sec;
-        }
-  | Sandbox
-      {
-        initial_kernel;
-        network;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        genesis_timestamp;
-        max_number_of_chunks;
-        wallet_dir;
-        funded_addresses;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
-        sequencer_keys;
-      } ->
-      Sandbox
-        {
-          initial_kernel;
-          network;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          genesis_timestamp;
-          max_number_of_chunks;
-          wallet_dir;
-          funded_addresses;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          sequencer_keys;
-        }
-  | _ -> mode
-
-let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?history ?data_dir ?config_file ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?spawn_rpc ?(websockets = false) endpoint =
+let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner ?history
+    ?data_dir ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?spawn_rpc
+    ?(websockets = false) ?initial_kernel ?preimages_dir ?private_rpc_port
+    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ~mode
+    () =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
   let new_name () =
     match mode with
-    | Proxy -> "proxy_" ^ fresh_name ()
+    | Proxy _ -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Sandbox _ -> "sandbox_" ^ fresh_name ()
     | Tezlink_sandbox _ -> "tezlink_sandbox_" ^ fresh_name ()
@@ -874,10 +753,15 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         rpc_addr;
         rpc_port;
         websockets;
-        endpoint;
         restricted_rpcs;
         runner;
         spawn_rpc;
+        initial_kernel;
+        preimages_dir;
+        private_rpc_port;
+        tx_queue_max_lifespan;
+        tx_queue_max_size;
+        tx_queue_tx_per_addr_limit;
       }
   in
   evm_node
@@ -885,6 +769,8 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
 let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
+
+let private_rpc_port evm_node = evm_node.persistent_state.private_rpc_port
 
 let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
 
@@ -913,27 +799,23 @@ let run_args evm_node =
     config_file_arg evm_node @ data_dir_arg evm_node
     @ evm_node.persistent_state.arguments
   in
+  let initial_kernel = evm_node.persistent_state.initial_kernel in
+  let sequencer_args {genesis_timestamp; wallet_dir; _} =
+    Cli_arg.optional_arg
+      "genesis-timestamp"
+      (fun timestamp ->
+        Client.time_of_timestamp timestamp |> Client.Time.to_notation)
+      genesis_timestamp
+    @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+  in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy -> ["run"; "proxy"]
-    | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Sandbox
-        {
-          initial_kernel;
-          network;
-          funded_addresses;
-          genesis_timestamp;
-          wallet_dir;
-          sequencer_keys;
-          _;
-        } ->
+    | Proxy _ -> ["run"; "proxy"]
+    | Sequencer {sequencer_config; _} ->
+        ["run"; "sequencer"]
+        @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
+        @ sequencer_args sequencer_config
+    | Sandbox {sequencer_config; network; funded_addresses; sequencer_keys} ->
         let sequencer_keys =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
@@ -942,32 +824,15 @@ let run_args evm_node =
         @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
         @ Cli_arg.optional_arg "network" Fun.id network
         @ sequencer_keys
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ sequencer_args sequencer_config
         @ fund_args funded_addresses
-    | Tezlink_sandbox
-        {
-          initial_kernel;
-          genesis_timestamp;
-          wallet_dir;
-          funded_addresses;
-          verbose;
-          _;
-        } ->
-        ["run"; "tezlink"; "sandbox"; "--kernel"; initial_kernel]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+    | Tezlink_sandbox {sequencer_config; funded_addresses; verbose} ->
+        ["run"; "tezlink"; "sandbox"]
+        @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
+        @ sequencer_args sequencer_config
         @ fund_args funded_addresses
         @ Cli_arg.optional_switch "verbose" verbose
-    | Observer {initial_kernel; _} ->
+    | Observer _ ->
         ["run"; "observer"]
         @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
     | Rpc _ -> ["experimental"; "run"; "rpc"]
@@ -1099,59 +964,73 @@ let spawn_init_config_minimal ?data_dir ?config_file
   @ extra_arguments
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
+  let ps = evm_node.persistent_state in
   let shared_args =
-    data_dir_arg evm_node @ config_file_arg evm_node
-    @ evm_node.persistent_state.arguments
-    @ Cli_arg.optional_arg
-        "restricted-rpcs"
-        Fun.id
-        evm_node.persistent_state.restricted_rpcs
+    data_dir_arg evm_node @ config_file_arg evm_node @ ps.arguments
+    @ Cli_arg.optional_arg "restricted-rpcs" Fun.id ps.restricted_rpcs
     @ Cli_arg.optional_arg
         "history"
         (function
           | Archive -> "archive"
           | Rolling n -> sf "rolling:%d" n
           | Full n -> sf "full:%d" n)
-        evm_node.persistent_state.history
-    @ Cli_arg.optional_switch "ws" evm_node.persistent_state.websockets
+        ps.history
+    @ Cli_arg.optional_switch "ws" ps.websockets
+    @ Cli_arg.optional_arg "preimages-dir" Fun.id ps.preimages_dir
+    @ Cli_arg.optional_arg "private-rpc-port" string_of_int ps.private_rpc_port
+    @ Cli_arg.optional_arg
+        "tx-pool-timeout-limit"
+        string_of_int
+        ps.tx_queue_max_lifespan
+    @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int ps.tx_queue_max_size
+    @ Cli_arg.optional_arg
+        "tx-pool-tx-per-addr-limit"
+        string_of_int
+        ps.tx_queue_tx_per_addr_limit
   in
-
   let time_between_blocks_fmt = function
     | Nothing -> "none"
     | Time_between_blocks f -> Format.sprintf "%.3f" f
   in
+  (* Common args from sequencer_config *)
+  let sequencer_args {time_between_blocks; max_number_of_chunks; wallet_dir; _}
+      =
+    Cli_arg.optional_arg
+      "time-between-blocks"
+      time_between_blocks_fmt
+      time_between_blocks
+    @ Cli_arg.optional_arg
+        "max-number-of-chunks"
+        string_of_int
+        max_number_of_chunks
+    @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+  in
   let mode_args =
-    match evm_node.persistent_state.mode with
-    | Proxy -> ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-    | Rpc _ -> []
+    match ps.mode with
+    | Proxy rollup_node_endpoint ->
+        ["--rollup-node-endpoint"; rollup_node_endpoint]
+    | Rpc _ ->
+        Tezt.Test.fail
+          ~__LOC__
+          "An rpc node should not have a config initialisation"
     | Sequencer
         {
-          initial_kernel = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
+          rollup_node_endpoint;
+          sequencer_config;
           sequencer_keys;
-          genesis_timestamp = _;
           max_blueprints_lag;
           max_blueprints_ahead;
           max_blueprints_catchup;
           catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
           dal_slots;
           sequencer_sunset_sec;
         } ->
-        let sequencer_keys =
+        let sequencer_keys_args =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
         in
-        sequencer_keys
-        @ ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
+        sequencer_keys_args
+        @ ["--rollup-node-endpoint"; rollup_node_endpoint]
         @ Cli_arg.optional_arg
             "maximum-blueprints-lag"
             string_of_int
@@ -1168,145 +1047,41 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "catch-up-cooldown"
             string_of_int
             catchup_cooldown
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ sequencer_args sequencer_config
         @ Cli_arg.optional_arg
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
         @ Cli_arg.optional_arg "sunset-sec" string_of_int sequencer_sunset_sec
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
-    | Sandbox
-        {
-          initial_kernel = _;
-          network = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          genesis_timestamp = _;
-          max_number_of_chunks;
-          wallet_dir;
-          funded_addresses = _;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          sequencer_keys;
-        } ->
-        let sequencer_keys =
+    | Sandbox {sequencer_config; sequencer_keys; _} ->
+        let sequencer_keys_args =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
         in
-        sequencer_keys
+        sequencer_keys_args
         @ [
             (* This argument is not necessary for the sandbox mode, however,
-             the init configuration needs it. *)
+           the init configuration needs it. *)
             "--rollup-node-endpoint";
-            evm_node.persistent_state.endpoint;
+            "http://dummyvalue:8932";
           ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
-    | Tezlink_sandbox
-        {
-          initial_kernel = _;
-          funded_addresses = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          genesis_timestamp = _;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          verbose;
-        } ->
+        @ sequencer_args sequencer_config
+    | Tezlink_sandbox {sequencer_config; verbose; _} ->
         [
           (* These two fields are not necessary for the sandbox mode, however,
-             the init configuration needs them. *)
+           the init configuration needs them. *)
           "--sequencer-key";
           "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
           "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
+          "http://dummyvalue:8932";
         ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
+        @ sequencer_args sequencer_config
         @ Cli_arg.optional_switch "verbose" verbose
-    | Observer
-        {
-          preimages_dir;
-          initial_kernel = _;
-          rollup_node_endpoint;
-          private_rpc_port;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-        } ->
-        ["--evm-node-endpoint"; evm_node.persistent_state.endpoint]
+    | Observer {rollup_node_endpoint; evm_node_endpoint} ->
+        ["--evm-node-endpoint"; evm_node_endpoint]
         @ (match rollup_node_endpoint with
           | Some endpoint -> ["--rollup-node-endpoint"; endpoint]
           | None -> ["--dont-track-rollup-node"])
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_queue_max_lifespan
-        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_queue_tx_per_addr_limit
         @ Cli_arg.optional_switch "fail-on-divergence" true
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
@@ -1319,19 +1094,9 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       else Runner.address evm_node.persistent_state.runner
     in
     if private_ then
-      match evm_node.persistent_state.mode with
-      | Sequencer {private_rpc_port = Some private_rpc_port; _}
-      | Observer {private_rpc_port = Some private_rpc_port; _}
-      | Sandbox {private_rpc_port = Some private_rpc_port; _}
-      | Tezlink_sandbox {private_rpc_port = Some private_rpc_port; _} ->
-          (host, private_rpc_port, "/private")
-      | Sequencer {private_rpc_port = None; _}
-      | Sandbox {private_rpc_port = None; _}
-      | Tezlink_sandbox {private_rpc_port = None; _} ->
-          Test.fail "Sequencer doesn't have a private RPC server"
-      | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
-      | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
-      | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
+      match evm_node.persistent_state.private_rpc_port with
+      | Some private_rpc_port -> (host, private_rpc_port, "/private")
+      | None -> Test.fail "%s doesn't have a private RPC server" evm_node.name
     else (host, evm_node.persistent_state.rpc_port, "")
   in
   Format.sprintf "http://%s:%d%s" addr port path
@@ -1451,14 +1216,16 @@ let patch_config_gc ?history_mode json =
        | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
        | Full retention -> `String (Format.sprintf "full:%d" retention))
 
-let init ?patch_config ?name ?runner ?mode ?end_test_on_failure ?data_dir
+let init ?patch_config ?name ?runner ~mode ?end_test_on_failure ?data_dir
     ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc
-    ?websockets ?extra_arguments rollup_node =
+    ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
+    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+    ?extra_arguments () =
   let evm_node =
     create
       ?name
       ?runner
-      ?mode
+      ~mode
       ?history:history_mode
       ?data_dir
       ?config_file
@@ -1467,7 +1234,13 @@ let init ?patch_config ?name ?runner ?mode ?end_test_on_failure ?data_dir
       ?restricted_rpcs
       ?spawn_rpc
       ?websockets
-      rollup_node
+      ?initial_kernel
+      ?preimages_dir
+      ?private_rpc_port
+      ?tx_queue_max_lifespan
+      ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit
+      ()
   in
   let* () = Process.check @@ spawn_init_config evm_node in
   let* () =
@@ -1985,16 +1758,9 @@ let make_l2_kernel_installer_config ?chain_id ?chain_family
   Runnable.{value = process; run = Process.check}
 
 let preimages_dir evm_node =
-  let rec from_node ~data_dir = function
-    | Sandbox {preimage_dir; _}
-    | Tezlink_sandbox {preimage_dir; _}
-    | Sequencer {preimage_dir; _}
-    | Observer {preimages_dir = preimage_dir; _} ->
-        Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
-    | Rpc mode -> from_node ~data_dir mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
+  Option.value
+    ~default:(data_dir evm_node // "wasm_2_0_0")
+    evm_node.persistent_state.preimages_dir
 
 let list_metrics ?hooks () =
   let cmd = ["list"; "metrics"] in
@@ -2029,29 +1795,9 @@ let switch_history_mode evm_node history =
   {Runnable.value = process; run}
 
 let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
-  let ( initial_kernel,
-        preimages_dir,
-        private_rpc_port,
-        tx_queue_max_lifespan,
-        tx_queue_max_size,
-        tx_queue_tx_per_addr_limit ) =
+  let rollup_node_endpoint =
     match mode old_sequencer with
-    | Sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port;
-          tx_queue_max_lifespan;
-          tx_queue_max_size;
-          tx_queue_tx_per_addr_limit;
-          _;
-        } ->
-        ( initial_kernel,
-          preimage_dir,
-          private_rpc_port,
-          tx_queue_max_lifespan,
-          tx_queue_max_size,
-          tx_queue_tx_per_addr_limit )
+    | Sequencer {rollup_node_endpoint; _} -> Some rollup_node_endpoint
     | _ -> invalid_arg "Evm_node is not a sequencer"
   in
   {
@@ -2062,16 +1808,6 @@ let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
         old_sequencer.persistent_state with
         mode =
           Observer
-            {
-              initial_kernel = Some initial_kernel;
-              preimages_dir;
-              private_rpc_port;
-              rollup_node_endpoint =
-                Some old_sequencer.persistent_state.endpoint;
-              tx_queue_max_lifespan;
-              tx_queue_max_size;
-              tx_queue_tx_per_addr_limit;
-            };
-        endpoint = endpoint new_sequencer;
+            {rollup_node_endpoint; evm_node_endpoint = endpoint new_sequencer};
       };
   }

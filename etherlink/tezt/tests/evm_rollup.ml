@@ -437,14 +437,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
-        let mode = Evm_node.Proxy in
+        let mode = Evm_node.Proxy (Sc_rollup_node.endpoint sc_rollup_node) in
         let* evm_node =
-          Evm_node.init
-            ~patch_config
-            ~mode
-            ?restricted_rpcs
-            ?websockets
-            (Sc_rollup_node.endpoint sc_rollup_node)
+          Evm_node.init ~patch_config ~mode ?restricted_rpcs ?websockets ()
         in
         return
           ( (fun () ->
@@ -459,25 +454,25 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           max_blueprints_ahead;
           genesis_timestamp;
         } ->
-        let private_rpc_port = Some (Port.fresh ()) in
+        let private_rpc_port = Port.fresh () in
+        let sequencer_config : Evm_node.sequencer_config =
+          {
+            time_between_blocks;
+            genesis_timestamp;
+            max_number_of_chunks;
+            wallet_dir = Some (Client.base_dir client);
+          }
+        in
         let sequencer_mode =
           Evm_node.Sequencer
             {
-              initial_kernel = output;
-              preimage_dir = Some preimages_dir;
-              private_rpc_port;
-              time_between_blocks;
+              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+              sequencer_config;
               sequencer_keys = [sequencer.alias];
-              genesis_timestamp;
               max_blueprints_lag = None;
               max_blueprints_ahead;
               max_blueprints_catchup = None;
               catchup_cooldown = None;
-              max_number_of_chunks;
-              wallet_dir = Some (Client.base_dir client);
-              tx_queue_max_lifespan;
-              tx_queue_max_size;
-              tx_queue_tx_per_addr_limit;
               dal_slots;
               sequencer_sunset_sec = None;
             }
@@ -488,7 +483,13 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             ~mode:sequencer_mode
             ?restricted_rpcs
             ?websockets
-            (Sc_rollup_node.endpoint sc_rollup_node)
+            ~initial_kernel:output
+            ~preimages_dir
+            ~private_rpc_port
+            ?tx_queue_max_lifespan
+            ?tx_queue_max_size
+            ?tx_queue_tx_per_addr_limit
+            ()
         in
         let produce_block () = Rpc.produce_block sequencer in
         if return_sequencer then return (produce_block, sequencer)
@@ -497,7 +498,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
             Evm_node.create
               ~data_dir:(Evm_node.data_dir sequencer)
               ~mode:(Rpc Evm_node.(mode sequencer))
-              (Evm_node.endpoint sequencer)
+              ()
           in
           let* () = Evm_node.run evm_node in
           return (produce_block, evm_node)
@@ -785,7 +786,9 @@ let test_evm_node_connection =
       ~kind:"wasm_2_0_0"
       ~default_operator:Constant.bootstrap1.alias
   in
-  let evm_node = Evm_node.create (Sc_rollup_node.endpoint sc_rollup_node) in
+  let evm_node =
+    Evm_node.create ~mode:(Proxy (Sc_rollup_node.endpoint sc_rollup_node)) ()
+  in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node in
   (* Tries to start the EVM node server without a listening rollup node. *)
   let* () = Process.check ~expect_failure:true @@ Evm_node.spawn_run evm_node in

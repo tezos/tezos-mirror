@@ -59,75 +59,51 @@ type time_between_blocks =
       (** Interval at which the sequencer creates an empty block by
           default. *)
 
-(** EVM node mode. *)
+(** Configuration shared by Sequencer, Sandbox, and Tezlink_sandbox modes. *)
+type sequencer_config = {
+  time_between_blocks : time_between_blocks option;
+      (** See {!time_between_blocks}, if the value is not
+          provided, the sequencer uses it default value. *)
+  genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
+  max_number_of_chunks : int option;
+  wallet_dir : string option;  (** --wallet-dir: client directory. *)
+}
+
+(** EVM node mode.
+
+    Common configuration fields (initial_kernel, preimages_dir, private_rpc_port,
+    tx_queue settings) are now passed directly to {!create} and stored in
+    persistent state, not in mode variants. *)
 type mode =
   | Observer of {
-      initial_kernel : string option;
-      preimages_dir : string option;
-      private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string option;
-          (*when None add `--dont-track-rollup-node` *)
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
+          (** When None adds `--dont-track-rollup-node` *)
+      evm_node_endpoint : string;
     }
   | Sequencer of {
-      initial_kernel : string;
-          (** Path to the initial kernel used by the sequencer. *)
-      preimage_dir : string option;
-          (** Path to the directory with the associated preimages. *)
-      private_rpc_port : int option;  (** Port for private RPC server*)
-      time_between_blocks : time_between_blocks option;
-          (** See {!time_between_blocks}, if the value is not
-              provided, the sequencer uses it default value. *)
+      rollup_node_endpoint : string;
+      sequencer_config : sequencer_config;
       sequencer_keys : string list;
           (** Secret keys used to sign the blueprints. *)
-      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_queue_max_lifespan : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the queue. *)
-      tx_queue_max_size : int option;
-          (** --tx-pool-max-txs: maximum number of transactions in the queue. *)
-      tx_queue_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum number of transactions per address in the queue. *)
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string option;
+      sequencer_config : sequencer_config;
       network : string option;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
-      initial_kernel : string;
+      sequencer_config : sequencer_config;
       funded_addresses : string list;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      genesis_timestamp : Client.timestamp option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_queue_max_lifespan : int option;
-      tx_queue_max_size : int option;
-      tx_queue_tx_per_addr_limit : int option;
       verbose : bool;
     }
-  | Proxy
+  | Proxy of string
   | Rpc of mode
 
 type history_mode =
@@ -155,7 +131,9 @@ val config_file : t -> string option
 val preimages_dir : t -> string
 
 (** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
-    ?spawn_rpc ?websockets rollup_node_endpoint] creates an EVM node server.
+    ?spawn_rpc ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
+    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+    rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
@@ -167,12 +145,17 @@ val preimages_dir : t -> string
     [rollup_node_endpoint].
 
     [mode] defaults to [Proxy].
+
+    Common stateful mode configuration:
+    - [initial_kernel]: Path to the initial kernel
+    - [preimages_dir]: Path to preimages directory
+    - [private_rpc_port]: Port for private RPC server
+    - [tx_queue_*]: Transaction queue configuration
 *)
 val create :
   ?path:string ->
   ?name:string ->
   ?runner:Runner.t ->
-  ?mode:mode ->
   ?history:history_mode ->
   ?data_dir:string ->
   ?config_file:string ->
@@ -181,7 +164,14 @@ val create :
   ?restricted_rpcs:string ->
   ?spawn_rpc:int ->
   ?websockets:bool ->
-  string ->
+  ?initial_kernel:string ->
+  ?preimages_dir:string ->
+  ?private_rpc_port:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  mode:mode ->
+  unit ->
   t
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
@@ -364,14 +354,16 @@ val patch_config_websockets_if_enabled :
 val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
 (** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?websockets rollup_node_endpoint] creates an EVM node server with {!create},
+    ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
+    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+    rollup_node_endpoint] creates an EVM node server with {!create},
     init the config with {!spawn_init_config}, patch it with [patch_config],
     then runs it with {!run}. *)
 val init :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?name:string ->
   ?runner:Runner.t ->
-  ?mode:mode ->
+  mode:mode ->
   ?end_test_on_failure:bool ->
   ?data_dir:string ->
   ?config_file:string ->
@@ -381,12 +373,21 @@ val init :
   ?history_mode:history_mode ->
   ?spawn_rpc:int ->
   ?websockets:bool ->
+  ?initial_kernel:string ->
+  ?preimages_dir:string ->
+  ?private_rpc_port:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
   ?extra_arguments:string list ->
-  string ->
+  unit ->
   t Lwt.t
 
 (** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
+
+(** Get the private RPC port, if set. *)
+val private_rpc_port : t -> int option
 
 (** Get the spawn_rpc value given on creation. *)
 val spawn_rpc : t -> int option
@@ -731,9 +732,6 @@ val man : ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
 val describe_config :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
-
-(** Returns the [mode] with a fresh private RPC port if one was present. *)
-val mode_with_new_private_rpc : mode -> mode
 
 (** A description of the metrics exported by the node. *)
 val list_metrics : ?hooks:Process_hooks.t -> unit -> unit Lwt.t
