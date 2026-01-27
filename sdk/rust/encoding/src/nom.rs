@@ -169,26 +169,22 @@ pub mod error {
         let mut res = String::new();
         let start = input.offset(error.input);
         let end = start + error.input.len();
-        let _ = write!(res, "Error decoding bytes [{}..{}]", start, end);
+        let _ = write!(res, "Error decoding bytes [{start}..{end}]");
         let _ = match error.kind {
-            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{:?}`", kind),
-            DecodeErrorKind::Utf8(kind, e) => write!(res, " by nom parser `{:?}`: {}", kind, e),
+            DecodeErrorKind::Nom(kind) => write!(res, " by nom parser `{kind:?}`"),
+            DecodeErrorKind::Utf8(kind, e) => write!(res, " by nom parser `{kind:?}`: {e}"),
             DecodeErrorKind::Boundary(kind) => {
-                write!(
-                    res,
-                    " caused by boundary violation of encoding `{:?}`",
-                    kind
-                )
+                write!(res, " caused by boundary violation of encoding `{kind:?}`")
             }
             DecodeErrorKind::Field(name) => {
-                write!(res, " while decoding field `{}`", name)
+                write!(res, " while decoding field `{name}`")
             }
             DecodeErrorKind::Variant(name) => {
-                write!(res, " while decoding variant `{}`", name)
+                write!(res, " while decoding variant `{name}`")
             }
-            DecodeErrorKind::Bits(e) => write!(res, " while performing bits operation: {}", e),
-            DecodeErrorKind::UnknownTag(tag) => write!(res, " caused by unsupported tag `{}`", tag),
-            DecodeErrorKind::InvalidTag(tag) => write!(res, " caused by invalid tag `{}`", tag),
+            DecodeErrorKind::Bits(e) => write!(res, " while performing bits operation: {e}"),
+            DecodeErrorKind::UnknownTag(tag) => write!(res, " caused by unsupported tag `{tag}`"),
+            DecodeErrorKind::InvalidTag(tag) => write!(res, " caused by invalid tag `{tag}`"),
         };
 
         if let Some(other) = error.other {

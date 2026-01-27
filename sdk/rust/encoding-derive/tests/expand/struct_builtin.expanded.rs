@@ -15,8 +15,7 @@ impl tezos_data_encoding::encoding::HasEncoding for StructBuiltins {
         tezos_data_encoding::encoding::Encoding::Obj(
             "StructBuiltins",
             <[_]>::into_vec(
-                #[rustc_box]
-                ::alloc::boxed::Box::new([
+                ::alloc::boxed::box_new([
                     tezos_data_encoding::encoding::Field::new(
                         "a",
                         tezos_data_encoding::encoding::Encoding::Int8,

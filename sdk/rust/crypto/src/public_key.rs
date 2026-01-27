@@ -31,10 +31,10 @@ pub enum PublicKey {
 impl Display for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Ed25519(tz1) => write!(f, "{}", tz1),
-            Self::Secp256k1(tz2) => write!(f, "{}", tz2),
-            Self::P256(tz3) => write!(f, "{}", tz3),
-            Self::Bls(tz4) => write!(f, "{}", tz4),
+            Self::Ed25519(tz1) => write!(f, "{tz1}"),
+            Self::Secp256k1(tz2) => write!(f, "{tz2}"),
+            Self::P256(tz3) => write!(f, "{tz3}"),
+            Self::Bls(tz4) => write!(f, "{tz4}"),
         }
     }
 }
