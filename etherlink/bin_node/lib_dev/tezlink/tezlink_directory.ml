@@ -343,6 +343,12 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.get_storage chain block contract)
+  |> opt_register
+       ~service:Tezos_services.get_storage
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.get_storage chain block contract)
   |> register
        ~service:Tezos_services.manager_key
        ~impl:(fun ({chain; block}, contract) _ _ ->

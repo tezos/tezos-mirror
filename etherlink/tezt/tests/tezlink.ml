@@ -366,10 +366,10 @@ let test_tezlink_balance =
   Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_storage =
+let test_tezlink_storage_via_client =
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
-    ~title:"Test of the storage rpc"
+    ~title:"Test of the storage rpc via client"
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
@@ -597,6 +597,73 @@ let test_tezlink_constants =
     Client.RPC.call ~hooks ~endpoint client
     @@ RPC.get_chain_block_context_constants ()
   in
+  unit
+
+let test_tezlink_storage_rpc =
+  register_tezlink_test
+    ~title:"Test of the /storage rpc"
+    ~tags:["rpc"; "storage"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let foreign_endpoint =
+    {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
+  (* Helper to get storage of a contract. Returns None if 404. *)
+  let storage_rpc contract =
+    let* response =
+      RPC_core.call_raw foreign_endpoint
+      @@ RPC.get_chain_block_context_contract_storage ~id:contract ()
+    in
+    match response.RPC_core.code with
+    | 200 -> Lwt.return_some (JSON.parse ~origin:"storage_rpc" response.body)
+    | 404 -> Lwt.return_none
+    | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
+  in
+  (* 1. Storage of a non-existent KT1 should return 404 *)
+  let fake_kt1 = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
+  let* storage = storage_rpc fake_kt1 in
+  Check.(
+    (storage = None)
+      (option json)
+      ~error_msg:"Expected None for non-existent KT1, got %L") ;
+
+  (* 2. Storage of an implicit account (tz1) should return 404 *)
+  let* storage = storage_rpc Constant.bootstrap1.public_key_hash in
+  Check.(
+    (storage = None)
+      (option json)
+      ~error_msg:"Expected None for implicit account, got %L") ;
+
+  (* 3. Storage of a non-existent tz1 should return 404 *)
+  let fake_tz1 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let* storage = storage_rpc fake_tz1 in
+  Check.(
+    (storage = None)
+      (option json)
+      ~error_msg:"Expected None for non-existent tz1, got %L") ;
+
+  (* 4. Storage of an originated contract should return its storage *)
+  let concat_hello = Tezt_etherlink.Michelson_contracts.concat_hello () in
+  let* contract =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.zero
+      ~alias:"concat_hello"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:concat_hello.initial_storage
+      ~prg:concat_hello.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+
+  let* storage = storage_rpc contract in
+  Check.(
+    (storage = Some (JSON.parse ~origin:"/storage" "[{\"string\":\"initial\"}]"))
+      (option json)
+      ~error_msg:"Expected Some %R for originated contract storage, got %L.") ;
+
   unit
 
 let test_tezlink_chain_id =
@@ -3240,6 +3307,7 @@ let () =
   test_tezlink_version [Alpha] ;
   test_tezlink_header [Alpha] ;
   test_tezlink_constants [Alpha] ;
+  test_tezlink_storage_rpc [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_raw_json_cycle [Alpha] ;
@@ -3250,7 +3318,7 @@ let () =
   test_tezlink_transfer_and_wait [Alpha] ;
   test_tezlink_reveal [Alpha] ;
   test_tezlink_block_info [Alpha] ;
-  test_tezlink_storage [Alpha] ;
+  test_tezlink_storage_via_client [Alpha] ;
   test_tezlink_execution [Alpha] ;
   test_tezlink_bigmap_option [Alpha] ;
   test_tezlink_bigmap_counter [Alpha] ;

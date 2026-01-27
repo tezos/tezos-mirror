@@ -769,6 +769,16 @@ let get_storage_normalized :
   import_service_with_arg
     Imported_protocol_plugin.RPC.Contract.S.get_storage_normalized
 
+let get_storage :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      unit,
+      unit,
+      Alpha_context.Script.expr )
+    Tezos_rpc.Service.t =
+  import_service_with_arg Imported_protocol_plugin.Contract_services.S.storage
+
 let injection_operation :
     ( [`POST],
       unit,
