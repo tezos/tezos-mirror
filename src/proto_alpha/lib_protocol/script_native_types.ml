@@ -45,6 +45,14 @@ module Helpers = struct
   let address_ty =
     {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
 
+  let address_map_ty (type value)
+      ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
+      (address, value) map ty_node tzresult =
+    let open Result_syntax in
+    let* map_t : ((address, value) map, _) ty = map_t loc address_t ty_value in
+    let untyped_map = prim Script.T_map [address_ty.untyped; unty_value] in
+    return {untyped = untyped_map; typed = Ty_ex_c map_t}
+
   let address_big_map_ty (type value)
       ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
       (address, value) big_map ty_node tzresult =
@@ -87,6 +95,12 @@ module Helpers = struct
     let open Result_syntax in
     let* ty_list = Script_typed_ir.list_t loc ty_elt in
     return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
+
+  let option_ty (type t) ({untyped; typed = Ty_ex_c ty; _} : t ty_node) :
+      t option ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.option_t loc ty in
+    {untyped = prim Script.T_option [untyped]; typed = Ty_ex_c typed}
 
   (** Entrypoints combinator *)
 
@@ -193,7 +207,11 @@ module CLST_types = struct
 
   type total_supply = nat
 
-  type storage = ledger * total_supply
+  type operators = (address, nat option) map
+
+  type operators_table = (address, operators) big_map
+
+  type storage = (ledger, total_supply, operators_table) tup3
 
   type entrypoint =
     | Deposit of deposit
@@ -243,10 +261,17 @@ module CLST_types = struct
     in
     return (finalize_entrypoint arg_type)
 
+  let operators_table_ty : operators_table ty_node tzresult =
+    let open Result_syntax in
+    let* allowance_ty = option_ty nat_ty in
+    let* operators_ty = address_map_ty allowance_ty in
+    address_big_map_ty operators_ty
+
   let storage_type : storage ty_node tzresult =
     let open Result_syntax in
     let* ledger_ty = address_big_map_ty nat_ty in
-    pair_ty ledger_ty nat_ty
+    let* operators_table_ty in
+    tup3_ty ledger_ty nat_ty operators_table_ty
 
   type balance_view = (address * nat, nat) view_type
 

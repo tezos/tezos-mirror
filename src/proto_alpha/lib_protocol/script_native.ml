@@ -371,7 +371,7 @@ module CLST_contract = struct
       let open Result_syntax in
       let* name = Script_string.of_string "get_total_supply" in
       let implementation (ctxt, _step_constants) (() : unit)
-          ((_ledger, total_supply) : storage) =
+          ((_ledger, (total_supply, _operators_table)) : storage) =
         let open Lwt_result_syntax in
         return (total_supply, ctxt)
       in

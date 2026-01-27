@@ -11,16 +11,22 @@ open Script_typed_ir
 
 type error += Total_supply_underflow
 
-type t = {ledger : CLST_types.ledger; total_supply : CLST_types.total_supply}
+type t = {
+  ledger : CLST_types.ledger;
+  total_supply : CLST_types.total_supply;
+  operators_table : CLST_types.operators_table;
+}
 
-let from_clst_storage (ledger, total_supply) = {ledger; total_supply}
+let from_clst_storage (ledger, (total_supply, operators_table)) =
+  {ledger; total_supply; operators_table}
 
-let to_clst_storage {ledger; total_supply} = (ledger, total_supply)
+let to_clst_storage {ledger; total_supply; operators_table} =
+  (ledger, (total_supply, operators_table))
 
 (* In case of single assets contracts, the token id of the asset is always 0. *)
 let token_id = Script_int.zero_n
 
-let get_storage ctxt =
+let get_storage ctxt : (t option * context) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* clst_contract_hash = Contract.get_clst_contract_hash ctxt in
   let* ctxt, clst_storage = Contract.get_storage ctxt clst_contract_hash in

@@ -50,7 +50,18 @@ module CLST_types : sig
 
   type total_supply = nat
 
-  type storage = ledger * total_supply
+  type operators = (address, nat option) map
+
+  (** The operators table associates each token owner with a list of
+      accounts that have permission to transfer tokens on their
+      behalf. This permission can either be a finite allowance (`Some
+      allowance`) or an infinite allowance (`None`).
+
+      A finite allowance decreases with each transfer or export of
+      tokens into tickets. Operators cannot increase the allowance. *)
+  type operators_table = (address, operators) big_map
+
+  type storage = (ledger, total_supply, operators_table) tup3
 
   type balance_view = (address * nat, nat) view_type
 
