@@ -3249,7 +3249,7 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
     return (Some parameter_file)
 
 let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
-    ?event_level ?event_sections_levels
+    ?event_level ?event_sections_levels ?media_type
     ?(nodes_args = Node.[Connections 0; Synchronisation_threshold 0])
     ?(keys = Constant.all_secret_keys) ?rpc_external ?dal_node ?remote_signer
     tag () =
@@ -3266,7 +3266,7 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
       let endpoint = Node node in
       let mode =
         match mode with
-        | `Client -> Client (Some endpoint, None)
+        | `Client -> Client (Some endpoint, media_type)
         | `Proxy -> Proxy endpoint
       in
       let client =
@@ -3297,7 +3297,7 @@ let init_with_node ?path ?admin_path ?name ?node_name ?color ?base_dir
       return (node1, client)
 
 let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
-    ?event_level ?event_sections_levels ?nodes_args
+    ?event_level ?event_sections_levels ?media_type ?nodes_args
     ?additional_bootstrap_account_count
     ?additional_revealed_bootstrap_account_count ?default_accounts_balance
     ?parameter_file ?timestamp ?keys ?rpc_external ?dal_node ?remote_signer tag
@@ -3312,6 +3312,7 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
       ?base_dir
       ?event_level
       ?event_sections_levels
+      ?media_type
       ?nodes_args
       ?keys
       ?rpc_external
