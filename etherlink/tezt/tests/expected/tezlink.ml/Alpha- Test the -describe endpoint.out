@@ -167,6 +167,8 @@ Available services:
             Return the list of entrypoints of the contract 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/manager_key
             Access the manager of an implicit contract. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/script
+            Access the code and data of the contract. 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/storage
             Access the data of the contract. 
         - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
