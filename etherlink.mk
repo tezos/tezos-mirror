@@ -121,10 +121,6 @@ sequencer.wasm::
 	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
 	@cp evm_installer.wasm sequencer.wasm
 
-octez-dsn-node:
-	@cd etherlink/bin_dsn_node; cargo build --release $(NATIVE_OPT)
-	@cp etherlink/bin_dsn_node/target/$(NATIVE_TARGET)/release/dsn-node octez-dsn-node
-
 .PHONY: revm
 revm:
 	@$(MAKE) -C ${KERNEL_DIR} build-revm
