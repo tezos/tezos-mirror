@@ -43,6 +43,8 @@ struct
         return info.balance
     | None -> return Tezos_types.Tez.zero
 
+  let list_contracts _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
+
   let bootstrap_accounts () = failwith "Not Implemented Yet (%s)" __LOC__
 
   let get_storage _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__

@@ -341,6 +341,10 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.balance chain block contract)
+  |> register ~service:Tezos_services.list ~impl:(fun {chain; block} _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.list_contracts chain block)
   |> register
        ~service:Tezos_services.get_storage_normalized
          (* TODO: #7995

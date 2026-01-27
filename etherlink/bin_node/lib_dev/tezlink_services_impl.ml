@@ -103,6 +103,19 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     Tezlink_durable_storage.balance (read ~block) c
 
+  let list_contracts chain block =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let+ contracts_keys =
+      subkeys ~block Tezlink_durable_storage.Path.accounts_index
+    in
+    List.filter_map
+      (fun k ->
+        let open Option_syntax in
+        let* bytes = Hex.to_string (`Hex k) in
+        Data_encoding.Binary.of_string_opt Tezos_types.Contract.encoding bytes)
+      contracts_keys
+
   let bootstrap_accounts () =
     let open Lwt_result_syntax in
     (* We call bootstrap accounts those that were present in durable storage
