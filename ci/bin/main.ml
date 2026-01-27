@@ -320,7 +320,7 @@ let () =
       not_on_tezos_namespace && push
       && Rules.has_tag_match octez_packaging_revision_tag_re)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
-    ~jobs:Release_tag.octez_packaging_revision_jobs
+    ~jobs:(Release_tag.octez_packaging_revision_jobs ~test:true ())
     ~description:
       "Dry run pipeline for 'octez_packaging_revision_tag'.\n\n\
        This pipeline checks that 'octez_packaging_revision_tag' pipelines work \
