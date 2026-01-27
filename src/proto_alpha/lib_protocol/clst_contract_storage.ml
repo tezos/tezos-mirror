@@ -9,6 +9,12 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+type t = {ledger : CLST_types.ledger; total_supply : CLST_types.total_supply}
+
+let from_clst_storage (ledger, total_supply) = {ledger; total_supply}
+
+let to_clst_storage {ledger; total_supply} = (ledger, total_supply)
+
 (* In case of single assets contracts, the token id of the asset is always 0. *)
 let token_id = Script_int.zero_n
 
@@ -17,7 +23,7 @@ let get_storage ctxt =
   let* clst_contract_hash = Contract.get_clst_contract_hash ctxt in
   let* ctxt, clst_storage = Contract.get_storage ctxt clst_contract_hash in
   let identity : Alpha_context.t -> CLST_types.storage -> 'a =
-   fun ctxt storage -> return (Some storage, ctxt)
+   fun ctxt storage -> return (Some (from_clst_storage storage), ctxt)
   in
   match clst_storage with
   | Some clst_storage ->
@@ -41,7 +47,7 @@ let get_storage ctxt =
       identity ctxt storage
   | None -> return (None, ctxt)
 
-let get_balance_from_storage ctxt (ledger, _total_supply) contract =
+let get_balance_from_storage ctxt {ledger; _} contract =
   let open Lwt_result_syntax in
   let* balance, ctxt = Script_big_map.get ctxt contract ledger in
   return (Option.value balance ~default:Script_int.zero_n, ctxt)
@@ -60,19 +66,19 @@ let get_balance ctxt contract =
   | Some storage -> get_balance_from_storage ctxt storage contract
   | None -> return (Script_int.zero_n, ctxt)
 
-let set_balance_from_storage ctxt (ledger, total_supply) contract amount =
+let set_balance_from_storage ctxt storage contract amount =
   let open Lwt_result_syntax in
   let* ledger, ctxt =
-    Script_big_map.update ctxt contract (Some amount) ledger
+    Script_big_map.update ctxt contract (Some amount) storage.ledger
   in
-  return ((ledger, total_supply), ctxt)
+  return ({storage with ledger}, ctxt)
 
 let get_total_supply ctxt =
   let open Lwt_result_syntax in
   let* storage_opt, ctxt = get_storage ctxt in
   let total_supply =
     match storage_opt with
-    | Some (_ledger, total_supply) -> total_supply
+    | Some {total_supply; _} -> total_supply
     | None -> Script_int.zero_n
   in
   return (total_supply, ctxt)
