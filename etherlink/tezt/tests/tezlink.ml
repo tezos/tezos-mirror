@@ -1209,6 +1209,20 @@ let test_tezlink_script_rpc =
 
   unit
 
+let test_contract_counter =
+  let contract = Michelson_contracts.concat_hello () in
+  register_tezlink_test
+    ~title:"Test that smart contracts don't have any counter"
+    ~tags:["rpc"; "counter"]
+    ~bootstrap_contracts:[contract]
+  @@ fun {sequencer; _} _protocol ->
+  let* valid_res = account_str_rpc sequencer contract.address "" in
+  Check.(
+    JSON.(valid_res |-> "counter" |> as_int_opt = None)
+      (option int)
+      ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_raw_json_cycle =
   register_tezlink_test
     ~title:"Test Tezlink raw json cycle rpc"
@@ -3882,6 +3896,7 @@ let () =
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_script_rpc [Alpha] ;
+  test_contract_counter [Alpha] ;
   test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
