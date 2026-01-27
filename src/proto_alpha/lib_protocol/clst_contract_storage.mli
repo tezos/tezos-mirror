@@ -16,7 +16,9 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
-type t = {ledger : CLST_types.ledger; total_supply : CLST_types.total_supply}
+(** Type of the storage of the CLST contract. 
+    It contains the ledger and the total number of CLST tokens. *)
+type t
 
 (** [from_clst_storage s] creates a high-level storage representation from
     the contract internal storage representation. *)
@@ -55,6 +57,12 @@ val set_balance_from_storage :
 (** [get_total_supply context] returns the total supply of CLST tokens
     in the CLST contract. *)
 val get_total_supply : context -> (CLST_types.nat * context) tzresult Lwt.t
+
+(** [increment_total_supply storage amount] increments the total supply by [amount]. *)
+val increment_total_supply : t -> CLST_types.nat -> t
+
+(** [decrement_total_supply storage amount] decrements the total supply by [amount]. *)
+val decrement_total_supply : t -> CLST_types.nat -> t tzresult
 
 (** [deposit_to_clst_deposits context ~clst_contract_hash amount] deposits
     [amount] tez from [clst_contract_hash] balance to the CLST deposits

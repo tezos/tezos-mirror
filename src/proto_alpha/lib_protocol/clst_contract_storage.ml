@@ -9,6 +9,8 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+type error += Total_supply_underflow
+
 type t = {ledger : CLST_types.ledger; total_supply : CLST_types.total_supply}
 
 let from_clst_storage (ledger, total_supply) = {ledger; total_supply}
@@ -82,6 +84,19 @@ let get_total_supply ctxt =
     | None -> Script_int.zero_n
   in
   return (total_supply, ctxt)
+
+let increment_total_supply storage added_amount =
+  {
+    storage with
+    total_supply = Script_int.add_n storage.total_supply added_amount;
+  }
+
+let decrement_total_supply storage removed_amount =
+  match
+    Script_int.sub storage.total_supply removed_amount |> Script_int.is_nat
+  with
+  | None -> error Total_supply_underflow
+  | Some total_supply -> ok {storage with total_supply}
 
 let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
   let clst_contract = Contract.Originated clst_contract_hash in

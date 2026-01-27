@@ -68,15 +68,16 @@ module CLST_contract = struct
         address
         new_amount
     in
-    let total_supply = Script_int.add_n new_storage.total_supply added_amount in
+    let new_storage =
+      Clst_contract_storage.increment_total_supply new_storage added_amount
+    in
     let* ctxt, balance_updates =
       Clst_contract_storage.deposit_to_clst_deposits
         ctxt
         ~clst_contract_hash:step_constants.self
         step_constants.amount
     in
-    return
-      (Script_list.empty, {new_storage with total_supply}, balance_updates, ctxt)
+    return (Script_list.empty, new_storage, balance_updates, ctxt)
 
   let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
       (amount : withdraw) (storage : Clst_contract_storage.t) :
@@ -145,14 +146,10 @@ module CLST_contract = struct
         ()
     in
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
-    let total_supply =
-      Script_int.(abs (sub storage.total_supply removed_amount))
+    let*? new_storage =
+      Clst_contract_storage.decrement_total_supply new_storage removed_amount
     in
-    return
-      ( Script_list.of_list [op],
-        {new_storage with total_supply},
-        balance_updates,
-        ctxt )
+    return (Script_list.of_list [op], new_storage, balance_updates, ctxt)
 
   let check_token_id token_id =
     error_unless
