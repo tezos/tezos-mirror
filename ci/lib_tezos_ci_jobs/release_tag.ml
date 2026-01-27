@@ -366,5 +366,35 @@ let octez_packaging_revision_jobs ?(test = false) () =
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
   in
-  ignore test ;
-  job_datadog_pipeline_trace :: jobs_debian_repository
+  let job_docker_amd64 =
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+      ~__POS__
+      ~arch:Amd64
+      (if test then Test else Release)
+  in
+  let job_docker_arm64 =
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      (if test then Test else Release)
+  in
+  let job_docker_merge =
+    job_docker_merge_manifests
+      ~__POS__
+      ~ci_docker_hub:(not test)
+      ~job_docker_amd64
+      ~job_docker_arm64
+  in
+  [
+    (* Stage: start *)
+    job_datadog_pipeline_trace;
+    job_docker_amd64;
+    job_docker_arm64;
+    job_docker_merge;
+  ]
+  @ jobs_debian_repository
