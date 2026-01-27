@@ -251,7 +251,14 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
         (Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue)
       ()
   in
-  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
+  let* () = Evm_node.wait_for_blueprint_applied observer 0
+  and* () =
+    (* Before !20262, the Tezlink observer did not survive the launch
+       of the drift monitor. The only purpose of waiting for the
+       drift_monitor_ready event here is to prevent regressions on
+       this. *)
+    Evm_node.wait_for_drift_monitor_ready observer
+  in
   return observer
 
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length

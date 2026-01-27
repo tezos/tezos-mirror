@@ -465,6 +465,18 @@ dream_websocket:
     { /* dream_websocket version 0 */
       "dream_websocket.v0": any }
   
+drift_monitor_is_ready:
+  description: the drift monitor is ready, initial drift is {drift}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* drift_monitor_is_ready version 0 */
+      "drift_monitor_is_ready.v0": $bignum }
+    $bignum:
+      /* Big number
+         Decimal representation of a big number */
+      string
+  
 evm_context_gc_finished:
   description: garbage collection finished for level {gc_level} at head level {head_level} (took {duration})
   level: info

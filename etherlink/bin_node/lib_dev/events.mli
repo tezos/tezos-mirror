@@ -104,6 +104,11 @@ val private_server_is_ready :
   backend:Configuration.rpc_server ->
   unit Lwt.t
 
+(** [drift_monitor_is_ready drift] advertises that the drift monitor
+    is ready and provides the initial drift (difference of block
+    number between the current node and its upstream node). *)
+val drift_monitor_is_ready : Z.t -> unit Lwt.t
+
 val rpc_server_error : exn -> unit
 
 val background_task_error : name:string -> exn -> unit Lwt.t

@@ -196,6 +196,15 @@ let event_private_server_is_ready =
     ~pp4:(fun fmt b ->
       (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
 
+let drift_monitor_is_ready =
+  declare_1
+    ~section
+    ~name:"drift_monitor_is_ready"
+    ~msg:"the drift monitor is ready, initial drift is {drift}"
+    ~level:Notice
+    ("drift", Data_encoding.z)
+    ~pp1:Z.pp_print
+
 let event_rpc_server_error =
   declare_1
     ~section
@@ -627,6 +636,8 @@ let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 
 let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_private_server_is_ready (rpc_addr, rpc_port, backend, websockets)
+
+let drift_monitor_is_ready drift = emit drift_monitor_is_ready drift
 
 let rpc_server_error exn =
   emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)
