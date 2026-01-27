@@ -105,17 +105,59 @@ module Tezos_block = struct
 
   let () = Data_encoding.Registration.register block_encoding
 
-  (* This function may be replaced in the future by an already existing function *)
-  (* When Tezos block will be complete *)
-  let block_from_binary bytes =
-    Data_encoding.Binary.of_bytes_exn block_encoding bytes
+  let version_from_bytes bytes =
+    match Rlp.decode_int bytes with
+    | Ok version -> version
+    | Error _ ->
+        (* TODO: Instead of raising an exception, return the Result *)
+        raise (Invalid_argument "Unexpected version read for a L2 Tezos block")
 
-  let encode_block (block : t) : (string, string) result =
-    Ok (Data_encoding.Binary.to_string_exn block_encoding block)
+  let block_from_v0 block_rlp =
+    let open Rlp in
+    match block_rlp with
+    | [
+     Value hash;
+     Value level;
+     Value previous_hash;
+     Value timestamp;
+     Value operations;
+    ] ->
+        let level = Bytes.get_int32_le level 0 in
+        let hash = decode_block_hash hash in
+        let parent_hash = decode_block_hash previous_hash in
+        let timestamp =
+          Time.Protocol.of_seconds @@ Bytes.get_int64_le timestamp 0
+        in
+        {hash; level; timestamp; parent_hash; operations}
+    | _ -> raise (Invalid_argument "Expected a List of 5 elements")
 
-  let decode_block (b : string) : (t, string) result =
-    let b = Bytes.of_string b in
-    try Ok (block_from_binary b) with e -> Error (Printexc.to_string e)
+  (* For now legacy encoding is the same as block encoding but this might
+      change in the future, for example when we'll add protocol fields*)
+  let legacy_encoding = block_encoding
+
+  let block_from_kernel bytes =
+    match Rlp.decode bytes with
+    | Ok (Rlp.List (Value version :: block_rlp)) ->
+        let version = version_from_bytes version in
+        if version = 0 then block_from_v0 block_rlp
+        else raise (Invalid_argument "Expected a valid version")
+    | _ ->
+        (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
+        Data_encoding.Binary.of_bytes_exn legacy_encoding bytes
+
+  let encode_block_for_store (block : t) : (string, string) result =
+    Result.map_error
+      (Format.asprintf
+         "Not a valid block: %a"
+         Data_encoding.Binary.pp_write_error)
+      (Data_encoding.Binary.to_string block_encoding block)
+
+  let decode_block_for_store (block : string) : (t, string) result =
+    Result.map_error
+      (Format.asprintf
+         "Not a valid block: %a"
+         Data_encoding.Binary.pp_read_error)
+      (Data_encoding.Binary.of_string block_encoding block)
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
@@ -158,5 +200,5 @@ let block_from_bytes (type f) ~(chain_family : f chain_family) bytes =
       let eth_block = Ethereum_types.block_from_rlp bytes in
       Eth eth_block
   | Michelson ->
-      let tez_block = Tezos_block.block_from_binary bytes in
+      let tez_block = Tezos_block.block_from_kernel bytes in
       Tez tez_block

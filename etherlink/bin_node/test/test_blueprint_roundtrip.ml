@@ -94,7 +94,7 @@ let make_tez_block ~level ~timestamp ~parent_hash () =
   let block_bytes =
     Bytes.of_string
     @@ expect_ok "could not encode the tez block"
-    @@ L2_types.Tezos_block.encode_block block_without_hash
+    @@ L2_types.Tezos_block.encode_block_for_store block_without_hash
   in
   let block_hash = Block_hash.hash_bytes [block_bytes] in
   let hash =
@@ -134,11 +134,11 @@ let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
   let* block = make_tez_block ~level ~timestamp ~parent_hash () in
   let encoding_result =
     expect_ok "could not encode the tez block"
-    @@ L2_types.Tezos_block.encode_block block
+    @@ L2_types.Tezos_block.encode_block_for_store block
   in
   let decoding_result =
     expect_ok "could not decode the tez block"
-    @@ L2_types.Tezos_block.decode_block encoding_result
+    @@ L2_types.Tezos_block.decode_block_for_store encoding_result
   in
   Check.(
     (decoding_result.level = block.level)

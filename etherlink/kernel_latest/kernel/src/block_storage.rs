@@ -70,7 +70,7 @@ pub fn store_current<Host: Runtime>(
     store_current_number(host, root, block.number())?;
     write_h256_be(host, &path::current_hash(root)?, block.hash())?;
     update_block_indexes(host, root, block)?;
-    host.store_write_all(&path::current_block(root)?, &block.to_bytes()?)?;
+    host.store_write_all(&path::current_block(root)?, &block.to_bytes())?;
     log!(
         host,
         Info,

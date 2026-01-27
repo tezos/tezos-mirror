@@ -291,8 +291,8 @@ module Q = struct
 
   let tezos_block =
     custom
-      ~encode:L2_types.Tezos_block.encode_block
-      ~decode:L2_types.Tezos_block.decode_block
+      ~encode:L2_types.Tezos_block.encode_block_for_store
+      ~decode:L2_types.Tezos_block.decode_block_for_store
       string
 
   let timestamp =

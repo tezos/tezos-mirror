@@ -137,7 +137,7 @@ let nth_block read n =
         Durable_storage.inspect_durable_and_decode_opt
           read
           (Durable_storage_path.Block.by_hash ~root block_hash)
-          L2_types.Tezos_block.block_from_binary
+          L2_types.Tezos_block.block_from_kernel
       in
       match block_opt with
       | None ->

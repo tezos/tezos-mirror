@@ -1,5 +1,4 @@
 use primitive_types::{H256, U256};
-use tezos_data_encoding::enc::{BinError, BinWriter};
 use tezos_ethereum::{block::EthBlock, rlp_helpers::VersionedEncoding};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::block::TezBlock;
@@ -34,7 +33,7 @@ impl L2Block {
     pub fn number_of_transactions(&self) -> usize {
         match &self {
             Self::Etherlink(block) => block.transactions.len(),
-            Self::Tezlink(block) => block.operations.len(),
+            Self::Tezlink(block) => block.operations.list.len(),
         }
     }
 
@@ -59,10 +58,10 @@ impl L2Block {
         }
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Self::Etherlink(block) => Ok(block.to_bytes()),
-            Self::Tezlink(block) => Ok(block.to_bytes()?),
+            Self::Etherlink(block) => block.to_bytes(),
+            Self::Tezlink(block) => block.to_bytes(),
         }
     }
 }
