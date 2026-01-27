@@ -149,6 +149,14 @@ end
    - Data: for each non-empty lag (in order), [number_of_slots] bits representing
      which slots are attested for that lag *)
 module Attestations = struct
+  (* Encode using the before 025 simple bitset format. *)
+  let encode_single_lag_before_025 dal_attestation =
+    let aux (acc, n) b =
+      let bit = if b then 1 else 0 in
+      (acc lor (bit lsl n), n + 1)
+    in
+    Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
+
   (* Encode using the multi-lag format (Dal_attestations_repr.t encoding).
      For a single bool array, we encode it as lag_index 0 attestations.
 
@@ -185,11 +193,7 @@ module Attestations = struct
 
   let encode protocol dal_attestation =
     if Protocol.number protocol < 025 then
-      let aux (acc, n) b =
-        let bit = if b then 1 else 0 in
-        (acc lor (bit lsl n), n + 1)
-      in
-      Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
+      encode_single_lag_before_025 dal_attestation
     else encode_single_lag_after_025 dal_attestation
 
   let rec decode protocol str =
