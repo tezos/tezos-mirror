@@ -823,6 +823,92 @@ let test_dal_attestation_threshold () =
   in
   return_unit
 
+(** This test would catch a former a bug where a slot that becomes
+    protocol-attested would be added to the skip list again when the attestation
+    window closes.
+
+    Scenario:
+    1. Publish a slot at level L
+    2. Have enough bakers attest at L+lag to make it protocol-attested
+       - Slot is added to skip list with is_proto_attested = true
+    3. Continue baking until L + attestation_lag (attestation window closes)
+       - code was trying to process ALL published slots
+*)
+let test_dal_attestations_skip_list_insertion_scenario () =
+  let open Lwt_result_wrap_syntax in
+  let attestation_lags = [2; 3] in
+  let attestation_lag = 3 in
+  let dal =
+    let base =
+      Tezos_protocol_alpha_parameters.Default_parameters.constants_test.dal
+    in
+    {base with attestation_lags; attestation_lag}
+  in
+  let* genesis, contracts =
+    Context.init_n ~dal_enable:true ~dal ~consensus_threshold_size:0 5 ()
+  in
+  let contract = Stdlib.List.hd contracts in
+  let* {parametric = {dal = dal_params; _}; _} =
+    Context.get_constants (B genesis)
+  in
+  let number_of_slots = dal_params.number_of_slots in
+  let number_of_lags = List.length dal_params.attestation_lags in
+
+  (* Bake a block so that attestations are not "emptied" as considered just
+     after migration. *)
+  let* b = Block.bake_n 1 genesis in
+
+  (* Publish a slot *)
+  let slot_index = Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+  in
+  let* op = Op.dal_publish_commitment (B b) contract slot_header in
+  let* b_published = Block.bake b ~operation:op in
+  let published_level = b_published.header.shell.level in
+  Log.info "Published slot at level %ld" published_level ;
+
+  let* b = Block.bake b_published in
+
+  let attestations =
+    Dal.Attestations.commit
+      Dal.Attestations.empty
+      ~number_of_slots
+      ~number_of_lags
+      ~lag_index:0
+      slot_index
+  in
+  let dal_content = {attestations} in
+  let* ops =
+    List.map_es
+      (fun attester -> Op.attestation ~manager_pkh:attester ~dal_content b)
+      (List.map Context.Contract.pkh contracts)
+  in
+  let* b, (metadata, _ops_results) =
+    Block.bake_with_metadata b ~operations:ops
+  in
+  let is_attested =
+    Dal.Slot_availability.is_attested
+      metadata.dal_slot_availability
+      ~number_of_slots
+      ~number_of_lags
+      ~lag_index:0
+      slot_index
+  in
+  let* () =
+    if not is_attested then
+      failwith "Expected slot to be attested at lag_index=0"
+    else return_unit
+  in
+  (* Now bake one more block so that the attestation window closes for the
+     published slot. *)
+  let* _b, (metadata, _ops_results) = Block.bake_with_metadata b in
+  let is_empty = Dal.Slot_availability.empty = metadata.dal_slot_availability in
+  Check.is_true ~__LOC__ is_empty ~error_msg:"Expected no slot to be attested" ;
+  return_unit
+
 (* The BLS mode encoding differs from the regular attestation encoding
    in that slots are omitted. This test verifies that an attestation's signature
    check remains valid even after replacing its slot with a different one. *)
@@ -1028,6 +1114,10 @@ let tests =
       "DAL attestation_threshold"
       `Quick
       test_dal_attestation_threshold;
+    Tztest.tztest
+      "DAL attestations - skip-list insertion scenario"
+      `Quick
+      test_dal_attestations_skip_list_insertion_scenario;
     (* slots are not part of the signed payload *)
     Tztest.tztest
       "slot substitution do not affect signature check"
