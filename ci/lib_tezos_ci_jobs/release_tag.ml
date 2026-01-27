@@ -452,8 +452,9 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_promote_to_latest ~ci_docker_hub:(not test) ();
   ]
 
-let octez_packaging_revision_jobs =
+let octez_packaging_revision_jobs ?(test = false) () =
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
   in
+  ignore test ;
   job_datadog_pipeline_trace :: jobs_debian_repository
