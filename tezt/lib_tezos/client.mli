@@ -2629,6 +2629,7 @@ val init_with_node :
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?media_type:media_type ->
   ?nodes_args:Node.argument list ->
   ?keys:Account.key list ->
   ?rpc_external:bool ->
@@ -2661,6 +2662,7 @@ val init_with_protocol :
   ?base_dir:string ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?media_type:media_type ->
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
   ?additional_revealed_bootstrap_account_count:int ->

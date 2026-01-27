@@ -52,10 +52,12 @@ module Helpers = struct
     Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
-  let supported_signature_schemes (_ : Protocol.t) =
-    ["ed25519"; "secp256k1"; "p256"; "bls"]
+  let supported_signature_schemes (protocol : Protocol.t) =
+    match protocol with
+    | Alpha -> ["ed25519"; "secp256k1"; "p256"; "bls"; "mldsa44"]
+    | T024 | S023 -> ["ed25519"; "secp256k1"; "p256"; "bls"]
 
-  let airdrop_and_reveal client accounts =
+  let airdrop_and_reveal ?(without_checks = false) client accounts =
     Log.info "Airdrop 1000tz to each account" ;
     let batches =
       Ezjsonm.list
@@ -75,18 +77,25 @@ module Helpers = struct
         client
     in
     let* () = Client.bake_for_and_wait client in
-    let* balances =
-      Lwt_list.map_p
-        (fun account ->
-          let* balance = get_balance account.Account.public_key_hash client in
-          return (account.alias, balance))
-        accounts
+    let* () =
+      if without_checks then unit
+      else
+        let* balances =
+          Lwt_list.map_p
+            (fun account ->
+              let* balance =
+                get_balance account.Account.public_key_hash client
+              in
+              return (account.alias, balance))
+            accounts
+        in
+        List.iter
+          (fun (alias, balance) ->
+            Check.((Tez.to_string balance = "1000") string)
+              ~error_msg:(sf "%s has balance %%L instead of %%R" alias))
+          balances ;
+        unit
     in
-    List.iter
-      (fun (alias, balance) ->
-        Check.((Tez.to_string balance = "1000") string)
-          ~error_msg:(sf "%s has balance %%L instead of %%R" alias))
-      balances ;
     Log.info "Revealing public keys" ;
     let* () =
       Lwt_list.iter_p
@@ -1169,10 +1178,59 @@ module Gen_keys = struct
     test_gen_keys_testnet protocols
 end
 
+module Media_type = struct
+  open Helpers
+
+  let test_media_type (media_type : Client.media_type) =
+    Protocol.register_test
+      ~__FILE__
+      ~title:
+        (sf
+           "Test media type: %s"
+           (match media_type with
+           | Json -> "Json"
+           | Binary -> "Binary"
+           | Any -> "Any"))
+      ~tags:["client"; "media"; "type"]
+    @@ fun protocol ->
+    let* _node, client =
+      Client.init_with_protocol ~media_type `Client ~protocol ()
+    in
+    Log.info "Generating new accounts" ;
+    let* accounts = gen_accounts protocol client 1 in
+    Log.info "Funding and revealing new accounts" ;
+    let* () =
+      airdrop_and_reveal
+        ~without_checks:true
+        (* To avoid issue with balance RPC results in binary *) client
+        accounts
+    in
+    let test_transfer (from : Account.key) (dest : Account.key) =
+      Log.info "Test transfer from %s to %s" from.alias dest.alias ;
+      let amount = Tez.of_int 1 in
+      let fee = Tez.of_int 1 in
+      Client.transfer
+        ~amount
+        ~giver:from.public_key_hash
+        ~receiver:dest.public_key_hash
+        ~fee
+        client
+    in
+    Lwt_list.iter_s
+      (fun account -> test_transfer account Constant.bootstrap1)
+      accounts
+
+  let register protocols =
+    List.iter
+      (fun media_type -> test_media_type media_type protocols)
+      [Client.Json; Binary; Any]
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols ;
   Signatures.register protocols ;
   Account_activation.register protocols ;
-  Gen_keys.register protocols
+  Gen_keys.register protocols ;
+  Media_type.register protocols

@@ -619,6 +619,8 @@ let to_bytes = function
 let of_bytes_opt s =
   let len = Bytes.length s in
   if len = Bls.size then Option.map (fun b -> Bls b) (Bls.of_bytes_opt s)
+  else if len = Mldsa44.size then
+    Option.map (fun b -> Mldsa44 b) (Mldsa44.of_bytes_opt s)
   else if len = Ed25519.size then Some (Unknown s)
   else None
 
