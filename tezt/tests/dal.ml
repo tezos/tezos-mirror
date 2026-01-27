@@ -887,7 +887,7 @@ type attestation_availability =
   | No_dal_attestation
 
 let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
-    ~signer ~number_of_slots availability client dal_parameters =
+    ~signer availability client dal_parameters =
   let dal_attestation =
     match availability with
     | Bitset bitset ->
@@ -898,6 +898,7 @@ let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
              dal_parameters
              bitset)
     | Slots availability ->
+        let number_of_slots = dal_parameters.number_of_slots in
         let dal_attestation = Array.make number_of_slots false in
         List.iter (fun i -> dal_attestation.(i) <- true) availability ;
         Some
@@ -950,7 +951,7 @@ let craft_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       some op
 
 let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
-    ~signer ~number_of_slots availability client dal_parameters =
+    ~signer availability client dal_parameters =
   let* res =
     craft_dal_attestation
       ~protocol
@@ -959,7 +960,6 @@ let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
       ?payload_level
       ?lag_index
       ~signer
-      ~number_of_slots
       availability
       client
       dal_parameters
@@ -973,8 +973,7 @@ let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
   | Some v -> return v
 
 let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
-    ?force ?error ?request ~signer ~number_of_slots availability client
-    dal_parameters =
+    ?force ?error ?request ~signer availability client dal_parameters =
   let* op_opt =
     craft_dal_attestation
       ~protocol
@@ -983,7 +982,6 @@ let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       ?payload_level
       ?lag_index
       ~signer
-      ~number_of_slots
       availability
       client
       dal_parameters
@@ -995,8 +993,7 @@ let inject_dal_attestation ~protocol ?level ?round ?payload_level ?lag_index
       some (op, oph)
 
 let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
-    ?force ?error ?request ~signer ~number_of_slots availability client
-    dal_parameters =
+    ?force ?error ?request ~signer availability client dal_parameters =
   let* res =
     inject_dal_attestation
       ~protocol
@@ -1008,7 +1005,6 @@ let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
       ?error
       ?request
       ~signer
-      ~number_of_slots
       availability
       client
       dal_parameters
@@ -1023,7 +1019,7 @@ let inject_dal_attestation_exn ~protocol ?level ?round ?payload_level ?lag_index
 
 let inject_dal_attestations ~protocol ?payload_level ?level ?round ?lag_index
     ?force ?request ?(signers = Array.to_list Account.Bootstrap.keys)
-    ~number_of_slots availability client dal_parameters =
+    availability client dal_parameters =
   Lwt_list.filter_map_s
     (fun signer ->
       inject_dal_attestation
@@ -1035,14 +1031,13 @@ let inject_dal_attestations ~protocol ?payload_level ?level ?round ?lag_index
         ?force
         ?request
         ~signer
-        ~number_of_slots
         availability
         client
         dal_parameters)
     signers
 
-let inject_dal_attestations_and_bake ~protocol ?lag_index node client
-    ~number_of_slots indexes dal_parameters =
+let inject_dal_attestations_and_bake ~protocol ?lag_index node client indexes
+    dal_parameters =
   let* baker =
     let* level = Node.get_level node in
     baker_for_round_zero node ~level:(level + 1)
@@ -1053,7 +1048,6 @@ let inject_dal_attestations_and_bake ~protocol ?lag_index node client
       ~protocol
       ?lag_index
       ~signers
-      ~number_of_slots
       indexes
       client
       dal_parameters
@@ -1451,13 +1445,11 @@ let test_slot_management_logic protocol parameters cryptobox node client
   check_manager_operation_status operations_result proof_error oph6 ;
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
   let attestation_lag = parameters.attestation_lag in
   let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
   let* _ =
     inject_dal_attestations
       ~protocol
-      ~number_of_slots
       ~signers:[Constant.bootstrap1; Constant.bootstrap2]
       (Slots [1; 0])
       client
@@ -1466,7 +1458,6 @@ let test_slot_management_logic protocol parameters cryptobox node client
   let* _ =
     inject_dal_attestations
       ~protocol
-      ~number_of_slots
       ~signers:[Constant.bootstrap3; Constant.bootstrap4; Constant.bootstrap5]
       (Slots [1])
       client
@@ -1505,8 +1496,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
 let test_slots_attestation_operation_behavior protocol parameters _cryptobox
     node client _bootstrap_key =
   (* Some helpers *)
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let attestation_lag = parameters.attestation_lag in
+  let attestation_lag = parameters.Dal.Parameters.attestation_lag in
   assert (attestation_lag > 1) ;
   let attest ?payload_level ?(signer = Constant.bootstrap2) ~level () =
     let* _op, op_hash =
@@ -1514,7 +1504,6 @@ let test_slots_attestation_operation_behavior protocol parameters _cryptobox
         ~protocol
         ?payload_level
         ~force:true
-        ~number_of_slots
         ~level
         ~signer
         (Slots [0])
@@ -1697,15 +1686,13 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
   let client = Client.with_dal_node client ~dal_node in
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let number_of_shards = parameters.cryptobox.number_of_shards in
+  let number_of_shards = parameters.Dal.Parameters.cryptobox.number_of_shards in
   Log.info "number_of_shards = %d" number_of_shards ;
   let* () = bake_for client in
   let* level = Client.level client in
   let* _op, `OpHash _oph =
     inject_dal_attestation_exn
       ~protocol
-      ~number_of_slots
       ~level
       ~signer:Constant.bootstrap1
       (Slots [])
@@ -1786,7 +1773,6 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           ~protocol
           ~error:
             (Operation.dal_data_availibility_attester_not_in_committee protocol)
-          ~number_of_slots
           ~level
           ~signer:new_account
           attested_slots
@@ -1942,8 +1928,7 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 12_000) node client
   return (published_level, commitment, res)
 
 let publish_store_and_attest_slot ~protocol ?counter ?force ?fee client node
-    dal_node source ~index ~content ~attestation_lag ~number_of_slots
-    dal_parameters =
+    dal_node source ~index ~content dal_parameters =
   let* _commitment =
     Helpers.publish_and_store_slot
       ?counter
@@ -1955,12 +1940,14 @@ let publish_store_and_attest_slot ~protocol ?counter ?force ?fee client node
       ~index
       content
   in
-  let* () = repeat attestation_lag (fun () -> bake_for client) in
+  let* () =
+    repeat dal_parameters.Dal.Parameters.attestation_lag (fun () ->
+        bake_for client)
+  in
   inject_dal_attestations_and_bake
     ~protocol
     node
     client
-    ~number_of_slots
     (Slots [index])
     dal_parameters
 
@@ -2144,7 +2131,6 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
     "Attest slots slot0 and slot2_b, and wait for the attestations to be final" ;
   let attested = [slot0; slot2_b] in
   let unattested = [slot1] in
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
   let* () = bake_for ~count:(lag - 3) client in
   let wait_block_processing3 =
     let attested_level = pub_level + lag in
@@ -2155,7 +2141,6 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
       ~protocol
       node
       client
-      ~number_of_slots
       (Slots (List.map fst attested))
       parameters
   in
@@ -2865,8 +2850,6 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
       Constant.bootstrap1
       ~index:0
       ~content:(Helpers.make_slot ~slot_size slot_content)
-      ~attestation_lag:parameters.attestation_lag
-      ~number_of_slots:parameters.number_of_slots
       parameters
   in
   let* level = Node.get_level node in
@@ -4852,7 +4835,6 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
         inject_dal_attestation_exn
           ~protocol:migrate_from
           ~signer:delegate
-          ~number_of_slots:dal_parameters.number_of_slots
           availability
           client
           dal_parameters
@@ -7857,8 +7839,6 @@ module Tx_kernel_e2e = struct
           (Helpers.make_slot
              ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
              payload1)
-        ~attestation_lag:parameters.attestation_lag
-        ~number_of_slots:parameters.number_of_slots
         parameters
     in
     Log.info
@@ -7876,8 +7856,6 @@ module Tx_kernel_e2e = struct
           (Helpers.make_slot
              ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
              payload2)
-        ~attestation_lag:parameters.attestation_lag
-        ~number_of_slots:parameters.number_of_slots
         parameters
     in
     (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
@@ -7953,8 +7931,6 @@ module Tx_kernel_e2e = struct
           (Helpers.make_slot
              ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
              payload)
-        ~attestation_lag:parameters.attestation_lag
-        ~number_of_slots:parameters.number_of_slots
         parameters
     in
 
@@ -8046,8 +8022,6 @@ module Tx_kernel_e2e = struct
           (Helpers.make_slot
              ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
              payload)
-        ~attestation_lag:parameters.attestation_lag
-        ~number_of_slots:parameters.number_of_slots
         parameters
     in
     Log.info "Wait for the rollup node to catch up." ;
@@ -9484,7 +9458,6 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-  let number_of_slots = dal_parameters.number_of_slots in
   let lag = dal_parameters.attestation_lag in
   let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
   let commitment, proof, shards_with_proofs =
@@ -9510,7 +9483,6 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     inject_dal_attestation_exn
       ~protocol
       ~signer
-      ~number_of_slots
       availability
       client
       dal_parameters
@@ -9906,7 +9878,6 @@ let test_producer_attester (protocol : Protocol.t)
   let* _ =
     inject_dal_attestations
       ~protocol
-      ~number_of_slots:dal_parameters.number_of_slots
         (* Since the attestation threshold of the test is set to 1%,
            having only [bootstrap2] signing is sufficient. *)
       ~signers:[Constant.bootstrap2]
@@ -10004,7 +9975,6 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   let* op1 =
     craft_dal_attestation_exn
       ~protocol
-      ~number_of_slots:dal_parameters.number_of_slots
       ~signer:Constant.bootstrap3
       (Slots [index])
       client
@@ -10016,7 +9986,6 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   let* op2 =
     craft_dal_attestation_exn
       ~protocol
-      ~number_of_slots:dal_parameters.number_of_slots
       ~signer:Constant.bootstrap2
       (Slots [])
       client
@@ -10176,7 +10145,6 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     inject_dal_attestation_exn
       ~protocol
       ~signer
-      ~number_of_slots:dal_parameters.number_of_slots
       availability
       client
       dal_parameters
@@ -10325,7 +10293,6 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer:Constant.bootstrap2
-        ~number_of_slots:dal_parameters.number_of_slots
         availability
         client
         dal_parameters
@@ -10377,7 +10344,6 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer
-        ~number_of_slots:dal_parameters.number_of_slots
         availability
         client
         dal_parameters
@@ -10897,7 +10863,6 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer:baker
-        ~number_of_slots
         baker_attestation
         client
         dal_parameters
@@ -10916,7 +10881,6 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer:attesting_dal_slot_10
-        ~number_of_slots
         attestation
         client
         dal_parameters
@@ -10930,7 +10894,6 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer:not_attesting_dal
-        ~number_of_slots
         dal_attestation
         client
         dal_parameters
@@ -10947,7 +10910,6 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
       inject_dal_attestation_exn
         ~protocol
         ~signer:not_sufficiently_attesting_dal_slot_10
-        ~number_of_slots
         slots_to_attest
         client
         dal_parameters
@@ -10959,7 +10921,6 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         inject_dal_attestation
           ~protocol
           ~signer:small_baker
-          ~number_of_slots
           slots_to_attest
           client
           dal_parameters
@@ -11679,7 +11640,6 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
   let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
   let attestation_lag = dal_parameters.attestation_lag in
-  let number_of_slots = dal_parameters.number_of_slots in
   (* To trigger the "all bakers attest" feature, one has to create enough tz4
      and stake with them. *)
   let* tz4_accounts =
@@ -11719,7 +11679,6 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
           inject_dal_attestation_exn
             ~protocol
             ~signer:delegate_wrongly_attestating
-            ~number_of_slots
             (Slots [slot_index])
             client
             dal_parameters

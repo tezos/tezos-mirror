@@ -3512,8 +3512,6 @@ let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
             (Dal_common.Helpers.make_slot
                ~slot_size
                (String.make slot_size 'T'))
-          ~attestation_lag
-          ~number_of_slots:dal_parameters.number_of_slots
           dal_parameters
   in
   (* Whether we published and attested a slot or not, we advance the L1 chain
