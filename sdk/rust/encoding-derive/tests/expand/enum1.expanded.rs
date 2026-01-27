@@ -11,8 +11,7 @@ where
             std::mem::size_of::<u8>(),
             tezos_data_encoding::encoding::TagMap::new(
                 <[_]>::into_vec(
-                    #[rustc_box]
-                    ::alloc::boxed::Box::new([
+                    ::alloc::boxed::box_new([
                         tezos_data_encoding::encoding::Tag::new(
                             0,
                             "A",
@@ -49,12 +48,9 @@ where
                     nom::Err::Error(
                         tezos_data_encoding::nom::error::DecodeError::invalid_tag(
                             input,
-                            {
-                                let res = ::alloc::fmt::format(
-                                    format_args!("0x{0:.2X}", tag),
-                                );
-                                res
-                            },
+                            ::alloc::__export::must_use({
+                                ::alloc::fmt::format(format_args!("0x{0:.2X}", tag))
+                            }),
                         ),
                     ),
                 );
