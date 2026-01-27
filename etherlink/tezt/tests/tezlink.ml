@@ -366,10 +366,10 @@ let test_tezlink_balance =
   Check.((Tez.to_mutez invalid_res = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
-let test_tezlink_storage =
+let test_tezlink_storage_via_client =
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
-    ~title:"Test of the storage rpc"
+    ~title:"Test of the storage rpc via client"
     ~tags:["rpc"; "storage"]
     ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
@@ -3318,7 +3318,7 @@ let () =
   test_tezlink_transfer_and_wait [Alpha] ;
   test_tezlink_reveal [Alpha] ;
   test_tezlink_block_info [Alpha] ;
-  test_tezlink_storage [Alpha] ;
+  test_tezlink_storage_via_client [Alpha] ;
   test_tezlink_execution [Alpha] ;
   test_tezlink_bigmap_option [Alpha] ;
   test_tezlink_bigmap_counter [Alpha] ;
