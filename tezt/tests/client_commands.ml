@@ -52,8 +52,12 @@ module Helpers = struct
     Client.RPC.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
-  let supported_signature_schemes (_ : Protocol.t) =
-    ["ed25519"; "secp256k1"; "p256"; "bls"]
+  let supported_signature_schemes (protocol : Protocol.t) =
+    match protocol with
+    | Alpha ->
+      ["ed25519"; "secp256k1"; "p256"; "bls" ; "mldsa44"]
+    | T024 | S023 ->
+      ["ed25519"; "secp256k1"; "p256"; "bls"]
 
   let airdrop_and_reveal client accounts =
     Log.info "Airdrop 1000tz to each account" ;
