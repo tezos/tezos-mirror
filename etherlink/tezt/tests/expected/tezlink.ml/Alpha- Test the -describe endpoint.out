@@ -155,6 +155,9 @@ Available services:
     + context/
       - GET /chains/main/blocks/head/context/constants
           All constants 
+      - GET /chains/main/blocks/head/context/contracts
+          All existing contracts (including empty implicit contracts that had
+          activity). 
       + contracts/<contract_id>/
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/balance
             The spendable balance of a contract (in mutez), also known as
