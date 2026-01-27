@@ -35,8 +35,6 @@ let iterate_levels ~min_published_level ~max_published_level f =
   in
   iterate_levels min_published_level
 
-let all_slots = Stdlib.List.init Constants.number_of_slots Fun.id
-
 (** Iterate through all levels and slot indices in the given range,
     calling [f] for each [{slot_level; slot_index}] slot id. *)
 let iterate_slots ~min_published_level ~max_published_level ~slots f =
@@ -218,7 +216,6 @@ module Merge = struct
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
       ~min_published_level ~max_published_level ~slots ~dst_root_dir =
     let open Lwt_result_syntax in
-    let slots = Option.value ~default:all_slots slots in
     let* config = Configuration_file.load ~config_file in
     let endpoint = Option.value ~default:config.endpoint endpoint in
     let config = Configuration_file.{config with endpoint} in
@@ -233,6 +230,11 @@ module Merge = struct
     (* Initialize crypto as needed by file layouts. *)
     let* cryptobox, _ =
       Node_context.init_cryptobox config proto_parameters profile_ctxt
+    in
+    let slots =
+      Option.value
+        ~default:(Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+        slots
     in
     (* Set crypto box share size hook. *)
     Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;

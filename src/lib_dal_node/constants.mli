@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [number_of_slots] is the default number of DAL slots per level. *)
-val number_of_slots : int
-
 (** [number_of_shards] is the default number of shards per slot. *)
 val number_of_shards : int
 
