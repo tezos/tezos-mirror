@@ -100,30 +100,23 @@ module Slots : sig
       given [slot_id]. *)
   val get_file_layout :
     slot_id:Types.slot_id ->
-    (root_dir:string ->
-    Types.slot_id * int ->
-    (unit, bytes) Key_value_store.layout)
+    (root_dir:string -> Types.slot_id -> (unit, bytes) Key_value_store.layout)
     tzresult
     Lwt.t
 
-  (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
-      given slot id to the given slot content. *)
+  (** [add_slot store slot_content slot_id] adds a mapping from the given slot
+      id to the given slot content. *)
   val add_slot :
-    t ->
-    slot_size:int ->
-    bytes ->
-    Types.slot_id ->
-    (unit, [> Errors.other]) result Lwt.t
+    t -> bytes -> Types.slot_id -> (unit, [> Errors.other]) result Lwt.t
 
-  (** [find_slot store ~slot_size slot_id] returns the slot associated to some
-      slot id or [Error `Not_found] if no slot is associated. *)
+  (** [find_slot store slot_id] returns the slot associated to some slot id or
+      [Error `Not_found] if no slot is associated. *)
   val find_slot :
     t ->
-    slot_size:int ->
     Types.slot_id ->
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
-  val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
+  val remove_slot : t -> Types.slot_id -> unit tzresult Lwt.t
 
   (** [add_file_layout] adds a new file layout that will be used starting at the
       given level. This aims to be called when a new protocol is activated,

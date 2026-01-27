@@ -28,8 +28,7 @@ module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
 (* This function removes from the store the given slot and its
    shards. In case of error, this function emits a warning instead
    of failing. *)
-let remove_slots_and_shards ~slot_size (store : Store.t)
-    (slot_id : Types.slot_id) =
+let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
   let open Lwt_syntax in
   let* () =
     let shards_store = Store.shards store in
@@ -47,7 +46,7 @@ let remove_slots_and_shards ~slot_size (store : Store.t)
   in
   let* () =
     let slots_store = Store.slots store in
-    let* res = Store.Slots.remove_slot slots_store ~slot_size slot_id in
+    let* res = Store.Slots.remove_slot slots_store slot_id in
     match res with
     | Ok () ->
         Event.emit_removed_slot
@@ -133,10 +132,7 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
              let slot_id : Types.slot_id =
                {slot_level = oldest_level; slot_index}
              in
-             remove_slots_and_shards
-               ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-               store
-               slot_id)
+             remove_slots_and_shards store slot_id)
            (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
 (* [attestation_lag] levels after the publication of a commitment,
@@ -146,7 +142,6 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
     ctxt ~attested_level attested =
   let open Lwt_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
-  let slot_size = proto_parameters.cryptobox_parameters.slot_size in
   let previous_lag = prev_proto_parameters.Types.attestation_lag in
   let current_lag = proto_parameters.attestation_lag in
   let store = Node_context.get_store ctxt in
@@ -168,7 +163,7 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
             let slot_id : Types.slot_id =
               {slot_level = published_level; slot_index}
             in
-            remove_slots_and_shards ~slot_size store slot_id)
+            remove_slots_and_shards store slot_id)
         (0 -- (number_of_slots - 1))
     else return_unit
   in
@@ -486,7 +481,6 @@ let process_commitments ctxt cctxt store proto_parameters block_level
     in
     return (Signature.Public_key_hash.Map.map fst res)
   in
-  let slot_size = proto_parameters.cryptobox_parameters.slot_size in
   let gs_worker = Node_context.get_gs_worker ctxt in
   List.iter_es
     (fun Dal_plugin.{slot_index; commitment; published_level} ->
@@ -496,7 +490,6 @@ let process_commitments ctxt cctxt store proto_parameters block_level
       (Slot_manager.publish_slot_data
          ctxt
          ~level_committee
-         ~slot_size
          gs_worker
          proto_parameters
          commitment
