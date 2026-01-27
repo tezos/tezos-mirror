@@ -321,6 +321,12 @@ let build_block_static_directory ~l2_chain_id
          let* script = Backend.get_script chain block contract in
          make_contract_info balance counter script)
   |> opt_register
+       ~service:Tezos_services.get_script
+       ~impl:(fun ({chain; block}, contract) _ _ ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.get_script chain block contract)
+  |> opt_register
        ~service:Tezos_services.list_entrypoints
        ~impl:(fun ({block; chain}, contract) {normalize_types} () ->
          let*? chain = check_chain chain in

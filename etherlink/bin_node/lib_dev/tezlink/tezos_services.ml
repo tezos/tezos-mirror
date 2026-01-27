@@ -789,6 +789,16 @@ let injection_operation :
     Tezos_rpc.Service.t =
   Tezos_shell_services.Injection_services.S.operation
 
+let get_script :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      unit,
+      unit,
+      Alpha_context.Script.t )
+    Tezos_rpc.Service.t =
+  import_service_with_arg Imported_protocol_plugin.Contract_services.S.script
+
 let preapply_operations :
     ( [`POST],
       tezlink_rpc_context,
