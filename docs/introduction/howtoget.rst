@@ -271,9 +271,14 @@ For ``RC`` versions, do rather::
 
     curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
 
-Install Octez using the downloaded formula with the following command::
+Install Octez using the downloaded formula, creating a new tap if necessary, with the following commands::
 
-    brew install -v ./octez.rb
+	# Create a local tap if not having one already:
+	brew tap-new octez-user/octeztap
+	# Move formula to the newly created tap:
+	mv octez.rb $(brew --repository)/Library/Taps/octez-user/homebrew-octeztap/Formula/
+	# Install formula from tap
+	brew install octez-user/octeztap/octez
 
 Depending on the speed of your system, the build can take more than 10
 minutes. We regularly test the build in our CI using macOS 14 (Sonoma) with Xcode 15 on an ARM-based Mac.
