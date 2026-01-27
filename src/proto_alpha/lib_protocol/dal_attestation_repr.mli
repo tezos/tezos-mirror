@@ -27,19 +27,17 @@
 
     {1 Overview}
 
-    For the data-availability layer, the layer 1 provides a list of
-   slots at every level (see {!Dal_slot_repr}). Slots are not posted
-   directly onto L1 blocks. Stakeholders, called attesters in this
-   context, can attest on the availability of the data via
-   attestation operations.
+    For the data-availability layer, the layer 1 provides a list of slots at
+    every level (see {!Dal_slot_repr}). Slots are not posted directly onto L1
+    blocks. Stakeholders, called attesters in this context, can attest on the
+    availability of the data via attestation operations.
 
-    The slot is uniformly split into shards. Each attester commits,
-   for every slot, on the availability of all shards they are assigned
-   to.
+    The slot is uniformly split into shards. Each attester commits, for every
+    slot, on the availability of all shards they are assigned to.
 
-    This module encapsulates the representation of this commitment
-   that aims to be provided with attestation operations. To avoid
-   overloading the network, this representation should be compact.  *)
+    This module encapsulates the representation of this commitment that aims to
+    be provided with attestation operations. To avoid overloading the network,
+    this representation should be compact.  *)
 
 type t = private Bitset.t
 
@@ -56,12 +54,13 @@ val empty : t
 val is_empty : t -> bool
 
 (** [is_attested slot_attestation ~index] returns [true] if the
-   [slot_attestation] commits that the slot at [index] is
-   available. *)
+    [slot_attestation] commits that the slot at [index] is available. [index]
+    must be valid (in particular, non-negative). *)
 val is_attested : t -> Dal_slot_index_repr.t -> bool
 
-(** [commit slot_attestation index] commits into [slot_attestation]
-   that the slot [index] is available. *)
+(** [commit slot_attestation index] commits into [slot_attestation] that the
+    slot [index] is available. [index] must be valid (in particular,
+    non-negative). *)
 val commit : t -> Dal_slot_index_repr.t -> t
 
 (** [occupied_size_in_bits slot_attestation] returns the size in bits of an attestation. *)

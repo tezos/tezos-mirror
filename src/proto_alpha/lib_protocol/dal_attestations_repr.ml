@@ -120,12 +120,14 @@ let expected_max_size_in_bits ~number_of_slots ~number_of_lags =
      the data section. *)
   number_of_lags * (1 + number_of_slots)
 
+let weight t = Bitset.cardinal t
+
 let number_of_attested_slots t ~number_of_lags =
   (* Count all 1 bits and subtract the prefix bits (which are 1 for non-empty lags) *)
   let total_bits = Bitset.cardinal t in
   (* Count prefix 1s: how many of the first number_of_lags bits are set *)
   let prefix_ones =
-    Misc.(0 --> number_of_lags)
+    Misc.(0 --> (number_of_lags - 1))
     |> List.filter (fun i ->
            match Bitset.mem t i with Ok b -> b | Error _ -> assert false)
     |> List.length

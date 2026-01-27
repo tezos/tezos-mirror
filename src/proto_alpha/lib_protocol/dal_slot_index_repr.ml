@@ -78,6 +78,9 @@ include Compare.Make (struct
   let compare = Compare.Int.compare
 end)
 
+module Set = Set.Make (Compare.Int)
+module Map = Map.Make (Compare.Int)
+
 let slots_range ~number_of_slots ~lower ~upper =
   let open Result_syntax in
   let* () = check_is_in_range ~number_of_slots lower in

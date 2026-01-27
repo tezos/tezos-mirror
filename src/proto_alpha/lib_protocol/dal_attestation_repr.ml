@@ -36,23 +36,11 @@ let to_z = Bitset.to_z
 
 let is_attested t index =
   let open Dal_slot_index_repr in
-  match Bitset.mem t (to_int index) with
-  | Ok b -> b
-  | Error _ ->
-      (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3104
-
-         Should we do something here? *)
-      false
+  match Bitset.mem t (to_int index) with Ok b -> b | Error _ -> assert false
 
 let commit t index =
   let open Dal_slot_index_repr in
-  match Bitset.add t (to_int index) with
-  | Ok t -> t
-  | Error _ ->
-      (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3104
-
-         Should we do something here? *)
-      t
+  match Bitset.add t (to_int index) with Ok t -> t | Error _ -> assert false
 
 let occupied_size_in_bits = Bitset.occupied_size_in_bits
 

@@ -31,6 +31,10 @@
    accommodate for higher values. *)
 type t
 
+module Set : Set.S with type elt = t
+
+module Map : Map.S with type key = t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
