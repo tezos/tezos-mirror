@@ -91,6 +91,9 @@ oc.docker:amd64:
   stage: build
   tags:
   - gcp
+  rules:
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -120,6 +123,9 @@ oc.docker:arm64:
   stage: build
   tags:
   - gcp_arm64
+  rules:
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -161,6 +167,35 @@ docker:merge_manifests:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  retry: 0
+
+docker:promote_revision_to_version:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - docker:merge_manifests
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_promote_to_version.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
