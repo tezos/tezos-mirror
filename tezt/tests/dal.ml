@@ -11318,12 +11318,18 @@ let test_dal_low_stake_attester_attestable_slots _protocol dal_parameters
         log_step "Level %d: Not_in_committee" attested_level ;
         unit
     | Not_in_committee, Some dal_attestation ->
-        Test.fail
-          "Level %d: Not_in_committee expected, but found dal_attestation=%s \
-           for %s"
-          attested_level
-          dal_attestation
-          new_account.public_key_hash
+        if dal_attestation = "0" then (
+          log_step
+            "Level %d: Not_in_committee (empty attestation)"
+            attested_level ;
+          unit)
+        else
+          Test.fail
+            "Level %d: Not_in_committee expected empty attestation, but found \
+             dal_attestation=%s for %s"
+            attested_level
+            dal_attestation
+            new_account.public_key_hash
     | Attestable_slots _slots, None ->
         if published_level > first_level then
           Test.fail

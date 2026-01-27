@@ -499,73 +499,89 @@ let dal_checks_and_warnings state =
   else return_unit
 
 let only_if_dal_feature_enabled state ~default_value f =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let open Constants in
   let Parametric.{dal = {feature_enable; _}; _} =
     state.global_state.constants.parametric
   in
   if feature_enable then
-    let*! () = dal_checks_and_warnings state in
+    let* () = dal_checks_and_warnings state in
     Option.fold
       ~none:(return default_value)
       ~some:f
       state.global_state.dal_node_rpc_ctxt
   else return default_value
 
-let process_dal_rpc_result state delegate level round =
-  let open Lwt_result_syntax in
-  function
-  | None -> return_none
-  | Some Tezos_dal_node_services.Types.Not_in_committee ->
-      let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
-      return_none
-  | Some (Attestable_slots {slots; published_level}) ->
+let process_dal_rpc_result state = function
+  | None -> Dal.Attestation.empty
+  | Some slots ->
       let number_of_slots =
         state.global_state.constants.parametric.dal.number_of_slots
       in
-      let dal_attestation =
-        List.fold_left_i
-          (fun i acc flag ->
-            match Dal.Slot_index.of_int_opt ~number_of_slots i with
-            | Some index when flag -> Dal.Attestation.commit acc index
-            | None | Some _ -> acc)
-          Dal.Attestation.empty
-          slots
-      in
-      let dal_content = {attestation = dal_attestation} in
-      let*! () =
-        Events.(
-          emit
-            attach_dal_attestation
-            (delegate, dal_content, published_level, level, round))
-      in
-      return_some dal_content
+      List.fold_left_i
+        (fun i acc flag ->
+          match Dal.Slot_index.of_int_opt ~number_of_slots i with
+          | Some index when flag -> Dal.Attestation.commit acc index
+          | None | Some _ -> acc)
+        Dal.Attestation.empty
+        slots
 
 let may_get_dal_content state consensus_vote =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let {delegate; vote_consensus_content; _} = consensus_vote in
   let level, round =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
   let delegate_id = Delegate.delegate_id delegate in
+  let dal_attestable_slots_worker =
+    state.global_state.dal_attestable_slots_worker
+  in
   only_if_dal_feature_enabled
     state
     ~default_value:None
     (fun _dal_node_rpc_ctxt ->
-      let*! dal_attestable_slots =
-        (Dal_attestable_slots_worker.get_dal_attestable_slots
-           state.global_state.dal_attestable_slots_worker
-           ~delegate_id
-           ~attestation_level:level
-         [@profiler.record_s
-           {verbosity = Debug}
-             (Format.asprintf
-                "get_dal_attestable_slots - delegate_id : %a"
-                Delegate_id.pp
-                delegate_id)])
+      let published_level =
+        Int32.(
+          sub
+            (succ level)
+            (of_int state.global_state.constants.parametric.dal.attestation_lag))
       in
-      process_dal_rpc_result state delegate_id level round dal_attestable_slots)
+      let* dal_attestation =
+        if
+          Dal_attestable_slots_worker.is_not_in_committee
+            dal_attestable_slots_worker
+            ~delegate_id
+            ~committee_level:level
+        then
+          let* () = Events.(emit not_in_dal_committee (delegate_id, level)) in
+          return Dal.Attestation.empty
+        else
+          let* dal_attestable_slots =
+            (Dal_attestable_slots_worker.get_dal_attestable_slots
+               dal_attestable_slots_worker
+               ~delegate_id
+               ~published_level
+             [@profiler.record_s
+               {verbosity = Debug}
+                 (Format.asprintf
+                    "get_dal_attestable_slots - delegate_id : %a"
+                    Delegate_id.pp
+                    delegate_id)])
+          in
+          let dal_attestation =
+            process_dal_rpc_result state dal_attestable_slots
+          in
+          return dal_attestation
+      in
+      let dal_content = {attestation = dal_attestation} in
+      let* () =
+        Events.(
+          emit
+            attach_dal_attestation
+            (delegate_id, dal_content, published_level, level, round))
+      in
+      return_some dal_content)
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -1162,13 +1178,10 @@ let update_to_level state level_update =
            can change at level boundaries (e.g. migrations, reorganisations, key/profile
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
-        let*! () =
-          Dal_attestable_slots_worker.update_streams_subscriptions
-            state.global_state.dal_attestable_slots_worker
-            dal_node_rpc_ctxt
-            ~delegate_ids:next_level_delegate_ids
-        in
-        return_unit)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids:next_level_delegate_ids)
   in
   return (new_state, new_action)
 

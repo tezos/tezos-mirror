@@ -70,6 +70,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let dal_attestable_slots_worker =
     Dal_attestable_slots_worker.create
       ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
   let* state =
@@ -86,7 +87,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       ~constants
       delegates
   in
-  let* () =
+  let*! () =
     Baking_actions.only_if_dal_feature_enabled
       state
       ~default_value:()
@@ -101,13 +102,10 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
         in
         (* Ensures the DAL attestable slots cache is populated in time for the
            first block’s attestation. *)
-        let*! () =
-          Dal_attestable_slots_worker.update_streams_subscriptions
-            state.global_state.dal_attestable_slots_worker
-            dal_node_rpc_ctxt
-            ~delegate_ids
-        in
-        return_unit)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids)
   in
   return state
 

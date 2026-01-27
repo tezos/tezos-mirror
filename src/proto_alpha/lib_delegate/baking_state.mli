@@ -151,7 +151,7 @@ val make_unsigned_consensus_vote_batch :
 (** [dal_content_map_p f unsigned_consensus_vote_batch] map each
     [unsigned_consensus_vote] in the batch with [f]. *)
 val dal_content_map_p :
-  (unsigned_consensus_vote -> dal_content option tzresult Lwt.t) ->
+  (unsigned_consensus_vote -> dal_content option Lwt.t) ->
   unsigned_consensus_vote_batch ->
   unsigned_consensus_vote_batch Lwt.t
 

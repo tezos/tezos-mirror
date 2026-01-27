@@ -142,11 +142,11 @@ val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 val only_if_dal_feature_enabled :
   state ->
   default_value:'a ->
-  (Tezos_rpc.Context.generic -> 'a tzresult Lwt.t) ->
-  'a tzresult Lwt.t
+  (Tezos_rpc.Context.generic -> 'a Lwt.t) ->
+  'a Lwt.t
 
-(** [may_get_dal_content state unsigned_consensus_vote], if the DAL feature is
-    enabled, recovers the attestable slots by calling
-    [Node_rpc.get_attestable_slots] and computes the corresponding [dal_content]. *)
+(** [may_get_dal_content state consensus_vote] retrieves DAL attestable slots
+    by querying the [Dal_attestable_slots_worker] for the corresponding
+    [attestation_level]. *)
 val may_get_dal_content :
-  state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
+  state -> unsigned_consensus_vote -> dal_content option Lwt.t

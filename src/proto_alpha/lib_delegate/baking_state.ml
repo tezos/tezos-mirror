@@ -349,10 +349,7 @@ let dal_content_map_p f unsigned_consensus_vote_batch =
         Lwt.catch
           (fun () ->
             let* dal_content = f unsigned_consensus_vote in
-            match dal_content with
-            | Ok dal_content ->
-                return {unsigned_consensus_vote with dal_content}
-            | Error _ -> return fallback_case)
+            return {unsigned_consensus_vote with dal_content})
           (fun _exn -> return fallback_case))
       unsigned_consensus_vote_batch.unsigned_consensus_votes
   in

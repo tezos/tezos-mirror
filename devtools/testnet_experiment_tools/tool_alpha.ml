@@ -264,6 +264,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let dal_attestable_slots_worker =
     Dal_attestable_slots_worker.create
       ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~attestation_lags:constants.parametric.dal.attestation_lags
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
   Baking_scheduling.create_initial_state
