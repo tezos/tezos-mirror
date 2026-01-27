@@ -143,7 +143,7 @@ module Config_file = struct
         |> Lwt.return
 end
 
-let create ?(path = "./fa-bridge-watchtower") ?name ?runner ?data_dir
+let create ?(path = Uses.path Constant.watchtower) ?name ?runner ?data_dir
     ?config_file () =
   let name = Option.value ~default:(fresh_name ()) name in
   let data_dir =
