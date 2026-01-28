@@ -177,6 +177,12 @@ let measure_and_add_data_point f ~tag =
   Long_test.add_data_point data_point ;
   return res
 
+(** Create expected attestation array with given slots attested. *)
+let expected_attestation dal_parameters attested_slots =
+  let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
+  List.iter (fun i -> arr.(i) <- true) attested_slots ;
+  arr
+
 (** Test the time it takes for one node to publish a slot
     and another node to download it.
     - The sole baker of the network ([node1]) will:
@@ -291,12 +297,18 @@ let test_produce_and_propagate_shards ~executors ~protocol =
     let* {dal_attestation; _} =
       Node.RPC.(call node1 @@ get_chain_block_metadata ())
     in
+    let number_of_lags = List.length dal_parameters.attestation_lags in
     let dal_attestation =
       Option.map
-        (Dal.Slot_availability.decode protocol dal_parameters)
+        (fun str ->
+          let dal_attestations =
+            Dal.Slot_availability.decode protocol dal_parameters str
+          in
+          dal_attestations.(number_of_lags - 1))
         dal_attestation
     in
-    Check.((Some [|true|] = dal_attestation) (option (array bool)))
+    let expected_attestation = expected_attestation dal_parameters [0] in
+    Check.((Some expected_attestation = dal_attestation) (option (array bool)))
       ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
     unit
   in
