@@ -214,6 +214,7 @@ tezos_internal_brassaia_eio_tests: brassaia-eio/test, brassaia-eio/test/brassaia
 tezos_internal_brassaia_tests: brassaia/test, brassaia/test/brassaia, brassaia/test/brassaia-mem, brassaia/test/brassaia-pack, brassaia/test/brassaia-tezos, brassaia/test/brassaia/data, brassaia/test/brassaia/generic-key
 tezos_internal_irmin_tests: irmin/test, irmin/test/irmin, irmin/test/irmin-mem, irmin/test/irmin-pack, irmin/test/irmin-tezos, irmin/test/irmin/data, irmin/test/irmin/generic-key
 tezt-cloud: tezt/lib_cloud
+tezt-cloud-etherlink: etherlink/tezt/tezt-cloud
 tezt-etherlink: etherlink/tezt/benchmarks/lib, etherlink/tezt/lib, etherlink/tezt/tests
 tezt-migration-registry: tezt/lib_migration_test_registry
 tezt-tests-cloud: tezt/tests/cloud
