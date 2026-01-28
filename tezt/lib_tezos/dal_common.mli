@@ -80,9 +80,22 @@ end
 
 (** Encoding/decoding of the DAL content included in attestation operations. *)
 module Attestations : sig
-  (** [encode protocol slot_array] encodes an array of Booleans
-      into a string, the format depending on the [protocol]. *)
-  val encode : Protocol.t -> bool array -> string
+  (** [encode_for_one_lag protocol ?lag_index dal_parameters slot_array] encodes
+      an array of Booleans into a string, the format depending on the [protocol]
+      and [dal_parameters]. The latter is necessary for [protocol] values >= 025,
+      [?lag_index] being an optional parameter to set the offset for the encoding,
+      defaulting to the last position in the [attestation_lags] list. *)
+  val encode_for_one_lag :
+    Protocol.t -> ?lag_index:int -> Parameters.t -> bool array -> string
+
+  (** [encode protocol parameters attestations_per_lag] encodes
+      attestations for multiple lag indices in a single call.
+      [attestations_per_lag] is an array of bool arrays, one per lag index,
+      where element [i] contains the slot attestations for lag index [i].
+      For protocols < 025, the [attestations_per_lag] array must
+      only contain a single element and will be encoded using the pre-025
+      single-lag format. *)
+  val encode : Protocol.t -> Parameters.t -> bool array array -> string
 
   (** [decode protocol string] decodes a string into an array of Booleans, the
       format depending on the [protocol]. *)
