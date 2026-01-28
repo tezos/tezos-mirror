@@ -30,7 +30,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_execution::account_storage::TezlinkAccount;
+use tezos_execution::account_storage::{TezlinkAccount, TezosImplicitAccount};
 use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
@@ -497,6 +497,10 @@ fn tezlink_deposit<Host: Runtime, C: Context>(
     let to_account = context
         .implicit_from_contract(&receiver)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+
+    let _was_allocated = to_account
+        .allocate(host)
+        .map_err(|_| TransferError::FailedToAllocateDestination)?;
 
     match to_account.add_balance(host, amount) {
         Ok(()) => {

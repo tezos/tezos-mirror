@@ -142,7 +142,7 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
           @@ Imported_protocol.Contract_manager_storage.Previously_revealed_key
                (Implicit source)
       | Some (Public_key pk), _op -> return (Ok (pk, source, counter))
-      | Some (Hash _), Reveal {public_key; _} ->
+      | (None | Some (Hash _)), Reveal {public_key; _} ->
           (* The operation might be the reveal of the public key we're
              searching for. *)
           let open Signature.V2 in
@@ -159,15 +159,10 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
                      expected_hash = source;
                      provided_hash = pkh_revealed;
                    })
-      | Some (Hash _), _op ->
+      | (None | Some (Hash _)), _op ->
           tzfail_p
           @@ Imported_protocol.Contract_manager_storage.Unrevealed_manager_key
-               (Implicit source)
-      | None, _ ->
-          (* If an address is not known, it doesn't hold any tez and can't send
-             operations. *)
-          tzfail_p
-          @@ Imported_protocol.Contract_storage.Empty_implicit_contract source)
+               (Implicit source))
   | _ -> tzfail @@ Not_a_manager_operation error_clue
 
 (** Information required to validate a batch of operations. Some will change
