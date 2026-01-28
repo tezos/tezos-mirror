@@ -2680,14 +2680,14 @@ pub fn typecheck_value<'a>(
                     Type::new_pair(content_type.clone(), Type::Nat),
                 ),
             ) {
-                Ok(TV::Pair(b)) => {
-                    let address = irrefutable_match!(TypedValue::unwrap_rc(b.0); TV::Address);
-                    let c = irrefutable_match!(TypedValue::unwrap_rc(b.1); TV::Pair);
+                Ok(TV::Pair(left, right)) => {
+                    let address = irrefutable_match!(TypedValue::unwrap_rc(left); TV::Address);
+                    irrefutable_match!(TypedValue::unwrap_rc(right); TV::Pair, content, amount);
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
                         content_type: content_type.clone(),
-                        content: TypedValue::unwrap_rc(c.0),
-                        amount: irrefutable_match!(TypedValue::unwrap_rc(c.1); TV::Nat),
+                        content: TypedValue::unwrap_rc(content),
+                        amount: irrefutable_match!(TypedValue::unwrap_rc(amount); TV::Nat),
                     })
                 }
                 _ => return Err(invalid_value_for_type!()),

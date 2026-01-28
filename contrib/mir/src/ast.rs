@@ -315,13 +315,13 @@ pub enum TypedValue<'a> {
     Bool(bool),
     String(String),
     Unit,
-    Pair(Box<(Rc<Self>, Rc<Self>)>),
-    Option(Option<Box<Rc<Self>>>),
+    Pair(Rc<Self>, Rc<Self>),
+    Option(Option<Rc<Self>>),
     List(MichelsonList<Rc<Self>>),
     Set(BTreeSet<Rc<Self>>),
     Map(BTreeMap<Rc<Self>, Rc<Self>>),
     BigMap(BigMap<'a>),
-    Or(Box<Or<Rc<Self>, Rc<Self>>>),
+    Or(Or<Rc<Self>, Rc<Self>>),
     Address(Address),
     ChainId(ChainId),
     Contract(Address),
@@ -363,10 +363,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             // This transformation for pairs deviates from the optimized representation of the
             // reference implementation, because reference implementation optimizes the size of combs
             // and uses an untyped representation that is the shortest.
-            TV::Pair(b) => {
-                let (l, r) = *b;
-                V::prim2(arena, Prim::Pair, go_rc(l), go_rc(r))
-            }
+            TV::Pair(l, r) => V::prim2(arena, Prim::Pair, go_rc(l), go_rc(r)),
             TV::List(l) => V::Seq(V::alloc_iter(arena, l.into_iter().map(go_rc))),
             TV::Set(s) => V::Seq(V::alloc_iter(arena, s.into_iter().map(go_rc))),
             TV::Map(m) => V::Seq(V::alloc_iter(
@@ -396,8 +393,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                 }
             },
-            TV::Option(x) => option_into_micheline(x.map(|v| TypedValue::unwrap_rc(*v))),
-            TV::Or(or) => match *or {
+            TV::Option(x) => option_into_micheline(x.map(TypedValue::unwrap_rc)),
+            TV::Or(or) => match or {
                 Or::Left(x) => V::prim1(arena, Prim::Left, go_rc(x)),
                 Or::Right(x) => V::prim1(arena, Prim::Right, go_rc(x)),
             },
@@ -489,22 +486,22 @@ impl<'a> TypedValue<'a> {
         Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
     }
 
-    /// Convenience function to construct a new [Self::Pair]. Allocates a new [Box].
+    /// Convenience function to construct a new [Self::Pair].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new((Rc::new(l), Rc::new(r))))
+        Self::Pair(Rc::new(l), Rc::new(r))
     }
 
-    /// Convenience function to construct a new [Self::Option]. Allocates a new [Box].
+    /// Convenience function to construct a new [Self::Option].
     pub fn new_option(x: Option<Self>) -> Self {
-        Self::Option(x.map(|v| Box::new(Rc::new(v))))
+        Self::Option(x.map(Rc::new))
     }
 
-    /// Convenience function to construct a new [Self::Or]. Allocates a new [Box].
+    /// Convenience function to construct a new [Self::Or].
     pub fn new_or(x: Or<Self, Self>) -> Self {
-        Self::Or(Box::new(match x {
+        Self::Or(match x {
             Or::Left(v) => Or::Left(Rc::new(v)),
             Or::Right(v) => Or::Right(Rc::new(v)),
-        }))
+        })
     }
 
     /// Convenience function to construct a new [Self::Operation]. Allocates a new [Box].

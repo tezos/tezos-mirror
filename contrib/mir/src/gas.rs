@@ -584,10 +584,12 @@ pub mod interpret_cost {
             let v = Checked::from(std::cmp::min(s1, s2));
             (35 + (v >> 6) + (v >> 7)).as_gas_cost()
         };
-        let cmp_pair = |l: &(Rc<TypedValue>, Rc<TypedValue>),
-                        r: &(Rc<TypedValue>, Rc<TypedValue>)| {
+        let cmp_pair = |l1: &Rc<TypedValue>,
+                        l2: &Rc<TypedValue>,
+                        r1: &Rc<TypedValue>,
+                        r2: &Rc<TypedValue>| {
             let c = Checked::from(10u32);
-            (c + compare(l.0.as_ref(), r.0.as_ref())? + compare(l.1.as_ref(), r.1.as_ref())?)
+            (c + compare(l1.as_ref(), r1.as_ref())? + compare(l2.as_ref(), r2.as_ref())?)
                 .as_gas_cost()
         };
         let cmp_option = Checked::from(10u32);
@@ -622,16 +624,14 @@ pub mod interpret_cost {
             (V::Unit, V::Unit) => 10,
             (V::Unit, _) => incomparable(),
 
-            (V::Pair(l), V::Pair(r)) => cmp_pair(l.as_ref(), r.as_ref())?,
-            (V::Pair(_), _) => incomparable(),
+            (V::Pair(l1, l2), V::Pair(r1, r2)) => cmp_pair(l1, l2, r1, r2)?,
+            (V::Pair(..), _) => incomparable(),
 
             (V::Option(l), V::Option(r)) => match (l, r) {
                 (None, None) => cmp_option,
                 (None, Some(_)) => cmp_option,
                 (Some(_), None) => cmp_option,
-                (Some(l), Some(r)) => {
-                    cmp_option + compare(l.as_ref().as_ref(), r.as_ref().as_ref())?
-                }
+                (Some(l), Some(r)) => cmp_option + compare(l.as_ref(), r.as_ref())?,
             }
             .as_gas_cost()?,
             (V::Option(_), _) => incomparable(),
@@ -654,7 +654,7 @@ pub mod interpret_cost {
             (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
             (V::KeyHash(_), _) => incomparable(),
 
-            (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {
+            (V::Or(l), V::Or(r)) => match (l, r) {
                 (Or::Left(x), Or::Left(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
                 (Or::Right(x), Or::Right(y)) => cmp_or + compare(x.as_ref(), y.as_ref())?,
                 (Or::Left(_), Or::Right(_)) => cmp_or,

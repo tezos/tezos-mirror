@@ -123,8 +123,7 @@ impl<'a> ContractScript<'a> {
         // Handle errors instead of panicking.
         let result = TypedValue::unwrap_rc(stack.pop().expect("empty execution stack"));
         match result {
-            V::Pair(p) => {
-                let (operation_list, storage) = *p;
+            V::Pair(operation_list, storage) => {
                 let mut operation_list = TypedValue::unwrap_rc(operation_list);
                 let mut storage = TypedValue::unwrap_rc(storage);
                 // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
@@ -961,7 +960,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::IF_NONE)?;
             match pop!(V::Option) {
                 Some(x) => {
-                    stack.push(TypedValue::unwrap_rc(*x));
+                    stack.push(x);
                     interpret(when_some, ctx, arena, stack)?
                 }
                 None => interpret(when_none, ctx, arena, stack)?,
@@ -983,7 +982,7 @@ fn interpret_one<'a>(
         }
         I::IfLeft(when_left, when_right) => {
             ctx.gas().consume(interpret_cost::IF_LEFT)?;
-            let or = *pop!(V::Or);
+            let or = pop!(V::Or);
             match or {
                 Or::Left(x) => {
                     stack.push(TypedValue::unwrap_rc(x));
@@ -1064,7 +1063,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::LOOP_LEFT_ENTER)?;
             loop {
                 ctx.gas().consume(interpret_cost::LOOP)?;
-                match *pop!(V::Or) {
+                match pop!(V::Or) {
                     Or::Left(x) => {
                         stack.push(TypedValue::unwrap_rc(x));
                         interpret(nested, ctx, arena, stack)?;
@@ -1100,7 +1099,7 @@ fn interpret_one<'a>(
                     let map = pop!(V::Map);
                     for (k, v) in map {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(V::Pair(Box::new((k, v))));
+                        stack.push(V::Pair(k, v));
                         interpret(nested, ctx, arena, stack)?;
                     }
                 }
@@ -1127,7 +1126,7 @@ fn interpret_one<'a>(
                 let result = match option {
                     Some(elem) => {
                         ctx.gas().consume(interpret_cost::PUSH)?;
-                        stack.push(TypedValue::unwrap_rc(*elem));
+                        stack.push(elem);
                         interpret(nested, ctx, arena, stack)?;
                         Some(pop!())
                     }
@@ -1141,7 +1140,7 @@ fn interpret_one<'a>(
                 for (key, val) in map.iter_mut() {
                     ctx.gas().consume(interpret_cost::PUSH)?;
                     let val_temp = std::mem::replace(val, Rc::new(V::Unit));
-                    stack.push(V::Pair(Box::new((key.clone(), val_temp))));
+                    stack.push(V::Pair(key.clone(), val_temp));
                     interpret(nested, ctx, arena, stack)?;
                     *val = Rc::new(pop!());
                 }
@@ -1167,13 +1166,13 @@ fn interpret_one<'a>(
         }
         I::Car => {
             ctx.gas().consume(interpret_cost::CAR)?;
-            let (l, _) = *pop!(V::Pair);
-            stack.push(TypedValue::unwrap_rc(l));
+            pop!(V::Pair, l, _r);
+            stack.push(l);
         }
         I::Cdr => {
             ctx.gas().consume(interpret_cost::CDR)?;
-            let (_, r) = *pop!(V::Pair);
-            stack.push(TypedValue::unwrap_rc(r));
+            pop!(V::Pair, _l, r);
+            stack.push(r);
         }
         I::Pair => {
             ctx.gas().consume(interpret_cost::PAIR)?;
@@ -1193,18 +1192,18 @@ fn interpret_one<'a>(
         }
         I::Unpair => {
             ctx.gas().consume(interpret_cost::UNPAIR)?;
-            let (l, r) = *pop!(V::Pair);
-            stack.push(TypedValue::unwrap_rc(r));
-            stack.push(TypedValue::unwrap_rc(l));
+            pop!(V::Pair, l, r);
+            stack.push(r);
+            stack.push(l);
         }
         I::UnpairN(n) => {
             ctx.gas().consume(interpret_cost::unpair_n(*n as usize)?)?;
             fn fill<'a>(n: u16, stack: &mut IStack<'a>, p: TypedValue<'a>) {
                 if n == 0 {
                     stack.push(p);
-                } else if let V::Pair(p) = p {
-                    fill(n - 1, stack, TypedValue::unwrap_rc(p.1));
-                    stack.push(TypedValue::unwrap_rc(p.0));
+                } else if let V::Pair(l, r) = p.as_ref() {
+                    fill(n - 1, stack, r.clone());
+                    stack.push(l.clone());
                 } else {
                     unreachable_state();
                 }
@@ -1404,12 +1403,12 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_update(&key, map.len())?)?;
                 match opt_new_val {
                     None => map.remove(&key),
-                    Some(val) => map.insert(Rc::new(key), *val),
+                    Some(val) => map.insert(Rc::new(key), val),
                 };
             }
             overloads::Update::BigMap => {
                 let key = pop!();
-                let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
+                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
                 let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -1426,14 +1425,14 @@ fn interpret_one<'a>(
                     .consume(interpret_cost::map_get_and_update(&key, map.len())?)?;
                 let opt_old_val = match opt_new_val {
                     None => map.remove(&key),
-                    Some(val) => map.insert(Rc::new(key), *val),
+                    Some(val) => map.insert(Rc::new(key), val),
                 };
                 let opt_old_val = opt_old_val.map(|v| TypedValue::unwrap_rc(v));
                 stack.push(V::new_option(opt_old_val));
             }
             overloads::GetAndUpdate::BigMap => {
                 let key = pop!();
-                let opt_new_val = pop!(V::Option).map(|x| TypedValue::unwrap_rc(*x));
+                let opt_new_val = pop!(V::Option).map(TypedValue::unwrap_rc);
                 let map = irrefutable_match!(Rc::make_mut(&mut stack[0]); V::BigMap);
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
@@ -1524,8 +1523,8 @@ fn interpret_one<'a>(
             ));
         }
         I::SetDelegate => {
-            let opt_keyhash = pop!(V::Option)
-                .map(|kh| irrefutable_match!(TypedValue::unwrap_rc(*kh); V::KeyHash));
+            let opt_keyhash =
+                pop!(V::Option).map(|kh| irrefutable_match!(TypedValue::unwrap_rc(kh); V::KeyHash));
             let counter: u128 = ctx.operation_counter();
             ctx.gas().consume(interpret_cost::SET_DELEGATE)?;
             stack.push(V::new_operation(
@@ -1674,9 +1673,9 @@ fn interpret_one<'a>(
         }
         I::SplitTicket => {
             let ticket = *pop!(V::Ticket);
-            let amounts = pop!(V::Pair);
-            let amount_left = irrefutable_match!(TypedValue::unwrap_rc(amounts.0); V::Nat);
-            let amount_right = irrefutable_match!(TypedValue::unwrap_rc(amounts.1); V::Nat);
+            pop!(V::Pair, amount_left, amount_right);
+            let amount_left = irrefutable_match!(TypedValue::unwrap_rc(amount_left); V::Nat);
+            let amount_right = irrefutable_match!(TypedValue::unwrap_rc(amount_right); V::Nat);
 
             ctx.gas()
                 .consume(interpret_cost::split_ticket(&amount_left, &amount_right)?)?;
@@ -1699,9 +1698,9 @@ fn interpret_one<'a>(
             }
         }
         I::JoinTickets => {
-            let tickets = pop!(V::Pair);
-            let mut ticket_left = irrefutable_match!(TypedValue::unwrap_rc(tickets.0); V::Ticket);
-            let ticket_right = irrefutable_match!(TypedValue::unwrap_rc(tickets.1); V::Ticket);
+            pop!(V::Pair, ticket_left, ticket_right);
+            let mut ticket_left = irrefutable_match!(TypedValue::unwrap_rc(ticket_left); V::Ticket);
+            let ticket_right = irrefutable_match!(TypedValue::unwrap_rc(ticket_right); V::Ticket);
             ctx.gas()
                 .consume(interpret_cost::join_tickets(&ticket_left, &ticket_right)?)?;
             if ticket_left.content == ticket_right.content
@@ -1828,7 +1827,7 @@ fn interpret_one<'a>(
             ctx.gas()
                 .consume(interpret_cost::pairing_check(list.len())?)?;
             let it = list.iter().map(|elt| {
-                let (g1, g2) = irrefutable_match!(elt.as_ref(); V::Pair).as_ref();
+                irrefutable_match!(elt.as_ref(); V::Pair, g1, g2);
                 (
                     irrefutable_match!(g1.as_ref(); V::Bls12381G1).as_ref(),
                     irrefutable_match!(g2.as_ref(); V::Bls12381G2).as_ref(),
@@ -1841,7 +1840,7 @@ fn interpret_one<'a>(
             ctx.gas().consume(interpret_cost::CREATE_CONTRACT)?;
             let counter: u128 = ctx.operation_counter();
             let opt_keyhash = pop!(V::Option)
-                .map(|keyhash| irrefutable_match!(TypedValue::unwrap_rc(*keyhash); V::KeyHash));
+                .map(|keyhash| irrefutable_match!(TypedValue::unwrap_rc(keyhash); V::KeyHash));
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
@@ -1949,13 +1948,11 @@ fn get_nth_field_ref<'a, 'b>(
     loop {
         match (m, val) {
             (0, val_) => break val_,
-            (1, V::Pair(p)) => {
-                let (l, _) = p.as_mut();
+            (1, V::Pair(l, _)) => {
                 break Rc::make_mut(l);
             }
 
-            (_, V::Pair(p)) => {
-                let (_, r) = p.as_mut();
+            (_, V::Pair(_, r)) => {
                 val = Rc::make_mut(r);
                 m -= 2;
             }

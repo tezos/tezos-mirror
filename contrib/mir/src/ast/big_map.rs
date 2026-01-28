@@ -666,17 +666,16 @@ impl<'a> TypedValue<'a> {
             Bls12381G1(_) => {}
             #[cfg(feature = "bls")]
             Bls12381G2(_) => {}
-            Pair(p) => {
-                let (l, r) = p.as_mut();
+            Pair(l, r) => {
                 Rc::make_mut(l).collect_big_maps(put_res);
                 Rc::make_mut(r).collect_big_maps(put_res);
             }
-            Or(p) => match p.as_mut() {
+            Or(p) => match p {
                 Left(l) => Rc::make_mut(l).collect_big_maps(put_res),
                 Right(r) => Rc::make_mut(r).collect_big_maps(put_res),
             },
             Option(p) => {
-                if let Some(x) = p {
+                if let Some(x) = p.as_mut() {
                     Rc::make_mut(x).collect_big_maps(put_res)
                 }
             }

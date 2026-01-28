@@ -35,13 +35,13 @@ impl PartialOrd for TypedValue<'_> {
             (Unit, Unit) => Some(std::cmp::Ordering::Equal),
             (Unit, _) => None,
 
-            (Pair(l), Pair(r)) => l.partial_cmp(r),
+            (Pair(l1, l2), Pair(r1, r2)) => (l1, l2).partial_cmp(&(r1, r2)),
             (Pair(..), _) => None,
 
             (Option(x), Option(y)) => x.as_deref().partial_cmp(&y.as_deref()),
             (Option(..), _) => None,
 
-            (Or(x), Or(y)) => x.as_ref().partial_cmp(y.as_ref()),
+            (Or(x), Or(y)) => x.partial_cmp(y),
             (Or(..), _) => None,
 
             (Address(l), Address(r)) => l.partial_cmp(r),
