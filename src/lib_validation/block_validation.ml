@@ -193,6 +193,7 @@ let hash_shell_header shell =
 
 type result = {
   shell_header_hash : Shell_header_hash.t;
+  protocol_data : Bytes.t;
   validation_store : validation_store;
   block_metadata : Bytes.t * Block_metadata_hash.t option;
   ops_metadata : ops_metadata;
@@ -281,12 +282,35 @@ let result_encoding =
       ]
   in
   conv
-    (fun {shell_header_hash; validation_store; block_metadata; ops_metadata} ->
-      (shell_header_hash, validation_store, block_metadata, ops_metadata))
-    (fun (shell_header_hash, validation_store, block_metadata, ops_metadata) ->
-      {shell_header_hash; validation_store; block_metadata; ops_metadata})
-    (obj4
+    (fun {
+           shell_header_hash;
+           protocol_data;
+           validation_store;
+           block_metadata;
+           ops_metadata;
+         }
+       ->
+      ( shell_header_hash,
+        protocol_data,
+        validation_store,
+        block_metadata,
+        ops_metadata ))
+    (fun ( shell_header_hash,
+           protocol_data,
+           validation_store,
+           block_metadata,
+           ops_metadata )
+       ->
+      {
+        shell_header_hash;
+        protocol_data;
+        validation_store;
+        block_metadata;
+        ops_metadata;
+      })
+    (obj5
        (req "shell_header_hash" Shell_header_hash.encoding)
+       (req "protocol_data" Data_encoding.bytes)
        (req "validation_store" validation_store_encoding)
        (req "block_metadata" (tup2 bytes (option Block_metadata_hash.encoding)))
        (req "ops_metadata" ops_metadata_encoding))
@@ -757,6 +781,7 @@ module Make (Proto : Protocol_plugin.T) = struct
             block_hash
             block_header
         in
+        let protocol_data_bytes = block_header.protocol_data in
         let*? block_header = parse_block_header block_hash block_header in
         let* () = check_operation_quota block_hash operations in
         let predecessor_hash = Block_header.hash predecessor_block_header in
@@ -902,6 +927,7 @@ module Make (Proto : Protocol_plugin.T) = struct
               result =
                 {
                   shell_header_hash = hash_shell_header block_header.shell;
+                  protocol_data = protocol_data_bytes;
                   validation_store;
                   block_metadata;
                   ops_metadata;
@@ -1034,6 +1060,8 @@ module Make (Proto : Protocol_plugin.T) = struct
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash ~operations =
     let open Lwt_result_syntax in
+    let protocol_data_bytes = protocol_data in
+    let*? protocol_data = parse_protocol_data protocol_data_bytes in
     let context = predecessor_context in
     let*! context =
       update_testchain_status context ~predecessor_hash timestamp
@@ -1311,6 +1339,7 @@ module Make (Proto : Protocol_plugin.T) = struct
       let result =
         {
           shell_header_hash = hash_shell_header (fst preapply_result);
+          protocol_data = protocol_data_bytes;
           validation_store;
           block_metadata;
           ops_metadata;
@@ -1643,15 +1672,6 @@ let preapply ~chain_id ~user_activated_upgrades
   (* The cache might be inconsistent with the context. By forcing the
      reloading of the cache, we restore the consistency. *)
   let module Block_validation = Make (Proto) in
-  let* protocol_data =
-    match
-      Data_encoding.Binary.of_bytes_opt
-        Proto.block_header_data_encoding
-        protocol_data
-    with
-    | None -> failwith "Invalid block header"
-    | Some protocol_data -> return protocol_data
-  in
   Block_validation.preapply
     ~chain_id
     ~cache

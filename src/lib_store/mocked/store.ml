@@ -407,6 +407,7 @@ module Block = struct
       block_metadata;
       ops_metadata;
       shell_header_hash = _;
+      protocol_data = _;
     } =
       validation_result
     in
