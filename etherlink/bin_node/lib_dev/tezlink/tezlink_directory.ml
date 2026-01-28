@@ -367,7 +367,14 @@ let build_block_static_directory ~l2_chain_id
        ~impl:(fun ((((), chain), block), contract) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         Backend.counter chain block contract)
+         (* On not-yet-allocated implicit accounts, L1 returns the
+            current global counter instead of [None]. We don't have a
+            global counter so we return 0 in this case instead. See
+            also https://gitlab.com/tezos/tezos/-/issues/7960. *)
+         let* counter_opt = Backend.counter chain block contract in
+         match (counter_opt, contract) with
+         | None, Implicit _ -> return_some Z.zero
+         | counter_opt, _ -> return counter_opt)
        ~convert_output:Protocol_types.Counter.of_z
   |> register
        ~service:Tezos_services.constants
