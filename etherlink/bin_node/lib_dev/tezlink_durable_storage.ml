@@ -59,7 +59,7 @@ let counter read c =
   Durable_storage.inspect_durable_and_decode_default
   (* FIXME: #7960
      This default should be the global counter *)
-    ~default:Z.one
+    ~default:Z.zero
     read
     (Path.counter c)
     (Data_encoding.Binary.of_bytes_exn Data_encoding.n)

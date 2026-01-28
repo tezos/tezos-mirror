@@ -457,7 +457,7 @@ let test_tezlink_contract_info_script =
   let code = JSON.(script |-> "code" |> as_list) in
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
-  Check.((counter = 1) int ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
   Check.(
     (List.length storage = 1)
       int
@@ -496,7 +496,7 @@ let test_tezlink_counter =
   Check.(JSON.(valid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
   let* invalid_res = account_rpc sequencer Constant.bootstrap2 "counter" in
   Check.(
-    JSON.(invalid_res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
+    JSON.(invalid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_contract_info_on_liquidity_baking =
