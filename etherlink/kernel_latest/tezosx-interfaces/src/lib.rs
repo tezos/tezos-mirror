@@ -2,42 +2,93 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::error::Error;
-
 use primitive_types::U256;
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use thiserror::Error;
+
+#[derive(Eq, PartialEq, Debug, Error)]
+pub enum TezosXRuntimeError {
+    #[error("RuntimeId not in registry")]
+    RuntimeNotFound(RuntimeId),
+    #[error("Conversion error: {0}")]
+    ConversionError(String),
+    #[error("Runtime error: {0}")]
+    Runtime(#[from] RuntimeError),
+    #[error("Storage error: {0}")]
+    Storage(#[from] tezos_storage::error::Error),
+    #[error("Path error: {0}")]
+    Path(#[from] tezos_smart_rollup_host::path::PathError),
+    #[error("Custom error: {0}")]
+    Custom(String),
+}
+pub trait Registry {
+    fn bridge<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        destination_runtime: RuntimeId,
+        destination_address: &[u8],
+        source_address: &[u8],
+        amount: U256,
+        data: &[u8],
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
+    fn generate_alias<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        native_address: &[u8],
+        runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
+    fn address_from_string(
+        &self,
+        address_str: &str,
+        runtime_id: RuntimeId,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+}
 
 pub trait RuntimeInterface {
-    type AddressType;
-    type Error: Error;
     // TODO: Probably need to pass more data to initialize
     // a real operation when creating an alias.
-    fn generate_alias(
+    fn generate_alias<Host: Runtime>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         native_address: &[u8],
-    ) -> Result<Self::AddressType, Self::Error>;
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+
     // This is a just a placeholder for now to show how the
     //interface would look like.
     // TODO: Probably need to pass and return more data to
     // initialize a real operation when we will implement this.
     // Amounts should have been subtracted from the sender
     // before calling this function.
-    fn call(
+    fn call<Host: Runtime>(
         &self,
-        host: &mut impl Runtime,
-        from: &Self::AddressType,
-        to: &Self::AddressType,
+        registry: &impl Registry,
+        host: &mut Host,
+        from: &[u8],
+        to: &[u8],
         amount: U256,
         data: &[u8],
-    ) -> Result<Vec<u8>, Self::Error>;
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
-    fn encode_address(&self, address: &Self::AddressType)
-        -> Result<Vec<u8>, Self::Error>;
+    fn address_from_string(
+        &self,
+        address_str: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
-    fn decode_address(&self, data: &[u8]) -> Result<Self::AddressType, Self::Error>;
+    #[cfg(feature = "testing")]
+    fn string_from_address(&self, address: &[u8]) -> Result<String, TezosXRuntimeError>;
+
+    #[cfg(feature = "testing")]
+    fn get_balance<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        address: &[u8],
+    ) -> Result<U256, TezosXRuntimeError>;
 }
 
+#[derive(Eq, PartialEq, Hash, Debug)]
 pub enum RuntimeId {
     Tezos = 0,
     Ethereum = 1,

@@ -10,6 +10,14 @@ license = "MIT"
 
 [dependencies]
 tezos-evm-runtime.workspace = true
+tezos-smart-rollup-host.workspace = true
+# TODO: Remove this crate (L2-809)
+tezos-storage.workspace = true
 primitive-types.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
+
+
+[features]
+testing = []
