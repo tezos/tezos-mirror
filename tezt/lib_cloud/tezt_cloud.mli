@@ -300,6 +300,9 @@ module Tezt_cloud_cli : sig
 
   (** Equivalent to [Cli.dns_domains] *)
   val dns_domains : string list
+
+  (** The tezt-cloud workspace name *)
+  val tezt_cloud : string
 end
 
 module Artifact_helpers : sig

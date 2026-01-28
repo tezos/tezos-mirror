@@ -702,6 +702,12 @@ module Localhost = struct
     let* network =
       if Env.docker_host_network then Lwt.return "host"
       else
+        (* Remove existing network if it exists (ignore errors) *)
+        let* () =
+          Docker.network ~command:"rm" ~network_name:docker_network
+          |> Process.wait
+          |> Lwt.map (fun _ -> ())
+        in
         let* () =
           Docker.network ~command:"create" ~network_name:docker_network
           |> Process.check
@@ -747,7 +753,9 @@ module Localhost = struct
       |> List.of_seq |> Lwt.all
     in
     let address configuration =
-      if Env.docker_host_network then Lwt.return "127.0.0.1"
+      (* On macOS, container IPs are not routable from the host.
+         We must use 127.0.0.1 with published ports instead. *)
+      if Env.docker_host_network || Env.macosx then Lwt.return "127.0.0.1"
       else
         let* output =
           Process.run_and_read_stdout

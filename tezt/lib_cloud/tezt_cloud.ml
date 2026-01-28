@@ -330,6 +330,8 @@ module Tezt_cloud_cli = struct
   let proxy = Cli.proxy
 
   let dns_domains = Cli.dns_domains
+
+  let tezt_cloud = Env.tezt_cloud
 end
 
 module Artifact_helpers = struct
