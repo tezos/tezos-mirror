@@ -122,3 +122,34 @@ let redeem_from_clst_deposits ctxt ~staker amount =
   in
   let* ctxt = Clst.add_redemption_request ctxt staker current_cycle amount in
   return (ctxt, redeem_balance_update)
+
+let get_account_operator_allowance context storage ~owner ~spender =
+  let open Lwt_result_syntax in
+  let* operators, context =
+    Script_big_map.get context owner storage.operators_table
+  in
+  let account_operators =
+    Option.value ~default:(Script_map.empty address_t) operators
+  in
+  return (Script_map.get spender account_operators, context)
+
+let set_account_operator_allowance context storage ~owner ~spender new_allowance
+    =
+  let open Lwt_result_syntax in
+  let* operators, context =
+    Script_big_map.get context owner storage.operators_table
+  in
+  let account_operators =
+    Option.value ~default:(Script_map.empty address_t) operators
+  in
+  let updated_operators =
+    Script_map.update spender new_allowance account_operators
+  in
+  let* operators_table, context =
+    Script_big_map.update
+      context
+      owner
+      (Some updated_operators)
+      storage.operators_table
+  in
+  return ({storage with operators_table}, context)

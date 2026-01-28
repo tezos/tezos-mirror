@@ -29,6 +29,7 @@ module CLST_contract = struct
     | Non_implicit_contract of Destination.t
     | Balance_too_low of Destination.t * nat * nat
     | Amount_too_large of Destination.t * nat
+    | Only_owner_can_change_operator of Destination.t * Destination.t
 
   let is_implicit : Destination.t -> bool = function
     | Destination.Contract (Contract.Implicit _) -> true
@@ -327,6 +328,68 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
+  let execute_approval (step_constants : step_constants) (storage, ctxt)
+      ((owner, (spender, (token_id, delta))) : approval) =
+    let open Lwt_result_syntax in
+    (* Restrict operator updates only to the owner of the token. *)
+    let*? () =
+      error_when
+        (not (Destination.equal step_constants.sender owner.destination))
+        (Only_owner_can_change_operator
+           (step_constants.sender, owner.destination))
+    in
+    (* Check token_id is the one defined by the contract. *)
+    let*? () = check_token_id token_id in
+    let* allowance, ctxt =
+      Clst_contract_storage.get_account_operator_allowance
+        ctxt
+        storage
+        ~owner
+        ~spender
+    in
+    let new_allowance =
+      match (allowance, delta) with
+      (* "Operator has precedence over spender" (cf TZIP26), i.e. if an
+       infinite allowance is set, then only the [update_operators]
+       entrypoint will have an effect on it. *)
+      | Some None, _ -> None
+      (* Operator already has an allowance *)
+      | Some (Some allowance), L increase ->
+          Some (Script_int.add_n allowance increase)
+      (* If the allowance would underflow, TZIP26 considers it as zero,
+       and not an error. *)
+      | Some (Some allowance), R decrease ->
+          let new_allowance =
+            Script_int.sub allowance decrease
+            |> Script_int.is_nat
+            |> Option.value ~default:Script_int.zero_n
+          in
+          Some new_allowance
+      (* The operator has no allowance defined already. *)
+      | None, L increase -> Some increase
+      | None, R _decrease -> Some Script_int.zero_n
+    in
+    let* storage, ctxt =
+      Clst_contract_storage.set_account_operator_allowance
+        ctxt
+        storage
+        ~owner
+        ~spender
+        (Some new_allowance)
+    in
+    return (storage, ctxt)
+
+  let execute_approve (ctxt, (step_constants : step_constants))
+      (value : approve) (storage : Clst_contract_storage.t) =
+    let open Lwt_result_syntax in
+    let* storage, ctxt =
+      List.fold_left_es
+        (execute_approval step_constants)
+        (storage, ctxt)
+        (Script_list.to_list value)
+    in
+    return (Script_list.empty, storage, [], ctxt)
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
@@ -334,7 +397,8 @@ module CLST_contract = struct
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
-    | Approve _ -> assert false
+    | Approve approvals ->
+        execute_approve (ctxt, step_constants) approvals storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
@@ -522,4 +586,29 @@ let () =
       | CLST_contract.Amount_too_large (address, amount) ->
           Some (address, amount)
       | _ -> None)
-    (fun (address, amount) -> CLST_contract.Amount_too_large (address, amount))
+    (fun (address, amount) -> CLST_contract.Amount_too_large (address, amount)) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.only_owner_can_change_operator"
+    ~title:"Only the owner can update operators"
+    ~description:"Only the owner can update operators"
+    ~pp:(fun ppf (sender, owner) ->
+      Format.fprintf
+        ppf
+        "%a cannot update operators on behalf of %a, only %a can do it."
+        Destination.pp
+        sender
+        Destination.pp
+        owner
+        Destination.pp
+        owner)
+    Data_encoding.(
+      obj2
+        (req "sender" Destination.encoding)
+        (req "owner" Destination.encoding))
+    (function
+      | CLST_contract.Only_owner_can_change_operator (sender, owner) ->
+          Some (sender, owner)
+      | _ -> None)
+    (fun (sender, owner) ->
+      CLST_contract.Only_owner_can_change_operator (sender, owner))

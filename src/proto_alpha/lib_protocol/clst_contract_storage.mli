@@ -85,3 +85,30 @@ val redeem_from_clst_deposits :
   staker:Contract.t ->
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
+
+(** [get_account_operator_allowance context storage owner spender] get
+    [spender] allowance on [owner]'s tokens:
+
+    - None if [spender] is not an operator
+    - Some None if [spender] has an infinite allowance
+    - Some (Some allowance) if [spender] can spend [allowance] tokens. *)
+val get_account_operator_allowance :
+  context ->
+  t ->
+  owner:address ->
+  spender:address ->
+  (CLST_types.nat option option * context) tzresult Lwt.t
+
+(** [set_account_operator_allowance context storage owner spender new_allowance]
+    set [spender] allowance on [owner]'s tokens:
+
+    - None if [spender] is not an operator
+    - Some None if [spender] has an infinite allowance
+    - Some (Some allowance) if [spender] can spend [allowance] tokens. *)
+val set_account_operator_allowance :
+  context ->
+  t ->
+  owner:address ->
+  spender:address ->
+  CLST_types.nat option option ->
+  (t * context) tzresult Lwt.t
