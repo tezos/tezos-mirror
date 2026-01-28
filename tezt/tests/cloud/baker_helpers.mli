@@ -20,13 +20,13 @@ type baker = {
   dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
   accounts : baker_account list;
-  stake : int;
+  stake : int64;
 }
 
 (** Initialize a whole fleet of bakers. *)
 val init_bakers :
   bakers:string list ->
-  stake:int list Lwt.t ->
+  stake:int64 list Lwt.t ->
   data_dir:string option ->
   simulate_network:Network_simulation.t ->
   external_rpc:bool ->

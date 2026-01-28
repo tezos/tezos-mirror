@@ -16,7 +16,7 @@ open Yes_crypto
 
 type configuration = {
   with_dal : bool;
-  stake : int list Lwt.t;
+  stake : int64 list Lwt.t;
   bakers : string list; (* unencrypted secret keys *)
   stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
@@ -724,7 +724,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                 Some
                   {
                     Protocol.balance =
-                      Some (List.nth stake i * 1_000_000_000_000);
+                      Some (Int64.mul (List.nth stake i) 1_000_000_000_000L);
                     consensus_key = None;
                     delegate = None;
                   } ))
@@ -736,7 +736,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
               ( key,
                 Some
                   {
-                    Protocol.balance = Some 1_000_000_000_000;
+                    Protocol.balance = Some 1_000_000_000_000L;
                     consensus_key = None;
                     delegate = None;
                   },

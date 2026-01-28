@@ -1747,7 +1747,9 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
      current default), the new baker should be assigned roughly 256 / 64 = 4
      shards on average. We should encounter relatively quickly a level where it
      is assigned to no shard. *)
-  let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
+  let stake =
+    Tez.of_mutez_int64 (Int64.div Protocol.default_bootstrap_balance 64L)
+  in
   let amount = Tez.(stake + of_int 10) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =

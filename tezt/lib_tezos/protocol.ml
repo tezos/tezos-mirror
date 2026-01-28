@@ -106,12 +106,12 @@ type bootstrap_smart_rollup = {
 }
 
 type bootstrap_parameters = {
-  balance : int option;
+  balance : int64 option;
   consensus_key : Account.key option;
   delegate : Account.key option;
 }
 
-let default_bootstrap_balance = 4_000_000_000_000
+let default_bootstrap_balance = 4_000_000_000_000L
 
 let default_bootstrap_parameters =
   {balance = None; consensus_key = None; delegate = None}
@@ -163,7 +163,7 @@ let write_parameter_file :
                   ([
                      `String account.public_key;
                      `String
-                       (string_of_int
+                       (Int64.to_string
                           (Option.value
                              ~default:default_bootstrap_balance
                              bootstrap_param.balance));
@@ -275,7 +275,7 @@ let write_parameter_file :
                  (if is_revealed then account.public_key
                   else account.public_key_hash);
                `String
-                 (string_of_int
+                 (Int64.to_string
                     (Option.value
                        ~default:default_bootstrap_balance
                        bootstrap_param.balance));
