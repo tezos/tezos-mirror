@@ -3274,6 +3274,87 @@ let test_delayed_deposit_is_included =
     ~error_msg:"Expected a 1000 tez on bootstrap1" ;
   unit
 
+let test_bridged_tez_transfer =
+  register_tezlink_test
+    ~time_between_blocks:Nothing
+    ~tags:["deposit"; "transfer"]
+    ~title:"A Tezlink account that has only bridged tez can make a transfer"
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  (* Check that account is empty and not revealed. *)
+  let* balance_1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.((balance_1 = Tez.zero) Tez.typ)
+    ~error_msg:"Expected balance at 0 for bootstrap1" ;
+  let* manager_key = account_rpc sequencer Constant.bootstrap1 "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = None)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         Constant.bootstrap1.public_key_hash
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Contract_repr.encoding
+      receiver
+  in
+  let (`Hex receiver) = Hex.of_bytes bytes in
+  let deposit_info =
+    Delayed_inbox.{receiver = TezosAddr receiver; chain_id = None}
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~rlp:true
+      ~amount:(Tez.of_int 1000)
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    bake_until_sync ~network:Tezlink ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let* _ = produce_block sequencer in
+  let* balance_2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.((balance_2 = Tez.one) Tez.typ)
+    ~error_msg:"Expected balance at 1 tez for bootstrap2" ;
+  unit
+
 let originate_contract ~sequencer ~client ~endpoint ~protocol ~filename ~storage
     =
   let* _alias, address =
@@ -3530,5 +3611,6 @@ let () =
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
   test_delayed_deposit_is_included [Alpha] ;
+  test_bridged_tez_transfer [Alpha] ;
   test_big_map_transfer [Alpha] ;
   test_tezlink_upgrade_kernel_auto_sync [Alpha]
