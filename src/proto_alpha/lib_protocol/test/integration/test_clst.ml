@@ -377,6 +377,26 @@ let () =
 
 let test_total_supply (total_supply_f : Block.t -> int64 tzresult Lwt.t) =
   let open Lwt_result_wrap_syntax in
+  let check_rpcs ~loc b expected_in_mutez =
+    (* total_supply = total_amount_of_tez
+       exchange_rate = 1 *)
+    let* total_supply = total_supply_f b in
+    let* total_amount_of_tez =
+      Plugin.Contract_services.clst_total_amount_of_tez Block.rpc_ctxt b
+    in
+    let* exchange_rate =
+      Plugin.Contract_services.clst_exchange_rate Block.rpc_ctxt b
+    in
+    let* () = Assert.equal_int64 ~loc total_supply expected_in_mutez in
+    let* () =
+      Assert.equal_int64
+        ~loc
+        (Tez.to_mutez total_amount_of_tez)
+        expected_in_mutez
+    in
+    let* () = Assert.is_true ~loc (Q.equal exchange_rate Q.one) in
+    return_unit
+  in
   let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
   let initial_bal_mutez = 300_000_000L in
   let* account_a, b =
@@ -404,23 +424,19 @@ let test_total_supply (total_supply_f : Block.t -> int64 tzresult Lwt.t) =
       (Tez.of_mutez_exn initial_clst_bal_mutez_b)
   in
   let* b = Block.bake ~operations:[deposit_a_tx; deposit_b_tx] b in
-  let* total_supply = total_supply_f b in
   let expected_total_supply =
     Int64.add initial_clst_bal_mutez_a initial_clst_bal_mutez_b
   in
-  let* () =
-    Assert.equal_int64 ~loc:__LOC__ total_supply expected_total_supply
-  in
+  let* () = check_rpcs ~loc:__LOC__ b expected_total_supply in
   let withdrawal_amount_mutez = 40_000_000L in
   let* withdraw_tx =
     Op.clst_withdraw ~fee:Tez.zero (B b) account_a withdrawal_amount_mutez
   in
   let* b = Block.bake ~operation:withdraw_tx b in
-  let* total_supply = total_supply_f b in
   let expected_total_supply =
     Int64.sub expected_total_supply withdrawal_amount_mutez
   in
-  Assert.equal_int64 ~loc:__LOC__ total_supply expected_total_supply
+  check_rpcs ~loc:__LOC__ b expected_total_supply
 
 let () =
   register_test ~title:"Test get_total_supply view" @@ fun () ->
@@ -509,3 +525,13 @@ let () =
      during the deposit. *)
   let* deposited_balance = total_amount_of_tez (Context.B b) in
   Assert.equal_tez ~loc:__LOC__ deposited_balance amount
+
+let () =
+  register_test ~title:"Initial exchange_rate is one" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, _funder = Context.init1 ~consensus_threshold_size:0 () in
+  let* exchange_rate =
+    Plugin.Contract_services.clst_exchange_rate Block.rpc_ctxt b
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (Q.equal exchange_rate Q.one) in
+  return_unit
