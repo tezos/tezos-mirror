@@ -2225,7 +2225,10 @@ let test_tezlink_prevalidation =
     Operation.Manager.(
       operation [make ~fee:1000 ~source:unknown (transfer ())] client)
   in
-  let unknown_rex = rex "Empty implicit contract" in
+  (* Unknown contracts are treated as unrevealed *)
+  let unknown_rex =
+    rex (sf "Unrevealed manager key for contract %s." unknown.public_key_hash)
+  in
   let* _ =
     Operation.inject
       ~error:unknown_rex
