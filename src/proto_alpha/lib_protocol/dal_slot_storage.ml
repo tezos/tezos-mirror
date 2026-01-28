@@ -427,6 +427,99 @@ let update_skip_list ctxt ~stored_history ~updated_history newly_attested
   in
   return ctxt
 
+let record_participation ctxt ~finalized_level ~attestation_lag updated_history
+    =
+  let finalized_level_map_opt =
+    Raw_level_repr.Map.find finalized_level updated_history
+  in
+  match finalized_level_map_opt with
+  | None -> return ctxt
+  | Some finalized_level_map ->
+      let delegate_map =
+        Dal_slot_index_repr.Map.fold
+          (fun _slot_index status delegate_map ->
+            if not status.Dal_attestations_repr.Accountability.is_proto_attested
+            then
+              (* Slots that are not protocol-attested are not taken into account
+                 when computing the DAL participation. *)
+              delegate_map
+            else
+              (* First, we increase the [number_of_slots_attested_by_delegate] of all those that attested. *)
+              let delegate_map =
+                Signature.Public_key_hash.Set.fold
+                  (fun attester delegate_map ->
+                    Signature.Public_key_hash.Map.update
+                      attester
+                      (function
+                        | None -> Some (1, 1)
+                        | Some
+                            ( number_of_slots_attested,
+                              number_of_attestable_slots ) ->
+                            Some
+                              ( number_of_slots_attested + 1,
+                                number_of_attestable_slots + 1 ))
+                      delegate_map)
+                  status.attesters
+                  delegate_map
+              in
+              (* Second, we do not increase the participation of all those that
+                 did not attest, while having assigned shards. *)
+              let shard_assignment_level =
+                (* same as [current_level - 1], but in this way we avoid a match *)
+                Raw_level_repr.add finalized_level (attestation_lag - 1)
+              in
+              let committee_level_to_delegate_to_shard_count =
+                Raw_context.Consensus.delegate_to_shard_count ctxt
+              in
+              match
+                Raw_level_repr.Map.find
+                  shard_assignment_level
+                  committee_level_to_delegate_to_shard_count
+              with
+              | None ->
+                  (* unreachable by construction of
+                  [committee_level_to_delegate_to_shard_count] *)
+                  assert false
+              | Some delegate_to_shard_count ->
+                  Signature.Public_key_hash.Map.fold
+                    (fun delegate _shard_count delegate_map ->
+                      if
+                        not
+                        @@ Signature.Public_key_hash.Set.mem
+                             delegate
+                             status.attesters
+                      then
+                        Signature.Public_key_hash.Map.update
+                          delegate
+                          (function
+                            | None -> Some (0, 1)
+                            | Some
+                                ( number_of_slots_attested,
+                                  number_of_attestable_slots ) ->
+                                Some
+                                  ( number_of_slots_attested,
+                                    number_of_attestable_slots + 1 ))
+                          delegate_map
+                      else delegate_map)
+                    delegate_to_shard_count
+                    delegate_map)
+          finalized_level_map
+          Signature.Public_key_hash.Map.empty
+      in
+      Signature.Public_key_hash.Map.fold_es
+        (fun delegate
+             ( number_of_slots_attested_by_delegate,
+               number_of_protocol_attested_slots )
+             ctxt
+           ->
+          Delegate_missed_attestations_storage.record_dal_participation
+            ctxt
+            ~delegate
+            ~number_of_slots_attested_by_delegate
+            ~number_of_protocol_attested_slots)
+        delegate_map
+        ctxt
+
 (** [finalize_attestation_history ctxt] merges the current block's
     accountability with stored history, updates storage, and returns the newly
     attested slots as a bitset. *)
@@ -466,11 +559,22 @@ let finalize_attestation_history ctxt =
       ~number_of_slots
       ~number_of_shards
   in
-  (* Drop finalized levels: those with [published_level <= current_level -
-     attestation_lag] *)
-  let finalized_threshold = Raw_level_repr.sub current_level attestation_lag in
+  let finalized_level_opt = Raw_level_repr.sub current_level attestation_lag in
+  (* Record participation *)
+  let* ctxt =
+    match finalized_level_opt with
+    | None -> return ctxt
+    | Some finalized_level ->
+        record_participation
+          ctxt
+          ~finalized_level
+          ~attestation_lag
+          updated_history
+  in
+  (* Drop finalized levels: those with [published_level
+     <= current_level - attestation_lag] *)
   let pruned_history =
-    match finalized_threshold with
+    match finalized_level_opt with
     | None ->
         updated_history (* [current_level < attestation_lag], keep everything *)
     | Some threshold_level ->
