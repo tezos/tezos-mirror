@@ -125,6 +125,13 @@ let yes_wallet =
     ~path:"./_build/default/devtools/yes_wallet/yes_wallet.exe"
     ()
 
+let watchtower =
+  Uses.make
+    ~how_to_build:"make fa-bridge-watchtower"
+    ~tag:"watchtower"
+    ~path:"./fa-bridge-watchtower"
+    ()
+
 module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm" ()

@@ -28,4 +28,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "A binary to claim FA deposits sent by the bridge"
+synopsis: "A binary to claim deposits sent by the bridge"

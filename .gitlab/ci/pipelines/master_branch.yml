@@ -287,6 +287,7 @@ oc.build_arm64-extra-dev:
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
+    - fa-bridge-watchtower
     when: on_success
 
 oc.build_arm64-exp:
@@ -342,6 +343,7 @@ oc.build_arm64-exp:
     - _build/default/tezt/tests/main.exe
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
+    - fa-bridge-watchtower
     when: on_success
 
 datadog_pipeline_trace:

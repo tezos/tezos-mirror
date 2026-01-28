@@ -208,6 +208,14 @@ module Event = struct
 
   let section = ["fa_bridge_watchtower"; "etherlink"]
 
+  let started =
+    declare_0
+      ~section
+      ~name:"bridge_watchtower_started"
+      ~msg:"watchtower has been started"
+      ~level:Notice
+      ()
+
   let transaction_log =
     declare_1
       ~section
@@ -315,6 +323,14 @@ module Event = struct
       ~level:Error
       ("error", Data_encoding.string)
       ~pp1:Format.pp_print_string
+
+  let transfered_to_tx_queue =
+    declare_0
+      ~section
+      ~name:"transfered_to_tx_queue"
+      ~msg:"Claim was transfered to tx queue"
+      ~level:Notice
+      ()
 
   let tx_queue_error =
     declare_1
@@ -591,7 +607,7 @@ let claim ctx ~deposit_id =
     let open Lwt_syntax in
     let* res = Tx_queue.transfer ctx ~to_:fa_bridge_address ~data () in
     match res with
-    | Ok (Ok ()) -> return_unit
+    | Ok (Ok ()) -> Event.(emit transfered_to_tx_queue) ()
     | Error trace ->
         Format.kasprintf Event.(emit tx_queue_error) "%a" pp_print_trace trace
     | Ok (Error error) -> Event.(emit injection_error) error
@@ -1064,4 +1080,5 @@ let start db ~config ~notify_ws_change ~first_block =
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;
+  Lwt.dont_wait (fun () -> Internal_event.Simple.emit Event.started ()) ignore ;
   loop ()

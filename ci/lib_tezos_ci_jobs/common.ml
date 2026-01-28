@@ -196,6 +196,7 @@ module Build = struct
           "_build/default/tezt/tests/main.exe";
           "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
           "etherlink-governance-observer";
+          "fa-bridge-watchtower";
         ]
     in
     job

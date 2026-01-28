@@ -734,9 +734,10 @@ let _fa_bridge_watchtower =
     ~internal_name:"main"
     ~path:"etherlink/fa-bridge-watchtower"
     ~opam:"fa-bridge-watchtower"
-    ~release_status:Unreleased
+    ~release_status:Experimental
+    ~bisect_ppx:Yes
     ~with_macos_security_framework:true
-    ~synopsis:"A binary to claim FA deposits sent by the bridge"
+    ~synopsis:"A binary to claim deposits sent by the bridge"
     ~deps:
       [
         bls12_381_archive;

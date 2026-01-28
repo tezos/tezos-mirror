@@ -293,6 +293,12 @@ let counter =
     ~label:"counter"
     ~contract:"TestCounter"
 
+let dummy_proxy =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/dummy_proxy.sol")
+    ~label:"dummyproxy"
+    ~contract:"DummyProxy"
+
 (** The info for the "coinbase.sol" contract. *)
 let coinbase =
   compile_contract
