@@ -27,6 +27,11 @@
 
 (** Helpers built upon the Sc_rollup_node and Sc_rollup_client *)
 
+(** [replace_variables string] sanitizes non-deterministic values in smart rollup
+    output (external messages, proofs, contract addresses), then applies standard
+    Tezos regression sanitizations. *)
+val replace_variables : string -> string
+
 (** Hooks that handles hashes specific to smart rollups. *)
 val hooks : Tezt.Process.hooks
 

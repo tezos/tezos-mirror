@@ -7205,6 +7205,15 @@ module Tx_kernel_e2e = struct
            sc_rollup_address
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+    (* Set up event handler to capture kernel debug output for regression test *)
+    let () =
+      Sc_rollup_node.on_event
+        sc_rollup_node
+        (fun Sc_rollup_node.{name; value; _} ->
+          if name = "kernel_debug.v0" then
+            Regression.capture
+              (Tx_kernel_helpers.replace_variables (JSON.as_string value)))
+    in
     let* () =
       Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
     in
