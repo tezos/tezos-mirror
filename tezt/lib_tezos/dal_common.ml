@@ -262,15 +262,18 @@ module Attestations = struct
         ~number_of_slots:parameters.Parameters.number_of_slots
         attestations_per_lag
 
+  (* Decode before 025 format: simple bitset where bit[i] = slot i is attested *)
+  let decode_before_025 str =
+    let attestation = Z.of_string str in
+    let length = Z.numbits attestation in
+    let array = Array.make length false in
+    List.iter
+      (fun i -> if Z.testbit attestation i then array.(i) <- true)
+      (range 0 (length - 1)) ;
+    array
+
   let rec decode protocol str =
-    if Protocol.number protocol < 025 then (
-      let attestation = Z.of_string str in
-      let length = Z.numbits attestation in
-      let array = Array.make length false in
-      List.iter
-        (fun i -> if Z.testbit attestation i then array.(i) <- true)
-        (range 0 (length - 1)) ;
-      array)
+    if Protocol.number protocol < 025 then decode_before_025 str
     else
       let z = Z.of_string str in
       Z.shift_right z 1 |> Z.to_string |> decode Protocol.T024
