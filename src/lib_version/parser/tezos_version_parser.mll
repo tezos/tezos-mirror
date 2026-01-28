@@ -44,9 +44,10 @@
     product: product;
     major : int;
     minor : int;
+    build: int;
     additional_info : additional_info} [@@deriving show]
 
-  let default = { product = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
+  let default = { product = Octez; major = 0 ; minor = 0 ; build = 0 ; additional_info = Dev }
 
 }
 
@@ -74,6 +75,8 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
     (num as major) ('.' (num as minor))? ".0"?
     (* Additional information for versions that are not actually releases. *)
     ('-' ("rc" | "beta" as extra_kind) (num as extra_num))?
+    (* Build number. *)
+    ('-' (num as build))?
     (* What follows depends on what we are parsing. *)
     (
       (* When parsing --node-version-allowed, we expect the following. *)
@@ -89,7 +92,8 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
       (* Convert strings. *)
       let product = product_of_string product in
       let major = int_of_string major in
-      let minor = Option.map int_of_string minor |> Option.value ~default: 0 in
+      let minor = Option.map int_of_string minor |> Option.value ~default:0 in
+      let build = Option.map int_of_string build |> Option.value ~default:0 in
       let additional_info_without_dev =
         match extra_kind, extra_num with
           | Some _, None | None, Some _ ->
@@ -117,7 +121,7 @@ rule parse_git_describe_or_node_version_allowed_exn = parse
                 | Beta n -> Beta_dev n
                 | Dev | RC_dev _ | Beta_dev _ as x -> x (* not supposed to happen *)
       in
-      Some ({ product; major; minor; additional_info }, commit_hash)
+      Some ({ product; major; minor; build; additional_info }, commit_hash)
     }
   | _ { None }
 
