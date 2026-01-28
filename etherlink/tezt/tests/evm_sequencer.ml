@@ -14449,9 +14449,8 @@ let test_eip3607_disabled_for_simulation =
   unit
 
 let test_fa_deposit_watchtower =
-  register_test
+  register_test_for_kernels
     ~__FILE__
-    ~kernel:Kernel.Latest
     ~tags:["evm"; "fa_deposit"; "watchtower"]
     ~title:"FA deposit is claimed by the watchtower"
     ~enable_fa_bridge:true
@@ -14558,6 +14557,8 @@ let test_fa_deposit_watchtower =
   unit
 
 let test_xtz_deposit_watchtower =
+  (* TODO: When 6.2 is released, replace `register_test` by
+     `register_test_for_kernels`.*)
   register_test
     ~__FILE__
     ~kernel:Kernel.Latest
