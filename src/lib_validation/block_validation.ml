@@ -424,15 +424,22 @@ module Make (Proto : Protocol_plugin.T) = struct
     in
     return_unit
 
+  (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
+  let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
+      'a tzresult =
+    let open Result_syntax in
+    match Data_encoding.Binary.of_bytes_opt encoding bytes with
+    | None -> tzfail Parse_error
+    | Some decoded_value -> return decoded_value
+
+  let parse_protocol_data (proto : bytes) =
+    safe_binary_of_bytes Proto.block_header_data_encoding proto
+
   let parse_block_header block_hash (block_header : Block_header.t) =
-    let open Lwt_result_syntax in
-    match
-      Data_encoding.Binary.of_bytes_opt
-        Proto.block_header_data_encoding
-        block_header.protocol_data
-    with
-    | None -> tzfail (invalid_block block_hash Cannot_parse_block_header)
-    | Some protocol_data ->
+    let open Result_syntax in
+    match parse_protocol_data block_header.protocol_data with
+    | Error _ -> tzfail (invalid_block block_hash Cannot_parse_block_header)
+    | Ok protocol_data ->
         return
           ({shell = block_header.shell; protocol_data} : Proto.block_header)
 
@@ -750,7 +757,7 @@ module Make (Proto : Protocol_plugin.T) = struct
             block_hash
             block_header
         in
-        let* block_header = parse_block_header block_hash block_header in
+        let*? block_header = parse_block_header block_hash block_header in
         let* () = check_operation_quota block_hash operations in
         let predecessor_hash = Block_header.hash predecessor_block_header in
         let* operations =
@@ -913,7 +920,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     let block_hash = Block_header.hash block_header in
     (* We assume that the block header and its associated operations
        have already been checked as valid. *)
-    let* block_header = parse_block_header block_hash block_header in
+    let*? block_header = parse_block_header block_hash block_header in
     let predecessor_hash = Block_header.hash predecessor_block_header in
     let* context =
       prepare_context
@@ -1007,15 +1014,7 @@ module Make (Proto : Protocol_plugin.T) = struct
           | Temporary -> Branch_delayed trace
           | Outdated -> Outdated)
 
-  (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
-  let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
-      'a tzresult =
-    let open Result_syntax in
-    match Data_encoding.Binary.of_bytes_opt encoding bytes with
-    | None -> tzfail Parse_error
-    | Some protocol_data -> return protocol_data
-
-  let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
+  let parse_operation_data (proto : bytes) : Proto.operation_data tzresult =
     safe_binary_of_bytes Proto.operation_data_encoding proto
 
   let parse {hash; operation = raw; check_signature} =
@@ -1024,7 +1023,7 @@ module Make (Proto : Protocol_plugin.T) = struct
     if size > Proto.max_operation_data_length then
       tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
-      let* protocol_data = parse_unsafe raw.proto in
+      let* protocol_data = parse_operation_data raw.proto in
       return {hash; check_signature; raw; protocol_data}
 
   let preapply ~chain_id ~cache ~user_activated_upgrades
@@ -1333,7 +1332,7 @@ module Make (Proto : Protocol_plugin.T) = struct
         block_hash
         block_header
     in
-    let* block_header = parse_block_header block_hash block_header in
+    let*? block_header = parse_block_header block_hash block_header in
     let* () = check_operation_quota block_hash operations in
     let*! context =
       update_testchain_status
