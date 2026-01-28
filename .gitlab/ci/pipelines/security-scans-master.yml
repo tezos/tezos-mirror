@@ -163,7 +163,7 @@ container_scanning_tezos-tezos-master:
     paths:
     - gl-container-scanning-report-tezos-tezos-master.json
 
-container_scanning_tezos-debian-unstable-master-07a4c8c9:
+container_scanning_tezos-debian-unstable-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -188,13 +188,13 @@ container_scanning_tezos-debian-unstable-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:unstable-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-debian-unstable-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:unstable-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-debian-unstable-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-unstable-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-debian-unstable-master-bcfcb772.json
 
-container_scanning_tezos-debian-bookworm-master-07a4c8c9:
+container_scanning_tezos-debian-bookworm-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -219,13 +219,13 @@ container_scanning_tezos-debian-bookworm-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-debian-bookworm-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-debian-bookworm-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-bookworm-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-debian-bookworm-master-bcfcb772.json
 
-container_scanning_tezos-debian-trixie-master-07a4c8c9:
+container_scanning_tezos-debian-trixie-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -250,13 +250,13 @@ container_scanning_tezos-debian-trixie-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-debian-trixie-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-debian-trixie-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-debian-trixie-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-debian-trixie-master-bcfcb772.json
 
-container_scanning_tezos-ubuntu-noble-master-07a4c8c9:
+container_scanning_tezos-ubuntu-noble-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -281,13 +281,13 @@ container_scanning_tezos-ubuntu-noble-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-ubuntu-noble-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-ubuntu-noble-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-noble-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-ubuntu-noble-master-bcfcb772.json
 
-container_scanning_tezos-ubuntu-jammy-master-07a4c8c9:
+container_scanning_tezos-ubuntu-jammy-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -312,13 +312,13 @@ container_scanning_tezos-ubuntu-jammy-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-ubuntu-jammy-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-ubuntu-jammy-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-jammy-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-ubuntu-jammy-master-bcfcb772.json
 
-container_scanning_tezos-ubuntu-plucky-master-07a4c8c9:
+container_scanning_tezos-ubuntu-plucky-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -343,13 +343,13 @@ container_scanning_tezos-ubuntu-plucky-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-ubuntu-plucky-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-ubuntu-plucky-master-bcfcb772.json
 
-container_scanning_tezos-fedora-39-master-07a4c8c9:
+container_scanning_tezos-fedora-39-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -374,13 +374,13 @@ container_scanning_tezos-fedora-39-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-fedora-39-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-fedora-39-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-39-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-fedora-39-master-bcfcb772.json
 
-container_scanning_tezos-fedora-41-master-07a4c8c9:
+container_scanning_tezos-fedora-41-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -405,13 +405,13 @@ container_scanning_tezos-fedora-41-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-fedora-41-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-fedora-41-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-41-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-fedora-41-master-bcfcb772.json
 
-container_scanning_tezos-fedora-42-master-07a4c8c9:
+container_scanning_tezos-fedora-42-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -436,13 +436,13 @@ container_scanning_tezos-fedora-42-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:42-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-fedora-42-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:42-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-fedora-42-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-fedora-42-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-fedora-42-master-bcfcb772.json
 
-container_scanning_tezos-rockylinux-9-master-07a4c8c9:
+container_scanning_tezos-rockylinux-9-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -467,13 +467,13 @@ container_scanning_tezos-rockylinux-9-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-rockylinux-9-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-rockylinux-9-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-rockylinux-9-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-rockylinux-9-master-bcfcb772.json
 
-container_scanning_tezos-rockylinux-10-master-07a4c8c9:
+container_scanning_tezos-rockylinux-10-master-bcfcb772:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -498,11 +498,11 @@ container_scanning_tezos-rockylinux-10-master-07a4c8c9:
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
-    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10-master-07a4c8c9
-    REPORT: gl-container-scanning-report-tezos-rockylinux-10-master-07a4c8c9.json
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10-master-bcfcb772
+    REPORT: gl-container-scanning-report-tezos-rockylinux-10-master-bcfcb772.json
   artifacts:
     paths:
-    - gl-container-scanning-report-tezos-rockylinux-10-master-07a4c8c9.json
+    - gl-container-scanning-report-tezos-rockylinux-10-master-bcfcb772.json
 
 container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
@@ -514,33 +514,33 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-master-07a4c8c9
-  - container_scanning_tezos-debian-bookworm-master-07a4c8c9
-  - container_scanning_tezos-debian-trixie-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-noble-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-jammy-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-plucky-master-07a4c8c9
-  - container_scanning_tezos-fedora-39-master-07a4c8c9
-  - container_scanning_tezos-fedora-41-master-07a4c8c9
-  - container_scanning_tezos-fedora-42-master-07a4c8c9
-  - container_scanning_tezos-rockylinux-9-master-07a4c8c9
-  - container_scanning_tezos-rockylinux-10-master-07a4c8c9
+  - container_scanning_tezos-debian-unstable-master-bcfcb772
+  - container_scanning_tezos-debian-bookworm-master-bcfcb772
+  - container_scanning_tezos-debian-trixie-master-bcfcb772
+  - container_scanning_tezos-ubuntu-noble-master-bcfcb772
+  - container_scanning_tezos-ubuntu-jammy-master-bcfcb772
+  - container_scanning_tezos-ubuntu-plucky-master-bcfcb772
+  - container_scanning_tezos-fedora-39-master-bcfcb772
+  - container_scanning_tezos-fedora-41-master-bcfcb772
+  - container_scanning_tezos-fedora-42-master-bcfcb772
+  - container_scanning_tezos-rockylinux-9-master-bcfcb772
+  - container_scanning_tezos-rockylinux-10-master-bcfcb772
   dependencies:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
   - container_scanning_tezos-tezos-octez-evm-node-latest
   - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-master-07a4c8c9
-  - container_scanning_tezos-debian-bookworm-master-07a4c8c9
-  - container_scanning_tezos-debian-trixie-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-noble-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-jammy-master-07a4c8c9
-  - container_scanning_tezos-ubuntu-plucky-master-07a4c8c9
-  - container_scanning_tezos-fedora-39-master-07a4c8c9
-  - container_scanning_tezos-fedora-41-master-07a4c8c9
-  - container_scanning_tezos-fedora-42-master-07a4c8c9
-  - container_scanning_tezos-rockylinux-9-master-07a4c8c9
-  - container_scanning_tezos-rockylinux-10-master-07a4c8c9
+  - container_scanning_tezos-debian-unstable-master-bcfcb772
+  - container_scanning_tezos-debian-bookworm-master-bcfcb772
+  - container_scanning_tezos-debian-trixie-master-bcfcb772
+  - container_scanning_tezos-ubuntu-noble-master-bcfcb772
+  - container_scanning_tezos-ubuntu-jammy-master-bcfcb772
+  - container_scanning_tezos-ubuntu-plucky-master-bcfcb772
+  - container_scanning_tezos-fedora-39-master-bcfcb772
+  - container_scanning_tezos-fedora-41-master-bcfcb772
+  - container_scanning_tezos-fedora-42-master-bcfcb772
+  - container_scanning_tezos-rockylinux-9-master-bcfcb772
+  - container_scanning_tezos-rockylinux-10-master-bcfcb772
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

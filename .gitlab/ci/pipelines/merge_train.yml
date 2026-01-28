@@ -108,7 +108,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
@@ -1348,7 +1348,7 @@ audit_riscv_deps:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
@@ -1393,7 +1393,7 @@ test_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1626,7 +1626,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: sanity
   tags:
   - gcp
@@ -2682,7 +2682,7 @@ etherlink.unit_tests:
   retry: 2
 
 etherlink.test_kernel:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
@@ -2731,7 +2731,7 @@ etherlink.test_kernel:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_evm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
@@ -2778,7 +2778,7 @@ etherlink.test_evm_compatibility:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.test_revm_compatibility:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
@@ -3517,7 +3517,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-bcfcb772
   stage: test
   tags:
   - gcp
