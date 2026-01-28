@@ -1222,6 +1222,7 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezos_tezlink_latest",
+ "tezosx-ethereum-runtime",
  "tezosx-interfaces",
  "tezosx-tezos-runtime",
  "thiserror 1.0.69",
@@ -2543,7 +2544,6 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "tezosx-interfaces",
- "tezosx-tezos-runtime",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -3188,6 +3188,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_tezlink_latest",
+ "tezosx-interfaces",
  "thiserror 1.0.69",
  "typed-arena",
 ]
@@ -3513,6 +3514,9 @@ version = "0.1.0"
 dependencies = [
  "primitive-types",
  "tezos-evm-runtime-latest",
+ "tezos-smart-rollup-host",
+ "tezos-storage-latest",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
