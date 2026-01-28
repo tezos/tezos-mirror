@@ -153,6 +153,8 @@ Available services:
   
   + chains/main/blocks/head/
     + context/
+      - GET /chains/main/blocks/head/context/big_maps/<big_map_id>/<script_expr>
+          Access the value associated with a key in a big map. 
       - GET /chains/main/blocks/head/context/constants
           All constants 
       - GET /chains/main/blocks/head/context/contracts
@@ -228,4 +230,8 @@ Dynamic parameter description:
       A cycle integer 
   <contract_id>
       A contract identifier encoded in b58check. 
+  <script_expr>
+      script_expr (Base58Check-encoded) 
+  <big_map_id>
+      A big map identifier 
 
