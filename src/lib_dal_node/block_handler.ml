@@ -155,15 +155,17 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
      listed in the [attested]. *)
   let remove_slots_and_shards lag attested =
     let published_level = Int32.(sub attested_level (of_int lag)) in
-    List.iter_s
-      (fun slot_index ->
-        if attested slot_index then return_unit
-        else
-          let slot_id : Types.slot_id =
-            {slot_level = published_level; slot_index}
-          in
-          remove_slots_and_shards ~slot_size store slot_id)
-      (0 -- (number_of_slots - 1))
+    if published_level > 0l then
+      List.iter_s
+        (fun slot_index ->
+          if attested slot_index then return_unit
+          else
+            let slot_id : Types.slot_id =
+              {slot_level = published_level; slot_index}
+            in
+            remove_slots_and_shards ~slot_size store slot_id)
+        (0 -- (number_of_slots - 1))
+    else return_unit
   in
   let* () =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
