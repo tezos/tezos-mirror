@@ -163,13 +163,11 @@ impl Transaction {
         })
     }
 
-    pub fn data(&self) -> Vec<u8> {
-        match &self.content {
+    pub fn data(self) -> Vec<u8> {
+        match self.content {
             TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => vec![],
             TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => {
-                transaction.data.clone()
-            }
+            | TransactionContent::EthereumDelayed(transaction) => transaction.data,
             TransactionContent::TezosDelayed(_) => vec![],
         }
     }
