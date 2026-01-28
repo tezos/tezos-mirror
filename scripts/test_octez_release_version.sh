@@ -29,6 +29,7 @@ cleanup() {
   git tag -d "octez-v$VERSION" > /dev/null 2>&1
   git tag -d "octez-v$VERSION"+rc1 > /dev/null 2>&1
   git tag -d "octez-v$VERSION"-rc1 > /dev/null 2>&1
+  git tag -d "octez-v$VERSION"-1 > /dev/null 2>&1
   git checkout "$CURRENT_BRANCH"
   git branch -D "$TESTBRANCH"
   set -e
@@ -42,23 +43,26 @@ git checkout -b "$TESTBRANCH"
 
 echo "--- Test a simple version tag."
 git tag "octez-v$VERSION" -m "test"
-test_version "Octez $VERSION"
+test_version "Octez $VERSION (build: 0)"
 
 echo "--- Test a commit above a simple version tag."
 git commit --allow-empty -m "test" > /dev/null 2>&1
-test_version "Octez $VERSION+dev"
+test_version "Octez $VERSION+dev (build: 0)"
+
+git tag "octez-v$VERSION-1" -m "test"
+test_version "Octez $VERSION (build: 1)"
 
 echo "--- Test an invalid version tag."
 git tag "octez-v$VERSION+rc1" -m "test"
-test_version "Octez 0.0+dev"
+test_version "Octez 0.0+dev (build: 0)"
 
 echo "--- Test a release candidate version tag."
 git tag "octez-v$VERSION-rc1" -m "test"
-test_version "Octez $VERSION~rc1"
+test_version "Octez $VERSION~rc1 (build: 0)"
 
 echo "--- Test a commit above a release candidate version tag."
 git commit --allow-empty -m "test" > /dev/null 2>&1
-test_version "Octez $VERSION~rc1+dev"
+test_version "Octez $VERSION~rc1+dev (build: 0)"
 
 echo "--- Done testing, cleaning up."
 git checkout -
