@@ -8,7 +8,7 @@
 (* Welcome message for ipc between main process and crypto process *)
 let welcome = Bytes.of_string "0 Ready"
 
-(* A Lwt worker maintening a queue of calculation jobs to send to the crypto process *)
+(* A Lwt worker maintaining a queue of calculation jobs to send to the crypto process *)
 type query =
   | Query of {
       slot_id : Types.slot_id;
@@ -18,7 +18,13 @@ type query =
       reconstruction_start_time : float;
     }
 
-type query_msg = Query_msg of {query_id : int; shards : bytes}
+type query_msg =
+  | Query_msg of {query_id : int; shards : bytes}
+  | Query_stop of {query_id : int}
+
+let query_msg_tag = 0
+
+let query_stop_tag = 1
 
 module Query_store = Stdlib.Hashtbl
 
@@ -44,6 +50,8 @@ type error +=
   | Reconstruction_process_worker_error of string
   | Amplification_query_sender_job of string
   | Amplification_reply_receiver_job of string
+
+exception Amplificator_stopped
 
 let () =
   register_error_kind
@@ -209,22 +217,28 @@ end = struct
   (* Utility function to trigger a shard reconstruction. *)
   let process_query ~query_id ~input cryptobox shards_proofs_precomputation =
     let open Result_syntax in
-    (* Read query from main dal process *)
-    let bytes_shards = Process_worker.read_message input in
-    let shards =
-      Data_encoding.(
-        Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
-      |> List.to_seq
-    in
-    let () =
-      Tezos_bees.Hive.async_lwt (fun () ->
-          Event.emit_crypto_process_received_query ~query_id)
-    in
-    (* crypto computation *)
-    let* proved_shards_encoded =
-      reconstruct cryptobox shards_proofs_precomputation shards
-    in
-    return proved_shards_encoded
+    let query_tag_bytes = Process_worker.read_message input in
+    let query_tag = Data_encoding.(Binary.of_bytes_exn int31 query_tag_bytes) in
+    match query_tag with
+    | tag when tag = query_msg_tag ->
+        (* Read query from main dal process *)
+        let bytes_shards = Process_worker.read_message input in
+        let shards =
+          Data_encoding.(
+            Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
+          |> List.to_seq
+        in
+        let () =
+          Tezos_bees.Hive.async_lwt (fun () ->
+              Event.emit_crypto_process_received_query ~query_id)
+        in
+        (* crypto computation *)
+        let* proved_shards_encoded =
+          reconstruct cryptobox shards_proofs_precomputation shards
+        in
+        return proved_shards_encoded
+    | tag when tag = query_stop_tag -> raise Amplificator_stopped
+    | _ -> assert false
 
   (* The main function that is run in the [Process_worker.t].
      [input] is the stream on which the apmlificator will read requests from the
@@ -248,50 +262,37 @@ end = struct
       Tezos_bees.Hive.async_lwt (fun () -> Event.emit_crypto_process_started ())
     in
     let read_query_id input =
-      match Eio.Stream.take input |> Bytes.to_string with
-      | "STOP" -> `Stop
-      | s -> `Query (int_of_string s)
+      let b = Eio.Stream.take input in
+      Data_encoding.(Binary.of_bytes_exn int31 b)
     in
     let rec loop () =
-      match read_query_id input with
-      | `Stop ->
+      let query_id = read_query_id input in
+      try
+        let r =
+          process_query ~query_id ~input cryptobox shards_proofs_precomputation
+        in
+        match r with
+        | Ok proved_shards_encoded ->
+            let () = reply_success ~query_id ~proved_shards_encoded ~output in
+            loop ()
+        | Error err ->
+            let (`Other err) = err in
+            let error = Format.asprintf "%a" Error_monad.pp_print_trace err in
+            (* send a reply with the error, and continue *)
+            let () = reply_error_query ~output ~query_id ~error in
+            loop ()
+      with
+      | Eio.Cancel.Cancelled _ | Amplificator_stopped ->
           Tezos_bees.Hive.async_lwt (fun () ->
               Event.emit_crypto_process_stopped ())
-      | `Query query_id -> (
-          try
-            let r =
-              process_query
-                ~query_id
-                ~input
-                cryptobox
-                shards_proofs_precomputation
-            in
-            match r with
-            | Ok proved_shards_encoded ->
-                let () =
-                  reply_success ~query_id ~proved_shards_encoded ~output
-                in
-                loop ()
-            | Error err ->
-                let (`Other err) = err in
-                let error =
-                  Format.asprintf "%a" Error_monad.pp_print_trace err
-                in
-                (* send a reply with the error, and continue *)
-                let () = reply_error_query ~output ~query_id ~error in
-                loop ()
-          with
-          | Eio.Cancel.Cancelled _ ->
-              Tezos_bees.Hive.async_lwt (fun () ->
-                  Event.emit_crypto_process_stopped ())
-          | exn ->
-              let error = Printexc.to_string exn in
-              let () =
-                Tezos_bees.Hive.async_lwt (fun () ->
-                    Event.emit_crypto_process_error ~msg:error)
-              in
-              let () = reply_error_query ~output ~query_id ~error in
-              raise exn)
+      | exn ->
+          let error = Printexc.to_string exn in
+          let () =
+            Tezos_bees.Hive.async_lwt (fun () ->
+                Event.emit_crypto_process_error ~msg:error)
+          in
+          let () = reply_error_query ~output ~query_id ~error in
+          raise exn
     in
     loop ()
 end
@@ -303,22 +304,43 @@ let query_sender_job {query_pipe; process; _} =
   let open Lwt_result_syntax in
   let process_input = Process_worker.input_channel process in
   let rec loop () =
-    let*! (Query_msg {query_id; shards; _}) =
-      Lwt_pipe.Unbounded.pop query_pipe
-    in
-    let*! () = Event.emit_main_process_sending_query ~query_id in
-    (* Serialization: query_id, then shards *)
-    let*! () =
-      Lwt_eio.run_eio (fun () ->
-          Eio.Stream.add
-            process_input
-            (Bytes.of_string (Int.to_string query_id)))
-    in
-    let*! () =
-      Lwt_eio.run_eio (fun () ->
-          Process_worker.write_message process_input shards)
-    in
-    loop ()
+    let*! request = Lwt_pipe.Unbounded.pop query_pipe in
+    match request with
+    | Query_msg {query_id; shards; _} ->
+        let*! () = Event.emit_main_process_sending_query ~query_id in
+        (* Serialization: query_id, then shards *)
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message
+                process_input
+                Data_encoding.(Binary.to_bytes_exn int31 query_id))
+        in
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message
+                process_input
+                Data_encoding.(Binary.to_bytes_exn int31 query_msg_tag))
+        in
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message process_input shards)
+        in
+        loop ()
+    | Query_stop {query_id} ->
+        let*! () = Event.emit_amplificator_stopped () in
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message
+                process_input
+                Data_encoding.(Binary.to_bytes_exn int31 query_id))
+        in
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message
+                process_input
+                Data_encoding.(Binary.to_bytes_exn int31 query_stop_tag))
+        in
+        loop ()
   in
   Lwt.catch loop (function exn ->
       (* Unknown exception *)
@@ -498,9 +520,10 @@ let stop_jobs amplificator =
   let () = Lwt.cancel amplificator.reply_receiver_job in
   ()
 
-let stop_process process =
-  let ic = Process_worker.input_channel process in
-  Lwt_eio.run_eio (fun () -> Eio.Stream.add ic (Bytes.of_string "STOP"))
+let stop_process amplificator =
+  let query_id = amplificator.query_id in
+  amplificator.query_id <- query_id + 1 ;
+  Lwt_pipe.Unbounded.push amplificator.query_pipe (Query_stop {query_id})
 
 let reset_query_state amplificator =
   amplificator.query_pipe <- Lwt_pipe.Unbounded.create () ;
@@ -539,7 +562,7 @@ let start_amplificator node_ctxt =
 let restart amplificator =
   let open Lwt_result_syntax in
   let () = stop_jobs amplificator in
-  let*! () = stop_process amplificator.process in
+  let () = stop_process amplificator in
   let () = reset_query_state amplificator in
   let* process = start_process amplificator.node_ctxt in
   amplificator.process <- process ;
