@@ -14,12 +14,31 @@
 
 ### Execution changes
 
-- Fix memory leak in blueprints follower caused by telemetry context
-  accumulation in recursive stream loop. (!20616)
-
 ### Storage changes
 
 ### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.53 (2026-01-28)
+
+This release includes an important memory leak fix for EVM nodes
+running in observer and RPC mode. We strongly recommend that all
+operators upgrade as soon as possible, as this issue affects every
+node deployment except the sequencer.
+
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
+
+### Execution changes
+
+- Fix memory leak in blueprints follower caused by telemetry context
+  accumulation in recursive stream loop. (!20616)
 
 ### Experimental features changes
 
