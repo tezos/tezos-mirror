@@ -272,17 +272,56 @@ module Attestations = struct
       (range 0 (length - 1)) ;
     array
 
-  let rec decode protocol str =
-    if Protocol.number protocol < 025 then decode_before_025 str
+  (* Decode post-025 multi-lag format into per-lag arrays.
+
+     Returns an array of size [number_of_lags], where element [i] is a bool
+     array of size [number_of_slots] representing the attested slots at lag
+     index [i].
+
+     The encoded format is:
+     - Prefix: first [number_of_lags] bits indicate which lag indices have
+       non-empty attestations (bit [i] set means lag index [i] has data)
+     - Data: for each non-empty lag (in order of lag_index), [number_of_slots]
+       bits representing attested slots. *)
+  let decode_after_025 ~number_of_lags ~number_of_slots str =
+    let z = Z.of_string str in
+    let result =
+      Array.init number_of_lags (fun _ -> Array.make number_of_slots false)
+    in
+    let lag_indices = List.init number_of_lags Fun.id in
+    let slot_indices = List.init number_of_slots Fun.id in
+    (* Parse prefix to find which lags have data, then extract slot bits.
+       We track [data_offset] which advances by [number_of_slots] for each
+       lag that has data. *)
+    let _final_offset =
+      List.fold_left
+        (fun data_offset lag_index ->
+          let lag_has_data = Z.testbit z lag_index in
+          if lag_has_data then (
+            List.iter
+              (fun slot_index ->
+                if Z.testbit z (data_offset + slot_index) then
+                  result.(lag_index).(slot_index) <- true)
+              slot_indices ;
+            data_offset + number_of_slots)
+          else data_offset)
+        number_of_lags
+        lag_indices
+    in
+    result
+
+  let decode protocol parameters str =
+    if Protocol.number protocol < 025 then [|decode_before_025 str|]
     else
-      let z = Z.of_string str in
-      Z.shift_right z 1 |> Z.to_string |> decode Protocol.T024
+      let number_of_lags = List.length parameters.Parameters.attestation_lags in
+      let number_of_slots = parameters.number_of_slots in
+      decode_after_025 ~number_of_lags ~number_of_slots str
 end
 
 (* Decoding of the multi-lag Slot_availability.t bitset format. It has the same
    format as Attestations. *)
 module Slot_availability = struct
-  let decode protocol _parameters = Attestations.decode protocol
+  let decode = Attestations.decode
 end
 
 module Committee = struct

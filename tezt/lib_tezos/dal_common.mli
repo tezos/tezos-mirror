@@ -70,12 +70,10 @@ module Parameters : sig
     proto_parameters:JSON.t -> int
 end
 
-(** Decoding of the slot availability bitset used in block metadata. *)
+(** Decoding of the slot availability bitset used in block metadata. It currently
+    has the same behaviour as the [Attestations] module. *)
 module Slot_availability : sig
-  (** [decode protocol ~number_of_slots ~attestation_lag str] decodes the multi-lag
-      format and returns a slot-indexed boolean array. The result is the union
-      of all attested slots across all lags. *)
-  val decode : Protocol.t -> Parameters.t -> string -> bool array
+  val decode : Protocol.t -> Parameters.t -> string -> bool array array
 end
 
 (** Encoding/decoding of the DAL content included in attestation operations. *)
@@ -97,9 +95,10 @@ module Attestations : sig
       single-lag format. *)
   val encode : Protocol.t -> Parameters.t -> bool array array -> string
 
-  (** [decode protocol string] decodes a string into an array of Booleans, the
-      format depending on the [protocol]. *)
-  val decode : Protocol.t -> string -> bool array
+  (** [decode protocol parameters str] decodes and returns an array of
+      size [number_of_lags], where each element is a bool array of size
+      [number_of_slots] representing attested slots at that lag index. *)
+  val decode : Protocol.t -> Parameters.t -> string -> bool array array
 end
 
 module Helpers : sig
