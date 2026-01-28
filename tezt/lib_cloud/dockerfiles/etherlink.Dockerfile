@@ -12,7 +12,22 @@ RUN apk add --no-cache \
     openssh openssh-server \
     docker-cli screen file \
     curl wget jq \
-    prometheus prometheus-node-exporter
+    prometheus prometheus-node-exporter \
+    coreutils perl bash
+
+# Install Foundry (cast) - download pre-built Alpine binaries (musl-compatible)
+# Detect architecture and download appropriate binary (amd64 or arm64)
+# hadolint ignore=DL3003,DL4006
+RUN mkdir -p /tmp/foundry && cd /tmp/foundry && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+      curl -L https://github.com/foundry-rs/foundry/releases/download/stable/foundry_stable_alpine_arm64.tar.gz | tar xz; \
+    else \
+      curl -L https://github.com/foundry-rs/foundry/releases/download/stable/foundry_stable_alpine_amd64.tar.gz | tar xz; \
+    fi && \
+    mv cast /usr/local/bin/ && \
+    chmod +x /usr/local/bin/cast && \
+    rm -rf /tmp/foundry
 
 # hadolint ignore=DL3022
 COPY --from=ncabatoff/process-exporter:latest \
