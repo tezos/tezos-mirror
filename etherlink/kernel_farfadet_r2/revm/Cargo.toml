@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'revm-etherlink-farfadet-r2'
+version = '0.1.0'
+edition = '2021'
+license = "MIT"
+
+[dependencies]
+
+# VM
+revm.workspace = true
+
+# Types
+hex.workspace = true
+primitive-types.workspace = true
+tezos_ethereum.workspace = true
+alloy-sol-types.workspace = true
+num-bigint.workspace = true
+rlp.workspace = true
+nom.workspace = true
+ethereum.workspace = true
+tezos-protocol.workspace = true
+
+# SDK
+tezos-evm-runtime.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-storage.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos_crypto_rs.workspace = true
+tezos_data_encoding.workspace = true
+tezos-indexable-storage.workspace = true
+
+# Miscs
+format_no_std.workspace = true
+thiserror.workspace = true
+tezos-evm-logging.workspace = true
+tracing = { workspace = true, optional = true }
+
+[features]
+tracing = ["dep:tracing", "tezos-evm-logging/tracing"]

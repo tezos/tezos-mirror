@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025-2026 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -11,6 +11,7 @@ use crate::{
 use log::trace;
 use runtime_farfadet::internal_runtime::InternalRuntime as FarfadetInternalRuntime;
 use runtime_farfadet_r1::internal_runtime::InternalRuntime as FarfadetR1InternalRuntime;
+use runtime_farfadet_r2::internal_runtime::InternalRuntime as FarfadetR2InternalRuntime;
 use tezos_smart_rollup_core_v2::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host_v2::{
     dal_parameters::RollupDalParameters,
@@ -352,6 +353,16 @@ impl FarfadetInternalRuntime for Hasher {
 }
 
 impl FarfadetR1InternalRuntime for Hasher {
+    fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
+        trace!("store_get_hash({path})");
+        let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())
+            .map_err(from_binding_error)?;
+
+        Ok(hash.as_bytes().to_vec())
+    }
+}
+
+impl FarfadetR2InternalRuntime for Hasher {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())

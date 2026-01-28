@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2025-2026 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -37,6 +37,7 @@ type kernel =
   | Ebisu
   | Farfadet
   | FarfadetR1
+  | FarfadetR2
 
 let kernel_from_string = function
   | "bifrost" -> Some Bifrost
@@ -47,6 +48,7 @@ let kernel_from_string = function
   | "ebisu" -> Some Ebisu
   | "farfadet" -> Some Farfadet
   | "farfadet-r1" -> Some FarfadetR1
+  | "farfadet-r2" -> Some FarfadetR2
   | _ -> None
 
 let root_hash_from_kernel = function
@@ -66,3 +68,5 @@ let root_hash_from_kernel = function
       `Hex "0079e0f348b608ce486c9e5e1fdf84b650019922bf3383b562522c2c8f60a098da"
   | FarfadetR1 ->
       `Hex "0056aea7f98b2bc4d18edb450b2f098f6e95e5356f30a1fac2b50080f3e482bad1"
+  | FarfadetR2 ->
+      `Hex "0031c5d2a4b555d151cc521a42500f61db12898cd4f7178aac42541b0c81a82e74"

@@ -2800,6 +2800,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm_kernel_farfadet_r2"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-sol-types 1.3.1",
+ "anyhow",
+ "bytes",
+ "ethbloom",
+ "ethereum",
+ "hex",
+ "libsecp256k1",
+ "mir 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "num-bigint",
+ "num-derive",
+ "num-traits",
+ "primitive-types 0.12.2",
+ "revm 33.1.0",
+ "revm-etherlink-farfadet-r2",
+ "rlp",
+ "sha3",
+ "softfloat",
+ "tezos-evm-logging-farfadet-r2",
+ "tezos-evm-runtime-farfadet-r2",
+ "tezos-execution-farfadet-r2",
+ "tezos-indexable-storage-farfadet-r2",
+ "tezos-protocol 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-core 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-debug 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-entrypoint 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-installer-config 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-storage-farfadet-r2",
+ "tezos-tracing-farfadet-r2",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_ethereum_farfadet_r2",
+ "tezos_tezlink_farfadet_r2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "f4jumble"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4382,6 +4426,7 @@ dependencies = [
  "evm_kernel_ebisu",
  "evm_kernel_farfadet",
  "evm_kernel_farfadet_r1",
+ "evm_kernel_farfadet_r2",
  "hex",
  "librustzcash",
  "log",
@@ -4396,6 +4441,7 @@ dependencies = [
  "tezos-evm-runtime-ebisu",
  "tezos-evm-runtime-farfadet",
  "tezos-evm-runtime-farfadet-r1",
+ "tezos-evm-runtime-farfadet-r2",
  "tezos-smart-rollup-core 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
  "tezos-smart-rollup-core 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
@@ -5585,6 +5631,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "revm-etherlink-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types 1.3.1",
+ "ethereum",
+ "format_no_std",
+ "hex",
+ "nom 7.1.3",
+ "num-bigint",
+ "primitive-types 0.12.2",
+ "revm 33.1.0",
+ "rlp",
+ "tezos-evm-logging-farfadet-r2",
+ "tezos-evm-runtime-farfadet-r2",
+ "tezos-indexable-storage-farfadet-r2",
+ "tezos-protocol 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_ethereum_farfadet_r2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "revm-handler"
 version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6516,6 +6588,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-evm-logging-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "nop-macros",
+ "num-derive",
+ "num-traits",
+ "tezos-smart-rollup-debug 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+]
+
+[[package]]
 name = "tezos-evm-runtime-bifrost"
 version = "0.1.0"
 dependencies = [
@@ -6620,6 +6703,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-evm-runtime-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "sha3",
+ "tezos-evm-logging-farfadet-r2",
+ "tezos-smart-rollup-core 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-debug 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-mock 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+]
+
+[[package]]
 name = "tezos-execution-dionysus"
 version = "0.1.0"
 dependencies = [
@@ -6713,6 +6809,30 @@ dependencies = [
  "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos_tezlink_farfadet_r1",
+ "thiserror 1.0.69",
+ "typed-arena",
+]
+
+[[package]]
+name = "tezos-execution-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "mir 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "nom 7.1.3",
+ "num-bigint",
+ "num-traits",
+ "primitive-types 0.12.2",
+ "tezos-evm-logging-farfadet-r2",
+ "tezos-evm-runtime-farfadet-r2",
+ "tezos-protocol 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-storage-farfadet-r2",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_tezlink_farfadet_r2",
  "thiserror 1.0.69",
  "typed-arena",
 ]
@@ -6828,6 +6948,21 @@ dependencies = [
  "tezos-smart-rollup-mock 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos-storage-farfadet-r1",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezos-indexable-storage-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "num-bigint",
+ "rlp",
+ "tezos-evm-logging-farfadet-r2",
+ "tezos-evm-runtime-farfadet-r2",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-mock 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-storage-farfadet-r2",
  "thiserror 1.0.69",
 ]
 
@@ -7408,6 +7543,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-storage-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "nom 7.1.3",
+ "num-bigint",
+ "primitive-types 0.12.2",
+ "rlp",
+ "sha3",
+ "tezos-evm-runtime-farfadet-r2",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_ethereum_farfadet_r2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "tezos-tracing-farfadet"
 version = "0.1.0"
 dependencies = [
@@ -7423,6 +7578,15 @@ dependencies = [
  "quote",
  "syn 2.0.106",
  "tezos-evm-logging-farfadet-r1",
+]
+
+[[package]]
+name = "tezos-tracing-farfadet-r2"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.106",
+ "tezos-evm-logging-farfadet-r2",
 ]
 
 [[package]]
@@ -7738,6 +7902,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos_ethereum_farfadet_r2"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "ethbloom",
+ "ethereum",
+ "hex",
+ "libsecp256k1",
+ "primitive-types 0.12.2",
+ "revm 33.1.0",
+ "rlp",
+ "sha3",
+ "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "tezos_tezlink_dionysus"
 version = "0.1.0"
 dependencies = [
@@ -7800,6 +7983,24 @@ dependencies = [
 
 [[package]]
 name = "tezos_tezlink_farfadet_r1"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "mir 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "nom 7.1.3",
+ "num-bigint",
+ "primitive-types 0.12.2",
+ "rlp",
+ "tezos-protocol 0.1.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezos_tezlink_farfadet_r2"
 version = "0.1.0"
 dependencies = [
  "hex",
