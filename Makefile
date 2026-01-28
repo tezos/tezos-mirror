@@ -526,11 +526,6 @@ etherlink-outbox-monitor:
 	@dune build ./etherlink/bin_outbox_monitor
 	@cp -f ./_build/default/etherlink/bin_outbox_monitor/main.exe $@
 
-.PHONY: fa-bridge-watchtower
-fa-bridge-watchtower:
-	@dune build ./etherlink/fa-bridge-watchtower
-	@cp -f ./_build/default/etherlink/fa-bridge-watchtower/main.exe $@
-
 .PHONY: build-unreleased
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'
