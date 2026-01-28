@@ -843,6 +843,24 @@ let raw_json_cycle :
     Tezos_rpc.Service.t =
   import_service_with_arg Raw_services.cycle
 
+module Big_map = struct
+  let big_map_root =
+    (Tezos_rpc.Path.(open_root / "context" / "big_maps")
+      : tezlink_rpc_context Tezos_rpc.Path.context)
+
+  let get :
+      ( [`GET],
+        tezlink_rpc_context,
+        (tezlink_rpc_context * Tezlink_imports.Alpha_context.Big_map.Id.t)
+        * Tezlink_imports.Imported_protocol.Script_expr_hash.t,
+        unit,
+        unit,
+        Alpha_context.Script.expr )
+      Tezos_rpc.Service.t =
+    Tezos_rpc.Service.subst2
+      Imported_protocol_plugin.Contract_services.S.big_map_get
+end
+
 module Forge = struct
   let operations :
       ( [`POST],
