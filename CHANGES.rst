@@ -103,5 +103,18 @@ DAL node
 - Option ``--slots-backup-uri`` now supports shard archives in addition to slot
   archives. Use URI fragments #shards or #slots (default if omitted). (MR :gl:`!19293`)
 
+- Dal node now respect the exit code documentation on unhandled errors
+  and exit with code 123. (MR :gl:`!20584`)
+
+- Dal node exit with code 1 on configuration file handling error. (MR :gl:`!20584`)
+
+- ``octez-dal-node config init`` now fails if a configuration file exists. new
+  command ``octez-dal-node config reset`` should be used instead. (MR
+  :gl:`!20584`)
+
+- ``octez-dal-node config update`` now fails if no configuration file exists. (MR
+  :gl:`!20584`)
+
+
 Miscellaneous
 -------------

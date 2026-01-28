@@ -2623,6 +2623,133 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
+let test_dal_node_invalid_config () =
+  Test.register
+    ~__FILE__
+    ~title:"dal node invalid config"
+    ~tags:[Tag.tezos2; "dal"; "config"]
+    ~uses:[Constant.octez_dal_node]
+    ~uses_client:false
+    ~uses_admin_client:false
+    ~uses_node:false
+  @@ fun () ->
+  let open Tezt.Base in
+  let l1_node_endpoint =
+    Endpoint.make ~scheme:"http" ~host:Constant.default_host ~port:8732 ()
+  in
+  let dal_node = Dal_node.create_from_endpoint ~l1_node_endpoint () in
+  let config_file = Dal_node.Config_file.filename dal_node in
+  let* correct_config_file =
+    let* () = Dal_node.init_config dal_node in
+    Lwt.return @@ read_file config_file
+  in
+  Sys.remove config_file ;
+  let illformed_json_config =
+    "{ \"version\": 2, \"rpc_addr\": \"127.0.0.1:1111\","
+  in
+  let wrong_field_config =
+    "{\n  \"version\": 2,\n  \"non_existing_field\": \"127.0.0.1:1111\"}"
+  in
+  let test ~command ?contents ~exit_code ?msg ?check_contents () =
+    let () =
+      match contents with
+      | Some contents -> write_file config_file ~contents
+      | None -> (
+          try Sys.remove config_file
+          with _ -> Test.fail ~__LOC__ "Failed to delete existing config_file")
+    in
+    let process = command dal_node in
+    let* () = Process.check_error ~exit_code ?msg process in
+    match check_contents with
+    | None -> Lwt.return_unit
+    | Some check_contents ->
+        let new_contents = read_file config_file in
+        check_contents ~new_contents
+  in
+  let check_contents ~initial_config ~new_contents =
+    Lwt.return
+    @@ Check.((new_contents = initial_config) string)
+         ~error_msg:
+           "Invalid config file should be left untouched, got %L expected %R."
+  in
+  let check_updated_contents ~expected_config ~new_contents =
+    Lwt.return
+    @@ Check.((new_contents = expected_config) string)
+         ~error_msg:"Config file is not what we expected, got %L expected %R."
+  in
+  let run =
+   fun dal_node ->
+    Process.spawn
+      (Dal_node.path dal_node)
+      [
+        "run";
+        "--data-dir";
+        Dal_node.data_dir dal_node;
+        "--config-file";
+        config_file;
+      ]
+  in
+  let* () =
+    (* running on malformed json fails *)
+    test
+      ~command:run
+      ~contents:illformed_json_config
+      ~exit_code:1
+      ~msg:(rex "not a valid JSON value")
+      ~check_contents:(check_contents ~initial_config:illformed_json_config)
+      ()
+  in
+  let* () =
+    (* running on configuration with non-existing fields fails *)
+    test
+      ~command:run
+      ~contents:wrong_field_config
+      ~exit_code:1
+      ~msg:(rex "Unexpected object field non_existing_field")
+      ~check_contents:(check_contents ~initial_config:wrong_field_config)
+      ()
+  in
+  let* () =
+    (* config init cannot overwrite config if file exists *)
+    test
+      ~command:Dal_node.spawn_config_init
+      ~contents:illformed_json_config
+      ~exit_code:1
+      ~msg:(rex "overwriting is forbidden")
+      ~check_contents:(check_contents ~initial_config:illformed_json_config)
+      ()
+  in
+  let* () =
+    (* config reset succeed if file  exists *)
+    test
+      ~command:Dal_node.spawn_config_reset
+      ~contents:correct_config_file
+      ~exit_code:0
+      ~check_contents:
+        (check_updated_contents ~expected_config:correct_config_file)
+      ()
+  in
+  let* () =
+    (* config reset also succeed if existing file is broken *)
+    test
+      ~command:Dal_node.spawn_config_reset
+      ~contents:illformed_json_config
+      ~exit_code:0
+      ~msg:(rex "")
+      ~check_contents:
+        (check_updated_contents ~expected_config:correct_config_file)
+      ()
+  in
+  let* () =
+    (* config update fails if file doesn't exists *)
+    test
+      ~command:Dal_node.spawn_config_update
+      ~exit_code:1
+      ~msg:(rex "is missing")
+      ()
+  in
+  unit
+
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
    - Originate a rollup with a kernel that:
       - Downloads page 0 from slot 0 published at level [current_level - attestation_lag].
@@ -11516,6 +11643,7 @@ let register ~protocols =
     test_e2e_trap_faulty_dal_node
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   test_dal_node_startup protocols ;
+  test_dal_node_invalid_config () ;
   scenario_with_layer1_and_dal_nodes
     ~operator_profiles:[0]
     "dal node slot management"

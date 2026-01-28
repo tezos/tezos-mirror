@@ -42,6 +42,7 @@ type error +=
       from_status_opt : Types.header_status option;
       to_status : Types.header_status;
     }
+  | Missing_configuration_file of {file : string}
 
 (** The errors below are used to extend tzresult/tztrace monad/errors with Some
     specific errors on which we'd like to match in the DAL node's code. *)
@@ -92,3 +93,21 @@ val to_option_tzresult :
     [`Not_found] case cannot happen, in which case the use of [option] for the
     non-failing case is not needed. *)
 val to_tzresult : ('a, [< other]) result Lwt.t -> 'a tzresult Lwt.t
+
+module Exit_codes : sig
+  open Cmdliner.Cmd.Exit
+
+  type code = int
+
+  val ok : code
+
+  val some_error : code
+
+  val cli_error : code
+
+  val internal_error : code
+
+  val invalid_configuration_file_code : code
+
+  val all : info trace
+end

@@ -464,20 +464,47 @@ let () =
       | _ -> None)
     (fun path -> DAL_node_unable_to_write_configuration_file path)
 
-let save ~config_file config =
+type error += DAL_node_unable_to_overwrite_configuration_file of string
+
+let () =
+  register_error_kind
+    ~id:"dal.node.unable_to_overwrite_configuration_file"
+    ~title:"Unable to overwrite configuration file"
+    ~description:"Configuration file already exists, overwriting forbidden."
+    ~pp:(fun ppf file ->
+      Format.fprintf
+        ppf
+        "Configuration file %s already exists, overwriting is forbidden, \
+         please use `config update` command"
+        file)
+    `Permanent
+    Data_encoding.(obj1 (req "file" string))
+    (function
+      | DAL_node_unable_to_overwrite_configuration_file path -> Some path
+      | _ -> None)
+    (fun path -> DAL_node_unable_to_overwrite_configuration_file path)
+
+let save ~allow_overwrite ~config_file config =
   let open Lwt_syntax in
   protect @@ fun () ->
-  let* v =
-    let* () = Lwt_utils_unix.create_dir config.data_dir in
-    Lwt_utils_unix.with_atomic_open_out config_file @@ fun chan ->
-    let json = Data_encoding.Json.construct encoding config in
-    let content = Data_encoding.Json.to_string json in
-    Lwt_utils_unix.write_string chan content
-  in
-  Lwt.return
-    (Result.map_error
-       (fun _ -> [DAL_node_unable_to_write_configuration_file config_file])
-       v)
+  let* file_exists = Lwt_unix.file_exists config_file in
+  if file_exists && not allow_overwrite then
+    Lwt_result_syntax.tzfail
+      (DAL_node_unable_to_overwrite_configuration_file config_file)
+  else
+    let* v =
+      let* () = Lwt_utils_unix.create_dir config.data_dir in
+      Lwt_utils_unix.with_atomic_open_out config_file @@ fun chan ->
+      let json = Data_encoding.Json.construct encoding config in
+      let content = Data_encoding.Json.to_string json in
+      Lwt_utils_unix.write_string chan content
+    in
+    Lwt.return
+      (Result.map_error
+         (fun _ ->
+           Error_monad.TzTrace.make
+           @@ DAL_node_unable_to_write_configuration_file config_file)
+         v)
 
 let load =
   let open Lwt_result_syntax in
@@ -510,18 +537,30 @@ let load =
           if List.is_empty older_versions then tzfail (Exn e)
           else try_decode json older_versions)
   in
-  fun ~config_file ->
-    let* json =
-      let*! json = Lwt_utils_unix.Json.read_file config_file in
-      match json with
-      | Ok json -> return json
-      | Error (Exn _ :: _ as e) | Error e -> fail e
-    in
-    let* config = try_decode json config_versions in
-    (* We save the config so that its format is that of the latest version. *)
-    let* () = save ~config_file config in
-    return config
+  fun ?on_file_not_found ~config_file () ->
+    let*! file_exists = Lwt_unix.file_exists config_file in
+    if not file_exists then
+      match on_file_not_found with
+      | None ->
+          Lwt_result_syntax.tzfail
+          @@ Errors.Missing_configuration_file {file = config_file}
+      | Some handler -> handler ()
+    else
+      let* json = Lwt_utils_unix.Json.read_file config_file in
+      let* config = try_decode json config_versions in
+      (* We save the config so that its format is that of the latest version. *)
+      let* () = save ~allow_overwrite:true ~config_file config in
+      return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"
 
 let peers_file {data_dir; _} = Filename.concat data_dir "peers.json"
+
+let exit_on_configuration_error ~emit result_p : 'a tzresult Lwt.t =
+  let open Lwt_syntax in
+  let* result = result_p in
+  match result with
+  | Ok _ -> result_p
+  | Error error_trace ->
+      let* () = emit ~error_trace in
+      Lwt_exit.exit_and_raise Errors.Exit_codes.invalid_configuration_file_code
