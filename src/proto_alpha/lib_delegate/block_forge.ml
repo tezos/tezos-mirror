@@ -53,7 +53,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           payload_hash;
           payload_round;
           seed_nonce_hash;
-          proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
+          proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce ();
           per_block_votes =
             {liquidity_baking_vote = liquidity_baking_toggle_vote};
         };
