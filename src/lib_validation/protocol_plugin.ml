@@ -29,6 +29,9 @@ module type T = sig
 
     val syntactic_check : operation -> [`Well_formed | `Ill_formed] Lwt.t
 
+    val equal_modulo_dummy_values :
+      block_header_data -> block_header_data -> bool
+
     val pre_filter :
       info ->
       config ->
@@ -101,6 +104,8 @@ module No_plugin (Proto : Registered_protocol.T) :
     let flush _ ~head:_ = Lwt_result_syntax.return_unit
 
     let syntactic_check _ = Lwt.return `Well_formed
+
+    let equal_modulo_dummy_values _ _ = false
 
     let pre_filter _ _ _ = `Passed_prefilter (`Low [])
 

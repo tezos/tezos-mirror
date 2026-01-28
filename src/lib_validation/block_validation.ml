@@ -744,16 +744,35 @@ module Make (Proto : Protocol_plugin.T) = struct
       ~(block_header : Block_header.t) operations =
     let open Lwt_result_syntax in
     let block_hash = Block_header.hash block_header in
-    let shell_header_hash = hash_shell_header block_header.shell in
+    let* already_cached =
+      match cached_result with
+      | Some ({result; _}, _) ->
+          let block_shell_header_hash = hash_shell_header block_header.shell in
+          if
+            Shell_header_hash.equal
+              result.shell_header_hash
+              block_shell_header_hash
+          then return_false
+          else
+            let*? cached_protocol_data =
+              parse_protocol_data result.protocol_data
+            in
+            let*? block_protocol_data =
+              parse_protocol_data block_header.protocol_data
+            in
+            return
+              (Proto.Plugin.equal_modulo_dummy_values
+                 cached_protocol_data
+                 block_protocol_data)
+      | None -> return false
+    in
     match cached_result with
-    | Some (({result; _} as cached_result), context)
-      when Shell_header_hash.equal result.shell_header_hash shell_header_hash ->
-        (* In order to implement the preapply's cache mechanism, we
-           need to differentiate blocks. Their hash cannot be used as
-           a resulting preapply block does not contain correct
-           protocol data (e.g. signature). Therefore, their hashes
-           won't be the same. However, shell headers will remain the
-           same thus we use those to discriminate blocks. *)
+    | Some (({result; _} as cached_result), context) when already_cached ->
+        (* In order to implement the preapply's cache mechanism, we need to differentiate
+         blocks. To know if a block application was already cached we make an
+         equality check with some of the protocol data (not all, since some data
+         are dummy values that have been filled in the proper block) and the
+         shell headers to discriminate blocks. *)
         let*! () = Validation_events.(emit using_preapply_result block_hash) in
         let*! context_hash =
           if simulate then

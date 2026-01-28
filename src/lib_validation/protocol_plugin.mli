@@ -56,6 +56,31 @@ module type T = sig
         when appropriate. *)
     val syntactic_check : operation -> [`Well_formed | `Ill_formed] Lwt.t
 
+    (** [equal_modulo_dummy_values data1 data2] compares the protocol [data1] and
+        [data2] disregarding the fields that may have been initialized with a
+        dummy value, namely the [signature], the [payload_hash] and the
+        [proof_of_work nonce].
+
+        This function is used to check if a context resulting from a preapplied
+        block can be used as the final context when applying an "equal" block.
+
+        This equality check is done across multiple fields but will fail if
+        checking that all fields are equal. This is due to the fact that to
+        [preapply] a block, some values are not yet known and need to be
+        replaced with dummy values. When comparing a preapplied block with a
+        block to apply, the values in the block to apply will have been set to a
+        proper value, leading to an inequality if compared with the dummy ones.
+
+        It must be noted that the preapply optimization holds as long as the
+        dummy values have no incidence in the resulting context. This equality
+        check may return [true] for a block that should not be considered as
+        already preapplied but, in this case, this function is not to blame, the
+        preapply invariant has been broken and needs to be fixed (i.e. make sure
+        that the dummy values have no influence over the resulting context hash)
+     *)
+    val equal_modulo_dummy_values :
+      block_header_data -> block_header_data -> bool
+
     (** Perform some light preliminary checks on the operation.
 
         If successful, return [`Passed_prefilter] with the priority of the
