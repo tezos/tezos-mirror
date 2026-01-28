@@ -1012,8 +1012,10 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
     "Injecting consensus for bootstrap1 at level %d round %d@."
     base_level
     round ;
+  let* dal_parameters = Dal_common.Parameters.from_client protocol client in
   let dal_attestation =
-    Dal_common.Attestations.encode protocol @@ Array.init 16 (fun _ -> true)
+    Dal_common.Attestations.encode_for_one_lag protocol dal_parameters
+    @@ Array.init 16 (fun _ -> true)
   in
   let* () =
     Operation.Consensus.(
