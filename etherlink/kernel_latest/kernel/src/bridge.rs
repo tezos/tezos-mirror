@@ -40,7 +40,7 @@ use tezos_tezlink::operation_result::{
     TransferTarget,
 };
 use tezos_tracing::trace_kernel;
-use tezosx_interfaces::RuntimeId;
+use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_tezos_runtime::TezosRuntime;
 
 use crate::apply::{pure_xtz_deposit, ExecutionResult, TransactionResult};
@@ -387,9 +387,11 @@ pub struct DepositResult<Outcome> {
     pub runtime: RuntimeId,
 }
 
+#[allow(clippy::too_many_arguments)]
 #[trace_kernel]
 pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     deposit: &Deposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -401,6 +403,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
         DepositReceiver::Ethereum(_) => {
             let execution_outcome = pure_xtz_deposit(
                 host,
+                registry,
                 deposit,
                 block_constants,
                 transaction_hash,
@@ -555,6 +558,7 @@ pub fn execute_tezlink_deposit<Host: Runtime, C: Context>(
 
 #[cfg(test)]
 mod tests {
+    use crate::registry_impl::RegistryImpl;
     use alloy_sol_types::SolEvent;
     use num_bigint::BigInt;
     use primitive_types::{H160, U256};
@@ -778,6 +782,7 @@ mod tests {
     #[test]
     fn deposit_execution_outcome_contains_event() {
         let mut host = MockKernelHost::default();
+        let registry = &RegistryImpl::new();
         init_precompile_bytecodes(&mut host).unwrap();
 
         let deposit = dummy_deposit();
@@ -785,6 +790,7 @@ mod tests {
         let limits = EvmLimits::default();
         let execution_result = apply_tezosx_xtz_deposit(
             &mut host,
+            registry,
             &deposit,
             &BlockConstants::first_block(
                 U256::zero(),
@@ -829,6 +835,7 @@ mod tests {
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut host = MockKernelHost::default();
+        let registry = &RegistryImpl::new();
         init_precompile_bytecodes(&mut host).unwrap();
 
         let mut deposit = dummy_deposit();
@@ -837,6 +844,7 @@ mod tests {
         let limits = EvmLimits::default();
         let execution_result = apply_tezosx_xtz_deposit(
             &mut host,
+            registry,
             &deposit,
             &BlockConstants::first_block(
                 U256::zero(),
@@ -868,6 +876,7 @@ mod tests {
 
         let execution_result = apply_tezosx_xtz_deposit(
             &mut host,
+            registry,
             &deposit,
             &BlockConstants::first_block(
                 U256::zero(),

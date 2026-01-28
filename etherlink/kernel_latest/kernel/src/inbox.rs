@@ -17,6 +17,7 @@ use crate::parsing::{
     SequencerParsingContext, MAX_SIZE_PER_CHUNK,
 };
 
+use crate::registry_impl::RegistryImpl;
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
     chunked_transaction_hash_exists, chunked_transaction_num_chunks,
@@ -449,7 +450,8 @@ fn read_and_dispatch_input<
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            chain_configuration.start_simulation_mode(host)?;
+            let registry = RegistryImpl::new();
+            chain_configuration.start_simulation_mode(host, &registry)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {

@@ -49,7 +49,7 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::operation_result::OperationError;
 use tezos_tracing::trace_kernel;
-use tezosx_interfaces::RuntimeId;
+use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
@@ -263,6 +263,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
 #[instrument(skip_all)]
 pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     block_constants: &BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     caller: H160,
@@ -306,6 +307,7 @@ pub fn revm_run_transaction<Host: Runtime>(
         GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
     revm_etherlink::run_transaction(
         host,
+        registry,
         *spec_id,
         block_constants,
         transaction_hash,
@@ -377,6 +379,7 @@ pub fn revm_run_transaction<Host: Runtime>(
 #[instrument(skip_all)]
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -407,6 +410,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let value = transaction.value;
     let execution_outcome = match revm_run_transaction(
         host,
+        registry,
         block_constants,
         Some(transaction_hash),
         caller,
@@ -464,8 +468,10 @@ impl From<&Deposit> for SolXTZDeposit {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn pure_xtz_deposit<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     deposit: &Deposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -495,6 +501,7 @@ pub fn pure_xtz_deposit<Host: Runtime>(
     let effective_gas_price = block_constants.base_fee_per_gas();
     match revm_run_transaction(
         host,
+        registry,
         &block_constants,
         Some(transaction_hash),
         caller,
@@ -573,9 +580,11 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[trace_kernel]
 pub fn pure_fa_deposit<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -609,6 +618,7 @@ pub fn pure_fa_deposit<Host: Runtime>(
     let effective_gas_price = block_constants.base_fee_per_gas();
     match revm_run_transaction(
         host,
+        registry,
         &block_constants,
         Some(transaction_hash),
         caller,
@@ -631,8 +641,10 @@ pub fn pure_fa_deposit<Host: Runtime>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_fa_deposit<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
@@ -642,6 +654,7 @@ fn apply_fa_deposit<Host: Runtime>(
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let execution_outcome = pure_fa_deposit(
         host,
+        registry,
         fa_deposit,
         block_constants,
         transaction_hash,
@@ -774,6 +787,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 #[instrument(skip_all)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: &Transaction,
@@ -790,6 +804,7 @@ pub fn apply_transaction<Host: Runtime>(
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
+            registry,
             block_constants,
             tx,
             transaction.tx_hash,
@@ -800,6 +815,7 @@ pub fn apply_transaction<Host: Runtime>(
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
+            registry,
             block_constants,
             tx,
             transaction.tx_hash,
@@ -812,6 +828,7 @@ pub fn apply_transaction<Host: Runtime>(
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
             apply_tezosx_xtz_deposit(
                 host,
+                registry,
                 deposit,
                 block_constants,
                 transaction.tx_hash,
@@ -824,6 +841,7 @@ pub fn apply_transaction<Host: Runtime>(
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
             apply_fa_deposit(
                 host,
+                registry,
                 fa_deposit,
                 block_constants,
                 transaction.tx_hash,
@@ -850,6 +868,7 @@ pub fn apply_transaction<Host: Runtime>(
                 .to_little_endian(&mut chain_id_bytes);
             match tezos_execution::validate_and_apply_operation(
                 host,
+                registry,
                 &context,
                 op.hash().map_err(|e| {
                     Error::InvalidRunTransaction(revm_etherlink::Error::Custom(

@@ -48,6 +48,7 @@ use tezos_tezlink::{
         OperationResult, OperationResultSum, OperationWithMetadata,
     },
 };
+use tezosx_interfaces::Registry;
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
@@ -302,6 +303,7 @@ pub trait ChainConfigTrait: Debug {
     fn compute_bip<Host: Runtime>(
         &self,
         host: &mut Host,
+        registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
         tick_counter: &mut TickCounter,
@@ -312,7 +314,11 @@ pub trait ChainConfigTrait: Debug {
         coinbase: H160,
     ) -> anyhow::Result<BlockComputationResult>;
 
-    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()>;
+    fn start_simulation_mode<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        registry: &impl Registry,
+    ) -> anyhow::Result<()>;
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -370,6 +376,7 @@ impl ChainConfigTrait for EvmChainConfig {
     fn compute_bip<Host: Runtime>(
         &self,
         host: &mut Host,
+        registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
         tick_counter: &mut TickCounter,
@@ -383,6 +390,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
         crate::block::compute_bip(
             host,
+            registry,
             outbox_queue,
             block_in_progress,
             tick_counter,
@@ -397,8 +405,12 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
-        start_simulation_mode(host, &self.spec_id)
+    fn start_simulation_mode<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        registry: &impl Registry,
+    ) -> anyhow::Result<()> {
+        start_simulation_mode(host, registry, &self.spec_id)
     }
 
     fn storage_root_path(&self) -> RefPath {
@@ -529,6 +541,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn compute_bip<Host: Runtime>(
         &self,
         host: &mut Host,
+        registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         mut block_in_progress: BlockInProgress<
             Self::Transaction,
@@ -578,6 +591,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     let processed_operations =
                         match tezos_execution::validate_and_apply_operation(
                             host,
+                            registry,
                             &context,
                             hash.clone(),
                             operation,
@@ -677,7 +691,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
         })
     }
 
-    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
+    fn start_simulation_mode<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        registry: &impl Registry,
+    ) -> anyhow::Result<()> {
         fn read_inbox_message(
             host: &mut impl Runtime,
         ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
@@ -740,6 +758,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let signature = operation.signature.clone();
         let operations = tezos_execution::validate_and_apply_operation(
             host,
+            registry,
             &context,
             hash.clone(),
             operation.clone(),
