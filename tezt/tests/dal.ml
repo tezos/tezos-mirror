@@ -12045,6 +12045,154 @@ let test_dal_low_stake_attester_attestable_slots _protocol dal_parameters
 
   unit
 
+(** Test encode/decode round-trip for single lag. *)
+let test_attestations_encode_decode_single_lag =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"DAL attestations encode/decode single lag"
+    ~tags:["dal"; "attestations"; "encode"; "decode"; "single_lag"]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun protocol ->
+  let attestation_lag, attestation_lags =
+    if Protocol.number protocol < 025 then (8, [8]) else (5, [2; 3; 5])
+  in
+  let dal_parameters : Dal.Parameters.t =
+    {
+      feature_enabled = true;
+      incentives_enabled = false;
+      cryptobox =
+        {
+          number_of_shards = 2048;
+          redundancy_factor = 16;
+          slot_size = 65536;
+          page_size = 4096;
+        };
+      number_of_slots = 4;
+      attestation_lag;
+      attestation_lags;
+      attestation_threshold = 50;
+    }
+  in
+  let number_of_lags = List.length dal_parameters.attestation_lags in
+  Log.info
+    "Parameters: number_of_slots=%d, number_of_lags=%d, attestation_lags=[%s]"
+    dal_parameters.number_of_slots
+    number_of_lags
+    (dal_parameters.attestation_lags |> List.map string_of_int
+   |> String.concat "; ") ;
+
+  Log.info "Create a test attestation: first and last slot attested" ;
+  let original = Array.make dal_parameters.number_of_slots false in
+  original.(0) <- true ;
+  original.(dal_parameters.number_of_slots - 1) <- true ;
+
+  List.iter
+    (fun lag_index ->
+      Log.info "Testing encoding/decoding at lag_index: %d" lag_index ;
+      let encoded =
+        Dal.Attestations.encode_for_one_lag
+          protocol
+          dal_parameters
+          ~lag_index
+          original
+      in
+      Log.info "Encoded (lag_index: %d): %s" lag_index encoded ;
+
+      let decoded = Dal.Attestations.decode protocol dal_parameters encoded in
+      let decoded_for_lag = decoded.(lag_index) in
+      Check.(
+        (Array.length decoded_for_lag = dal_parameters.number_of_slots) int)
+        ~error_msg:"Expected %R slots, got %L" ;
+      Array.iteri
+        (fun i expected ->
+          Check.(decoded_for_lag.(i) = expected)
+            Check.bool
+            ~error_msg:(Format.sprintf "Slot %d mismatch after round-trip" i))
+        original)
+    (List.init number_of_lags Fun.id) ;
+
+  Log.info "Single-lag encode/decode succeeded" ;
+  unit
+
+(** Test encode/decode round-trip for multiple lags. *)
+let test_attestations_encode_decode_multiple_lags =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"DAL attestations encode/decode multiple lags"
+    ~tags:["dal"; "attestations"; "encode"; "decode"; "multiple_lags"]
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+    ~supports:(Protocol.From_protocol 025)
+  @@ fun protocol ->
+  let dal_parameters : Dal.Parameters.t =
+    {
+      feature_enabled = true;
+      incentives_enabled = false;
+      cryptobox =
+        {
+          number_of_shards = 2048;
+          redundancy_factor = 16;
+          slot_size = 65536;
+          page_size = 4096;
+        };
+      number_of_slots = 4;
+      attestation_lag = 5;
+      attestation_lags = [2; 3; 5];
+      attestation_threshold = 50;
+    }
+  in
+  let number_of_lags = List.length dal_parameters.attestation_lags in
+  Log.info
+    "Parameters: number_of_slots=%d, number_of_lags=%d, attestation_lags=[%s]"
+    dal_parameters.number_of_slots
+    number_of_lags
+    (dal_parameters.attestation_lags |> List.map string_of_int
+   |> String.concat "; ") ;
+
+  (* Create test attestations: different slots attested at different lags *)
+  let attestations_per_lag =
+    Array.init number_of_lags (fun lag_index ->
+        let arr = Array.make dal_parameters.number_of_slots false in
+        (* Attest slot [lag_index mod number_of_slots] at each lag *)
+        arr.(lag_index mod dal_parameters.number_of_slots) <- true ;
+        (* Also attest slot 1 at lag 0 if we have multiple slots *)
+        if lag_index = 0 && dal_parameters.number_of_slots > 1 then
+          arr.(1) <- true ;
+        arr)
+  in
+  let encoded =
+    Dal.Attestations.encode protocol dal_parameters attestations_per_lag
+  in
+  Log.info "Encoded multi-lag: %s" encoded ;
+
+  let decoded = Dal.Attestations.decode protocol dal_parameters encoded in
+  Check.((Array.length decoded = number_of_lags) int)
+    ~error_msg:"Expected %R lags, got %L" ;
+  Array.iteri
+    (fun lag_index original_arr ->
+      let decoded_arr = decoded.(lag_index) in
+      Check.((Array.length decoded_arr = dal_parameters.number_of_slots) int)
+        ~error_msg:
+          (Format.sprintf "Lag %d: expected %%R slots, got %%L" lag_index) ;
+      Array.iteri
+        (fun slot_index expected ->
+          Check.(decoded_arr.(slot_index) = expected)
+            Check.bool
+            ~error_msg:
+              (Format.sprintf
+                 "Lag %d, slot %d mismatch: expected %b"
+                 lag_index
+                 slot_index
+                 expected))
+        original_arr)
+    attestations_per_lag ;
+
+  Log.info "Multi-lag encode/decode succeeded" ;
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -12616,7 +12764,10 @@ let register ~protocols =
     ~wait_ready:true
     "Test amplification by ignoring topics"
     Amplification.test_by_ignoring_topics
-    protocols
+    protocols ;
+
+  test_attestations_encode_decode_single_lag protocols ;
+  test_attestations_encode_decode_multiple_lags protocols
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in
