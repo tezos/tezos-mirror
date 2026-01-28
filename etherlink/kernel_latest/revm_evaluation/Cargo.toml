@@ -19,6 +19,9 @@ tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
+tezosx-interfaces.workspace = true
+
+kernel.workspace = true
 
 # Evaluation specific deps
 serde_json = { version = "1.0.145", features = ["preserve_order"] }

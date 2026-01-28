@@ -1155,6 +1155,7 @@ name = "evm-evaluation"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "evm_kernel",
  "hex",
  "hex-literal",
  "primitive-types",
@@ -1171,6 +1172,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos_ethereum_latest",
+ "tezosx-interfaces",
  "thiserror 1.0.69",
  "walkdir",
 ]
@@ -2552,6 +2554,7 @@ dependencies = [
 name = "revm-evaluation"
 version = "0.1.0"
 dependencies = [
+ "evm_kernel",
  "primitive-types",
  "revm",
  "revm-etherlink",
@@ -2563,6 +2566,7 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_ethereum_latest",
+ "tezosx-interfaces",
 ]
 
 [[package]]

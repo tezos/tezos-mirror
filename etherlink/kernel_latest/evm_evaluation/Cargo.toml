@@ -21,6 +21,10 @@ tezos-smart-rollup-host.workspace = true
 tezos-smart-rollup-core.workspace = true
 serde.workspace = true
 
+tezosx-interfaces.workspace = true
+
+kernel.workspace = true
+
 hex = { version = "0.4.3", features = ["serde"] }
 hex-literal.workspace = true
 

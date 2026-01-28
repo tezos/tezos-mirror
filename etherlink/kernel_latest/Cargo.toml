@@ -79,6 +79,7 @@ tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
 tezosx-interfaces = { package = "tezosx-interfaces", path = "./tezosx-interfaces" }
 tezosx-ethereum-runtime = { package = "tezosx-ethereum-runtime", path = "./tezosx-ethereum-runtime" }
 tezosx-tezos-runtime = { package = "tezosx-tezos-runtime", path = "./tezosx-tezos-runtime" }
+kernel = { package = "evm_kernel", path = "./kernel"}
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
