@@ -33,6 +33,20 @@ module Path = struct
   let storage contract = account contract ^ "/data/storage"
 
   let code contract = account contract ^ "/data/code"
+
+  (** Path to a specific big_map: /tezlink/context/big_map/{id} *)
+  let big_map_id id =
+    big_map ^ "/"
+    ^ Z.to_string (Tezlink_imports.Alpha_context.Big_map.Id.unparse_to_z id)
+
+  (** Path to a big_map value: /tezlink/context/big_map/{id}/{key_hash_hex}
+      where key_hash_hex is the hex encoding of the raw Script_expr_hash bytes *)
+  let big_map_value id key_hash =
+    let raw_hash =
+      Tezlink_imports.Imported_protocol.Script_expr_hash.to_bytes key_hash
+    in
+    let (`Hex key_hex) = Hex.of_bytes raw_hash in
+    big_map_id id ^ "/" ^ key_hex
 end
 
 let contract_of_path = Contract.of_hex
@@ -63,6 +77,18 @@ let counter read c =
     read
     (Path.counter c)
     (Data_encoding.Binary.of_bytes_exn Data_encoding.n)
+
+let big_map_get read id key_hash =
+  let open Lwt_result_syntax in
+  let path = Path.big_map_value id key_hash in
+  let decode =
+    Data_encoding.Binary.of_bytes_opt
+      Tezlink_imports.Alpha_context.Script.expr_encoding
+  in
+  let+ result =
+    Durable_storage.inspect_durable_and_decode_opt read path decode
+  in
+  Option.join result
 
 let nth_block read n =
   let open Lwt_result_syntax in

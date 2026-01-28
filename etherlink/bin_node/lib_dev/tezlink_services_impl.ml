@@ -189,6 +189,10 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     Tezlink_durable_storage.counter (read ~block) c
 
+  let big_map_get chain block id key_hash =
+    let `Main = chain in
+    Tezlink_durable_storage.big_map_get (read ~block) id key_hash
+
   let block chain block =
     let open Lwt_result_syntax in
     let `Main = chain in

@@ -68,6 +68,9 @@ struct
 
   let counter _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
 
+  let big_map_get _chain _block _id _key_hash =
+    failwith "Not Implemented Yet (%s)" __LOC__
+
   let block _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
 
   let monitor_heads _chain _query =

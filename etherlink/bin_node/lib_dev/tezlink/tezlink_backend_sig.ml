@@ -52,6 +52,13 @@ module type S = sig
   val counter :
     [`Main] -> block_param -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t
 
+  val big_map_get :
+    [`Main] ->
+    block_param ->
+    Tezlink_imports.Alpha_context.Big_map.Id.t ->
+    Tezlink_imports.Imported_protocol.Script_expr_hash.t ->
+    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+
   val block : [`Main] -> block_param -> L2_types.Tezos_block.t tzresult Lwt.t
 
   val bootstrapped :
