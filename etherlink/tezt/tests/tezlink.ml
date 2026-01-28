@@ -2226,6 +2226,79 @@ let test_tezlink_origination =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
+let test_tezlink_operation_hashes_in_pass =
+  register_tezlink_test
+    ~title:"Test /operation_hashes/<pass> rpc"
+    ~tags:["rpc"; "operation_hashes"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  let* transfer_hash =
+    let process =
+      Client.spawn_transfer
+        ~endpoint
+        ~amount:Tez.one
+        ~fee:Tez.one
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:Constant.bootstrap2.alias
+        ~burn_cap:Tez.one
+        client
+    in
+    let* client_output = Process.check_and_read_stdout process in
+    match client_output =~* rex "Operation hash is '?(o\\w{50})'" with
+    | None ->
+        Test.fail
+          "Cannot extract operation hash from client_output: %s"
+          client_output
+    | Some hash -> return hash
+  in
+  let*@ _ = produce_block sequencer in
+  let block = "head" in
+
+  let* hashes_in_pass0 =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_operation_hashes_of_validation_pass ~block 0
+  in
+  Check.(
+    (hashes_in_pass0 = []) (list string) ~error_msg:"Expected %R but got %L") ;
+  let* hashes_in_pass1 =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_operation_hashes_of_validation_pass ~block 1
+  in
+  Check.(
+    (hashes_in_pass1 = []) (list string) ~error_msg:"Expected %R but got %L") ;
+  let* hashes_in_pass2 =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_operation_hashes_of_validation_pass ~block 2
+  in
+  Check.(
+    (hashes_in_pass2 = []) (list string) ~error_msg:"Expected %R but got %L") ;
+  let* hashes_in_pass3 =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_operation_hashes_of_validation_pass ~block 3
+  in
+  Check.(
+    (hashes_in_pass3 = [transfer_hash])
+      (list string)
+      ~error_msg:"Expected %R but got %L") ;
+
+  let* operation_hashes =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_operation_hashes ~block ()
+  in
+  Check.(
+    (operation_hashes
+    = [hashes_in_pass0; hashes_in_pass1; hashes_in_pass2; hashes_in_pass3])
+      (list (list string))
+      ~error_msg:"Expected %R but got %L") ;
+
+  unit
+
 let test_event =
   let emit_events_contract =
     Tezt_etherlink.Michelson_contracts.emit_events_contract ()
@@ -3800,6 +3873,7 @@ let () =
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
+  test_tezlink_operation_hashes_in_pass [Alpha] ;
   test_event [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
   test_tezlink_prevalidation_gas_limit_lower_bound [Alpha] ;
