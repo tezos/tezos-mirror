@@ -334,6 +334,7 @@ module CLST_contract = struct
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
+    | Approve _ -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in

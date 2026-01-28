@@ -28,6 +28,8 @@ module CLST_types : sig
 
   type ('a, 'b, 'c, 'd) tup4 = 'a * ('b * ('c * 'd))
 
+  type 'a s_list = 'a Script_list.t
+
   type deposit = unit
 
   type redeem = nat
@@ -42,7 +44,18 @@ module CLST_types : sig
     pair
     Script_list.t
 
-  type fa21_entrypoints = transfer
+  type allowance_delta = (nat (* increase *), nat (* decrease *)) or_
+
+  type approval =
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      allowance_delta (* action *) )
+    tup4
+
+  type approve = approval s_list
+
+  type fa21_entrypoints = (transfer, approve) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -73,6 +86,7 @@ module CLST_types : sig
     | Deposit of deposit
     | Redeem of redeem
     | Transfer of transfer
+    | Approve of approve
 
   val entrypoint_from_arg : arg -> entrypoint
 

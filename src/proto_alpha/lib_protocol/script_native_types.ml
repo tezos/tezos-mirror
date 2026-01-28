@@ -181,6 +181,8 @@ module CLST_types = struct
 
   type ('a, 'b, 'c, 'd) tup4 = ('a, 'b, 'c, 'd) Helpers.tup4
 
+  type 'a s_list = 'a Script_list.t
+
   type nat = Script_int.n Script_int.num
 
   type int = Script_int.z Script_int.num
@@ -199,7 +201,18 @@ module CLST_types = struct
     pair
     Script_list.t
 
-  type fa21_entrypoints = transfer
+  type allowance_delta = (nat (* increase *), nat (* decrease *)) or_
+
+  type approval =
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      allowance_delta (* action *) )
+    tup4
+
+  type approve = approval s_list
+
+  type fa21_entrypoints = (transfer, approve) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -217,16 +230,19 @@ module CLST_types = struct
     | Deposit of deposit
     | Redeem of redeem
     | Transfer of transfer
+    | Approve of approve
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L p) -> Deposit p
     | L (R p) -> Redeem p
-    | R p -> Transfer p
+    | R (L p) -> Transfer p
+    | R (R p) -> Approve p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L p)
     | Redeem p -> L (R p)
-    | Transfer p -> R p
+    | Transfer p -> R (L p)
+    | Approve p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -247,15 +263,35 @@ module CLST_types = struct
     let* transfer = list_ty elt in
     make_entrypoint_leaf "transfer" transfer
 
+  let approval_type : approval ty_node tzresult =
+    let open Result_syntax in
+    let* token_id_approval =
+      or_ty (add_name "increase" nat_ty) (add_name "decrease" nat_ty)
+    in
+    tup4_ty
+      (add_name "owner" address_ty)
+      (add_name "spender" address_ty)
+      (add_name "token_id" nat_ty)
+      (add_name "action" token_id_approval)
+
+  let approve_type : (approve ty_node * approve entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* approval_type in
+    let* approve_type = list_ty approval_type in
+    make_entrypoint_leaf "approve" approve_type
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
     let* transfer_type in
+    let* approve_type in
     let* clst_entrypoints_type =
       make_entrypoint_node deposit_type redeem_type
     in
-    let fa21_entrypoints_type = transfer_type in
+    let* fa21_entrypoints_type =
+      make_entrypoint_node transfer_type approve_type
+    in
     let* arg_type =
       make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type
     in
