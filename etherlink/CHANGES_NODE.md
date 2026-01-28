@@ -1,25 +1,19 @@
 # Changelog
 
-## Unreleased
+## Version 0.53 (2026-01-28)
 
-### Breaking changes
+This release includes an important memory leak fix for EVM nodes
+running in observer and RPC mode. We strongly recommend that all
+operators upgrade as soon as possible, as this issue affects every
+node deployment except the sequencer.
 
-### Configuration changes
-
-### RPCs changes
-
-### Monitoring changes
-
-### Command-line interface changes
+This release will not apply any migration to the node’s store (version 22),
+meaning it is possible to downgrade to previous version).
 
 ### Execution changes
 
 - Fix memory leak in blueprints follower caused by telemetry context
   accumulation in recursive stream loop. (!20616)
-
-### Storage changes
-
-### Documentation changes
 
 ### Experimental features changes
 
