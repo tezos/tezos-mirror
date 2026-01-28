@@ -457,6 +457,35 @@ module CLST_contract = struct
       in
       return (Ex_view {name; ty = CLST_types.is_token_view_ty; implementation})
 
+    let get_allowance : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "get_allowance" in
+      let implementation (ctxt, _step_constants) (owner, (spender, token_id))
+          (storage : storage) =
+        let open Lwt_result_syntax in
+        if
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
+        then
+          let* allowance, ctxt =
+            Clst_contract_storage.get_account_operator_allowance
+              ctxt
+              (Clst_contract_storage.from_clst_storage storage)
+              ~owner
+              ~spender
+          in
+          let allowance =
+            match allowance with
+            | None -> Script_int.zero_n
+            | Some None -> Script_int.zero_n
+            | Some (Some n) -> n
+          in
+          return (allowance, ctxt)
+        else return (Script_int.zero_n, ctxt)
+      in
+      let* ty = CLST_types.get_allowance_view_ty in
+      return (Ex_view {name; ty; implementation})
+
     let view_map : storage Script_native_types.view_map tzresult =
       let open Result_syntax in
       let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
@@ -464,6 +493,9 @@ module CLST_contract = struct
         total_supply
       in
       let* (Ex_view {name = is_token_name; _} as is_token) = is_token in
+      let* (Ex_view {name = get_allowance_name; _} as get_allowance) =
+        get_allowance
+      in
       let view_map =
         Script_map.update
           get_balance_name
@@ -474,6 +506,9 @@ module CLST_contract = struct
         Script_map.update get_total_supply_name (Some get_total_supply) view_map
       in
       let view_map = Script_map.update is_token_name (Some is_token) view_map in
+      let view_map =
+        Script_map.update get_allowance_name (Some get_allowance) view_map
+      in
       return view_map
   end
 end

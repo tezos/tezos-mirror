@@ -315,6 +315,11 @@ module CLST_types = struct
 
   type is_token_view = (nat, bool) view_type
 
+  type get_allowance_view =
+    ( (address (* owner *), address (* spender *), nat (* token_id *)) tup3,
+      nat (* allowance *) )
+    view_type
+
   let balance_view_ty =
     let open Result_syntax in
     let* {typed = input_ty; _} = pair_ty address_ty nat_ty in
@@ -324,6 +329,11 @@ module CLST_types = struct
     {input_ty = unit_ty.typed; output_ty = nat_ty.typed}
 
   let is_token_view_ty = {input_ty = nat_ty.typed; output_ty = bool_ty.typed}
+
+  let get_allowance_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
+    return {input_ty; output_ty = nat_ty.typed}
 
   let transfer_event_type =
     let open Result_syntax in
