@@ -19,7 +19,6 @@ open Common.Build
 open Common.Docker
 open Gitlab_ci.Util
 open Tezos_ci
-open Tezos_ci.Cache
 
 let rules_always = [job_rule ~when_:Always ()]
 
@@ -106,24 +105,6 @@ let jobs =
       ()
   in
 
-  (* Smart Rollup: Kernel SDK
-
-     See [src/kernel_sdk/RELEASE.md] for more information. *)
-  let job_publish_kernel_sdk : tezos_job =
-    job
-      ~__POS__
-      ~name:"publish_kernel_sdk"
-      ~image:Images.rust_toolchain
-      ~stage:Stages.manual
-      ~rules:[job_rule ~when_:Manual ()]
-      ~interruptible:false
-      [
-        "make -f kernels.mk publish-sdk-deps";
-        (* Manually set SSL_CERT_DIR as default setting points to empty dir *)
-        "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk";
-      ]
-    |> enable_cargo_cache |> enable_sccache
-  in
   (* arm builds are manual on the master branch pipeline *)
   let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in
   let job_build_arm64_release =
@@ -146,5 +127,3 @@ let jobs =
   ]
   (* Jobs to build and update on Docker Hub the Octez Docker image.  *)
   @ octez_distribution_docker_jobs
-  (* Stage: manual *)
-  @ [job_publish_kernel_sdk]
