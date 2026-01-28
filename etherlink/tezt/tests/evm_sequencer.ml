@@ -15,6 +15,7 @@
                  # Install cast or foundry (see: https://book.getfoundry.sh/getting-started/installation)
                  curl -L https://foundry.paradigm.xyz | bash
                  foundryup
+                 make fa-bridge-watchtower
                  ./scripts/install_dal_trusted_setup.sh
                  # Install websocat (see: https://github.com/vi/websocat?tab=readme-ov-file#installation)
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
@@ -14447,6 +14448,115 @@ let test_eip3607_disabled_for_simulation =
     ~error_msg:"Expected error msg %R but got %L" ;
   unit
 
+let test_fa_deposit_watchtower =
+  register_test
+    ~__FILE__
+    ~kernel:Kernel.Latest
+    ~tags:["evm"; "fa_deposit"; "watchtower"]
+    ~title:"FA deposit is claimed by the watchtower"
+    ~enable_fa_bridge:true
+    ~enable_multichain:false
+    ~enable_dal:false
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec; Constant.watchtower]
+    ~websockets:true
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      _protocol
+    ->
+  (* The following test is hack-ish to mimic the behavior of FA deposits + a proxy involved.
+     Deploying a proper proxy is pretty tedious, so we will deploy a dummy one that just
+     does nothing and succeeds so we can test the behavior of the watchtower.
+     BACKLOG (for better testing):
+     - Deploy an actual ERC20 proxy like:
+       https://explorer.etherlink.com/address/0x9121B153bbCF8C23F20eE43b494F08760B91aD64?tab=contract
+     - Deploy the according L1 contract and use its data as the constructor of the proxy contract.
+     - At the end of the test also check the receiver's balance on the proxy contract. *)
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let* dummy_proxy = Solidity_contracts.dummy_proxy evm_version in
+  let* () = Eth_cli.add_abi ~label:dummy_proxy.label ~abi:dummy_proxy.abi () in
+  (* Dummy proxy just to enable the two step process queue/claim for the watchtower. *)
+  let* proxy, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:dummy_proxy.abi
+         ~bin:dummy_proxy.bin)
+      sequencer
+  in
+  let amount = 1125 in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+  let* _watchtower =
+    let config =
+      Watchtower.
+        {
+          evm_node_endpoint = Evm_node.endpoint sequencer;
+          gas_limit = None;
+          max_fee_per_gas = None;
+          rpc = None;
+          secret_key = Some whale.private_key;
+          whitelist = Some [{proxy; ticket_hashes = None}];
+        }
+    in
+    Watchtower.init ~config ~first_block:1 ()
+  in
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~proxy
+      ~amount
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* () =
+    (* We let some time to the watchtower to inject the claim. This avoids flakyness. *)
+    repeat 4 (fun () ->
+        let* _ = produce_block sequencer in
+        unit)
+  in
+  (* We fetch the only new ticket hash that was produced via the durable storage. *)
+  let*@ ticket_hashes =
+    Rpc.state_subkeys
+      sequencer
+      "/evm/world_state/eth_accounts/0000000000000000000000000000000000000000/ticket_table"
+  in
+  let ticket_hash =
+    match ticket_hashes with
+    | Some [t] -> t
+    | _ -> failwith "ticket hash not found"
+  in
+  (* Since the proxy call succeeded the owner is the proxy, we make sure of that.
+     NB: If the proxy was not a dummy one we could check the ERC20 balance of the
+     receiver's address as an additional check. *)
+  let* ticket_balance_via_sequencer =
+    ticket_balance ~ticket_hash ~account:proxy (Either.Right sequencer)
+  in
+  Check.((amount = ticket_balance_via_sequencer) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the sequencer, got %R" ;
+  unit
+
 let test_evm_events_cleanup () =
   Test_helpers.register_sandbox
     ~__FILE__
@@ -14649,4 +14759,5 @@ let () =
   test_validate_encoding_compatibility_accounts [Alpha] ;
   test_eip2537 [Alpha] ;
   test_eip3607_disabled_for_simulation [Alpha] ;
+  test_fa_deposit_watchtower [Alpha] ;
   test_evm_events_cleanup ()
