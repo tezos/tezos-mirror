@@ -64,6 +64,14 @@ let octez_legal_versions =
         build = 0;
         additional_info = Beta_dev 1;
       } );
+    ( "octez-v10.93-4",
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        build = 4;
+        additional_info = Release;
+      } );
   ]
 
 let octez_evm_node_legal_versions =
