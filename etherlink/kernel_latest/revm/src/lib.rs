@@ -35,6 +35,7 @@ use tezos_evm_logging::{
 };
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezosx_interfaces::{Registry, TezosXRuntimeError};
 use thiserror::Error;
 
 pub mod helpers;
@@ -47,18 +48,18 @@ pub mod tezosx;
 
 mod database;
 
-type EVMInnerContext<'a, Host> = Context<
+type EVMInnerContext<'a, Host, R> = Context<
     &'a BlockEnv,
     &'a TxEnv,
     CfgEnv,
-    EtherlinkVMDB<'a, Host>,
-    Journal<EtherlinkVMDB<'a, Host>>,
+    EtherlinkVMDB<'a, Host, R>,
+    Journal<EtherlinkVMDB<'a, Host, R>>,
 >;
 
-type EvmContext<'a, Host> = Evm<
-    EVMInnerContext<'a, Host>,
+type EvmContext<'a, Host, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
     (),
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
@@ -75,6 +76,21 @@ pub enum Error {
     /// Underflow of gas limit when subtracting gas for fees
     #[error("Insufficient gas to cover the non-execution fees")]
     GasToFeesUnderflow,
+}
+
+impl From<Error> for TezosXRuntimeError {
+    fn from(value: Error) -> Self {
+        match value {
+            Error::Runtime(err) => TezosXRuntimeError::Runtime(err),
+            Error::Custom(msg) => TezosXRuntimeError::Custom(msg),
+            Error::FeesToGasOverflow => TezosXRuntimeError::Custom(
+                "Gas for fees overflowed u64::max in conversion".to_string(),
+            ),
+            Error::GasToFeesUnderflow => TezosXRuntimeError::Custom(
+                "Insufficient gas to cover the non-execution fees".to_string(),
+            ),
+        }
+    }
 }
 
 pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
@@ -199,11 +215,11 @@ fn tx_env<Host: Runtime>(
 }
 
 #[instrument(skip_all)]
-fn get_inspector_from<'a, Host: Runtime + 'a>(
+fn get_inspector_from<'a, Host: Runtime + 'a, R: Registry + 'a>(
     tracer_input: TracerInput,
     precompiles: EtherlinkPrecompiles,
     spec_id: SpecId,
-) -> Box<dyn EtherlinkInspector<'a, Host>> {
+) -> Box<dyn EtherlinkInspector<'a, Host, R>> {
     match tracer_input {
         TracerInput::CallTracer(CallTracerInput {
             config,
@@ -213,19 +229,19 @@ fn get_inspector_from<'a, Host: Runtime + 'a>(
             precompiles,
             spec_id,
             transaction_hash,
-        )) as Box<dyn EtherlinkInspector<'a, Host>>,
+        )) as Box<dyn EtherlinkInspector<'a, Host, R>>,
         TracerInput::StructLogger(StructLoggerInput {
             config,
             transaction_hash,
         }) => Box::new(StructLogger::new(config, transaction_hash))
-            as Box<dyn EtherlinkInspector<'a, Host>>,
+            as Box<dyn EtherlinkInspector<'a, Host, R>>,
     }
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
-    db: EtherlinkVMDB<'a, Host>,
+fn evm_inspect<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>(
+    db: EtherlinkVMDB<'a, Host, R>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
@@ -234,7 +250,7 @@ fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
     spec_id: SpecId,
     inspector: INSP,
     is_simulation: bool,
-) -> EvmInspection<'a, Host, INSP> {
+) -> EvmInspection<'a, Host, INSP, R> {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
         .with_spec_and_mainnet_gas_params(spec_id);
@@ -245,8 +261,8 @@ fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
         BlockEnv,
         TxEnv,
         CfgEnv,
-        EtherlinkVMDB<'a, Host>,
-        Journal<EtherlinkVMDB<'a, Host>>,
+        EtherlinkVMDB<'a, Host, R>,
+        Journal<EtherlinkVMDB<'a, Host, R>>,
     >::new(db, spec_id)
     .with_block(block)
     .with_tx(tx)
@@ -257,8 +273,8 @@ fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm<'a, Host: Runtime>(
-    db: EtherlinkVMDB<'a, Host>,
+fn evm<'a, Host: Runtime, R: Registry>(
+    db: EtherlinkVMDB<'a, Host, R>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     maximum_gas_per_transaction: u64,
@@ -266,7 +282,7 @@ fn evm<'a, Host: Runtime>(
     chain_id: u64,
     spec_id: SpecId,
     is_simulation: bool,
-) -> EvmContext<'a, Host> {
+) -> EvmContext<'a, Host, R> {
     let mut cfg = CfgEnv::new()
         .with_chain_id(chain_id)
         .with_spec_and_mainnet_gas_params(spec_id);
@@ -277,8 +293,8 @@ fn evm<'a, Host: Runtime>(
         BlockEnv,
         TxEnv,
         CfgEnv,
-        EtherlinkVMDB<'a, Host>,
-        Journal<EtherlinkVMDB<'a, Host>>,
+        EtherlinkVMDB<'a, Host, R>,
+        Journal<EtherlinkVMDB<'a, Host, R>>,
     >::new(db, spec_id)
     .with_block(block)
     .with_tx(tx)
@@ -287,8 +303,8 @@ fn evm<'a, Host: Runtime>(
     .with_precompiles(precompiles)
 }
 
-fn execute_transaction<'a, Host: Runtime>(
-    evm: &mut EvmContext<'a, Host>,
+fn execute_transaction<'a, Host: Runtime, R: Registry>(
+    evm: &mut EvmContext<'a, Host, R>,
     tx: &'a TxEnv,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
 ) -> Result<ExecutionResult, EVMError<Error>> {
@@ -315,8 +331,9 @@ fn execute_transaction<'a, Host: Runtime>(
 
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
-pub fn run_transaction<'a, Host: Runtime>(
+pub fn run_transaction<'a, Host: Runtime, R: Registry>(
     host: &'a mut Host,
+    registry: &'a R,
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
@@ -343,7 +360,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants)?;
+    let db = EtherlinkVMDB::new(host, registry, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
         let mut evm = evm_inspect(
@@ -354,7 +371,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
-            get_inspector_from::<Host>(
+            get_inspector_from::<Host, R>(
                 tracer_input,
                 EtherlinkPrecompiles::new(),
                 spec_id,
@@ -435,12 +452,12 @@ mod test {
     };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_host::runtime::Runtime;
-    use tezosx_interfaces::RuntimeInterface;
-    use tezosx_tezos_runtime::TezosRuntime;
+    use tezosx_interfaces::Registry as RegistryTrait;
+
     use utilities::{
-        block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
+        block_constants_with_fees, block_constants_with_no_fees, Registry,
+        DEFAULT_SPEC_ID,
     };
 
     use super::Error;
@@ -487,11 +504,103 @@ mod test {
         use primitive_types::{H160 as PH160, U256 as PU256};
         use revm::primitives::hardfork::SpecId;
         use tezos_ethereum::block::{BlockConstants, BlockFees};
+        use tezos_evm_runtime::runtime::Runtime;
+        use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+        use tezosx_interfaces::{
+            Registry as RegistryTrait, RuntimeId, RuntimeInterface, TezosXRuntimeError,
+        };
 
         use crate::test::GAS_LIMIT;
 
+        // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
+        // It contains a MockTezosRuntime for testing cross-runtime functionality.
+        pub(crate) struct Registry {
+            mock_tezos: MockTezosRuntime,
+        }
+
+        impl Registry {
+            pub(crate) fn new() -> Self {
+                Self {
+                    mock_tezos: MockTezosRuntime,
+                }
+            }
+
+            pub(crate) fn get_balance<Host: Runtime>(
+                &self,
+                host: &mut Host,
+                address: &[u8],
+                runtime_id: RuntimeId,
+            ) -> Result<primitive_types::U256, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => self.mock_tezos.get_balance(host, address),
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                    }
+                }
+            }
+        }
+
+        impl RegistryTrait for Registry {
+            fn bridge<Host: Runtime>(
+                &self,
+                host: &mut Host,
+                destination_runtime: RuntimeId,
+                destination_address: &[u8],
+                source_address: &[u8],
+                amount: primitive_types::U256,
+                data: &[u8],
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                match destination_runtime {
+                    RuntimeId::Tezos => self.mock_tezos.call(
+                        self,
+                        host,
+                        source_address,
+                        destination_address,
+                        amount,
+                        data,
+                    ),
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
+                    }
+                }
+            }
+
+            fn generate_alias<Host: Runtime>(
+                &self,
+                host: &mut Host,
+                native_address: &[u8],
+                runtime_id: RuntimeId,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => {
+                        self.mock_tezos.generate_alias(host, native_address)
+                    }
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                    }
+                }
+            }
+
+            fn address_from_string(
+                &self,
+                address_str: &str,
+                runtime_id: RuntimeId,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                match runtime_id {
+                    RuntimeId::Tezos => self.mock_tezos.address_from_string(address_str),
+                    RuntimeId::Ethereum => {
+                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                    }
+                }
+            }
+        }
+
         pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
         const ETHERLINK_CHAIN_ID: u64 = 42793;
+
+        // Path where mock Tezos balances are stored for testing
+        const MOCK_TEZOS_BALANCES_PATH: RefPath =
+            RefPath::assert_from(b"/mock_tezos/balances");
 
         pub(crate) fn block_constants_with_fees() -> BlockConstants {
             BlockConstants::first_block(
@@ -511,6 +620,99 @@ mod test {
                 GAS_LIMIT,
                 PH160::zero(),
             )
+        }
+
+        pub(crate) struct MockTezosRuntime;
+
+        impl RuntimeInterface for MockTezosRuntime {
+            fn generate_alias<Host: Runtime>(
+                &self,
+                _host: &mut Host,
+                native_address: &[u8],
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                // Simple mock: prefix with "tz1_" marker and return a hash-like alias
+                let mut alias = vec![0u8; 22]; // tz1 address size
+                alias[0] = 0x00; // tz1 tag
+                alias[1] = 0x00;
+                // Copy as much of native_address as fits
+                let copy_len = native_address.len().min(20);
+                alias[2..2 + copy_len].copy_from_slice(&native_address[..copy_len]);
+                Ok(alias)
+            }
+
+            fn call<Host: Runtime>(
+                &self,
+                _registry: &impl RegistryTrait,
+                host: &mut Host,
+                _from: &[u8],
+                to: &[u8],
+                amount: primitive_types::U256,
+                _data: &[u8],
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                // Store the balance for the destination address
+                let address_hex = hex::encode(to);
+                let path = OwnedPath::try_from(format!("/{address_hex}"))
+                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
+
+                // Read existing balance
+                let current_balance = match host.store_read_all(&full_path) {
+                    Ok(bytes) if bytes.len() == 32 => {
+                        primitive_types::U256::from_little_endian(&bytes)
+                    }
+                    _ => primitive_types::U256::zero(),
+                };
+
+                // Add amount and store
+                let new_balance =
+                    current_balance.checked_add(amount).ok_or_else(|| {
+                        TezosXRuntimeError::Custom("Balance overflow".to_string())
+                    })?;
+                let mut balance_bytes = [0u8; 32];
+                new_balance.to_little_endian(&mut balance_bytes);
+                host.store_write_all(&full_path, &balance_bytes)?;
+
+                Ok(vec![])
+            }
+
+            fn address_from_string(
+                &self,
+                address_str: &str,
+            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+                // Simple mock: just return the string as bytes
+                Ok(address_str.as_bytes().to_vec())
+            }
+
+            fn string_from_address(
+                &self,
+                address: &[u8],
+            ) -> Result<String, TezosXRuntimeError> {
+                // Simple mock: convert bytes to string
+                String::from_utf8(address.to_vec())
+                    .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))
+            }
+
+            fn get_balance<Host: Runtime>(
+                &self,
+                host: &mut Host,
+                address: &[u8],
+            ) -> Result<primitive_types::U256, TezosXRuntimeError> {
+                let address_hex = hex::encode(address);
+                let path = OwnedPath::try_from(format!("/{address_hex}"))
+                    .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
+                let full_path = concat(&MOCK_TEZOS_BALANCES_PATH, &path)?;
+
+                match host.store_read_all(&full_path) {
+                    Ok(bytes) if bytes.len() == 32 => {
+                        Ok(primitive_types::U256::from_little_endian(&bytes))
+                    }
+                    Ok(_) => Ok(primitive_types::U256::zero()),
+                    Err(tezos_smart_rollup_host::runtime::RuntimeError::PathNotFound) => {
+                        Ok(primitive_types::U256::zero())
+                    }
+                    Err(e) => Err(TezosXRuntimeError::Runtime(e)),
+                }
+            }
         }
 
         sol!("contracts/tests/create_and_revert.sol");
@@ -554,8 +756,10 @@ mod test {
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
 
+        let registry = Registry::new();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -598,17 +802,19 @@ mod test {
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
-        let tezos_runtime = TezosRuntime {};
-        let alias = tezos_runtime
-            .generate_alias(&mut host, &destination.0 .0)
+        let registry = Registry::new();
+        let alias = registry
+            .generate_alias(
+                &mut host,
+                &destination.0 .0,
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
             .unwrap();
-        let mut alias_bytes = Vec::new();
-        alias.bin_write(&mut alias_bytes).unwrap();
         store_alias(
             &mut host,
             &destination,
             tezosx_interfaces::RuntimeId::Tezos,
-            &alias_bytes,
+            &alias,
         )
         .unwrap();
 
@@ -636,8 +842,10 @@ mod test {
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
 
+        let registry = Registry::new();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -670,17 +878,19 @@ mod test {
 
         let caller = Address::from(&[1; 20]);
         let destination = Address::from(&[2; 20]);
-        let tezos_runtime = TezosRuntime {};
-        let alias = tezos_runtime
-            .generate_alias(&mut host, &destination.0 .0)
+        let registry = Registry::new();
+        let alias = registry
+            .generate_alias(
+                &mut host,
+                &destination.0 .0,
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
             .unwrap();
-        let mut alias_bytes = Vec::new();
-        alias.bin_write(&mut alias_bytes).unwrap();
         store_alias(
             &mut host,
             &destination,
             tezosx_interfaces::RuntimeId::Tezos,
-            &alias_bytes,
+            &alias,
         )
         .unwrap();
         let value_sent = U256::from(5000000000000u64);
@@ -696,13 +906,19 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        // Create a mock implicit address string for the test
+        let implicit_address =
+            String::from_utf8(alias.clone()).unwrap_or_else(|_| hex::encode(&alias));
+
         let calldata = RuntimeGatewayCalls::transfer(transferCall {
-            implicitAddress: alias.to_b58check(),
+            implicitAddress: implicit_address,
         })
         .abi_encode();
 
+        let registry = Registry::new();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -725,13 +941,9 @@ mod test {
                 panic!("Transfer to implicit address should have succeeded")
             }
         }
-        let destination_kt1 = match alias {
-            Contract::Originated(pkh) => pkh,
-            _ => panic!("Expected originated address alias"),
-        };
-        let balance =
-            TezosRuntime::get_originated_account_balance(&mut host, &destination_kt1)
-                .unwrap();
+        let balance = registry
+            .get_balance(&mut host, &alias, tezosx_interfaces::RuntimeId::Tezos)
+            .unwrap();
         assert_eq!(balance, primitive_types::U256::from(5));
     }
 
@@ -783,8 +995,10 @@ mod test {
 
         contract_account.set_info(&mut host, contract_info).unwrap();
 
+        let registry = Registry::new();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -838,8 +1052,10 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
         let result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -927,11 +1143,13 @@ mod test {
         let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
+        let registry = Registry::new();
         let ExecutionOutcome {
             result,
             withdrawals,
         } = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1009,8 +1227,10 @@ mod test {
             })
             .abi_encode();
 
+        let registry = Registry::new();
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1070,8 +1290,10 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
         let result_create = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1099,8 +1321,10 @@ mod test {
             other => panic!("ERROR: ended up in {other:?}"),
         };
 
+        let registry = Registry::new();
         let result_call = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1139,8 +1363,10 @@ mod test {
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
+        let registry = Registry::new();
         let result_create = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1216,12 +1442,14 @@ mod test {
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
+        let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1274,8 +1502,10 @@ mod test {
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CreateAndRevert contract
+        let registry = Registry::new();
         let result_create = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1307,12 +1537,14 @@ mod test {
                 bytecode: Bytes::from_hex("0x6080604052348015600e575f5ffd5b50606a80601a5f395ff3fe6080604052348015600e575f5ffd5b50600436106026575f3560e01c80636b59084d14602a575b5f5ffd5b60306032565b005b56fea2646970667358221220e7c453431baacca104fa0d26c8d9fb06266545148b18a79c3ed740ce52d16a0a64736f6c634300081e0033").unwrap()
             });
 
+        let registry = Registry::new();
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
         let ExecutionOutcome {
             result,
             withdrawals: _,
         } = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1385,8 +1617,10 @@ mod test {
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
+        let registry = Registry::new();
         run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1444,8 +1678,10 @@ mod test {
         assert_eq!(caller_info.balance, U256::MAX);
         assert_eq!(destination_info.balance, U256::ZERO);
 
+        let registry = Registry::new();
         let result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1488,8 +1724,10 @@ mod test {
             ticketHash: Default::default(),
         };
 
+        let registry = Registry::new();
         let outcome = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1509,6 +1747,7 @@ mod test {
 
         let outcome = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
@@ -1590,7 +1829,7 @@ mod test {
                     block_constants_with_no_fees,
                     FABridge::{claimCall, queueCall, withdrawCall, Deposit, Withdrawal},
                     ITable::FaDepositWithProxy,
-                    DEFAULT_SPEC_ID,
+                    Registry, DEFAULT_SPEC_ID,
                 },
                 GAS_LIMIT,
             },
@@ -1682,8 +1921,10 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
             let outcome = run_transaction(
                 host,
+                &registry,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -1711,8 +1952,10 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
             run_transaction(
                 host,
+                &registry,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -1751,8 +1994,10 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
             run_transaction(
                 host,
+                &registry,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -1784,8 +2029,10 @@ mod test {
                     },
                 )
                 .unwrap();
+            let registry = Registry::new();
             let result_create = run_transaction(
                 host,
+                &registry,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
@@ -2464,8 +2711,10 @@ mod test {
 
         contract_account.set_info(&mut host, contract_info).unwrap();
 
+        let registry = Registry::new();
         let execution_result = run_transaction(
             &mut host,
+            &registry,
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
