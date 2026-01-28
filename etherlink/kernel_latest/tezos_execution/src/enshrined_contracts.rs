@@ -7,8 +7,11 @@ use mir::{
     context::CtxTrait,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Registry, RuntimeId};
+
+use crate::mir_ctx::HasHost;
 
 #[derive(Debug, PartialEq)]
 pub enum EnshrinedContracts {
@@ -40,12 +43,12 @@ pub fn is_enshrined(kt1: &ContractKt1Hash) -> bool {
     from_kt1(kt1).is_some()
 }
 
-pub(crate) fn execute_enshrined_contract<'a>(
+pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
     _contract: EnshrinedContracts,
     _entrypoint: &Entrypoint,
-    _value: Micheline<'a>,
-    _ctx: &mut impl CtxTrait<'a>,
-    _registry: &impl Registry,
+    value: Micheline<'a>,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
+    registry: &impl Registry,
 ) -> Result<(), TransferError> {
     // TODO L2-708
     Ok(())

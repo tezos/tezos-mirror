@@ -49,8 +49,8 @@ use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
-    TcCtx,
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, HasHost,
+    OperationCtx, TcCtx,
 };
 
 extern crate alloc;
@@ -848,13 +848,13 @@ where
     }
 }
 
-fn execute_smart_contract<'a>(
+fn execute_smart_contract<'a, Host: Runtime>(
     code: account_storage::Code,
     storage: Vec<u8>,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
     registry: &impl Registry,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     match code {

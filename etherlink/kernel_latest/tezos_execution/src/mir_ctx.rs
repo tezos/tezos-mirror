@@ -283,8 +283,14 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     }
 }
 
-impl<Host: Runtime, C: Context> Ctx<'_, '_, Host, C> {
-    pub fn host(&mut self) -> &mut Host {
+pub trait HasHost<Host: Runtime> {
+    fn host(&mut self) -> &mut Host;
+}
+
+impl<'a, 'operation, Host: Runtime, C: Context> HasHost<Host>
+    for Ctx<'a, 'operation, Host, C>
+{
+    fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
 }
