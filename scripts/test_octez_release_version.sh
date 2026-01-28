@@ -44,8 +44,9 @@ test_version "Octez $VERSION" "octez-v$VERSION"
 git commit --allow-empty -m "test" > /dev/null 2>&1
 test_version "Octez $VERSION+dev" "$(git describe --tags)"
 
+# Not a valid version number.
 git tag "octez-v$VERSION+rc1" -m "test"
-test_version "Octez $VERSION+dev" "octez-v$VERSION+rc1"
+test_version "Octez 0.0+dev" "octez-v$VERSION+rc1"
 
 git tag "octez-v$VERSION-rc1" -m "test"
 test_version "Octez $VERSION~rc1" "octez-v$VERSION-rc1"
