@@ -14449,9 +14449,8 @@ let test_eip3607_disabled_for_simulation =
   unit
 
 let test_fa_deposit_watchtower =
-  register_test
+  register_test_for_kernels
     ~__FILE__
-    ~kernel:Kernel.Latest
     ~tags:["evm"; "fa_deposit"; "watchtower"]
     ~title:"FA deposit is claimed by the watchtower"
     ~enable_fa_bridge:true
@@ -14556,6 +14555,174 @@ let test_fa_deposit_watchtower =
     ~error_msg:
       "After deposit we expect %L ticket balance in the sequencer, got %R" ;
   unit
+
+let test_xtz_deposit_watchtower =
+  (* TODO: When 6.2 is released, replace `register_test` by
+     `register_test_for_kernels`.*)
+  register_test
+    ~__FILE__
+    ~kernel:Kernel.Latest
+    ~tags:["evm"; "xtz_deposit"; "watchtower"]
+    ~title:"XTZ deposit is claimed by the watchtower"
+    ~enable_fa_bridge:true
+    ~enable_multichain:false
+    ~enable_dal:false
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~additional_uses:[Constant.octez_codec; Constant.watchtower]
+    ~websockets:true
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      _protocol
+    ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let sponsored =
+    Eth_account.
+      {
+        address = "0x202dFc8a729ac2cdE90D3B0e7A0424b6Ed6f6c34";
+        private_key =
+          "0x7d597ae2d861eda61e148e757478c9a07d950be9f355958195f1fc75a0cdd8b2";
+      }
+  in
+  (* The future EIP-7702 account will have 0 balance before the deposit. *)
+  let*@ balance = Rpc.get_balance ~address:sponsored.address sequencer in
+  Check.((balance = Wei.zero) Wei.typ)
+    ~error_msg:
+      "Expected balance of the sponsored address of zero wei, got %L wei" ;
+  let endpoint = Evm_node.endpoint sequencer in
+  let* eip7702 = Solidity_contracts.eip7702_fallback evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  (* We start by deploying a simple contract that emits a log. This will be
+     the delegation contract that will be executed from the EOA's address
+     when the deposit happens. *)
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let base_tx ~nonce ~authorization =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization
+      ~address:sponsored.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:sponsored.private_key
+      ~endpoint
+      ()
+  in
+  (* We craft the EIP-7702 transaction thanks to cast. The sponsor that has the
+     necessary balance will use the signed authorization and post in on chain. *)
+  let* raw_set_eoa = base_tx ~nonce:1 ~authorization:signed_auth in
+  let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{type_; _} =
+    Rpc.get_transaction_receipt ~tx_hash:set_eoa_hash sequencer
+  in
+  (* Type 4 = EIP-7702 *)
+  Check.((type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected tx.type of %R, got %L" ;
+  (* We can retrieve the authorization list from the transaction object: *)
+  let*@! Transaction.{authorizationList; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:set_eoa_hash sequencer
+  in
+  (match authorizationList with
+  | Some [{address; _}] ->
+      Check.(
+        (String.lowercase_ascii address
+        = String.lowercase_ascii eip7702_contract)
+          string)
+        ~error_msg:"Expected msg.sender of %R, got %L"
+  | Some _ -> failwith "Authorization list should only contain one element."
+  | None -> failwith "Authorization list should not be empty.") ;
+  (* At this point, the EOA has code that can be called on deposit. *)
+  let* _watchtower =
+    let config =
+      Watchtower.
+        {
+          evm_node_endpoint = Evm_node.endpoint sequencer;
+          gas_limit = None;
+          max_fee_per_gas = None;
+          rpc = None;
+          secret_key = Some whale.private_key;
+          whitelist = None;
+        }
+    in
+    Watchtower.init ~config ~first_block:1 ()
+  in
+  let scenario_for ~address =
+    let depositor = Constant.bootstrap5 in
+    let amount = Tez.of_int 1125 in
+    let deposit_info = {receiver = EthereumAddr address; chain_id = None} in
+    let* () =
+      send_deposit_to_delayed_inbox
+        ~amount
+        ~bridge:l1_contracts.bridge
+        ~depositor
+        ~deposit_info
+        ~sc_rollup_node
+        ~sc_rollup_address
+        client
+    in
+    let* () =
+      wait_for_delayed_inbox_add_tx_and_injected
+        ~sequencer
+        ~sc_rollup_node
+        ~client
+    in
+    let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
+    let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+    (* Since it's an address that contains code that we deposit in, the balance
+       should still be zero, it's a two step process, we need to claim it. *)
+    let*@ balance = Rpc.get_balance ~address sequencer in
+    Check.((balance = Wei.zero) Wei.typ)
+      ~error_msg:
+        "Expected balance of the sponsored address of zero wei, got %L wei" ;
+    (* Check that the deposit was queued for the address with code. *)
+    let* deposit_receipt = get_one_receipt_from_latest_or_fail sequencer in
+    let deposit_log : Transaction.tx_log = List.hd deposit_receipt.logs in
+    assert (Solidity_contracts.Precompile.xtz_bridge = deposit_log.address) ;
+    assert (revm_queued_xtz_deposit_event_topic = List.hd deposit_log.topics) ;
+    let* () =
+      (* We let some time to the watchtower to inject the claim. This avoids flakyness. *)
+      repeat 4 (fun () ->
+          let* _ = produce_block sequencer in
+          unit)
+    in
+    (* Check that the balance was properly deposited. *)
+    let*@ balance = Rpc.get_balance ~address sequencer in
+    Check.((balance = Wei.of_tez amount) Wei.typ)
+      ~error_msg:"Expected balance of the address with code of %R, got %L wei" ;
+    unit
+  in
+  (* The scenario has to work for both the EOA (EIP-7702) account and the
+     regular smart contract. *)
+  let* () = scenario_for ~address:sponsored.address in
+  scenario_for ~address:eip7702_contract
 
 let test_evm_events_cleanup () =
   Test_helpers.register_sandbox
@@ -14760,4 +14927,5 @@ let () =
   test_eip2537 [Alpha] ;
   test_eip3607_disabled_for_simulation [Alpha] ;
   test_fa_deposit_watchtower [Alpha] ;
+  test_xtz_deposit_watchtower [Alpha] ;
   test_evm_events_cleanup ()

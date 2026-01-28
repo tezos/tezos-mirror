@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Functori, <contact@functori.com>                       *)
+(* Copyright (c) 2025-2026 Functori, <contact@functori.com>                  *)
 (* Copyright (c) 2025 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -21,6 +21,13 @@ type ctx = {
 }
 
 module Craft = struct
+  let strip_0x s =
+    if String.starts_with ~prefix:"0x" s then
+      String.sub s 2 (String.length s - 2)
+    else s
+
+  let amount_to_float_1e6 (Ethereum_types.Qty z) = Z.to_float z *. 1e-6
+
   let prepare_and_forge_tx
       {max_fee_per_gas; sk; gas_limit; chain_id = L2_types.Chain_id chain_id; _}
       ?to_ ?data ~nonce ~value () =
@@ -136,7 +143,7 @@ let addr_to_topic address =
       addresses and ticket hashes
     @return A filter configuration for Ethereum log queries
 *)
-let mk_filter address selectors whitelist =
+let mk_filter addresses selectors whitelist =
   (* First topic is always the event selector *)
   let selector_topic = Some (Ethereum_types.Filter.Or selectors) in
   (* Construct topics array based on whitelist configuration *)
@@ -197,11 +204,11 @@ let mk_filter address selectors whitelist =
   (* Create bloom filter for efficient filtering *)
   let bloom =
     Filter_helpers.make_bloom_address_topics
-      (Some (Single address))
+      (Some (Vec addresses))
       (Some topics)
   in
   (* Return the complete filter configuration *)
-  Filter_helpers.{bloom; address = [address]; topics}
+  Filter_helpers.{bloom; address = addresses; topics}
 
 module Event = struct
   include Internal_event.Simple
@@ -224,12 +231,12 @@ module Event = struct
       ~level:Debug
       ("log", Ethereum_types.transaction_log_encoding)
 
-  let deposit_log =
+  let fa_deposit_log =
     declare_6
       ~section
-      ~name:"deposit_log"
+      ~name:"fa_deposit_log"
       ~msg:
-        "Deposit {nonce}: {amount} {token} to {receiver} in transaction \
+        "FA Deposit {nonce}: {amount} {token} to {receiver} in transaction \
          {transactionHash} of block {blockNumber}"
       ~level:Notice
       ("nonce", Db.quantity_hum_encoding)
@@ -245,15 +252,50 @@ module Event = struct
       ~pp5:Ethereum_types.pp_hash
       ~pp6:Ethereum_types.pp_quantity
 
-  let emit_deposit_log ws_client (d : Db.deposit) (l : Db.log_info) =
+  let xtz_deposit_log =
+    declare_5
+      ~section
+      ~name:"xtz_deposit_log"
+      ~msg:
+        "XTZ Deposit {nonce}: {amount} to {receiver} in transaction \
+         {transactionHash} of block {blockNumber}"
+      ~level:Notice
+      ("nonce", Db.quantity_hum_encoding)
+      ("amount", Data_encoding.float)
+      ("receiver", Ethereum_types.address_encoding)
+      ("transactionHash", Ethereum_types.hash_encoding)
+      ("blockNumber", Db.quantity_hum_encoding)
+      ~pp1:Ethereum_types.pp_quantity
+      ~pp3:(fun fmt a ->
+        Format.pp_print_string fmt (Ethereum_types.Address.to_string a))
+      ~pp4:Ethereum_types.pp_hash
+      ~pp5:Ethereum_types.pp_quantity
+
+  let emit_deposit_log ws_client (deposit : Db.deposit) (l : Db.log_info) =
     let open Lwt_result_syntax in
-    let* amount, symbol =
-      Token_info.get_for_display ws_client d.proxy d.amount
-    in
-    Lwt_result.ok
-    @@ emit
-         deposit_log
-         (d.nonce, amount, symbol, d.receiver, l.transactionHash, l.blockNumber)
+    match deposit.token with
+    | XTZ ->
+        Lwt_result.ok
+        @@ emit
+             xtz_deposit_log
+             ( deposit.nonce,
+               Craft.amount_to_float_1e6 deposit.amount,
+               deposit.receiver,
+               l.transactionHash,
+               l.blockNumber )
+    | FA {proxy; _} ->
+        let* amount, symbol =
+          Token_info.get_for_display ws_client proxy deposit.amount
+        in
+        Lwt_result.ok
+        @@ emit
+             fa_deposit_log
+             ( deposit.nonce,
+               amount,
+               symbol,
+               deposit.receiver,
+               l.transactionHash,
+               l.blockNumber )
 
   let unclaimed_deposits =
     declare_1
@@ -264,13 +306,15 @@ module Event = struct
       ("number", Data_encoding.int31)
 
   let claiming_deposit =
-    declare_1
+    declare_2
       ~section
       ~name:"claiming_deposit"
-      ~msg:"Claiming deposit {nonce}"
+      ~msg:"Claiming {deposit_type} deposit {nonce}"
       ~level:Notice
+      ("deposit_type", Data_encoding.string)
       ("nonce", Db.quantity_hum_encoding)
-      ~pp1:Ethereum_types.pp_quantity
+      ~pp1:Format.pp_print_string
+      ~pp2:Ethereum_types.pp_quantity
 
   let claimed_deposit =
     declare_3
@@ -442,21 +486,26 @@ let () =
       | _ -> None)
     (fun (block, limit) -> Too_many_deposits_in_one_block {block; limit})
 
+module Address = struct
+  (* See [kernel]/revm/src/precompiles/constants.rs *)
+
+  let xtz_bridge_hex = "ff00000000000000000000000000000000000001"
+
+  let xtz_bridge_0x = "0x" ^ xtz_bridge_hex
+
+  let xtz_bridge = Ethereum_types.Address (Hex xtz_bridge_hex)
+
+  let fa_bridge_hex = "ff00000000000000000000000000000000000002"
+
+  let fa_bridge_0x = "0x" ^ fa_bridge_hex
+
+  let fa_bridge = Ethereum_types.Address (Hex fa_bridge_hex)
+
+  let bridge_addresses = [xtz_bridge; fa_bridge]
+end
+
 module Deposit = struct
-  type data = Db.deposit = {
-    nonce : Ethereum_types.quantity;
-    proxy : Ethereum_types.Address.t;
-    ticket_hash : Ethereum_types.hash;
-    receiver : Ethereum_types.Address.t;
-    amount : Ethereum_types.quantity;
-  }
-
-  (* FA bridge address, see [kernel]/revm/src/precompiles/constants.rs *)
-  let fa_bridge_address_hex = "ff00000000000000000000000000000000000002"
-
-  let fa_bridge_address_0x = "0x" ^ fa_bridge_address_hex
-
-  let fa_bridge_address = Ethereum_types.Address (Hex fa_bridge_address_hex)
+  type data = Db.deposit
 
   module Dionysus = struct
     (*
@@ -471,7 +520,7 @@ module Deposit = struct
    topics  = keccak selector + ticket_hash + proxy
   *)
 
-    let topic =
+    let fa_topic =
       kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
   end
 
@@ -488,13 +537,31 @@ module Deposit = struct
       );
     *)
 
-    let topic =
+    let fa_topic =
       kecack_topic
         "QueuedDeposit(uint256,address,uint256,address,uint256,uint256,uint256)"
   end
 
-  let filter whitelist =
-    mk_filter fa_bridge_address [Dionysus.topic; Farfadet.topic] whitelist
+  module FarfadetR2 = struct
+    (*
+      event QueuedDeposit(
+          uint256 amount,
+          uint256 nonce,
+          address receiver,
+          uint256 inbox_level,
+          uint256 inbox_msg_id
+      );
+    *)
+
+    let xtz_topic =
+      kecack_topic "QueuedDeposit(uint256,uint256,address,uint256,uint256)"
+  end
+
+  let filter ~addresses whitelist =
+    mk_filter
+      addresses
+      [Dionysus.fa_topic; Farfadet.fa_topic; FarfadetR2.xtz_topic]
+      whitelist
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
@@ -536,7 +603,38 @@ module Deposit = struct
     if matched_by_whitelist then return_some (log_ticket_hash, log_proxy)
     else return_none
 
-  let decode_event_data whitelist
+  let decode_xtz_event_data Ethereum_types.{topics; data = Hex hex_data; _} =
+    let open Result_syntax in
+    let* is_xtz_event_deposit =
+      match topics with
+      | [selector] -> Ok (selector = FarfadetR2.xtz_topic)
+      | _ ->
+          error_with
+            "Something went wrong while parsing XTZ deposit event topics, \
+             should contain exactly one topic"
+    in
+    if not is_xtz_event_deposit then return_none
+    else
+      let data = Hex.to_bytes (`Hex hex_data) in
+      let* data =
+        match data with
+        | None -> error_with "Invalid hex data in deposit event"
+        | Some d -> return d
+      in
+      let* () =
+        if Bytes.length data < 3 * 32 then
+          error_with "Invalid length for data of deposit event"
+        else return_unit
+      in
+      let amount = extract_32 0 data |> Ethereum_types.decode_number_be in
+      let nonce = extract_32 1 data |> Ethereum_types.decode_number_be in
+      let receiver =
+        extract_32 2 data ~padding:(`Left_padded 20)
+        |> Ethereum_types.decode_address
+      in
+      return_some @@ Db.{nonce; token = XTZ; receiver; amount}
+
+  let decode_fa_event_data whitelist
       Ethereum_types.{topics; data = Hex hex_data; _} =
     let open Result_syntax in
     let* th_proxy = whitelist_filter whitelist topics in
@@ -560,7 +658,8 @@ module Deposit = struct
           |> Ethereum_types.decode_address
         in
         let amount = extract_32 2 data |> Ethereum_types.decode_number_be in
-        return_some {nonce; proxy; ticket_hash; receiver; amount}
+        return_some
+        @@ Db.{nonce; token = FA {proxy; ticket_hash}; receiver; amount}
 end
 
 let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
@@ -593,19 +692,37 @@ let parsed_log_to_db (log : Ethereum_types.transaction_log) event =
 
 let parse_log whitelist (log : Ethereum_types.transaction_log) =
   let open Result_syntax in
-  let* deposit_data = Deposit.decode_event_data whitelist log in
+  let* deposit_data =
+    if log.address = Address.xtz_bridge then Deposit.decode_xtz_event_data log
+    else Deposit.decode_fa_event_data whitelist log
+  in
   return (Option.map (parsed_log_to_db log) deposit_data)
 
-let fa_bridge_address = Efunc_core.Private.a Deposit.fa_bridge_address_hex
+let param_address address =
+  let (Ethereum_types.Address (Hex address_hex)) = address in
+  Efunc_core.Private.a (Craft.strip_0x address_hex)
 
-let claim ctx ~deposit_id =
+let xtz_bridge_address = Efunc_core.Private.a Address.xtz_bridge_hex
+
+let fa_bridge_address = Efunc_core.Private.a Address.fa_bridge_hex
+
+let claim_fa_call_data deposit_id =
+  Efunc_core.Evm.encode ~name:"claim" [`uint 256] [`int deposit_id]
+
+let claim_xtz_call_data deposit_id =
+  Efunc_core.Evm.encode ~name:"claim_xtz" [`uint 256] [`int deposit_id]
+
+let claim ctx ~is_native ~deposit_id =
   let open Lwt_result_syntax in
-  let data =
-    Efunc_core.Evm.encode ~name:"claim" [`uint 256] [`int deposit_id]
-  in
   let _ : unit Lwt.t =
     let open Lwt_syntax in
-    let* res = Tx_queue.transfer ctx ~to_:fa_bridge_address ~data () in
+    let data, bridge_address =
+      if is_native then (claim_xtz_call_data deposit_id, Address.xtz_bridge)
+      else (claim_fa_call_data deposit_id, Address.fa_bridge)
+    in
+    let* res =
+      Tx_queue.transfer ctx ~to_:(param_address bridge_address) ~data ()
+    in
     match res with
     | Ok (Ok ()) -> Event.(emit transfered_to_tx_queue) ()
     | Error trace ->
@@ -678,20 +795,21 @@ let lwt_stream_iter_es_with_timeout ~timeout f stream =
 *)
 let rec get_logs ?(n = 1) ctx ~block =
   let open Lwt_result_syntax in
-  let open Ethereum_types in
   (* Query logs for the specified block range *)
-  let filter = Deposit.filter ctx.whitelist in
+  let filter =
+    Deposit.filter ~addresses:Address.bridge_addresses ctx.whitelist
+  in
   let*! logs =
     Websocket_client.send_jsonrpc
       ?timeout:ctx.rpc_timeout
       ctx.ws_client
       (Call
          ( (module Rpc_encodings.Get_logs),
-           Filter.
+           Ethereum_types.Filter.
              {
                from_block = Some (Number block);
                to_block = Some (Number block);
-               address = Some (Single Deposit.fa_bridge_address);
+               address = Some (Vec Address.bridge_addresses);
                topics = Some filter.topics;
                block_hash = None;
              } ))
@@ -714,10 +832,16 @@ let rec get_logs ?(n = 1) ctx ~block =
       get_logs ~n:(n + 1) ctx ~block
   | Error e -> fail e
 
-let claim_selector =
+let claim_fa_selector =
   (Efunc_core.Evm.method_id ~name:"claim" [`uint 256] :> string)
 
-let is_claim_input = String.starts_with ~prefix:claim_selector
+let claim_xtz_selector =
+  (Efunc_core.Evm.method_id ~name:"claim_xtz" [`uint 256] :> string)
+
+let is_claim_input ~bridge_address =
+  if bridge_address = Address.fa_bridge then
+    String.starts_with ~prefix:claim_fa_selector
+  else String.starts_with ~prefix:claim_xtz_selector
 
 let handle_confirmed_txs {db; ws_client; rpc_timeout; _} number =
   let open Lwt_result_syntax in
@@ -738,8 +862,11 @@ let handle_confirmed_txs {db; ws_client; rpc_timeout; _} number =
      let (Hex input) = Transaction_object.input tx in
      match Transaction_object.to_ tx with
      | Some to_
-       when Ethereum_types.Address.compare to_ Deposit.fa_bridge_address = 0
-            && is_claim_input input -> (
+       when List.mem
+              ~equal:Ethereum_types.Address.equal
+              to_
+              Address.bridge_addresses
+            && is_claim_input ~bridge_address:to_ input -> (
          let tx_hash = Transaction_object.hash tx in
          let input =
            Hex.to_string (`Hex input) |> WithExceptions.Option.get ~loc:__LOC__
@@ -812,12 +939,17 @@ let claim_deposits ctx =
       (* Clear queue because we reinject all missing claims. *)
       let (module Tx_container) = Tx_queue.tx_container in
       let* () = Tx_container.clear () in
-      List.iter_es
-        (fun deposit ->
-          let (Qty deposit_id) = deposit.Db.nonce in
-          let*! () = Event.(emit claiming_deposit) deposit.Db.nonce in
-          claim ctx ~deposit_id)
-        deposits
+      let handle_deposits deposit =
+        let is_native = Db.(deposit.token = XTZ) in
+        let deposit_id_qty = deposit.nonce in
+        let (Qty deposit_id) = deposit_id_qty in
+        let deposit_type = if is_native then "xtz" else "fa" in
+        let*! () =
+          Event.(emit claiming_deposit) (deposit_type, deposit_id_qty)
+        in
+        claim ctx ~is_native ~deposit_id
+      in
+      List.iter_es handle_deposits deposits
 
 let on_new_block ctx ~catch_up number =
   let open Lwt_result_syntax in
