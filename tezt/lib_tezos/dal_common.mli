@@ -319,13 +319,16 @@ module RPC : sig
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
 
   (** Call RPC "GET
-        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots" to
-        get the slots currently attestable by the given public key hash at the
+        /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+        to get the slots currently attestable by the given public key hash at the
         given attested level. The result is either a [Not_in_committee] or a
         [Attestable_slots flags], where [flags] is a boolean list of length
         [num_slots]. A slot is attestable if it is published at level [level -
         attestation_lag]) and all the shards assigned to the given attester at
-        level [level] are available in the DAL node's store. *)
+        level [level] are available in the DAL node's store. Please note that with
+        the introduction of [attestation_lags] list the result is only for
+        the published level corresponding to the maximum lag, so there is not an
+        equivalence between this RPC and the DAL attestation from the chain. *)
   val get_attestable_slots :
     attester:Account.key -> attested_level:int -> attestable_slots RPC_core.t
 
