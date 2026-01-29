@@ -559,10 +559,13 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
 fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
     transactions: Vec<Vec<u8>>,
 ) -> anyhow::Result<Vec<ChainConfig::Transaction>> {
-    transactions
-        .iter()
-        .map(|tx_common| ChainConfig::transaction_from_bytes(tx_common))
-        .collect::<anyhow::Result<Vec<ChainConfig::Transaction>>>()
+    let mut result = vec![];
+    for tx_common in transactions.iter() {
+        if let Some(transaction) = ChainConfig::transaction_from_bytes(tx_common)? {
+            result.push(transaction)
+        }
+    }
+    Ok(result)
 }
 
 pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(

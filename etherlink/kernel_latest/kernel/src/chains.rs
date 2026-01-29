@@ -308,7 +308,7 @@ pub trait ChainConfigTrait: Debug {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>;
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Self::Transaction>;
+    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>>;
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
@@ -411,8 +411,9 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Self::Transaction> {
-        ethereum_transaction_from_bytes(bytes)
+    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>> {
+        let tx = ethereum_transaction_from_bytes(bytes)?;
+        Ok(Some(tx))
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -626,8 +627,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ))
     }
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Self::Transaction> {
-        tezos_operation_from_bytes(bytes)
+    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>> {
+        let operation = tezos_operation_from_bytes(bytes)?;
+        Ok(Some(operation))
     }
 
     fn read_block_in_progress(
