@@ -3170,9 +3170,7 @@ module Dal : sig
     val finalize_current_slot_headers : context -> context Lwt.t
 
     val finalize_pending_slot_headers :
-      context ->
-      number_of_slots:int ->
-      (context * Slot_availability.t) tzresult Lwt.t
+      context -> (context * Slot_availability.t) tzresult Lwt.t
   end
 
   module Shard_with_proof : sig
