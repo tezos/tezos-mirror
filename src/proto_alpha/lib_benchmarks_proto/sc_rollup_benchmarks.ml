@@ -283,8 +283,7 @@ end
     The inferred cost model is [c1 + c2 * proof_length]. *)
 module Sc_rollup_verify_output_proof_benchmark = struct
   open Pvm_state_generator
-  module Full_Wasm =
-    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+  module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
   (* Benchmark starts here. *)
 
@@ -497,8 +496,7 @@ end
 module Sc_rollup_deserialize_output_proof_benchmark = struct
   open Pvm_state_generator
   open Benchmarks_proto
-  module Full_Wasm =
-    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+  module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
   (* Benchmark starts here. *)
 
@@ -645,8 +643,7 @@ end
 (** This benchmark estimates the cost of installing a boot sector. *)
 module Sc_rollup_install_boot_sector_benchmark = struct
   open Pvm_state_generator
-  module Full_Wasm =
-    Sc_rollup_wasm.V2_0_0.Make (Environment.Wasm_2_0_0.Make) (Wasm_context)
+  module Full_Wasm = Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
   (* Benchmark starts here. *)
 

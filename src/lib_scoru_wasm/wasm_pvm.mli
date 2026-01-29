@@ -24,6 +24,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type CONTEXT_PROOF = sig
+  type context
+
+  module Wrapped_tree : Tezos_tree_encoding.TREE
+
+  val empty_tree : unit -> Wrapped_tree.tree
+
+  val tree_hash :
+    Wrapped_tree.tree -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
+
+  type proof
+
+  val proof_encoding : proof Data_encoding.t
+
+  val proof_start_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val proof_stop_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val produce_proof :
+    context ->
+    Wrapped_tree.tree ->
+    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
+    (proof * 'a) option Lwt.t
+
+  val verify_proof :
+    proof ->
+    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
+    (Wrapped_tree.tree * 'a) option Lwt.t
+
+  val cast_read_only : proof -> proof
+end
+
 val pvm_state_encoding :
   Wasm_pvm_state.Internal_state.pvm_state Tezos_tree_encoding.t
 
@@ -32,7 +64,26 @@ val durable_buffers_encoding :
 
 val durable_storage_encoding : Durable.t Tezos_tree_encoding.t
 
-module Make (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.S with type tree = T.tree
+module Make_machine (T : Tezos_tree_encoding.TREE) :
+  Wasm_pvm_sig.Machine with type tree = T.tree and type state = T.tree
 
-module Make_pvm (Wasm_vm : Wasm_vm_sig.S) : module type of Make
+module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
+    module type of Make_machine
+
+module Make_pvm_machine (Context : CONTEXT_PROOF) :
+  Wasm_pvm_sig.S
+    with type context = Context.context
+     and type proof = Context.proof
+     and type tree = Context.Wrapped_tree.tree
+
+module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
+    module type of Make_pvm_machine
+
+module Wasm_pvm_in_memory :
+  Wasm_pvm_sig.S
+    with type context = Tezos_context_memory.Context_binary.context
+     and type tree = Tezos_context_memory.Context_binary.tree
+     and type state = Tezos_context_memory.Context_binary.tree
+     and type proof =
+      Tezos_context_memory.Context.Proof.tree
+      Tezos_context_memory.Context.Proof.t

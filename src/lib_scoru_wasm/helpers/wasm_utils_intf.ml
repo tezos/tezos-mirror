@@ -186,7 +186,7 @@ module type S = sig
   module Tree_encoding_runner :
     Tezos_tree_encoding.Runner.S with type tree = tree
 
-  module Wasm : Wasm_pvm_sig.S with type tree = tree
+  module Wasm : Wasm_pvm_sig.Machine with type tree = tree
 
-  module Wasm_fast : Wasm_pvm_sig.S with type tree = tree
+  module Wasm_fast : Wasm_pvm_sig.Machine with type tree = tree
 end

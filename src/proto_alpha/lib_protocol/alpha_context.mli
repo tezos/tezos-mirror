@@ -4101,16 +4101,12 @@ module Sc_rollup : sig
 
     val decode_reveal : Wasm_2_0_0.reveal -> reveal
 
-    module type Make_wasm = module type of Wasm_2_0_0.Make
+    module type S = sig
+      include PVM.S
 
-    module Make
-        (Wasm_backend : Make_wasm)
-        (C : Generic_irmin_pvm_context_sig) : sig
-      include
-        PVM.S
-          with type context = C.Tree.t
-           and type state = C.tree
-           and type proof = C.proof
+      val parse_boot_sector : string -> string option
+
+      val pp_boot_sector : Format.formatter -> string -> unit
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -4123,20 +4119,19 @@ module Sc_rollup : sig
         is_reveal_enabled:is_reveal_enabled -> state -> status Lwt.t
 
       val get_outbox : Raw_level.t -> state -> output list Lwt.t
-
-      val produce_proof :
-        context ->
-        is_reveal_enabled:is_reveal_enabled ->
-        input option ->
-        state ->
-        proof tzresult Lwt.t
     end
 
+    module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
+      S
+        with type context = WASM_machine.context
+         and type state = WASM_machine.state
+         and type proof = WASM_machine.proof
+
     module Protocol_implementation :
-      PVM.PROTO_VERIFICATION
-        with type context = Context.t
-         and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t
+      S
+        with type context = Wasm_2_0_0.Wasm_pvm_machine.context
+         and type state = Wasm_2_0_0.Wasm_pvm_machine.state
+         and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
   end
 
   module Riscv_PVM : sig

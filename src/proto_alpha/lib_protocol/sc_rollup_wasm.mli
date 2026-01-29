@@ -64,23 +64,18 @@ module V2_0_0 : sig
       Raw_level_repr.t -> state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module type Make_wasm = module type of Wasm_2_0_0.Make
-
-  (** Build a WebAssembly PVM using the given proof-supporting context. *)
-  module Make
-      (Lib_scoru_Wasm : Make_wasm)
-      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
+  module Make_pvm (WASM_machine : Wasm_2_0_0.WASM_PVM_MACHINE) :
     S
-      with type context = Context.Tree.t
-       and type state = Context.tree
-       and type proof = Context.proof
+      with type context = WASM_machine.context
+       and type state = WASM_machine.state
+       and type proof = WASM_machine.proof
 
   (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
   module Protocol_implementation :
     S
-      with type context = Context.t
-       and type state = Context.tree
-       and type proof = Context.Proof.tree Context.Proof.t
+      with type context = Wasm_2_0_0.Wasm_pvm_machine.context
+       and type state = Wasm_2_0_0.Wasm_pvm_machine.state
+       and type proof = Wasm_2_0_0.Wasm_pvm_machine.proof
 
   (** Number of ticks between snapshotable states, chosen low enough
       to maintain refutability.

@@ -1073,7 +1073,7 @@ struct
     struct
       type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
-      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
+      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make_machine (struct
         include Tree
 
         let select = function

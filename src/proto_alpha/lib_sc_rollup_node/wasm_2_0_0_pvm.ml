@@ -26,24 +26,6 @@
 open Protocol
 open Alpha_context
 
-(** This module manifests the proof format used by the Wasm PVM as defined by
-    the Layer 1 implementation for it.
-
-    It is imperative that this is aligned with the protocol's implementation.
-*)
-module Wasm_2_0_0_proof_format =
-  Irmin_context.Proof
-    (struct
-      include Sc_rollup.State_hash
-
-      let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-    end)
-    (struct
-      let proof_encoding =
-        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
-        .tree_proof_encoding
-    end)
-
 module type TreeS =
   Tezos_context_sigs.Context.TREE
     with type key = string list
@@ -62,11 +44,36 @@ module Make_wrapped_tree (Tree : TreeS) :
   let wrap t = PVM_tree t
 end
 
-module Make_backend (Tree : TreeS) = struct
-  include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+(** This module manifests the proof format used by the Wasm PVM as defined by
+    the Layer 1 implementation for it.
 
-  let compute_step =
-    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+    It is imperative that this is aligned with the protocol's implementation.
+*)
+module Wasm_2_0_0_proof_format = struct
+  include
+    Irmin_context.Proof
+      (struct
+        include Sc_rollup.State_hash
+
+        let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
+      end)
+      (struct
+        let proof_encoding =
+          Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+          .tree_proof_encoding
+      end)
+
+  type context = Irmin_context.rw_index
+
+  let proof_start_state = proof_before
+
+  let proof_stop_state = proof_after
+
+  module Wrapped_tree = Make_wrapped_tree (Irmin_context.Tree)
+
+  let empty_tree () = Irmin_context.PVMState.empty ()
+
+  let tree_hash tree = hash_tree tree |> Lwt.return
 end
 
 (** Durable part of the storage of this PVM. *)
@@ -127,17 +134,33 @@ module Make_durable_state
     Tezos_scoru_wasm.Durable.list durable key
 end
 
-module Durable_state =
-  Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
+module Durable_state = Make_durable_state (Wasm_2_0_0_proof_format.Wrapped_tree)
 
 type unsafe_patch =
   | Increase_max_nb_ticks of int64
   | Patch_durable_storage of {key : string; value : string}
 
+module Wasm_fast_pvm_machine :
+  Tezos_scoru_wasm.Wasm_pvm_sig.S
+    with type context = Wasm_2_0_0_proof_format.context
+     and type tree = Wasm_2_0_0_proof_format.Tree.tree
+     and type proof = Wasm_2_0_0_proof_format.proof =
+  Tezos_scoru_wasm_fast.Pvm.Make_pvm_machine (Wasm_2_0_0_proof_format)
+
+module Wasm_pvm_on_disk :
+  Sc_rollup.Wasm_2_0_0PVM.S
+    with type context = Wasm_2_0_0_proof_format.context
+     and type state = Wasm_2_0_0_proof_format.Tree.tree
+     and type proof = Wasm_2_0_0_proof_format.proof =
+Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
+  include Wasm_fast_pvm_machine
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end)
+
 module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
-  module PVM =
-    Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
-  include PVM
+  include Wasm_pvm_on_disk
 
   type repo = Irmin_context.repo
 
@@ -157,8 +180,6 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       Durable_state.lookup state key
   end
 
-  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
-
   module Unsafe_patches = struct
     type t = unsafe_patch
 
@@ -174,7 +195,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
       match unsafe_patch with
       | Increase_max_nb_ticks max_nb_ticks ->
           let* registered_max_nb_ticks =
-            Backend.Unsafe.get_max_nb_ticks state
+            Wasm_fast_pvm_machine.Unsafe.get_max_nb_ticks state
           in
           let max_nb_ticks = Z.of_int64 max_nb_ticks in
           if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
@@ -183,9 +204,9 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
               "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
               (Z.to_string registered_max_nb_ticks)
               (Z.to_string max_nb_ticks) ;
-          Backend.Unsafe.set_max_nb_ticks max_nb_ticks state
+          Wasm_fast_pvm_machine.Unsafe.set_max_nb_ticks max_nb_ticks state
       | Patch_durable_storage {key; value} ->
-          Backend.Unsafe.durable_set ~key ~value state
+          Wasm_fast_pvm_machine.Unsafe.durable_set ~key ~value state
   end
 
   let string_of_status : status -> string = function
@@ -209,7 +230,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
 
   let eval_many ?(check_invalid_kernel = true) ~reveal_builtins ~write_debug
       ~is_reveal_enabled:_ =
-    Backend.compute_step_many
+    Wasm_fast_pvm_machine.compute_step_many
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~write_debug
@@ -221,7 +242,7 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
     Pvm_sig.MUTABLE_STATE_S
       with type hash = hash
        and type t = Ctxt_wrapper.mut_state = struct
-    type t = tree ref
+    type t = state ref
 
     type hash = Sc_rollup.State_hash.t
 

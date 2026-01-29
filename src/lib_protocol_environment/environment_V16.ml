@@ -133,6 +133,12 @@ module type T = sig
        and type Wasm_2_0_0.input_request =
         Tezos_scoru_wasm.Wasm_pvm_state.input_request
        and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
+       and type Wasm_2_0_0.Wasm_pvm_machine.context =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.context
+       and type Wasm_2_0_0.Wasm_pvm_machine.state =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.state
+       and type Wasm_2_0_0.Wasm_pvm_machine.proof =
+        Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory.proof
        and module Skip_list = Tezos_base.Skip_list
        and type Smart_rollup.Address.t =
         Tezos_crypto.Hashed.Smart_rollup_address.t
@@ -1261,20 +1267,64 @@ struct
 
     let v5 = Tezos_scoru_wasm.Wasm_pvm_state.V5
 
-    module Make
-        (Tree : Context.TREE with type key = string list and type value = bytes) =
-    struct
-      type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
+    module type WASM_PVM_MACHINE = sig
+      type state
 
-      include Tezos_scoru_wasm.Wasm_pvm.Make (struct
-        include Tree
+      val initial_state : version -> state -> state Lwt.t
 
-        let select = function
-          | PVM_tree t -> t
-          | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
+      val install_boot_sector :
+        ticks_per_snapshot:Z.t ->
+        outbox_validity_period:int32 ->
+        outbox_message_limit:Z.t ->
+        string ->
+        state ->
+        state Lwt.t
 
-        let wrap t = PVM_tree t
-      end)
+      val compute_step : state -> state Lwt.t
+
+      val set_input_step : input -> string -> state -> state Lwt.t
+
+      val reveal_step : bytes -> state -> state Lwt.t
+
+      val get_output : output -> state -> string option Lwt.t
+
+      val get_info : state -> info Lwt.t
+
+      type context
+
+      val empty_state : unit -> state
+
+      type proof
+
+      val state_hash :
+        state -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
+
+      val proof_encoding : proof Data_encoding.t
+
+      val proof_start_state :
+        proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+      val proof_stop_state :
+        proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+      val cast_read_only : proof -> proof
+
+      val verify_proof :
+        proof -> (state -> (state * 'a) Lwt.t) -> (state * 'a) option Lwt.t
+
+      val produce_proof :
+        context ->
+        state ->
+        (state -> (state * 'a) Lwt.t) ->
+        (proof * 'a) option Lwt.t
+
+      module Internal_for_tests : sig
+        val insert_failure : state -> state Lwt.t
+      end
+    end
+
+    module Wasm_pvm_machine = struct
+      include Tezos_scoru_wasm.Wasm_pvm.Wasm_pvm_in_memory
 
       let compute_step =
         compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
