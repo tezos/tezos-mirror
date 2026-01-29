@@ -770,6 +770,18 @@ let simulate_operation :
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
 
+let pack_data :
+    ( [`POST],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      Alpha_context.Script.expr
+      * Alpha_context.Script.expr
+      * Alpha_context.Gas.Arith.integral option,
+      bytes * Alpha_context.Gas.t )
+    Tezos_rpc.Service.t =
+  import_service Imported_protocol_plugin.RPC.Scripts.S.pack_data
+
 let monitor_heads :
     ( [`GET],
       unit,
