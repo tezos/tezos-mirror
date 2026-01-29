@@ -493,6 +493,8 @@ let import_service s = Tezos_rpc.Service.subst0 s
     but keeps the last arg of the n-uplet intact. *)
 let import_service_with_arg s = Tezos_rpc.Service.subst1 s
 
+let import_service_with_arg2 s = Tezos_rpc.Service.subst2 s
+
 type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
@@ -857,8 +859,39 @@ module Big_map = struct
         unit,
         Alpha_context.Script.expr )
       Tezos_rpc.Service.t =
-    Tezos_rpc.Service.subst2
+    import_service_with_arg2
       Imported_protocol_plugin.Contract_services.S.big_map_get
+
+  let raw_info_encoding =
+    let open Data_encoding in
+    obj4
+      (req "key_type" Alpha_context.Script.expr_encoding)
+      (req "value_type" Alpha_context.Script.expr_encoding)
+      (req "total_bytes" z)
+      (req "contents" (list Alpha_context.Script.expr_encoding))
+
+  let raw_info :
+      ( [`GET],
+        tezlink_rpc_context,
+        tezlink_rpc_context * Alpha_context.Big_map.Id.t,
+        unit,
+        unit,
+        Alpha_context.Script.expr
+        * Alpha_context.Script.expr
+        * Z.t
+        * Alpha_context.Script.expr list )
+      Tezos_rpc.Service.t =
+    let service =
+      Tezos_rpc.Service.get_service
+        ~description:
+          "Returns big_map info (key_type, value_type, total_bytes, contents)"
+        ~query:Tezos_rpc.Query.empty
+        ~output:raw_info_encoding
+        Imported_env.RPC_path.(
+          Raw_services.custom_root / "big_maps" / "index"
+          /: Alpha_context.Big_map.Id.rpc_arg)
+    in
+    import_service_with_arg service
 end
 
 module Forge = struct
