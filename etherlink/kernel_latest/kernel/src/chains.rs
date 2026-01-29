@@ -50,7 +50,7 @@ use tezos_tezlink::{
         OperationResult, OperationResultSum, OperationWithMetadata,
     },
 };
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Registry, RuntimeId};
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
@@ -374,6 +374,12 @@ fn ethereum_transaction_from_bytes(
     })
 }
 
+#[derive(Debug)]
+pub enum TezosXTransaction {
+    Ethereum(Box<crate::transaction::Transaction>),
+    Tezos(TezlinkOperation),
+}
+
 impl ChainConfigTrait for EvmChainConfig {
     type BlockConstants = tezos_ethereum::block::BlockConstants;
 
@@ -416,12 +422,57 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn transaction_from_bytes(
-        _host: &mut impl Runtime,
+        host: &mut impl Runtime,
         bytes: &[u8],
-        _blueprint_version: u8,
+        blueprint_version: u8,
     ) -> anyhow::Result<Option<Self::Transaction>> {
-        let tx = ethereum_transaction_from_bytes(bytes)?;
-        Ok(Some(tx))
+        let tx: TezosXTransaction = match blueprint_version {
+            0 => {
+                // Blueprints version 0 can only contain Ethereum
+                // transactions, they are not prefixed by a tag.
+                let tx = ethereum_transaction_from_bytes(bytes)?;
+                TezosXTransaction::Ethereum(Box::new(tx))
+            }
+            1 => {
+                // Blueprints version 1 can contain both Tezos
+                // operations and Ethereum transactions, prefixed by
+                // 0x00 or 0x01 respectively.
+                let Some((tag, tx_common)) = bytes.split_first() else {
+                    return Err(error::Error::NomReadError(
+                        "Unexpected empty transaction.".to_string(),
+                    ))?;
+                };
+                match RuntimeId::try_from(*tag) {
+                    Ok(RuntimeId::Tezos) => {
+                        let op = tezos_operation_from_bytes(tx_common)?;
+                        TezosXTransaction::Tezos(op)
+                    }
+                    Ok(RuntimeId::Ethereum) => {
+                        let tx = ethereum_transaction_from_bytes(tx_common)?;
+                        TezosXTransaction::Ethereum(Box::new(tx))
+                    }
+                    Err(message) => {
+                        log!(host, Error, "Unknown runtime id tag: {tag}, {message}");
+                        return Ok(None);
+                    }
+                }
+            }
+            _ => {
+                log!(
+                    host,
+                    Debug,
+                    "Unknown blueprint version: {blueprint_version:?}"
+                );
+                return Ok(None);
+            }
+        };
+        match tx {
+            TezosXTransaction::Ethereum(tx) => Ok(Some(*tx)),
+            TezosXTransaction::Tezos(op) => {
+                log!(host, Debug, "Ignoring Tezos operation in blueprint: {op:?}");
+                Ok(None)
+            }
+        }
     }
 
     fn fetch_hashes_from_delayed_inbox(
