@@ -308,7 +308,11 @@ pub trait ChainConfigTrait: Debug {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>;
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>>;
+    fn transaction_from_bytes(
+        host: &mut impl Runtime,
+        bytes: &[u8],
+        blueprint_version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>>;
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
@@ -411,7 +415,11 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>> {
+    fn transaction_from_bytes(
+        _host: &mut impl Runtime,
+        bytes: &[u8],
+        _blueprint_version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>> {
         let tx = ethereum_transaction_from_bytes(bytes)?;
         Ok(Some(tx))
     }
@@ -627,7 +635,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ))
     }
 
-    fn transaction_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<Self::Transaction>> {
+    fn transaction_from_bytes(
+        _host: &mut impl Runtime,
+        bytes: &[u8],
+        _version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>> {
         let operation = tezos_operation_from_bytes(bytes)?;
         Ok(Some(operation))
     }

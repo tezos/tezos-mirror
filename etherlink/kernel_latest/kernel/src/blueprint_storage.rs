@@ -557,11 +557,15 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
 }
 
 fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
+    host: &mut impl Runtime,
     transactions: Vec<Vec<u8>>,
+    blueprint_version: u8,
 ) -> anyhow::Result<Vec<ChainConfig::Transaction>> {
     let mut result = vec![];
     for tx_common in transactions.iter() {
-        if let Some(transaction) = ChainConfig::transaction_from_bytes(tx_common)? {
+        if let Some(transaction) =
+            ChainConfig::transaction_from_bytes(host, tx_common, blueprint_version)?
+        {
             result.push(transaction)
         }
     }
@@ -592,8 +596,11 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
             }
         };
 
-    let transactions_with_hashes =
-        transactions_from_bytes::<ChainConfig>(blueprint_with_hashes.transactions)?;
+    let transactions_with_hashes = transactions_from_bytes::<ChainConfig>(
+        host,
+        blueprint_with_hashes.transactions,
+        blueprint_with_hashes.version,
+    )?;
 
     delayed_txs.extend(transactions_with_hashes);
     Ok((
