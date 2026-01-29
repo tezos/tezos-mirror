@@ -94,6 +94,7 @@ let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
   let open Lwt_result_syntax in
   let* store =
     Evm_store.init
+      ~chain_family:L2_types.EVM
       ~data_dir:configuration.data_dir
       ~perm:(Read_only {pool_size = configuration.db.pool_size})
       ?max_conn_reuse_count:configuration.db.max_conn_reuse_count

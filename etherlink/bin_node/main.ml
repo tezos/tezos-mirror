@@ -3685,7 +3685,11 @@ let switch_history_mode_command =
       in
 
       let* store =
-        Evm_store.init ~data_dir:config.data_dir ~perm:Read_write ()
+        Evm_store.init
+          ~chain_family:Evm_node_lib_dev_encoding.L2_types.EVM
+          ~data_dir:config.data_dir
+          ~perm:Read_write
+          ()
       in
       let* () =
         Evm_store.use store @@ fun conn ->
@@ -3820,7 +3824,13 @@ let debug_print_store_schemas_command =
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
       Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
-      let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+      let* store =
+        Evm_store.init
+          ~chain_family:Evm_node_lib_dev_encoding.L2_types.EVM
+          ~data_dir
+          ~perm:Read_write
+          ()
+      in
       let* schemas = Evm_store.(use store Schemas.get_all) in
       let output = String.concat ";\n\n" schemas in
       Format.printf "%s\n" output ;

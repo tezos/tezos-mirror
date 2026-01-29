@@ -65,7 +65,13 @@ let store_info conn =
 
 let export_store ~data_dir ~output_db_file =
   let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
+  let* store =
+    Evm_store.init
+      ~chain_family:L2_types.EVM
+      ~data_dir
+      ~perm:(Read_only {pool_size = 1})
+      ()
+  in
   Evm_store.use store @@ fun conn ->
   let* info = store_info conn in
   let* () = Evm_store.vacuum ~conn ~output_db_file in
@@ -73,7 +79,13 @@ let export_store ~data_dir ~output_db_file =
 
 let store_info ~data_dir =
   let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
+  let* store =
+    Evm_store.init
+      ~chain_family:L2_types.EVM
+      ~data_dir
+      ~perm:(Read_only {pool_size = 1})
+      ()
+  in
   Evm_store.use store store_info
 
 let use ~data_dir k =

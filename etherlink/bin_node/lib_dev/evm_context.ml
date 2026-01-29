@@ -351,13 +351,13 @@ module State = struct
 
   let load ~l2_chains ~data_dir ~store_perm:perm index =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~perm () in
-    Evm_store.use store @@ fun conn ->
-    let* latest = Evm_store.Context_hashes.find_latest conn in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
     let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family ~l2_chains
     in
+    let* store = Evm_store.init ~chain_family ~data_dir ~perm () in
+    Evm_store.use store @@ fun conn ->
+    let* latest = Evm_store.Context_hashes.find_latest conn in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
         let*! context = Pvm.Context.checkout_exn index checkpoint in
@@ -1905,7 +1905,13 @@ module State = struct
           in
           match history_mode with
           | Some h ->
-              let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+              let* store =
+                Evm_store.init
+                  ~chain_family:L2_types.EVM
+                  ~data_dir
+                  ~perm:Read_write
+                  ()
+              in
               let* () =
                 Evm_store.use store @@ fun conn ->
                 Evm_store.Metadata.store_history_mode conn h
@@ -2106,6 +2112,7 @@ module State = struct
     let* () =
       let* ro_store =
         Evm_store.init
+          ~chain_family:L2_types.EVM
           ~data_dir:configuration.data_dir
           ~perm:(Read_only {pool_size = 1})
           ()
@@ -2136,7 +2143,9 @@ module State = struct
 
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
-    let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+    let* store =
+      Evm_store.init ~chain_family:L2_types.EVM ~data_dir ~perm:Read_write ()
+    in
     Evm_store.use store @@ fun conn ->
     Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset_after store ~l2_level
@@ -2758,7 +2767,9 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
       ~full_transaction_object:true
   in
   (* Init the store *)
-  let* store = Evm_store.init ~data_dir ~perm:Read_write () in
+  let* store =
+    Evm_store.init ~chain_family:L2_types.EVM ~data_dir ~perm:Read_write ()
+  in
   let* () =
     Evm_store.(
       use store @@ fun conn ->

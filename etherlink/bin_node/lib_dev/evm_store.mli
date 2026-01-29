@@ -18,6 +18,7 @@ include module type of Sqlite
     fail. With [Read_write], they will succeed as expected. *)
 val init :
   ?max_conn_reuse_count:int ->
+  chain_family:_ L2_types.chain_family ->
   data_dir:string ->
   perm:perm ->
   unit ->

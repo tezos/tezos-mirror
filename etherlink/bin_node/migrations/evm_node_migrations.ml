@@ -32,7 +32,6 @@ let make_migration path =
   in
 
   let migration_step = ( @@ ) (unit ->. unit) in
-
   let make_migration_requests str =
     String.split ';' str
     |> List.filter_map (fun i ->

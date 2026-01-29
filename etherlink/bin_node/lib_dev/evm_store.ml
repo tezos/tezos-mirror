@@ -1059,15 +1059,15 @@ module Migrations = struct
 end
 
 module Tezlink_migrations = struct
-  let _create_table store =
+  let create_table store =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Tezlink_migration.create_table ()
 
-  let _table_exists store =
+  let table_exists store =
     with_connection store @@ fun conn ->
     Db.find conn Q.table_exists "tezlink_migrations"
 
-  let _missing_migrations store =
+  let missing_migrations store =
     let open Lwt_result_syntax in
     let all_migrations =
       List.mapi (fun i m -> (i, m)) Q.Tezlink_migration.all
@@ -1090,7 +1090,7 @@ module Tezlink_migrations = struct
              EVM node"
     | None -> return all_migrations
 
-  let _apply_migration store id (module M : Evm_node_migrations.S) =
+  let apply_migration store id (module M : Evm_node_migrations.S) =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
@@ -1099,7 +1099,8 @@ end
 
 let sqlite_file_name = "store.sqlite"
 
-let init ?max_conn_reuse_count ~data_dir ~perm () =
+let init (type f) ?max_conn_reuse_count
+    ~(chain_family : f L2_types.chain_family) ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
@@ -1108,25 +1109,42 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
     let* () =
       if not exists then
         let* () = Migrations.create_table conn in
+        let* () =
+          match chain_family with
+          | L2_types.Michelson -> Tezlink_migrations.create_table conn
+          | _ -> return_unit
+        in
         let*! () = Evm_store_events.init_store () in
         return_unit
       else
         let* table_exists = Migrations.table_exists conn in
+        let* tezlink_migrations_exist =
+          match chain_family with
+          | L2_types.Michelson -> Tezlink_migrations.table_exists conn
+          | _ -> return_true
+        in
         let* () =
-          when_ (not table_exists) (fun () ->
+          when_
+            (not (table_exists && tezlink_migrations_exist))
+            (fun () ->
               failwith "A store already exists, but its content is incorrect.")
         in
         return_unit
     in
     let* migrations = Migrations.missing_migrations conn in
+    let* tezlink_migrations =
+      match chain_family with
+      | L2_types.Michelson -> Tezlink_migrations.missing_migrations conn
+      | _ -> return []
+    in
     let*? () =
-      match (perm, migrations) with
-      | Read_only _, _ :: _ ->
+      match (perm, migrations, tezlink_migrations) with
+      | Read_only _, _ :: _, _ | Read_only _, _, _ :: _ ->
           error_with
             "The store has %d missing migrations but was opened in read-only \
              mode."
             (List.length migrations)
-      | _, _ -> Ok ()
+      | _, _, _ -> Ok ()
     in
     let* () =
       List.iter_es
@@ -1138,6 +1156,17 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
           let*! () = Evm_store_events.applied_migration M.name migration_time in
           return_unit)
         migrations
+    in
+    let* () =
+      List.iter_es
+        (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
+          let start_t = Time.System.now () in
+          let* () = Tezlink_migrations.apply_migration conn i mig in
+          let end_t = Time.System.now () in
+          let migration_time = Ptime.diff end_t start_t in
+          let*! () = Evm_store_events.applied_migration M.name migration_time in
+          return_unit)
+        tezlink_migrations
     in
     let* legacy_block_storage_mode =
       with_connection conn @@ fun conn ->
