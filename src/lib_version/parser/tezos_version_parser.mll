@@ -46,8 +46,6 @@
     minor : int;
     additional_info : additional_info} [@@deriving show]
 
-  let int s = int_of_string_opt s |> Option.value ~default: 0
-
   let default = { product = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
 
 }
@@ -56,88 +54,81 @@ let num = ['0'-'9']+
 let hexa = ['0'-'9' 'A'-'F' 'a'-'f']+
 let product = ("octez" | "octez-evm-node" | "octez-smart-rollup-node")
 
-rule version_tag = parse
-  | (product as product) "-" 'v'? (num as major) ('.' (num as minor))? ".0"?
-      {
-        let minor = match minor with
-          | None -> 0
-          | Some m -> int m
-        in
-        Some {
-        product = product_of_string product;
-        major = int major;
-        minor;
-        additional_info = extra lexbuf }
-      }
-  | _ | eof
-      { None }
+(* This function is used to parse multiple formats:
+   - the result of git describe (of the form TAG or TAG-COMMITS-HASH);
+   - the --node-version-allowed argument of the agnostic baker (of the form TAG or TAG:HASH).
+   TODO: instead of mixing the two, have --node-version-allowed be parsed
+   by using [String.split_on_char ':'], and *then* use this parser.
 
-and extra = parse
-  | "-rc" (num as rc) eof
-      { (RC (int rc)) }
-  | "-rc" (num as rc) _
-      { (RC_dev (int rc)) }
-  | "-beta" (num as beta) eof
-      { (Beta (int beta)) }
-  | "-beta" (num as beta) _
-      { (Beta_dev (int beta)) }
-  | eof
-      { Release }
-  | _
-      { Dev }
+   Some tests in test_parser.ml also parse with "+dev",
+   which makes it look like this parser is expected to also be able
+   to parse version numbers, except that those tests also test
+   versions with "-rc" instead of "~rc", so they are not real version numbers,
+   but "pseudo" version numbers.
+   TODO: find out where we actually need to parse version numbers outside of tests,
+   and why we're not expecting tildes. *)
+rule parse_git_describe_or_node_version_allowed_exn = parse
+  | (* Prefix that identifies the tag as a version tag. *)
+    (product as product) '-' 'v'?
+    (* Version number. *)
+    (num as major) ('.' (num as minor))? ".0"?
+    (* Additional information for versions that are not actually releases. *)
+    ('-' ("rc" | "beta" as extra_kind) (num as extra_num))?
+    (* What follows depends on what we are parsing. *)
+    (
+      (* When parsing --node-version-allowed, we expect the following. *)
+      ':' (hexa as commit_hash)
+      (* When parsing git describe, we expect the following (or nothing). *)
+    | '-' (num as additional_commits) "-g" (hexa as commit_hash)
+      (* When parsing pseudo version numbers, we can find the following. *)
+    | ("+dev" as plus_dev)
+    )?
+    (* There must be nothing after that. *)
+    eof
+    {
+      (* Convert strings. *)
+      let product = product_of_string product in
+      let major = int_of_string major in
+      let minor = Option.map int_of_string minor |> Option.value ~default: 0 in
+      let additional_info_without_dev =
+        match extra_kind, extra_num with
+          | Some _, None | None, Some _ ->
+              (* Cannot happen because both [extra_kind] and [extra_num]
+                 are below the same [?]. *)
+              assert false
+          | None, None ->
+              Release
+          | Some "rc", Some num ->
+              RC (int_of_string num)
+          | Some "beta", Some num ->
+              Beta (int_of_string num)
+          | Some _, Some _ ->
+              (* Cannot happen because the regexp only accepts "rc" and "beta". *)
+              assert false
+      in
+      let additional_info =
+        match additional_commits, plus_dev with
+          | None, None ->
+              additional_info_without_dev
+          | _ ->
+              match additional_info_without_dev with
+                | Release -> Dev
+                | RC n -> RC_dev n
+                | Beta n -> Beta_dev n
+                | Dev | RC_dev _ | Beta_dev _ as x -> x (* not supposed to happen *)
+      in
+      Some ({ product; major; minor; additional_info }, commit_hash)
+    }
+  | _ { None }
 
-and version_commit = parse
-  | (product as product) "-" 'v'? (num as major) ('.' (num as minor))? ".0"?
-      {
-        let extra = extra_noeof lexbuf in
-        match extra with
-        | None -> None
-        | Some additional_info ->
-          (let commit = commit lexbuf in
-          match commit with
-          | Some commit ->
-            let minor = match minor with
-              | None -> 0
-              | Some m -> int m
-            in
-            Some (
-              {
-                product = product_of_string product;
-                major = int major;
-                minor;
-                additional_info;
-              },
-            commit)
-          | _ -> None)
-      }
-  | _ | eof
-      { None }
+{
+  let version_commit lexbuf =
+    try
+      parse_git_describe_or_node_version_allowed_exn lexbuf
+    with Failure _ ->
+      (* Raised by [int_of_string] for integers that are too large. *)
+      None
 
-(* This rule is similar to rule extra, but can be followed by a commit hash *)
-and extra_noeof = parse
-  | "-rc" (num as rc) (eof | ':')
-      { Some (RC (int rc)) }
-  | "-rc" (num as rc) "+dev" (eof | ':')
-      { Some (RC_dev (int rc)) }
-  | "-beta" (num as beta) (eof | ':')
-      { Some (Beta (int beta)) }
-  | "-beta" (num as beta) "+dev" (eof | ':')
-      { Some (Beta_dev (int beta)) }
-  | "+dev" (eof | ':')
-      { Some Dev }
-  | (eof | ':')
-      { Some Release }
-  | _
-      { None }
-
-and commit = parse
-  | (hexa as hash) eof
-      { let l = String.length hash in
-        if l >= 8 && l <= 40
-        then Some (Some (String.lowercase_ascii hash))
-        else None
-      }
-  | eof
-      { Some None }
-  | _
-      { None }
+  let version_tag lexbuf =
+    Option.map fst (version_commit lexbuf)
+}
