@@ -85,6 +85,7 @@ type t = Tezos_version_parser.t = {
   product : product;
   major : int;
   minor : int;
+  build : int;
   additional_info : additional_info;
 }
 

@@ -95,13 +95,14 @@ let additional_info_encoding =
 let version_encoding =
   let open Data_encoding in
   conv
-    (fun ({product = _; major; minor; additional_info} : Version.t) ->
-      (major, minor, additional_info))
-    (fun (major, minor, additional_info) ->
-      {product = Octez; major; minor; additional_info})
-    (obj3
+    (fun ({product = _; major; minor; build; additional_info} : Version.t) ->
+      (major, minor, build, additional_info))
+    (fun (major, minor, build, additional_info) ->
+      {product = Octez; major; minor; build; additional_info})
+    (obj4
        (req "major" int31)
        (req "minor" int31)
+       (req "build" int31)
        (req "additional_info" additional_info_encoding))
 
 let encoding =
@@ -144,11 +145,14 @@ let partially_compare (v1 : Version.t) (c1 : commit_info option)
         let minor_comp = Int.compare v1.minor v2.minor in
         if minor_comp <> 0 then Some minor_comp
         else
-          match (v1.additional_info, v2.additional_info) with
-          | Beta n1, Beta n2 | RC n1, RC n2 -> Some (Int.compare n1 n2)
-          | Beta _, (RC _ | Release) | RC _, Release -> Some (-1)
-          | Release, (RC _ | Beta _) | RC _, Beta _ -> Some 1
-          | _, _ -> None
+          let build_comp = Int.compare v1.build v2.build in
+          if build_comp <> 0 then Some build_comp
+          else
+            match (v1.additional_info, v2.additional_info) with
+            | Beta n1, Beta n2 | RC n1, RC n2 -> Some (Int.compare n1 n2)
+            | Beta _, (RC _ | Release) | RC _, Release -> Some (-1)
+            | Release, (RC _ | Beta _) | RC _, Beta _ -> Some 1
+            | _, _ -> None
   in
   match (is_commit_equal, version_comparison) with
   | None, Some 0 ->
