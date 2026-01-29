@@ -204,6 +204,9 @@ Available services:
       - POST /chains/main/blocks/head/helpers/preapply/operations
           Simulate the application of the operations with the context of the
           given block and return the result of each operation application. 
+      - POST /chains/main/blocks/head/helpers/scripts/pack_data
+          Computes the serialized version of some data expression using the
+          same algorithm as script instruction PACK 
       - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
           Simulate running an operation at some future moment (based on the
           number of blocks given in the `latency` argument), and return the
