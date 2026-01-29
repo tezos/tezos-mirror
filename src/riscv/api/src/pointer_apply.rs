@@ -39,7 +39,7 @@ pub fn apply_imm<R, T: Clone>(
 where
     ImmutableState<T>: ocaml::Custom,
 {
-    let (new_state, result) = ptr.as_ref().to_owned().apply(f);
+    let (new_state, result) = ptr.as_ref().share().apply(f);
     let ptr = Pointer::alloc_custom(new_state);
     (ptr, result)
 }

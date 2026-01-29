@@ -7,6 +7,7 @@
 
 mod move_semantics;
 mod pointer_apply;
+mod safe_pointer;
 
 use core::panic;
 use std::fs;
