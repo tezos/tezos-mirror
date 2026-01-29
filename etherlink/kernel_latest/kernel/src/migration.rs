@@ -764,6 +764,11 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V48 => {
+            // Starting version 48, blueprints from the sequencer can
+            // have a version field
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
