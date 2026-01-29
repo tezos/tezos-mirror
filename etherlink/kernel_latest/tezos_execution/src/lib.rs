@@ -56,6 +56,7 @@ use crate::mir_ctx::{
 extern crate alloc;
 pub mod account_storage;
 mod address;
+mod alias;
 pub mod context;
 mod enshrined_contracts;
 mod gas;

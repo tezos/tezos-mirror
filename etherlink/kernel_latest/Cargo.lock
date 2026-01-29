@@ -3494,6 +3494,7 @@ dependencies = [
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "tezosx-interfaces",
  "thiserror 1.0.69",
  "typed-arena",
 ]
