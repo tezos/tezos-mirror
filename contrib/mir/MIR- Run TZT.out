@@ -126,6 +126,7 @@
   "cons_int_02.tzt": true,
   "cons_lists_00.tc.tzt": true,
   "cons_string_00.tzt": true,
+  "constant_dup.tzt": true,
   "contract_00.tzt": true,
   "contract_01.tzt": true,
   "contract_02.tzt": true,
