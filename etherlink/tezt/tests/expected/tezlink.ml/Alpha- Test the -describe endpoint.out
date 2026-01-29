@@ -210,6 +210,8 @@ Available services:
           contents of the cache at that future moment. This RPC estimates
           future gas consumption by trying to predict the state of the cache
           using some heuristics. 
+    - GET /chains/main/blocks/head/metadata
+        All the metadata associated to the block. 
     - GET /chains/main/blocks/head/operation_hashes
         The hashes of all the operations included in the block. 
     - GET /chains/main/blocks/head/operations

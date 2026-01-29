@@ -835,6 +835,43 @@ let test_tezlink_header =
        ~chain_id
        ~current_timestamp:(Some current_timestamp)
 
+let test_tezlink_block_metadata =
+  register_tezlink_test
+    ~title:"Test of the metadata rpc"
+    ~tags:["rpc"; "metadata"; "offset"]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let check_current_block_metadata () =
+    let* block_metadata_raw =
+      Client.RPC.call ~hooks ~endpoint client
+      @@ RPC.get_chain_block_metadata_raw ()
+    in
+    let* block_data =
+      Client.RPC.call ~hooks ~endpoint client
+      @@ RPC.get_chain_block ~force_metadata:true ~metadata:`Always ()
+    in
+    Check.(
+      JSON.(block_metadata_raw = (block_data |-> "metadata"))
+        json
+        ~error_msg:"Check block metadata failed, Expected %R but got %L") ;
+    unit
+  in
+  let* () = check_current_block_metadata () in
+  let*@ _n = Rpc.produce_block sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let current_timestamp =
+    Tezos_base.Time.(
+      System.now () |> System.to_protocol |> Protocol.to_notation)
+  in
+  let* () = check_current_block_metadata () in
+  let*@ _n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 2 in
+  check_current_block_metadata ()
+
 let test_tezlink_block_info =
   register_tezlink_test
     ~title:"Test of the block_info rpc"
@@ -3614,6 +3651,7 @@ let () =
   test_tezlink_version [Alpha] ;
   test_tezlink_contracts_rpc [Alpha] ;
   test_tezlink_header [Alpha] ;
+  test_tezlink_block_metadata [Alpha] ;
   test_tezlink_constants [Alpha] ;
   test_tezlink_storage_rpc [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
