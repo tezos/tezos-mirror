@@ -1586,6 +1586,44 @@ let test_tezlink_bigmap_rpcs =
       ~error_msg:"Expected value_type %R but got %L") ;
   unit
 
+let test_tezlink_pack_data =
+  register_tezlink_test
+    ~title:"Test of the pack_data RPC"
+    ~tags:["rpc"; "pack_data"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* Test cases: (data, type) as Micheline JSON *)
+  let test_cases =
+    [
+      (`O [("int", `String "1")], `O [("prim", `String "nat")]);
+      (`O [("prim", `String "True")], `O [("prim", `String "bool")]);
+      (`O [("string", `String "hello")], `O [("prim", `String "string")]);
+    ]
+  in
+  let check_pack_data (data, ty) =
+    (* Call pack_data on Tezlink *)
+    let* tezlink_result =
+      Client.RPC.call ~endpoint:tezlink_endpoint client
+      @@ RPC.post_chain_block_helpers_scripts_pack_data ~data ~ty ()
+    in
+    (* Call pack_data on L1 *)
+    let* l1_result =
+      Client.RPC.call client
+      @@ RPC.post_chain_block_helpers_scripts_pack_data ~data ~ty ()
+    in
+    Check.(
+      (tezlink_result = l1_result)
+        json
+        ~error_msg:"pack_data mismatch: Tezlink=%L, L1=%R") ;
+    unit
+  in
+  Lwt_list.iter_s check_pack_data test_cases
+
 let test_tezlink_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   register_tezlink_test
@@ -3682,6 +3720,7 @@ let () =
   test_tezlink_bigmap_option [Alpha] ;
   test_tezlink_bigmap_counter [Alpha] ;
   test_tezlink_bigmap_rpcs [Alpha] ;
+  test_tezlink_pack_data [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
   test_tezlink_long_batch [Alpha] ;
