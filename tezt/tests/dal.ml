@@ -4240,6 +4240,24 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
   let slot_index = 0 in
   let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
       dal_node =
+    let publish_and_store level dal_params cryptobox =
+      let publish source ~index message =
+        let* _op_hash =
+          publish_dummy_slot ~source ~index ~message cryptobox client
+        in
+        unit
+      in
+      let source = Constant.bootstrap1 in
+      let slot_content = Format.asprintf "content at level %d" level in
+      let* () = publish source ~index:slot_index slot_content in
+      let* _commitment, _proof =
+        let slot_size = dal_params.Dal.Parameters.cryptobox.slot_size in
+        Helpers.(
+          store_slot dal_node ~slot_index @@ make_slot ~slot_size slot_content)
+      in
+      Log.info "Slot (normally) published at level %d" level ;
+      unit
+    in
     (* [dal_parameters] should contain the parameters of the "previous"
        protocol. *)
     log_step "Getting the parameters of the next protocol" ;
@@ -4250,7 +4268,27 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     in
     let old_lag = dal_parameters.attestation_lag in
     let new_lag = new_dal_parameters.attestation_lag in
-
+    let* () =
+      let* res =
+        Cryptobox.init_prover_dal
+          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          ~fetch_trusted_setup:false
+          ()
+      in
+      match res with
+      | Ok () -> unit
+      | Error _ -> Test.fail "Cannot init the cryptobox prover mode"
+    in
+    let old_cryptobox =
+      match Cryptobox.make dal_parameters.cryptobox with
+      | Ok cryptobox -> cryptobox
+      | Error (`Fail s) -> Test.fail "Old cryptobox cannot be computed: %s" s
+    in
+    let new_cryptobox =
+      match Cryptobox.make new_dal_parameters.cryptobox with
+      | Ok cryptobox -> cryptobox
+      | Error (`Fail s) -> Test.fail "New cryptobox cannot be computed: %s" s
+    in
     let* level = Client.level client in
     (* We will publish random data for a whole cycle, which includes a migration
        in the middle. *)
@@ -4264,37 +4302,44 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     assert (first_level + old_lag < migration_level) ;
     assert (migration_level + new_lag < last_publication_level) ;
     log_step
-      "Launching a producer publishing from first_level = %d to last_level = %d"
+      "Producing DAL slots and baking blocks from first_level = %d to \
+       last_level = %d"
       first_level
       last_publication_level ;
-    let _promise =
-      simple_slot_producer
-        ~slot_size:dal_parameters.cryptobox.slot_size
-        ~slot_index
-        ~from:first_level
-        ~into:last_publication_level
-        dal_node
-        node
+    let rec loop loop_lvl =
+      Log.info "Currently at level %d, publishing and baking" loop_lvl ;
+      if loop_lvl = migration_level then
+        Log.info "Migration is happening in this level" ;
+      let current_cryptobox =
+        if loop_lvl <= migration_level then old_cryptobox else new_cryptobox
+      in
+      let current_dal_params =
+        if loop_lvl <= migration_level then dal_parameters
+        else new_dal_parameters
+      in
+      if loop_lvl > last_publication_level then unit
+      else
+        let* () =
+          publish_and_store loop_lvl current_dal_params current_cryptobox
+        in
+        let* () =
+          bake_for ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node) client
+        and* _ = Node.wait_for_level node loop_lvl
+        and* () =
+          if loop_lvl > 3 then
+            wait_for_layer1_final_block dal_node (loop_lvl - 2)
+          else unit
+        in
+        loop (loop_lvl + 1)
+    in
+    let* () = loop first_level in
+    log_step "Baking 2 last blocks before doing the checks" ;
+    let* () =
+      bake_for
+        ~count:2
+        ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node)
         client
     in
-    log_step "Start baker" ;
-    let baker =
-      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
-      Agnostic_baker.create
-        ~dal_node_rpc_endpoint
-        ~delegates:
-          (List.map
-             (fun x -> x.Account.public_key_hash)
-             Constant.all_secret_keys)
-        node
-        client
-    in
-    let* () = Agnostic_baker.run baker in
-    let* _level = Node.wait_for_level node migration_level in
-    log_step "Migrated to next protocol" ;
-    let* _level = Node.wait_for_level node last_publication_level in
-    log_step "Turning the baker off" ;
-    let* () = Agnostic_baker.terminate baker in
     let check_if_metadata_contain_expected_dal attested_level =
       let* metadata =
         Node.RPC.call node
@@ -4375,7 +4420,6 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~scenario
     ~tags
     ~description
-    ~uses:[Constant.octez_agnostic_baker]
     ~activation_timestamp:Now
     ~operator_profiles:[slot_index]
     ~migration_level:13
