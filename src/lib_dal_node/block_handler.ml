@@ -774,11 +774,14 @@ let new_finalized_head ctxt cctxt l1_crawler finalized_block_hash
       | Some (_hash, head) -> Block_header.(head.level, head.proto_level)
       | None -> assert false (* Not reachable *)
     in
-    Node_context.may_add_plugin_and_cryptobox
-      ctxt
-      cctxt
-      ~proto_level
-      ~block_level
+    let* _updated =
+      Node_context.may_add_plugin_and_cryptobox
+        ctxt
+        cctxt
+        ~proto_level
+        ~block_level
+    in
+    return_unit
   in
   (* If L = HEAD~2, then HEAD~1 is payload final. *)
   let finalized_payload_level = Int32.succ level in

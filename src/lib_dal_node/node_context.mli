@@ -71,6 +71,7 @@ val get_plugin_for_level : t -> level:int32 -> (module Dal_plugin.T) tzresult
 
 (** Tries to add a new plugin for the protocol with level [proto_level] to be used
     starting with the given [block_level].
+    Returns [true] if a plugin is added. [false] otherwise.
 
     It returns an error if the node is not ready, if the
     [Chain_services.Blocks.protocols] RPC fails, or if the plugin is not
@@ -80,7 +81,7 @@ val may_add_plugin_and_cryptobox :
   Rpc_context.t ->
   block_level:int32 ->
   proto_level:int ->
-  unit tzresult Lwt.t
+  bool tzresult Lwt.t
 
 (** Set the protocol plugins to the given value. *)
 val set_proto_plugins : t -> Proto_plugins.t -> unit
