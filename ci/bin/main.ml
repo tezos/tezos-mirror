@@ -37,8 +37,6 @@ let variables : variables =
        the variable tezos/tezos but tezos. *)
     ( "rust_toolchain_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
-    ( "rust_toolchain_image_name_protected",
-      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_sdk_bindings_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
     ( "rust_sdk_bindings_image_name_protected",
