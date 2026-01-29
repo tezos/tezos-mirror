@@ -131,7 +131,7 @@ const PUBLIC_KEY_PATH: RefPath = RefPath::assert_from(b"/public.key");
 
 /// Find the path where account information is stored from the account address.
 pub fn account_path(address: &ContractTz1Hash) -> Result<OwnedPath, AccountStorageError> {
-    let address_name: Vec<u8> = alloc::format!("/{}", address).into();
+    let address_name: Vec<u8> = alloc::format!("/{address}").into();
     OwnedPath::try_from(address_name).map_err(AccountStorageError::from)
 }
 

@@ -60,7 +60,7 @@ fn process_slot(
         }
     }
 
-    let slot_path = format!("/output/slot-{}", slot_index);
+    let slot_path = format!("/output/slot-{slot_index}");
     let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
     host.store_write(&path, &read_bytes.to_le_bytes(), 0)
         .map_err(|_| "Error writing to storage".to_string())

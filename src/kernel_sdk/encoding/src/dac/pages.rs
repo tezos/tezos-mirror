@@ -425,10 +425,7 @@ mod tests {
             (Page::V0ContentPage(page), SlicePage::V0ContentPage(slice_page)) => {
                 assert_eq!(page.as_ref(), slice_page.inner)
             }
-            _ => panic!(
-                "Should be content pages, got: {:?} & {:?}",
-                page, slice_page
-            ),
+            _ => panic!("Should be content pages, got: {page:?} & {slice_page:?}",),
         }
     }
 
@@ -449,10 +446,7 @@ mod tests {
 
                 assert_eq!(hashes, slice_hashes);
             }
-            _ => panic!(
-                "Should be content pages, got: {:?} & {:?}",
-                page, slice_page
-            ),
+            _ => panic!("Should be content pages, got: {page:?} & {slice_page:?}",),
         }
     }
 }

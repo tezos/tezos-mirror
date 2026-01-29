@@ -46,7 +46,7 @@ fn process_slot(
                     slot_index,
                     num
                 );
-                let slot_path = format!("/output/slot-{}", slot_index);
+                let slot_path = format!("/output/slot-{slot_index}");
                 let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
 
                 host.store_write(&path, &buffer, 0)

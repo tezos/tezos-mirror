@@ -190,9 +190,7 @@ impl Iterator for Inbox {
     type Item = (u32, u32, Vec<u8>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(level) = self.levels.front_mut() else {
-            return None;
-        };
+        let level = self.levels.front_mut()?;
 
         match level.pop_front() {
             // An inbox message is available for this level

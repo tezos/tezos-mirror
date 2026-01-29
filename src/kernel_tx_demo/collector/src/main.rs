@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
     let mut should_stop = false;
 
     //Open a websocket listener
-    let mut listener = Server::bind(format!("0.0.0.0:{}", port))?;
+    let mut listener = Server::bind(format!("0.0.0.0:{port}"))?;
 
     println!("Ready to receive new connection");
 
@@ -77,11 +77,11 @@ fn main() -> anyhow::Result<()> {
                     listeners_tx.send(Some(client)).unwrap();
                 }
                 Err(e) => {
-                    println!("couldn't get client: {:?}", e);
+                    println!("couldn't get client: {e:?}");
                 }
             },
             Err(e) => {
-                println!("couldn't get client: {:?}", e);
+                println!("couldn't get client: {e:?}");
             }
         }
     });
@@ -103,7 +103,7 @@ fn main() -> anyhow::Result<()> {
         Ok(_) => {
             let _ = notify_tx.send(false);
         }
-        Err(e) => println!("watch error: {:?}", e),
+        Err(e) => println!("watch error: {e:?}"),
     })?;
 
     //Accept a connection
@@ -179,7 +179,7 @@ fn main() -> anyhow::Result<()> {
                 break;
             }
             Err(e) => {
-                println!("couldn't get client: {:?}", e);
+                println!("couldn't get client: {e:?}");
                 break;
             }
         }

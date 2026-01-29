@@ -64,7 +64,7 @@ impl Debug for TicketHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TicketId(")?;
         for &byte in self.inner.as_ref() {
-            write!(f, "{:02x?}", byte)?;
+            write!(f, "{byte:02x?}")?;
         }
         write!(f, ")")
     }

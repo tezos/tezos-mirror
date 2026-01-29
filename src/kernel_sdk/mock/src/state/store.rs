@@ -36,7 +36,7 @@ impl Node {
         keys.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
         for (k, v) in keys.iter() {
-            let prefix = format!("{}/{}", prefix, k);
+            let prefix = format!("{prefix}/{k}");
             v.print(&prefix, f)?;
         }
 
@@ -137,7 +137,7 @@ impl Store {
 
     pub fn get_value(&self, path: &str) -> &Vec<u8> {
         self.maybe_get_value(path)
-            .unwrap_or_else(|| panic!("MockRuntime: value not found at {}", path))
+            .unwrap_or_else(|| panic!("MockRuntime: value not found at {path}"))
     }
 
     pub fn maybe_get_value(&self, path: &str) -> Option<&Rc<Vec<u8>>> {

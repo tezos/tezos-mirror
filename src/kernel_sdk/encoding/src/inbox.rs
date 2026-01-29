@@ -204,15 +204,15 @@ pub enum InternalInboxMessage<Expr: Michelson> {
 impl<Expr: Michelson> Display for InternalInboxMessage<Expr> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Transfer(tr) => write!(f, "{}", tr),
+            Self::Transfer(tr) => write!(f, "{tr}"),
             Self::StartOfLevel => write!(f, "StartOfLevel"),
             Self::EndOfLevel => write!(f, "EndOfLevel"),
-            Self::InfoPerLevel(ipl) => write!(f, "{}", ipl),
+            Self::InfoPerLevel(ipl) => write!(f, "{ipl}"),
             Self::ProtocolMigration(proto) => {
-                write!(f, "ProtocolMigration {{protocol: {}}}", proto)
+                write!(f, "ProtocolMigration {{protocol: {proto}}}")
             }
             #[cfg(feature = "proto-alpha")]
-            Self::DalAttestedSlots(dal) => write!(f, "{}", dal),
+            Self::DalAttestedSlots(dal) => write!(f, "{dal}"),
         }
     }
 }
@@ -612,8 +612,9 @@ mod test {
 
         assert_eq!(
             re_encoded_bytes, ocaml_bytes,
-            "Re-encoded bytes should match original OCaml bytes.\nExpected: {:02x?}\nGot:      {:02x?}",
-            ocaml_bytes, re_encoded_bytes
+            r#"Re-encoded bytes should match original OCaml bytes.
+Expected: {ocaml_bytes:02x?}
+Got:      {re_encoded_bytes:02x?}"#,
         );
     }
 }

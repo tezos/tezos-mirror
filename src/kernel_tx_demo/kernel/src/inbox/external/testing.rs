@@ -49,6 +49,8 @@ impl Signer {
 
 /// Generate single keypair
 pub fn gen_ed25519_keys() -> (PublicKeyEd25519, SecretKeyEd25519) {
+    use rand::RngCore;
+
     let mut seed = [0; 32];
     rand::thread_rng().fill_bytes(&mut seed);
 

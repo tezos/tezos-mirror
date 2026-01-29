@@ -959,7 +959,7 @@ mod tests {
         let result = mock.store_read(&PATH, OFFSET, READ_SIZE);
 
         // Assert
-        let expected = std::iter::repeat(b'2').take(READ_SIZE / FRACTION).collect();
+        let expected = std::iter::repeat_n(b'2', READ_SIZE / FRACTION).collect();
 
         assert_eq!(Ok(expected), result);
     }
@@ -991,7 +991,7 @@ mod tests {
         let result = mock.store_read(&PATH, OFFSET, READ_SIZE);
 
         // Assert
-        let expected = std::iter::repeat(b'Z').take(READ_SIZE / FRACTION).collect();
+        let expected = std::iter::repeat_n(b'Z', READ_SIZE / FRACTION).collect();
 
         assert_eq!(Ok(expected), result);
     }
@@ -1437,9 +1437,8 @@ mod tests {
 
             let write_bytes = MAX_INPUT_MESSAGE_SIZE / fill_fraction;
 
-            let input_bytes = std::iter::repeat(fill_with)
-                .take(write_bytes)
-                .collect::<Box<_>>();
+            let input_bytes =
+                std::iter::repeat_n(fill_with, write_bytes).collect::<Box<_>>();
 
             mock.expect_read_input().return_once(
                 move |message_info_arg, buffer_arg, max_bytes_arg| {
