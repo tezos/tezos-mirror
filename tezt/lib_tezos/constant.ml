@@ -188,6 +188,18 @@ module WASM = struct
         "tezt/tests/kernels/echo_dal_reveal_pages_high_target_pub_level.wasm"
       ()
 
+  (* Toy kernel "echo_dal_reveal_pages_with_external_message".
+
+     Same as {!echo_dal_reveal_pages} above, but the page is revealed and
+    appended to the key "/dal/page" only when an external message starts
+    with "I". *)
+  let echo_dal_reveal_pages_with_external_message =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:
+        "tezt/tests/kernels/echo_dal_reveal_pages_with_external_message.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"

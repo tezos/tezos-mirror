@@ -1,0 +1,146 @@
+(module
+  (import "smart_rollup_core" "reveal"
+    (func $reveal (param i32 i32 i32 i32) (result i32)))
+  (import "smart_rollup_core" "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
+  (import "smart_rollup_core" "store_value_size"
+    (func $store_value_size (param i32 i32) (result i32)))
+  (import "smart_rollup_core" "read_input"
+    (func $read_input (param i32 i32 i32) (result i32)))
+
+  (memory 2)
+  (export "memory" (memory 0))
+
+  (global $PUBLISHED_LEVEL i32 (i32.const 15))
+  (global $SLOT_INDEX i32 (i32.const 1))
+  ;; CHANGEMENT MINIMAL: 3967 -> 4096 pour laisser la place complete a la page
+  (global $PAGE_SIZE i32 (i32.const 4096))
+  (global $CHUNK     i32 (i32.const 1024))
+
+  ;; Buffers
+  (global $REQ_PTR  i32 (i32.const 64))      ;; payload 8B
+  (global $PAGE_BUF i32 (i32.const 128))     ;; page buffer
+  (data (i32.const 65536) "/dal/page")
+  (global $KEY_PTR  i32 (i32.const 65536))
+  (global $KEY_LEN  i32 (i32.const 9))
+  (global $INFO_PTR  i32 (i32.const 220))  ;; ReadInputMessageInfo {level; id}
+  (global $INBOX_BUF i32 (i32.const 260))
+  (global $INBOX_MAX i32 (i32.const 64))   ;; we read only a few bytes
+
+  (func $write_chunked (param $path_ptr i32) (param $path_len i32)
+                        (param $base_off i32) (param $src_ptr i32) (param $len i32)
+                        (result i32)
+    (local $written i32) (local $part i32) (local $rc i32)
+    (local.set $written (i32.const 0))
+    (block $done
+      (loop $loop
+        (br_if $done (i32.ge_u (local.get $written) (local.get $len)))
+        (local.set $part
+          (select
+            (global.get $CHUNK)
+            (i32.sub (local.get $len) (local.get $written))
+            (i32.gt_u (i32.sub (local.get $len) (local.get $written)) (global.get $CHUNK))
+          )
+        )
+        (local.set $rc
+          (call $store_write
+            (local.get $path_ptr) (local.get $path_len)
+            (i32.add (local.get $base_off) (local.get $written))
+            (i32.add (local.get $src_ptr)  (local.get $written))
+            (local.get $part)
+          )
+        )
+        (br_if $done (i32.lt_s (local.get $rc) (i32.const 0)))
+        (local.set $written (i32.add (local.get $written) (local.get $part)))
+        (br $loop)
+      )
+    )
+    (local.get $written)
+  )
+
+  (func (export "kernel_run")
+    (local $size i32) (local $tag i32) (local $cmd i32)
+    (local $page_index i32) (local $len i32) (local $offset i32) (local $cur_len i32)
+
+    (block $done
+      (loop $loop
+        ;; Lire un message (0 => plus rien a consommer)
+        (local.set $size
+          (call $read_input
+            (global.get $INFO_PTR)
+            (global.get $INBOX_BUF)
+            (global.get $INBOX_MAX)
+          )
+        )
+        (br_if $done (i32.eqz (local.get $size)))
+
+        ;; tag externe ?
+        (local.set $tag (i32.load8_u (global.get $INBOX_BUF)))
+        (if (i32.eq (local.get $tag) (i32.const 1))
+          (then
+            ;; payload[0] (donc buf[1]) == 'I' ?
+            (if (i32.gt_u (local.get $size) (i32.const 1))
+              (then
+                (local.set $cmd (i32.load8_u (i32.add (global.get $INBOX_BUF) (i32.const 1))))
+                (if (i32.eq (local.get $cmd) (i32.const 73))  ;; 'I' = 0x49
+                  (then
+                    ;; --- TON CODE EXISTANT: construire la requête DAL ---
+                    (local.set $page_index (i32.const 10))
+
+                    (i32.store8 (global.get $REQ_PTR) (i32.const 2))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 1))
+                                (i32.shr_u (global.get $PUBLISHED_LEVEL) (i32.const 24)))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 2))
+                                (i32.shr_u (global.get $PUBLISHED_LEVEL) (i32.const 16)))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 3))
+                                (i32.shr_u (global.get $PUBLISHED_LEVEL) (i32.const 8)))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 4))
+                                (global.get $PUBLISHED_LEVEL))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 5))
+                                (global.get $SLOT_INDEX))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 6))
+                                (i32.shr_u (local.get $page_index) (i32.const 8)))
+                    (i32.store8 (i32.add (global.get $REQ_PTR) (i32.const 7))
+                                (local.get $page_index))
+
+                    (local.set $len
+                      (call $reveal
+                        (global.get $REQ_PTR) (i32.const 8)
+                        (global.get $PAGE_BUF) (global.get $PAGE_SIZE)
+                      )
+                    )
+
+                    ;; si reveal échoue (len < 0), on n'écrit pas
+                    (if (i32.lt_s (local.get $len) (i32.const 0))
+                      (then (br $loop))
+                    )
+
+                    ;; --- TON APPEND EXISTANT ---
+                    (local.set $cur_len
+                      (call $store_value_size (global.get $KEY_PTR) (global.get $KEY_LEN))
+                    )
+                    (local.set $offset
+                      (select
+                        (i32.const 0)
+                        (local.get $cur_len)
+                        (i32.lt_s (local.get $cur_len) (i32.const 0))
+                      )
+                    )
+                    (drop
+                      (call $write_chunked
+                        (global.get $KEY_PTR) (global.get $KEY_LEN)
+                        (local.get $offset) (global.get $PAGE_BUF) (local.get $len)
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+
+        (br $loop)
+      )
+    )
+  )
+)
