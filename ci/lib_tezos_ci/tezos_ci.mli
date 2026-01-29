@@ -587,8 +587,6 @@ module Images : sig
 
   val rust_toolchain : Image.t
 
-  val rust_toolchain_master : Image.t
-
   val rust_sdk_bindings : Image.t
 
   val trivy : Image.t
