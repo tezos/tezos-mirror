@@ -59,6 +59,18 @@ module type S = sig
     Tezlink_imports.Imported_protocol.Script_expr_hash.t ->
     Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
 
+  val big_map_raw_info :
+    [`Main] ->
+    block_param ->
+    Tezlink_imports.Alpha_context.Big_map.Id.t ->
+    (Tezlink_imports.Alpha_context.Script.expr
+    * Tezlink_imports.Alpha_context.Script.expr
+    * Z.t
+    * Tezlink_imports.Alpha_context.Script.expr list)
+    option
+    tzresult
+    Lwt.t
+
   val block : [`Main] -> block_param -> L2_types.Tezos_block.t tzresult Lwt.t
 
   val bootstrapped :
