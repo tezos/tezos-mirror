@@ -63,7 +63,7 @@ let mk_cryptobox dal_params =
 let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
     ~constants_divider =
   {
-    S.redundancy_factor;
+    S.Parameters.redundancy_factor;
     page_size = reference.page_size / constants_divider;
     slot_size = reference.slot_size / constants_divider;
     number_of_shards = reference.number_of_shards / constants_divider;

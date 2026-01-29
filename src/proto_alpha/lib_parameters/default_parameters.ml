@@ -143,7 +143,7 @@ let make_sc_rollup_parameter ~dal_activation_level
 
 let default_cryptobox_parameters =
   {
-    Dal.page_size = 3967;
+    Dal.Parameters.page_size = 3967;
     slot_size = 126_944;
     redundancy_factor = 8;
     number_of_shards = 512;

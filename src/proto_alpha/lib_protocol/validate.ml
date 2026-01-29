@@ -2410,7 +2410,7 @@ module Anonymous = struct
               {attestation; consensus_slot; slot_index; shard_with_proof})) =
       operation.protocol_data.contents
     in
-    let*? level, dal_content =
+    let*? raw_level, dal_content =
       let open Result_syntax in
       match attestation.protocol_data.contents with
       | Single (Attestation {consensus_content = {slot; level; _}; dal_content})
@@ -2434,13 +2434,38 @@ module Anonymous = struct
     | None ->
         tzfail
           (Invalid_accusation_no_dal_content
-             {tb_slot = consensus_slot; level; slot_index})
+             {tb_slot = consensus_slot; level = raw_level; slot_index})
     | Some dal_content -> (
-        let number_of_slots = Constants.dal_number_of_slots vi.ctxt in
+        let* dal_params = Dal.Past_parameters.parameters vi.ctxt raw_level in
+        let attestation_lag = dal_params.attestation_lag in
+        let*? () = check_denunciation_age vi `Dal_denounciation raw_level in
+        let level = Level.from_raw vi.ctxt raw_level in
+        let* ctxt, consensus_key =
+          Stake_distribution.attestation_slot_owner
+            vi.ctxt
+            ~attested_level:level
+            consensus_slot
+        in
+        let delegate = consensus_key.delegate in
+        let* published_level =
+          match Raw_level.(sub (succ raw_level) attestation_lag) with
+          | None ->
+              (* The slot couldn't have been published in this case *)
+              tzfail
+                (Invalid_accusation_slot_not_published
+                   {delegate; level = raw_level; slot_index})
+          | Some level -> return level
+        in
+        let* dal_params =
+          Dal.Past_parameters.parameters vi.ctxt published_level
+        in
+        let number_of_slots = dal_params.number_of_slots in
         let*? () =
           Dal.Slot_index.check_is_in_range ~number_of_slots slot_index
         in
-        let number_of_shards = Constants.dal_number_of_shards vi.ctxt in
+        let number_of_shards =
+          dal_params.cryptobox_parameters.number_of_shards
+        in
         let shard_index = shard_with_proof.shard.index in
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
@@ -2449,17 +2474,8 @@ module Anonymous = struct
           error_unless
             (Dal.Attestation.is_attested dal_content.attestation slot_index)
             (Invalid_accusation_slot_not_attested
-               {tb_slot = consensus_slot; level; slot_index})
+               {tb_slot = consensus_slot; level = raw_level; slot_index})
         in
-        let*? () = check_denunciation_age vi `Dal_denounciation level in
-        let level = Level.from_raw vi.ctxt level in
-        let* ctxt, consensus_key =
-          Stake_distribution.attestation_slot_owner
-            vi.ctxt
-            ~attested_level:level
-            consensus_slot
-        in
-        let delegate = consensus_key.delegate in
         let*! already_denounced =
           Dal.Delegate.is_already_denounced ctxt delegate level slot_index
         in
@@ -2468,7 +2484,7 @@ module Anonymous = struct
             (not already_denounced)
             (Dal_already_denounced {delegate; level = level.level})
         in
-        let traps_fraction = (Constants.parametric ctxt).dal.traps_fraction in
+        let traps_fraction = dal_params.traps_fraction in
         let*? is_trap =
           Dal.Shard_with_proof.share_is_trap
             delegate
@@ -2502,21 +2518,6 @@ module Anonymous = struct
                  shard_owner = shard_owner.delegate;
                })
         in
-        let* attestation_lag =
-          let+ parameters =
-            Alpha_context.Dal.Past_parameters.parameters ctxt level.level
-          in
-          parameters.attestation_lag
-        in
-        let* published_level =
-          match Raw_level.(sub (succ level.level) attestation_lag) with
-          | None ->
-              (* The slot couldn't have been published in this case *)
-              tzfail
-                (Invalid_accusation_slot_not_published
-                   {delegate; level = level.level; slot_index})
-          | Some level -> return level
-        in
         let* slot_headers_opt =
           Dal.Slot.find_slot_headers ctxt published_level
         in
@@ -2537,7 +2538,17 @@ module Anonymous = struct
             match slot_header_opt with
             | Some (header, _publisher)
               when Raw_level.equal header.id.published_level published_level ->
-                let*? _ctxt, cryptobox = Dal.make ctxt in
+                let*? cryptobox =
+                  let open Result_syntax in
+                  if
+                    Dal.Parameters.equal
+                      (Constants.parametric ctxt).dal.cryptobox_parameters
+                      dal_params.cryptobox_parameters
+                  then
+                    let* _ctxt, cryptobox = Dal.make ctxt in
+                    return cryptobox
+                  else Dal.make_cryptobox dal_params.cryptobox_parameters
+                in
                 let*? () =
                   Dal.Shard_with_proof.verify
                     cryptobox
