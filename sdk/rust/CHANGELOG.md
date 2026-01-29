@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `SecretKeySecp256k1` and `SecretKeyP256` hashes
 - Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
 - Add `ScriptExprHash` hash
+- Add `SmartRollupCommitment` and state hash definitions.
+- Add `SmartRollupOperation` cement and publish types to the `operation` module.
 - Allow the unit type `()` as field in derived implementations of `NomReader` and `BinWriter`.
 - Add a new package `tezos-protocol`, holding the Tezos protocol structures.
 - Add `Contract` defining contract address.
