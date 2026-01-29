@@ -43,6 +43,7 @@ COPY --chown=tezos:nogroup websocket tezos/websocket
 COPY --chown=tezos:nogroup lwt_domain tezos/lwt_domain
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
+COPY --chown=tezos:nogroup efunc-core tezos/efunc-core
 COPY --chown=tezos:nogroup teztale tezos/teztale
 COPY --chown=tezos:nogroup contrib tezos/contrib
 ENV GIT_SHORTREF=${GIT_SHORTREF}
