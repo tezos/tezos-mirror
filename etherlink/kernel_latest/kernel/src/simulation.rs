@@ -39,6 +39,7 @@ use tezos_ethereum::transaction::TransactionObject;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
+use tezosx_interfaces::Registry;
 
 // SIMULATION/SIMPLE/RLP_ENCODED_SIMULATION
 pub const SIMULATION_SIMPLE_TAG: u8 = 1;
@@ -376,6 +377,7 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
+        registry: &impl Registry,
         tracer_input: Option<TracerInput>,
         spec_id: &SpecId,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
@@ -480,6 +482,7 @@ impl Evaluation {
 
         match revm_run_transaction(
             host,
+            registry,
             &constants,
             None,
             from,
@@ -647,6 +650,7 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     spec_id: &SpecId,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
@@ -654,7 +658,7 @@ pub fn start_simulation_mode<Host: Runtime>(
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(host, tracer_input, spec_id)?;
+            let outcome = simulation.run(host, registry, tracer_input, spec_id)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -671,6 +675,7 @@ mod tests {
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use crate::registry_impl::RegistryImpl;
     use crate::{retrieve_block_fees, retrieve_chain_id};
 
     use super::*;
@@ -774,8 +779,10 @@ mod tests {
         let gas_limit = 300_000;
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
+        let registry = RegistryImpl::new();
         let outcome = run_transaction(
             host,
+            &registry,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
             None,
@@ -805,6 +812,7 @@ mod tests {
     fn simulation_result() {
         // setup
         let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::new();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -818,7 +826,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -844,7 +852,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -863,6 +871,7 @@ mod tests {
     fn evaluation_result_no_gas() {
         // setup
         let mut host = MockKernelHost::default();
+        let registry = RegistryImpl::new();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -876,7 +885,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &SpecId::default());
+        let outcome = evaluation.run(&mut host, &registry, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();

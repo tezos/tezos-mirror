@@ -26,6 +26,7 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
+use tezosx_interfaces::Registry;
 
 use super::{
     storage::{
@@ -206,7 +207,9 @@ impl StructLogger {
     }
 }
 
-impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host> for StructLogger {
+impl<'a, Host: Runtime + 'a, R: Registry + 'a> EtherlinkInspector<'a, Host, R>
+    for StructLogger
+{
     fn is_struct_logger(&self) -> bool {
         true
     }
@@ -216,10 +219,11 @@ impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host> for StructLogger {
     }
 }
 
-impl<'a, Host, CTX, INTR> Inspector<CTX, INTR> for StructLogger
+impl<'a, Host, R, CTX, INTR> Inspector<CTX, INTR> for StructLogger
 where
     Host: Runtime + 'a,
-    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
+    R: Registry + 'a,
+    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host, R>>,
     INTR: InterpreterTypes<
         Stack: StackTr + StructStack,
         ReturnData = ReturnDataImpl,

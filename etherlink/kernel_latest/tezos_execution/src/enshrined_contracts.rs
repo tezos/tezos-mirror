@@ -8,6 +8,7 @@ use mir::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_tezlink::operation_result::TransferError;
+use tezosx_interfaces::Registry;
 
 #[derive(Debug, PartialEq)]
 pub enum EnshrinedContracts {
@@ -44,6 +45,7 @@ pub(crate) fn execute_enshrined_contract<'a>(
     _entrypoint: &Entrypoint,
     _value: Micheline<'a>,
     _ctx: &mut impl CtxTrait<'a>,
+    _registry: &impl Registry,
 ) -> Result<(), TransferError> {
     // TODO L2-708
     Ok(())

@@ -17,6 +17,7 @@ use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
+use crate::registry_impl::RegistryImpl;
 use crate::storage;
 use crate::transaction::Transaction;
 use crate::upgrade;
@@ -37,6 +38,7 @@ use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
 use tezos_tracing::trace_kernel;
+use tezosx_interfaces::Registry;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -126,6 +128,7 @@ fn can_fit_in_reboot(
 #[allow(clippy::too_many_arguments)]
 pub fn compute<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut BlockInProgress<Transaction, TransactionReceipt>,
     block_constants: &BlockConstants,
@@ -170,6 +173,7 @@ pub fn compute<Host: Runtime>(
             "apply_transaction",
             apply_transaction(
                 host,
+                registry,
                 outbox_queue,
                 block_constants,
                 &transaction,
@@ -301,6 +305,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[allow(clippy::too_many_arguments)]
 pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
+    registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress<Transaction, TransactionReceipt>,
     tick_counter: &mut TickCounter,
@@ -323,6 +328,7 @@ pub fn compute_bip<Host: Runtime>(
     );
     let result = compute(
         host,
+        registry,
         outbox_queue,
         &mut block_in_progress,
         &constants,
@@ -458,6 +464,8 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
+    let registry = RegistryImpl::new();
+
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
         match ChainConfig::read_block_in_progress(&safe_host)? {
@@ -504,6 +512,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let processed_blueprint = block_in_progress.number;
     let computation_result = chain_config.compute_bip(
         &mut safe_host,
+        &registry,
         &outbox_queue,
         block_in_progress,
         &mut tick_counter,
@@ -1692,7 +1701,7 @@ mod tests {
     fn test_stop_computation() {
         // init host
         let mut host = MockKernelHost::default();
-
+        let registry = RegistryImpl::new();
         let block_constants = first_block(&mut host);
 
         //provision sender account
@@ -1720,6 +1729,7 @@ mod tests {
         // act
         let result = compute(
             &mut host,
+            &registry,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,

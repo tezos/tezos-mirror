@@ -42,6 +42,7 @@ use tezos_tezlink::{
         RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
     },
 };
+use tezosx_interfaces::Registry;
 
 use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
 use crate::address::OriginationNonce;
@@ -158,6 +159,7 @@ fn burn_tez(
 fn execute_internal_operations<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+    registry: &impl Registry,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &C::OriginatedAccountType,
     parser: &'a Parser<'a>,
@@ -214,6 +216,7 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
                     let receipt = transfer(
                         tc_ctx,
                         operation_ctx,
+                        registry,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -374,6 +377,7 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
 fn transfer<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+    registry: &impl Registry,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
@@ -438,7 +442,7 @@ fn transfer<'a, Host: Runtime, C: Context>(
                 operation_ctx,
             };
             let (internal_operations, new_storage) = execute_smart_contract(
-                code, storage, entrypoint, param, parser, &mut ctx,
+                code, storage, entrypoint, param, parser, &mut ctx, registry,
             )?;
             dest_account
                 .set_storage(ctx.host(), &new_storage)
@@ -453,6 +457,7 @@ fn transfer<'a, Host: Runtime, C: Context>(
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
+                registry,
                 internal_operations,
                 &dest_account,
                 parser,
@@ -511,9 +516,11 @@ fn get_contract_entrypoint<C: Context>(
 }
 
 // Handles manager transfer operations.
+#[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+    registry: &impl Registry,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
@@ -532,6 +539,7 @@ fn transfer_external<'a, Host: Runtime, C: Context>(
     transfer(
         tc_ctx,
         operation_ctx,
+        registry,
         operation_ctx.source,
         amount,
         dest,
@@ -847,6 +855,7 @@ fn execute_smart_contract<'a>(
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut impl CtxTrait<'a>,
+    registry: &impl Registry,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     match code {
         Code::Code(code) => {
@@ -859,7 +868,7 @@ fn execute_smart_contract<'a>(
         Code::Enshrined(contract) => {
             // TODO POC
             enshrined_contracts::execute_enshrined_contract(
-                contract, entrypoint, value, ctx,
+                contract, entrypoint, value, ctx, registry,
             )?;
             Ok((InternalOperationIterator::<_>::Empty, vec![]))
         }
@@ -868,6 +877,7 @@ fn execute_smart_contract<'a>(
 
 pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
+    registry: &impl Registry,
     context: &C,
     hash: OperationHash,
     operation: Operation,
@@ -910,6 +920,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
     let mut origination_nonce = OriginationNonce::initial(hash);
     let (receipts, applied) = apply_batch(
         &mut safe_host,
+        registry,
         context,
         &mut origination_nonce,
         validation_info,
@@ -939,6 +950,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
 
 fn apply_batch<Host: Runtime, C: Context>(
     host: &mut Host,
+    registry: &impl Registry,
     context: &C,
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch<C::ImplicitAccountType>,
@@ -971,6 +983,7 @@ fn apply_batch<Host: Runtime, C: Context>(
         } else {
             apply_operation(
                 host,
+                registry,
                 context,
                 origination_nonce,
                 &source_account,
@@ -1008,8 +1021,10 @@ fn apply_batch<Host: Runtime, C: Context>(
     (receipts, true)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_operation<Host: Runtime, C: Context>(
     host: &mut Host,
+    registry: &impl Registry,
     context: &C,
     origination_nonce: &mut OriginationNonce,
     source_account: &C::ImplicitAccountType,
@@ -1061,6 +1076,7 @@ fn apply_operation<Host: Runtime, C: Context>(
             let transfer_result = transfer_external(
                 &mut tc_ctx,
                 &mut operation_ctx,
+                registry,
                 amount,
                 destination,
                 parameters,
@@ -1181,6 +1197,41 @@ mod tests {
         context, validate_and_apply_operation, OperationError,
     };
     use crate::{make_default_ctx, COST_PER_BYTES};
+    use tezosx_interfaces::{Registry, RuntimeId, TezosXRuntimeError};
+
+    // Mock Registry for tests that don't need cross-runtime functionality
+    struct MockRegistry;
+
+    impl Registry for MockRegistry {
+        fn bridge<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            destination_runtime: RuntimeId,
+            _destination_address: &[u8],
+            _source_address: &[u8],
+            _amount: primitive_types::U256,
+            _data: &[u8],
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
+        }
+
+        fn generate_alias<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            _native_address: &[u8],
+            runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+        }
+
+        fn address_from_string(
+            &self,
+            _address_str: &str,
+            runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+        }
+    }
 
     macro_rules! block_ctx {
         () => {
@@ -1553,6 +1604,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
@@ -1586,6 +1638,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
@@ -1619,6 +1672,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
@@ -1666,6 +1720,7 @@ mod tests {
         let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -1731,6 +1786,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -1791,6 +1847,7 @@ mod tests {
 
         let result = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation,
@@ -1833,6 +1890,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -1908,6 +1966,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -1987,6 +2046,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2079,6 +2139,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2196,6 +2257,7 @@ mod tests {
         );
         let res = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2330,6 +2392,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2445,6 +2508,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2526,6 +2590,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2592,6 +2657,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             operation.clone(),
@@ -2675,6 +2741,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &ctx,
             OperationHash(H256::zero()),
             batch.clone(),
@@ -2857,6 +2924,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &ctx,
             OperationHash(H256::zero()),
             batch,
@@ -2951,6 +3019,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             OperationHash(H256::zero()),
             batch,
@@ -3065,6 +3134,7 @@ mod tests {
 
         let receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation.clone(),
@@ -3287,6 +3357,7 @@ mod tests {
         let context = context::TezlinkContext::init_context();
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -3450,6 +3521,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -3513,6 +3585,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -3580,6 +3653,7 @@ mod tests {
 
         let _receipt = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context::TezlinkContext::init_context(),
             operation.hash().unwrap(),
             operation,
@@ -3658,6 +3732,7 @@ mod tests {
         );
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation.clone(),
@@ -3854,6 +3929,7 @@ mod tests {
         );
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation.clone(),
@@ -4080,6 +4156,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &ctx,
             OperationHash(H256::zero()),
             batch.clone(),
@@ -4356,6 +4433,7 @@ mod tests {
         );
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4431,6 +4509,7 @@ mod tests {
         );
         let receipts1 = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4472,6 +4551,7 @@ mod tests {
         );
         let receipts2 = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4514,6 +4594,7 @@ mod tests {
         );
         let receipts3 = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4564,6 +4645,7 @@ mod tests {
         );
         let receipts4 = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4657,6 +4739,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             &mut host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -4759,6 +4842,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             ctx.host,
+            &MockRegistry,
             ctx.context,
             OperationHash(H256::zero()),
             operation,
@@ -5056,6 +5140,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             ctx.host,
+            &MockRegistry,
             &context,
             OperationHash(H256::zero()),
             operation,
@@ -5301,6 +5386,7 @@ mod tests {
         // as the big_map passed in argument doesn't have the key "d"
         let receipts = validate_and_apply_operation(
             ctx.host,
+            &MockRegistry,
             ctx.context,
             OperationHash(H256::zero()),
             operation,

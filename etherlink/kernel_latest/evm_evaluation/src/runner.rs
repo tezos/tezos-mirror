@@ -281,8 +281,10 @@ fn execute_transaction(
     );
     let mut bytes = vec![0u8; 32];
     transaction_value.to_little_endian(&mut bytes);
+    let registry = kernel::registry_impl::RegistryImpl::new();
     run_transaction(
         host,
+        &registry,
         spec_id,
         &block_constants,
         None,

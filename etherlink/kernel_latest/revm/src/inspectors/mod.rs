@@ -21,6 +21,7 @@ use revm::{
 };
 use struct_logger::StructLoggerInput;
 use tezos_evm_runtime::runtime::Runtime;
+use tezosx_interfaces::Registry;
 
 pub mod call_tracer;
 pub mod storage;
@@ -28,26 +29,31 @@ pub mod struct_logger;
 
 pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
 
-pub type EvmInspection<'a, Host, INSP> = Evm<
-    EVMInnerContext<'a, Host>,
+pub type EvmInspection<'a, Host, INSP, R> = Evm<
+    EVMInnerContext<'a, Host, R>,
     INSP,
-    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host>>,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host, R>>,
     EtherlinkPrecompiles,
     EthFrame<EthInterpreter>,
 >;
 
-pub struct EtherlinkEvmInspector<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> {
-    inner: EvmInspection<'a, Host, INSP>,
+pub struct EtherlinkEvmInspector<
+    'a,
+    Host: Runtime,
+    R: Registry,
+    INSP: EtherlinkInspector<'a, Host, R>,
+> {
+    inner: EvmInspection<'a, Host, INSP, R>,
 }
 
-impl<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> ExecuteEvm
-    for EtherlinkEvmInspector<'a, Host, INSP>
+impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>> ExecuteEvm
+    for EtherlinkEvmInspector<'a, Host, R, INSP>
 {
     type ExecutionResult = ExecutionResult;
     type State = EvmState;
     type Error = EVMError<Error>;
-    type Tx = <EVMInnerContext<'a, Host> as ContextTr>::Tx;
-    type Block = <EVMInnerContext<'a, Host> as ContextTr>::Block;
+    type Tx = <EVMInnerContext<'a, Host, R> as ContextTr>::Tx;
+    type Block = <EVMInnerContext<'a, Host, R> as ContextTr>::Block;
 
     fn set_block(&mut self, block: Self::Block) {
         self.inner.set_block(block);
@@ -74,8 +80,8 @@ impl<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> ExecuteEvm
     }
 }
 
-impl<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> ExecuteCommitEvm
-    for EtherlinkEvmInspector<'a, Host, INSP>
+impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>>
+    ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host, R, INSP>
 {
     fn commit(&mut self, state: Self::State) {
         self.inner.commit(state);
@@ -119,8 +125,8 @@ where
     type IT = EthInterpreter;
 }
 
-impl<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>> InspectEvm
-    for EtherlinkEvmInspector<'a, Host, INSP>
+impl<'a, Host: Runtime, R: Registry, INSP: EtherlinkInspector<'a, Host, R>> InspectEvm
+    for EtherlinkEvmInspector<'a, Host, R, INSP>
 {
     type Inspector = INSP;
 
@@ -152,15 +158,15 @@ impl TracerInput {
     }
 }
 
-pub trait EtherlinkInspector<'a, Host: Runtime + 'a>:
-    Inspector<EVMInnerContext<'a, Host>>
+pub trait EtherlinkInspector<'a, Host: Runtime + 'a, R: Registry + 'a>:
+    Inspector<EVMInnerContext<'a, Host, R>>
 {
     fn is_struct_logger(&self) -> bool;
     fn get_transaction_hash(&self) -> Option<B256>;
 }
 
-impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host>
-    for Box<dyn EtherlinkInspector<'a, Host>>
+impl<'a, Host: Runtime + 'a, R: Registry + 'a> EtherlinkInspector<'a, Host, R>
+    for Box<dyn EtherlinkInspector<'a, Host, R>>
 {
     fn is_struct_logger(&self) -> bool {
         self.as_ref().is_struct_logger()

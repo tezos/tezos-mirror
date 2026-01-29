@@ -12,8 +12,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{account_storage::TezlinkAccount, context::Context};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
-use thiserror::Error;
+use tezosx_interfaces::TezosXRuntimeError;
 
 use crate::{
     account::{
@@ -25,94 +24,100 @@ use crate::{
 
 pub struct TezosRuntime;
 
-#[derive(Debug, Error)]
-pub enum TezosRuntimeError {
-    // Define specific errors as needed
-    #[error("Unimplemented feature")]
-    Unimplemented,
-    #[error("Conversion error: {0}")]
-    ConversionError(String),
-    #[error("Custom error: {0}")]
-    Custom(String),
-    #[error("Path error: {0}")]
-    Path(#[from] PathError),
-    #[error("Runtime error: {0}")]
-    Runtime(#[from] RuntimeError),
-    #[error("Storage error: {0}")]
-    Storage(#[from] tezos_storage::error::Error),
-}
-
 pub mod account;
 pub mod context;
 
 impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
-    type AddressType = Contract;
-    type Error = TezosRuntimeError;
-
-    fn generate_alias(
+    fn generate_alias<Host: Runtime>(
         &self,
-        _host: &mut impl Runtime,
+        _host: &mut Host,
         native_address: &[u8],
-    ) -> Result<Self::AddressType, Self::Error> {
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
         let digest = blake2b::digest(native_address, ContractKt1Hash::hash_size())
             .map_err(|err| {
-                TezosRuntimeError::Custom(format!(
+                TezosXRuntimeError::Custom(format!(
                     "Failed to compute Blake2b digest: {err}"
                 ))
             })?;
         // TODO: Add code in this contract.
-        Ok(Contract::Originated(
+        let contract = Contract::Originated(
             HashTrait::try_from_bytes(digest.as_slice())
-                .map_err(|e| TezosRuntimeError::ConversionError(e.to_string()))?,
-        ))
+                .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))?,
+        );
+        contract.to_bytes().map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Failed to encode address to bytes: {e}"
+            ))
+        })
     }
 
     // For now only implement transfers with implicit accounts.
-    fn call(
+    fn call<Host: Runtime>(
         &self,
-        host: &mut impl Runtime,
-        _from: &Self::AddressType,
-        to: &Self::AddressType,
+        _registry: &impl tezosx_interfaces::Registry,
+        host: &mut Host,
+        _from: &[u8],
+        to: &[u8],
         amount: U256,
         _data: &[u8],
-    ) -> Result<Vec<u8>, Self::Error> {
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        let to = Contract::nom_read_exact(to).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Failed to decode address from bytes: {e:?}"
+            ))
+        })?;
         match to {
             Contract::Implicit(pkh) => {
-                let mut account = account::get_tezos_account_info_or_init(host, pkh)?;
+                let mut account = account::get_tezos_account_info_or_init(host, &pkh)?;
                 account.balance =
                     account.balance.checked_add(amount).ok_or_else(|| {
-                        TezosRuntimeError::ConversionError("Balance overflow".to_string())
+                        TezosXRuntimeError::ConversionError(
+                            "Balance overflow".to_string(),
+                        )
                     })?;
-                account::set_tezos_account_info(host, pkh, account)?;
+                account::set_tezos_account_info(host, &pkh, account)?;
                 Ok(vec![])
             }
             Contract::Originated(kt1) => {
                 // TODO: Have our own implementation of originated contracts.
                 let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_PATH)?;
-                let originated_account = context.originated_from_kt1(kt1)?;
+                let originated_account = context.originated_from_kt1(&kt1)?;
                 originated_account.add_balance(host, amount.as_u64())?;
                 Ok(vec![])
             }
         }
     }
 
-    fn encode_address(
+    fn address_from_string(
         &self,
-        address: &Self::AddressType,
-    ) -> Result<Vec<u8>, Self::Error> {
-        address.to_bytes().map_err(|e| {
-            TezosRuntimeError::ConversionError(format!(
+        address_str: &str,
+    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+        let contract = Contract::from_b58check(address_str).map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
+                "Failed to parse address from string: {e}"
+            ))
+        })?;
+        contract.to_bytes().map_err(|e| {
+            TezosXRuntimeError::ConversionError(format!(
                 "Failed to encode address to bytes: {e}"
             ))
         })
     }
 
-    fn decode_address(&self, data: &[u8]) -> Result<Self::AddressType, Self::Error> {
-        Contract::nom_read_exact(data).map_err(|e| {
-            TezosRuntimeError::ConversionError(format!(
-                "Failed to decode address from bytes: {e:?}"
-            ))
-        })
+    // Need to implement this only for IDE. Not needed in compilation or tests.
+    #[cfg(feature = "testing")]
+    fn get_balance<Host: Runtime>(
+        &self,
+        _host: &mut Host,
+        _address: &[u8],
+    ) -> Result<U256, TezosXRuntimeError> {
+        unimplemented!("Use mocks if you are in tests")
+    }
+
+    // Need to implement this only for IDE. Not needed in compilation or tests.
+    #[cfg(feature = "testing")]
+    fn string_from_address(&self, _address: &[u8]) -> Result<String, TezosXRuntimeError> {
+        unimplemented!("Use mocks if you are in tests")
     }
 }
 
@@ -121,20 +126,20 @@ impl TezosRuntime {
         host: &mut impl Runtime,
         pub_key_hash: &PublicKeyHash,
         amount: U256,
-    ) -> Result<(), TezosRuntimeError> {
+    ) -> Result<(), TezosXRuntimeError> {
         let mut info = get_tezos_account_info_or_init(host, pub_key_hash)?;
         info.balance = info
             .balance
             .checked_add(amount)
-            .ok_or(TezosRuntimeError::Custom("Balance overflow".to_string()))?;
+            .ok_or(TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
         set_tezos_account_info(host, pub_key_hash, info)
     }
 
     // Used for debug while we don't have our own originated account implementation.
     pub fn get_originated_account_balance(
-        host: &mut impl Runtime,
+        host: &impl Runtime,
         kt1: &ContractKt1Hash,
-    ) -> Result<U256, TezosRuntimeError> {
+    ) -> Result<U256, TezosXRuntimeError> {
         let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_PATH)?;
         let originated_account = context.originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;

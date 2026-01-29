@@ -32,12 +32,11 @@ use tezos_crypto_rs::{
 use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezosx_interfaces::{RuntimeId, RuntimeInterface};
-use tezosx_tezos_runtime::TezosRuntime;
+use tezosx_interfaces::{Registry, RuntimeId};
 
-pub struct EtherlinkVMDB<'a, Host: Runtime> {
+pub struct EtherlinkVMDB<'a, Host: Runtime, R: Registry> {
+    pub registry: &'a R,
     /// Runtime host
     pub host: &'a mut Host,
     /// Constants for the current block
@@ -62,12 +61,17 @@ enum AccountState {
     SelfDestructed,
 }
 
-impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
+impl<'a, Host: Runtime, R: Registry> EtherlinkVMDB<'a, Host, R> {
     #[instrument(skip_all)]
-    pub fn new(host: &'a mut Host, block: &'a BlockConstants) -> Result<Self, Error> {
+    pub fn new(
+        host: &'a mut Host,
+        registry: &'a R,
+        block: &'a BlockConstants,
+    ) -> Result<Self, Error> {
         let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
             host,
+            registry,
             block,
             commit_status: true,
             withdrawals: vec![],
@@ -114,7 +118,7 @@ macro_rules! abort_on_error {
     };
 }
 
-impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime, R: Registry> EtherlinkVMDB<'_, Host, R> {
     #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
         self.commit_status
@@ -192,7 +196,9 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
-impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
+    for EtherlinkVMDB<'_, Host, R>
+{
     fn log_node_message(&mut self, level: Level, message: &str) {
         log!(self.host, level, "{message:?}");
     }
@@ -265,45 +271,36 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
                     "insufficient balance for transfer to runtime".to_string(),
                 )
             })?;
-        let runtime = TezosRuntime {};
+
         let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
-            Some(alias) => runtime.decode_address(&alias).map_err(|e| {
-                CustomPrecompileError::Revert(format!(
-                    "Failed to decode alias for source address: {e:?}"
-                ))
-            })?,
+            Some(alias) => alias,
             None => {
-                let alias =
-                    runtime
-                        .generate_alias(self.host, &source.0 .0)
-                        .map_err(|e| {
-                            CustomPrecompileError::Revert(format!(
-                                "Failed to generate alias for source address: {e:?}"
-                            ))
-                        })?;
-                store_alias(
-                    self.host,
-                    &source,
-                    RuntimeId::Tezos,
-                    &runtime.encode_address(&alias).map_err(|e| {
+                let alias = self
+                    .registry
+                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos)
+                    .map_err(|e| {
                         CustomPrecompileError::Revert(format!(
-                            "Failed to encode alias for source address: {e:?}"
+                            "Failed to generate alias for source address: {e:?}"
                         ))
-                    })?,
-                )?;
+                    })?;
+                store_alias(self.host, &source, RuntimeId::Tezos, &alias)?;
                 alias
             }
         };
-        let destination_contract = Contract::from_b58check(destination).map_err(|e| {
-            CustomPrecompileError::Revert(format!(
-                "Failed to parse destination contract address: {e}"
-            ))
-        })?;
-        runtime
-            .call(
+        let destination_contract = self
+            .registry
+            .address_from_string(destination, RuntimeId::Tezos)
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!(
+                    "Failed to get destination contract address from string: {e:?}"
+                ))
+            })?;
+        self.registry
+            .bridge(
                 self.host,
-                &alias,
+                RuntimeId::Tezos,
                 &destination_contract,
+                &alias,
                 primitive_types::U256::from(
                     mutez_from_wei(alloy_to_u256(&amount)).map_err(|e| {
                         CustomPrecompileError::Revert(format!(
@@ -324,7 +321,7 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
     }
 }
 
-impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime, R: Registry> Database for EtherlinkVMDB<'_, Host, R> {
     type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
@@ -366,7 +363,9 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         }
     }
 }
-impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime, R: Registry> DatabaseCommitPrecompileStateChanges
+    for EtherlinkVMDB<'_, Host, R>
+{
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
         if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
@@ -409,7 +408,7 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
     }
 }
 
-impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
+impl<Host: Runtime, R: Registry> DatabaseCommit for EtherlinkVMDB<'_, Host, R> {
     fn commit(&mut self, changes: HashMap<Address, Account>) {
         for (address, account) in changes {
             // The account isn't marked as touched, the changes are not commited

@@ -33,5 +33,7 @@ tezos-evm-logging.workspace = true
 mir.workspace = true
 tezos-protocol.workspace = true
 
+tezosx-interfaces.workspace = true
+
 [dev-dependencies]
 pretty_assertions = "1.4.0"

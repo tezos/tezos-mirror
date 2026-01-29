@@ -50,6 +50,7 @@ tezos-indexable-storage.workspace = true
 tezos-storage.workspace = true
 tezosx-interfaces.workspace = true
 tezosx-tezos-runtime.workspace = true
+tezosx-ethereum-runtime.workspace = true
 
 tezos-smart-rollup.workspace = true
 tezos-smart-rollup-core.workspace = true
@@ -73,6 +74,9 @@ mir.workspace = true
 tezos-smart-rollup-mock.workspace = true
 tezos-smart-rollup-panic-hook.workspace = true
 proptest.workspace = true
+tezosx-interfaces = { workspace = true, features = ["testing"] }
+tezosx-ethereum-runtime = { workspace = true, features = ["testing"] }
+tezosx-tezos-runtime = { workspace = true, features = ["testing"] }
 
 # Hack: getrandom will use custom implementation if kernel is being built for wasm32-unknown-unknown
 # See https://github.com/rust-random/getrandom/blob/a39033a34a0b81c5b15ef1fba28696ab93aac9db/src/custom.rs

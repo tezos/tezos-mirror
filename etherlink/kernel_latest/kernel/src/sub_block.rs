@@ -17,6 +17,7 @@ use crate::{
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
     gas_price::base_fee_per_gas,
+    registry_impl::RegistryImpl,
     retrieve_chain_id, retrieve_da_fee,
     storage::{self, read_sequencer_pool_address},
     transaction::Transaction,
@@ -198,6 +199,7 @@ pub fn handle_run_transaction<Host: Runtime>(
         host,
         world_state: OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH),
     };
+    let registry = RegistryImpl::new();
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let mut block_in_progress = match crate::storage::read_block_in_progress(&safe_host)?
@@ -238,6 +240,7 @@ pub fn handle_run_transaction<Host: Runtime>(
 
     let result = compute(
         &mut safe_host,
+        &registry,
         &outbox_queue,
         &mut block_in_progress,
         &block_constants,

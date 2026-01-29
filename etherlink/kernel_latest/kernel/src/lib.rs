@@ -64,6 +64,7 @@ mod l2block;
 mod linked_list;
 mod migration;
 mod parsing;
+pub mod registry_impl;
 mod reveal_storage;
 mod sequencer_blueprint;
 mod simulation;

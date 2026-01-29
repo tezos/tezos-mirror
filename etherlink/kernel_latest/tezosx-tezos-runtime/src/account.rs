@@ -18,8 +18,7 @@ use tezos_smart_rollup_host::{
     path::{concat, OwnedPath, RefPath},
     runtime::RuntimeError,
 };
-
-use crate::TezosRuntimeError;
+use tezosx_interfaces::TezosXRuntimeError;
 
 // Path where Tezos accounts are stored.
 pub(crate) const TEZOS_ACCOUNTS_PATH: RefPath =
@@ -31,12 +30,12 @@ const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
 pub fn narith_to_u256(
     narith: &Narith,
-) -> Result<primitive_types::U256, TezosRuntimeError> {
+) -> Result<primitive_types::U256, TezosXRuntimeError> {
     let bytes = narith.0.to_bytes_be();
     if bytes.len() <= 32 {
         Ok(primitive_types::U256::from_big_endian(&bytes))
     } else {
-        Err(TezosRuntimeError::ConversionError(
+        Err(TezosXRuntimeError::ConversionError(
             "Narith value too large to fit in U256".to_string(),
         ))
     }
@@ -105,10 +104,10 @@ impl Decodable for TezosAccountInfo {
 
 pub fn path_to_tezos_account(
     pub_key_hash: &PublicKeyHash,
-) -> Result<OwnedPath, TezosRuntimeError> {
+) -> Result<OwnedPath, TezosXRuntimeError> {
     let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)
-        .map_err(|e| TezosRuntimeError::Custom(e.to_string()))?;
+        .map_err(|e| TezosXRuntimeError::Custom(e.to_string()))?;
     let prefix = concat(&TEZOS_ACCOUNTS_PATH, &address_path)?;
     Ok(concat(&prefix, &INFO_PATH)?)
 }
@@ -116,7 +115,7 @@ pub fn path_to_tezos_account(
 pub fn get_tezos_account_info(
     host: &impl Runtime,
     pub_key_hash: &PublicKeyHash,
-) -> Result<Option<TezosAccountInfo>, TezosRuntimeError> {
+) -> Result<Option<TezosAccountInfo>, TezosXRuntimeError> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
     match host.store_read_all(&path) {
@@ -126,14 +125,14 @@ pub fn get_tezos_account_info(
             Ok(Some(account_info))
         }
         Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(TezosRuntimeError::Runtime(err)),
+        Err(err) => Err(TezosXRuntimeError::Runtime(err)),
     }
 }
 
 pub fn get_tezos_account_info_or_init(
     host: &mut impl Runtime,
     pub_key_hash: &PublicKeyHash,
-) -> Result<TezosAccountInfo, TezosRuntimeError> {
+) -> Result<TezosAccountInfo, TezosXRuntimeError> {
     match get_tezos_account_info(host, pub_key_hash)? {
         Some(info) => Ok(info),
         None => Ok(TezosAccountInfo::default()),
@@ -144,7 +143,7 @@ pub fn set_tezos_account_info(
     host: &mut impl Runtime,
     pub_key_hash: &PublicKeyHash,
     info: TezosAccountInfo,
-) -> Result<(), TezosRuntimeError> {
+) -> Result<(), TezosXRuntimeError> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
     let value = &info.rlp_bytes();

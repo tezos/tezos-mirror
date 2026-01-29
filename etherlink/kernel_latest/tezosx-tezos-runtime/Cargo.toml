@@ -28,3 +28,6 @@ tezos_data_encoding.workspace = true
 tezos-storage.workspace = true
 
 [dev-dependencies]
+
+[features]
+testing = ["tezosx-interfaces/testing"]
