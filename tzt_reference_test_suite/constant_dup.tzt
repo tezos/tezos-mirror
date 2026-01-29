@@ -1,0 +1,67 @@
+# This is a regression test for a performance issue in MIR. This
+# creates a 3D matrix of type (list (list (list unit))) containing
+# 1 billion entries. For this test to run without consuming too much
+# time nor memory, the implementation must preserve sharing when
+# interpreting the DUP instruction. 
+input { };
+output { };
+code {
+
+       PUSH int 1000;
+
+       UNIT;
+       NIL unit;
+
+       # While the integer is non-negative, cons an element to the list
+       PUSH bool True;
+       LOOP
+         {
+           DUP 2;
+           CONS;
+           DIG 2;
+           PUSH int -1; ADD;
+           DUG 2;
+           DUP 3;
+           GE
+         };
+       DUG 2;
+       DROP 2; # drop the unit and the null integer
+
+       # Same but this time the element which is pushed is the previously-built list
+       PUSH int 1000;
+       SWAP;
+       NIL (list unit);
+       PUSH bool True;
+       LOOP
+         {
+           DUP 2;
+           CONS;
+           DIG 2;
+           PUSH int -1; ADD;
+           DUG 2;
+           DUP 3;
+           GE
+         };
+       DUG 2;
+       DROP 2; # drop the (list unit) and the null integer
+
+       # Same trick again
+       PUSH int 1000;
+       SWAP;
+       NIL (list (list unit));
+       PUSH bool True;
+       LOOP
+         {
+           DUP 2;
+           CONS;
+           DIG 2;
+           PUSH int -1; ADD;
+           DUG 2;
+           DUP 3;
+           GE
+         };
+       DUG 2;
+       DROP 2; # drop the (list (list unit)) and the null integer
+
+       DROP;
+     };
