@@ -269,6 +269,24 @@ let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
     ~data
     Fun.id
 
+let post_chain_block_helpers_scripts_pack_data ?(chain = "main")
+    ?(block = "head") ~data ~ty ?gas () =
+  let body =
+    `O
+      (List.filter_map
+         Fun.id
+         [
+           Some ("data", data);
+           Some ("type", ty);
+           Option.map (fun g -> ("gas", `String (string_of_int g))) gas;
+         ])
+  in
+  make
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "pack_data"]
+    ~data:(Data body)
+    Fun.id
+
 let get_chain_chain_id ?(chain = "main") () =
   make GET ["chains"; chain; "chain_id"] JSON.as_string
 

@@ -258,6 +258,22 @@ val post_chain_block_helpers_scripts_run_operation :
   data ->
   JSON.t t
 
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/pack_data]
+
+    Computes the serialized version of some data expression using the
+    same algorithm as script instruction PACK.
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val post_chain_block_helpers_scripts_pack_data :
+  ?chain:string ->
+  ?block:string ->
+  data:JSON.u ->
+  ty:JSON.u ->
+  ?gas:int ->
+  unit ->
+  JSON.t t
+
 (** RPC: [GET /chains/<chain>/chain_id]
 
     Returns the chain ID. *)
