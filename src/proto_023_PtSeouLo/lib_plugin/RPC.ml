@@ -1047,6 +1047,30 @@ module Scripts = struct
   (* 4_000_000 ꜩ *)
   let default_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
+  let pack_data_impl ?(allow_forged_lazy_storage_id = true) ctxt ~gas ~data ~ty
+      =
+    let open Lwt_result_syntax in
+    let open Script_ir_translator in
+    let ctxt =
+      match gas with
+      | None -> Gas.set_unlimited ctxt
+      | Some gas -> Gas.set_limit ctxt gas
+    in
+    let*? Ex_ty typ, ctxt =
+      parse_packable_ty ctxt ~legacy:true (Micheline.root ty)
+    in
+    let* data, ctxt =
+      parse_data
+        ctxt
+        ~elab_conf:(elab_conf ~legacy:true ())
+        ~allow_forged_tickets:true
+        ~allow_forged_lazy_storage_id
+        typ
+        (Micheline.root data)
+    in
+    let+ bytes, ctxt = Script_ir_translator.pack_data ctxt typ data in
+    (bytes, Gas.level ctxt)
+
   let register () =
     let open Lwt_result_syntax in
     let originate_dummy_contract ctxt script balance =
@@ -1643,27 +1667,7 @@ module Scripts = struct
     Registration.register0
       ~chunked:true
       S.pack_data
-      (fun ctxt () (expr, typ, maybe_gas) ->
-        let open Script_ir_translator in
-        let ctxt =
-          match maybe_gas with
-          | None -> Gas.set_unlimited ctxt
-          | Some gas -> Gas.set_limit ctxt gas
-        in
-        let*? Ex_ty typ, ctxt =
-          parse_packable_ty ctxt ~legacy:true (Micheline.root typ)
-        in
-        let* data, ctxt =
-          parse_data
-            ctxt
-            ~elab_conf:(elab_conf ~legacy:true ())
-            ~allow_forged_tickets:true
-            ~allow_forged_lazy_storage_id:true
-            typ
-            (Micheline.root expr)
-        in
-        let+ bytes, ctxt = Script_ir_translator.pack_data ctxt typ data in
-        (bytes, Gas.level ctxt)) ;
+      (fun ctxt () (data, ty, gas) -> pack_data_impl ctxt ~gas ~data ~ty) ;
     Registration.register0
       ~chunked:true
       S.normalize_data
