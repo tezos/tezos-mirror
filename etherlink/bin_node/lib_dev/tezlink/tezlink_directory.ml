@@ -449,6 +449,21 @@ let build_block_static_directory ~l2_chain_id
          in
          return (operation.protocol_data, result))
   |> register
+       ~service:Tezos_services.run_operation
+       ~impl:(fun {block; chain} _param (operation, _chain_id) ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* result =
+           Backend.simulate_operation
+             ~chain_id
+             ~skip_signature:true
+             operation
+             (Alpha_context.Operation.hash_packed operation)
+             block
+         in
+         return (operation.protocol_data, result))
+  |> register
        ~service:Tezos_services.pack_data
        ~impl:(fun _ctxt () (data, ty, gas) ->
          Tezlink_mock.pack_data ~data ~ty ~gas)

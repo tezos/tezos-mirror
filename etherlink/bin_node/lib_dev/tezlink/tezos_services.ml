@@ -770,6 +770,17 @@ let simulate_operation :
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
 
+let run_operation :
+    ( [`POST],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      < version : Imported_protocol_plugin.RPC.version option >,
+      Alpha_context.packed_operation * Chain_id.t,
+      Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
+    )
+    Tezos_rpc.Service.t =
+  import_service Imported_protocol_plugin.RPC.Scripts.S.run_operation
+
 let pack_data :
     ( [`POST],
       tezlink_rpc_context,
