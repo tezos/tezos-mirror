@@ -274,7 +274,12 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
-  let blueprint_version : Sequencer_blueprint.blueprint_version = Legacy in
+  let storage_version = head_info.storage_version in
+  let tezosx_runtimes = head_info.tezosx_runtimes in
+  let blueprint_version : Sequencer_blueprint.blueprint_version =
+    if storage_version >= 48 && not (List.is_empty tezosx_runtimes) then V1
+    else Legacy
+  in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:head_info.next_blueprint_number
