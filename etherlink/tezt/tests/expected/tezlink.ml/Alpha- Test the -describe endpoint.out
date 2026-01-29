@@ -182,6 +182,8 @@ Available services:
       - GET /chains/main/blocks/head/context/issuance/expected_issuance
           Returns the expected issued tez for the provided block and the next
           'consensus_rights_delay' cycles (in mutez) 
+      - GET /chains/main/blocks/head/context/raw/json/big_maps/index/<big_map_id>
+          Returns big_map info (key_type, value_type, total_bytes, contents) 
       - GET /chains/main/blocks/head/context/raw/json/cycle/<block_cycle>
           Returns the cycle <i>. This RPC is a mock as there's no cycle
           notion in Tezlink and doesn't represent what's in the context of a
