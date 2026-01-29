@@ -1499,6 +1499,44 @@ let test_tezlink_bigmap_counter =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
+let test_tezlink_bigmap_get_rpc =
+  let counter_contract = Michelson_contracts.big_map_counter () in
+  register_tezlink_test
+    ~title:"Test of the big_map get RPC"
+    ~tags:["rpc"; "big_map"; "get"]
+    ~bootstrap_contracts:[counter_contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* Call the contract to populate the big_map with key 1 *)
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:counter_contract.address
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  (* Hash the key to get the script_expr_hash *)
+  let* hash_result = Client.hash_data ~data:"1" ~typ:"nat" client in
+  let key_hash = hash_result.script_expr_hash in
+  (* Query the big_map using the RPC. Big_map ID 4 is the first user big_map *)
+  let* json =
+    let big_map_id = "4" in
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_context_big_map ~id:big_map_id ~key_hash ()
+  in
+  (* The value associated to key_hash in the big_map should be Unit *)
+  let prim = JSON.(json |-> "prim" |> as_string) in
+  Check.((prim = "Unit") string ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let test_tezlink_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   register_tezlink_test
@@ -3593,6 +3631,7 @@ let () =
   test_tezlink_execution [Alpha] ;
   test_tezlink_bigmap_option [Alpha] ;
   test_tezlink_bigmap_counter [Alpha] ;
+  test_tezlink_bigmap_get_rpc [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
   test_tezlink_long_batch [Alpha] ;
