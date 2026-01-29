@@ -1536,11 +1536,11 @@ let test_tezlink_bigmap_counter =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let test_tezlink_bigmap_get_rpc =
+let test_tezlink_bigmap_rpcs =
   let counter_contract = Michelson_contracts.big_map_counter () in
   register_tezlink_test
-    ~title:"Test of the big_map get RPC"
-    ~tags:["rpc"; "big_map"; "get"]
+    ~title:"Test of the big_map RPCs"
+    ~tags:["rpc"; "big_map"]
     ~bootstrap_contracts:[counter_contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
@@ -1560,18 +1560,30 @@ let test_tezlink_bigmap_get_rpc =
       client
   in
   let*@ _ = produce_block sequencer in
-  (* Hash the key to get the script_expr_hash *)
+  (* Big_map ID 4 is the first user big_map (0-3 are reserved for Liquidity Baking) *)
+  let big_map_id = "4" in
+  (* Test big_map get RPC *)
   let* hash_result = Client.hash_data ~data:"1" ~typ:"nat" client in
   let key_hash = hash_result.script_expr_hash in
-  (* Query the big_map using the RPC. Big_map ID 4 is the first user big_map *)
   let* json =
-    let big_map_id = "4" in
     Client.RPC.call ~endpoint client
     @@ RPC.get_chain_block_context_big_map ~id:big_map_id ~key_hash ()
   in
-  (* The value associated to key_hash in the big_map should be Unit *)
   let prim = JSON.(json |-> "prim" |> as_string) in
   Check.((prim = "Unit") string ~error_msg:"Expected %R but got %L") ;
+  (* Test big_map raw info RPC *)
+  let* json =
+    Client.RPC.call ~endpoint client
+    @@ RPC.get_chain_block_context_raw_json_big_maps_index ~id:big_map_id ()
+  in
+  let key_type_prim = JSON.(json |-> "key_type" |-> "prim" |> as_string) in
+  Check.(
+    (key_type_prim = "nat") string ~error_msg:"Expected key_type %R but got %L") ;
+  let value_type_prim = JSON.(json |-> "value_type" |-> "prim" |> as_string) in
+  Check.(
+    (value_type_prim = "unit")
+      string
+      ~error_msg:"Expected value_type %R but got %L") ;
   unit
 
 let test_tezlink_reveal_transfer_batch =
@@ -3669,7 +3681,7 @@ let () =
   test_tezlink_execution [Alpha] ;
   test_tezlink_bigmap_option [Alpha] ;
   test_tezlink_bigmap_counter [Alpha] ;
-  test_tezlink_bigmap_get_rpc [Alpha] ;
+  test_tezlink_bigmap_rpcs [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
   test_tezlink_long_batch [Alpha] ;
