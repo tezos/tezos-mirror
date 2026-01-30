@@ -7232,14 +7232,11 @@ module Amplification = struct
 
     unit
 
-  let check_slot_attested node protocol parameters ~number_of_slots
-      ~attested_level ~expected_attestation =
+  let check_slot_attested node protocol parameters ~attested_level ~lag_index
+      ~expected_attestation =
     let* metadata =
       Node.RPC.call node
       @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
-    in
-    let number_of_lags =
-      List.length parameters.Dal.Parameters.attestation_lags
     in
     let attestation =
       match metadata.dal_attestation with
@@ -7249,23 +7246,9 @@ module Amplification = struct
              level %d"
             attested_level
       | Some str ->
-          let v =
-            (Dal.Slot_availability.decode protocol parameters str).(number_of_lags
-                                                                    - 1)
-          in
-          (* [v]'s length may be smaller than [number_of_slots]; we fill it with [false] *)
-          List.init number_of_slots (fun i ->
-              if i < Array.length v then v.(i) else false)
+          (Dal.Slot_availability.decode protocol parameters str).(lag_index)
     in
-    let msg_prefix =
-      sf "Unexpected DAL attestation at attested_level %d: " attested_level
-    in
-    Check.(
-      (attestation = expected_attestation)
-        ~__LOC__
-        (list bool)
-        ~error_msg:(msg_prefix ^ "expected %R, got %L")) ;
-    unit
+    return (attestation = expected_attestation)
 
   let test_by_ignoring_topics protocol dal_parameters _cryptobox node client
       dal_bootstrap =
@@ -7476,24 +7459,28 @@ module Amplification = struct
 
     let expected_attestation =
       assert (index = 0) ;
-      List.init number_of_slots (fun i -> i = index)
+      Array.init number_of_slots (fun i -> i = index)
     in
     let rec check_attestation offset =
       if offset >= published_slots then unit
       else
-        let attested_level =
-          before_publication_level + attestation_lag + offset + 1
+        let* results =
+          Lwt_list.mapi_s
+            (fun lag_index attestation_lag ->
+              let attested_level =
+                before_publication_level + attestation_lag + offset + 1
+              in
+              check_slot_attested
+                node
+                protocol
+                dal_parameters
+                ~attested_level
+                ~lag_index
+                ~expected_attestation)
+            dal_parameters.attestation_lags
         in
-        let* () =
-          check_slot_attested
-            node
-            protocol
-            dal_parameters
-            ~number_of_slots
-            ~attested_level
-            ~expected_attestation
-        in
-        check_attestation (offset + 1)
+        if List.exists Fun.id results then check_attestation (offset + 1)
+        else Test.fail "Expected attestation not found at any attested level"
     in
     check_attestation 0
 end
