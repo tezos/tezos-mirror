@@ -443,6 +443,47 @@ module Q = struct
       Evm_node_migrations.migrations version
   end
 
+  (* Specific module for Tezlink migration, should NEVER be used for an Etherlink evm_node*)
+  module Tezlink_migration = struct
+    let create_table =
+      (unit ->. unit)
+      @@ {|
+      CREATE TABLE tezlink_migrations (
+        id SERIAL PRIMARY KEY,
+        name TEXT
+      )|}
+
+    let current_migration =
+      (unit ->? int)
+      @@ {|SELECT id FROM tezlink_migrations ORDER BY id DESC LIMIT 1|}
+
+    let register_migration =
+      (t2 int string ->. unit)
+      @@ {|
+      INSERT INTO tezlink_migrations (id, name) VALUES (?, ?)
+      |}
+
+    (*
+      To introduce a new migration
+        - Create a .sql file in tezlink_migrations led by the next migration number
+          [N = version + 1] (with leading 0s) followed by the name of the migration
+          (e.g. 000_tezlink_add_version.sql])
+        - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+        - Increment [version]
+        - Regenerate the schemas, using [[
+              dune exec -- etherlink/tezt/tests/main.exe --file evm_sequencer.ml \
+                evm store schemas regression --reset-regressions
+          ]]
+
+      You can review the result at
+      [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
+    *)
+    let version = 0
+
+    let all : Evm_node_migrations.migration list =
+      Tezlink_node_migrations.tezlink_migrations version
+  end
+
   module Blueprints = struct
     let table = "blueprints" (* For opentelemetry *)
 
@@ -1015,6 +1056,45 @@ module Migrations = struct
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
     Db.exec conn Q.Migrations.register_migration (id, M.name)
+end
+
+module Tezlink_migrations = struct
+  let _create_table store =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Tezlink_migration.create_table ()
+
+  let _table_exists store =
+    with_connection store @@ fun conn ->
+    Db.find conn Q.table_exists "tezlink_migrations"
+
+  let _missing_migrations store =
+    let open Lwt_result_syntax in
+    let all_migrations =
+      List.mapi (fun i m -> (i, m)) Q.Tezlink_migration.all
+    in
+    let* current =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Tezlink_migration.current_migration ()
+    in
+    match current with
+    | Some current ->
+        let applied = current + 1 in
+        let known = List.length all_migrations in
+        if applied <= known then return (List.drop_n applied all_migrations)
+        else
+          let*! () =
+            Evm_store_events.migrations_from_the_future ~applied ~known
+          in
+          failwith
+            "Cannot use a store modified by a more up-to-date version of the \
+             EVM node"
+    | None -> return all_migrations
+
+  let _apply_migration store id (module M : Evm_node_migrations.S) =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
+    Db.exec conn Q.Tezlink_migration.register_migration (id, M.name)
 end
 
 let sqlite_file_name = "store.sqlite"
