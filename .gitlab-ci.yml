@@ -202,7 +202,7 @@ workflow:
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     variables:
-      PIPELINE_TYPE: schedule_master_test_release
+      PIPELINE_TYPE: schedule_test_release
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CONTAINER_SCANNING_MASTER"
     variables:
@@ -469,7 +469,7 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_DAL_USE_BAKER"
     when: always
-- local: .gitlab/ci/pipelines/schedule_master_test_release.yml
+- local: .gitlab/ci/pipelines/schedule_test_release.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     when: always
