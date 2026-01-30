@@ -635,6 +635,8 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
     let legacy_dal_signals_disabled =
         crate::storage::is_legacy_dal_signals_disabled(host).unwrap_or(false);
+    let dal_publishers_whitelist =
+        crate::storage::read_dal_publishers_whitelist(host).unwrap_or_default();
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -645,6 +647,7 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
         next_blueprint_number,
         experimental_features,
         legacy_dal_signals_disabled,
+        dal_publishers_whitelist,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

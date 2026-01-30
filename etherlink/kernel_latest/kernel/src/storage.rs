@@ -17,12 +17,14 @@ use revm_etherlink::inspectors::call_tracer::CallTracerInput;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
 use tezos_crypto_rs::hash::ContractKt1Hash;
+use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
+use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::ValueType;
@@ -199,6 +201,12 @@ pub const DISABLE_LEGACY_DAL_SIGNALS: RefPath =
 
 // Path to the DAL slot indices to use.
 pub const DAL_SLOTS: RefPath = RefPath::assert_from(b"/evm/dal_slots");
+
+// Path to the whitelist of authorized DAL publishers (public key hashes).
+// These are the keys authorized to publish DAL slots that the kernel will accept.
+// NOTE: Empty whitelist means reject all publishers (therefore all slots).
+pub const DAL_PUBLISHERS_WHITELIST: RefPath =
+    RefPath::assert_from(b"/evm/dal_publishers_whitelist");
 
 // Path where the input for the tracer is stored by the sequencer.
 const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
@@ -790,6 +798,38 @@ pub fn dal_slots<Host: Runtime>(host: &Host) -> anyhow::Result<Option<Vec<u8>>> 
         Ok(Some(bytes))
     } else {
         Ok(None)
+    }
+}
+
+/// Read the whitelist of authorized DAL publishers from storage.
+/// Returns an empty vector if no whitelist is configured.
+/// The whitelist is stored as an RLP-encoded list of binary-encoded public key hashes.
+///
+/// NOTE: An empty whitelist means NO publishers are authorized
+/// The kernel will reject all DAL slots if the whitelist is empty.
+pub fn read_dal_publishers_whitelist<Host: Runtime>(
+    host: &Host,
+) -> anyhow::Result<Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>> {
+    if host.store_has(&DAL_PUBLISHERS_WHITELIST)?.is_some() {
+        let rlp_bytes = host.store_read_all(&DAL_PUBLISHERS_WHITELIST)?;
+        let rlp = rlp::Rlp::new(&rlp_bytes);
+
+        let mut whitelist = Vec::new();
+        for item in rlp.iter() {
+            let pkh_bytes = item.as_val::<Vec<u8>>()?;
+            let (remaining, pkh) = PublicKeyHash::nom_read(&pkh_bytes).map_err(|e| {
+                anyhow::anyhow!("Failed to decode public key hash: {:?}", e)
+            })?;
+            if !remaining.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Unexpected trailing bytes after public key hash"
+                ));
+            }
+            whitelist.push(pkh);
+        }
+        Ok(whitelist)
+    } else {
+        Ok(Vec::new())
     }
 }
 

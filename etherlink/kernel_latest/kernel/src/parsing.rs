@@ -197,6 +197,13 @@ pub trait Parsable {
     fn on_deposit(context: &mut Self::Context);
 
     fn on_fa_deposit(context: &mut Self::Context);
+
+    /// Get the whitelist of authorized DAL publishers from the context.
+    /// Returns an empty slice if no whitelist is configured or in proxy mode.
+    /// NOTE: Empty whitelist means reject all publishers (therefore all slots).
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash];
 }
 
 impl ProxyInput {
@@ -301,6 +308,13 @@ impl Parsable for ProxyInput {
     fn on_deposit(_: &mut Self::Context) {}
 
     fn on_fa_deposit(_: &mut Self::Context) {}
+
+    fn dal_publishers_whitelist(
+        _context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        // Proxy mode doesn't have a whitelist - return empty slice (rejects all publishers)
+        &[]
+    }
 }
 
 pub struct BufferTransactionChunks {
@@ -324,6 +338,10 @@ pub struct SequencerParsingContext {
     // When true, legacy DAL slot import signals are disabled.
     // The kernel will rely on DalAttestedSlots internal messages instead.
     pub legacy_dal_signals_disabled: bool,
+    // Whitelist of authorized DAL publishers (public key hashes).
+    // Only slots published by these keys will be accepted from DalAttestedSlots messages.
+    pub dal_publishers_whitelist:
+        Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>,
 }
 
 fn check_unsigned_blueprint_chunk(
@@ -723,6 +741,12 @@ impl Parsable for SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_PER_FA_DEPOSIT_PARSING);
     }
+
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        &context.dal_publishers_whitelist
+    }
 }
 
 impl<Mode: Parsable> InputResult<Mode> {
@@ -947,18 +971,64 @@ impl<Mode: Parsable> InputResult<Mode> {
             ),
             InternalInboxMessage::EndOfLevel => InputResult::NoInput,
             InternalInboxMessage::DalAttestedSlots(dal_attested) => {
-                // Extract all slot indices from the slots_by_publisher vector.
+                // Extract slot indices only from whitelisted publishers.
                 // Each PublisherSlots contains a Zarith bitset where bit i is
                 // set if slot index i is attested.
+                let whitelist = Mode::dal_publishers_whitelist(context);
+
+                // Count total published slots before filtering
+                let total_published_slots: usize = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .count()
+                    })
+                    .sum();
+
+                let mut rejected_publishers = Vec::new();
                 let slot_indices: Vec<u8> = dal_attested
                     .slots_by_publisher
                     .iter()
+                    .filter(|publisher_slots| {
+                        let is_whitelisted =
+                            whitelist.contains(&publisher_slots.publisher);
+                        if !is_whitelisted {
+                            rejected_publishers
+                                .push(publisher_slots.publisher.to_b58check());
+                        }
+                        is_whitelisted
+                    })
                     .flat_map(|publisher_slots| {
                         (0..dal_attested.number_of_slots)
                             .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
                             .map(|i| i as u8)
                     })
                     .collect();
+
+                // Log summary
+                if rejected_publishers.is_empty() {
+                    log!(
+                        host,
+                        Debug,
+                        "For published level {}, accepted {}/{} DAL slots from {} publishers",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        dal_attested.slots_by_publisher.len()
+                    );
+                } else {
+                    log!(
+                        host,
+                        Debug,
+                        "For published level {}, accepted {}/{} DAL slots; not whitelisted: {}",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        rejected_publishers.join(", ")
+                    );
+                }
 
                 InputResult::Input(Input::DalAttestedSlots {
                     published_level: dal_attested.published_level,
