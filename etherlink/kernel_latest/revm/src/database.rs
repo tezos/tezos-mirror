@@ -263,15 +263,6 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         destination: &str,
         amount: U256,
     ) -> Result<(), CustomPrecompileError> {
-        let mut source_account = StorageAccount::from_address(&source)?;
-        let mut source_info = source_account.info(self.host)?;
-        let new_source_balance =
-            source_info.balance.checked_sub(amount).ok_or_else(|| {
-                CustomPrecompileError::Revert(
-                    "insufficient balance for transfer to runtime".to_string(),
-                )
-            })?;
-
         let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
             Some(alias) => alias,
             None => {
@@ -322,8 +313,6 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                     "Failed to transfer tez to destination contract: {e:?}"
                 ))
             })?;
-        source_info.balance = new_source_balance;
-        source_account.set_info(self.host, source_info)?;
         Ok(())
     }
 }

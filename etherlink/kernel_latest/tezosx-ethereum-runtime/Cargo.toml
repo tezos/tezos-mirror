@@ -24,6 +24,7 @@ tezos-smart-rollup-host.workspace = true
 tezos_data_encoding.workspace = true
 
 [dev-dependencies]
+hex.workspace = true
 
 [features]
 testing = ["tezosx-interfaces/testing"]

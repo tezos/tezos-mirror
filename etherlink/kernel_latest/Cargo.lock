@@ -2545,6 +2545,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezosx-ethereum-runtime",
  "tezosx-interfaces",
  "thiserror 1.0.69",
  "tracing",
@@ -3503,6 +3504,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "hex",
  "nom",
  "primitive-types",
  "revm",

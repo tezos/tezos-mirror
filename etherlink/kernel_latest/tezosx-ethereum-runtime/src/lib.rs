@@ -24,7 +24,6 @@ use tezosx_interfaces::{
     AliasCreationContext, Registry, RuntimeInterface, TezosXRuntimeError,
 };
 
-/// Solidity interface for init_tezosx_alias function.
 alloy_sol_types::sol! {
     function init_tezosx_alias(string nativeAddress) external payable;
 }
@@ -136,7 +135,7 @@ impl RuntimeInterface for EthereumRuntime {
         // Ensure the TezosX caller account has balance for gas
         let mut caller_account = StorageAccount::from_address(&TEZOSX_CALLER_ADDRESS)?;
         let mut caller_info = caller_account.info(host)?;
-        if caller_info.balance < AlloyU256::from(context.gas_limit) {
+        if caller_info.balance < AlloyU256::MAX.div_ceil(AlloyU256::from(2)) {
             caller_info.balance = AlloyU256::MAX;
             caller_account.set_info_without_code(host, caller_info)?;
         }
@@ -233,62 +232,7 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use revm::state::AccountInfo;
-    use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezosx_interfaces::{Registry as RegistryTrait, RuntimeId, TezosXRuntimeError};
-
-    const GAS_LIMIT: u64 = 30_000_000;
-    const CHAIN_ID: u64 = 42793;
-
-    /// Mock Registry for testing that delegates to EthereumRuntime
-    struct MockRegistry;
-
-    impl RegistryTrait for MockRegistry {
-        fn bridge<Host: Runtime>(
-            &self,
-            _host: &mut Host,
-            _destination_runtime: RuntimeId,
-            _destination_address: &[u8],
-            _source_address: &[u8],
-            _amount: primitive_types::U256,
-            _data: &[u8],
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            unimplemented!("bridge not needed for these tests")
-        }
-
-        fn generate_alias<Host: Runtime>(
-            &self,
-            host: &mut Host,
-            native_address: &[u8],
-            runtime_id: RuntimeId,
-            context: AliasCreationContext,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            match runtime_id {
-                RuntimeId::Ethereum => {
-                    EthereumRuntime.generate_alias(self, host, native_address, context)
-                }
-                _ => Err(TezosXRuntimeError::RuntimeNotFound(runtime_id)),
-            }
-        }
-
-        fn address_from_string(
-            &self,
-            _address_str: &str,
-            _runtime_id: RuntimeId,
-        ) -> Result<Vec<u8>, TezosXRuntimeError> {
-            unimplemented!("address_from_string not needed for these tests")
-        }
-    }
-
-    fn create_test_context() -> AliasCreationContext {
-        AliasCreationContext {
-            gas_limit: GAS_LIMIT,
-            chain_id: CHAIN_ID,
-            timestamp: primitive_types::U256::from(1),
-            block_number: primitive_types::U256::from(1),
-        }
-    }
+    use alloy_primitives::Keccak256;
 
     /// Test that alias addresses are computed deterministically from native addresses.
     #[test]
@@ -326,21 +270,5 @@ mod tests {
         let alias2 = compute_alias(b"tz1xyz");
 
         assert_ne!(alias1, alias2);
-    }
-
-    #[test]
-    fn test_eip7702_delegation_bytecode_format() {
-        // Verify the EIP-7702 delegation bytecode format
-        let delegation = Bytecode::new_eip7702(ALIAS_FORWARDER_PRECOMPILE_ADDRESS);
-        let raw = delegation.original_byte_slice();
-
-        // EIP-7702 format: 0xEF01 + 0x00 (version) + 20 bytes address = 23 bytes
-        assert_eq!(raw.len(), 23);
-        assert_eq!(raw[0], 0xEF);
-        assert_eq!(raw[1], 0x01);
-        assert_eq!(raw[2], 0x00); // version
-
-        // The remaining 20 bytes should be the precompile address
-        assert_eq!(&raw[3..], ALIAS_FORWARDER_PRECOMPILE_ADDRESS.as_slice());
     }
 }

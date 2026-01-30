@@ -1197,7 +1197,9 @@ mod tests {
         context, validate_and_apply_operation, OperationError,
     };
     use crate::{make_default_ctx, COST_PER_BYTES};
-    use tezosx_interfaces::{Registry, RuntimeId, TezosXRuntimeError};
+    use tezosx_interfaces::{
+        AliasCreationContext, Registry, RuntimeId, TezosXRuntimeError,
+    };
 
     // Mock Registry for tests that don't need cross-runtime functionality
     struct MockRegistry;
@@ -1220,6 +1222,7 @@ mod tests {
             _host: &mut Host,
             _native_address: &[u8],
             runtime_id: RuntimeId,
+            _context: AliasCreationContext,
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }
