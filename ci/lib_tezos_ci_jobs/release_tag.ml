@@ -402,12 +402,56 @@ let octez_packaging_revision_jobs ?(test = false) () =
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~tag:Gcp_not_interruptible
   in
+  let job_static_arm64 =
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      ~release:true
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ()
+  in
+  let job_static_x86_64 =
+    job_build_static_binaries
+      ~dependencies:(Dependent [])
+      ~__POS__
+      ~arch:Amd64
+      ~cpu:Very_high
+      ~storage:Ramfs
+      ~release:true
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ()
+  in
+  let job_update_gitlab_release =
+    job
+      ~__POS__
+      ~image:Images.ci_release
+      ~stage:Stages.publish
+      ~name:"gitlab:update_release"
+      ~description:
+        "Update existing GitLab release with new static binaries from this \
+         packaging revision"
+      ~dependencies:
+        (Dependent [Artifacts job_static_x86_64; Artifacts job_static_arm64])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ~id_tokens:Tezos_ci.id_tokens
+      ["./scripts/releases/update_gitlab_release.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
+  in
   [
     (* Stage: start *)
     job_datadog_pipeline_trace;
+    (* Docker images *)
     job_docker_amd64;
     job_docker_arm64;
     job_docker_merge;
     job_docker_promote_to_version;
+    (* Static binaries *)
+    job_static_x86_64;
+    job_static_arm64;
+    (* Release update *)
+    job_update_gitlab_release;
   ]
   @ jobs_debian_repository
