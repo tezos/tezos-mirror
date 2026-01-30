@@ -23,7 +23,15 @@ module CLST_types : sig
 
   type withdraw = nat
 
-  type arg = (deposit, withdraw) or_
+  type transfer =
+    ( address (* from_ *),
+      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
+      Script_list.t
+    (* txs *) )
+    pair
+    Script_list.t
+
+  type arg = (deposit, (withdraw, transfer) or_) or_
 
   type ledger = (address, nat) big_map
 
@@ -37,7 +45,10 @@ module CLST_types : sig
 
   type is_token_view = (nat, bool) view_type
 
-  type entrypoint = Deposit of deposit | Withdraw of withdraw
+  type entrypoint =
+    | Deposit of deposit
+    | Withdraw of withdraw
+    | Transfer of transfer
 
   val entrypoint_from_arg : arg -> entrypoint
 

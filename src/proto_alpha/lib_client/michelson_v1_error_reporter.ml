@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 open Tezos_micheline
 open Script_tc_errors
-open Script_interpreter
+open Script_interpreter_errors
 open Michelson_v1_printer
 
 let print_ty ppf ty = Michelson_v1_printer.print_expr_unwrapped ppf ty
@@ -487,8 +487,10 @@ let report_errors ~details ~show_source
            Try again with a higher storage limit.@]" ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | [Environment.Ecoproto_error (Script_interpreter.Bad_contract_parameter c)]
-      ->
+    | [
+     Environment.Ecoproto_error
+       (Script_interpreter_errors.Bad_contract_parameter c);
+    ] ->
         Format.fprintf
           ppf
           "@[<v 0>Account %a is not a smart contract, it does not take \

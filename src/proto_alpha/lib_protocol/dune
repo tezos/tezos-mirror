@@ -286,6 +286,7 @@
   Ticket_transfer
   Clst_contract_storage
   Script_interpreter_defs
+  Script_interpreter_errors
   Script_native
   Script_interpreter
   Sc_rollup_management_protocol
@@ -594,6 +595,7 @@
   ticket_transfer.ml ticket_transfer.mli
   clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -903,6 +905,7 @@
   ticket_transfer.ml ticket_transfer.mli
   clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -1196,6 +1199,7 @@
   ticket_transfer.ml ticket_transfer.mli
   clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
+  script_interpreter_errors.ml script_interpreter_errors.mli
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli

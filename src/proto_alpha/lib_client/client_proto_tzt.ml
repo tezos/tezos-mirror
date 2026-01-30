@@ -18,11 +18,11 @@ let convert_error trace =
   let open Result_syntax in
   let open Micheline in
   function
-  | Script_interpreter.Reject (_loc, value, _trace) ->
+  | Script_interpreter_errors.Reject (_loc, value, _trace) ->
       let value = Michelson_v1_primitives.strings_of_prims value in
       return (Prim (0, "Failed", [root value], []))
   | Tez_repr.Addition_overflow _ | Tez_repr.Multiplication_overflow _
-  | Script_interpreter.Overflow _ ->
+  | Script_interpreter_errors.Overflow _ ->
       return (Prim (0, "Overflow", [], []))
   | Tez_repr.Subtraction_underflow (a, b) ->
       return

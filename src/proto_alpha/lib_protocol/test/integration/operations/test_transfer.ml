@@ -738,7 +738,7 @@ let test_bad_parameter () =
     when List.mem
            ~equal:( = )
            (Environment.Ecoproto_error
-              (Script_interpreter.Bad_contract_parameter
+              (Script_interpreter_errors.Bad_contract_parameter
                  (Contract.Originated Contract_helpers.default_self)))
            lst ->
       return_unit

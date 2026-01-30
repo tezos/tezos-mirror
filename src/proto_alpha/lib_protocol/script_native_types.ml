@@ -24,20 +24,20 @@ module Helpers = struct
     let annot = match named with Some name -> name :: annot | None -> annot in
     Prim (loc, prim, args, annot)
 
-  let unit_ty () = {untyped = prim Script.T_unit []; typed = Ty_ex_c unit_t}
+  let unit_ty = {untyped = prim Script.T_unit []; typed = Ty_ex_c unit_t}
 
   (* Some combinators are unused for now but will be used later, and they serve as an
      example to implement the rest. They are not exported as they are specific
      to building native contracts types. *)
   [@@@ocaml.warning "-32"]
 
-  let int_ty () = {untyped = prim Script.T_int []; typed = Ty_ex_c int_t}
+  let int_ty = {untyped = prim Script.T_int []; typed = Ty_ex_c int_t}
 
-  let nat_ty () = {untyped = prim Script.T_nat []; typed = Ty_ex_c nat_t}
+  let nat_ty = {untyped = prim Script.T_nat []; typed = Ty_ex_c nat_t}
 
-  let bool_ty () = {untyped = prim Script.T_bool []; typed = Ty_ex_c bool_t}
+  let bool_ty = {untyped = prim Script.T_bool []; typed = Ty_ex_c bool_t}
 
-  let address_ty () =
+  let address_ty =
     {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
 
   let address_big_map_ty (type value)
@@ -48,7 +48,7 @@ module Helpers = struct
       big_map_t loc address_t ty_value
     in
     let untyped_big_map =
-      prim Script.T_big_map [(address_ty ()).untyped; unty_value]
+      prim Script.T_big_map [address_ty.untyped; unty_value]
     in
     return {untyped = untyped_big_map; typed = Ty_ex_c big_map_t}
 
@@ -66,19 +66,30 @@ module Helpers = struct
     let+ typed = Script_typed_ir.or_t loc tyl tyr in
     {untyped = prim Script.T_or [untyl; untyr]; typed}
 
-  (** Entrypoints combinator *)
+  let list_ty ({untyped; typed = Ty_ex_c ty_elt} : 'a ty_node) :
+      'a Script_list.t ty_node tzresult =
+    let open Result_syntax in
+    let* ty_list = Script_typed_ir.list_t loc ty_elt in
+    return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
+
+  (** Nodes and entrypoints combinators *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
 
-  (** Generates the leaf of the entrypoint tree, i.e. an entrypoint. *)
-  let make_entrypoint_leaf (type t) name ({untyped; typed} : t ty_node) =
-    let open Result_syntax in
+  (** Annotates a node with a name. *)
+  let add_name name node =
     let untyped =
-      match untyped with
+      match node.untyped with
       | Prim (loc, prim, args, annot) ->
           Prim (loc, prim, args, ("%" ^ name) :: annot)
-      | untyped -> untyped
+      | (Int _ | String _ | Bytes _ | Seq _) as x -> x
     in
+    {node with untyped}
+
+  (** Generates the leaf of the entrypoint tree, i.e. an entrypoint. *)
+  let make_entrypoint_leaf (type t) name (node : t ty_node) =
+    let open Result_syntax in
+    let {typed; untyped} = add_name name node in
     let* name = Entrypoint.of_string_strict ~loc name in
     let at_node = Some {name; original_type_expr = untyped} in
     return ({typed; untyped}, {at_node; nested = Entrypoints_None})
@@ -137,7 +148,15 @@ module CLST_types = struct
 
   type withdraw = nat
 
-  type arg = (deposit, withdraw) or_
+  type transfer =
+    ( address (* from_ *),
+      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
+      Script_list.t
+    (* txs *) )
+    pair
+    Script_list.t
+
+  type arg = (deposit, (withdraw, transfer) or_) or_
 
   type ledger = (address, nat) big_map
 
@@ -145,33 +164,51 @@ module CLST_types = struct
 
   type storage = ledger * total_supply
 
-  type entrypoint = Deposit of deposit | Withdraw of withdraw
+  type entrypoint =
+    | Deposit of deposit
+    | Withdraw of withdraw
+    | Transfer of transfer
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L p -> Deposit p
-    | R p -> Withdraw p
+    | R (L p) -> Withdraw p
+    | R (R p) -> Transfer p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L p
-    | Withdraw p -> R p
+    | Withdraw p -> R (L p)
+    | Transfer p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
-    make_entrypoint_leaf "deposit" (unit_ty ())
+    make_entrypoint_leaf "deposit" unit_ty
 
   let withdraw_type : (withdraw ty_node * withdraw entrypoints_node) tzresult =
-    make_entrypoint_leaf "withdraw" (nat_ty ())
+    make_entrypoint_leaf "withdraw" nat_ty
+
+  let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* token_id_and_amount =
+      pair_ty (add_name "token_id" nat_ty) (add_name "amount" nat_ty)
+    in
+    let* tx = pair_ty (add_name "to_" address_ty) token_id_and_amount in
+    let* txs = list_ty tx in
+    let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
+    let* transfer = list_ty elt in
+    make_entrypoint_leaf "transfer" transfer
 
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* withdraw_type in
-    let* arg_type = make_entrypoint_node deposit_type withdraw_type in
+    let* transfer_type in
+    let* r1 = make_entrypoint_node withdraw_type transfer_type in
+    let* arg_type = make_entrypoint_node deposit_type r1 in
     return (finalize_entrypoint arg_type)
 
   let storage_type : storage ty_node tzresult =
     let open Result_syntax in
-    let* ledger_ty = address_big_map_ty (nat_ty ()) in
-    pair_ty ledger_ty (nat_ty ())
+    let* ledger_ty = address_big_map_ty nat_ty in
+    pair_ty ledger_ty nat_ty
 
   type balance_view = (address * nat, nat) view_type
 
@@ -181,14 +218,13 @@ module CLST_types = struct
 
   let balance_view_ty =
     let open Result_syntax in
-    let* {typed = input_ty; _} = pair_ty (address_ty ()) (nat_ty ()) in
-    return {input_ty; output_ty = (nat_ty ()).typed}
+    let* {typed = input_ty; _} = pair_ty address_ty nat_ty in
+    return {input_ty; output_ty = nat_ty.typed}
 
   let total_supply_view_ty =
-    {input_ty = (unit_ty ()).typed; output_ty = (nat_ty ()).typed}
+    {input_ty = unit_ty.typed; output_ty = nat_ty.typed}
 
-  let is_token_view_ty =
-    {input_ty = (nat_ty ()).typed; output_ty = (bool_ty ()).typed}
+  let is_token_view_ty = {input_ty = nat_ty.typed; output_ty = bool_ty.typed}
 end
 
 type ('arg, 'storage) kind =

@@ -1070,7 +1070,8 @@ let apply_manager_operation : type kind.
               let* () =
                 fail_unless
                   (Script.is_unit parameters)
-                  (Script_interpreter.Bad_contract_parameter source_contract)
+                  (Script_interpreter_errors.Bad_contract_parameter
+                     source_contract)
               in
               apply_transaction_to_implicit
                 ~ctxt
@@ -1082,7 +1083,8 @@ let apply_manager_operation : type kind.
               let* () =
                 fail_unless
                   (Script.is_unit parameters)
-                  (Script_interpreter.Bad_contract_parameter source_contract)
+                  (Script_interpreter_errors.Bad_contract_parameter
+                     source_contract)
               in
               apply_stake
                 ~ctxt
@@ -1094,7 +1096,8 @@ let apply_manager_operation : type kind.
               let* () =
                 fail_unless
                   (Script.is_unit parameters)
-                  (Script_interpreter.Bad_contract_parameter source_contract)
+                  (Script_interpreter_errors.Bad_contract_parameter
+                     source_contract)
               in
               apply_unstake
                 ~ctxt
@@ -1106,7 +1109,8 @@ let apply_manager_operation : type kind.
               let* () =
                 fail_unless
                   (Script.is_unit parameters)
-                  (Script_interpreter.Bad_contract_parameter source_contract)
+                  (Script_interpreter_errors.Bad_contract_parameter
+                     source_contract)
               in
               apply_finalize_unstake
                 ~ctxt
