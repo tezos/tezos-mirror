@@ -13,6 +13,8 @@ tests=(
   "true lalalalal xxx tezos SoftRelease"
   "false lalalalal xxx tezos TestBranch"
   "false  octez-v1.1 xxx tezos TestBranch 1.1"
+  "true lalalalal xxx tezos TestProtectedBranch"
+  "true  octez-v1.1 xxx tezos TestProtectedBranch 1.1"
   "true lalalalal master tezos Master"
   # Add more test cases here as needed
 )
