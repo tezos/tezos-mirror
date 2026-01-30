@@ -29,20 +29,8 @@ open Baking_cache
 open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
 module Events = Node_rpc_events
-
-module Profiler = struct
-  include (val Profiler.wrap Baking_profiler.node_rpc_profiler)
-
-  let[@warning "-32"] reset_block_section =
-    Baking_profiler.create_reset_block_section Baking_profiler.node_rpc_profiler
-end
-
-module RPC_profiler = struct
-  include (val Tezos_profiler.Profiler.wrap RPC_profiler.rpc_client_profiler)
-
-  let[@warning "-32"] reset_block_section =
-    RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler
-end
+module Profiler = Baking_profiler.Node_rpc_Profiler
+module RPC_profiler = Baking_profiler.RPC_profiler
 
 let warn_on_stalling_rpc ~rpc_name f =
   Utils.event_on_stalling_promise
