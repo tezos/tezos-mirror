@@ -129,6 +129,206 @@ let test_publish_blueprints_on_dal ~dal_slot =
   Lwt.cancel signal_counter_p ;
   unit
 
+(* This test verifies DAL publishers whitelist for protocols > 024.
+   It checks that only whitelisted publishers can have their DAL slots processed. *)
+let test_publish_blueprints_on_dal_with_whitelist ~dal_slot
+    ~dal_publishers_whitelist =
+  let default_publisher = Constant.bootstrap1.public_key_hash in
+  let publisher_whitelisted =
+    List.mem default_publisher dal_publishers_whitelist
+  in
+  let number_of_blueprints = 5 in
+  (* When publisher is not whitelisted, reduce lag threshold to trigger catch-up
+     quickly.  Catch-up triggers when [lag > max_blueprints_lag], so use
+     [number_of_blueprints - 1] to ensure it triggers before we run out of
+     blueprints. *)
+  let max_blueprints_lag =
+    if publisher_whitelisted then None else Some (number_of_blueprints - 1)
+  in
+  register_test
+    ~time_between_blocks:Nothing
+    ?max_blueprints_lag
+    ~tags:["evm"; "sequencer"; "data"; "whitelist"]
+    ~title:
+      (sf
+         "Sequencer publishes the blueprints on DAL slot index %d; publisher \
+          whitelisted: %b (whitelist length: %d)"
+         dal_slot
+         publisher_whitelisted
+         (List.length dal_publishers_whitelist))
+    ~dal_slots:(Some [dal_slot])
+    ~dal_publishers_whitelist
+  @@ fun {sequencer; client; sc_rollup_node; enable_dal; _} _protocol ->
+  Log.info "Verify whitelist is correctly configured in kernel storage" ;
+  let* () =
+    Log.info "Checking DAL publishers whitelist in kernel storage" ;
+    let* whitelist_hex =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:"/evm/dal_publishers_whitelist"
+           ()
+    in
+    match whitelist_hex with
+    | Some hex ->
+        (* Decode RLP-encoded whitelist *)
+        let rlp_bytes = Hex.to_bytes (`Hex hex) in
+        let open Evm_node_lib_dev_encoding.Rlp in
+        let rlp_item = decode_exn rlp_bytes in
+        let stored_keys =
+          match rlp_item with
+          | List items ->
+              List.map
+                (fun item ->
+                  match item with
+                  | Value pkh_bytes ->
+                      (* Decode binary PublicKeyHash to base58check *)
+                      let pkh =
+                        Data_encoding.Binary.of_bytes_exn
+                          Tezos_crypto.Signature.Public_key_hash.encoding
+                          pkh_bytes
+                      in
+                      Tezos_crypto.Signature.Public_key_hash.to_b58check pkh
+                  | List _ ->
+                      Test.fail "Expected Value in whitelist RLP, got List")
+                items
+          | Value _ -> Test.fail "Expected List in whitelist RLP, got Value"
+        in
+        Check.(
+          (stored_keys = dal_publishers_whitelist)
+            ~__LOC__
+            (list string)
+            ~error_msg:"Expected %R in whitelist, got %L") ;
+        Log.info "Whitelist in storage: [%s]" (String.concat ", " stored_keys) ;
+        unit
+    | None -> Test.fail "Empty whitelist in kernel storage!"
+  in
+
+  let number_of_blueprints_sent_to_inbox = ref 0 in
+  let number_of_blueprints_sent_to_dal = ref 0 in
+
+  let inbox_counter_p =
+    count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
+  in
+
+  let dal_counter_p =
+    count_event
+      sequencer
+      "blueprint_injection_on_DAL.v0"
+      number_of_blueprints_sent_to_dal
+  in
+
+  let* _ =
+    repeat number_of_blueprints (fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+  in
+
+  (* Wait more to avoid flakiness, in particular with DAL *)
+  let timeout = if enable_dal then 50. else 5. in
+  let* () =
+    Evm_node.wait_for_blueprint_injected ~timeout sequencer number_of_blueprints
+  in
+
+  (* At this point, the evm node should call the batcher endpoint to publish
+     all the blueprints. *)
+  let* () =
+    if publisher_whitelisted then
+      (* Whitelisted: sync should happen quickly via DAL *)
+      let* () =
+        bake_until_sync ~__LOC__ ~sc_rollup_node ~client ~sequencer ()
+      in
+      (* bake 2 blocks so evm_node sees it as finalized in `rollup_node_follower` *)
+      repeat 2 (fun () ->
+          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+          unit)
+    else
+      let* () =
+        Log.info
+          "Baking blocks (expecting desync due to whitelist rejection, \
+           catch-up at lag=%d)"
+          (number_of_blueprints - 1) ;
+        repeat 8 (fun () ->
+            let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+            unit)
+      in
+      Log.info
+        "Waiting for catch-up mechanism to republish %d blueprints to inbox..."
+        number_of_blueprints ;
+      let rec wait_for_inbox_blueprints attempts =
+        if !number_of_blueprints_sent_to_inbox >= number_of_blueprints then (
+          Log.info
+            "Catch-up complete: %d blueprints sent to inbox"
+            !number_of_blueprints_sent_to_inbox ;
+          unit)
+        else if attempts <= 0 then
+          Test.fail
+            "Catch-up incomplete after timeout: only %d/%d blueprints sent to \
+             inbox"
+            !number_of_blueprints_sent_to_inbox
+            number_of_blueprints
+        else
+          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+          wait_for_inbox_blueprints (attempts - 1)
+      in
+      wait_for_inbox_blueprints 10
+  in
+
+  (* Note: check_rollup_head_consistency may fail when not whitelisted due to desync *)
+  let* () =
+    if publisher_whitelisted then
+      check_rollup_head_consistency ~evm_node:sequencer ~sc_rollup_node ()
+    else (
+      Log.info
+        "Skipping consistency check (desync expected when publisher not \
+         whitelisted)" ;
+      unit)
+  in
+
+  (* Expected behavior:
+     - Batcher always publishes to DAL (independent of kernel whitelist)
+     - Kernel processes DAL slots only if publisher is whitelisted
+     - If rejected by whitelist, catch-up mechanism republishes via inbox *)
+  let expected_nb_of_bp_on_dal = number_of_blueprints in
+  let expected_nb_of_bp_on_inbox =
+    if publisher_whitelisted then 0 else number_of_blueprints
+  in
+
+  Log.info
+    "Blueprints sent to DAL: %d (expected: %d)"
+    !number_of_blueprints_sent_to_dal
+    expected_nb_of_bp_on_dal ;
+  Log.info
+    "Blueprints sent to inbox: %d (expected: %d)"
+    !number_of_blueprints_sent_to_inbox
+    expected_nb_of_bp_on_inbox ;
+
+  Check.(expected_nb_of_bp_on_dal = !number_of_blueprints_sent_to_dal)
+    ~__LOC__
+    Check.int
+    ~error_msg:
+      "Wrong number of blueprints published on the DAL; Expected %L, got %R." ;
+
+  (* For inbox: when not whitelisted, catch-up may republish, so check >= *)
+  if publisher_whitelisted then
+    Check.(expected_nb_of_bp_on_inbox = !number_of_blueprints_sent_to_inbox)
+      ~__LOC__
+      Check.int
+      ~error_msg:
+        "Wrong number of blueprints published on the inbox; Expected %L, got \
+         %R."
+  else
+    Check.(
+      (!number_of_blueprints_sent_to_inbox >= expected_nb_of_bp_on_inbox) int)
+      ~error_msg:
+        "Expected at least %R blueprints on inbox (catch-up may republish), \
+         got %L" ;
+
+  Lwt.cancel dal_counter_p ;
+  Lwt.cancel inbox_counter_p ;
+  unit
+
 (* We aim to send data big enough to trigger splitting in multiple
    chunks, or multiple slots. Chunks size depends on the size of
    messages in the inbox, which is for now of 4096 bytes. We build
@@ -269,10 +469,43 @@ let test_more_than_one_slot_per_l1_level =
 
 let protocols = Protocol.all
 
+(* Split protocols: legacy DAL signals (≤ 024) vs DalAttestedSlots with
+   whitelist (> 024) *)
+let protocols_legacy_dal =
+  List.filter (fun p -> Protocol.number p <= 024) protocols
+
+let protocols_with_whitelist =
+  List.filter (fun p -> Protocol.number p > 024) protocols
+
 let () =
-  test_publish_blueprints_on_dal protocols ~dal_slot:4 ;
+  (* Test legacy DAL signals for protocols ≤ 024 *)
+  test_publish_blueprints_on_dal ~dal_slot:4 protocols_legacy_dal ;
   (* Also run the test for slot index 0 because it is a particular
      case in the RLP encoding used to send signals to the rollup. *)
-  test_publish_blueprints_on_dal protocols ~dal_slot:0 ;
+  test_publish_blueprints_on_dal ~dal_slot:0 protocols_legacy_dal ;
+
+  (* Test DalAttestedSlots with whitelist for protocols after Tallinn (> 024) *)
+  (* Test acceptance: bootstrap1 is whitelisted *)
+  test_publish_blueprints_on_dal_with_whitelist
+    ~dal_slot:4
+    ~dal_publishers_whitelist:[Constant.bootstrap1.public_key_hash]
+    protocols_with_whitelist ;
+  (* Test rejection: only bootstrap2 is whitelisted, so bootstrap1's slots are rejected *)
+  test_publish_blueprints_on_dal_with_whitelist
+    ~dal_slot:0
+    ~dal_publishers_whitelist:[Constant.bootstrap2.public_key_hash]
+    protocols_with_whitelist ;
+  (* Test rejection: empty whitelist, bootstrap1's slots are rejected *)
+  test_publish_blueprints_on_dal_with_whitelist
+    ~dal_slot:0
+    ~dal_publishers_whitelist:[]
+    protocols_with_whitelist ;
+  (* Test acceptance with multiple publishers in whitelist *)
+  test_publish_blueprints_on_dal_with_whitelist
+    ~dal_slot:0
+    ~dal_publishers_whitelist:
+      [Constant.bootstrap2.public_key_hash; Constant.bootstrap1.public_key_hash]
+    protocols_with_whitelist ;
+
   test_chunked_blueprints_on_dal protocols ;
   test_more_than_one_slot_per_l1_level protocols
