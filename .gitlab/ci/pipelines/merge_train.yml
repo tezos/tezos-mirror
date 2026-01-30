@@ -905,7 +905,7 @@ trigger:homebrew_auto:
     strategy: depend
 
 test_sdk_rust:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
@@ -920,10 +920,8 @@ test_sdk_rust:
     - scripts/version.sh
     - sdk/rust/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1255,24 +1253,18 @@ select_tezts:
     when: always
 
 check_riscv_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: test
   tags:
   - gcp
   rules:
   - changes:
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -1305,7 +1297,7 @@ check_riscv_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 audit_riscv_deps:
-  image: ${rust_toolchain_image_name_protected}:master
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
   stage: sanity
   tags:
   - gcp

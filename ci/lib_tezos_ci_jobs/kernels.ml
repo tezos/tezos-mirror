@@ -17,14 +17,6 @@ module Files = struct
   let kernels = "src/kernel_sdk/**/*" :: riscv
 
   let test_kernels = "kernels.mk" :: "src/kernel_*/**/*" :: riscv
-
-  let rust_toolchain =
-    [
-      "images/rust-toolchain/**/*";
-      "images/create_image.sh";
-      "images/scripts/install_datadog_static.sh";
-      "scripts/version.sh";
-    ]
 end
 
 module CI = Cacio.Shared
@@ -47,8 +39,8 @@ let job_check_riscv_kernels =
     ~__POS__
     ~stage:Test
     ~description:"Run 'make check' in 'src/riscv'."
-    ~only_if_changed:Files.(kernels @ rust_toolchain)
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:Files.kernels
+    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     [
       (* EXTRA_FLAGS ensure we don't need Ocaml installed in the check and test jobs. *)
       "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features \
@@ -62,9 +54,7 @@ let job_audit_riscv_deps =
     ~stage:Test
     ~description:"Run 'make audit' in 'src/riscv'."
     ~only_if_changed:Files.kernels
-      (* Since we depend on the Images.rust_toolchain_master,
-         we start the job only if the code is modified, but not the image itself. *)
-    ~image:Tezos_ci.Images.rust_toolchain_master
+    ~image:Tezos_ci.Images.Base_images.rust_toolchain_trixie
     ["make -C src/riscv audit"]
 
 let job_test_kernels =

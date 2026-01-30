@@ -424,7 +424,7 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"test_sdk_rust"
-          ~image:Images.rust_toolchain
+          ~image:Images.Base_images.rust_toolchain_trixie
           ~stage:Stages.test
           ~dependencies:dependencies_needs_start
           ~rules:

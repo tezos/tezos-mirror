@@ -1662,11 +1662,6 @@ module Images = struct
       ~image_path
       ()
 
-  (** The rust toolchain image (static tag [master]) *)
-  let rust_toolchain_master =
-    let image_path = "${rust_toolchain_image_name_protected}:master" in
-    Image.mk_external ~image_path
-
   (** The image containing all dependencies required for Rust SDK bindings *)
   let rust_sdk_bindings =
     (* The job that builds the rust-sdk-bindings image.
