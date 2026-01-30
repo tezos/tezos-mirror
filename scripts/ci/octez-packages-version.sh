@@ -24,6 +24,7 @@ set -eu
 # - TestRebuild : A tag is set, Namespace is not tezos and there
 #   is an associated valid packaging
 # - TestBranch : branch is not protected
+# - TestProtectedBranch : branch is protected
 
 export RELEASETYPE=
 export VERSION=
@@ -81,8 +82,7 @@ else
       fi
     else
       # protected, !tag, other protected branches
-      # Not a valid release
-      : nop
+      export RELEASETYPE="TestProtectedBranch"
     fi
   else
     # ! protected
