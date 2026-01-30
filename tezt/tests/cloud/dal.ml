@@ -1422,13 +1422,13 @@ let yes_wallet_exe = Uses.path Constant.yes_wallet
 
 let register (module Cli : Scenarios_cli.Dal) =
   let simulate_network = Cli.simulate_network in
-  let stake =
+  let parsed_stake =
     Stake_repartition.Dal.parse_arg
       ~stake_arg:Cli.stake
       ~simulation_arg:simulate_network
   in
   let configuration, etherlink_configuration =
-    let stake_machine_type = Cli.stake_machine_type in
+    let open Cli in
     let dal_node_producers =
       let last_index = ref (-1) in
       List.init Cli.producers (fun i ->
@@ -1440,35 +1440,12 @@ let register (module Cli : Scenarios_cli.Dal) =
               last_index := index ;
               index)
     in
-    let observers_slot_indices = Cli.observers_slot_indices in
-    let observer_machine_type = Cli.observer_machine_type in
-    let archivers_slot_indices = Cli.archivers_slot_indices in
-    let observer_pkhs = Cli.observer_pkhs in
-    let protocol = Cli.protocol in
-    let producer_machine_type = Cli.producer_machine_type in
-    let etherlink = Cli.etherlink in
-    let etherlink_sequencer = Cli.etherlink_sequencer in
-    let etherlink_producers = Cli.etherlink_producers in
-    let echo_rollups = Cli.echo_rollups in
-    let disconnect = Cli.disconnect in
-    let network = Cli.network in
-    let snapshot = Cli.snapshot in
-    let bootstrap = Cli.bootstrap in
-    let etherlink_dal_slots = Cli.etherlink_dal_slots in
-    let teztale = Cli.teztale in
-    let memtrace = Cli.memtrace in
-    let data_dir = Cli.data_dir in
-    let producer_key = Cli.producer_key in
-    let producers_delay = Cli.producers_delay in
-    let ignore_pkhs = Cli.ignore_pkhs in
-    let tezlink = Cli.tezlink in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
         ~some:Option.some
         Cli.fundraiser
     in
-    let etherlink_chain_id = Cli.etherlink_chain_id in
     let etherlink =
       if etherlink then
         Some
@@ -1482,29 +1459,12 @@ let register (module Cli : Scenarios_cli.Dal) =
             }
       else None
     in
-    let blocks_history = Cli.blocks_history in
-    let bootstrap_node_identity_file = Cli.bootstrap_node_identity_file in
-    let bootstrap_dal_node_identity_file =
-      Cli.bootstrap_dal_node_identity_file
-    in
-    let with_dal = Cli.with_dal in
-    let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
-    let disable_shard_validation = Cli.disable_shard_validation in
-    let disable_amplification = Cli.disable_amplification in
-    let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
-    let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
     let daily_logs_destination =
       Option.map (fun dir -> dir // "daily_logs") Tezt_cloud_cli.artifacts_dir
     in
-    let slot_size = Cli.slot_size in
-    let number_of_slots = Cli.number_of_slots in
-    let attestation_lag = Cli.attestation_lag in
-    let attestation_lags = Cli.attestation_lags in
-    let traps_fraction = Cli.traps_fraction in
-    let publish_slots_regularly = Cli.publish_slots_regularly in
-    let stresstest = Cli.stresstest in
+    let stake = parsed_stake in
     let t =
       {
         with_dal;
