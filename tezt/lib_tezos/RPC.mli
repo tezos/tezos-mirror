@@ -85,8 +85,18 @@ val get_network_greylist_ips : JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks]
 
-    [chain] defaults to ["main"]. *)
-val get_chain_blocks : ?chain:string -> unit -> JSON.t t
+    [chain] defaults to ["main"].
+    Optional arguments map to query parameters:
+    - [heads] -> repeated [head] query args.
+    - [length] -> [length] query arg.
+    - [min_date] -> [min_date] query arg (seconds since epoch). *)
+val get_chain_blocks :
+  ?chain:string ->
+  ?heads:string list ->
+  ?length:int ->
+  ?min_date:int ->
+  unit ->
+  JSON.t t
 
 (** RPC: [GET /chains/<chain>/invalid_blocks]
 
