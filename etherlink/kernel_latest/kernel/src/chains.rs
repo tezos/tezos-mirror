@@ -42,6 +42,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
+    enc_wrappers::BlockNumber,
     operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
@@ -444,6 +445,11 @@ impl EvmChainConfig {
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
     RefPath::assert_from(b"/tezlink/simulation_result");
 
+pub struct TezlinkBlockConstants {
+    pub level: BlockNumber,
+    pub context: context::TezlinkContext,
+}
+
 impl ChainConfigTrait for MichelsonChainConfig {
     type Transaction = TezlinkOperation;
     type TransactionReceipt = AppliedOperation;
@@ -554,14 +560,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.number
         );
 
-        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
-
-        let level = block_in_progress.number.try_into()?;
-        let now = block_in_progress.timestamp;
-        let block_ctx = BlockCtx {
-            level: &level,
-            now: &now,
-            chain_id: &self.chain_id,
+        let block_constants = TezlinkBlockConstants {
+            level: block_in_progress.number.try_into()?,
+            context: context::TezlinkContext::from_root(&self.storage_root_path())?,
         };
 
         let mut included_delayed_transactions = vec![];
@@ -569,6 +570,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
         while block_in_progress.has_tx() {
             let operation = block_in_progress.pop_tx().ok_or(error::Error::Reboot)?;
             let is_delayed = operation.is_delayed();
+
+            let context = &block_constants.context;
+
+            let level = block_constants.level;
+            let now = block_in_progress.timestamp;
+            let block_ctx = BlockCtx {
+                level: &level,
+                now: &now,
+                chain_id: &self.chain_id,
+            };
 
             let applied_operation = match operation.content {
                 TezlinkContent::Tezos(operation) => {
@@ -586,7 +597,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                         match tezos_execution::validate_and_apply_operation(
                             host,
                             registry,
-                            &context,
+                            context,
                             hash.clone(),
                             operation,
                             &block_ctx,
@@ -622,7 +633,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
 
                     let deposit_result =
-                        execute_tezlink_deposit(host, &context, &deposit)?;
+                        execute_tezlink_deposit(host, context, &deposit)?;
 
                     let source =
                         PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
@@ -669,7 +680,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
         // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(
-            level,
+            block_constants.level,
             block_in_progress.timestamp,
             block_in_progress.parent_hash,
             block_in_progress.cumulative_receipts,
