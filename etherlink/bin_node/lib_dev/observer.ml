@@ -117,6 +117,7 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
 
 let on_next_block_info timestamp number =
   let open Lwt_result_syntax in
+  Broadcast.notify_next_block_info timestamp number ;
   let*! () = Events.next_block_info timestamp number in
   let* () = Evm_context.next_block_info timestamp number in
   return_unit
