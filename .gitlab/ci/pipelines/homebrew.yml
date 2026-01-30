@@ -43,7 +43,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-bcfcb772
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -69,7 +69,7 @@ oc.build-homebrew-formula:
     CARGO_NET_OFFLINE: "false"
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-07a4c8c9
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-bcfcb772
   stage: build
   tags:
   - gcp
