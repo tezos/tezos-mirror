@@ -10082,6 +10082,7 @@ let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
       message
   in
   let* () = bake_for client in
+  let* published_level = Node.get_level node in
   let dal_node_endpoint =
     Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
   in
@@ -10124,29 +10125,49 @@ let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
       "The consensus power of the tz4 accounts is not sufficient to ensure \
        that the ability to read inside the aggregated attestations is required \
        for the slot to be protocol attested." ;
-  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-  match metadata.dal_attestation with
-  | None ->
-      Test.fail
-        "Field dal_attestation in block headers is mandatory when DAL is \
-         activated"
-  | Some str ->
-      let number_of_lags = List.length dal_parameters.attestation_lags in
-      let bitset =
-        (Dal.Slot_availability.decode protocol dal_parameters str).(number_of_lags
-                                                                    - 1)
-      in
-      let attested_count =
-        Array.fold_left (fun acc b -> if b then acc + 1 else acc) 0 bitset
-      in
-      Check.((attested_count = 1) ~__LOC__ int)
-        ~error_msg:
-          "There should be only one slot DAL attested at protocol level. Got \
-           %L." ;
-      Check.is_true
-        bitset.(slot_index)
-        ~__LOC__
-        ~error_msg:"Slot was supposed to be protocol attested." ;
+  let check_at_level ~level ~lag ~lag_index =
+    let* metadata =
+      Node.RPC.(
+        call node @@ get_chain_block_metadata ~block:(string_of_int level) ())
+    in
+    match metadata.dal_attestation with
+    | None ->
+        Test.fail
+          "Field dal_attestation in block headers is mandatory when DAL is \
+           activated"
+    | Some str ->
+        let bitset =
+          (Dal.Slot_availability.decode protocol dal_parameters str).(lag_index)
+        in
+        let attested_count =
+          Array.fold_left (fun acc b -> if b then acc + 1 else acc) 0 bitset
+        in
+        Log.info
+          "Check dal_attestation at level=%d (lag=%d, lag_index=%d): \
+           attested_count=%d slot[%d]=%b"
+          level
+          lag
+          lag_index
+          attested_count
+          slot_index
+          bitset.(slot_index) ;
+        return (attested_count = 1 && bitset.(slot_index))
+  in
+  let lags = dal_parameters.attestation_lags in
+  let* results =
+    Lwt_list.mapi_s
+      (fun lag_index lag ->
+        let attested_level = published_level + lag in
+        check_at_level ~level:attested_level ~lag ~lag_index)
+      lags
+  in
+  if List.exists Fun.id results then unit
+  else
+    Test.fail
+      "Slot was NOT protocol attested at any expected attested level \
+       (published_level=%d, lags=%s)"
+      published_level
+      (String.concat "," (List.map string_of_int lags))
       unit
 
 let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
