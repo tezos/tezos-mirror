@@ -33,12 +33,11 @@ use tezos_crypto_rs::hash::HashTrait;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{
-    TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
+    TransactionHash, TransactionObject, TransactionType, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
-use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::context::Context;
@@ -69,26 +68,6 @@ pub struct TransactionReceiptInfo {
     pub overall_gas_used: U256,
 }
 
-/// Details about the original transaction.
-///
-/// See <https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash>
-/// for more details.
-#[derive(Debug)]
-pub struct TransactionObjectInfo {
-    pub from: H160,
-    /// Gas provided by the sender
-    pub gas: U256,
-    /// Gas price provided by the sender
-    pub gas_price: U256,
-    pub hash: TransactionHash,
-    pub input: Vec<u8>,
-    pub nonce: u64,
-    pub to: Option<H160>,
-    pub index: u32,
-    pub value: U256,
-    pub signature: Option<TxSignature>,
-}
-
 #[inline(always)]
 #[allow(clippy::too_many_arguments)]
 fn make_receipt_info(
@@ -114,13 +93,14 @@ fn make_receipt_info(
 }
 
 #[inline(always)]
-fn make_object_info(
+fn make_object(
+    block_number: U256,
     transaction: &Transaction,
     from: H160,
     index: u32,
     fee_updates: &FeeUpdates,
-) -> Result<TransactionObjectInfo, anyhow::Error> {
-    let (gas, gas_price) = match &transaction.content {
+) -> Result<TransactionObject, anyhow::Error> {
+    let (gas_used, gas_price) = match &transaction.content {
         TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
@@ -131,9 +111,10 @@ fn make_object_info(
         }
     };
 
-    Ok(TransactionObjectInfo {
+    Ok(TransactionObject {
+        block_number,
         from,
-        gas,
+        gas_used,
         gas_price,
         hash: transaction.tx_hash,
         input: transaction.data(),
@@ -240,7 +221,6 @@ pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
 pub struct TransactionResult {
     pub caller: H160,
     pub execution_outcome: ExecutionOutcome,
-    pub gas_used: U256,
     pub estimated_ticks_used: u64,
     pub runtime: RuntimeId,
 }
@@ -435,12 +415,9 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let gas_used = execution_outcome.result.gas_used().into();
-
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
-        gas_used,
         estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
@@ -663,14 +640,11 @@ fn apply_fa_deposit<Host: Runtime>(
         tracer_input,
     )?;
 
-    let gas_used = execution_outcome.result.gas_used().into();
-
     let transaction_result = TransactionResult {
         // A specific address is allocated for queue call
         // System address can only be used as caller for simulations
         caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
         execution_outcome,
-        gas_used,
         estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
@@ -683,9 +657,8 @@ pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
 
 pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
-    pub object_info: TransactionObjectInfo,
+    pub tx_object: TransactionObject,
     pub estimated_ticks_used: u64,
-    pub execution_gas_used: U256,
     pub runtime: RuntimeId,
 }
 
@@ -718,16 +691,17 @@ pub fn handle_transaction_result<Host: Runtime>(
     let TransactionResult {
         caller,
         mut execution_outcome,
-        gas_used,
         estimated_ticks_used: ticks_used,
         runtime,
     } = transaction_result;
 
     let to = transaction.to()?;
 
+    let gas_used = execution_outcome.result.gas_used();
+
     let fee_updates = transaction
         .content
-        .fee_updates(&block_constants.block_fees, gas_used);
+        .fee_updates(&block_constants.block_fees, gas_used.into());
 
     log!(
         host,
@@ -735,12 +709,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         "Transaction executed, outcome: {:?}",
         execution_outcome
     );
-    log!(
-        host,
-        Benchmarking,
-        "gas_used: {:?}",
-        execution_outcome.result.gas_used()
-    );
+    log!(host, Benchmarking, "gas_used: {:?}", gas_used);
     log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
     for message in execution_outcome.withdrawals.drain(..) {
         match message {
@@ -761,7 +730,13 @@ pub fn handle_transaction_result<Host: Runtime>(
         fee_updates.apply(host, caller, sequencer_pool_address)?;
     }
 
-    let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
+    let tx_object = make_object(
+        block_constants.number,
+        transaction,
+        caller,
+        index,
+        &fee_updates,
+    )?;
 
     let receipt_info = make_receipt_info(
         transaction.tx_hash,
@@ -776,9 +751,8 @@ pub fn handle_transaction_result<Host: Runtime>(
 
     Ok(ExecutionInfo {
         receipt_info,
-        object_info,
+        tx_object,
         estimated_ticks_used: ticks_used,
-        execution_gas_used: gas_used,
         runtime,
     })
 }
@@ -910,7 +884,6 @@ pub fn apply_transaction<Host: Runtime>(
                             },
                             withdrawals: vec![],
                         },
-                        gas_used: U256::zero(),
                         estimated_ticks_used: 0,
                         runtime: RuntimeId::Tezos,
                     }))
