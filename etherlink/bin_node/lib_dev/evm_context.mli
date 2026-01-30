@@ -194,7 +194,9 @@ val next_block_info :
 (** [execute_single_transaction transaction hash] executes
     a single Ethereum transaction within the current future block state.
     Returns the execution outcome as [Transaction_receipt.t].
-    Can be None if single execution was locked by a divergence or stream startup. *)
+    Returns [None] if instant confirmation is disabled.
+    Returns an error if called while awaiting block info, as this indicates
+    a bug in the caller. *)
 val execute_single_transaction :
   Broadcast.transaction ->
   Ethereum_types.hash ->
