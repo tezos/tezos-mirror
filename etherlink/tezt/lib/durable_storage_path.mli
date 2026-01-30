@@ -84,6 +84,9 @@ val sequencer : path
 (** [sequencer_pool_address] is the path to the L2 address credited with DA fees. *)
 val sequencer_pool_address : path
 
+(** [dal_publishers_whitelist] is the path to the whitelist of authorized DAL publishers. *)
+val dal_publishers_whitelist : path
+
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
 

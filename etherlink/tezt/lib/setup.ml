@@ -287,7 +287,8 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
-    ?evm_version ?with_runtimes ~sequencer ~preimages_dir ~kernel protocol () =
+    ?dal_publishers_whitelist ?evm_version ?with_runtimes ~sequencer
+    ~preimages_dir ~kernel protocol () =
   let output_config = Temp.file "config.yaml" in
   let tez_bootstrap_accounts =
     (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
@@ -297,6 +298,16 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
   (* Legacy DAL signals are used until Tallinn (which is protocol 024) *)
   let disable_legacy_dal_signals =
     Protocol.number protocol > 024 && enable_dal
+  in
+  (* For protocols after Tallinn, default to whitelisting bootstrap1 (the rollup node operator)
+     unless explicitly overridden by the test *)
+  let dal_publishers_whitelist =
+    match dal_publishers_whitelist with
+    | Some wl -> Some wl
+    | None ->
+        if Protocol.number protocol > 024 && enable_dal then
+          Some [Constant.bootstrap1.public_key_hash]
+        else None
   in
   let*! () =
     Evm_node.make_kernel_installer_config
@@ -318,6 +329,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
+      ?dal_publishers_whitelist
       ~disable_legacy_dal_signals
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
@@ -483,8 +495,9 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     ?max_delayed_inbox_blueprint_length ~mainnet_compat ~sequencer
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~preimages_dir ~kernel
-    ?evm_version ?with_runtimes ~client protocol () =
+    ?dal_publishers_whitelist ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ~preimages_dir ~kernel ?evm_version ?with_runtimes ~client
+    protocol () =
   if not enable_multichain then (
     assert (List.length l2_chains = 1) ;
     let chain_config = List.hd l2_chains in
@@ -504,6 +517,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
+      ?dal_publishers_whitelist
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts:chain_config.Evm_node.eth_bootstrap_accounts
       ?tez_bootstrap_accounts:chain_config.Evm_node.tez_bootstrap_accounts
@@ -550,10 +564,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
-    ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
-    ?history_mode ?spawn_rpc ?periodic_snapshot_path ?(signatory = false)
-    ?tx_queue ?(sequencer_sunset_sec = 0) ?with_runtimes ?instant_confirmations
-    protocol =
+    ~enable_dal ?dal_slots ?dal_publishers_whitelist ~enable_multichain
+    ~l2_chains ?rpc_server ?websockets ?history_mode ?spawn_rpc
+    ?periodic_snapshot_path ?(signatory = false) ?tx_queue
+    ?(sequencer_sunset_sec = 0) ?with_runtimes ?instant_confirmations protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -646,6 +660,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?dal_slots
+      ?dal_publishers_whitelist
       ~enable_multichain
       ~l2_chains
       ?evm_version
@@ -900,10 +915,10 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?challenge_window ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
-    ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
-    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
-    ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body ~title
-    ~tags protocols =
+    ?dal_publishers_whitelist ~enable_multichain ~l2_setups ?rpc_server
+    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?signatory ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body
+    ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -966,6 +981,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?history_mode
         ~enable_dal
         ?dal_slots
+        ?dal_publishers_whitelist
         ~enable_multichain
         ~l2_chains
         ?rpc_server
@@ -1023,10 +1039,11 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?commitment_period ?challenge_window ?uses ?additional_uses
-    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
-    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
-    ?signatory ?l2_setups ?sequencer_sunset_sec ?with_runtimes
-    ?instant_confirmations body ~title ~tags protocols =
+    ?rollup_history_mode ~enable_dal ?dal_slots ?dal_publishers_whitelist
+    ~enable_multichain ?rpc_server ?websockets ?history_mode ?tx_queue
+    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
+    ?sequencer_sunset_sec ?with_runtimes ?instant_confirmations body ~title
+    ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -1066,6 +1083,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rollup_history_mode
     ~enable_dal
     ?dal_slots
+    ?dal_publishers_whitelist
     ~enable_multichain
     ?rpc_server
     ?websockets
@@ -1095,10 +1113,10 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
     ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
-    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?history_mode ?tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec
-    ?instant_confirmations ~title ~tags body protocols =
+    ?dal_publishers_whitelist ~enable_multichain ?rpc_server ?websockets
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode ?tx_queue
+    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
+    ?sequencer_sunset_sec ?instant_confirmations ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -1139,6 +1157,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?rollup_history_mode
         ~enable_dal
         ?dal_slots
+        ?dal_publishers_whitelist
         ~enable_multichain
         ?tx_queue
         ?spawn_rpc
