@@ -63,14 +63,13 @@ module Delegate_sampler_state = struct
 
   let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
 
+  (* that's symbolic: 1 cycle = 1 entry *)
+  let size = 1
+
   let init ctxt cycle sampler_state =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
     let* ctxt = Storage.Delegate_sampler_state.init ctxt cycle sampler_state in
-    let size =
-      1
-      (* that's symbolic: 1 cycle = 1 entry *)
-    in
     let*? ctxt = Cache.update ctxt id (Some (sampler_state, size)) in
     return ctxt
 
@@ -81,6 +80,7 @@ module Delegate_sampler_state = struct
     match v_opt with
     | None ->
         let* v = Storage.Delegate_sampler_state.get ctxt cycle in
+        let*? ctxt = Cache.update ctxt id (Some (v, size)) in
         return (ctxt, v)
     | Some v -> return (ctxt, v)
 
