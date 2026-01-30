@@ -2221,6 +2221,7 @@ module Receipt : sig
     | Block_fees : Tez.t balance
     | Deposits : frozen_staker -> Tez.t balance
     | Unstaked_deposits : unstaked_frozen_staker * Cycle.t -> Tez.t balance
+    | CLST_deposits : Tez.t balance
     | Nonce_revelation_rewards : Tez.t balance
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
@@ -4631,6 +4632,12 @@ module Address_registry : sig
   end
 end
 
+module Clst : sig
+  (** [total_amount_of_tez ctxt] returns the total amount of tez available for
+      staking in the CLST contract. *)
+  val total_amount_of_tez : context -> Tez.t tzresult Lwt.t
+end
+
 (** See {!Block_payload_repr}. *)
 module Block_payload : sig
   (** See {!Block_payload_repr.hash}. *)
@@ -5742,6 +5749,7 @@ module Token : sig
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Frozen_deposits of Receipt.frozen_staker
     | `Unstaked_frozen_deposits of Receipt.unstaked_frozen_staker * Cycle.t
+    | `CLST_deposits
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 

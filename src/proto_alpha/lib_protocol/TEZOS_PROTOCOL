@@ -169,6 +169,7 @@
         "Adaptive_issuance_costs",
         "Contract_delegate_storage",
         "Stake_storage",
+        "Clst_storage",
         "Unstaked_frozen_deposits_storage",
         "Pending_denunciations_storage",
         "Unstake_requests_storage",
@@ -277,7 +278,7 @@
         "Ticket_accounting",
         "Ticket_transfer",
 
-        "Clst_storage",
+        "Clst_contract_storage",
         "Script_interpreter_defs",
         "Script_native",
         "Script_interpreter",

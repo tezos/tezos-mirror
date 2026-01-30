@@ -508,6 +508,10 @@ module Address_registry = struct
   include Address_registry_storage
 end
 
+module Clst = struct
+  let total_amount_of_tez = Storage.Clst.Deposits_balance.get
+end
+
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map
 

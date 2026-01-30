@@ -60,6 +60,7 @@ type execution_result = {
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
   address_registry_diff : Address_registry.diff list;
+  balance_updates : Receipt.balance_updates;
 }
 
 type step_constants = Script_typed_ir.step_constants = {

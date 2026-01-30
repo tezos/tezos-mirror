@@ -30,5 +30,9 @@ val execute :
   ('arg, 'storage) kind ->
   'arg ->
   'storage ->
-  ((Script_typed_ir.operation Script_list.t, 'storage) pair * context) tzresult
+  ((Script_typed_ir.operation Script_list.t
+   * 'storage
+   * Receipt.balance_updates)
+  * context)
+  tzresult
   Lwt.t

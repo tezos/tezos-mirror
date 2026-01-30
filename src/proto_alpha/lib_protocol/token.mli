@@ -65,6 +65,7 @@ type container =
   | `Unstaked_frozen_deposits of Unstaked_frozen_staker_repr.t * Cycle_repr.t
     (** Frozen tokens of a contract that have been unstaked at the
         given cycle. *)
+  | `CLST_deposits  (** Frozen tokens deposited through the CLST contract. *)
   | `Block_fees  (** Current block's fees collection *)
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t
     (** Frozen tokens of a contract for bond deposits (currently used by rollups) *)

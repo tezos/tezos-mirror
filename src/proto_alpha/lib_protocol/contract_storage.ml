@@ -968,6 +968,20 @@ module For_RPC = struct
     | None -> return_none
     | Some (_, amount) -> return_some amount
 
+  let if_contract_is_clst ctxt f =
+    let open Lwt_result_syntax in
+    function
+    | Contract_repr.Implicit _ -> return_none
+    | Originated contract_hash ->
+        (* Note: it would probably make sense to put this contract hash in cache
+           at some point, to avoid fetching it too much. Irmin / Brassaia's
+           cache should already have in its own cache nevertheless. *)
+        let* clst_hash = Storage.Contract.Native_contracts.CLST.get ctxt in
+        if Contract_hash.equal contract_hash clst_hash then
+          let* amount = f ctxt in
+          return_some amount
+        else return_none
+
   let get_full_balance ctxt contract =
     let open Lwt_result_syntax in
     let* balance_n_frozen = get_balance_and_frozen_bonds ctxt contract in
@@ -977,9 +991,16 @@ module For_RPC = struct
     let u_frozen, u_final =
       Option.value ~default:(Tez_repr.zero, Tez_repr.zero) us
     in
+    let* clst_deposits_balance =
+      if_contract_is_clst ctxt Storage.Clst.Deposits_balance.get contract
+    in
+    let clst_deposits_balance =
+      Option.value ~default:Tez_repr.zero clst_deposits_balance
+    in
     Tez_repr.(
       let*? x = balance_n_frozen +? staked in
       let*? y = u_frozen +? x in
       let*? z = u_final +? y in
-      return z)
+      let*? with_clst_deposits = z +? clst_deposits_balance in
+      return with_clst_deposits)
 end

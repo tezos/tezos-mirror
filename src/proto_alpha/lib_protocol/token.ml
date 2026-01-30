@@ -28,6 +28,7 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Frozen_deposits of Frozen_staker_repr.t
   | `Unstaked_frozen_deposits of Unstaked_frozen_staker_repr.t * Cycle_repr.t
+  | `CLST_deposits
   | `Block_fees
   | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
@@ -118,6 +119,11 @@ let credit ctxt receiver amount origin =
                 amount
             in
             (ctxt, Unstaked_deposits (staker, cycle))
+        | `CLST_deposits ->
+            let+ ctxt =
+              Clst_storage.increase_deposit_only_call_from_token ctxt amount
+            in
+            (ctxt, CLST_deposits)
         | `Block_fees ->
             let*? ctxt =
               Raw_context.credit_collected_fees_only_call_from_token ctxt amount
@@ -193,6 +199,11 @@ let spend ctxt giver amount origin =
                 amount
             in
             (ctxt, Unstaked_deposits (staker, cycle))
+        | `CLST_deposits ->
+            let+ ctxt =
+              Clst_storage.decrease_deposit_only_call_from_token ctxt amount
+            in
+            (ctxt, CLST_deposits)
         | `Block_fees ->
             let*? ctxt =
               Raw_context.spend_collected_fees_only_call_from_token ctxt amount
@@ -262,7 +273,8 @@ module Internal_for_tests = struct
     | `Collected_commitments bpkh ->
         let*! allocated = Commitment_storage.exists ctxt bpkh in
         return (ctxt, allocated)
-    | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees ->
+    | `Frozen_deposits _ | `Unstaked_frozen_deposits _ | `Block_fees
+    | `CLST_deposits ->
         return (ctxt, true)
     | `Frozen_bonds (contract, bond_id) ->
         Contract_storage.bond_allocated ctxt contract bond_id

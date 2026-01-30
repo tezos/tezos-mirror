@@ -439,6 +439,7 @@ let pp_balance_updates ppf balance_updates =
                 staker
                 Cycle.pp
                 cycle
+          | CLST_deposits -> Format.asprintf "clst deposits"
           | Nonce_revelation_rewards -> "nonce revelation rewards"
           | Attesting_rewards -> "attesting rewards"
           | Baking_rewards -> "baking rewards"

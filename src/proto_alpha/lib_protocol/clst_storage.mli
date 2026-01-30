@@ -5,44 +5,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-open Script_native_types
-open Script_typed_ir
+(** Abstraction for low level storage to handle CLST deposits, unstake requests
+    and finalization.
 
-(** [token_id] is the token identifier of CLST, being 0 by default for FA2
-    single asset contracts. *)
-val token_id : CLST_types.nat
+    This module is responsible for maintaining the
+    {!Storage.Clst.Deposits_balance} table.
+*)
 
-(** [get_storage ctxt] returns the storage retrieved and parsed from the
-    context. It doesn't fail if the storage didn't exist in the context, i.e.
-    the CLST contract has not been originated. *)
-val get_storage :
-  context -> (CLST_types.storage option * context) tzresult Lwt.t
+(** [increase_deposit_only_call_from_token ctxt amount] increases the deposited
+    amount of tez in the CLST contract. Such amount is considered frozen and not
+    spendable. *)
+val increase_deposit_only_call_from_token :
+  Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [get_balance_from_storage ctxt storage address] returns the balance from the
-    given address, extracted from the CLST contract's storage. Returns `zero_n`
-    if no balance has been found, following FA2.1 specification. *)
-val get_balance_from_storage :
-  context ->
-  CLST_types.storage ->
-  address ->
-  (CLST_types.nat * context) tzresult Lwt.t
-
-(** [get_balance context contract] retrieves the balance of a given contract on
-    the CLST contract. This is a combination of `get_storage` and
-    `get_balance_from_storage`. *)
-val get_balance :
-  context -> Contract.t -> (CLST_types.nat * context) tzresult Lwt.t
-
-(** [set_balance_from_storage ctxt storage address amount] updates the balance of the
-    given address to [amount]. *)
-val set_balance_from_storage :
-  context ->
-  CLST_types.storage ->
-  address ->
-  CLST_types.nat ->
-  (CLST_types.storage * context) tzresult Lwt.t
-
-(** [get_total_supply context] returns the total supply of CLST tokens
-    in the CLST contract. *)
-val get_total_supply : context -> (CLST_types.nat * context) tzresult Lwt.t
+(** [decrease_deposit_only_call_from_token ctxt amount] decreases the deposited
+    amount of tez in the CLST contract. *)
+val decrease_deposit_only_call_from_token :
+  Raw_context.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t

@@ -606,6 +606,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
            ticket_diffs;
            ticket_receipt;
            address_registry_diff;
+           balance_updates = balance_updates_from_contract;
          },
          ctxt ) =
     execute
@@ -651,6 +652,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
       (updated_script, updated_cached_script)
       updated_size
   in
+  let balance_updates = balance_updates @ balance_updates_from_contract in
   let result =
     Transaction_to_contract_result
       {
@@ -2957,6 +2959,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                      ticket_diffs;
                      ticket_receipt;
                      address_registry_diff;
+                     balance_updates = balance_updates_from_contract;
                    },
                    ctxt ) =
               Script_interpreter.execute_with_typed_parameter
@@ -3013,6 +3016,9 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                     cache_key
                     (updated_script, updated_cached_script)
                     updated_size
+                in
+                let balance_updates =
+                  balance_updates @ balance_updates_from_contract
                 in
                 let result =
                   Transaction_result

@@ -362,6 +362,27 @@ let assert_equal_list_opt ~loc eq msg pp =
     msg
     (Format.pp_print_option (pp_print_list pp))
 
+(** [assert_is_subset_list ~loc eq msg pp l1 l2] checks that l1 is a subset of
+    l2: all items from l1 must be present in l2, in the same order. *)
+let assert_is_subset_list ~loc eq msg pp l1 l2 =
+  let rec is_subset l1 l2 =
+    match (l1, l2) with
+    | [], _ -> true
+    | h1 :: l1', h2 :: l2' ->
+        if eq h1 h2 then is_subset l1' l2' else is_subset (h1 :: l1') l2'
+    | _ :: _, [] -> false
+  in
+  if not (is_subset l1 l2) then
+    failwith
+      "@[@[[%s]@] - @[%s : %a is not a subset of %a@]@]"
+      loc
+      msg
+      (pp_print_list pp)
+      l1
+      (pp_print_list pp)
+      l2
+  else Lwt_result_syntax.return_unit
+
 (** Checks that both lists have the same elements, not taking the
     order of these elements into account, but taking their
     multiplicity into account. *)

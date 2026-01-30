@@ -418,11 +418,11 @@ module S = struct
           Contract.get_clst_contract_hash ctxt) ;
       register1 ~chunked:false balance_service (fun ctxt contract () () ->
           let open Lwt_result_syntax in
-          let* balance, _ = Clst_storage.get_balance ctxt contract in
+          let* balance, _ = Clst_contract_storage.get_balance ctxt contract in
           return balance) ;
       register0 ~chunked:false total_supply_service (fun ctxt () () ->
           let open Lwt_result_syntax in
-          let* total_supply, _ = Clst_storage.get_total_supply ctxt in
+          let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
           return total_supply)
   end
 end

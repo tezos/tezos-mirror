@@ -25,7 +25,9 @@ module CLST_contract = struct
 
   let execute_deposit (ctxt, (step_constants : Script_typed_ir.step_constants))
       (() : deposit) (storage : storage) :
-      ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
+      ((operation Script_list.t * storage * Receipt.balance_updates) * context)
+      tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
     let*? () = error_when Tez.(step_constants.amount = zero) Empty_transfer in
     let*? () =
@@ -37,7 +39,7 @@ module CLST_contract = struct
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
     let* amount, ctxt =
-      Clst_storage.get_balance_from_storage ctxt storage address
+      Clst_contract_storage.get_balance_from_storage ctxt storage address
     in
     let added_amount =
       Tez.to_mutez step_constants.amount
@@ -45,15 +47,28 @@ module CLST_contract = struct
     in
     let new_amount = Script_int.(add_n added_amount amount) in
     let* new_storage, ctxt =
-      Clst_storage.set_balance_from_storage ctxt storage address new_amount
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        address
+        new_amount
     in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.add_n total_supply added_amount in
-    return ((Script_list.empty, (new_ledger, total_supply)), ctxt)
+    let* ctxt, balance_updates =
+      Clst_contract_storage.deposit_to_clst_deposits
+        ctxt
+        ~clst_contract_hash:step_constants.self
+        step_constants.amount
+    in
+    return
+      ((Script_list.empty, (new_ledger, total_supply), balance_updates), ctxt)
 
   let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
       (amount : withdraw) (storage : storage) :
-      ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
+      ((operation Script_list.t * storage * Receipt.balance_updates) * context)
+      tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
     let*? () =
       error_when
@@ -80,7 +95,7 @@ module CLST_contract = struct
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
     let* current_amount, ctxt =
-      Clst_storage.get_balance_from_storage ctxt storage address
+      Clst_contract_storage.get_balance_from_storage ctxt storage address
     in
     let* removed_amount =
       if Compare.Int.(Script_int.compare current_amount amount < 0) then
@@ -89,11 +104,21 @@ module CLST_contract = struct
     in
     let new_amount = Script_int.(abs (sub current_amount removed_amount)) in
     let* new_storage, ctxt =
-      Clst_storage.set_balance_from_storage ctxt storage address new_amount
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        address
+        new_amount
     in
     let amount_tez =
       Tez.of_mutez_exn
         (Option.value ~default:0L (Script_int.to_int64 removed_amount))
+    in
+    let* ctxt, balance_updates =
+      Clst_contract_storage.withdraw_from_clst_deposits
+        ctxt
+        ~clst_contract_hash:step_constants.self
+        amount_tez
     in
     let gas_counter, outdated_ctxt =
       Local_gas_counter.local_gas_counter_and_outdated_context ctxt
@@ -110,7 +135,9 @@ module CLST_contract = struct
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.(abs (sub total_supply removed_amount)) in
-    return ((Script_list.of_list [op], (new_ledger, total_supply)), ctxt)
+    return
+      ( (Script_list.of_list [op], (new_ledger, total_supply), balance_updates),
+        ctxt )
 
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
@@ -126,8 +153,10 @@ module CLST_contract = struct
       let implementation (ctxt, _step_constants) ((address : address), token_id)
           (storage : storage) =
         let open Lwt_result_syntax in
-        if Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
-        then Clst_storage.get_balance_from_storage ctxt storage address
+        if
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
+        then Clst_contract_storage.get_balance_from_storage ctxt storage address
         else return (Script_int.zero_n, ctxt)
       in
       return (Ex_view {name; ty; implementation})
@@ -150,7 +179,8 @@ module CLST_contract = struct
           (_storage : storage) =
         let open Lwt_result_syntax in
         let is_token =
-          Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
         in
         return (is_token, ctxt)
       in
@@ -184,7 +214,9 @@ let get_views : type arg storage.
 
 let execute (type arg storage) (ctxt, step_constants)
     (kind : (arg, storage) kind) (arg : arg) (storage : storage) :
-    ((operation Script_list.t, storage) pair * context, error trace) result
+    ( (operation Script_list.t * storage * Receipt.balance_updates) * context,
+      error trace )
+    result
     Lwt.t =
   match kind with
   | CLST_kind -> CLST_contract.execute (ctxt, step_constants) arg storage

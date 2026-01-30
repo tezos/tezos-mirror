@@ -1539,6 +1539,21 @@ module Stake = struct
   module Selected_bakers = Cycle.Selected_bakers
 end
 
+module Clst = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["clst"]
+      end)
+
+  module Deposits_balance =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["deposits"]
+      end)
+      (Tez_repr)
+end
+
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
