@@ -310,11 +310,11 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
-    ?enable_revm ?enable_dal ?dal_slots ?disable_legacy_dal_signals
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?enable_multichain
-    ?set_account_code ?max_delayed_inbox_blueprint_length ?evm_version
-    ?(with_runtimes = []) ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output
-    () =
+    ?enable_revm ?enable_dal ?dal_slots ?dal_publishers_whitelist
+    ?disable_legacy_dal_signals ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
+    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
+    ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -443,6 +443,34 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
         ~path_prefix:["evm"; "world_state"; "feature_flags"]
         enable_fast_fa_withdrawal
     @ make_instr ~convert:decimal_list_to_bytes dal_slots
+    @ make_instr
+        ~convert:(fun s ->
+          let open Evm_node_lib_dev_encoding.Rlp in
+          let pkh_list =
+            if String.trim s = "" then [] else String.split_on_char ',' s
+          in
+          let encoded_list =
+            List.map
+              (fun pkh_str ->
+                let pkh_str = String.trim pkh_str in
+                (* Decode base58check to get the PublicKeyHash *)
+                let pkh =
+                  Tezos_crypto.Signature.Public_key_hash.of_b58check_exn pkh_str
+                in
+                (* Encode to binary using Data_encoding *)
+                let binary =
+                  Data_encoding.Binary.to_bytes_exn
+                    Tezos_crypto.Signature.Public_key_hash.encoding
+                    pkh
+                in
+                (* Store as binary bytes in RLP *)
+                Value binary)
+              pkh_list
+          in
+          (* RLP-encode the list *)
+          let rlp_item = List encoded_list in
+          Bytes.to_string (encode rlp_item))
+        dal_publishers_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_multichain
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
