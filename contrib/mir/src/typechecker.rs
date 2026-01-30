@@ -861,7 +861,8 @@ pub(crate) fn typecheck_instruction<'a>(
         };
     }
 
-    Ok(match (i, stack.as_slice()) {
+    let stack_slice = stack.as_slice();
+    Ok(match (i, stack_slice.as_slice()) {
         (
             micheline_types!() | micheline_literals!() | micheline_fields!() | micheline_values!(),
             _,
@@ -1237,7 +1238,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Gt
         }
-        (App(GT, [], _), [.., t]) => no_overload!(GT, TypesNotEqual(T::Int, t.clone())),
+        (App(GT, [], _), [.., t]) => no_overload!(GT, TypesNotEqual(T::Int, (*t).clone())),
         (App(GT, [], _), []) => no_overload!(GT, len 1),
         (App(GT, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1245,7 +1246,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Ge
         }
-        (App(GE, [], _), [.., t]) => no_overload!(GE, TypesNotEqual(T::Int, t.clone())),
+        (App(GE, [], _), [.., t]) => no_overload!(GE, TypesNotEqual(T::Int, (*t).clone())),
         (App(GE, [], _), []) => no_overload!(GE, len 1),
         (App(GE, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1253,7 +1254,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Eq
         }
-        (App(EQ, [], _), [.., t]) => no_overload!(EQ, TypesNotEqual(T::Int, t.clone())),
+        (App(EQ, [], _), [.., t]) => no_overload!(EQ, TypesNotEqual(T::Int, (*t).clone())),
         (App(EQ, [], _), []) => no_overload!(EQ, len 1),
         (App(EQ, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1261,7 +1262,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Neq
         }
-        (App(NEQ, [], _), [.., t]) => no_overload!(NEQ, TypesNotEqual(T::Int, t.clone())),
+        (App(NEQ, [], _), [.., t]) => no_overload!(NEQ, TypesNotEqual(T::Int, (*t).clone())),
         (App(NEQ, [], _), []) => no_overload!(NEQ, len 1),
         (App(NEQ, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1269,7 +1270,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Le
         }
-        (App(LE, [], _), [.., t]) => no_overload!(LE, TypesNotEqual(T::Int, t.clone())),
+        (App(LE, [], _), [.., t]) => no_overload!(LE, TypesNotEqual(T::Int, (*t).clone())),
         (App(LE, [], _), []) => no_overload!(LE, len 1),
         (App(LE, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1277,7 +1278,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = T::Bool;
             I::Lt
         }
-        (App(LT, [], _), [.., t]) => no_overload!(LT, TypesNotEqual(T::Int, t.clone())),
+        (App(LT, [], _), [.., t]) => no_overload!(LT, TypesNotEqual(T::Int, (*t).clone())),
         (App(LT, [], _), []) => no_overload!(LT, len 1),
         (App(LT, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1294,7 +1295,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::If(nested_t, nested_f)
         }
         (App(IF, [Seq(_), Seq(_)], _), [.., t]) => {
-            no_overload!(IF, TypesNotEqual(T::Bool, t.clone()))
+            no_overload!(IF, TypesNotEqual(T::Bool, (*t).clone()))
         }
         (App(IF, [Seq(_), Seq(_)], _), []) => no_overload!(IF, len 1),
         (App(IF, expect_args!(2 seq), _), _) => unexpected_micheline!(),
@@ -1313,7 +1314,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::IfNone(when_none, when_some)
         }
         (App(IF_NONE, [Seq(_), Seq(_)], _), [.., t]) => {
-            no_overload!(IF_NONE, NMOR::ExpectedOption(t.clone()))
+            no_overload!(IF_NONE, NMOR::ExpectedOption((*t).clone()))
         }
         (App(IF_NONE, [Seq(_), Seq(_)], _), []) => no_overload!(IF_NONE, len 1),
         (App(IF_NONE, expect_args!(2 seq), _), _) => unexpected_micheline!(),
@@ -1333,7 +1334,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::IfCons(when_cons, when_nil)
         }
         (App(IF_CONS, [Seq(_), Seq(_)], _), [.., t]) => {
-            no_overload!(IF_CONS, NMOR::ExpectedList(t.clone()))
+            no_overload!(IF_CONS, NMOR::ExpectedList((*t).clone()))
         }
         (App(IF_CONS, [Seq(_), Seq(_)], _), []) => no_overload!(IF_CONS, len 1),
         (App(IF_CONS, expect_args!(2 seq), _), _) => unexpected_micheline!(),
@@ -1353,7 +1354,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::IfLeft(when_left, when_right)
         }
         (App(IF_LEFT, [Seq(_), Seq(_)], _), [.., t]) => {
-            no_overload!(IF_LEFT, NMOR::ExpectedOr(t.clone()))
+            no_overload!(IF_LEFT, NMOR::ExpectedOr((*t).clone()))
         }
         (App(IF_LEFT, [Seq(_), Seq(_)], _), []) => no_overload!(IF_LEFT, len 1),
         (App(IF_LEFT, expect_args!(2 seq), _), _) => unexpected_micheline!(),
@@ -1399,7 +1400,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = Type::Nat;
             I::Abs
         }
-        (App(ABS, [], _), [.., t]) => no_overload!(ABS, TypesNotEqual(T::Int, t.clone())),
+        (App(ABS, [], _), [.., t]) => no_overload!(ABS, TypesNotEqual(T::Int, (*t).clone())),
         (App(ABS, [], _), []) => no_overload!(ABS, len 1),
         (App(ABS, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1407,7 +1408,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack[0] = Type::new_option(Type::Nat);
             I::IsNat
         }
-        (App(ISNAT, [], _), [.., t]) => no_overload!(ISNAT, TypesNotEqual(T::Int, t.clone())),
+        (App(ISNAT, [], _), [.., t]) => no_overload!(ISNAT, TypesNotEqual(T::Int, (*t).clone())),
         (App(ISNAT, [], _), []) => no_overload!(ISNAT, len 1),
         (App(ISNAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1425,7 +1426,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Loop(nested)
         }
         (App(LOOP, [Seq(_)], _), [.., ty]) => {
-            no_overload!(LOOP, TypesNotEqual(T::Bool, ty.clone()))
+            no_overload!(LOOP, TypesNotEqual(T::Bool, (*ty).clone()))
         }
         (App(LOOP, [Seq(_)], _), []) => no_overload!(LOOP, len 1),
         (App(LOOP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
@@ -1444,7 +1445,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::LoopLeft(nested)
         }
         (App(LOOP_LEFT, [Seq(_)], _), [.., ty]) => {
-            no_overload!(LOOP_LEFT, NMOR::ExpectedOr(ty.clone()))
+            no_overload!(LOOP_LEFT, NMOR::ExpectedOr((*ty).clone()))
         }
         (App(LOOP_LEFT, [Seq(_)], _), []) => no_overload!(LOOP_LEFT, len 1),
         (App(LOOP_LEFT, expect_args!(1 seq), _), _) => unexpected_micheline!(),
@@ -1572,7 +1573,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Never
         }
         (App(NEVER, [], _), [.., t]) => {
-            no_overload!(NEVER, TypesNotEqual(T::Never, t.clone()))
+            no_overload!(NEVER, TypesNotEqual(T::Never, (*t).clone()))
         }
         (App(NEVER, [], _), []) => no_overload!(NEVER, len 1),
         (App(NEVER, ..), _) => unexpected_micheline!(),
@@ -1588,7 +1589,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(l);
             I::Car
         }
-        (App(CAR, [], _), [.., ty]) => no_overload!(CAR, NMOR::ExpectedPair(ty.clone())),
+        (App(CAR, [], _), [.., ty]) => no_overload!(CAR, NMOR::ExpectedPair((*ty).clone())),
         (App(CAR, [], _), []) => no_overload!(CAR, len 1),
         (App(CAR, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1597,7 +1598,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(r);
             I::Cdr
         }
-        (App(CDR, [], _), [.., ty]) => no_overload!(CDR, NMOR::ExpectedPair(ty.clone())),
+        (App(CDR, [], _), [.., ty]) => no_overload!(CDR, NMOR::ExpectedPair((*ty).clone())),
         (App(CDR, [], _), []) => no_overload!(CDR, len 1),
         (App(CDR, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1633,7 +1634,7 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(l);
             I::Unpair
         }
-        (App(UNPAIR, [], _), [.., ty]) => no_overload!(UNPAIR, NMOR::ExpectedPair(ty.clone())),
+        (App(UNPAIR, [], _), [.., ty]) => no_overload!(UNPAIR, NMOR::ExpectedPair((*ty).clone())),
         (App(UNPAIR, [], _), []) => no_overload!(UNPAIR, len 1),
         (App(UNPAIR, [Micheline::Int(n)], _), [.., _]) => {
             let n = validate_u10(n)?;
@@ -1714,7 +1715,7 @@ pub(crate) fn typecheck_instruction<'a>(
             pop!();
             I::Cons
         }
-        (App(CONS, [], _), [.., ty, _]) => no_overload!(CONS, NMOR::ExpectedList(ty.clone())),
+        (App(CONS, [], _), [.., ty, _]) => no_overload!(CONS, NMOR::ExpectedList((*ty).clone())),
         (App(CONS, [], _), [] | [_]) => no_overload!(CONS, len 2),
         (App(CONS, expect_args!(0), _), _) => unexpected_micheline!(),
 
@@ -1962,7 +1963,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::Unpack(ty)
         }
         (App(UNPACK, [_], _), [.., ty]) => {
-            no_overload!(UNPACK, TypesNotEqual(T::Bytes, ty.clone()))
+            no_overload!(UNPACK, TypesNotEqual(T::Bytes, (*ty).clone()))
         }
         (App(UNPACK, [_], _), []) => no_overload!(UNPACK, len 1),
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
@@ -2052,7 +2053,7 @@ pub(crate) fn typecheck_instruction<'a>(
             I::HashKey
         }
         (App(HASH_KEY, [], _), [.., t]) => {
-            no_overload!(HASH_KEY, TypesNotEqual(T::Key, t.clone()))
+            no_overload!(HASH_KEY, TypesNotEqual(T::Key, (*t).clone()))
         }
         (App(HASH_KEY, [], _), []) => no_overload!(HASH_KEY, len 1),
         (App(HASH_KEY, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -2066,7 +2067,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     return Err(TcError::NoMatchingOverload {
                         instr: APPLY,
                         stack: stack.clone(),
-                        reason: Option::Some(NMOR::ExpectedPair(t.clone())),
+                        reason: Option::Some(NMOR::ExpectedPair((*t).clone())),
                     });
                 }
             };
@@ -2130,7 +2131,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(SHA3, [], _), [.., T::Bytes]) => I::Sha3,
         (App(SHA512, [], _), [.., T::Bytes]) => I::Sha512,
         (App(prim @ (BLAKE2B | KECCAK | SHA256 | SHA3 | SHA512), [], _), [.., t]) => {
-            no_overload!(*prim, TypesNotEqual(T::Bytes, t.clone()))
+            no_overload!(*prim, TypesNotEqual(T::Bytes, (*t).clone()))
         }
         (App(prim @ (BLAKE2B | KECCAK | SHA256 | SHA3 | SHA512), [], _), []) => {
             no_overload!(*prim, len 1)
@@ -2290,7 +2291,7 @@ pub(crate) fn typecheck_instruction<'a>(
             PAIRING_CHECK,
             TypesNotEqual(
                 T::new_list(T::new_pair(T::Bls12381G1, T::Bls12381G2)),
-                t.clone()
+                (*t).clone()
             )
         ),
         #[cfg(feature = "bls")]
@@ -2488,15 +2489,23 @@ pub fn typecheck_value<'a>(
             TV::new_option(Some(v))
         }
         (T::Option(_), V::App(Prim::None, [], _)) => TV::new_option(None),
-        (T::List(ty), V::Seq(vs)) => TV::List(
+        (T::List(ty), V::Seq(vs)) => TV::List(MichelsonList::from(
             vs.iter()
-                .map(|v| typecheck_value(v, ctx, ty))
-                .collect::<Result<_, TcError>>()?,
-        ),
-        (T::Set(ty), V::Seq(vs)) => TV::Set(typecheck_set(ctx, t, ty, vs)?),
+                .map(|v| typecheck_value(v, ctx, ty).map(Rc::new))
+                .collect::<Result<Vec<_>, TcError>>()?,
+        )),
+        (T::Set(ty), V::Seq(vs)) => {
+            let set = typecheck_set(ctx, t, ty, vs)?;
+            TV::Set(set.into_iter().map(Rc::new).collect())
+        }
         (T::Map(m), V::Seq(vs)) => {
             let (tk, tv) = m.as_ref();
-            TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
+            let map = typecheck_map(ctx, t, tk, tv, vs)?;
+            TV::Map(
+                map.into_iter()
+                    .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                    .collect(),
+            )
         }
         // All valid instantiations of big map are mentioned in
         // https://tezos.gitlab.io/michelson-reference/#type-big_map
@@ -2671,14 +2680,14 @@ pub fn typecheck_value<'a>(
                     Type::new_pair(content_type.clone(), Type::Nat),
                 ),
             ) {
-                Ok(TV::Pair(b)) => {
-                    let address = irrefutable_match!(b.0; TV::Address);
-                    let c = irrefutable_match!(b.1; TV::Pair);
+                Ok(TV::Pair(left, right)) => {
+                    let address = irrefutable_match!(TypedValue::unwrap_rc(left); TV::Address);
+                    irrefutable_match!(TypedValue::unwrap_rc(right); TV::Pair, content, amount);
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
                         content_type: content_type.clone(),
-                        content: c.0,
-                        amount: irrefutable_match!(c.1; TV::Nat),
+                        content: TypedValue::unwrap_rc(content),
+                        amount: irrefutable_match!(TypedValue::unwrap_rc(amount); TV::Nat),
                     })
                 }
                 _ => return Err(invalid_value_for_type!()),
@@ -3007,6 +3016,7 @@ mod typecheck_tests {
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use std::collections::HashMap;
+    use std::rc::Rc;
     use Instruction::*;
     use Option::None;
 
@@ -4938,10 +4948,12 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Set(BTreeSet::from([
-                TypedValue::int(1),
-                TypedValue::int(2)
-            ]))))
+            Ok(Push(TypedValue::Set(
+                [TypedValue::int(1), TypedValue::int(2)]
+                    .into_iter()
+                    .map(Rc::new)
+                    .collect()
+            )))
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
     }
@@ -5013,10 +5025,15 @@ mod typecheck_tests {
                 &mut Gas::default(),
                 &mut stack
             ),
-            Ok(Push(TypedValue::Map(BTreeMap::from([
-                (TypedValue::int(1), TypedValue::String("foo".to_owned())),
-                (TypedValue::int(2), TypedValue::String("bar".to_owned()))
-            ]))))
+            Ok(Push(TypedValue::Map(
+                [
+                    (TypedValue::int(1), TypedValue::String("foo".to_owned())),
+                    (TypedValue::int(2), TypedValue::String("bar".to_owned()))
+                ]
+                .into_iter()
+                .map(|(key, value)| (Rc::new(key), Rc::new(value)))
+                .collect()
+            )))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
     }

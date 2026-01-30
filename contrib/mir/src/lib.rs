@@ -155,7 +155,7 @@ mod tests {
 
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
-    use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
+    use crate::stack::{stk, tc_stk, FailingTypeStack, IStack, Stack, TypeStack};
     use crate::typechecker;
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
@@ -181,7 +181,7 @@ mod tests {
         assert!(ast
             .interpret(&mut Ctx::default(), &temp, &mut istack)
             .is_ok());
-        assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
+        assert!(istack.len() == 1 && istack[0].as_ref() == &TypedValue::int(55));
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         let temp = Arena::new();
         let mut ctx = Ctx::default();
         let ast = ast.typecheck_instruction(ctx.gas(), None, &[]).unwrap();
-        let mut istack = stk![];
+        let mut istack: IStack<'_> = Stack::new();
         assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
     }
@@ -383,7 +383,10 @@ mod tests {
         use TypedValue as TV;
         match interp_res.unwrap() {
             (_, TV::Map(m)) => {
-                assert_eq!(m.get(&TV::String("foo".to_owned())).unwrap(), &TV::int(1))
+                assert_eq!(
+                    m.get(&TV::String("foo".to_owned())).unwrap().as_ref(),
+                    &TV::int(1)
+                )
             }
             _ => panic!("unexpected contract output"),
         };
@@ -395,8 +398,8 @@ mod tests {
         instr: &'a str,
         input_type_stack: TypeStack,
         output_type_stack: TypeStack,
-        mut input_stack: Stack<TypedValue<'a>>,
-        output_stack: Stack<TypedValue<'a>>,
+        mut input_stack: IStack<'a>,
+        output_stack: IStack<'a>,
         mut ctx: Ctx<'a>,
     ) {
         let ast = parse(instr).unwrap();
@@ -541,9 +544,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "BALANCE",
-            stk![],
+            Stack::new(),
             stk![Type::Mutez],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Mutez(45),],
             {
                 let mut c = Ctx::default();
@@ -730,9 +733,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "LEVEL",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(45),],
             {
                 let mut c = Ctx::default();
@@ -747,9 +750,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "MIN_BLOCK_TIME",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(45),],
             {
                 let mut c = Ctx::default();
@@ -765,9 +768,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SELF_ADDRESS",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(addr.clone())],
             {
                 let mut c = Ctx::default();
@@ -783,9 +786,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SENDER",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(addr.clone())],
             {
                 let mut c = Ctx::default();
@@ -801,9 +804,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "SOURCE",
-            stk![],
+            Stack::new(),
             stk![Type::Address],
-            stk![],
+            Stack::new(),
             stk![TypedValue::Address(Address {
                 hash: addr.clone().into(),
                 entrypoint: Entrypoint::default()
@@ -821,18 +824,18 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "PUSH timestamp 1571659294",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(1571659294)],
             Ctx::default(),
         );
         run_e2e_test(
             &Arena::new(),
             "PUSH timestamp \"2019-10-21T12:01:34Z\"",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(1571659294)],
             Ctx::default(),
         );
@@ -843,9 +846,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "NOW",
-            stk![],
+            Stack::new(),
             stk![Type::Timestamp],
-            stk![],
+            Stack::new(),
             stk![TypedValue::timestamp(4500),],
             {
                 let mut c = Ctx::default();
@@ -915,9 +918,9 @@ mod tests {
         run_e2e_test(
             &Arena::new(),
             "TOTAL_VOTING_POWER",
-            stk![],
+            Stack::new(),
             stk![Type::Nat],
-            stk![],
+            Stack::new(),
             stk![TypedValue::nat(80)],
             {
                 let mut c = Ctx::default();

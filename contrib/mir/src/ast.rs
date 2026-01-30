@@ -315,13 +315,13 @@ pub enum TypedValue<'a> {
     Bool(bool),
     String(String),
     Unit,
-    Pair(Box<(Self, Self)>),
-    Option(Option<Box<Self>>),
-    List(MichelsonList<Self>),
-    Set(BTreeSet<Self>),
-    Map(BTreeMap<Self, Self>),
+    Pair(Rc<Self>, Rc<Self>),
+    Option(Option<Rc<Self>>),
+    List(MichelsonList<Rc<Self>>),
+    Set(BTreeSet<Rc<Self>>),
+    Map(BTreeMap<Rc<Self>, Rc<Self>>),
     BigMap(BigMap<'a>),
-    Or(Box<Or<Self, Self>>),
+    Or(Or<Rc<Self>, Rc<Self>>),
     Address(Address),
     ChainId(ChainId),
     Contract(Address),
@@ -347,6 +347,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         use Micheline as V;
         use TypedValue as TV;
         let go = |x: Self| x.into_micheline_optimized_legacy(arena);
+        let go_rc = |x: Rc<Self>| go(TypedValue::unwrap_rc(x));
         let option_into_micheline = |x: Option<Self>| match x {
             None => V::prim0(Prim::None),
             Some(x) => V::prim1(arena, Prim::Some, go(x)),
@@ -362,13 +363,13 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             // This transformation for pairs deviates from the optimized representation of the
             // reference implementation, because reference implementation optimizes the size of combs
             // and uses an untyped representation that is the shortest.
-            TV::Pair(b) => V::prim2(arena, Prim::Pair, go(b.0), go(b.1)),
-            TV::List(l) => V::Seq(V::alloc_iter(arena, l.into_iter().map(go))),
-            TV::Set(s) => V::Seq(V::alloc_iter(arena, s.into_iter().map(go))),
+            TV::Pair(l, r) => V::prim2(arena, Prim::Pair, go_rc(l), go_rc(r)),
+            TV::List(l) => V::Seq(V::alloc_iter(arena, l.into_iter().map(go_rc))),
+            TV::Set(s) => V::Seq(V::alloc_iter(arena, s.into_iter().map(go_rc))),
             TV::Map(m) => V::Seq(V::alloc_iter(
                 arena,
                 m.into_iter()
-                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+                    .map(|(key, val)| V::prim2(arena, Prim::Elt, go_rc(key), go_rc(val))),
             )),
             TV::BigMap(m) => match m.content {
                 big_map::BigMapContent::InMemory(m) => V::Seq(V::alloc_iter(
@@ -392,10 +393,10 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     }
                 }
             },
-            TV::Option(x) => option_into_micheline(x.map(|v| *v)),
-            TV::Or(or) => match *or {
-                Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
-                Or::Right(x) => V::prim1(arena, Prim::Right, go(x)),
+            TV::Option(x) => option_into_micheline(x.map(TypedValue::unwrap_rc)),
+            TV::Or(or) => match or {
+                Or::Left(x) => V::prim1(arena, Prim::Left, go_rc(x)),
+                Or::Right(x) => V::prim1(arena, Prim::Right, go_rc(x)),
             },
             TV::Address(x) => V::Bytes(x.to_bytes_vec()),
             TV::ChainId(x) => V::Bytes(x.into()),
@@ -481,19 +482,41 @@ pub(crate) fn unwrap_ticket(t: Ticket) -> TypedValue {
 }
 
 impl<'a> TypedValue<'a> {
-    /// Convenience function to construct a new [Self::Pair]. Allocates a new [Box].
+    pub(crate) fn unwrap_rc(rc: Rc<Self>) -> Self {
+        Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone())
+    }
+
+    /// Convenience function to construct a new [Self::Pair].
     pub fn new_pair(l: Self, r: Self) -> Self {
-        Self::Pair(Box::new((l, r)))
+        Self::Pair(Rc::new(l), Rc::new(r))
     }
 
-    /// Convenience function to construct a new [Self::Option]. Allocates a new [Box].
+    /// Convenience function to construct a new [Self::Pair] from Rc values.
+    pub fn new_pair_rc(l: Rc<Self>, r: Rc<Self>) -> Self {
+        Self::Pair(l, r)
+    }
+
+    /// Convenience function to construct a new [Self::Option].
     pub fn new_option(x: Option<Self>) -> Self {
-        Self::Option(x.map(Box::new))
+        Self::Option(x.map(Rc::new))
     }
 
-    /// Convenience function to construct a new [Self::Or]. Allocates a new [Box].
+    /// Convenience function to construct a new [Self::Option] from Rc values.
+    pub fn new_option_rc(x: Option<Rc<Self>>) -> Self {
+        Self::Option(x)
+    }
+
+    /// Convenience function to construct a new [Self::Or].
     pub fn new_or(x: Or<Self, Self>) -> Self {
-        Self::Or(Box::new(x))
+        Self::Or(match x {
+            Or::Left(v) => Or::Left(Rc::new(v)),
+            Or::Right(v) => Or::Right(Rc::new(v)),
+        })
+    }
+
+    /// Convenience function to construct a new [Self::Or] from Rc values.
+    pub fn new_or_rc(x: Or<Rc<Self>, Rc<Self>>) -> Self {
+        Self::Or(x)
     }
 
     /// Convenience function to construct a new [Self::Operation]. Allocates a new [Box].
@@ -857,10 +880,14 @@ pub mod test_strategies {
                 .boxed()
             }
             T::List(t) => prop::collection::vec(typed_value_by_type(t), 0..=3)
-                .prop_map(|x| V::List(MichelsonList::from(x)))
+                .prop_map(|x| {
+                    V::List(MichelsonList::from(
+                        x.into_iter().map(Rc::new).collect::<Vec<_>>(),
+                    ))
+                })
                 .boxed(),
             T::Set(elt) => prop::collection::btree_set(typed_value_by_type(elt), 0..=3)
-                .prop_map(V::Set)
+                .prop_map(|set| V::Set(set.into_iter().map(Rc::new).collect()))
                 .boxed(),
             T::Map(m) => {
                 let (key_ty, val_ty) = m.as_ref();
@@ -869,7 +896,13 @@ pub mod test_strategies {
                     typed_value_by_type(val_ty),
                     0..=3,
                 )
-                .prop_map(V::Map)
+                .prop_map(|map| {
+                    V::Map(
+                        map.into_iter()
+                            .map(|(k, v)| (Rc::new(k), Rc::new(v)))
+                            .collect(),
+                    )
+                })
                 .boxed()
             }
             // We don't generate all the allowed syntaxes for big maps
