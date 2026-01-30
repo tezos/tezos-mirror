@@ -2100,6 +2100,20 @@ let get_chain_block_context_clst_total_supply ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "clst"; "total_supply"]
     Fun.id
 
+let get_chain_block_context_clst_total_amount_of_tez ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "clst"; "total_amount_of_tez"]
+    Fun.id
+
+let get_chain_block_context_clst_exchange_rate ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "clst"; "exchange_rate"]
+    Fun.id
+
 let get_chain_block_context_contract_clst_balance ?(chain = "main")
     ?(block = "head") ~id () =
   make

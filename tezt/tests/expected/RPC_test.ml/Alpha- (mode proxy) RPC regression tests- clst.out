@@ -23,5 +23,11 @@
 ./octez-client --mode proxy rpc get /chains/main/blocks/head/context/clst/total_supply
 "0"
 
+./octez-client --mode proxy rpc get /chains/main/blocks/head/context/clst/total_amount_of_tez
+"0"
+
+./octez-client --mode proxy rpc get /chains/main/blocks/head/context/clst/exchange_rate
+{ "numerator": "1", "denominator": "1" }
+
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/clst_balance'
 "0"

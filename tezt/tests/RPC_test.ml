@@ -473,6 +473,14 @@ let test_clst ~contracts ?endpoint client =
     Client.RPC.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_clst_total_supply ()
   in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_clst_total_amount_of_tez ()
+  in
+  let* _ =
+    Client.RPC.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_clst_exchange_rate ()
+  in
   let bootstrap = List.hd contracts in
   let* _ =
     Client.RPC.call ?endpoint ~hooks client

@@ -413,6 +413,30 @@ module S = struct
         ~output:Script_int.n_encoding
         RPC_path.(open_root / "context" / "clst" / "total_supply")
 
+    let total_amount_of_tez_service =
+      RPC_service.get_service
+        ~description:
+          "Returns the total amount of tez in the CLST staking ledger (in \
+           mutez)."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(open_root / "context" / "clst" / "total_amount_of_tez")
+
+    let q_encoding =
+      conv
+        (fun Q.{num; den} -> (num, den))
+        (fun (num, den) -> Q.make num den)
+        (obj2 (req "numerator" n) (req "denominator" n))
+
+    let exchange_rate_service =
+      RPC_service.get_service
+        ~description:
+          "Returns the exchange rate between CLST token and tez calculated as \
+           the ratio of total_amount_of_tez to total_supply."
+        ~query:RPC_query.empty
+        ~output:q_encoding
+        RPC_path.(open_root / "context" / "clst" / "exchange_rate")
+
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
           Contract.get_clst_contract_hash ctxt) ;
@@ -423,7 +447,26 @@ module S = struct
       register0 ~chunked:false total_supply_service (fun ctxt () () ->
           let open Lwt_result_syntax in
           let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
-          return total_supply)
+          return total_supply) ;
+      register0 ~chunked:false total_amount_of_tez_service (fun ctxt () () ->
+          Clst.total_amount_of_tez ctxt) ;
+      register0 ~chunked:false exchange_rate_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let* total_amount = Clst.total_amount_of_tez ctxt in
+          let* total_supply, _ = Clst_contract_storage.get_total_supply ctxt in
+          let total_amount = Tez.to_mutez total_amount in
+          let total_supply = Script_int.to_zint total_supply in
+          let rate =
+            if
+              Compare.Int64.equal total_amount 0L || Z.equal total_supply Z.zero
+            then
+              (* This follows Invariant 1 from
+                 Staking_pseudotokens_storage: when there are no
+                 tokens, the rate is 1. *)
+              Q.one
+            else Q.div (Q.of_int64 total_amount) (Q.of_bigint total_supply)
+          in
+          return rate)
   end
 end
 
@@ -930,3 +973,9 @@ let clst_balance ctxt block contract =
 
 let clst_total_supply ctxt block =
   RPC_context.make_call0 S.CLST.total_supply_service ctxt block () ()
+
+let clst_total_amount_of_tez ctxt block =
+  RPC_context.make_call0 S.CLST.total_amount_of_tez_service ctxt block () ()
+
+let clst_exchange_rate ctxt block =
+  RPC_context.make_call0 S.CLST.exchange_rate_service ctxt block () ()

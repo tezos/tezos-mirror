@@ -1529,6 +1529,20 @@ val get_chain_block_context_clst_contract_hash :
 val get_chain_block_context_clst_total_supply :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/total_amount_of_tez]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_clst_total_amount_of_tez :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/clst/exchange_rate]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_clst_exchange_rate :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/clst_balance]
 
     [chain] defaults to ["main"].
