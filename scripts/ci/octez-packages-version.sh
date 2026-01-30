@@ -81,8 +81,7 @@ else
       fi
     else
       # protected, !tag, other protected branches
-      # Not a valid release
-      : nop
+      export RELEASETYPE="TestProtectedBranch"
     fi
   else
     # ! protected
