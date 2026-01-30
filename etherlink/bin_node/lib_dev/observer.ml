@@ -222,6 +222,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~config:config.tx_queue
         ~keep_alive:config.keep_alive
         ~timeout:config.rpc_timeout
+        ~start_injector_worker:true
         ()
     in
     return tx_container

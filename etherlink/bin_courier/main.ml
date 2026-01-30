@@ -294,7 +294,14 @@ let command =
           tx_per_addr_limit;
         }
       in
-      let* () = start_container ~config ~keep_alive:true ~timeout:10. () in
+      let* () =
+        start_container
+          ~config
+          ~keep_alive:true
+          ~timeout:10.
+          ~start_injector_worker:true
+          ()
+      in
       let _ =
         start_blueprint_follower
           ~container

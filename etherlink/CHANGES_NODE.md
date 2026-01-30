@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+-Fix: Observer node sends transaction batches in a synchronous request-response fashion (!20553)
 ### Breaking changes
 
 ### Configuration changes

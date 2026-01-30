@@ -221,6 +221,7 @@ let main
             ~config:config.tx_queue
             ~keep_alive:config.keep_alive
             ~timeout:config.rpc_timeout
+            ~start_injector_worker:true
             ()
         in
         return
