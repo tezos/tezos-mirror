@@ -45,7 +45,7 @@ SoftRelease)
   VERSION="$TIMESTAMP+${CI_COMMIT_TAG:-}"
   TARGETDIR="public/homebrew/${CI_COMMIT_TAG}/Formula"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   VERSION="$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
   TARGETDIR="public/homebrew/$CI_COMMIT_REF_NAME/Formula"
   ;;
