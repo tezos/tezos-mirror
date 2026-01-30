@@ -1014,6 +1014,19 @@ module Actions = struct
       ( "operation_information",
         unsigned_consensus_vote_encoding_for_logging__cannot_decode )
 
+  let signing_block =
+    declare_3
+      ~section
+      ~name:"signing_block"
+      ~level:Info
+      ~msg:"signing block at level {level}, round {round} for {delegate}"
+      ~pp1:pp_int32
+      ~pp2:Round.pp
+      ~pp3:Delegate.pp
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+
   let invalid_json_file =
     declare_1
       ~section

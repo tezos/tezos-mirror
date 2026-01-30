@@ -29,7 +29,7 @@ open Baking_state
 open Baking_state_types
 
 module Profiler = struct
-  include (val Profiler.wrap Baking_profiler.baker_profiler)
+  include Baking_profiler.Baker_profiler
 
   let[@warning "-32"] reset_block_section =
     (* The section_maker must be created here and not inside the pattern

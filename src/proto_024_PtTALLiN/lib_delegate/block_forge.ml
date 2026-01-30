@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+module Profiler = Baking_profiler.Baker_profiler
 
 type unsigned_block = {
   unsigned_block_header : Block_header.t;
@@ -167,19 +168,22 @@ let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
   let filtered_operations =
-    Operation_selection.filter_operations_without_simulation
-      fees_config
-      ~hard_gas_limit_per_block
-      operation_pool
+    (Operation_selection.filter_operations_without_simulation
+       fees_config
+       ~hard_gas_limit_per_block
+       operation_pool
+     [@profiler.record_f
+       {verbosity = Debug} "filter operations without simulation"])
   in
   let* shell_header, preapply_result =
-    Node_rpc.preapply_block
-      cctxt
-      ~chain
-      ~head:pred_info.hash
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      filtered_operations
+    (Node_rpc.preapply_block
+       cctxt
+       ~chain
+       ~head:pred_info.hash
+       ~timestamp
+       ~protocol_data:faked_protocol_data
+       filtered_operations
+     [@profiler.record_s {verbosity = Debug} "Node: preapply block"])
   in
   (* only retain valid operations *)
   let operations =
@@ -214,14 +218,14 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
     ~force_apply ~round ~context_index ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let* incremental =
-    Baking_simulator.begin_construction
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      ~force_apply
-      ~pred_resulting_context_hash
-      context_index
-      pred_info
-      chain_id
+    (Baking_simulator.begin_construction
+       ~timestamp
+       ~protocol_data:faked_protocol_data
+       ~force_apply
+       ~pred_resulting_context_hash
+       context_index
+       pred_info
+       chain_id [@profiler.record_s {verbosity = Debug} "begin construction"])
   in
   let* {
          Operation_selection.operations;
@@ -230,11 +234,13 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
          manager_operations_infos;
          _;
        } =
-    Operation_selection.filter_operations_with_simulation
-      incremental
-      fees_config
-      ~hard_gas_limit_per_block
-      operation_pool
+    (Operation_selection.filter_operations_with_simulation
+       incremental
+       fees_config
+       ~hard_gas_limit_per_block
+       operation_pool
+     [@profiler.record_s
+       {verbosity = Debug} "filter operations with simulation"])
   in
   let* changed =
     check_protocol_changed
@@ -254,17 +260,18 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
       ~pred_info
       ~payload_round
       ~operation_pool
-      cctxt
+      cctxt [@profiler.record_s {verbosity = Debug} "filter via node"]
   else
     let* shell_header =
-      finalize_block_header
-        ~shell_header:incremental.header
-        ~validation_result
-        ~operations_hash
-        ~pred_info
-        ~pred_resulting_context_hash
-        ~round
-        ~locked_round:None
+      (finalize_block_header
+         ~shell_header:incremental.header
+         ~validation_result
+         ~operations_hash
+         ~pred_info
+         ~pred_resulting_context_hash
+         ~round
+         ~locked_round:None
+       [@profiler.record_s {verbosity = Debug} "finalize block header"])
     in
     let operations = List.map (List.map convert_operation) operations in
     let payload_hash =
@@ -289,13 +296,14 @@ let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
   let chain = `Hash chain_id in
   let operations = Operation_pool.ordered_to_list_list ordered_pool in
   let* shell_header, _preapply_result =
-    Node_rpc.preapply_block
-      cctxt
-      ~chain
-      ~head:pred_info.hash
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      operations
+    (Node_rpc.preapply_block
+       cctxt
+       ~chain
+       ~head:pred_info.hash
+       ~timestamp
+       ~protocol_data:faked_protocol_data
+       operations
+     [@profiler.record_s {verbosity = Debug} "Node: preapply block"])
   in
   let operations = List.map (List.map convert_operation) operations in
   let manager_operations_infos =
@@ -314,21 +322,22 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
     ~context_index ~payload_hash cctxt =
   let open Lwt_result_syntax in
   let* incremental =
-    Baking_simulator.begin_construction
-      ~timestamp
-      ~protocol_data:faked_protocol_data
-      ~force_apply
-      ~pred_resulting_context_hash
-      context_index
-      pred_info
-      chain_id
+    (Baking_simulator.begin_construction
+       ~timestamp
+       ~protocol_data:faked_protocol_data
+       ~force_apply
+       ~pred_resulting_context_hash
+       context_index
+       pred_info
+       chain_id [@profiler.record_s {verbosity = Debug} "begin construction"])
   in
   (* We still need to filter attestations. Two attestations could be
      referring to the same slot. *)
   let* incremental, ordered_pool =
-    Operation_selection.filter_consensus_operations_only
-      incremental
-      ordered_pool
+    (Operation_selection.filter_consensus_operations_only
+       incremental
+       ordered_pool
+     [@profiler.record_s {verbosity = Debug} "filter consensus operations only"])
   in
   let operations = Operation_pool.ordered_to_list_list ordered_pool in
   let operations_hash =
@@ -343,7 +352,11 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
   let incremental =
     {incremental with header = {incremental.header with operations_hash}}
   in
-  let* validation_result = Baking_simulator.finalize_construction incremental in
+  let* validation_result =
+    (Baking_simulator.finalize_construction
+       incremental
+     [@profiler.record_s {verbosity = Debug} "finalize construction"])
+  in
   let validation_result = Option.map fst validation_result in
   let* changed =
     check_protocol_changed
@@ -376,14 +389,15 @@ let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
           (Option.value (List.hd operations) ~default:[])
     in
     let* shell_header =
-      finalize_block_header
-        ~shell_header:incremental.header
-        ~validation_result
-        ~operations_hash
-        ~pred_info
-        ~pred_resulting_context_hash
-        ~round
-        ~locked_round:locked_round_when_no_validation_result
+      (finalize_block_header
+         ~shell_header:incremental.header
+         ~validation_result
+         ~operations_hash
+         ~pred_info
+         ~pred_resulting_context_hash
+         ~round
+         ~locked_round:locked_round_when_no_validation_result
+       [@profiler.record_s {verbosity = Debug} "finalize block header"])
     in
     let operations = List.map (List.map convert_operation) operations in
     let manager_operations_infos =
@@ -813,20 +827,28 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
         (* We cannot include operations that are not live with respect
            to our predecessor otherwise the node would reject the block. *)
         let filtered_pool =
-          retain_live_operations_only
-            ~live_blocks:pred_live_blocks
-            operation_pool
+          (retain_live_operations_only
+             ~live_blocks:pred_live_blocks
+             operation_pool
+           [@profiler.record_f
+             {verbosity = Debug} "retain live operations only"])
         in
         if constants.aggregate_attestation then
           let*? consensus =
-            aggregate_attestations_on_proposal filtered_pool.consensus
+            (aggregate_attestations_on_proposal
+               filtered_pool.consensus
+             [@profiler.record_f
+               {verbosity = Debug} "aggregate attestations on proposal"])
           in
           return (Filter {filtered_pool with consensus})
         else return (Filter filtered_pool)
     | Apply {ordered_pool; payload_hash} ->
         if constants.aggregate_attestation then
           let*? consensus =
-            aggregate_consensus_operations_on_reproposal ordered_pool.consensus
+            (aggregate_consensus_operations_on_reproposal
+               ordered_pool.consensus
+             [@profiler.record_f
+               {verbosity = Debug} "aggregate consensus on reproposal"])
           in
           let ordered_pool = {ordered_pool with consensus} in
           return (Apply {ordered_pool; payload_hash})
@@ -842,16 +864,16 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~liquidity_baking_toggle_vote
             ()
         in
-        filter_via_node
-          ~chain_id
-          ~faked_protocol_data
-          ~fees_config
-          ~hard_gas_limit_per_block
-          ~timestamp
-          ~pred_info
-          ~payload_round
-          ~operation_pool
-          cctxt
+        (filter_via_node
+           ~chain_id
+           ~faked_protocol_data
+           ~fees_config
+           ~hard_gas_limit_per_block
+           ~timestamp
+           ~pred_info
+           ~payload_round
+           ~operation_pool
+           cctxt [@profiler.record_s {verbosity = Debug} "filter via node"])
     | Node, Apply {ordered_pool; payload_hash} ->
         let faked_protocol_data =
           forge_faked_protocol_data
@@ -861,14 +883,14 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~liquidity_baking_toggle_vote
             ()
         in
-        apply_via_node
-          ~chain_id
-          ~faked_protocol_data
-          ~timestamp
-          ~pred_info
-          ~ordered_pool
-          ~payload_hash
-          cctxt
+        (apply_via_node
+           ~chain_id
+           ~faked_protocol_data
+           ~timestamp
+           ~pred_info
+           ~ordered_pool
+           ~payload_hash
+           cctxt [@profiler.record_s {verbosity = Debug} "apply via node"])
     | Local context_index, Filter operation_pool ->
         let faked_protocol_data =
           forge_faked_protocol_data
@@ -877,21 +899,21 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~liquidity_baking_toggle_vote
             ()
         in
-        filter_with_context
-          ~chain_id
-          ~faked_protocol_data
-          ~fees_config
-          ~hard_gas_limit_per_block
-          ~user_activated_upgrades
-          ~timestamp
-          ~pred_info
-          ~pred_resulting_context_hash
-          ~force_apply
-          ~round
-          ~context_index
-          ~payload_round
-          ~operation_pool
-          cctxt
+        (filter_with_context
+           ~chain_id
+           ~faked_protocol_data
+           ~fees_config
+           ~hard_gas_limit_per_block
+           ~user_activated_upgrades
+           ~timestamp
+           ~pred_info
+           ~pred_resulting_context_hash
+           ~force_apply
+           ~round
+           ~context_index
+           ~payload_round
+           ~operation_pool
+           cctxt [@profiler.record_s {verbosity = Debug} "filter with context"])
     | Local context_index, Apply {ordered_pool; payload_hash} ->
         let faked_protocol_data =
           forge_faked_protocol_data
@@ -901,33 +923,34 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
             ~liquidity_baking_toggle_vote
             ()
         in
-        apply_with_context
-          ~chain_id
-          ~faked_protocol_data
-          ~user_activated_upgrades
-          ~timestamp
-          ~pred_info
-          ~pred_resulting_context_hash
-          ~force_apply
-          ~round
-          ~ordered_pool
-          ~context_index
-          ~payload_hash
-          cctxt
+        (apply_with_context
+           ~chain_id
+           ~faked_protocol_data
+           ~user_activated_upgrades
+           ~timestamp
+           ~pred_info
+           ~pred_resulting_context_hash
+           ~force_apply
+           ~round
+           ~ordered_pool
+           ~context_index
+           ~payload_hash
+           cctxt [@profiler.record_s {verbosity = Debug} "apply with context"])
   in
   let* contents =
-    Baking_pow.mine
-      ~proof_of_work_threshold:constants.proof_of_work_threshold
-      shell_header
-      (fun proof_of_work_nonce ->
-        {
-          Block_header.payload_hash;
-          payload_round;
-          seed_nonce_hash;
-          proof_of_work_nonce;
-          per_block_votes =
-            {liquidity_baking_vote = liquidity_baking_toggle_vote};
-        })
+    (Baking_pow.mine
+       ~proof_of_work_threshold:constants.proof_of_work_threshold
+       shell_header
+       (fun proof_of_work_nonce ->
+         {
+           Block_header.payload_hash;
+           payload_round;
+           seed_nonce_hash;
+           proof_of_work_nonce;
+           per_block_votes =
+             {liquidity_baking_vote = liquidity_baking_toggle_vote};
+         })
+    [@profiler.record_s {verbosity = Debug} "Baking_pow mine"])
   in
   let unsigned_block_header =
     {

@@ -26,8 +26,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-
-module Profiler = (val Profiler.wrap Baking_profiler.operation_worker_profiler)
+module Profiler = Baking_profiler.Operation_worker_profiler
 
 module Events = struct
   include Internal_event.Simple
