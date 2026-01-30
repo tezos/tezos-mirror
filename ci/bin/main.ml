@@ -455,12 +455,12 @@ let () =
        'master'.\n\n\
        This scheduled pipeline exercices the full tezt tests suites." ;
   register
-    "schedule_master_test_release"
+    "schedule_test_release"
     schedule_test_release
     ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)
     ~description:
-      "Scheduled pipeline that runs a test release pipeline for master. The \
-       jobs are the same as a release pipeline but run in dry-mode." ;
+      "Scheduled pipeline that runs a test release pipeline. The jobs are the \
+       same as a release pipeline but run in dry-mode." ;
   register
     "schedule_container_scanning_master"
     schedule_container_scanning_master
