@@ -161,6 +161,25 @@ let default_dal =
       number_of_slots = 160;
       attestation_lag = 5;
       attestation_lags = [1; 2; 3; 4; 5];
+      (* The list of attestation lags at which an attester can attest a DAL
+         slot. A lag represents the offset of the attested level with respect
+         to the slot's published level.
+
+         There is a trade-off concerning the number of supported lags: more lags
+         can increase the size of the DAL payload in an attestation operation
+         (which is in the worst case proportional to the number of lags and the
+         number of slots). However, more lags provide greater flexibility for
+         attestation timing, enabling better latency optimization.
+
+         Enforced constraints: the list should be increasing and
+         [attestation_lag] should be its last element.
+
+         Note that a DAL specific terminology is used for various levels related
+         to the publication and attestation of a DAL slot (like published,
+         attestation, attested, and committee levels), see
+         {!Dal_slot_repr.Header}'s documentation.
+
+         Introduced in protocol U. *)
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
       minimal_participation_ratio = Q.(64 // 100);
