@@ -337,9 +337,6 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
             },
           payload_round )
   in
-  let*! () =
-    Events.(emit forging_block (level, round, delegate, force_apply))
-  in
   let* injection_level =
     Node_rpc.current_level
       cctxt
@@ -423,6 +420,9 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     Round.round_duration global_state.round_durations round
     |> Period.to_seconds |> Int64.to_float
   in
+  let*! () =
+    Events.(emit forging_block (level, round, delegate, force_apply))
+  in
   let* {unsigned_block_header; operations; manager_operations_infos} =
     Utils.event_on_stalling_promise
       ~initial_delay:(round_duration /. 2.)
@@ -446,6 +446,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           global_state.constants.parametric
         [@profiler.record_s {verbosity = Info} "forge block"])
   in
+  let*! () = Events.(emit signing_block (level, round, delegate)) in
   let* signed_block_header =
     (sign_block_header
        round_duration
