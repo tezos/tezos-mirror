@@ -29,8 +29,7 @@ open Baking_state
 open Baking_state_types
 open Baking_actions
 module Events = Baking_events.State_transitions
-
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = Baking_profiler.Baker_profiler
 
 let do_nothing state = Lwt.return (state, Do_nothing)
 

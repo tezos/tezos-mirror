@@ -27,8 +27,7 @@
 open Protocol
 open Alpha_context
 module Events = Baking_events.Nonces
-
-module Profiler = (val Profiler.wrap Baking_profiler.nonce_profiler)
+module Profiler = Baking_profiler.Nonce_profiler
 
 type state = {
   cctxt : Protocol_client_context.full;

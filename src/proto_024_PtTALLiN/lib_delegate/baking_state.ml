@@ -27,8 +27,7 @@ open Protocol
 open Alpha_context
 open Baking_errors
 open Baking_state_types
-
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = Baking_profiler.Baker_profiler
 
 type validation_mode = Node | Local of Abstract_context_index.t
 

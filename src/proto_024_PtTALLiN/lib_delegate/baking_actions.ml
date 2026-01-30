@@ -28,8 +28,7 @@ open Alpha_context
 open Baking_state
 open Baking_state_types
 module Events = Baking_events.Actions
-
-module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
+module Profiler = Baking_profiler.Baker_profiler
 
 module Operations_source = struct
   type error +=
