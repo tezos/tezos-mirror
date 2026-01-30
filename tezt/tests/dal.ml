@@ -2883,16 +2883,10 @@ let test_dal_node_invalid_config () =
   unit
 
 (** Create expected attestation array with given slots attested. *)
-let expected_attestation protocol dal_parameters attested_slots =
-  if Protocol.number protocol >= 025 then (
-    let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
-    List.iter (fun i -> arr.(i) <- true) attested_slots ;
-    arr)
-  else
-    let max_slot = List.fold_left max 0 attested_slots in
-    let arr = Array.make (max_slot + 1) false in
-    List.iter (fun i -> arr.(i) <- true) attested_slots ;
-    arr
+let expected_attestation dal_parameters attested_slots =
+  let arr = Array.make dal_parameters.Dal.Parameters.number_of_slots false in
+  List.iter (fun i -> arr.(i) <- true) attested_slots ;
+  arr
 
 (* Test that the rollup kernel can fetch and store a requested DAL page. Works as follows:
    - Originate a rollup with a kernel that:
@@ -2968,7 +2962,7 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
                                                                 - 1))
       dal_attestation
   in
-  let expected_attestation = expected_attestation protocol parameters [0] in
+  let expected_attestation = expected_attestation parameters [0] in
   Check.((Some expected_attestation = dal_attestation) (option (array bool)))
     ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
   Log.info "Wait for the rollup node to catch up to the latest level." ;
@@ -9092,7 +9086,7 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
         (Dal.Slot_availability.decode protocol parameters str).(number_of_lags
                                                                 - 1)
   in
-  let expected_attestation = expected_attestation protocol parameters [0] in
+  let expected_attestation = expected_attestation parameters [0] in
   Check.(
     (expected_attestation = obtained_dal_attestation)
       (array bool)
@@ -11839,7 +11833,7 @@ let use_mockup_node_for_getting_attestable_slots protocol dal_parameters
                                                                     - 1))
       dal_attestation
   in
-  let expected_attestation = expected_attestation protocol dal_parameters [0] in
+  let expected_attestation = expected_attestation dal_parameters [0] in
   Check.((Some expected_attestation = dal_attestation) (option (array bool)))
     ~error_msg:"Unexpected DAL attestation: expected %L, got %R" ;
   unit
