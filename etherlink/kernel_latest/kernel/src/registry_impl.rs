@@ -58,13 +58,16 @@ impl Registry for RegistryImpl {
         host: &mut Host,
         native_address: &[u8],
         runtime_id: tezosx_interfaces::RuntimeId,
+        context: tezosx_interfaces::AliasCreationContext,
     ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
         match runtime_id {
             tezosx_interfaces::RuntimeId::Tezos => {
-                self.tezos.generate_alias(host, native_address)
+                self.tezos
+                    .generate_alias(self, host, native_address, context)
             }
             tezosx_interfaces::RuntimeId::Ethereum => {
-                self.ethereum.generate_alias(host, native_address)
+                self.ethereum
+                    .generate_alias(self, host, native_address, context)
             }
         }
     }

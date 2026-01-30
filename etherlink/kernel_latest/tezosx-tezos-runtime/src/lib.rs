@@ -30,8 +30,10 @@ pub mod context;
 impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
     fn generate_alias<Host: Runtime>(
         &self,
+        _registry: &impl tezosx_interfaces::Registry,
         _host: &mut Host,
         native_address: &[u8],
+        _context: tezosx_interfaces::AliasCreationContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         let digest = blake2b::digest(native_address, ContractKt1Hash::hash_size())
             .map_err(|err| {

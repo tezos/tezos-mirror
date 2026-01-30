@@ -33,7 +33,7 @@ use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_interfaces::{AliasCreationContext, Registry, RuntimeId};
 
 pub struct EtherlinkVMDB<'a, Host: Runtime, R: Registry> {
     pub registry: &'a R,
@@ -275,9 +275,16 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
             Some(alias) => alias,
             None => {
+                // Create context for alias generation using current block constants
+                let context = AliasCreationContext {
+                    gas_limit: self.block.gas_limit,
+                    chain_id: self.block.chain_id.as_u64(),
+                    timestamp: self.block.timestamp,
+                    block_number: self.block.number,
+                };
                 let alias = self
                     .registry
-                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos)
+                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos, context)
                     .map_err(|e| {
                         CustomPrecompileError::Revert(format!(
                             "Failed to generate alias for source address: {e:?}"

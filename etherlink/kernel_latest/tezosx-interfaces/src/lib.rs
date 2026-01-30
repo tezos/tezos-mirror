@@ -7,6 +7,19 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
+/// Context required for creating aliases
+#[derive(Clone, Debug)]
+pub struct AliasCreationContext {
+    /// Gas limit
+    pub gas_limit: u64,
+    /// Chain ID
+    pub chain_id: u64,
+    /// Timestamp for the block
+    pub timestamp: U256,
+    /// Block number
+    pub block_number: U256,
+}
+
 #[derive(Eq, PartialEq, Debug, Error)]
 pub enum TezosXRuntimeError {
     #[error("RuntimeId not in registry")]
@@ -38,6 +51,7 @@ pub trait Registry {
         host: &mut Host,
         native_address: &[u8],
         runtime_id: RuntimeId,
+        context: AliasCreationContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     fn address_from_string(
@@ -48,12 +62,16 @@ pub trait Registry {
 }
 
 pub trait RuntimeInterface {
-    // TODO: Probably need to pass more data to initialize
-    // a real operation when creating an alias.
+    /// Generate an alias address for a native address in this runtime.
+    ///
+    /// This function creates an alias that allows the native address to receive
+    /// funds in this runtime and have them forwarded to the original address.
     fn generate_alias<Host: Runtime>(
         &self,
+        registry: &impl Registry,
         host: &mut Host,
         native_address: &[u8],
+        context: AliasCreationContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     // This is a just a placeholder for now to show how the

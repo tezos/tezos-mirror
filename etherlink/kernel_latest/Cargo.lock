@@ -3502,12 +3502,15 @@ name = "tezosx-ethereum-runtime"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "alloy-sol-types",
  "nom",
  "primitive-types",
+ "revm",
  "revm-etherlink",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-host",
  "tezos_data_encoding",
+ "tezos_ethereum_latest",
  "tezosx-interfaces",
  "thiserror 1.0.69",
 ]

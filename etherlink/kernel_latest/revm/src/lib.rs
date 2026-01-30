@@ -456,8 +456,8 @@ mod test {
     use tezosx_interfaces::Registry as RegistryTrait;
 
     use utilities::{
-        block_constants_with_fees, block_constants_with_no_fees, Registry,
-        DEFAULT_SPEC_ID,
+        block_constants_with_fees, block_constants_with_no_fees,
+        test_alias_creation_context, Registry, DEFAULT_SPEC_ID,
     };
 
     use super::Error;
@@ -570,11 +570,15 @@ mod test {
                 host: &mut Host,
                 native_address: &[u8],
                 runtime_id: RuntimeId,
+                context: tezosx_interfaces::AliasCreationContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 match runtime_id {
-                    RuntimeId::Tezos => {
-                        self.mock_tezos.generate_alias(host, native_address)
-                    }
+                    RuntimeId::Tezos => self.mock_tezos.generate_alias(
+                        self,
+                        host,
+                        native_address,
+                        context,
+                    ),
                     RuntimeId::Ethereum => {
                         Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
                     }
@@ -622,13 +626,25 @@ mod test {
             )
         }
 
+        pub(crate) fn test_alias_creation_context(
+        ) -> tezosx_interfaces::AliasCreationContext {
+            tezosx_interfaces::AliasCreationContext {
+                gas_limit: GAS_LIMIT,
+                chain_id: ETHERLINK_CHAIN_ID,
+                timestamp: PU256::from(1),
+                block_number: PU256::from(1),
+            }
+        }
+
         pub(crate) struct MockTezosRuntime;
 
         impl RuntimeInterface for MockTezosRuntime {
             fn generate_alias<Host: Runtime>(
                 &self,
+                _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 native_address: &[u8],
+                _context: tezosx_interfaces::AliasCreationContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 // Simple mock: prefix with "tz1_" marker and return a hash-like alias
                 let mut alias = vec![0u8; 22]; // tz1 address size
@@ -808,6 +824,7 @@ mod test {
                 &mut host,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
+                test_alias_creation_context(),
             )
             .unwrap();
         store_alias(
@@ -884,6 +901,7 @@ mod test {
                 &mut host,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
+                test_alias_creation_context(),
             )
             .unwrap();
         store_alias(
