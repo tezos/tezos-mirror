@@ -264,6 +264,8 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 }
 
 pub trait ChainConfigTrait: Debug {
+    type BlockConstants;
+
     type Transaction: TransactionTrait + Encodable + Decodable + Debug;
 
     type TransactionReceipt: Debug;
@@ -275,6 +277,13 @@ pub trait ChainConfigTrait: Debug {
     fn get_chain_family(&self) -> ChainFamily;
 
     fn storage_root_path(&self) -> RefPath;
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<Self::BlockConstants>;
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
@@ -321,6 +330,8 @@ pub trait ChainConfigTrait: Debug {
 }
 
 impl ChainConfigTrait for EvmChainConfig {
+    type BlockConstants = tezos_ethereum::block::BlockConstants;
+
     type Transaction = crate::transaction::Transaction;
 
     type TransactionReceipt = tezos_ethereum::transaction::TransactionReceipt;
@@ -333,6 +344,22 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn get_chain_family(&self) -> ChainFamily {
         ChainFamily::Evm
+    }
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<Self::BlockConstants> {
+        Ok(block_in_progress.constants(
+            self.chain_id,
+            self.limits.minimum_base_fee_per_gas,
+            da_fee_per_byte,
+            crate::block::GAS_LIMIT,
+            coinbase,
+            self.enable_tezos_runtime(),
+        ))
     }
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
@@ -451,6 +478,7 @@ pub struct TezlinkBlockConstants {
 }
 
 impl ChainConfigTrait for MichelsonChainConfig {
+    type BlockConstants = TezlinkBlockConstants;
     type Transaction = TezlinkOperation;
     type TransactionReceipt = AppliedOperation;
     type ChainHeader = TezBlockHeader;
@@ -465,6 +493,17 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn base_fee_per_gas(&self, _host: &impl Runtime, _timestamp: Timestamp) -> U256 {
         U256::zero()
+    }
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        _da_fee_per_byte: U256,
+        _coinbase: H160,
+    ) -> anyhow::Result<TezlinkBlockConstants> {
+        let level = block_in_progress.number.try_into()?;
+        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
+        Ok(TezlinkBlockConstants { level, context })
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -550,8 +589,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         >,
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
-        _da_fee_per_byte: U256,
-        _coinbase: H160,
+        da_fee_per_byte: U256,
+        coinbase: H160,
     ) -> anyhow::Result<BlockComputationResult> {
         log!(
             host,
@@ -560,10 +599,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.number
         );
 
-        let block_constants = TezlinkBlockConstants {
-            level: block_in_progress.number.try_into()?,
-            context: context::TezlinkContext::from_root(&self.storage_root_path())?,
-        };
+        let block_constants =
+            self.constants(&block_in_progress, da_fee_per_byte, coinbase)?;
 
         let mut included_delayed_transactions = vec![];
         // Compute operations that are in the block in progress
