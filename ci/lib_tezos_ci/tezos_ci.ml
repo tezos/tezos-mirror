@@ -1351,7 +1351,8 @@ module Images_external = struct
      This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
   let docker =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1363,7 +1364,8 @@ module Images_external = struct
 
   let ci_release =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
 
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 

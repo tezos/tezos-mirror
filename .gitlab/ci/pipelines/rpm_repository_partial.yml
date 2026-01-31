@@ -43,7 +43,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.docker-build-rockylinux-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -76,7 +76,7 @@ oc.docker-build-rockylinux-dependencies:
       - gcp_very_high_cpu
 
 oc.docker-build-merge-manifest.rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -231,7 +231,7 @@ rpm_repo_rockylinux:
   retry: 0
 
 oc.docker-systemd-tests-rpm-rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -264,7 +264,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
       - gcp_very_high_cpu
 
 oc.docker-systemd-merge-manifest.rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -319,7 +319,7 @@ oc.install_bin_rockylinux_9.3.doc:
   variables: {}
 
 oc.install_bin_rockylinux_93_systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp

@@ -8,7 +8,7 @@ stages:
 - publish
 
 oc.docker:rust-sdk-bindings:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp

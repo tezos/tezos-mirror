@@ -31,7 +31,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.docker-systemd_tests_debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -68,7 +68,7 @@ oc.docker-systemd_tests_debian:
       - gcp_arm64
 
 oc.docker-systemd_tests_ubuntu:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -104,7 +104,7 @@ oc.docker-systemd_tests_ubuntu:
       - gcp_arm64
 
 oc.docker-systemd-merge-manifest.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -142,7 +142,7 @@ oc.docker-systemd-merge-manifest.debian:
       - gcp_very_high_cpu
 
 oc.docker-systemd-merge-manifest.ubuntu:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -179,7 +179,7 @@ oc.docker-systemd-merge-manifest.ubuntu:
       - gcp_very_high_cpu
 
 oc.docker-build-debian-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -216,7 +216,7 @@ oc.docker-build-debian-dependencies:
       - gcp_arm64
 
 oc.docker-build-merge-manifest.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -367,7 +367,7 @@ apt_repo_debian:
   retry: 0
 
 oc.docker-build-ubuntu-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -403,7 +403,7 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_arm64
 
 oc.docker-build-merge-manifest.ubuntu:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -569,7 +569,7 @@ oc.install_bin_debian_bookworm:
     PREFIX: ""
 
 oc.install_bin_debian_bookworm_systemd_test:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -602,7 +602,7 @@ oc.install_bin_debian_bookworm_systemd_test:
     RELEASE: bookworm
 
 oc.upgrade_bin_debian_bookworm-systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -635,7 +635,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
     RELEASE: bookworm
 
 oc.upgrade_bin_debian_bookworm-systemd_no_restart:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -738,7 +738,7 @@ oc.install_bin_ubunty_noble:
     PREFIX: ""
 
 oc.install_bin_ubuntu_noble_systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -771,7 +771,7 @@ oc.install_bin_ubuntu_noble_systemd:
     RELEASE: noble
 
 oc.upgrade_bin_ubuntu_jammy_systemd_test:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -804,7 +804,7 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
     RELEASE: jammy
 
 oc.upgrade_bin_ubuntu_jammy_systemd_test_no_restart:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -837,7 +837,7 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test_no_restart:
     RELEASE: jammy
 
 oc.upgrade_bin_ubuntu_noble_systemd_test:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -870,7 +870,7 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
     RELEASE: noble
 
 oc.upgrade_bin_ubuntu_noble_systemd_test_no_restart:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
