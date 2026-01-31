@@ -214,6 +214,8 @@ impl InputHandler for SequencerInput {
             }) => {
                 log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
+                let slot_size = params.slot_size;
+                let page_size = params.page_size;
                 let next_blueprint_number: U256 =
                     crate::blueprint_storage::read_next_blueprint_number(host)?;
                 for signal in signals.0.iter() {
@@ -230,7 +232,8 @@ impl InputHandler for SequencerInput {
                         if let Some(unsigned_seq_blueprints) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
-                                &params,
+                                slot_size,
+                                page_size,
                                 &next_blueprint_number,
                                 *slot_index,
                                 published_level,
