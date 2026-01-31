@@ -446,7 +446,7 @@ module Packaging = struct
        (* this second variable is for a read only registry and we want it to be
             tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION" )
+         "${GCP_PROTECTED_CI_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION" )
     :: add
 
   let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)
