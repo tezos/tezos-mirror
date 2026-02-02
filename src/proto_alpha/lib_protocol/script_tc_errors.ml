@@ -86,6 +86,8 @@ type error += Sc_rollup_disabled of Script.location
 
 type error += Zk_rollup_disabled of Script.location
 
+type error += Tz5_account_disabled of Script.location
+
 type error += Zk_rollup_bad_deposit_parameter of Script.location * Script.expr
 
 (* Instruction typing errors *)

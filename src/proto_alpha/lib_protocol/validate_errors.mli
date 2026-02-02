@@ -283,6 +283,7 @@ module Manager : sig
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
+    | Tz5_account_disabled
 end
 
 type error += Failing_noop_error

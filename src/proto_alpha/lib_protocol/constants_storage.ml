@@ -287,6 +287,8 @@ let aggregate_attestation c = (Raw_context.constants c).aggregate_attestation
 let allow_tz4_delegate_enable c =
   (Raw_context.constants c).allow_tz4_delegate_enable
 
+let tz5_account_enable c = (Raw_context.constants c).tz5_account_enable
+
 let all_bakers_attest_activation_threshold c =
   (Raw_context.constants c).all_bakers_attest_activation_threshold
 

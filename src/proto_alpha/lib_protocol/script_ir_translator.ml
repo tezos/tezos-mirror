@@ -1679,6 +1679,9 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
     match destination with
     | Destination.Zk_rollup _ when not (Constants.zk_rollup_enable ctxt) ->
         tzfail @@ Zk_rollup_disabled loc
+    | Destination.Contract (Implicit (Signature.Mldsa44 _))
+      when not (Constants.tz5_account_enable ctxt) ->
+        tzfail @@ Tz5_account_disabled loc
     | _ -> Ok ({destination; entrypoint}, ctxt)
   in
   function

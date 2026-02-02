@@ -2869,6 +2869,13 @@ module Manager = struct
         let* acc = f init (Elt contents) in
         batch_fold_left_e ~f ~init:acc ~batch:tail
 
+  let check_tz5_account_enabled ctxt (contract : Contract.t) =
+    match contract with
+    | Implicit (Signature.Mldsa44 _)
+      when not (Constants.tz5_account_enable ctxt) ->
+        result_error Tz5_account_disabled
+    | _ -> Ok ()
+
   let check_source ~expected_source ~source =
     Option.iter_e
       (fun expected_source ->
@@ -2986,6 +2993,7 @@ module Manager = struct
       | Cons (Manager_operation {source; counter; _}, _) ->
           (source, counter)
     in
+    let*? () = check_tz5_account_enabled vi.ctxt (Implicit source) in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
     let revealed_key =
@@ -3198,7 +3206,8 @@ module Manager = struct
     | Reveal {public_key; proof} ->
         let* () = Contract.check_public_key public_key source in
         check_bls_proof_for_manager_pk remaining_gas source public_key proof
-    | Transaction {parameters; _} ->
+    | Transaction {parameters; destination; _} ->
+        let* () = check_tz5_account_enabled vi.ctxt destination in
         let* (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters
         in
@@ -3220,7 +3229,8 @@ module Manager = struct
         check_update_consensus_key vi remaining_gas source public_key proof kind
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit
-    | Transfer_ticket {contents; ty; _} ->
+    | Transfer_ticket {contents; ty; destination; _} ->
+        let* () = check_tz5_account_enabled vi.ctxt destination in
         let* remaining_gas = consume_decoding_gas remaining_gas contents in
         let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
         return_unit
