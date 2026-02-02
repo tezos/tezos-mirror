@@ -38,6 +38,26 @@ module MetricInfo : sig
     help : string;
     label_names : LabelName.t list;
   }
+
+  (** [v ~help ~label_names ~metric_type ~namespace ~subsystem name] creates
+      metric metadata with full name [namespace_subsystem_name] and
+      documentation string [help].
+
+      @param help Documentation string describing the metric.
+      @param label_names Names of labels for this metric (default: [[]]).
+      @param metric_type The type of metric (Counter, Gauge, Summary, or
+        Histogram).
+      @param namespace Optional prefix for the metric name.
+      @param subsystem Optional prefix between namespace and name.
+  *)
+  val v :
+    help:string ->
+    ?label_names:LabelName.t list ->
+    metric_type:metric_type ->
+    ?namespace:string ->
+    ?subsystem:string ->
+    string ->
+    t
 end
 
 (** A map indexed by a set of labels. *)
