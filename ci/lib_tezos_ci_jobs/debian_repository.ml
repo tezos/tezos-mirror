@@ -69,7 +69,7 @@ let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Full | Release ->
       [
         [
-          ("RELEASE", ["noble"; "jammy"; "22.04"; "24.04"]);
+          ("RELEASE", ["22.04"; "24.04"]);
           ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]

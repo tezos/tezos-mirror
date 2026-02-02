@@ -1572,12 +1572,6 @@ module Images = struct
 
     let debian_unstable = make_img "debian:unstable" debian_version
 
-    let ubuntu_noble = make_img "ubuntu:noble" debian_version
-
-    let ubuntu_jammy = make_img "ubuntu:jammy" debian_version
-
-    let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
-
     let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
 
     let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version

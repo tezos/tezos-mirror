@@ -638,12 +638,6 @@ module Images : sig
 
     val debian_trixie : Image.t
 
-    val ubuntu_noble : Image.t
-
-    val ubuntu_jammy : Image.t
-
-    val ubuntu_plucky : Image.t
-
     val ubuntu_22_04 : Image.t
 
     val ubuntu_24_04 : Image.t

@@ -557,8 +557,6 @@ oc.docker-build-ubuntu-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
       - "22.04"
       - "24.04"
       TAGS:
@@ -595,8 +593,6 @@ oc.docker-build-merge-manifest.ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
       - "22.04"
       - "24.04"
       TAGS:
@@ -640,8 +636,6 @@ oc.build-ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
       - "22.04"
       - "24.04"
       TAGS:

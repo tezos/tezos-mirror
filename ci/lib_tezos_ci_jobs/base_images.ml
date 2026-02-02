@@ -13,7 +13,7 @@ let debian_releases = ["unstable"; "bookworm"; "trixie"]
 
 let debian_matrix = [("RELEASE", debian_releases)]
 
-let ubuntu_releases = ["noble"; "jammy"; "plucky"; "22.04"; "24.04"; "25.10"]
+let ubuntu_releases = ["22.04"; "24.04"; "25.10"]
 
 let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
 
