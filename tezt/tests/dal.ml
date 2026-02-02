@@ -3269,30 +3269,64 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   check_attestations first_level
 
 (* This is the version of [test_attester_with_daemon] that does not use the
-   baker daemon, only `bake for`. *)
+   baker daemon, only `bake for`.
+
+   Test goal: verify that slots are attested when all delegates participate,
+   and remain unattested when a delegate is missing (threshold = 100%).
+
+   With multi-lag attestations a slot published at level P can be attested at
+   levels P+lag[1], P+lag[2], etc. For a slot to be attested, it must be attested
+   at ANY of those opportunities. For a slot to remain unattested, it must fail
+   to be attested at ALL opportunities.
+
+   Scenario:
+   - Phase 1 (all delegates baking): covers all attestation opportunities for
+     the attested publication window.
+   - Phase 2 (missing delegate): covers all attestation opportunities for the
+     unattested publication window. *)
 let test_attester_with_bake_for _protocol parameters cryptobox node client
     dal_node =
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
   let client = Client.with_dal_node client ~dal_node in
+
   let max_lag = parameters.attestation_lag in
+  let min_lag = List.fold_left Int.min max_int parameters.attestation_lags in
+
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.alias)
   in
   let not_all_delegates = List.tl all_delegates in
 
-  (* Test goal: the published slot at a level in [first_level,
-     intermediary_level] should be attested, the one at a level in
-     [intermediary_level + 1, last_checked_level] should not be attested. *)
+  (* Number of publication levels to check in each category. *)
   let attested_levels = 2 in
   let unattested_levels = 2 in
-  let* first_level = next_level node in
-  let intermediary_level = first_level + attested_levels - 1 in
-  let last_checked_level = intermediary_level + unattested_levels - 1 in
-  let last_level = last_checked_level + max_lag + 1 in
 
-  Log.info "attestation_lag = %d" max_lag ;
+  (* Attested window: [first_attested_level, last_attested_level]
+   For these publications to be attested, we need ANY attestation opportunity
+   to fall in phase 1. The test conservatively ensures ALL opportunities fall
+   in phase 1 by extending phase 1 to cover up to [last_attested_level + max_lag]. *)
+  let* first_attested_level = next_level node in
+  let last_attested_level = first_attested_level + attested_levels - 1 in
+
+  (* Unattested window: [first_unattested_level, last_unattested_level]
+     These publications must have ALL their attestation opportunities in phase 2.
+     First opportunity for [first_unattested_level] is at [first_unattested_level + min_lag].
+     Phase 2 starts at (last_attested_level + max_lag + 1), so we need
+    [first_unattested_level + min_lag >= last_attested_level + max_lag + 1]. *)
+  let first_unattested_level = last_attested_level + max_lag - min_lag + 1 in
+  let last_unattested_level = first_unattested_level + unattested_levels - 1 in
+
+  let last_level = last_unattested_level + max_lag + 1 in
+
+  Log.info "min_lag = %d, max_lag = %d" min_lag max_lag ;
+  Log.info
+    "Attested window: [%d, %d], Unattested window: [%d, %d]"
+    first_attested_level
+    last_attested_level
+    first_unattested_level
+    last_unattested_level ;
 
   let wait_level = last_level + 1 in
   let wait_block_processing_on_l1 = wait_for_layer1_head dal_node wait_level in
@@ -3301,10 +3335,11 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     wait_for_layer1_final_block dal_node (wait_level - 2)
   in
 
+  (* Phase 1: Publish attested slots, then bake until phase 1 ends. *)
   let* _ =
     publish_and_bake
-      ~from_level:first_level
-      ~to_level:(intermediary_level + max_lag)
+      ~from_level:first_attested_level
+      ~to_level:(last_attested_level + max_lag)
       ~delegates:(`For all_delegates)
       parameters
       cryptobox
@@ -3312,9 +3347,11 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       client
       dal_node
   in
+
+  (* Phase 2: Publish unattested slots, then bake until all opportunities pass. *)
   let* _ =
     publish_and_bake
-      ~from_level:(intermediary_level + max_lag + 1)
+      ~from_level:(last_attested_level + max_lag + 1)
       ~to_level:last_level
       ~delegates:(`For not_all_delegates)
       parameters
@@ -3323,31 +3360,40 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       client
       dal_node
   in
+
   let* () = bake_for client in
   let* () = wait_block_processing_on_l1 in
   let* () = wait_block_processing_on_dal in
   let* current_level = Node.get_level node in
   Log.info "current level is %d" current_level ;
   Log.info "Check the attestation status of the published slots." ;
-  let rec check_attestations level =
-    if level > last_checked_level then return ()
+
+  let rec check_range ~from_level ~to_level ~expected_status =
+    if from_level > to_level then unit
     else
-      let expected_status =
-        let open Dal_RPC in
-        if level <= intermediary_level then Attested max_lag else Unattested
-      in
       let* () =
         check_slot_status
           ~__LOC__
           dal_node
           ~expected_status
           ~check_attested_lag:`At_most
-          ~slot_level:level
-          ~slot_index:(slot_idx parameters level)
+          ~slot_level:from_level
+          ~slot_index:(slot_idx parameters from_level)
       in
-      check_attestations (level + 1)
+      check_range ~from_level:(from_level + 1) ~to_level ~expected_status
   in
-  check_attestations first_level
+
+  let* () =
+    check_range
+      ~from_level:first_attested_level
+      ~to_level:last_attested_level
+      ~expected_status:(Attested max_lag)
+  in
+
+  check_range
+    ~from_level:first_unattested_level
+    ~to_level:last_unattested_level
+    ~expected_status:Unattested
 
 (** End-to-end DAL Tests.  *)
 
