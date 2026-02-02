@@ -2932,6 +2932,9 @@ module Dal : sig
 
   val only_if_dynamic_lag_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
+  val committee_level_of :
+    t -> attested_level:Raw_level.t -> lag:int -> Raw_level.t option
+
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
     type t

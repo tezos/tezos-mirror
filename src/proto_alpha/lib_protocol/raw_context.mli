@@ -500,6 +500,17 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
+  (** [committee_level_of ctxt ~attested_level ~lag] computes the shard
+      assignment level, aka as committee level, for the slots published at
+      [attested_level - lag], referred to as [published_level].
+
+      The committee level for a given [published_level] is defined
+      as [published_level + attestation_lag - 1].
+
+      It returns [None] if [published_level] is negative. *)
+  val committee_level_of :
+    t -> attested_level:Raw_level_repr.t -> lag:int -> Raw_level_repr.t option
+
   (** [record_number_of_attested_shards ctxt attestation ~delegate
       number_of_shards] records that a number of shards were attested
       (declared available) by [delegate]. *)

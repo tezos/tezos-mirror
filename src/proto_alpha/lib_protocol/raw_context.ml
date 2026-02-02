@@ -2246,6 +2246,13 @@ module Dal = struct
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
+  let committee_level_of ctxt ~attested_level ~lag =
+    let params = (constants ctxt).dal in
+    match Raw_level_repr.sub attested_level lag with
+    | None -> None
+    | Some published_level ->
+        Some (Raw_level_repr.add published_level (params.attestation_lag - 1))
+
   let record_number_of_attested_shards ctxt attestation ~delegate =
     let dal = dal ctxt in
     let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
