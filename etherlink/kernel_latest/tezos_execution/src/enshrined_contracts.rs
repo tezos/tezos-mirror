@@ -146,9 +146,15 @@ pub(crate) fn get_enshrined_contract_entrypoint(
 
 #[cfg(test)]
 mod tests {
+    use mir::ast::AddressHash;
+    use primitive_types::U256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::RuntimeId;
 
     use crate::enshrined_contracts::*;
+    use crate::mir_ctx::mock::MockCtx;
+    use crate::test_utils::MockRegistry;
 
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
 
@@ -158,5 +164,71 @@ mod tests {
         assert![is_enshrined(&contract)];
         assert![contract.to_base58_check().as_str() == GATEWAY_KT1];
         assert![from_kt1(&contract) == Some(EnshrinedContracts::TezosXGateway)];
+    }
+
+    #[test]
+    fn test_tezosx_transfer_creates_alias_when_absent() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias.clone());
+
+        // tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb as AddressHash
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 1000i64;
+
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+        let result = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        assert!(result.is_ok());
+
+        // Verify generate_alias was called
+        let alias_calls = registry.generate_alias_calls.borrow();
+        assert_eq!(alias_calls.len(), 1);
+        assert_eq!(alias_calls[0].1, RuntimeId::Ethereum);
+
+        // Verify bridge was called with correct parameters
+        let bridge_calls = registry.bridge_calls.borrow();
+        assert_eq!(bridge_calls.len(), 1);
+        assert_eq!(bridge_calls[0].0, RuntimeId::Ethereum);
+        assert_eq!(bridge_calls[0].1, dest.as_bytes().to_vec());
+        assert_eq!(bridge_calls[0].2, generated_alias);
+        assert_eq!(bridge_calls[0].3, U256::from(1000));
+    }
+
+    #[test]
+    fn test_tezosx_transfer_reuses_existing_alias() {
+        let mut host = MockKernelHost::default();
+        let generated_alias = vec![0x01, 0x02, 0x03, 0x04];
+        let registry = MockRegistry::new(generated_alias.clone());
+
+        let source = AddressHash::from_bytes(&[
+            0x00, 0x00, 0x6b, 0x82, 0x19, 0x8e, 0xb6, 0x4a, 0x5f, 0x10, 0x19, 0x24, 0x42,
+            0x40, 0xe0, 0x7c, 0xb2, 0x85, 0x22, 0x76, 0xa0, 0x05,
+        ])
+        .unwrap();
+        let dest = "0x1234567890123456789012345678901234567890";
+        let amount = 1000i64;
+
+        let mut ctx = MockCtx::new(&mut host, source, amount);
+
+        // First transfer creates alias
+        let result1 = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        assert!(result1.is_ok());
+
+        // Second transfer should reuse alias
+        let result2 = tezosx_transfer_tez(&registry, &mut ctx, dest);
+        assert!(result2.is_ok());
+
+        // generate_alias should only have been called once
+        let alias_calls = registry.generate_alias_calls.borrow();
+        assert_eq!(alias_calls.len(), 1);
+
+        // bridge should have been called twice
+        let bridge_calls = registry.bridge_calls.borrow();
+        assert_eq!(bridge_calls.len(), 2);
     }
 }
