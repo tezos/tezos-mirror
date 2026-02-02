@@ -990,6 +990,7 @@ module Constants : sig
       all_bakers_attest_activation_threshold : Ratio.t;
       native_contracts_enable : bool;
       swrr_new_baker_lottery_enable : bool;
+      tz5_account_enable : bool;
     }
 
     val encoding : t Data_encoding.t

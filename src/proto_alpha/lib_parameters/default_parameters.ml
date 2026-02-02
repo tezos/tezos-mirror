@@ -434,6 +434,7 @@ let constants_mainnet : Constants.Parametric.t =
     (* Native contracts feature flag *)
     native_contracts_enable = false;
     swrr_new_baker_lottery_enable = false;
+    tz5_account_enable = false;
   }
 
 let constants_sandbox =
@@ -472,6 +473,7 @@ let constants_sandbox =
     max_operations_time_to_live = 8;
     allow_tz4_delegate_enable = true;
     native_contracts_enable = true;
+    tz5_account_enable = true;
   }
 
 let constants_test =
@@ -514,6 +516,7 @@ let constants_test =
          divisions by a limit do not easily get intermingled. *);
     max_operations_time_to_live = 8;
     native_contracts_enable = true;
+    tz5_account_enable = true;
   }
 
 let test_commitments =
