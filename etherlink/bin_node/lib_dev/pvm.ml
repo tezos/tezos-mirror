@@ -232,7 +232,7 @@ module Kernel = struct
   let start ~tree version kernel =
     let open Lwt_result_syntax in
     let tree = Wasm_internal.to_irmin_exn tree in
-    let* tree = Wasm_debugger.start ~tree version kernel in
+    let* tree = Wasm_debugger.start ~state:tree version kernel in
     return (Wasm_internal.of_irmin tree)
 
   let find_key_in_durable tree key =

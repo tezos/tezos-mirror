@@ -59,10 +59,10 @@ let get_function_symbols = Wasm.Commands.get_function_symbols
 
 let set_durable_value = Wasm.set_durable_value
 
-let start ~tree version = function
-  | On_disk kernel -> Wasm.start ~tree version kernel
+let start ~state version = function
+  | On_disk kernel -> Wasm.start ~state version kernel
   | In_memory kernel ->
-      Wasm.handle_module ~tree version true "installer.wasm" kernel
+      Wasm.handle_module ~state version true "installer.wasm" kernel
 
 let find_key_in_durable = Wasm.Commands.find_key_in_durable
 

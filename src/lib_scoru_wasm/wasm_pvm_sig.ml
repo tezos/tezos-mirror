@@ -26,46 +26,46 @@
 open Wasm_pvm_state
 
 module type Unsafe = sig
-  type tree
+  type state
 
   (** Retrieve the maximum number of ticks for the PVM from the state. *)
-  val get_max_nb_ticks : tree -> Z.t Lwt.t
+  val get_max_nb_ticks : state -> Z.t Lwt.t
 
   (** Change the maximum number of ticks (per snapshot) of the WASM PVM. This is
       to be used only for tests or to increase the tick limit in a non-refutable
       setting. *)
-  val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
+  val set_max_nb_ticks : Z.t -> state -> state Lwt.t
 
-  (** Set a value to a given key in the durable storage of [tree].
+  (** Set a value to a given key in the durable storage of [state].
       If there is an existing value, it is overwritten. *)
-  val durable_set : key:string -> value:string -> tree -> tree Lwt.t
+  val durable_set : key:string -> value:string -> state -> state Lwt.t
 end
 
 module type Internal_for_tests = sig
   open Internal_state
 
-  type tree
+  type state
 
-  val insert_failure : tree -> tree Lwt.t
+  val insert_failure : state -> state Lwt.t
 
-  val get_tick_state : tree -> tick_state Lwt.t
+  val get_tick_state : state -> tick_state Lwt.t
 
   val get_module_instance_exn :
-    tree -> Tezos_webassembly_interpreter.Instance.module_inst Lwt.t
+    state -> Tezos_webassembly_interpreter.Instance.module_inst Lwt.t
 
-  val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
+  val is_stuck : state -> Wasm_pvm_errors.t option Lwt.t
 
-  val set_maximum_reboots_per_input : Z.t -> tree -> tree Lwt.t
+  val set_maximum_reboots_per_input : Z.t -> state -> state Lwt.t
 
-  val decr_reboot_counter : tree -> tree Lwt.t
+  val decr_reboot_counter : state -> state Lwt.t
 
-  val reset_reboot_counter : tree -> tree Lwt.t
+  val reset_reboot_counter : state -> state Lwt.t
 
   val get_input_buffer :
-    tree -> Tezos_webassembly_interpreter.Input_buffer.t Lwt.t
+    state -> Tezos_webassembly_interpreter.Input_buffer.t Lwt.t
 
   val get_output_buffer :
-    tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
+    state -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
 
   val compute_step_many_until :
     wasm_entrypoint:string ->
@@ -74,24 +74,22 @@ module type Internal_for_tests = sig
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->
     (pvm_state -> bool Lwt.t) ->
-    tree ->
-    (tree * int64) Lwt.t
+    state ->
+    (state * int64) Lwt.t
 
-  include Unsafe with type tree := tree
+  include Unsafe with type state := state
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)
 module type Machine = sig
-  type tree
+  include Wasm_vm_sig.Generic
 
-  include Wasm_vm_sig.Generic with type state = tree
-
-  (** [initial_state empty_tree] computes the initial tree whose hash
+  (** [initial_state empty_tree] computes the initial state whose hash
       is hard-coded in the protocol. *)
   val initial_state : version -> state -> state Lwt.t
 
   (** [install_boot_sector ~ticks_per_snapshot ~output_validity_period payload
-      tree] installs the [payload] passed as an argument in [tree] so that it is
+      state] installs the [payload] passed as an argument in [state] so that it is
       interpreted as the kernel to be used by the PVM. *)
   val install_boot_sector :
     ticks_per_snapshot:Z.t ->
@@ -109,9 +107,9 @@ module type Machine = sig
 
   val get_wasm_version : state -> Wasm_pvm_state.version Lwt.t
 
-  module Unsafe : Unsafe with type tree := tree
+  module Unsafe : Unsafe with type state := state
 
-  module Internal_for_tests : Internal_for_tests with type tree := tree
+  module Internal_for_tests : Internal_for_tests with type state := state
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)

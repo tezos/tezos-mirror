@@ -77,7 +77,7 @@ let write_debug_on_stdout =
     (fun msg -> Lwt.return @@ Format.printf "%s\n%!" msg)
 
 module Make (Ctx : Tezos_tree_encoding.Encodings_util.S) :
-  Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree =
+  Wasm_utils_intf.S with type t = Ctx.t and type state = Ctx.Tree.tree =
   Make (Ctx) (Wasm_pvm.Make_machine (Ctx.Tree))
     (Tezos_scoru_wasm_fast.Pvm.Make (Ctx.Tree))
 

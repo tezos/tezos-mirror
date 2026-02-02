@@ -47,7 +47,7 @@ let init_tree_with_empty_input ~version =
       )
     |}
   in
-  let*! tree = initial_tree ~version ~from_binary:false module_ in
+  let*! tree = initial_state ~version ~from_binary:false module_ in
   let*! tree = eval_until_input_requested tree in
   let*! tree = set_empty_inbox_step 0l tree in
   return tree

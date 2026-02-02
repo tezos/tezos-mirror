@@ -191,7 +191,7 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
         (fun () ->
           let context = Prover.make_empty_context () in
           let* tree =
-            initial_tree ~from_binary ~version ?ticks_per_snapshot kernel
+            initial_state ~from_binary ~version ?ticks_per_snapshot kernel
           in
           let* tree = set_full_input_step inputs 0l tree in
           let* tree = eval context tree in

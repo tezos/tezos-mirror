@@ -143,7 +143,7 @@ type unsafe_patch =
 module Wasm_fast_pvm_machine :
   Tezos_scoru_wasm.Wasm_pvm_sig.S
     with type context = Wasm_2_0_0_proof_format.context
-     and type tree = Wasm_2_0_0_proof_format.Tree.tree
+     and type state = Wasm_2_0_0_proof_format.Tree.tree
      and type proof = Wasm_2_0_0_proof_format.proof =
   Tezos_scoru_wasm_fast.Pvm.Make_pvm_machine (Wasm_2_0_0_proof_format)
 

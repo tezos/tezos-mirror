@@ -74,7 +74,7 @@ let zero =
     (Bounded.Non_negative_int32.of_value 0l)
 
 let initialise_tree () =
-  Wasm_utils.initial_tree ~from_binary:true "arbitrary boot sector"
+  Wasm_utils.initial_state ~from_binary:true "arbitrary boot sector"
 
 let make_inbox_info ~inbox_level ~message_counter =
   Wasm_pvm_state.

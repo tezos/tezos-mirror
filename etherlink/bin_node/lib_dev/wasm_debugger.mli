@@ -41,7 +41,7 @@ val set_durable_value :
   Irmin_context.tree Lwt.t
 
 val start :
-  tree:Irmin_context.tree ->
+  state:Irmin_context.tree ->
   Tezos_scoru_wasm.Wasm_pvm_state.version ->
   Pvm_types.kernel ->
   Irmin_context.tree tzresult Lwt.t

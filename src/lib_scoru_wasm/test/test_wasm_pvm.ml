@@ -49,7 +49,7 @@ let should_boot_unreachable_kernel ~version ~batch_size kernel =
         loop_until_input_required batch_size tree
     | _ -> return tree
   in
-  let* tree = initial_tree ~version ~from_binary:true kernel in
+  let* tree = initial_state ~version ~from_binary:true kernel in
   (* Feeding it with one input *)
   let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
@@ -100,7 +100,7 @@ let should_run_debug_kernel ~version () =
  )
 |}
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   (* Feeding it with one input *)
   let* tree = set_empty_inbox_step 0l tree in
   (* running until waiting for input *)
@@ -173,7 +173,7 @@ let should_run_store_has_kernel ~version () =
  )
   |}
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   let* tree = add_value tree ["hi"; "bye"] in
   let* tree = add_value tree ["hello"] in
   let* tree = add_value tree ["hello"; "universe"] in
@@ -229,7 +229,7 @@ let should_run_store_list_size_kernel ~version () =
  )
   |}
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["one"; "three"] in
@@ -287,7 +287,7 @@ let should_run_store_delete_kernel ~version () =
 |}
   in
   let open Lwt_syntax in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["three"] in
@@ -360,7 +360,7 @@ let should_run_store_move_kernel ~version () =
       from_path
       to_path
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   let* tree = add_value tree ["a"; "b"] ~content:"ab" in
   let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
   let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
@@ -421,7 +421,7 @@ let should_run_store_copy_kernel ~version () =
       from_path
       to_path
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   let* tree = add_value tree ["a"; "b"] ~content:"ab" in
   let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
   let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
@@ -470,7 +470,7 @@ let try_availability_above_v1_only ~version import_name import_params
     import_results () =
   let open Lwt_syntax in
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~from_binary:false
       (nop_module import_name import_params import_results)
@@ -490,7 +490,7 @@ let try_availability_above_v6_only ~version import_name import_params
     import_results () =
   let open Lwt_syntax in
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~from_binary:false
       (nop_module import_name import_params import_results)
@@ -601,7 +601,7 @@ let test_modify_read_only_storage_kernel ~version () =
  )
   |}
   in
-  let* tree = initial_tree ~version ~from_binary:false module_ in
+  let* tree = initial_state ~version ~from_binary:false module_ in
   (* The kernel is not expected to fail, the PVM should not have stuck state on.
       *)
   let* state = Wasm.Internal_for_tests.get_tick_state tree in
@@ -755,7 +755,7 @@ let test_snapshotable_state ~version () =
       )
     |}
   in
-  let*! tree = initial_tree ~version ~from_binary:false module_ in
+  let*! tree = initial_state ~version ~from_binary:false module_ in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree in
   let* () =
     match state with
@@ -797,7 +797,7 @@ let test_rebuild_snapshotable_state ~version () =
       )
     |}
   in
-  let*! tree = initial_tree ~version ~from_binary:false module_ in
+  let*! tree = initial_state ~version ~from_binary:false module_ in
   let*! tree = set_empty_inbox_step 0l tree in
   (* First evaluate until the snapshotable state. *)
   let*! tree_after_eval = eval_to_snapshot tree in
@@ -867,7 +867,7 @@ let test_unkown_host_function_truncated ~version () =
       unknown_function
   in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~version ~from_binary:false module_ in
+  let*! tree = initial_state ~version ~from_binary:false module_ in
   (* The tree should be in snapshot state by default, hence in input step. *)
   let*! tree_with_dummy_input = set_empty_inbox_step 0l tree in
   let*! tree_stuck =
@@ -901,7 +901,7 @@ let test_bulk_noops ~version () =
       )
     |}
   in
-  let* base_tree = initial_tree ~version ~ticks_per_snapshot:500L module_ in
+  let* base_tree = initial_state ~version ~ticks_per_snapshot:500L module_ in
   let* base_tree = set_empty_inbox_step 0l base_tree in
 
   let rec goto_snapshot ticks tree_slow =
@@ -985,7 +985,7 @@ let test_durable_store_io ~version () =
       to_path
   in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~version ~from_binary:false modul in
+  let*! tree = initial_state ~version ~from_binary:false modul in
 
   (* Add content to '/from/value' key in durable *)
   let content = "abcde" in
@@ -1099,7 +1099,7 @@ let test_reveal_upgrade_kernel_ok ~version () =
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~version ~from_binary:true modul in
+  let*! tree = initial_state ~version ~from_binary:true modul in
   let*! state_before_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
@@ -1177,7 +1177,7 @@ let test_reveal_upgrade_kernel_fallsback_on_error ~version ~binary
   let open Lwt_result_syntax in
   let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~version ~from_binary:true modul in
+  let*! tree = initial_state ~version ~from_binary:true modul in
   let*! tree = eval_until_input_or_reveal_requested tree in
   let*! state_before_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -1305,7 +1305,7 @@ let test_pvm_reboot_counter ~version ~pvm_max_reboots () =
   in
 
   let*! tree =
-    initial_tree
+    initial_state
       ~version
       ~max_reboots:(Z.of_int32 pvm_max_reboots)
       ~from_binary:false
@@ -1466,7 +1466,7 @@ let test_kernel_reboot_gen ?hooks ~version ~reboots ~expected_reboots
   in
   (* Let's first init the tree to compute. *)
   let*! tree =
-    initial_tree
+    initial_state
       ~version
       ~max_reboots:(Z.of_int32 pvm_max_reboots)
       ~from_binary:false
@@ -1616,7 +1616,7 @@ let test_inbox_cleanup ~version () =
   in
   let max_tick = 1000L in
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~ticks_per_snapshot:max_tick
       ~from_binary:false
@@ -1658,7 +1658,7 @@ let test_wasm_entrypoint ~version () =
   in
   let max_tick = 1000L in
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~ticks_per_snapshot:max_tick
       ~from_binary:false
@@ -1688,8 +1688,8 @@ let test_scheduling_multiple_inboxes ~version input_numbers =
       )
     |}
   in
-  let*! initial_tree = initial_tree ~version ~from_binary:false module_ in
-  let+ (_ : Wasm.tree) =
+  let*! initial_state = initial_state ~version ~from_binary:false module_ in
+  let+ (_ : Wasm.state) =
     List.fold_left_i_es
       (fun level tree input_number ->
         let*! tree = test_set_inputs input_number (Int32.of_int level) tree in
@@ -1709,7 +1709,7 @@ let test_scheduling_multiple_inboxes ~version input_numbers =
         let*! info_after_eval = Wasm.get_info tree in
         assert (info_after_eval.input_request = Input_required) ;
         return tree)
-      initial_tree
+      initial_state
       input_numbers
   in
   ()
@@ -1774,7 +1774,7 @@ let test_outboxes_at_each_level ~version () =
   in
 
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false
@@ -1824,7 +1824,7 @@ let test_outbox_validity_period ~version () =
   in
 
   let* tree =
-    initial_tree
+    initial_state
       ~version
       ~ticks_per_snapshot:1000L (* This kernel takes about 838 ticks to run. *)
       ~from_binary:false

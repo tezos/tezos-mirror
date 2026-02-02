@@ -35,9 +35,9 @@ let new_message_counter () =
 
 module Make
     (Ctx : Tezos_tree_encoding.Encodings_util.S)
-    (Wasm : Wasm_pvm_sig.Machine with type tree = Ctx.Tree.tree)
-    (Wasm_fast : Wasm_pvm_sig.Machine with type tree = Ctx.Tree.tree) :
-  Wasm_utils_intf.S with type t = Ctx.t and type tree = Ctx.Tree.tree = struct
+    (Wasm : Wasm_pvm_sig.Machine with type state = Ctx.Tree.tree)
+    (Wasm_fast : Wasm_pvm_sig.Machine with type state = Ctx.Tree.tree) :
+  Wasm_utils_intf.S with type t = Ctx.t and type state = Ctx.Tree.tree = struct
   module Ctx = Ctx
   module Tree_encoding_runner = Ctx.Tree_encoding_runner
   module Wasm = Wasm
@@ -45,65 +45,65 @@ module Make
 
   type t = Ctx.t
 
-  type tree = Ctx.Tree.tree
+  type state = Ctx.Tree.tree
 
-  let initial_tree ~version ?tree ?(ticks_per_snapshot = default_max_tick)
+  let initial_state ~version ?state ?(ticks_per_snapshot = default_max_tick)
       ?(max_reboots = Constants.maximum_reboots_per_input)
       ?(from_binary = false)
       ?(outbox_validity_period = default_outbox_validity_period)
       ?(outbox_message_limit = default_outbox_message_limit) code =
     let open Lwt_syntax in
     let max_tick_Z = Z.of_int64 ticks_per_snapshot in
-    let* tree =
-      match tree with None -> Ctx.empty_tree () | Some tree -> return tree
+    let* state =
+      match state with None -> Ctx.empty_tree () | Some state -> return state
     in
-    let* tree = Wasm.initial_state version tree in
+    let* state = Wasm.initial_state version state in
     let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
-    let* tree =
+    let* state =
       Wasm.install_boot_sector
         ~ticks_per_snapshot:max_tick_Z
         ~outbox_validity_period
         ~outbox_message_limit
         boot_sector
-        tree
+        state
     in
-    Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
+    Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots state
 
   let reveal_builtins _reveal =
     Stdlib.failwith "reveals are not available out of the box in tests"
 
   let eval_until_stuck ?(wasm_entrypoint = Constants.wasm_entrypoint)
       ?(reveal_builtins = reveal_builtins) ?hooks ?write_debug
-      ?(max_steps = 20000L) tree =
+      ?(max_steps = 20000L) state =
     let open Lwt.Syntax in
-    let rec go counter tree =
-      let* tree, _ =
+    let rec go counter state =
+      let* state, _ =
         Wasm.compute_step_many
           ~wasm_entrypoint
           ~reveal_builtins
           ?hooks
           ?write_debug
           ~max_steps
-          tree
+          state
       in
-      let* stuck = Wasm.Internal_for_tests.is_stuck tree in
+      let* stuck = Wasm.Internal_for_tests.is_stuck state in
       match stuck with
-      | Some stuck -> Lwt_result.return (stuck, tree)
+      | Some stuck -> Lwt_result.return (stuck, state)
       | _ ->
-          if counter > 0L then go (Int64.pred counter) tree
+          if counter > 0L then go (Int64.pred counter) state
           else failwith "Failed to get stuck in time"
     in
-    go max_steps tree
+    go max_steps state
 
   (* This function relies on the invariant that `compute_step_many` will always
      stop at a Snapshot or an input request, and never start another
      `kernel_run`. *)
   let rec eval_to_snapshot ?(wasm_entrypoint = Constants.wasm_entrypoint)
       ?(reveal_builtins = reveal_builtins) ?hooks ?write_debug
-      ?(max_steps = Int64.max_int) tree =
+      ?(max_steps = Int64.max_int) state =
     let open Lwt_syntax in
-    let eval tree =
-      let* tree, _ =
+    let eval state =
+      let* state, _ =
         Wasm.compute_step_many
           ~wasm_entrypoint
           ~reveal_builtins
@@ -111,42 +111,42 @@ module Make
           ?write_debug
           ~stop_at_snapshot:true
           ~max_steps
-          tree
+          state
       in
-      let* state = Wasm.Internal_for_tests.get_tick_state tree in
-      match state with
-      | Snapshot | Collect -> return tree
+      let* tick_state = Wasm.Internal_for_tests.get_tick_state state in
+      match tick_state with
+      | Snapshot | Collect -> return state
       | _ ->
           eval_to_snapshot
             ~wasm_entrypoint
             ~max_steps
             ~reveal_builtins
             ?write_debug
-            tree
+            state
     in
-    let* info = Wasm.get_info tree in
+    let* info = Wasm.get_info state in
     match info.input_request with
-    | No_input_required -> eval tree
+    | No_input_required -> eval state
     | Input_required | Reveal_required _ ->
         Stdlib.failwith "Cannot reach snapshot point"
 
-  (** [eval_until_input_requested tree] will either
-    - return tree if input is required
+  (** [eval_until_input_requested state] will either
+    - return state if input is required
     - or run compute_step_many to reach a point where input is required *)
   let eval_until_input_requested ?(wasm_entrypoint = Constants.wasm_entrypoint)
       ?(reveal_builtins = Some reveal_builtins) ?hooks ?write_debug
-      ?(fast_exec = false) ?(max_steps = Int64.max_int) tree =
+      ?(fast_exec = false) ?(max_steps = Int64.max_int) state =
     let open Lwt_syntax in
     let run =
       if fast_exec then Wasm_fast.compute_step_many ~wasm_entrypoint ?hooks
       else Wasm.compute_step_many ~wasm_entrypoint ?hooks
     in
-    let* info = Wasm.get_info tree in
+    let* info = Wasm.get_info state in
     match info.input_request with
     | No_input_required ->
-        let* tree, _ = run ?reveal_builtins ?write_debug ~max_steps tree in
-        return tree
-    | Input_required | Reveal_required _ -> return tree
+        let* state, _ = run ?reveal_builtins ?write_debug ~max_steps state in
+        return state
+    | Input_required | Reveal_required _ -> return state
 
   let eval_until_input_or_reveal_requested =
     eval_until_input_requested ~reveal_builtins:None
@@ -160,23 +160,23 @@ module Make
         message_counter;
       }
 
-  let set_sol_input level tree =
+  let set_sol_input level state =
     let sol_input =
       Pvm_input_kind.(
         Internal_for_tests.to_binary_input (Internal Start_of_level) None)
     in
-    Wasm.set_input_step (input_info level Z.zero) sol_input tree
+    Wasm.set_input_step (input_info level Z.zero) sol_input state
 
-  let set_protocol_migration_input proto level tree =
+  let set_protocol_migration_input proto level state =
     let sol_input =
       Pvm_input_kind.(
         Internal_for_tests.to_binary_input
           (Internal (Protocol_migration proto))
           None)
     in
-    Wasm.set_input_step (input_info level Z.one) sol_input tree
+    Wasm.set_input_step (input_info level Z.one) sol_input state
 
-  let set_info_per_level_input ?(migration_block = false) level tree =
+  let set_info_per_level_input ?(migration_block = false) level state =
     let block_hash = Block_hash.zero in
     let timestamp = Time.Protocol.epoch in
     let info_res =
@@ -196,68 +196,68 @@ module Make
         Wasm.set_input_step
           (input_info level (if migration_block then Z.of_int 2 else Z.one))
           info_per_level_input
-          tree
+          state
     | Error _ ->
-        (* There's no reason the encoding has failed, but we return the tree
+        (* There's no reason the encoding has failed, but we return the state
            anyway *)
         Stdlib.failwith "Info_per_level encoding has failed, this is impossible"
 
   (* Puts a message into the inbox, where the message already includes
      Internal vs External etc. information in the payload.
   *)
-  let set_raw_message level counter message tree =
-    Wasm.set_input_step (input_info level counter) message tree
+  let set_raw_message level counter message state =
+    Wasm.set_input_step (input_info level counter) message state
 
-  let set_internal_message level counter message tree =
+  let set_internal_message level counter message state =
     let encoded_message =
       Pvm_input_kind.(
         Internal_for_tests.to_binary_input (Internal Transfer) (Some message))
     in
-    Wasm.set_input_step (input_info level counter) encoded_message tree
+    Wasm.set_input_step (input_info level counter) encoded_message state
 
-  let set_eol_input level counter tree =
+  let set_eol_input level counter state =
     let sol_input =
       Pvm_input_kind.(
         Internal_for_tests.to_binary_input (Internal End_of_level) None)
     in
-    Wasm.set_input_step (input_info level counter) sol_input tree
+    Wasm.set_input_step (input_info level counter) sol_input state
 
-  let set_inputs_step ?migrate_to set_internal_message messages level tree =
+  let set_inputs_step ?migrate_to set_internal_message messages level state =
     let open Lwt_syntax in
     let next_message_counter = new_message_counter () in
     let (_ : Z.t) = next_message_counter () in
-    let* tree = set_sol_input level tree in
-    let* tree =
+    let* state = set_sol_input level state in
+    let* state =
       match migrate_to with
       | Some proto ->
-          let+ tree = set_protocol_migration_input proto level tree in
+          let+ state = set_protocol_migration_input proto level state in
           let (_ : Z.t) = next_message_counter () in
-          tree
-      | None -> return tree
+          state
+      | None -> return state
     in
     let (_ : Z.t) = next_message_counter () in
-    let* tree =
+    let* state =
       set_info_per_level_input
         ~migration_block:(Option.is_some migrate_to)
         level
-        tree
+        state
     in
-    let* tree =
+    let* state =
       List.fold_left_s
-        (fun tree message ->
-          set_internal_message level (next_message_counter ()) message tree)
-        tree
+        (fun state message ->
+          set_internal_message level (next_message_counter ()) message state)
+        state
         messages
     in
-    set_eol_input level (next_message_counter ()) tree
+    set_eol_input level (next_message_counter ()) state
 
   let set_full_input_step_gen ?migrate_to set_internal_message messages level
-      tree =
+      state =
     let open Lwt_syntax in
-    let* tree =
-      set_inputs_step ?migrate_to set_internal_message messages level tree
+    let* state =
+      set_inputs_step ?migrate_to set_internal_message messages level state
     in
-    eval_to_snapshot ~max_steps:Int64.max_int tree
+    eval_to_snapshot ~max_steps:Int64.max_int state
 
   let set_full_input_step ?migrate_to =
     set_full_input_step_gen ?migrate_to set_internal_message
@@ -265,25 +265,25 @@ module Make
   let set_full_raw_input_step ?migrate_to =
     set_full_input_step_gen set_raw_message ?migrate_to
 
-  let set_empty_inbox_step ?migrate_to level tree =
-    set_full_input_step ?migrate_to [] level tree
+  let set_empty_inbox_step ?migrate_to level state =
+    set_full_input_step ?migrate_to [] level state
 
-  let rec eval_until_init ?(wasm_entrypoint = Constants.wasm_entrypoint) tree =
+  let rec eval_until_init ?(wasm_entrypoint = Constants.wasm_entrypoint) state =
     let open Lwt_syntax in
-    let* state_after_first_message =
-      Wasm.Internal_for_tests.get_tick_state tree
+    let* tick_state_after_first_message =
+      Wasm.Internal_for_tests.get_tick_state state
     in
-    match state_after_first_message with
-    | Stuck _ | Init _ -> return tree
+    match tick_state_after_first_message with
+    | Stuck _ | Init _ -> return state
     | _ ->
-        let* tree = Wasm.compute_step ~wasm_entrypoint tree in
-        eval_until_init tree
+        let* state = Wasm.compute_step ~wasm_entrypoint state in
+        eval_until_init state
 
-  (** [eval_to_result tree] tries to evaluates the PVM until the next `SK_Result`
+  (** [eval_to_result state] tries to evaluates the PVM until the next `SK_Result`
     or `SK_Trap`, and stops in case of reveal tick or input tick. It has the
     property that the memory hasn't been flushed yet and can be inspected. *)
   let eval_to_result ?(wasm_entrypoint = Constants.wasm_entrypoint) ?write_debug
-      ?reveal_builtins ?hooks tree =
+      ?reveal_builtins ?hooks state =
     let open Lwt_syntax in
     let should_compute pvm_state =
       let+ input_request_val = Wasm_vm.get_info pvm_state in
@@ -306,7 +306,7 @@ module Make
       | No_input_required, _ -> true
     in
     let* pvm_state =
-      Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
+      Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding state
     in
     Wasm.Internal_for_tests.compute_step_many_until
       ~wasm_entrypoint
@@ -315,9 +315,9 @@ module Make
       ?hooks
       ~max_steps:(Z.to_int64 pvm_state.max_nb_ticks)
       should_compute
-      tree
+      state
 
-  let set_input_step message message_counter tree =
+  let set_input_step message message_counter state =
     let input_info =
       Wasm_pvm_state.
         {
@@ -327,7 +327,7 @@ module Make
           message_counter = Z.of_int message_counter;
         }
     in
-    Wasm.set_input_step input_info message tree
+    Wasm.set_input_step input_info message state
 
   let pp_interpreter_error out
       Wasm_pvm_errors.{raw_exception = Truncated raw_exception; explanation} =
@@ -451,18 +451,18 @@ module Make
         check_error ?expected_kind:step ?expected_reason:reason err
     | _ -> false
 
-  let wrap_as_durable_storage tree =
+  let wrap_as_durable_storage state =
     let open Lwt.Syntax in
     let+ tree =
       Tree_encoding_runner.decode
         Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
-        tree
+        state
     in
     Tezos_webassembly_interpreter.Durable_storage.of_tree tree
 
-  let has_stuck_flag tree =
+  let has_stuck_flag state =
     let open Lwt_syntax in
-    let* durable = wrap_as_durable_storage tree in
+    let* durable = wrap_as_durable_storage state in
     let durable = Durable.of_storage_exn durable in
     let+ allows_stuck = Durable.(find_value durable Constants.stuck_flag_key) in
     Option.is_some allows_stuck

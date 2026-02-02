@@ -162,8 +162,8 @@ let test_against_both ~version ?write_debug ?(fast_should_run = true)
     (tree, Int32.succ counter, hash2 :: hash3 :: hashes)
   in
 
-  let* initial_tree =
-    Wasm_utils.initial_tree
+  let* initial_state =
+    Wasm_utils.initial_state
       ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary
@@ -171,19 +171,19 @@ let test_against_both ~version ?write_debug ?(fast_should_run = true)
   in
 
   (* make sure to start in correct state *)
-  let* initial_tree =
+  let* initial_state =
     Wasm_utils.eval_until_input_or_reveal_requested
       ~fast_exec:false
       ~max_steps:Int64.max_int
-      initial_tree
+      initial_state
   in
 
-  let* stuck = Wasm_utils.Wasm.Internal_for_tests.is_stuck initial_tree in
+  let* stuck = Wasm_utils.Wasm.Internal_for_tests.is_stuck initial_state in
   assert (Option.is_none stuck) ;
 
   let run_with apply =
     let+ _, _, hashes =
-      List.fold_left_s (make_folder apply) (initial_tree, 0l, []) messages
+      List.fold_left_s (make_folder apply) (initial_state, 0l, []) messages
     in
     hashes
   in
@@ -805,15 +805,15 @@ let test_tx ~version () =
 let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let open Lwt_result_syntax in
   let reveal_builtins = Wasm_utils.reveal_builtins in
-  let*! initial_tree =
-    Wasm_utils.initial_tree
+  let*! initial_state =
+    Wasm_utils.initial_state
       ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
   in
   (* Supply input messages manually in order to have full control over tick_state we are in *)
-  let*! tree = Wasm_utils.set_sol_input 0l initial_tree in
+  let*! tree = Wasm_utils.set_sol_input 0l initial_state in
   let*! tree = Wasm_utils.set_internal_message 0l Z.one "message" tree in
   let*! tree = Wasm_utils.set_eol_input 0l (Z.of_int 2) tree in
 
@@ -870,15 +870,15 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
 let test_check_nb_ticks ~version () =
   let open Lwt_result_syntax in
   let reveal_builtins = Wasm_utils.reveal_builtins in
-  let*! initial_tree =
-    Wasm_utils.initial_tree
+  let*! initial_state =
+    Wasm_utils.initial_state
       ~version
       ~ticks_per_snapshot:Wasm_utils.production_max_tick
       ~from_binary:false
       kernel_bounded_reboot
   in
   (* Supply input messages manually in order to have full control over tick_state we are in *)
-  let*! tree = Wasm_utils.set_sol_input 0l initial_tree in
+  let*! tree = Wasm_utils.set_sol_input 0l initial_state in
   let*! tree = Wasm_utils.set_internal_message 0l Z.one "message" tree in
   let*! tree = Wasm_utils.set_eol_input 0l (Z.of_int 2) tree in
 

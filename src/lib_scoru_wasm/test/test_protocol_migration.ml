@@ -45,7 +45,7 @@ let noop_module =
 let test_protocol_migration_message ~from_version ~to_version
     ~after_protocol_activation:protocol () =
   let open Lwt_syntax in
-  let* tree = initial_tree ~version:from_version noop_module in
+  let* tree = initial_state ~version:from_version noop_module in
   let* tree = eval_until_input_requested tree in
   let* version = Wasm.get_wasm_version tree in
   assert (version = from_version) ;
