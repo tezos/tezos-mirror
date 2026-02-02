@@ -256,13 +256,13 @@ fn pvm_hooks_from_ocaml_fn(
 #[ocaml::func]
 #[ocaml::sig("state -> mut_state")]
 pub fn octez_riscv_from_imm(state: SafePointer<State>) -> SafePointer<MutState> {
-    state.as_ref().to_mut_state().into()
+    state.to_mut_state().into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("mut_state -> state")]
 pub fn octez_riscv_to_imm(state: SafePointer<MutState>) -> SafePointer<State> {
-    state.as_ref().to_imm_state().into()
+    state.to_imm_state().into()
 }
 
 #[ocaml::func]
@@ -276,13 +276,13 @@ pub fn octez_riscv_id_unsafe_of_raw_bytes(bytes: &[u8]) -> SafePointer<Id> {
 #[ocaml::func]
 #[ocaml::sig("id -> bytes")]
 pub fn octez_riscv_storage_id_to_raw_bytes(id: SafePointer<Id>) -> [u8; 32] {
-    id.as_ref().0.into()
+    id.0.into()
 }
 
 #[ocaml::func]
 #[ocaml::sig("id -> id -> bool")]
 pub fn octez_riscv_storage_id_equal(id1: SafePointer<Id>, id2: SafePointer<Id>) -> bool {
-    id1.as_ref().0 == id2.as_ref().0
+    id1.0 == id2.0
 }
 
 #[ocaml::func]
@@ -320,7 +320,7 @@ pub fn octez_riscv_storage_commit(
     state: SafePointer<State>,
 ) -> OcamlFallible<SafePointer<Id>> {
     state.apply_ro(|pvm| {
-        let mut guard = repo.as_ref().0.write();
+        let mut guard = repo.0.write();
         match guard.commit(pvm) {
             Ok(hash) => Ok(Id(hash).into()),
             Err(e) => Err(ocaml::Error::Error(Box::new(e))),
@@ -334,8 +334,8 @@ pub fn octez_riscv_storage_checkout(
     repo: SafePointer<Repo>,
     id: SafePointer<Id>,
 ) -> OcamlFallible<Option<SafePointer<State>>> {
-    let id = &id.as_ref().0;
-    let guard = repo.as_ref().0.read();
+    let id = &id.0;
+    let guard = repo.0.read();
     match guard.checkout(id) {
         Ok(pvm) => Ok(Some(ImmutableState::new(pvm).into())),
         Err(PvmStorageError::StorageError(StorageError::NotFound(_))) => Ok(None),
@@ -389,7 +389,7 @@ pub fn octez_riscv_compute_step_many(
 #[ocaml::func]
 #[ocaml::sig("int64 -> mut_state -> int64")]
 pub fn octez_riscv_mut_compute_step_many(max_steps: u64, state: SafePointer<MutState>) -> i64 {
-    state.apply_mut(|pvm| pvm.compute_step_many(StdoutDebugHooks, max_steps as usize))
+    state.apply(|pvm| pvm.compute_step_many(StdoutDebugHooks, max_steps as usize))
 }
 
 #[ocaml::func]
@@ -411,7 +411,7 @@ pub fn octez_riscv_mut_compute_step_many_with_debug(
     printer: ocaml::Value,
 ) -> i64 {
     let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
-    state.apply_mut(|pvm| pvm.compute_step_many(hooks, max_steps as usize))
+    state.apply(|pvm| pvm.compute_step_many(hooks, max_steps as usize))
 }
 
 #[ocaml::func]
@@ -507,7 +507,7 @@ pub fn octez_riscv_set_input(state: SafePointer<State>, input: Input) -> SafePoi
 #[ocaml::func]
 #[ocaml::sig("mut_state -> input -> unit")]
 pub fn octez_riscv_mut_set_input(state: SafePointer<MutState>, input: Input) -> () {
-    let res = state.apply_mut(|pvm| NodePvm::set_input(pvm, input.into()));
+    let res = state.apply(|pvm| NodePvm::set_input(pvm, input.into()));
     assert!(res)
 }
 
@@ -530,8 +530,8 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
     id: SafePointer<Id>,
     path: &str,
 ) -> Result<(), ocaml::Value> {
-    let id = &id.as_ref().0;
-    let guard = repo.as_ref().0.read();
+    let id = &id.0;
+    let guard = repo.0.read();
     guard.export_snapshot(id, path).map_err(|e| {
         let s = format!("{e:?}");
         unsafe { ocaml::Value::hash_variant(gc, "Msg", Some(s.to_value(gc))) }
@@ -587,7 +587,7 @@ ocaml::custom!(Proof);
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_proof_start_state(proof: SafePointer<Proof>) -> OcamlFallible<[u8; 32]> {
     // Ensure that the proof has been deserialised and contains the verifier backend.
-    let (_, merkle_proof) = match proof.as_ref().get_or_create_verifier() {
+    let (_, merkle_proof) = match proof.get_or_create_verifier() {
         Ok(verifier) => verifier,
         Err(e) => {
             return Err(ocaml::Error::Error(
@@ -602,7 +602,7 @@ pub fn octez_riscv_proof_start_state(proof: SafePointer<Proof>) -> OcamlFallible
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_proof_stop_state(proof: SafePointer<Proof>) -> [u8; 32] {
-    proof.as_ref().final_state_hash.into()
+    proof.final_state_hash.into()
 }
 
 #[ocaml::func]
@@ -624,8 +624,8 @@ pub fn octez_riscv_verify_proof(
 ) -> Option<InputRequest> {
     let input = input.map(|i| i.into());
 
-    let final_state_hash = proof.as_ref().final_state_hash;
-    let (node_pvm, merkle_tree) = proof.as_ref().get_or_create_verifier().ok()?;
+    let final_state_hash = proof.final_state_hash;
+    let (node_pvm, merkle_tree) = proof.get_or_create_verifier().ok()?;
     let input_request =
         node_pvm
             .clone()
@@ -639,7 +639,7 @@ pub fn octez_riscv_verify_proof(
 pub unsafe fn octez_riscv_serialise_proof(proof: SafePointer<Proof>) -> BytesWrapper {
     // Safety: the function needs to return the same `ocaml::Value` as in the signature.
     // In this case, an OCaml bytes value has to be returned.
-    let bytes = proof.as_ref().serialised_proof.clone();
+    let bytes = proof.serialised_proof.clone();
     BytesWrapper(bytes)
 }
 
@@ -723,7 +723,7 @@ pub fn octez_riscv_insert_failure(state: SafePointer<State>) -> SafePointer<Stat
 #[ocaml::func]
 #[ocaml::sig("mut_state -> unit")]
 pub fn octez_riscv_mut_insert_failure(state: SafePointer<MutState>) {
-    state.apply_mut(|pvm| pvm.insert_failure())
+    state.apply(|pvm| pvm.insert_failure())
 }
 
 /// Test endpoint to check argument passing between OCaml and Rust.
