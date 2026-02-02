@@ -1043,37 +1043,40 @@ open struct
       ~pp3:pp_int_list
 
   let trap_injection =
-    declare_5
+    declare_6
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_injection"
       ~msg:
         "Injecting entrapment evidence for delegate {delegate}, published \
-         level {published_level}, attested level {attested_level}, slot index \
-         {slot_index}, shard index {shard_index}"
+         level {published_level}, attested level {attested_level}, lag index \
+         {lag_index}, slot index {slot_index}, shard index {shard_index}"
       ~level:Notice
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("attested_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+      ("lag_index", Data_encoding.int31)
 
   let trap_injection_failure =
-    declare_6
+    declare_7
       ~section
       ~prefix_name_with_section:true
       ~name:"trap_injection_failure"
       ~msg:
         "Failed to inject an entrapment evidence for delegate {delegate}, \
          published level {published_level}, attested level {attested_level}, \
-         slot index {slot_index}, shard index {shard_index}: {error}"
+         lag index {lag_index}, slot index {slot_index}, shard index \
+         {shard_index}: {error}"
       ~level:Warning
-      ~pp6:pp_print_trace
+      ~pp7:pp_print_trace
       ("delegate", Signature.Public_key_hash.encoding)
       ("published_level", Data_encoding.int32)
       ("attested_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+      ("lag_index", Data_encoding.int31)
       ("error", trace_encoding)
 
   let trap_check_failure =
@@ -1631,16 +1634,27 @@ let emit_attester_did_not_attest_because_of_traps ~attester ~attested_level
     (attester, attested_level, slot_indexes)
 
 let emit_trap_injection ~delegate ~published_level ~attested_level ~slot_index
-    ~shard_index =
+    ~shard_index ~lag_index =
   emit
     trap_injection
-    (delegate, published_level, attested_level, slot_index, shard_index)
+    ( delegate,
+      published_level,
+      attested_level,
+      slot_index,
+      shard_index,
+      lag_index )
 
 let emit_trap_injection_failure ~delegate ~published_level ~attested_level
-    ~slot_index ~shard_index ~error =
+    ~slot_index ~shard_index ~lag_index ~error =
   emit
     trap_injection_failure
-    (delegate, published_level, attested_level, slot_index, shard_index, error)
+    ( delegate,
+      published_level,
+      attested_level,
+      slot_index,
+      shard_index,
+      lag_index,
+      error )
 
 let emit_trap_check_failure ~published_level ~slot_index ~shard_index ~delegate
     =
