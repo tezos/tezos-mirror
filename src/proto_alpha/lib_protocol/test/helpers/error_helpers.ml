@@ -266,3 +266,8 @@ let expect_clst_balance_too_low ~loc errs =
       :: Script_native.CLST_contract.Balance_too_low _ :: _ ->
         true
     | _ -> false)
+
+let expect_tz5_account_disabled ~loc errs =
+  Assert.expect_error ~loc errs (function
+    | [Validate_errors.Manager.Tz5_account_disabled] -> true
+    | _ -> false)

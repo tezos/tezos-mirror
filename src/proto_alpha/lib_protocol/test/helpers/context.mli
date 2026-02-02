@@ -427,6 +427,7 @@ type 'accounts init :=
   ?allow_tz4_delegate_enable:bool ->
   ?aggregate_attestation:bool ->
   ?native_contracts_enable:bool ->
+  ?tz5_account_enable:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

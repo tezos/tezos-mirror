@@ -84,8 +84,9 @@
   "allow_tz4_delegate_enable": true,
   "all_bakers_attest_activation_threshold":
     { "numerator": 1, "denominator": 2 }, "native_contracts_enable": true,
-  "swrr_new_baker_lottery_enable": false, "issuance_modification_delay": 2,
-  "consensus_key_activation_delay": 2, "unstake_finalization_delay": 3 }
+  "swrr_new_baker_lottery_enable": false, "tz5_account_enable": true,
+  "issuance_modification_delay": 2, "consensus_key_activation_delay": 2,
+  "unstake_finalization_delay": 3 }
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",

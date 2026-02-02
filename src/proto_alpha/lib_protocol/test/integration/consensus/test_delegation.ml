@@ -1600,7 +1600,9 @@ let test_bls_account_self_delegate ~allow_tz4_delegate_enable () =
 
 let test_mldsa44_account_self_delegate () =
   let open Lwt_result_syntax in
-  let* b, bootstrap = Context.init1 ~consensus_threshold_size:0 () in
+  let* b, bootstrap =
+    Context.init1 ~tz5_account_enable:true ~consensus_threshold_size:0 ()
+  in
   let {Account.pkh = tz5_pkh; pk = tz5_pk; _} =
     Account.new_account ~algo:Mldsa44 ()
   in
