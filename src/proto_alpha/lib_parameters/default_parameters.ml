@@ -157,7 +157,7 @@ let default_dal =
     {
       feature_enable = true;
       incentives_enable = true;
-      dynamic_lag_enable = false;
+      dynamic_lag_enable = true;
       number_of_slots = 160;
       attestation_lag = 5;
       attestation_lags = [1; 2; 3; 4; 5];
