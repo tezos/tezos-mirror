@@ -208,7 +208,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
       ~allowed_consensus:None
-      ~delegate_to_shard_count:(Some delegate_to_shard_count)
+      ~delegate_to_shard_count
   in
   return ctxt
 
@@ -241,6 +241,10 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       (ctxt, Level.Map.empty)
       allowed_levels
   in
+  let current_level = Level.current ctxt in
+  let* ctxt, delegate_to_shard_count =
+    delegate_to_shard_count ctxt ~current_level
+  in
   let ctxt =
     (* Store the resulting map in the context as [allowed_consensus]. *)
     Consensus.initialize_consensus_operation
@@ -248,7 +252,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       ~allowed_attestations:None
       ~allowed_preattestations:None
       ~allowed_consensus:(Some minimal_slots)
-      ~delegate_to_shard_count:None
+      ~delegate_to_shard_count
   in
   return ctxt
 

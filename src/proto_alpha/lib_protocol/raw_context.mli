@@ -398,7 +398,7 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+    t -> int Signature.Public_key_hash.Map.t raw_level_map
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -420,8 +420,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:
-      int Signature.Public_key_hash.Map.t raw_level_map option ->
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an

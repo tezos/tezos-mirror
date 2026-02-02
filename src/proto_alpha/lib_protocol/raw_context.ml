@@ -124,10 +124,9 @@ module Raw_consensus = struct
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
     delegate_to_shard_count :
-      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t option;
-        (** Holds the number of assigned shards of delegates
-            with at least one assigned shard for all relevant future
-            levels. This is [None] only in mempool mode. *)
+      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t;
+        (** Holds the number of assigned shards of delegates with at least one
+            assigned shard for all relevant (future) committee levels. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -161,7 +160,7 @@ module Raw_consensus = struct
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
-      delegate_to_shard_count = Some Raw_level_repr.Map.empty;
+      delegate_to_shard_count = Raw_level_repr.Map.empty;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
@@ -2077,7 +2076,7 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+    t -> int Signature.Public_key_hash.Map.t raw_level_map
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
@@ -2090,8 +2089,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:
-      int Signature.Public_key_hash.Map.t raw_level_map option ->
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
     t
 
   val record_attestation :
