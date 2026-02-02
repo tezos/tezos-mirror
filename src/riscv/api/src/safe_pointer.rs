@@ -14,16 +14,17 @@ use std::ops::Deref;
 
 use super::move_semantics::ImmutableState;
 
+/// A version of [`ocaml::Pointer`] which does not allow mutable references to the underlying data.
 #[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct SafePointer<T>(ocaml::Pointer<T>);
+pub struct SafePointer<T: Sync>(ocaml::Pointer<T>);
 
-impl<T: ocaml::Custom> From<T> for SafePointer<T> {
+impl<T: ocaml::Custom + Sync + Send> From<T> for SafePointer<T> {
     fn from(t: T) -> Self {
         SafePointer(t.into())
     }
 }
 
-impl<T> Deref for SafePointer<T> {
+impl<T: Sync> Deref for SafePointer<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -31,14 +32,15 @@ impl<T> Deref for SafePointer<T> {
     }
 }
 
-impl<T> SafePointer<ImmutableState<T>> {
-    pub fn apply_imm<R>(self, f: impl FnOnce(&mut T) -> R) -> (Self, R)
-    where
-        T: Clone,
-        ImmutableState<T>: ocaml::Custom,
-    {
-        let v = self.share();
-        let (new_v, result) = v.apply(f);
+impl<T> SafePointer<ImmutableState<T>>
+where
+    T: Clone,
+    ImmutableState<T>: ocaml::Custom + Sync + Send,
+{
+    /// In the case that we have an `ImmutableState` and a function that requires a mutable
+    /// reference, we first make a copy of the state to apply the function to.
+    pub fn apply_imm<R>(&self, f: impl FnOnce(&mut T) -> R) -> (Self, R) {
+        let (new_v, result) = self.apply(f);
         (new_v.into(), result)
     }
 }

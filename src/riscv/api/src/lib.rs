@@ -651,15 +651,12 @@ pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<SafePointer<Proof>,
     let (proof, node_pvm): (PvmProof, NodePvm<Verify>) =
         deserialise_proof(iter).map_err(|e| e.to_string())?;
     let final_state_hash = proof.final_state_hash();
-
     let merkle_tree = proof.into_tree();
-    let verifier = OnceLock::new();
-    verifier.get_or_init(|| (node_pvm, merkle_tree));
 
     Ok(Proof {
         final_state_hash,
         serialised_proof: bytes.into(),
-        verifier,
+        verifier: OnceLock::from((node_pvm, merkle_tree)),
     }
     .into())
 }

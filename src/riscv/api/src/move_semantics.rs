@@ -15,6 +15,14 @@ use parking_lot::RwLock;
 
 pub struct ImmutableState<T>(Arc<T>);
 
+impl<T> Clone for ImmutableState<T> {
+    /// Clone method on this struct just shares a reference so it is very cheap, the underlying
+    /// data is not copied.
+    fn clone(&self) -> Self {
+        ImmutableState(Arc::clone(&self.0))
+    }
+}
+
 impl<T> From<MutableState<T>> for ImmutableState<T> {
     /// Very cheap conversion from [`MutableState<T>`] to [`ImmutableState<T>`]
     fn from(value: MutableState<T>) -> Self {
@@ -32,12 +40,6 @@ impl<T> ImmutableState<T> {
         Self(Arc::new(state))
     }
 
-    /// Cheaply creates a new `ImmutableState` using `Arc::clone` to get a new reference. Underlying
-    /// data is not copied.
-    pub fn share(&self) -> Self {
-        Self(Arc::clone(&self.0))
-    }
-
     /// Create a mutable state from an ImmutableState state
     #[inline]
     pub fn to_mut_state(&self) -> MutableState<T> {
@@ -53,14 +55,13 @@ impl<T> ImmutableState<T> {
     /// Apply a mutable function `f` over the underlying state. Clones the old data to the new object.
     #[inline]
     #[must_use = "ImmutableState::apply returns new state"]
-    pub fn apply<R>(self, f: impl FnOnce(&mut T) -> R) -> (Self, R)
+    pub fn apply<R>(&self, f: impl FnOnce(&mut T) -> R) -> (Self, R)
     where
         T: Clone,
     {
-        let mut_state: MutableState<T> = self.into();
-        let result = mut_state.apply(f);
-        let imm_state = mut_state.into();
-        (imm_state, result)
+        let mut t = self.0.as_ref().clone();
+        let result = f(&mut t);
+        (ImmutableState::new(t), result)
     }
 }
 
@@ -74,6 +75,12 @@ impl<T> ImmutableState<T> {
 /// or
 ///
 /// 1. Created from an underlying state `T` directly with constructor [`MutableState::owned`]
+///
+/// Note on thread-safety: this type provide interior mutability using a `RwLock`. From a Rust POV
+/// the implementation will seem rather strange because we use `try_read().expect(...)` and
+/// `try_write().expect(...)`. This makes sense because the end user of this type is an OCaml
+/// program calling an FFI; we wish to ensure thread-safety but we don't want to block as it could
+/// cause the OCaml RT to hang.
 pub struct MutableState<T>(RwLock<MutableInner<T>>);
 
 enum MutableInner<T> {
@@ -108,7 +115,7 @@ impl<T> MutableState<T> {
         T: Clone,
     {
         let guard = self.0.try_read().expect(
-            "MutableState::to_imm_state shouldn't try to read a MutableState that is being written to.",
+            "Shouldn't try to read a MutableState that is being written to. See `move_semantics::MutableState`",
         );
         match guard.deref() {
             MutableInner::Owned(t) => ImmutableState::new(t.clone()),
@@ -120,7 +127,7 @@ impl<T> MutableState<T> {
     #[inline]
     pub fn apply_ro<R>(&self, f: impl FnOnce(&T) -> R) -> R {
         let guard = self.0.try_read().expect(
-            "MutableState::apply_ro shouldn't try to read a MutableState that is being written to.",
+            "Shouldn't try to read a MutableState that is being written to. See `move_semantics::MutableState`",
         );
         match guard.deref() {
             MutableInner::Owned(t) => f(t),
@@ -135,19 +142,17 @@ impl<T> MutableState<T> {
     where
         T: Clone,
     {
-        let mut guard = self.0.try_write().expect(
-            "MutableState::apply should not be competing for write access to MutableState.",
-        );
-        match guard.deref_mut() {
+        let mut guard = self
+            .0
+            .try_write()
+            .expect("Shouldn't be competing for write access. See `move_semantics::MutableState`");
+        let inner = guard.deref_mut();
+        match inner {
             MutableInner::Owned(t) => f(t),
-            inner => {
-                let (t, res) = if let MutableInner::Borrowed(arc) = inner {
-                    let mut t = arc.as_ref().clone();
-                    let res = f(&mut t);
-                    (t, res)
-                } else {
-                    unreachable!()
-                };
+            MutableInner::Borrowed(arc) => {
+                let mut t = arc.as_ref().clone();
+                let res = f(&mut t);
+
                 *inner = MutableInner::Owned(t);
                 res
             }
