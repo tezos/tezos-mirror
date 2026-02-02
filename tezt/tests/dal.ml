@@ -3275,7 +3275,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
   let client = Client.with_dal_node client ~dal_node in
-  let lag = parameters.attestation_lag in
+  let max_lag = parameters.attestation_lag in
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.alias)
@@ -3290,16 +3290,9 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let* first_level = next_level node in
   let intermediary_level = first_level + attested_levels - 1 in
   let last_checked_level = intermediary_level + unattested_levels - 1 in
-  let last_level = last_checked_level + lag + 1 in
+  let last_level = last_checked_level + max_lag + 1 in
 
-  Log.info "attestation_lag = %d" lag ;
-  Log.info
-    "first_level = %d, intermediary_level = %d, last_checked_level = %d, \
-     last_level = %d"
-    first_level
-    intermediary_level
-    last_checked_level
-    last_level ;
+  Log.info "attestation_lag = %d" max_lag ;
 
   let wait_level = last_level + 1 in
   let wait_block_processing_on_l1 = wait_for_layer1_head dal_node wait_level in
@@ -3311,7 +3304,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let* _ =
     publish_and_bake
       ~from_level:first_level
-      ~to_level:(intermediary_level + lag)
+      ~to_level:(intermediary_level + max_lag)
       ~delegates:(`For all_delegates)
       parameters
       cryptobox
@@ -3321,7 +3314,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   in
   let* _ =
     publish_and_bake
-      ~from_level:(intermediary_level + lag + 1)
+      ~from_level:(intermediary_level + max_lag + 1)
       ~to_level:last_level
       ~delegates:(`For not_all_delegates)
       parameters
@@ -3341,7 +3334,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     else
       let expected_status =
         let open Dal_RPC in
-        if level <= intermediary_level then Attested lag else Unattested
+        if level <= intermediary_level then Attested max_lag else Unattested
       in
       let* () =
         check_slot_status
