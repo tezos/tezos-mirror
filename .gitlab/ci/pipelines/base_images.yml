@@ -115,6 +115,9 @@ oc.base-images.ubuntu:
       - noble
       - jammy
       - plucky
+      - "22.04"
+      - "24.04"
+      - "25.10"
 
 oc.base-images.fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0

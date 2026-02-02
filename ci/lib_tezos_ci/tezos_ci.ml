@@ -1576,6 +1576,12 @@ module Images = struct
 
     let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
 
+    let ubuntu_22_04 = make_img "ubuntu:22.04" debian_version
+
+    let ubuntu_24_04 = make_img "ubuntu:24.04" debian_version
+
+    let ubuntu_25_10 = make_img "ubuntu:25.10" debian_version
+
     let rpm_version = common_version
 
     let rockylinux_9 = make_img "rockylinux:9.6" rpm_version
