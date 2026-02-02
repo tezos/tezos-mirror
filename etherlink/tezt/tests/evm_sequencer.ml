@@ -3264,7 +3264,7 @@ let test_empty_block_on_upgrade =
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:kernel
-      ~activation_timestamp:"2026-01-01T00:00:00Z"
+      ~activation_timestamp:"2077-01-01T00:00:00Z"
   in
 
   (* Bake a few blocks to make sure the sequencer sees the deposit and the
@@ -3290,10 +3290,10 @@ let test_empty_block_on_upgrade =
 
   (* Producing the block will create an empty block. As the kernel
      is going to upgrade, the sequencer will not pick the transaction. *)
-  let*@ _ = produce_block ~timestamp:"2026-02-02T00:00:00Z" sequencer in
+  let*@ _ = produce_block ~timestamp:"2077-02-02T00:00:00Z" sequencer in
   let* () = check_transactions_in_block 0 in
   (* Next block will have the deposit. *)
-  let*@ _ = produce_block ~timestamp:"2026-02-02T00:00:00Z" sequencer in
+  let*@ _ = produce_block ~timestamp:"2077-02-02T00:00:00Z" sequencer in
   let* () = check_transactions_in_block 1 in
 
   unit
