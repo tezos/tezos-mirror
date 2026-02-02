@@ -226,7 +226,6 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
   let*? slots =
     Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   in
-  let number_of_shards = Constants.dal_number_of_shards ctxt in
   let* ctxt, (delegates_map, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
@@ -248,11 +247,6 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                   delegates_map )
           | Some initial_slot -> (initial_slot, delegates_map)
         in
-        (* [slots_map]'keys are the minimal slots of delegates because
-           we fold on slots in increasing order *)
-        let in_dal_committee =
-          if Compare.Int.(Slot.to_int slot < number_of_shards) then 1 else 0
-        in
         let slots_map =
           Slot.Map.update
             initial_slot
@@ -264,17 +258,10 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                       attesting_power =
                         incr_slot Attesting_power.zero
                         (* stake added in the next step *);
-                      dal_power = in_dal_committee;
                     }
-              | Some
-                  ({consensus_key; attesting_power; dal_power} :
-                    Consensus_key.power) ->
+              | Some ({consensus_key; attesting_power} : Consensus_key.power) ->
                   Some
-                    {
-                      consensus_key;
-                      attesting_power = incr_slot attesting_power;
-                      dal_power = dal_power + in_dal_committee;
-                    })
+                    {consensus_key; attesting_power = incr_slot attesting_power})
             slots_map
         in
         (ctxt, (delegates_map, slots_map)))
@@ -307,7 +294,6 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                       Consensus_key.consensus_key;
                       attesting_power =
                         Attesting_power.make ~slots:0 ~baking_power:weight;
-                      dal_power = 0;
                     }
                     acc,
                   succ_i )

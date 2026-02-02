@@ -642,7 +642,7 @@ module Consensus = struct
     let (Single (Preattestation consensus_content)) =
       operation.protocol_data.contents
     in
-    let* {consensus_key; attesting_power; dal_power = _} =
+    let* {consensus_key; attesting_power} =
       match vi.mode with
       | Application block_info | Partial_validation block_info ->
           let* () =
@@ -873,7 +873,7 @@ module Consensus = struct
     let (Single (Attestation {consensus_content; dal_content})) =
       operation.protocol_data.contents
     in
-    let* {consensus_key; attesting_power; dal_power = _} =
+    let* {consensus_key; attesting_power} =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ -> (
           let* () =
@@ -1322,7 +1322,7 @@ module Consensus = struct
           List.fold_left_es
             (fun (public_keys, total_attesting_power) slot ->
               (* Lookup the slot owner *)
-              let*? {consensus_key; attesting_power; dal_power = _} =
+              let*? {consensus_key; attesting_power} =
                 get_delegate_details
                   consensus_info.preattestation_slot_map
                   Preattestation
@@ -1429,7 +1429,7 @@ module Consensus = struct
           List.fold_left_es
             (fun (pks, weighted_pks, total_power) (slot, dal) ->
               (* Lookup the slot owner *)
-              let*? {consensus_key; attesting_power; dal_power = _} =
+              let*? {consensus_key; attesting_power} =
                 get_delegate_details
                   consensus_info.attestation_slot_map
                   Attestation

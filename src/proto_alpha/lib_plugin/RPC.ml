@@ -3967,7 +3967,6 @@ module Attestation_rights = struct
                     companion_pkh = _;
                   };
                 attesting_power;
-                dal_power = _;
               } :
                Consensus_key.power)
              acc

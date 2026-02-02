@@ -95,7 +95,6 @@ let consensus_pk_encoding =
 type consensus_power = {
   consensus_key : consensus_pk;
   attesting_power : Attesting_power_repr.t;
-  dal_power : int;
 }
 
 module Raw_consensus = struct
@@ -2247,14 +2246,31 @@ module Dal = struct
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let record_number_of_attested_shards ctxt attestation ~delegate number =
+  let record_number_of_attested_shards ctxt attestation ~delegate =
     let dal = dal ctxt in
+    let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
+    let attested_level = (current_level ctxt).level in
+    let number_of_baker_shards =
+      match Raw_level_repr.pred attested_level with
+      | None -> 0
+      | Some committee_level -> (
+          match
+            Raw_level_repr.Map.find committee_level delegate_to_shard_count
+          with
+          | None -> 0
+          | Some delegate_map -> (
+              match
+                Signature.Public_key_hash.Map.find delegate delegate_map
+              with
+              | None -> 0
+              | Some n -> n))
+    in
     let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
         dal.slot_accountability
         ~delegate
         attestation
-        number
+        number_of_baker_shards
     in
     update_dal ctxt {dal with slot_accountability}
 

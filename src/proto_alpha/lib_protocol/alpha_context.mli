@@ -2349,11 +2349,7 @@ module Consensus_key : sig
     consensus_pkh : Signature.Public_key_hash.t;
   }
 
-  type power = {
-    consensus_key : pk;
-    attesting_power : Attesting_power.t;
-    dal_power : int;
-  }
+  type power = {consensus_key : pk; attesting_power : Attesting_power.t}
 
   val encoding : t Data_encoding.t
 
@@ -3031,7 +3027,7 @@ module Dal : sig
     val number_of_attested_slots : t -> int
 
     val record_number_of_attested_shards :
-      context -> t -> delegate:Signature.public_key_hash -> int -> context
+      context -> t -> delegate:Signature.public_key_hash -> context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 

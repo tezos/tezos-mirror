@@ -45,15 +45,14 @@ val validate_attestation :
   Dal.Attestation.t ->
   unit tzresult Lwt.t
 
-(** [apply_attestation ctxt attestation ~delegate ~tb_slot ~power] records in
+(** [apply_attestation ctxt attestation ~delegate ~tb_slot] records in
     the context that the given [attestation] was issued by [delegate] with
-    initial Tenderbake slot [tb_slot] and the given [power]. *)
+    initial Tenderbake slot [tb_slot]. *)
 val apply_attestation :
   t ->
   delegate:Signature.public_key_hash ->
   Dal.Attestation.t ->
   tb_slot:Slot.t ->
-  power:int ->
   t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
@@ -72,15 +71,13 @@ val apply_publish_commitment :
   source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
 
-(** [record_participation ctxt delegate tb_slot ~dal_power slot_availability]
-    records the number of protocol-attested slots (given in [slot_availability])
-    attested by [delegate] (with the initial TB slot [tb_slot] and [dal_power]
-    assigned shards per slot) in the current block. *)
+(** [record_participation ctxt delegate tb_slot slot_availability] records the
+    number of protocol-attested slots (given in [slot_availability]) attested by
+    [delegate] (with the initial TB slot [tb_slot]) in the current block. *)
 val record_participation :
   t ->
   Signature.Public_key_hash.t ->
   Slot.t ->
-  dal_power:int ->
   Dal.Slot_availability.t ->
   t tzresult Lwt.t
 
