@@ -1058,7 +1058,6 @@ module State = struct
     | Executing
         ({timestamp; next_tx_index; da_fee_per_byte; base_fee_per_gas; _} as
          future_block_info) ->
-        Format.printf "BACK 1@." ;
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
@@ -1077,7 +1076,6 @@ module State = struct
             hash
             tx
         in
-        Format.printf "BACK 2@." ;
         Octez_telemetry.Trace.add_attrs (fun () ->
             let (Ethereum_types.Qty gas_used) = receipt.gasUsed in
             let execution_gas =
@@ -1242,6 +1240,25 @@ module State = struct
     | Awaiting_next_block_info | Executing _ ->
         ctxt.session.future_block_info <- Awaiting_next_block_info ;
         ()
+
+  (* Helper to find Divergence or Unsync in error trace.
+    The exception emitted by `apply_blueprint_store_unsafe` is caught by
+    `Sqlite.with_transaction` and converted to `Error`, so we need to pattern match
+    on the error result rather than using `Lwt.catch` to find retry cases. *)
+  let find_divergence_or_unsync trace =
+    List.find_map
+      (function
+        | Exn
+            (Divergence
+               {
+                 level = Qty level;
+                 computed_block_hash = block_hash;
+                 expected_block_hash;
+               }) ->
+            Some (`Divergence (level, block_hash, expected_block_hash))
+        | Exn Unsync -> Some `Unsync
+        | _ -> None)
+      trace
 
   (** [apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
       delayed_transactions] applies the blueprint [chunks] on the head of
@@ -2428,30 +2445,29 @@ module Handlers = struct
           State.reset_future_block_info_if_enabled ctxt ;
           apply_blueprint ?expected_block_hash:None ctxt conn
         in
+        let*! result =
+          State.Transaction.run ctxt @@ fun ctxt conn ->
+          apply_blueprint ?expected_block_hash ctxt conn
+        in
         let* block =
-          Lwt.catch
-            (fun () ->
-              State.Transaction.run ctxt @@ fun ctxt conn ->
-              apply_blueprint ?expected_block_hash ctxt conn)
-            (function
-              | Divergence _ when not fail_on_divergence ->
-                  State.Transaction.run ctxt retry_apply_blueprint
-              | Unsync -> State.Transaction.run ctxt retry_apply_blueprint
-              | Divergence
-                  {
-                    level = Qty level;
-                    computed_block_hash = block_hash;
-                    expected_block_hash;
-                  } ->
-                  tzfail
-                    (Node_error.Diverged
-                       {
-                         level;
-                         expected_block_hash;
-                         found_block_hash = Some block_hash;
-                         must_exit = true;
-                       })
-              | exn -> Lwt.reraise exn)
+          match result with
+          | Ok block -> return block
+          | Error trace -> (
+              match State.find_divergence_or_unsync trace with
+              | Some (`Divergence (level, block_hash, expected_block_hash)) ->
+                  if not fail_on_divergence then
+                    State.Transaction.run ctxt retry_apply_blueprint
+                  else
+                    tzfail
+                      (Node_error.Diverged
+                         {
+                           level;
+                           expected_block_hash;
+                           found_block_hash = Some block_hash;
+                           must_exit = true;
+                         })
+              | Some `Unsync -> State.Transaction.run ctxt retry_apply_blueprint
+              | None -> Lwt.return (Error trace))
         in
         let tx_hashes =
           match block with
