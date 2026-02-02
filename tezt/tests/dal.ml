@@ -4153,11 +4153,11 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
-    ~migrate_to ~migration_level ~scenario ~description ?operator_profiles
-    ?custom_constants ?attestation_lag ?attestation_threshold ?number_of_slots
-    ?number_of_shards ?slot_size ?page_size ?redundancy_factor ?traps_fraction
-    ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
-    ?parameter_overrides ?activation_timestamp () =
+    ~migrate_to ~migration_level ~scenario ~description ?bootstrap_profile
+    ?operator_profiles ?custom_constants ?attestation_lag ?attestation_threshold
+    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
+    ?traps_fraction ?consensus_committee_size ?blocks_per_cycle
+    ?minimal_block_delay ?parameter_overrides ?activation_timestamp () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4211,9 +4211,7 @@ let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
   let* () = Node.run ~patch_config node nodes_args in
   let* () = Node.wait_for_ready node in
 
-  let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ?operator_profiles dal_node in
-  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* dal_node = make_dal_node ?operator_profiles ?bootstrap_profile node in
 
   scenario ~migration_level dal_parameters client node dal_node
 
@@ -6685,8 +6683,7 @@ module Amplification = struct
     let slot_index = 0 in
     (* Parameters and constants. *)
     let {
-      Dal.Parameters.attestation_lag;
-      attestation_threshold;
+      Dal.Parameters.attestation_threshold;
       number_of_slots;
       cryptobox =
         {Dal.Cryptobox.slot_size; number_of_shards; redundancy_factor; _};
@@ -6815,11 +6812,15 @@ module Amplification = struct
           all_attesters
     in
     info "Waiting for grafting of the attester - producer/observer connections" ;
-    (* Each attester DAL node won't join the DAL network until it has
-       processed some finalized L1 block in which the associated baker
-       is reported to have some rights. For this to happen, we need to
-       bake a few blocks. *)
-    let* () = bake_for ~count:3 client in
+    (* Each attester DAL node won't join the DAL network until it has processed
+       some finalized L1 block in which the associated baker is reported to have
+       some rights. For this to happen, we need to bake a few blocks.
+       If this test is used at a migration, one has to restart the client to use
+       the right protocol, instead of using [bake_for ~count:n]. *)
+    let* () = repeat 3 (fun () -> bake_for client) in
+    let* level = next_level node in
+    let* () = bake_for client
+    and* () = wait_for_layer1_final_block dal_bootstrap (level - 2) in
     let* () = Lwt.join check_graft_promises in
     info "Attester - producer connections grafted" ;
 
@@ -6865,6 +6866,12 @@ module Amplification = struct
 
     let* level_before_publication = Client.level client in
     let publication_level = level_before_publication + 1 in
+    let* proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let attestation_lag =
+      JSON.(proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    in
     let attested_level = publication_level + attestation_lag in
     let attestation_level = attested_level - 1 in
 
@@ -13146,7 +13153,19 @@ let register_migration ~migrate_from ~migrate_to =
   test_skip_list_store_with_migration
     ~migration_level:11
     ~migrate_from
+    ~migrate_to ;
+  test_l1_migration_scenario
+    ~scenario:(fun ~migration_level:_ dal_params client node dal_node ->
+      Amplification.test_amplification () dal_params () node client dal_node)
+    ~tags:["migration"; "dal"; "amplification"]
+    ~description:"Test amplification after migration"
+    ~bootstrap_profile:true
+    ~activation_timestamp:Now
+    ~redundancy_factor:2
+    ~migration_level:3
+    ~migrate_from
     ~migrate_to
+    ()
 
 let () =
   Regression.register
