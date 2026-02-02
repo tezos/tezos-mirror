@@ -29,6 +29,12 @@
 
     This module is an interface for the slot storage for the layer 1.
 
+    It is responsible for maintaining the following tables:
+    - {!Storage.Dal.Slot.LevelHistories}
+    - {!Storage.Dal.Slot.Headers}
+    - {!Storage.Dal.Slot.History}
+    - {!Storage.Dal.AttestationHistory}
+
     Depending on the current level of the context and the [attestation_lag] (a
     constant given by the context), the status of the slot may differ:
 

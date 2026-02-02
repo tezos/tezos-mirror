@@ -23,6 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This module manages the persistent storage for DAL (Data Availability Layer)
+   slot headers and attestation tracking.
+
+   == Storages used ==
+
+   Storage.Dal.Slot.Headers : Raw_level -> (Header * Contract) list
+     Path: /dal/level/<level>/slot_headers
+     Purpose: Stores published slot headers with their publishers for each
+     level. Used to verify DAL entrapment evidence and to build skip list
+     cells. Kept for [(denunciation_period + 1) * blocks_per_cycle] levels, then
+     pruned by [remove_old_headers].
+
+   Storage.Dal.Slot.History : Dal_slot_repr.History.t
+     Path: /dal/slot_headers_history
+     Purpose: Stores the head of the skip list tracking all slot attestation
+     results. Updated at each block finalization with newly unpublished slots,
+     attested slots and finalized unattested slots.
+
+   Storage.Dal.Slot.LevelHistories : (hash * History.t) list
+     Path: /dal/slot_headers_successive_histories_of_level
+     Purpose: The skip list cells constructed during the current's block
+     application. Used by the RPC [skip_list_cells_of_level], itself used by
+     the DAL node to populate its skip-list store.
+
+   Storage.Dal.AttestationHistory : Accountability.history
+     Path: /dal/attestation_history
+     Purpose: Tracks per-slot attestation progress (attested shards, attesters
+     set, threshold status) for levels within the attestation window. Maps
+     [published_level -> slot_index -> attestation_status]. Pruned to keep only
+     levels where [published_level > current_level - attestation_lag].
+
+   == Lifecycle ==
+
+   At block finalization ([finalize_pending_slot_headers]):
+   1. Current block's attestations are merged into [AttestationHistory]
+   2. Slots crossing the attestation threshold are identified
+   3. Skip list ([LevelHistory] and [History]) is updated with newly attested
+      and finalized slots
+   4. Old entries in [AttestationHistory] are pruned (after [attestation_lag] levels)
+   5. Old [Headers] are removed (after [denunciation period + 1] cycles)
+*)
+
 let find_slot_headers ctxt level = Storage.Dal.Slot.Headers.find ctxt level
 
 let find_level_histories ctxt = Storage.Dal.Slot.LevelHistories.find ctxt
