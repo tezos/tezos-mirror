@@ -578,6 +578,12 @@ let wait_for_diverged evm_node =
   let found_hash = json |-> "found_hash" |> as_string in
   Some (level, expected_hash, found_hash)
 
+let wait_for_assemble_block_diverged ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"assemble_block_diverged.v0"
+  @@ fun json ->
+  let level = JSON.(json |> as_int) in
+  Some level
+
 let wait_for_reset evm_node =
   wait_for evm_node "evm_context_reset_at_level.v0" @@ fun _json -> Some ()
 
@@ -715,6 +721,10 @@ let wait_for_inclusion ?timeout ?hash evm_node =
   | Some expected_hash ->
       if String.equal expected_hash found_hash then Some found_hash else None
   | None -> Some found_hash
+
+let wait_for_single_tx_execution_done ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"single_tx_execution_done.v0"
+  @@ fun json -> Some (JSON.as_string json)
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner ?history
     ?data_dir ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?spawn_rpc
@@ -1497,6 +1507,15 @@ let patch_state evm_node ~key ~value =
       in
       let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
       Process.check process
+
+let execute_single_transaction evm_node ~raw_tx =
+  let* _response =
+    call_evm_rpc
+      ~private_:true
+      evm_node
+      {method_ = "executeSingleTransaction"; parameters = `A [`String raw_tx]}
+  in
+  unit
 
 let snapshot_store () =
   (* Use a single common snapshot store for all snapshots. *)

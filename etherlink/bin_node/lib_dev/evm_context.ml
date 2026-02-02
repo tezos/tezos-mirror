@@ -1058,6 +1058,7 @@ module State = struct
     | Executing
         ({timestamp; next_tx_index; da_fee_per_byte; base_fee_per_gas; _} as
          future_block_info) ->
+        Format.printf "BACK 1@." ;
         let*! data_dir, config = execution_config in
         let* receipt, evm_state =
           Evm_state.execute_single_transaction
@@ -1076,6 +1077,7 @@ module State = struct
             hash
             tx
         in
+        Format.printf "BACK 2@." ;
         Octez_telemetry.Trace.add_attrs (fun () ->
             let (Ethereum_types.Qty gas_used) = receipt.gasUsed in
             let execution_gas =
@@ -1090,6 +1092,7 @@ module State = struct
         ctxt.session.future_block_info <-
           Executing
             {future_block_info with next_tx_index = Int32.succ next_tx_index} ;
+        let*! () = Events.single_tx_execution_done hash in
         return_some receipt
     | Disabled -> return_none
     | Awaiting_next_block_info ->

@@ -561,6 +561,14 @@ let event_tx_inclusion =
     ("op", Data_encoding.string)
     ("txn_hash", Ethereum_types.hash_encoding)
 
+let single_tx_execution_done =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"single_tx_execution_done"
+    ~msg:"single transaction execution done for {txn_hash}"
+    ~level:Debug
+    ("txn_hash", Ethereum_types.hash_encoding)
+
 let patched_sequencer_key =
   Internal_event.Simple.declare_2
     ~section
@@ -739,6 +747,8 @@ let sent_next_block_info timestamp level =
   emit event_next_block_info ("sent", level, timestamp)
 
 let sent_inclusion hash = emit event_tx_inclusion ("sent", hash)
+
+let single_tx_execution_done hash = emit single_tx_execution_done hash
 
 let patched_sequencer_key pk =
   emit patched_sequencer_key (pk, Signature.Public_key.hash pk)

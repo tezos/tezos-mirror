@@ -234,6 +234,10 @@ val sent_next_block_info :
 
 val sent_inclusion : Ethereum_types.hash -> unit Lwt.t
 
+(** [single_tx_execution_done hash] advertises that a single transaction
+    execution is complete for the transaction with hash [hash]. *)
+val single_tx_execution_done : Ethereum_types.hash -> unit Lwt.t
+
 (** [patched_sequencer_key pk] advertises that the sequencer key in
     state was patched with [pk] . *)
 val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t

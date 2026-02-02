@@ -328,6 +328,9 @@ module Propose_next_block_timestamp :
 module Produce_proposal :
   METHOD with type input = Time.Protocol.t and type output = unit
 
+module Execute_single_transaction :
+  METHOD with type input = Ethereum_types.hex and type output = unit
+
 module Inject_transaction :
   METHOD
     with type input = Transaction_object.t * string * bool

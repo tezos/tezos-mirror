@@ -915,6 +915,24 @@ module Produce_proposal = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Execute_single_transaction = struct
+  (** Takes a raw transaction hex string. The server parses it and
+      executes it via the IC single transaction execution path. *)
+  open Ethereum_types
+
+  type input = hex
+
+  type output = unit
+
+  let input_encoding = Data_encoding.tup1 hex_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "executeSingleTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Inject_transaction = struct
   open Ethereum_types
 
@@ -1266,6 +1284,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Propose_next_block_timestamp);
     (module Produce_proposal);
+    (module Execute_single_transaction);
     (module Inject_transaction);
     (module Wait_transaction_confirmation);
     (module Eth_max_priority_fee_per_gas);

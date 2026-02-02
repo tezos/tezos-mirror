@@ -1784,6 +1784,16 @@ let dispatch_private_request (type f) ~websocket
           rpc_ok ()
         in
         build_with_input ~f module_ parameters
+    | Method (Execute_single_transaction.Method, module_) ->
+        let f raw_tx_hex =
+          let open Lwt_result_syntax in
+          let raw_tx = Ethereum_types.hex_to_bytes raw_tx_hex in
+          let hash = Ethereum_types.hash_raw_tx raw_tx in
+          let tx = Broadcast.Common (Evm raw_tx) in
+          let* _receipt = Evm_context.execute_single_transaction tx hash in
+          rpc_ok ()
+        in
+        build_with_input ~f module_ parameters
     | Method (Wait_transaction_confirmation.Method, module_) ->
         let open Lwt_result_syntax in
         let f hash =
