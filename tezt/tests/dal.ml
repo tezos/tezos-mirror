@@ -2536,7 +2536,7 @@ let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
         unit)
       tests_error
   in
-  unit
+  Dal_node.terminate fresh_dal_node
 
 let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
     dal_node =
