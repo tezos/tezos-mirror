@@ -700,7 +700,7 @@ grafazos.build:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cd grafazos/
-  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec95ce32336fe47c8881361847c475b5254
   - make
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
