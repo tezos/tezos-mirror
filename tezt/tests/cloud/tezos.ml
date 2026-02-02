@@ -892,7 +892,7 @@ module Evm_node = struct
     let create ?(group = "Etherlink") ?(copy_binary = true)
         ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ~mode
         ?rpc_port ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
-        endpoint cloud agent =
+        cloud agent =
       let* path =
         if copy_binary then Agent.copy agent ~source:path
         else
@@ -912,23 +912,24 @@ module Evm_node = struct
         | None -> Agent.next_available_port agent
         | Some port -> port
       in
-      create
-        ?name
-        ~path
-        ?runner
-        ?data_dir
-        ~rpc_port
-        ~mode
-        ?websockets
-        ?initial_kernel
-        ?preimages_dir
-        ?private_rpc_port
-        endpoint
-      |> Lwt.return
+      let node_setup =
+        make_setup
+          ~path
+          ?name
+          ?runner
+          ?data_dir
+          ~rpc_port
+          ?websockets
+          ?initial_kernel
+          ?preimages_dir
+          ?private_rpc_port
+          ()
+      in
+      create ~node_setup ~mode () |> Lwt.return
 
     let init ?patch_config ?name ~mode ?websockets ?data_dir ?rpc_port ?wait
         ?extra_arguments ?copy_binary ?initial_kernel ?preimages_dir
-        ?private_rpc_port rollup_node cloud agent =
+        ?private_rpc_port cloud agent =
       let* evm_node =
         create
           ?name
@@ -940,7 +941,6 @@ module Evm_node = struct
           ?initial_kernel
           ?preimages_dir
           ?private_rpc_port
-          rollup_node
           cloud
           agent
       in

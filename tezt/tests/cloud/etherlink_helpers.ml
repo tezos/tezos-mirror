@@ -421,7 +421,6 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
              ())
       ~name:(name_of_daemon (Etherlink_evm_node name))
       ~mode
-      ()
       cloud
       agent
   in
@@ -524,7 +523,6 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
       ~mode
       ~initial_kernel:output
       ~preimages_dir
-      ()
       cloud
       agent
   in

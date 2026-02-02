@@ -126,7 +126,6 @@ let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
       ~preimages_dir
       ?private_rpc_port
       ~extra_arguments
-      ()
       cloud
       agent
   in
