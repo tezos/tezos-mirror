@@ -2,7 +2,6 @@
 
 ## Unreleased
 
--Fix: Observer node sends transaction batches in a synchronous request-response fashion (!20553)
 ### Breaking changes
 
 ### Configuration changes
@@ -11,11 +10,16 @@
 
 ### Monitoring changes
 
+- Export metrics for the number of host function calls during kernel
+  execution. (!19228)
+
 ### Command-line interface changes
 
 ### Execution changes
 
 - Supports executing Farfadet-r2 natively. (!20604)
+- Fix: Observer node sends transaction batches in a synchronous request-response
+  fashion (!20553)
 
 ### Storage changes
 
