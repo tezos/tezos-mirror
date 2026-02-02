@@ -362,8 +362,52 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   | true, Beta_release_tag -> [job_release_page]
   | _ -> []
 
-let octez_packaging_revision_jobs =
+let octez_packaging_revision_jobs ?(test = false) () =
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true ~manual:true Release
   in
-  job_datadog_pipeline_trace :: jobs_debian_repository
+  let job_docker_amd64 =
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ~__POS__
+      ~arch:Amd64
+      (if test then Test else Release)
+  in
+  let job_docker_arm64 =
+    job_docker_build
+      ~dependencies:(Dependent [])
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      (if test then Test else Release)
+  in
+  let job_docker_merge =
+    job_docker_merge_manifests
+      ~__POS__
+      ~ci_docker_hub:(not test)
+      ~job_docker_amd64
+      ~job_docker_arm64
+  in
+  let job_docker_promote_to_version =
+    job_docker_authenticated
+      ~__POS__
+      ~dependencies:(Dependent [Job job_docker_merge])
+      ~stage:Stages.publish
+      ~name:"oc.docker:promote_revision_to_version"
+      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ~allow_failure:No ()]
+      ~ci_docker_hub:(not test)
+      ["./scripts/ci/docker_promote_to_version.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
+  in
+  [
+    (* Stage: start *)
+    job_datadog_pipeline_trace;
+    job_docker_amd64;
+    job_docker_arm64;
+    job_docker_merge;
+    job_docker_promote_to_version;
+  ]
+  @ jobs_debian_repository
