@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -26,6 +27,9 @@ pub const SBI_FIRMWARE_TEZOS: u64 = 0x0A000000;
 
 /// Function ID for `sbi_tezos_inbox_next`
 pub const SBI_TEZOS_INBOX_NEXT: u64 = 0x01;
+
+/// Function ID for `sbi_tezos_write_output`
+pub const SBI_TEZOS_WRITE_OUTPUT: u64 = 0x03;
 
 /// Function ID for `sbi_tezos_ed25519_verify`
 pub const SBI_TEZOS_ED25519_VERIFY: u64 = 0x05;
@@ -64,6 +68,8 @@ pub enum SbiError {
     AlreadyStarted = -7,
     AlreadyStopped = -8,
     NoSharedMemory = -9,
+    OutputTooLarge = -10,
+    FullOutbox = -11,
     Unknown = i64::MIN,
 }
 
@@ -80,6 +86,8 @@ impl SbiError {
             -7 => Some(Self::AlreadyStarted),
             -8 => Some(Self::AlreadyStopped),
             -9 => Some(Self::NoSharedMemory),
+            -10 => Some(Self::OutputTooLarge),
+            -11 => Some(Self::FullOutbox),
             _ if result < 0 => Some(Self::Unknown),
             _ => None,
         }

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2026 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -12,8 +13,14 @@ use std::{
     slice::from_raw_parts,
 };
 use tezos_smart_rollup_constants::{
-    core::{GENERIC_INVALID_ACCESS, MEMORY_INVALID_ACCESS},
-    riscv::{SbiError, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_REVEAL},
+    core::{
+        FULL_OUTBOX, GENERIC_INVALID_ACCESS, INPUT_OUTPUT_TOO_LARGE,
+        MEMORY_INVALID_ACCESS,
+    },
+    riscv::{
+        SbiError, SBI_FIRMWARE_TEZOS, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_REVEAL,
+        SBI_TEZOS_WRITE_OUTPUT,
+    },
 };
 
 /// Check the SBI return value for errors.
@@ -27,6 +34,12 @@ fn check_sbi_result(result: isize) -> Result<usize, i32> {
 
         // Indicates a bad address or memory access.
         Some(SbiError::InvalidAddress) => Err(MEMORY_INVALID_ACCESS),
+
+        // The kernel tried to write an outbox message which is too large.
+        Some(SbiError::OutputTooLarge) => Err(INPUT_OUTPUT_TOO_LARGE),
+
+        // The kernel tried to write an outbox message but the outbox is full.
+        Some(SbiError::FullOutbox) => Err(FULL_OUTBOX),
 
         // Uncategorised error.
         Some(_) => Err(GENERIC_INVALID_ACCESS),
@@ -117,8 +130,25 @@ pub(crate) unsafe fn reveal_metadata(buffer: *mut u8, max_bytes: usize) -> i32 {
 }
 
 #[inline]
-pub(crate) unsafe fn write_output(_src: *const u8, _num_bytes: usize) -> i32 {
-    unimplemented!()
+pub(crate) unsafe fn write_output(src: *const u8, num_bytes: usize) -> i32 {
+    let result: isize;
+
+    // SBI call
+    //   extension = SBI_FIRMWARE_TEZOS
+    //   function = SBI_TEZOS_WRITE_OUTPUT
+    core::arch::asm!(
+        "ecall",
+        in("a0") src,
+        in("a1") num_bytes,
+        in("a6") SBI_TEZOS_WRITE_OUTPUT,
+        in("a7") SBI_FIRMWARE_TEZOS,
+        lateout("a0") result,
+    );
+
+    match check_sbi_result(result) {
+        Ok(result) => result as i32,
+        Err(err) => err,
+    }
 }
 
 #[inline]
