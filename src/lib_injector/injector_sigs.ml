@@ -178,6 +178,10 @@ module type PARAMETERS = sig
       from the client default (100). *)
   val safety_guard : Operation.t -> int option
 
+  (** Returns the maximum number of operations to include in a single batch.
+      If None, batches are limited only by the operation size limit. *)
+  val max_batch_length : state -> int option
+
   (** Indicate which operations should be persisted on disk to be reinjected
       upon restart.  *)
   val persist_operation : Operation.t -> bool

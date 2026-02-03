@@ -65,6 +65,9 @@ type injector = {
   injection_ttl : int;
       (** The number of blocks after which an operation that is injected but
           never included is retried. *)
+  max_batch_length : int option;
+      (** The maximum number of operations to include in a single L1 batch.
+          If not specified, batches are limited only by the operation size limit. *)
 }
 
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t

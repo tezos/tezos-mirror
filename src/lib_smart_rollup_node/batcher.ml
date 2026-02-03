@@ -407,8 +407,8 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let check_batcher_config (module Plugin : Protocol_plugin_sig.S)
-    Configuration.{max_batch_size; _} =
-  match max_batch_size with
+    (batcher : Configuration.batcher) =
+  match batcher.max_batch_size with
   | Some m when m > Plugin.Batcher_constants.protocol_max_batch_size ->
       error_with
         "batcher.max_batch_size must be smaller than %d"
