@@ -19,7 +19,7 @@ type query =
     }
 
 type query_msg =
-  | Query_msg of {query_id : int; shards : bytes}
+  | Query_msg of {query_id : int; shards : bytes; slot_level : Int32.t}
   | Query_stop of {query_id : int}
 
 let query_msg_tag = 0
@@ -228,9 +228,15 @@ end = struct
             Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
           |> List.to_seq
         in
+        let bytes_slot_level = Process_worker.read_message input in
+        let slot_level =
+          Data_encoding.(Binary.of_bytes_exn int32 bytes_slot_level)
+        in
         let () =
           Tezos_bees.Hive.async_lwt (fun () ->
-              Event.emit_crypto_process_received_query ~query_id)
+              Event.emit_crypto_process_received_query
+                ~query_id
+                ~level:slot_level)
         in
         (* crypto computation *)
         let* proved_shards_encoded =
@@ -306,8 +312,10 @@ let query_sender_job {query_pipe; process; _} =
   let rec loop () =
     let*! request = Lwt_pipe.Unbounded.pop query_pipe in
     match request with
-    | Query_msg {query_id; shards; _} ->
-        let*! () = Event.emit_main_process_sending_query ~query_id in
+    | Query_msg {query_id; shards; slot_level} ->
+        let*! () =
+          Event.emit_main_process_sending_query ~query_id ~level:slot_level
+        in
         (* Serialization: query_id, then shards *)
         let*! () =
           Lwt_eio.run_eio (fun () ->
@@ -324,6 +332,13 @@ let query_sender_job {query_pipe; process; _} =
         let*! () =
           Lwt_eio.run_eio (fun () ->
               Process_worker.write_message process_input shards)
+        in
+        let slot_level_bytes =
+          Data_encoding.(Binary.to_bytes_exn int32 slot_level)
+        in
+        let*! () =
+          Lwt_eio.run_eio (fun () ->
+              Process_worker.write_message process_input slot_level_bytes)
         in
         loop ()
     | Query_stop {query_id} ->
@@ -601,12 +616,13 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
       (Query {slot_id; commitment; proto_parameters; reconstruction_start_time})
   in
   let length = Query_store.length amplificator.query_store in
+  let slot_level = slot_id.slot_level in
   let () = Dal_metrics.update_amplification_queue_length length in
   let*! () = Event.emit_main_process_enqueue_query ~query_id in
   let () =
     Lwt_pipe.Unbounded.push
       amplificator.query_pipe
-      (Query_msg {query_id; shards})
+      (Query_msg {query_id; shards; slot_level})
   in
   return_unit
 
