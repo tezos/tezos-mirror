@@ -203,4 +203,4 @@ let item head tail = Stack.Table.hashcons Stack.table (Item_t (head, tail))
 let clear_tables () =
   Base.(Table.clear table) ;
   Stack.(Table.clear table) ;
-  Gc.full_major ()
+  Gc.compact ()
