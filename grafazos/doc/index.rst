@@ -121,3 +121,10 @@ dashboard.
 .. code-block:: shell
 
     UID="some_string"
+
+By default, dashboards use a hardcoded ``Prometheus`` datasource. If you want to enable a dropdown
+menu to select from any available Prometheus datasource, set ``DATASOURCE_SELECTION`` to ``true``:
+
+.. code-block:: shell
+
+    DATASOURCE_SELECTION=true
