@@ -860,6 +860,9 @@ let coinbase ?websocket evm_node =
 let configuration evm_node =
   Curl.get (Evm_node.endpoint evm_node ^ "/configuration") |> Runnable.run
 
+let metrics evm_node =
+  Curl.get_raw (Evm_node.endpoint evm_node ^ "/metrics") |> Runnable.run
+
 module Tezosx = struct
   let tez_getTezosEthereumAddress ?websocket tezos_address evm_node =
     let* response =

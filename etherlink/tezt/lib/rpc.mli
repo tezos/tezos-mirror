@@ -402,6 +402,9 @@ val coinbase :
 (** Returns the EVM node configuration. *)
 val configuration : Evm_node.t -> JSON.t Lwt.t
 
+(** Returns collected Prometheus metrics with /metrics RPC. *)
+val metrics : Evm_node.t -> string Lwt.t
+
 module Tezosx : sig
   val tez_getTezosEthereumAddress :
     ?websocket:Websocket.t ->
