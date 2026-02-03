@@ -417,3 +417,22 @@ let get_ongoing_games cctxt rollup staker =
         Tezos_crypto.Signature.Of_V3.public_key_hash staker1,
         Tezos_crypto.Signature.Of_V3.public_key_hash staker2 ))
     games
+
+let filter_conflicts_ready_to_start ~current_level ~commitment_period_in_blocks
+    conflicts =
+  let open Lwt_result_syntax in
+  let filtered =
+    List.filter
+      (fun conflict ->
+        let commitment_inbox_level =
+          conflict.Octez_smart_rollup.Game.their_commitment.inbox_level
+        in
+        let earliest_start_level =
+          Int32.add
+            commitment_inbox_level
+            (Int32.of_int commitment_period_in_blocks)
+        in
+        current_level >= earliest_start_level)
+      conflicts
+  in
+  return filtered

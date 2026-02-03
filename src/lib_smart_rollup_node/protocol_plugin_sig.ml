@@ -277,6 +277,16 @@ module type REFUTATION_GAME_HELPERS = sig
     (Game.t * Signature.public_key_hash * Signature.public_key_hash) list
     tzresult
     Lwt.t
+
+  (** [filter_conflicts_ready_to_start ~current_level ~commitment_period_in_blocks conflicts]
+      filters conflicts to only include those that are ready to start a refutation game
+      at the given [current_level]. This implements protocol-specific rules about
+      when refutation games can begin. *)
+  val filter_conflicts_ready_to_start :
+    current_level:int32 ->
+    commitment_period_in_blocks:int ->
+    Game.conflict list ->
+    Game.conflict list tzresult Lwt.t
 end
 
 (** Signature of protocol plugins for the rollup node. NOTE: the plugins have to

@@ -411,3 +411,8 @@ let get_ongoing_games cctxt rollup staker =
         Tezos_crypto.Signature.Of_V1.public_key_hash staker1,
         Tezos_crypto.Signature.Of_V1.public_key_hash staker2 ))
     games
+
+let filter_conflicts_ready_to_start ~current_level:_
+    ~commitment_period_in_blocks:_ conflicts =
+  (* This protocol doesn't have the commitment_period delay requirement *)
+  Lwt_result_syntax.return conflicts
