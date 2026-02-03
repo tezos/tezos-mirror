@@ -5478,21 +5478,23 @@ module Stake_distribution : sig
     Slot.t ->
     (context * Consensus_key.pk) tzresult Lwt.t
 
-  val stake_info_for_cycle :
-    context ->
-    Cycle.t ->
-    (context * Int64.t * (Consensus_key.pk * Int64.t) list) tzresult Lwt.t
+  type delegate_stake_info = {
+    consensus_pk : Consensus_key.pk;
+    stake_weight : Int64.t;
+  }
 
-  val stake_info :
-    context ->
-    Level.t ->
-    (context * Int64.t * (Consensus_key.pk * Int64.t) list) tzresult Lwt.t
+  type stake_info = {
+    total_stake_weight : Int64.t;
+    delegates : delegate_stake_info list;
+  }
+
+  val stake_info_for_cycle :
+    context -> Cycle.t -> (context * stake_info) tzresult Lwt.t
+
+  val stake_info : context -> Level.t -> (context * stake_info) tzresult Lwt.t
 
   (** See {!Delegate_sampler.load_sampler_for_cycle}. *)
   val load_sampler_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
-
-  (** See {!Delegate_sampler.load_stake_info_for_cycle}. *)
-  val load_stake_info_for_cycle : context -> Cycle.t -> context tzresult Lwt.t
 
   val get_total_frozen_stake : context -> Cycle.t -> Tez.t tzresult Lwt.t
 

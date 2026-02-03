@@ -694,6 +694,16 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
+  type delegate_stake_info = Delegate_sampler.delegate_stake_info = {
+    consensus_pk : Consensus_key.pk;
+    stake_weight : Int64.t;
+  }
+
+  type stake_info = Delegate_sampler.stake_info = {
+    total_stake_weight : Int64.t;
+    delegates : delegate_stake_info list;
+  }
+
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let attestation_slot_owner ctxt ~attested_level slot =
@@ -713,8 +723,6 @@ module Stake_distribution = struct
   let stake_info = Delegate_sampler.stake_info
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
-
-  let load_stake_info_for_cycle = Delegate_sampler.load_stake_info_for_cycle
 
   let get_total_frozen_stake ctxt cycle =
     let open Lwt_result_syntax in

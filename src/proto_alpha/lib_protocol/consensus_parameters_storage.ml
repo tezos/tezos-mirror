@@ -13,10 +13,10 @@ let check_all_bakers_attest_at_level ctxt ~attested_level =
 let consensus_committee ctxt ~attested_level =
   let open Lwt_result_syntax in
   if check_all_bakers_attest_at_level ctxt ~attested_level then
-    let* ctxt, total_staking_weight, _ =
+    let* ctxt, {total_stake_weight; _} =
       Delegate_sampler.stake_info ctxt attested_level
     in
-    return (ctxt, total_staking_weight)
+    return (ctxt, total_stake_weight)
   else
     return
       (ctxt, Int64.of_int @@ Constants_storage.consensus_committee_size ctxt)

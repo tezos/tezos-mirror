@@ -4797,25 +4797,28 @@ let register () =
     ~chunked:false
     S.baking_power_distribution_for_current_cycle
     (fun ctxt () () ->
-      let* (_ctxt : t), total_stake, stake_info_list =
+      let* (_ctxt : t), {total_stake_weight; delegates = stake_info_list} =
         Stake_distribution.stake_info ctxt (Level.current ctxt)
       in
       let stake_info_list =
-        List.map (fun (x, y) -> (Consensus_key.pkh x, y)) stake_info_list
+        List.map
+          (fun Stake_distribution.{consensus_pk; stake_weight} ->
+            (Consensus_key.pkh consensus_pk, stake_weight))
+          stake_info_list
       in
-      return (total_stake, stake_info_list)) ;
+      return (total_stake_weight, stake_info_list)) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio
     (fun ctxt q () ->
       let cycle = Option.value ~default:(Level.current ctxt).cycle q in
-      let* _, _total_stake, stake_info_list =
+      let* _, {total_stake_weight = _; delegates = stake_info_list} =
         Stake_distribution.stake_info_for_cycle ctxt cycle
       in
       let tz4_bakers =
         List.fold_left
-          (fun acc (x, _) ->
-            match x.Consensus_key.consensus_pk with
+          (fun acc Stake_distribution.{consensus_pk; _} ->
+            match consensus_pk.Consensus_key.consensus_pk with
             | Bls _ -> acc + 1
             | _ -> acc)
           0

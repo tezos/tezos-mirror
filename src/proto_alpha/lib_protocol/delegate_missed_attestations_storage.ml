@@ -110,13 +110,19 @@ let record_attesting_participation ctxt ~delegate ~participation
             {remaining_slots; missed_levels = missed_levels + 1}
       | None -> (
           let level = Level_storage.current ctxt in
-          let* ctxt, total_active_stake_weight, stake_list =
+          let* ( ctxt,
+                 {
+                   total_stake_weight = total_active_stake_weight;
+                   delegates = stake_list;
+                 } ) =
             Delegate_sampler.stake_info ctxt level
           in
           let stake_weight_info =
             List.find
-              (fun (pk, _) ->
-                Signature.Public_key_hash.equal delegate pk.Raw_context.delegate)
+              (fun {Delegate_sampler.consensus_pk; _} ->
+                Signature.Public_key_hash.equal
+                  delegate
+                  consensus_pk.Raw_context.delegate)
               stake_list
           in
           match stake_weight_info with
@@ -128,7 +134,7 @@ let record_attesting_participation ctxt ~delegate ~participation
                  case its participation is simply ignored. *)
               assert (Compare.Int32.(level.cycle_position = 0l)) ;
               return ctxt
-          | Some (_, active_stake_weight) ->
+          | Some {stake_weight = active_stake_weight; _} ->
               let expected_slots =
                 expected_slots_for_given_active_stake
                   ctxt
@@ -318,7 +324,7 @@ module For_RPC = struct
             expected_attesting_rewards = Tez_repr.zero;
           }
     | Some active_stake ->
-        let* ctxt, total_active_stake_weight, _ =
+        let* ctxt, {total_stake_weight = total_active_stake_weight; _} =
           Delegate_sampler.stake_info ctxt level
         in
         let active_stake_weight = Stake_repr.staking_weight active_stake in
