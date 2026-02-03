@@ -25,6 +25,13 @@ let fedora_releases = ["39"; "41"; "42"]
 
 let fedora_matrix = [("RELEASE", fedora_releases)]
 
+(* Helper function to standardise the path of a base image built in the same
+   pipeline. Used to build more complex base images and avoid code duplications *)
+let base_dep_img_name image =
+  let prefix = "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos" in
+  let tag = "${RELEASE}-${CI_COMMIT_REF_SLUG}" in
+  Format.sprintf "%s/%s:%s" prefix image tag
+
 type compilation =
   | Amd64_only (* Built on amd64 runner *)
   | Arm64_only
@@ -37,6 +44,14 @@ type compilation =
    Use 3 runners. 2 jobs for building the images, one job for merging the manifest
    must be added to create one multi-arch image. Both images are suffixed,
    repesctively, with -amd64 or -arm64 *)
+
+type upstream_image = Pipeline_dep of string | Upstream of string
+(* Datatype to differenciate between variable passed with IMAGE_PATH to the
+   dockerfile via --build-arg IMAGE=IMAGE_PATH.
+   Upstream is the name of an upstream image ( eg. debian:trixie )
+   Pipeline_dep is the name of an image generate in this pipeline ( eg.
+   ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$COMMIT_REF_SLUG )
+*)
 
 let jobs =
   (* This function can build docker images both in an emulated environment using
@@ -53,6 +68,7 @@ let jobs =
      [image_name] is the name of the final docker image.
 
      [base_name] is the name of the image upon the newly created image is FROM.
+     It can be either the upstream image, or an image generated in this pipeline.
 
      [compilation] determines the type of the image.
      If [compilation] parameter is either set to [Emulated] or omitted then we
@@ -65,8 +81,9 @@ let jobs =
      If [compilation] is set to [Native] we build for both architectures using
      a native runner. In this case we also must add a merge manifest job.
      *)
-  let make_job_base_images ~__POS__ ~name ~matrix ~image_name ?base_name
-      ?(changes = Changeset.make []) ?(compilation = Emulated) dockerfile =
+  let make_job_base_images ~__POS__ ~name ~matrix ~image_name
+      ?(base_name = Upstream image_name) ?(changes = Changeset.make [])
+      ?(compilation = Emulated) ?dependencies dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -88,9 +105,13 @@ let jobs =
     let variables =
       [
         ("DISTRIBUTION", image_name);
+        (* if the base name is passed explicitely, then we assume is a
+           fully qualified image, otherwise we add the release component
+           to the image name *)
         ( "IMAGE_PATH",
-          if Option.is_none base_name then image_name else Option.get base_name
-        );
+          match base_name with
+          | Upstream name -> Format.asprintf "%s:$RELEASE" name
+          | Pipeline_dep name -> base_dep_img_name name );
         ("PLATFORM", platform);
       ]
     in
@@ -106,6 +127,7 @@ let jobs =
         ]
       ~parallel:(Matrix [matrix @ tags])
       ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
+      ?dependencies
       [script]
   in
   let job_debian_based_images =
@@ -144,20 +166,34 @@ let jobs =
       ~__POS__
       ~name:"oc.base-images.rockylinux"
       ~image_name:"rockylinux"
-      ~base_name:"rockylinux/rockylinux"
+      ~base_name:(Upstream "rockylinux/rockylinux")
       ~matrix:rockylinux_matrix
       ~changes
       "images/base-images/Dockerfile.rpm"
   in
   let job_rust_based_images, job_rust_based_images_merge =
     let images =
+      (* the changeset here and an under approximation. When adding
+         these pipelines to the merge trains, these should be refactored.
+       
+FIXME: remove changesets from [base_images.daily] which is a branch pipeline
+cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
+      let changes =
+        Changeset.make
+          [
+            "images/base-images/Dockerfile.debian";
+            "images/base-images/Dockerfile.rust";
+          ]
+      in
       make_job_base_images
         ~__POS__
         ~name:"oc.base-images.rust"
         ~image_name:"debian-rust"
-        ~base_name:"debian"
+        ~base_name:(Pipeline_dep "debian")
         ~matrix:[("RELEASE", ["trixie"])]
+        ~dependencies:(Dependent [Job job_debian_based_images])
         ~compilation:Native
+        ~changes
         "images/base-images/Dockerfile.rust"
     in
     let merge =
@@ -177,13 +213,18 @@ let jobs =
   in
   let job_debian_homebrew_base_images =
     let changes =
-      Changeset.make ["images/base-images/Dockerfile.debian-homebrew"]
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.debian";
+          "images/base-images/Dockerfile.debian-homebrew";
+        ]
     in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian-homebrew"
       ~image_name:"debian-homebrew"
-      ~base_name:"debian"
+      ~base_name:(Pipeline_dep "debian")
+      ~dependencies:(Dependent [Job job_debian_based_images])
       ~matrix:[("RELEASE", ["trixie"])]
       ~compilation:Amd64_only
       ~changes
