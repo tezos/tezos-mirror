@@ -876,6 +876,21 @@ let test_storage_fees_and_internal_operation () =
   in
   ()
 
+let test_disabled_tz5_account () =
+  let open Lwt_result_syntax in
+  let* blk, c =
+    Context.init1 ~tz5_account_enable:false ~consensus_threshold_size:0 ()
+  in
+  let new_c = Account.new_account ~algo:Mldsa44 () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  let* op_transaction =
+    Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 10_000_000L)
+  in
+  let*! blk = Block.bake blk ~operation:op_transaction in
+  match blk with
+  | Error trace -> Error_helpers.expect_tz5_account_disabled ~loc:__LOC__ trace
+  | Ok _ -> failwith "Tz5 account should be disabled"
+
 let tests =
   [
     (* single transfer *)
@@ -983,6 +998,7 @@ let tests =
       "storage fees after contract call and allocation"
       `Quick
       test_storage_fees_and_internal_operation;
+    Tztest.tztest "Disabled tz5 account" `Quick test_disabled_tz5_account;
   ]
 
 let () =

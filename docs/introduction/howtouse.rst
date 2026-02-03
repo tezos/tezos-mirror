@@ -332,9 +332,10 @@ and P256 curves have been added for interoperability with Bitcoin and Hardware
 Security Modules (*HSMs*) mostly. Unless your use case requires those, you
 should probably use *Ed25519*. We use a verified library for Ed25519, and it is
 generally recommended over other curves by the crypto community, for performance
-and security reasons. Starting with Protocol U, Tezos supports a
-quantum-resistant signature scheme: a module-lattice-based *ML-DSA-44*, which is
-secure against classical and quantum computer attacks.
+and security reasons. Starting with Protocol U, under feature flag disabled on
+mainnet, Tezos supports a quantum-resistant signature scheme: a
+module-lattice-based *ML-DSA-44*, which is secure against classical and quantum
+computer attacks.
 
 Make sure to make a back-up of the client data directory and that the password
 protecting your secret keys is properly managed (if you stored them encrypted).

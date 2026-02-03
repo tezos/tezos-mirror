@@ -1677,6 +1677,7 @@ module Manager = struct
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
+    | Tz5_account_disabled
 
   let () =
     register_error_kind
@@ -1938,7 +1939,20 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)
       Data_encoding.unit
       (function Zk_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Zk_rollup_feature_disabled)
+      (fun () -> Zk_rollup_feature_disabled) ;
+    let tz5_account_disabled_description =
+      "tz5 ML-DSA-44 accounts are disabled"
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.tz5_account_disabled"
+      ~title:"tz5 ML-DSA-44 accounts are disabled"
+      ~description:tz5_account_disabled_description
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "%s" tz5_account_disabled_description)
+      Data_encoding.unit
+      (function Tz5_account_disabled -> Some () | _ -> None)
+      (fun () -> Tz5_account_disabled)
 end
 
 type error += Failing_noop_error

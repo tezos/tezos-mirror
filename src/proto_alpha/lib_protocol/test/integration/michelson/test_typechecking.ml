@@ -944,6 +944,99 @@ let test_contract_success path =
   test_contract path ~ok:return ~ko:(fun t ->
       Alcotest.failf "Unexpected error: %a" Environment.Error_monad.pp_trace t)
 
+let test_tz5_in_contract_code ~tz5_account_enable () =
+  let open Lwt_result_wrap_syntax in
+  let* block, _contract = Context.init1 ~tz5_account_enable () in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let script = read_file (path // "contracts/forbidden_tz5_in_code.tz") in
+  let contract_expr = Expr.from_string script in
+  let*! result =
+    Script_ir_translator.typecheck_code
+      ~legacy:false
+      ~show_types:false
+      ctxt
+      contract_expr
+  in
+  match result with
+  | Ok _ ->
+      if tz5_account_enable then return_unit
+      else Alcotest.failf "tz5 address should not be allowed in contract code"
+  | Error trace ->
+      if tz5_account_enable then
+        Alcotest.failf
+          "tz5 address should be allowed in contract code: %a"
+          Environment.Error_monad.pp_trace
+          trace
+      else return_unit
+
+let test_tz5_in_contract_storage ~tz5_account_enable () =
+  let open Lwt_result_wrap_syntax in
+  let* block, contract = Context.init1 ~tz5_account_enable () in
+  let contract_string = read_file (path // "contracts/store_address.tz") in
+  let code = Expr.toplevel_from_string contract_string in
+  let storage = Expr.from_string {|"tz5fxSJrMeVsmEAVDencuUcpgRe3Kw7CwPFe"|} in
+  let script =
+    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+  in
+  let* operation, _originated =
+    Op.contract_origination_hash (B block) contract ~script
+  in
+  let*! res = Block.bake block ~operations:[operation] in
+  match res with
+  | Error trace ->
+      if tz5_account_enable then
+        Alcotest.failf
+          "tz5 address should be allowed in contract storage: %a"
+          pp_print_trace
+          trace
+      else return_unit
+  | Ok _block ->
+      if not tz5_account_enable then
+        Alcotest.failf "tz5 address should not be allowed in contract storage"
+      else return_unit
+
+let test_tz5_in_contract_parameter ~tz5_account_enable () =
+  let open Lwt_result_wrap_syntax in
+  let* block, contract =
+    Context.init1 ~consensus_threshold_size:0 ~tz5_account_enable ()
+  in
+  let contract_string = read_file (path // "contracts/store_address.tz") in
+  let code = Expr.toplevel_from_string contract_string in
+  let storage = Expr.from_string {|"tz1burnburnburnburnburnburnburjAYjjX"|} in
+  let script =
+    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+  in
+  let* operation, originated =
+    Op.contract_origination_hash (B block) contract ~script
+  in
+  let* block = Block.bake block ~operations:[operation] in
+  let parameters =
+    Script.lazy_expr
+    @@ Expr.from_string {|"tz5fxSJrMeVsmEAVDencuUcpgRe3Kw7CwPFe"|}
+  in
+  let* operation =
+    Op.transaction
+      ~parameters
+      (B block)
+      contract
+      (Originated originated)
+      Tez.zero
+  in
+  let*! res = Block.bake block ~operations:[operation] in
+  match res with
+  | Error trace ->
+      if tz5_account_enable then
+        Alcotest.failf
+          "tz5 address should be allowed as contract parameter: %a"
+          pp_print_trace
+          trace
+      else return_unit
+  | Ok _block ->
+      if not tz5_account_enable then
+        Alcotest.failf "tz5 address should not be allowed as contract parameter"
+      else return_unit
+
 let test_contract_failure path =
   let open Lwt_result_syntax in
   test_contract
@@ -1015,6 +1108,30 @@ let tests =
       "lambda_rec with type error"
       `Quick
       (test_contract_failure (path // "contracts/fail_rec.tz"));
+    Tztest.tztest
+      "tz5 in contract code (tz5_account_enable: true)"
+      `Quick
+      (test_tz5_in_contract_code ~tz5_account_enable:true);
+    Tztest.tztest
+      "tz5 in contract code (tz5_account_enable: false)"
+      `Quick
+      (test_tz5_in_contract_code ~tz5_account_enable:false);
+    Tztest.tztest
+      "tz5 in contract storage (tz5_account_enable: true)"
+      `Quick
+      (test_tz5_in_contract_storage ~tz5_account_enable:true);
+    Tztest.tztest
+      "tz5 in contract storage (tz5_account_enable: false)"
+      `Quick
+      (test_tz5_in_contract_storage ~tz5_account_enable:false);
+    Tztest.tztest
+      "tz5 in contract parameter (tz5_account_enable: true)"
+      `Quick
+      (test_tz5_in_contract_parameter ~tz5_account_enable:true);
+    Tztest.tztest
+      "tz5 in contract parameter (tz5_account_enable: false)"
+      `Quick
+      (test_tz5_in_contract_parameter ~tz5_account_enable:false);
   ]
 
 let () =

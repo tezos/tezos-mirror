@@ -1291,6 +1291,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  all_bakers_attest_activation_threshold;
                  native_contracts_enable;
                  swrr_new_baker_lottery_enable;
+                 tz5_account_enable;
                }
                 : Previous.t) =
             c
@@ -1345,6 +1346,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             all_bakers_attest_activation_threshold;
             native_contracts_enable;
             swrr_new_baker_lottery_enable;
+            tz5_account_enable;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1645,6 +1647,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             (* Feature flag should be set to true once the feature has been enabled. *)
             native_contracts_enable = false;
             swrr_new_baker_lottery_enable = false;
+            tz5_account_enable = false;
           }
         in
         let*! ctxt = add_constants ctxt constants in

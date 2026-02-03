@@ -166,5 +166,6 @@
         "denominator": 2
     },
     "native_contracts_enable": true,
-    "swrr_new_baker_lottery_enable": false
+    "swrr_new_baker_lottery_enable": false,
+    "tz5_account_enable": true
 }

@@ -276,6 +276,8 @@ type t = {
   native_contracts_enable : bool;
   (* SWRR new baker lottery feature flag *)
   swrr_new_baker_lottery_enable : bool;
+  (* Tz5 ML-DSA-44 account feature flag *)
+  tz5_account_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding

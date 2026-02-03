@@ -74,4 +74,4 @@
   "allow_tz4_delegate_enable": true,
   "all_bakers_attest_activation_threshold":
     { "numerator": 1, "denominator": 2 }, "native_contracts_enable": false,
-  "swrr_new_baker_lottery_enable": false }
+  "swrr_new_baker_lottery_enable": false, "tz5_account_enable": false }

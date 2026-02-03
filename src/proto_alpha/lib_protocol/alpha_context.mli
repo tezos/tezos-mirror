@@ -990,6 +990,7 @@ module Constants : sig
       all_bakers_attest_activation_threshold : Ratio.t;
       native_contracts_enable : bool;
       swrr_new_baker_lottery_enable : bool;
+      tz5_account_enable : bool;
     }
 
     val encoding : t Data_encoding.t
@@ -1141,6 +1142,8 @@ module Constants : sig
   val aggregate_attestation : context -> bool
 
   val allow_tz4_delegate_enable : context -> bool
+
+  val tz5_account_enable : context -> bool
 
   (** All constants: fixed and parametric and derived. *)
   type t = private {
