@@ -55,7 +55,6 @@ let on_new_finalized_head ctxt cctxt crawler =
   let open Lwt_result_syntax in
   let stream = Crawler.finalized_heads_stream crawler in
   let rec loop () =
-    let cryptobox = Node_context.get_cryptobox ctxt in
     let*! next_final_head = Lwt_stream.get stream in
     let launch_time = Unix.gettimeofday () in
     match next_final_head with
@@ -72,7 +71,6 @@ let on_new_finalized_head ctxt cctxt crawler =
              ctxt
              cctxt
              crawler
-             cryptobox
              finalized_block_hash
              finalized_shell_header
              ~launch_time
@@ -671,14 +669,19 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       ~head_level
       ~first_seen_level
   in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5743
-     Instead of recomputing these parameters, they could be stored
-     (for a given cryptobox). *)
-  let* cryptobox, shards_proofs_precomputation =
-    Node_context.init_cryptobox config proto_parameters profile_ctxt
+  let* proto_cryptoboxes =
+    Proto_cryptoboxes.init
+      ~cctxt
+      ~header
+      ~config
+      ~current_head_proto_parameters:proto_parameters
+      ~first_seen_level:(Option.value first_seen_level ~default:head_level)
+      profile_ctxt
+      proto_plugins
   in
-  (* Set crypto box share size hook. *)
-  Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
+  let*? cryptobox, _ =
+    Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
+  in
   let*! () =
     if disable_shard_validation then Event.emit_shard_validation_is_disabled ()
     else Lwt.return_unit
@@ -694,8 +697,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       config
       ~identity
       profile_ctxt
-      cryptobox
-      shards_proofs_precomputation
+      proto_cryptoboxes
       proto_plugins
       store
       gs_worker

@@ -77,13 +77,19 @@ module Slots_handlers = struct
             slot_id
         in
         let*! proof =
-          let cryptobox = Node_context.get_cryptobox ctxt in
+          let*? cryptobox, _ =
+            Errors.other_result
+            @@ Node_context.get_cryptobox_and_precomputations
+                 ~level:slot_level
+                 ctxt
+          in
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
           return proof
         in
         match proof with
         | Ok proof -> return proof
+        | Error (`Other _ as e) -> fail e
         | Error e ->
             let msg =
               match e with
@@ -93,6 +99,7 @@ module Slots_handlers = struct
               | ( `Invalid_degree_strictly_less_than_expected _
                 | `Prover_SRS_not_loaded ) as commit_error ->
                   Cryptobox.string_of_commit_error commit_error
+              | `Other _ -> assert false (* Case already catched above *)
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
 

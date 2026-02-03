@@ -152,7 +152,7 @@ module Merge = struct
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
         let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-        let file_layout = Store.Slots.file_layout in
+        let* file_layout = Store.Slots.get_file_layout ~slot_id in
         kvs_copy_value src_store dst_store file_layout (slot_id, slot_size) ())
       (fun () ->
         let open Lwt_syntax in
@@ -181,7 +181,7 @@ module Merge = struct
            but for now we'll scan for existing files. *)
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
-        let file_layout = Store.Shards_disk.file_layout in
+        let* file_layout = Store.Shards_disk.get_file_layout ~slot_id in
         let*! count_result =
           Key_value_store.Read.count_values src_store file_layout slot_id
         in
@@ -226,28 +226,37 @@ module Merge = struct
     let config = Configuration_file.{config with endpoint} in
     let cctxt = Rpc_context.make config.Configuration_file.endpoint in
     let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
+    let head_level = header.Block_header.shell.level in
     let*? (module Plugin : Dal_plugin.T), proto_parameters =
       Proto_plugins.get_plugin_and_parameters_for_level
         proto_plugins
-        ~level:header.Block_header.shell.level
+        ~level:head_level
     in
     let profile_ctxt = Profile_manager.empty in
+    let* first_seen_level =
+      read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
+    in
     (* Initialize crypto as needed by file layouts. *)
-    let* cryptobox, _ =
-      Node_context.init_cryptobox config proto_parameters profile_ctxt
+    let* proto_cryptoboxes =
+      Proto_cryptoboxes.init
+        ~cctxt
+        ~header
+        ~config
+        ~current_head_proto_parameters:proto_parameters
+        ~first_seen_level
+        profile_ctxt
+        proto_plugins
+    in
+    let*? cryptobox, _ =
+      Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
     in
     let slots =
       Option.value
         ~default:(Stdlib.List.init proto_parameters.number_of_slots Fun.id)
         slots
     in
-    (* Set crypto box share size hook. *)
-    Value_size_hooks.set_share_size (Cryptobox.encoded_share_size cryptobox) ;
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
-    in
-    let* first_seen_level =
-      read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
     in
     let* last_processed_level =
       read_from_store ~root_dir:src_root_dir (module Store.Last_processed_level)

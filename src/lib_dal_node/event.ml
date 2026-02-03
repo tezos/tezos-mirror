@@ -1324,6 +1324,14 @@ open struct
       ("block_level", Data_encoding.int32)
       ~pp2:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
+
+  let cryptobox_registered =
+    declare_1
+      ~section
+      ~name:"cryptobox_registered"
+      ~msg:"Cryptobox registered starting at level {level}"
+      ~level:Info
+      ("level", Data_encoding.int32)
 end
 
 (* DAL node event emission functions *)
@@ -1695,3 +1703,5 @@ let emit_publication ~block_level ~op_hash =
 
 let emit_publication_failed ~block_level ~error =
   emit publication_failed (block_level, error)
+
+let emit_cryptobox_registered ~level = emit cryptobox_registered level

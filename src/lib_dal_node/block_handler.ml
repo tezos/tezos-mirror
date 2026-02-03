@@ -147,15 +147,20 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
   let open Lwt_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
   let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-  let store = Node_context.get_store ctxt in
   let previous_lag = prev_proto_parameters.Types.attestation_lag in
   let current_lag = proto_parameters.attestation_lag in
+  let store = Node_context.get_store ctxt in
+  let* first_seen_level =
+    let* fsl = Store.First_seen_level.load (Store.first_seen_level store) in
+    match fsl with Ok (Some v) -> return v | Ok None | Error _ -> return 0l
+  in
   (* This function removes from the store all the slots (and their shards)
      published [lag] levels before the [attested_level] and which are not
      listed in the [attested]. *)
   let remove_slots_and_shards lag attested =
     let published_level = Int32.(sub attested_level (of_int lag)) in
-    if published_level > 0l then
+    (* Do not try to remove slot that will never be stored. *)
+    if published_level >= first_seen_level then
       List.iter_s
         (fun slot_index ->
           if attested slot_index then return_unit
@@ -729,7 +734,7 @@ let new_finalized_payload_level ctxt cctxt block_level =
    Tenderbake. However, plugin registration is based on the latest L1 head not
    on the finalized block. This ensures new plugins are registered
    immediately after migration, rather than waiting for finalization. *)
-let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
+let new_finalized_head ctxt cctxt l1_crawler finalized_block_hash
     finalized_shell_header ~launch_time =
   let open Lwt_result_syntax in
   let level = finalized_shell_header.Block_header.level in
@@ -746,13 +751,15 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
       | Some (_hash, head) -> Block_header.(head.level, head.proto_level)
       | None -> assert false (* Not reachable *)
     in
-    Node_context.may_add_plugin ctxt cctxt ~proto_level ~block_level
+    Node_context.may_add_plugin_and_cryptobox
+      ctxt
+      cctxt
+      ~proto_level
+      ~block_level
   in
-
   (* If L = HEAD~2, then HEAD~1 is payload final. *)
   let finalized_payload_level = Int32.succ level in
   let* () = new_finalized_payload_level ctxt cctxt finalized_payload_level in
-
   let*? proto_parameters =
     Node_context.get_proto_parameters ctxt ~level:(`Level level)
   in
@@ -779,6 +786,9 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         committee
         ~committee_level ;
       return_unit
+  in
+  let*? cryptobox, _ =
+    Node_context.get_cryptobox_and_precomputations ~level ctxt
   in
   Gossipsub.Worker.Validate_message_hook.set_batch
     (Message_validation.gossipsub_batch_validation

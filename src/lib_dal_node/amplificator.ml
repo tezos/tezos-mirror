@@ -422,9 +422,12 @@ let start_amplificator node_ctxt =
   let*? amplification_random_delay_min, amplification_random_delay_max =
     determine_amplification_delays node_ctxt
   in
-  let cryptobox = Node_context.get_cryptobox node_ctxt in
-  let shards_proofs_precomputation =
-    Node_context.get_shards_proofs_precomputation node_ctxt
+  let l1_current_head = Node_context.get_l1_current_head_level node_ctxt in
+  (* This is not great, since the amplificator should not run forever with the same cryptobox. *)
+  let*? cryptobox, shards_proofs_precomputation =
+    Node_context.get_cryptobox_and_precomputations
+      ~level:l1_current_head
+      node_ctxt
   in
   let* shards_proofs_precomputation =
     match shards_proofs_precomputation with
@@ -542,11 +545,15 @@ let amplify node_store commitment (slot_id : Types.slot_id)
       ~number_of_received_shards:number_of_already_stored_shards
       ~number_of_shards
   in
-  let shards =
-    Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
-    |> Seq_s.filter_map (function
-         | _, index, Ok share -> Some Cryptobox.{index; share}
-         | _ -> None)
+  let* shards =
+    let* seq =
+      Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
+    in
+    Seq_s.filter_map
+      (function
+        | _, index, Ok share -> Some Cryptobox.{index; share} | _ -> None)
+      seq
+    |> return
   in
   let*? shards =
     Seq_s.take

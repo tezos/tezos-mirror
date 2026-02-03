@@ -96,17 +96,20 @@ let produce_commitment_and_proof =
                 commitment) ->
         return (commitment, commitment_proof)
     | _ ->
-        let cryptobox = Node_context.get_cryptobox ctxt in
+        let l1_level = Node_context.get_l1_current_head_level ctxt in
+        let*? cryptobox, shards_proofs_precomputation =
+          Node_context.get_cryptobox_and_precomputations ~level:l1_level ctxt
+          |> Errors.other_result
+        in
         let profile = Node_context.get_profile_ctxt ctxt in
         let* () =
           if not (Profile_manager.is_prover_profile profile) then
             fail (Errors.other [No_prover_profile])
           else return_unit
         in
-        let* proto_parameters =
-          (Node_context.get_proto_parameters ctxt ~level:`Head
-          |> Lwt.return
-          |> lwt_map_error (fun e -> `Other e))
+        let*? proto_parameters =
+          (Node_context.get_proto_parameters ctxt ~level:(`Level l1_level)
+          |> Errors.other_result)
           [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
               (Opentelemetry_helpers.trace_slot_no_commitment
@@ -162,15 +165,6 @@ let produce_commitment_and_proof =
                (Opentelemetry_helpers.trace_slot_no_commitment
                   ~slot
                   ~name:"computing_commitment_proof")])
-        in
-        let shards_proofs_precomputation =
-          (Node_context.get_shards_proofs_precomputation
-             ctxt
-           [@profiler.wrap_f
-             {driver_ids = [Opentelemetry]}
-               (Opentelemetry_helpers.trace_slot_no_commitment
-                  ~slot
-                  ~name:"shard_proof_precomputation")])
         in
         let* () =
           (Slot_manager.add_commitment_shards

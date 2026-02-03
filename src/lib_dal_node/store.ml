@@ -144,7 +144,9 @@ module Stores_dirs = struct
 end
 
 module Shards_disk = struct
-  type error += Invalid_min_shards_to_reconstruct_slot of {given : int}
+  type error +=
+    | Invalid_min_shards_to_reconstruct_slot of {given : int}
+    | NoShardLayout of {level : int32}
 
   let () =
     register_error_kind
@@ -163,7 +165,17 @@ module Shards_disk = struct
       (function
         | Invalid_min_shards_to_reconstruct_slot {given} -> Some given
         | _ -> None)
-      (fun given -> Invalid_min_shards_to_reconstruct_slot {given})
+      (fun given -> Invalid_min_shards_to_reconstruct_slot {given}) ;
+    register_error_kind
+      `Permanent
+      ~id:"dal.shards.NoShardLayout"
+      ~title:"No shard layout"
+      ~description:"No shard layout found for the given slot level"
+      ~pp:(fun ppf level ->
+        Format.fprintf ppf "No shard layout found for slot at level %ld" level)
+      Data_encoding.(obj1 (req "level" int32))
+      (function NoShardLayout {level} -> Some level | _ -> None)
+      (fun level -> NoShardLayout {level})
 
   type t = {
     shards_store : (Types.slot_id, int, Cryptobox.share) KVS.t;
@@ -174,25 +186,49 @@ module Shards_disk = struct
            parameters. It must always be > 0. *)
   }
 
-  let file_layout ~root_dir (slot_id : Types.slot_id) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  module ShardsLayouts = Map.Make (struct
+    type t = Int32.t
 
-       Make Key-Value store layout resilient to crypto parameters change.  Also,
-       putting a value not far from the real number of shards allows saving disk
-       storage. *)
-    let number_of_shards = 4096 in
-    let slot_id_string =
-      Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+    let compare = compare
+  end)
+
+  let shards_layouts = ref ShardsLayouts.empty
+
+  let get_file_layout ~(slot_id : Types.slot_id) =
+    let e =
+      ShardsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !shards_layouts
     in
-    let filepath = Filename.concat root_dir slot_id_string in
-    Key_value_store.layout
-      ~encoded_value_size:(Value_size_hooks.share_size ())
-      ~encoding:Cryptobox.share_encoding
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:Fun.id
-      ~number_of_keys_per_file:number_of_shards
-      ()
+    match e with
+    | Some (_, v) -> Lwt_result_syntax.return v
+    | None ->
+        Lwt_result_syntax.tzfail (NoShardLayout {level = slot_id.slot_level})
+
+  let make_file_layout cryptobox =
+    let share_size = Cryptobox.encoded_share_size cryptobox in
+    let params = Cryptobox.parameters cryptobox in
+    let number_of_shards = params.number_of_shards in
+    fun ~root_dir (slot_id : Types.slot_id) ->
+      let slot_id_string =
+        Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
+      in
+      let filepath = Filename.concat root_dir slot_id_string in
+      Key_value_store.layout
+        ~encoded_value_size:share_size
+        ~encoding:Cryptobox.share_encoding
+        ~filepath
+        ~eq:Stdlib.( = )
+        ~index_of:Fun.id
+        ~number_of_keys_per_file:number_of_shards
+        ()
+
+  let add_file_layout level cryptobox_parameters =
+    let open Result_syntax in
+    let* cryptobox = Cryptobox.make cryptobox_parameters in
+    let layout = make_file_layout cryptobox in
+    shards_layouts := ShardsLayouts.add level layout !shards_layouts ;
+    return_unit
 
   let with_metrics store f =
     let open Lwt_result_syntax in
@@ -207,17 +243,28 @@ module Shards_disk = struct
   let number_of_shards_available {shards_store = store; _} slot_id shard_indexes
       =
     let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun count shard_index ->
-        let+ exists = KVS.value_exists store file_layout slot_id shard_index in
-        if exists then count + 1 else count)
-      0
-      shard_indexes
+    let*! fl = get_file_layout ~slot_id in
+    match fl with
+    | Ok file_layout ->
+        List.fold_left_es
+          (fun count shard_index ->
+            let+ exists =
+              KVS.value_exists store file_layout slot_id shard_index
+            in
+            if exists then count + 1 else count)
+          0
+          shard_indexes
+    | Error [NoShardLayout _] ->
+        (* There is no file layout available to read the data, we assume no
+           shard are available. *)
+        return 0
+    | Error _ as e -> Lwt.return e
 
   (* Persist shards for [slot_id], but never more than
      [min_shards_to_reconstruct_slot]. *)
   let write_all {shards_store; min_shards_to_reconstruct_slot} slot_id shards =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     (* Invariant of init below: [min_shards_to_reconstruct_slot > 0] *)
     (* Get how many shards are already persisted. *)
     let* already_stored =
@@ -276,34 +323,44 @@ module Shards_disk = struct
       return_unit
 
   let read_all ?from_bytes {shards_store; _} slot_id ~number_of_shards =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     let reader =
       match from_bytes with
       | None -> KVS.read_values shards_store file_layout
       | Some bytes -> KVS.read_values_from_bytes file_layout bytes
     in
-    Seq.ints 0
-    |> Seq.take_while (fun x -> x < number_of_shards)
-    |> Seq.map (fun shard_index -> (slot_id, shard_index))
-    |> reader
+    let v =
+      Seq.ints 0
+      |> Seq.take_while (fun x -> x < number_of_shards)
+      |> Seq.map (fun shard_index -> (slot_id, shard_index))
+      |> reader
+    in
+    return (fun () -> v ())
 
   let read {shards_store = store; _} slot_id shard_id =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let*! res =
       with_metrics store @@ fun () ->
       KVS.read_value store file_layout slot_id shard_id
     in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
-    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error [KVS.Missing_stored_kvs_data _] | Error [NoShardLayout _] ->
+        fail Errors.not_found
     | Error err ->
         let data_kind = Types.Store.Shard in
         fail @@ Errors.decoding_failed data_kind err
 
   let count_values {shards_store = store; _} slot_id =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     with_metrics store @@ fun () -> KVS.count_values store file_layout slot_id
 
   let remove {shards_store = store; _} slot_id =
     let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     let* () =
       with_metrics store @@ fun () -> KVS.remove_file store file_layout slot_id
     in
@@ -480,9 +537,12 @@ module Shards = struct
     | `Disk d -> Disk.read d slot_id shard_id
 
   let read_all ?from_bytes st slot_id ~number_of_shards =
+    let open Lwt_result_syntax in
     match source_target st slot_id with
-    | `Cache c -> Cache.read_all c slot_id
-    | `Disk d -> Disk.read_all ?from_bytes d slot_id ~number_of_shards
+    | `Cache c -> Cache.read_all c slot_id |> return
+    | `Disk d ->
+        let* v = Disk.read_all ?from_bytes d slot_id ~number_of_shards in
+        return (fun () -> v ())
 
   let count_values st slot_id =
     match source_target st slot_id with
@@ -496,12 +556,45 @@ module Shards = struct
 end
 
 module Slots = struct
+  type error += NoSlotLayout of {level : int32}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.shards.NoSlotLayout"
+      ~title:"No slot layout"
+      ~description:"No slot layout found for the given slot level"
+      ~pp:(fun ppf level ->
+        Format.fprintf ppf "No slot layout found for slot at level %ld" level)
+      Data_encoding.(obj1 (req "level" int32))
+      (function NoSlotLayout {level} -> Some level | _ -> None)
+      (fun level -> NoSlotLayout {level})
+
   type t = (Types.slot_id * int, unit, bytes) KVS.t
 
-  let file_layout ~root_dir ((slot_id : Types.slot_id), slot_size) =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+  module SlotsLayouts = Map.Make (struct
+    type t = Int32.t
 
-       Make Key-Value store layout resilient to crypto parameters change. *)
+    let compare = compare
+  end)
+
+  let slots_layouts = ref SlotsLayouts.empty
+
+  let get_file_layout ~(slot_id : Types.slot_id) =
+    let e =
+      SlotsLayouts.find_last
+        (fun first_level -> slot_id.slot_level >= first_level)
+        !slots_layouts
+    in
+    match e with
+    | Some (_, v) ->
+        Lwt_result_syntax.return (fun ~root_dir (slot_id, _slot_size) ->
+            v ~root_dir slot_id)
+    | None ->
+        Lwt_result_syntax.tzfail (NoSlotLayout {level = slot_id.slot_level})
+
+  let make_file_layout {Cryptobox.slot_size; _} =
+   fun ~root_dir (slot_id : Types.slot_id) ->
     let number_of_slots = 1 in
     let slot_id_string =
       Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
@@ -516,12 +609,17 @@ module Slots = struct
       ~number_of_keys_per_file:number_of_slots
       ()
 
+  let add_file_layout level cryptobox =
+    let layout = make_file_layout cryptobox in
+    slots_layouts := SlotsLayouts.add level layout !slots_layouts
+
   let init node_store_dir slot_store_dir =
     let root_dir = Filename.concat node_store_dir slot_store_dir in
     KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
 
   let add_slot t ~slot_size slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let* () =
       KVS.write_value ~override:true t file_layout (slot_id, slot_size) () slot
       |> Errors.other_lwt_result
@@ -535,15 +633,19 @@ module Slots = struct
 
   let find_slot t ~slot_size slot_id =
     let open Lwt_result_syntax in
+    let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
     match res with
     | Ok slot -> return slot
-    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
+    | Error [KVS.Missing_stored_kvs_data _] | Error [NoSlotLayout _] ->
+        fail Errors.not_found
     | Error err ->
         let data_kind = Types.Store.Slot in
         fail @@ Errors.decoding_failed data_kind err
 
   let remove_slot t ~slot_size slot_id =
+    let open Lwt_result_syntax in
+    let* file_layout = get_file_layout ~slot_id in
     KVS.remove_file t file_layout (slot_id, slot_size)
 end
 

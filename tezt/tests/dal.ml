@@ -1129,6 +1129,8 @@ let publish_and_bake ?slots ?delegates ~from_level ~to_level parameters
           level
           predecessor ;
       let* () = publish source ~index slot_content in
+      (* Storing the slot is required as the producer/operator does not store
+         anything. *)
       let* _commitment, _proof =
         let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
         Helpers.(
@@ -5137,7 +5139,8 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
        C.7 - Tamper slot size to trigger size mismatch (expected 404)
        C.8 - Use invalid archive URI (expected 500 with resolution errors)
        C.9 - Try to fetch slot with no commitment on L1 (expected 500)
-       C.10 - Try to fetch an unpublished slot for an old level (expected 500)
+       C.10 - Try to fetch an unpublished slot for an old level without any
+              cryptobox available (expected 404)
        C.11 - Try future level (expected 404)
        C.12 - Try out-of-bounds slot index (expected 404)
        C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
@@ -5418,13 +5421,11 @@ let dal_slots_retrievability =
            ~expected_error:"No_commitment_published_on_l1_for_slot_id"
     in
 
-    (* C.10 No slot published at level 0: expect 500 *)
+    (* C.10 No slot published at level 0: expect 404 *)
     let* () =
-      Log.info "C.10: no slot published at level 0" ;
+      Log.info "C.10: no slot published at level 0: no cryptobox" ;
       get_slot_rpc valid_dal_fetcher_1_2 ~published_level:0 ~slot_index:1
-      |> fetch_500_expected
-           ~__LOC__
-           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
+      |> fetch_404_expected ~__LOC__
     in
 
     (* C.11 Future level: expect 404 *)
