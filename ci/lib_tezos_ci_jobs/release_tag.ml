@@ -451,3 +451,6 @@ let octez_evm_node_jobs ?(test = false) () =
     job_gitlab_release;
     job_docker_promote_to_latest ~ci_docker_hub:(not test) ();
   ]
+
+let octez_packaging_revision_jobs =
+  [(* Stage: start *) job_datadog_pipeline_trace]
