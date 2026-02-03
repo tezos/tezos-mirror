@@ -1,6 +1,6 @@
-# When copying this image, feel free to change to debian:stable if you
-# encounter any dependency issue
-FROM debian:sid AS base
+# Use testing to get newer glibc/libstdc++ compatible with host-built binaries,
+# while avoiding sid's stricter signature policies.
+FROM debian:trixie AS base
 
 # ignore "Pin versions in apt get install" and "Delete the apt-get
 # lists after installing something" hadolint warnings. The apt-get
@@ -49,24 +49,21 @@ RUN apt-get update && apt-get install -y \
     # DL3015: Use --no-install-recommends
     --no-install-recommends
 
-# Add Microsoft keys and repo, to be able to install dotnet to run TZKT
-
-# ignore "Pin versions in apt get install" hadolint warning.
-# hadolint ignore=DL3008
-RUN wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    rm packages-microsoft-prod.deb && \
-    # dotnet is used to compile and run TZKT
-    apt-get update && apt-get install -y dotnet-sdk-9.0 \
-    # DL3015: Use --no-install-recommends
-    --no-install-recommends  && \
-    # DL3009: Delete the apt-get lists after Installing
-    rm -rf /var/lib/apt/lists/* && \
+# Install dotnet SDK without relying on Microsoft apt repositories (which can
+# fail signature verification on newer Debian releases).
+RUN wget -q https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 9.0 --install-dir /usr/share/dotnet && \
+    ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet && \
+    rm dotnet-install.sh && \
     # This directory is necessary for running sshd
     mkdir -p /run/sshd && \
     # A server ssh also requires a key. We generate one for all the main schemes
     mkdir -p /root/.ssh && \
     ssh-keygen -A
+
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}"
 # The public key giving access in ssh to the container
 ARG SSH_PUBLIC_KEY
 # The key is added to already existing keys
