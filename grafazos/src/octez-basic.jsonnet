@@ -46,10 +46,10 @@ local misc_y = 114;
 dashboard.new('Octez basic dashboard' + if !uid then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-basic' + uid_ext) else {})
 + dashboard.withDescription('A basic dashboard for Octez')
-+ dashboard.withTags(['tezos', 'octez'])
++ dashboard.withTags(['tezos', 'octez', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
-+ dashboard.withVariables([base.nodeInstance])
++ dashboard.withVariables(base.standardVariables)
 
 + dashboard.withPanels(
 

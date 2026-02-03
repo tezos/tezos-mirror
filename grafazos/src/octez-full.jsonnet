@@ -53,10 +53,10 @@ local logs_y = 165;
 dashboard.new('Octez full dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('octez-full' + uid_ext) else {})
 + dashboard.withDescription('A full dashboard for Octez')
-+ dashboard.withTags(['tezos', 'octez', 'hardware', 'logs'])
++ dashboard.withTags(['tezos', 'octez', 'hardware', 'logs', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
-+ dashboard.withVariables([base.nodeInstance])
++ dashboard.withVariables(base.standardVariables)
 
 + dashboard.withPanels(
 

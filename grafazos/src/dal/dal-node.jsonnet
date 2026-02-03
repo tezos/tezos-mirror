@@ -53,7 +53,7 @@ local graph = base.graph;
 
   storedShards(h, w, x, y):
     local shards = 'Stored shards';
-    local shardsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_number_of_stored_shards' + base.node_instance_query + '[1m])')
+    local shardsQuery = grafonnet.query.prometheus.new(base.datasource, 'deriv(' + namespace + '_number_of_stored_shards' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(shards);
     graph.new('The number of shards stored per second (over 1min)', [shardsQuery], h, w, x, y)
     + graph.withQueryColor([[shards, 'blue']]),
@@ -61,26 +61,26 @@ local graph = base.graph;
   slotsAttesatationSummary(h, w, x, y):
     local attested = 'Number of attested slots';
     local waiting = 'Number of slots waiting for attestation';
-    local attestedQuery = grafonnet.query.prometheus.new('Prometheus', 'sum(' + namespace + '_slots_attested' + base.slot_index_instance_query + ')')
+    local attestedQuery = grafonnet.query.prometheus.new(base.datasource, 'sum(' + namespace + '_slots_attested' + base.slot_index_instance_query + ')')
                           + query.prometheus.withLegendFormat(attested);
-    local waitingQuery = grafonnet.query.prometheus.new('Prometheus', 'sum(' + namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query + ')')
+    local waitingQuery = grafonnet.query.prometheus.new(base.datasource, 'sum(' + namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query + ')')
                          + query.prometheus.withLegendFormat(waiting);
     graph.new('Number of slots waiting for attestation and attested slots', [attestedQuery, waitingQuery], h, w, x, y)
     + graph.withQueryColor([[waiting, 'yellow'], [attested, 'green']]),
 
   slotsWaitingAttestations(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query)
+    local q = grafonnet.query.prometheus.new(base.datasource, namespace + '_slots_waiting_for_attestaion' + base.slot_index_instance_query)
               + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
     graph.new('Indexes of slots waiting for attestation', [q], h, w, x, y),
 
 
   slotsAttested(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_attested' + base.slot_index_instance_query)
+    local q = grafonnet.query.prometheus.new(base.datasource, namespace + '_slots_attested' + base.slot_index_instance_query)
               + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
     graph.new('Indexes of attested slots', [q], h, w, x, y),
 
   slotsUnattested(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_unattested' + base.slot_index_instance_query)
+    local q = grafonnet.query.prometheus.new(base.datasource, namespace + '_slots_unattested' + base.slot_index_instance_query)
               + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
     graph.new('Indexes of unattested slots', [q], h, w, x, y),
 

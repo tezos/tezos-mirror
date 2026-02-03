@@ -60,25 +60,25 @@ local graph = base.graph;
     local injection = 'Injection';
     local private = 'Private';
     local misc = 'Misc';
-    local chainsQuery = query.prometheus.new('Prometheus', q("'/chains/<chain_id>/.*'"))
+    local chainsQuery = query.prometheus.new(base.datasource, q("'/chains/<chain_id>/.*'"))
                         + query.prometheus.withLegendFormat(chains);
-    local blocksQuery = query.prometheus.new('Prometheus', q("'/chains/<chain_id>/blocks/.*'"))
+    local blocksQuery = query.prometheus.new(base.datasource, q("'/chains/<chain_id>/blocks/.*'"))
                         + query.prometheus.withLegendFormat(blocks);
-    local versionQuery = query.prometheus.new('Prometheus', q("'/version.*'"))
+    local versionQuery = query.prometheus.new(base.datasource, q("'/version.*'"))
                          + query.prometheus.withLegendFormat(version);
-    local configQuery = query.prometheus.new('Prometheus', q("'/config.*'"))
+    local configQuery = query.prometheus.new(base.datasource, q("'/config.*'"))
                         + query.prometheus.withLegendFormat(config);
-    local workersQuery = query.prometheus.new('Prometheus', q("'/workers.*'"))
+    local workersQuery = query.prometheus.new(base.datasource, q("'/workers.*'"))
                          + query.prometheus.withLegendFormat(workers);
-    local networkQuery = query.prometheus.new('Prometheus', q("'/network.*'"))
+    local networkQuery = query.prometheus.new(base.datasource, q("'/network.*'"))
                          + query.prometheus.withLegendFormat(network);
-    local protocolsQuery = query.prometheus.new('Prometheus', q("'/protocols.*'"))
+    local protocolsQuery = query.prometheus.new(base.datasource, q("'/protocols.*'"))
                            + query.prometheus.withLegendFormat(protocols);
-    local injectionQuery = query.prometheus.new('Prometheus', q("'/injection.*'"))
+    local injectionQuery = query.prometheus.new(base.datasource, q("'/injection.*'"))
                            + query.prometheus.withLegendFormat(injection);
-    local privateQuery = query.prometheus.new('Prometheus', q("'/private.*'"))
+    local privateQuery = query.prometheus.new(base.datasource, q("'/private.*'"))
                          + query.prometheus.withLegendFormat(private);
-    local miscQuery = query.prometheus.new('Prometheus', q("'/(fetch_protocol|stats|monitor)*.'"))
+    local miscQuery = query.prometheus.new(base.datasource, q("'/(fetch_protocol|stats|monitor)*.'"))
                       + query.prometheus.withLegendFormat(misc);
     graph.new(title, [chainsQuery, blocksQuery, versionQuery, configQuery, workersQuery, networkQuery, protocolsQuery, injectionQuery, privateQuery, miscQuery], h, w, x, y)
     + graph.withLegendRight()
@@ -91,7 +91,7 @@ local graph = base.graph;
 
   //The total number of calls
   totalCalls(h, w, x, y):
-    local q = query.prometheus.new('Prometheus', self.countQuery("'.*'"))
+    local q = query.prometheus.new(base.datasource, self.countQuery("'.*'"))
               + query.prometheus.withLegendFormat('total calls');
     info.new('Total of RPC calls', q, h, w, x, y)
     + info.withThreshold([['Base', 'light-yellow']])
@@ -100,7 +100,7 @@ local graph = base.graph;
 
   //The rate of calls from the last hour
   callsRate(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', 'sum(' + 'rate(' + base.namespace + '_rpc_calls_count{' + base.endpoint_label + '=~".*",' + base.node_instance + '="$node_instance"}' + '[1h]))')
+    local q = grafonnet.query.prometheus.new(base.datasource, 'sum(' + 'rate(' + base.namespace + '_rpc_calls_count{' + base.endpoint_label + '=~".*",' + base.node_instance + '="$node_instance"}' + '[1h]))')
               + query.prometheus.withLegendFormat('calls rate');
     info.new('RPC calls rate per hour', q, h, w, x, y)
     + info.withThreshold([['Base', 'light-yellow']])
@@ -108,7 +108,7 @@ local graph = base.graph;
 
   //The total duration of all RPCs calls
   totalDuration(h, w, x, y):
-    local q = query.prometheus.new('Prometheus', self.sumQuery("'.*'"))
+    local q = query.prometheus.new(base.datasource, self.sumQuery("'.*'"))
               + query.prometheus.withLegendFormat('total duration');
     info.new('Total of RPC calls durations', q, h, w, x, y)
     + info.withThreshold([['Base', 'blue']])
@@ -118,7 +118,7 @@ local graph = base.graph;
 
   //The average duration of all RPC calls
   averageDuration(h, w, x, y):
-    local q = query.prometheus.new('Prometheus', self.sumQuery("'.*'") + '/' + self.countQuery("'.*'"))
+    local q = query.prometheus.new(base.datasource, self.sumQuery("'.*'") + '/' + self.countQuery("'.*'"))
               + query.prometheus.withLegendFormat('total calls');
     info.new('Average of calls durations', q, h, w, x, y)
     + info.withThreshold([['Base', 'blue']])
@@ -128,7 +128,7 @@ local graph = base.graph;
 
   //The maximum of the total duration of each RPC calls
   maxTotalDuration(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"})')
+    local q = grafonnet.query.prometheus.new(base.datasource, 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"})')
               + query.prometheus.withLegendFormat('max total duration');
     info.new('Max of total calls durations', q, h, w, x, y)
     + info.withThreshold([['Base', 'blue']])
@@ -139,7 +139,7 @@ local graph = base.graph;
   //The maximum of the average duration of each RPC calls
   // i.e the duration of the longest call on average
   maxAverageDuration(h, w, x, y):
-    local q = grafonnet.query.prometheus.new('Prometheus', 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"} / ' + base.namespace + '_rpc_calls_count{' + base.node_instance + '="$node_instance"})')
+    local q = grafonnet.query.prometheus.new(base.datasource, 'max(' + base.namespace + '_rpc_calls_sum{' + base.node_instance + '="$node_instance"} / ' + base.namespace + '_rpc_calls_count{' + base.node_instance + '="$node_instance"})')
               + query.prometheus.withLegendFormat('max average duration');
     info.new('Max of average calls durations', q, h, w, x, y)
     + info.withThreshold([['Base', 'blue']])

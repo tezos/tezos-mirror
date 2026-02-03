@@ -42,10 +42,10 @@ local p2p_y = gossipsub_y + 24;
 dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
 + (if !uid then dashboard.withUid('dal-basic' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Octez DAL node')
-+ dashboard.withTags(['tezos', 'octez', 'dal'])
++ dashboard.withTags(['tezos', 'octez', 'dal', 'grafazos'])
 + dashboard.time.withFrom('now-3h')
 + dashboard.withRefresh('20s')
-+ dashboard.withVariables([base.nodeInstanceDal, base.slotIndex, base.pkh, base.peer])
++ dashboard.withVariables(base.standardVariablesDAL)
 
 + dashboard.withPanels(
 
