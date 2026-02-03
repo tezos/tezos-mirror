@@ -277,6 +277,23 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
+        let*! cycles =
+          Storage.Stake.Selected_distribution_for_cycle.keys ctxt
+        in
+        let* ctxt =
+          List.fold_left_es
+            (fun ctxt c ->
+              (* [stake_info_for_cycle] will not only return the stake info but
+                 also compute and store it in the storage since it hasn't already
+                 been done. Since we only need to update the storage here,
+                 the returned stake_info is ignored. *)
+              let* ctxt, _stake_info =
+                Delegate_sampler.stake_info_for_cycle ctxt c
+              in
+              return ctxt)
+            ctxt
+            cycles
+        in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in

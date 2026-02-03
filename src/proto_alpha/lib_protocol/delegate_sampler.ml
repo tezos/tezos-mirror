@@ -204,21 +204,35 @@ let sort_stakes_pk_for_stake_info stakes_pk =
     [Raw_context.set_stake_info_for_cycle]. *)
 let stake_info_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
-  let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
-  let total_stake_weight = Stake_repr.staking_weight total_stake in
-  let* ctxt, stakes_pkh = Stake_storage.get_selected_distribution ctxt cycle in
-  let* stakes_pk =
-    List.rev_map_es
-      (fun (pkh, stake) ->
-        let+ pk =
-          Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
-        in
-        Raw_context.
-          {consensus_pk = pk; stake_weight = Stake_repr.staking_weight stake})
-      stakes_pkh
-  in
-  let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-  return (ctxt, Raw_context.{total_stake_weight; delegates = stakes_pk})
+  let* r_opt = Storage.Delegate_stake_info.find ctxt cycle in
+  match r_opt with
+  | Some s -> return (ctxt, s)
+  (* The none case happens if the table hasn't been computed in advance.
+     This happens for a couple of cycles after the activation that includes
+     the new storage [Delegate_stake_info]. *)
+  | None ->
+      let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
+      let total_stake_weight = Stake_repr.staking_weight total_stake in
+      let* ctxt, stakes_pkh =
+        Stake_storage.get_selected_distribution ctxt cycle
+      in
+      let* stakes_pk =
+        List.rev_map_es
+          (fun (pkh, stake) ->
+            let+ pk =
+              Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
+            in
+            Raw_context.
+              {
+                consensus_pk = pk;
+                stake_weight = Stake_repr.staking_weight stake;
+              })
+          stakes_pkh
+      in
+      let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
+      let r = Raw_context.{total_stake_weight; delegates = stakes_pk} in
+      let*! ctxt = Storage.Delegate_stake_info.add ctxt cycle r in
+      return (ctxt, r)
 
 let stake_info ctxt level =
   let cycle = level.Level_repr.cycle in
@@ -287,9 +301,9 @@ let select_distribution_for_cycle ctxt cycle =
       stakes
       total_stake
   in
-  let* stakes_pk, tz4_number_bakers =
+  let* stakes_pk, tz4_number_bakers, total_stake_weight =
     List.fold_left_es
-      (fun (list_acc, tz4_count_acc) (pkh, stake) ->
+      (fun (list_acc, tz4_count_acc, total_stake_weight) (pkh, stake) ->
         let* pk =
           Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
         in
@@ -299,14 +313,38 @@ let select_distribution_for_cycle ctxt cycle =
           | Bls _ -> tz4_count_acc + 1
           | _ -> tz4_count_acc
         in
-        return ((pk, stake_weight) :: list_acc, tz4_count))
-      ([], 0)
+        return
+          ( (pk, stake_weight) :: list_acc,
+            tz4_count,
+            Int64.add total_stake_weight stake_weight ))
+      ([], 0, 0L)
       stakes
   in
   let state = Sampler.create stakes_pk in
   let* ctxt = Delegate_sampler_state.init ctxt cycle state in
   (* pre-allocate the sampler *)
   let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
+  (* Update stake info *)
+  (* At the end of the cycle, we store the data used to
+     compute the [sampler_state] as [stake_info]. This include the
+     [total_staking_power] for the cycle, as well as the list
+     of active stakes and consensus keys for each active delegate.
+     They are also sorted with [sort_stakes_pk_for_stake_info], as
+     it is important for ABAAB that they are sorted in a
+     deterministic way. *)
+  let delegates =
+    List.map
+      (fun (consensus_pk, stake_weight) ->
+        Raw_context.{consensus_pk; stake_weight})
+      stakes_pk
+  in
+  let delegates = sort_stakes_pk_for_stake_info delegates in
+  (* Note: it is impossible that this entry for this cycle would have been
+     initialised before, because it needs the sampler info, which is being done
+     is this very function *)
+  let* ctxt =
+    Storage.Delegate_stake_info.init ctxt cycle {total_stake_weight; delegates}
+  in
   (* Update all bakers attest activation level if tz4 stake
      is above activation threshold *)
   let*! ctxt =
@@ -330,6 +368,11 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | None -> return ctxt
   | Some outdated_cycle ->
       let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
+      (* We cannot use [remove_existing] for [Delegate_stake_info] because
+         there exists some cycles for which the storage does not exist.
+         This happens because this data doesn't exist for cycles before
+         the storage has been introduced. *)
+      let*! ctxt = Storage.Delegate_stake_info.remove ctxt outdated_cycle in
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
 let attesting_power ~all_bakers_attest_enabled ctxt level =
