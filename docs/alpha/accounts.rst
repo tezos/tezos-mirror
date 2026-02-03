@@ -102,11 +102,14 @@ that is used to sign the DAL specific attestation and aggregate it with the regu
 ``tz5``: ML-DSA-44
 ''''''''''''''''''
 
-Addresses that start with the ``tz5`` prefix are hashes of ML-DSA-44 public keys and
-signatures must be produced by using the `ML-DSA-44 signature scheme
-<https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>`_ . One
-particularity of ML-DSA-44 is that it is secure against classical and
-quantum computer attacks.
+Addresses that start with the ``tz5`` prefix are hashes of ML-DSA-44 public keys
+and signatures must be produced by using the `ML-DSA-44 signature scheme
+<https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf>`_ . One particularity
+of ML-DSA-44 is that it is secure against classical and quantum computer
+attacks. ``tz5`` accounts are under a feature flag ``tz5_account_enable``, which
+is disabled by default on the mainnet. On testing networks where this feature
+flag is enabled, ``tz5`` accounts cannot be registered as delegates, and ``tz5``
+keys cannot be used as consensus keys.
 
 
 Smart contracts
