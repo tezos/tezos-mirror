@@ -847,6 +847,15 @@ open struct
       ~level:Warning
       ()
 
+  let amplificator_stopped =
+    declare_0
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplificator_stopped"
+      ~msg:"the amplificator process worker was stopped"
+      ~level:Info
+      ()
+
   let crypto_process_received_query =
     declare_1
       ~section:(section @ ["crypto"])
@@ -1577,6 +1586,8 @@ let emit_crypto_process_error ~msg = emit crypto_process_error msg
 let emit_crypto_process_fatal ~msg = emit crypto_process_fatal msg
 
 let emit_amplificator_uninitialized () = emit amplificator_uninitialized ()
+
+let emit_amplificator_stopped () = emit amplificator_stopped ()
 
 let emit_crypto_process_received_query ~query_id =
   emit crypto_process_received_query query_id
