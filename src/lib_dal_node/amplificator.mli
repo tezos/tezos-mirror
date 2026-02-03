@@ -47,3 +47,8 @@ val try_amplification :
 
 (** Creates a new amplificator process *)
 val make : Node_context.t -> t tzresult Lwt.t
+
+(** [restart amplificator] restarts the process worker.
+    Should be called if the node context cryptobox or shard proof
+    precomputations changed. *)
+val restart : t -> unit tzresult Lwt.t

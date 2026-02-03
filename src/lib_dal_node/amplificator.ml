@@ -24,8 +24,8 @@ module Query_store = Stdlib.Hashtbl
 
 type t = {
   node_ctxt : Node_context.t;
-  process : Process_worker.t;
-  query_pipe : query_msg Lwt_pipe.Unbounded.t;
+  mutable process : Process_worker.t;
+  mutable query_pipe : query_msg Lwt_pipe.Unbounded.t;
   mutable query_id : int;
   query_store : (int, query) Query_store.t;
   amplification_random_delay_min : float;
@@ -36,6 +36,8 @@ type t = {
          received from the network. The duration of the delay is picked at
          random between [amplification_random_delay_min] and
          [amplification_random_delay_max]. *)
+  mutable query_sender_job : unit tzresult Lwt.t;
+  mutable reply_receiver_job : unit tzresult Lwt.t;
 }
 
 type error +=
@@ -157,7 +159,7 @@ module Reconstruction_process_worker : sig
     Cryptobox.t * Cryptobox.shards_proofs_precomputation ->
     unit
 end = struct
-  let welcome_handshake input =
+  let read_welcome_handshake input =
     let r = Process_worker.read_message input in
     match r with
     | b when Bytes.equal b welcome -> ()
@@ -241,40 +243,55 @@ end = struct
       =
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
-    let () = welcome_handshake input in
+    let () = read_welcome_handshake input in
     let () =
       Tezos_bees.Hive.async_lwt (fun () -> Event.emit_crypto_process_started ())
     in
+    let read_query_id input =
+      match Eio.Stream.take input |> Bytes.to_string with
+      | "STOP" -> `Stop
+      | s -> `Query (int_of_string s)
+    in
     let rec loop () =
-      let query_id =
-        Eio.Stream.take input |> Bytes.to_string |> int_of_string
-      in
-      try
-        let r =
-          process_query ~query_id ~input cryptobox shards_proofs_precomputation
-        in
-        match r with
-        | Ok proved_shards_encoded ->
-            let () = reply_success ~query_id ~proved_shards_encoded ~output in
-            loop ()
-        | Error err ->
-            let (`Other err) = err in
-            let error = Format.asprintf "%a" Error_monad.pp_print_trace err in
-            (* send a reply with the error, and continue *)
-            let () = reply_error_query ~output ~query_id ~error in
-            loop ()
-      with
-      | Eio.Cancel.Cancelled _ ->
+      match read_query_id input with
+      | `Stop ->
           Tezos_bees.Hive.async_lwt (fun () ->
               Event.emit_crypto_process_stopped ())
-      | exn ->
-          let error = Printexc.to_string exn in
-          let () =
-            Tezos_bees.Hive.async_lwt (fun () ->
-                Event.emit_crypto_process_error ~msg:error)
-          in
-          let () = reply_error_query ~output ~query_id ~error in
-          raise exn
+      | `Query query_id -> (
+          try
+            let r =
+              process_query
+                ~query_id
+                ~input
+                cryptobox
+                shards_proofs_precomputation
+            in
+            match r with
+            | Ok proved_shards_encoded ->
+                let () =
+                  reply_success ~query_id ~proved_shards_encoded ~output
+                in
+                loop ()
+            | Error err ->
+                let (`Other err) = err in
+                let error =
+                  Format.asprintf "%a" Error_monad.pp_print_trace err
+                in
+                (* send a reply with the error, and continue *)
+                let () = reply_error_query ~output ~query_id ~error in
+                loop ()
+          with
+          | Eio.Cancel.Cancelled _ ->
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_crypto_process_stopped ())
+          | exn ->
+              let error = Printexc.to_string exn in
+              let () =
+                Tezos_bees.Hive.async_lwt (fun () ->
+                    Event.emit_crypto_process_error ~msg:error)
+              in
+              let () = reply_error_query ~output ~query_id ~error in
+              raise exn)
     in
     loop ()
 end
@@ -417,11 +434,12 @@ let determine_amplification_delays node_ctxt =
   let amplification_random_delay_max = 2. *. amplification_period in
   (amplification_random_delay_min, amplification_random_delay_max)
 
-let start_amplificator node_ctxt =
+let write_welcome_handshake amplificator =
+  let ic = Process_worker.input_channel amplificator.process in
+  Lwt_eio.run_eio (fun () -> Process_worker.write_message ic welcome)
+
+let start_process node_ctxt =
   let open Lwt_result_syntax in
-  let*? amplification_random_delay_min, amplification_random_delay_max =
-    determine_amplification_delays node_ctxt
-  in
   let l1_current_head = Node_context.get_l1_current_head_level node_ctxt in
   (* This is not great, since the amplificator should not run forever with the same cryptobox. *)
   let*? cryptobox, shards_proofs_precomputation =
@@ -442,31 +460,10 @@ let start_amplificator node_ctxt =
           Reconstruction_process_worker.reconstruct_process_worker
           (cryptobox, shards_proofs_precomputation))
   in
-  let query_pipe = Lwt_pipe.Unbounded.create () in
-  let query_store = Query_store.create 23 in
-  let queue_length = Query_store.length query_store in
-  let () = Dal_metrics.update_amplification_queue_length queue_length in
-  let amplificator =
-    {
-      node_ctxt;
-      process;
-      query_pipe;
-      query_store;
-      query_id = 0;
-      amplification_random_delay_min;
-      amplification_random_delay_max;
-    }
-  in
-  return amplificator
+  return process
 
-let welcome_handshake amplificator =
-  let ic = Process_worker.input_channel amplificator.process in
-  Lwt_eio.run_eio (fun () -> Process_worker.write_message ic welcome)
-
-let make node_ctxt =
+let start_jobs amplificator =
   let open Lwt_result_syntax in
-  let* amplificator = start_amplificator node_ctxt in
-  (* Run a job enqueueing all shards calculation tasks *)
   let amplificator_query_sender_job =
     let*! r = query_sender_job amplificator in
     match r with
@@ -480,9 +477,8 @@ let make node_ctxt =
         Lwt_result_syntax.fail
           (Amplification_query_sender_job "Error running query sender job" :: e)
   in
-  (* Run a job retrieving all shards and their proof and publish them *)
   let amplificator_reply_receiver_job =
-    let*! r = reply_receiver_job amplificator node_ctxt in
+    let*! r = reply_receiver_job amplificator amplificator.node_ctxt in
     match r with
     | Ok () -> return_unit
     | Error [Exn Lwt.Canceled] -> (* Graceful cancellation *) return_unit
@@ -494,13 +490,72 @@ let make node_ctxt =
         Lwt_result_syntax.fail
           (Amplification_reply_receiver_job "Error in reply receiver job" :: e)
   in
+  amplificator.query_sender_job <- amplificator_query_sender_job ;
+  amplificator.reply_receiver_job <- amplificator_reply_receiver_job
+
+let stop_jobs amplificator =
+  let () = Lwt.cancel amplificator.query_sender_job in
+  let () = Lwt.cancel amplificator.reply_receiver_job in
+  ()
+
+let stop_process process =
+  let ic = Process_worker.input_channel process in
+  Lwt_eio.run_eio (fun () -> Eio.Stream.add ic (Bytes.of_string "STOP"))
+
+let reset_query_state amplificator =
+  amplificator.query_pipe <- Lwt_pipe.Unbounded.create () ;
+  Query_store.clear amplificator.query_store ;
+  amplificator.query_id <- 0 ;
+  Dal_metrics.update_amplification_queue_length 0
+
+let start_amplificator node_ctxt =
+  let open Lwt_result_syntax in
+  let*? amplification_random_delay_min, amplification_random_delay_max =
+    determine_amplification_delays node_ctxt
+  in
+  let* process = start_process node_ctxt in
+  let query_pipe = Lwt_pipe.Unbounded.create () in
+  let query_store = Query_store.create 23 in
+  let queue_length = Query_store.length query_store in
+  let () = Dal_metrics.update_amplification_queue_length queue_length in
+  let dummy_job = Lwt.return (Ok ()) in
+  let amplificator : t =
+    {
+      node_ctxt;
+      process;
+      query_pipe;
+      query_store;
+      query_id = 0;
+      amplification_random_delay_min;
+      amplification_random_delay_max;
+      query_sender_job = dummy_job;
+      reply_receiver_job = dummy_job;
+    }
+  in
+  let*! () = write_welcome_handshake amplificator in
+  let () = start_jobs amplificator in
+  return amplificator
+
+let restart amplificator =
+  let open Lwt_result_syntax in
+  let () = stop_jobs amplificator in
+  let*! () = stop_process amplificator.process in
+  let () = reset_query_state amplificator in
+  let* process = start_process amplificator.node_ctxt in
+  amplificator.process <- process ;
+  let*! () = write_welcome_handshake amplificator in
+  let () = start_jobs amplificator in
+  return_unit
+
+let make node_ctxt =
+  let open Lwt_result_syntax in
+  let* amplificator = start_amplificator node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
-        let () = Lwt.cancel amplificator_query_sender_job in
-        let () = Lwt.cancel amplificator_reply_receiver_job in
+        let () = Lwt.cancel amplificator.query_sender_job in
+        let () = Lwt.cancel amplificator.reply_receiver_job in
         Lwt.return_unit)
   in
-  let*! () = welcome_handshake amplificator in
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
