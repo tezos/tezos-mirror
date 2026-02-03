@@ -17,15 +17,21 @@ let _main =
     ~synopsis:"Tezt tests using Tezt cloud"
     ~bisect_ppx:No
     ~deps:
-      [
-        bls12_381_archive;
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_cloud |> open_;
-        tezt_etherlink;
-        tezt_benchmark_lib;
-        octez_stdlib_unix;
-      ]
+      ([
+         tezt_migration_registry;
+         bls12_381_archive;
+         octez_test_helpers |> open_;
+         tezt_wrapper |> open_ |> open_ ~m:"Base";
+         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+         tezt_cloud |> open_;
+         tezt_etherlink;
+         tezt_benchmark_lib;
+         octez_stdlib_unix;
+       ]
+      @ List.fold_left
+          (fun acc proto ->
+            (Protocol.(test_migration_exn proto) |> open_) :: acc)
+          []
+          Protocol.active)
     ~release_status:Unreleased
     ~with_macos_security_framework:true

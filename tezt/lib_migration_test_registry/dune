@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_migration_registry)
+ (public_name tezt-migration-registry)
+ (libraries
+  tezt-tezos
+  tezt
+  octez-libs.tezt-wrapper
+  octez-libs.base
+  octez-libs.base.unix
+  cohttp-lwt-unix)
+ (flags
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base))

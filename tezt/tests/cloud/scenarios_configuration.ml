@@ -345,7 +345,7 @@ module LAYER1 = struct
     without_dal : bool;
     dal_node_producers : int list option;
     maintenance_delay : int;
-    migration_offset : int option;
+    migration : Protocol_migration.t option;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     signing_delay : (float * float) option;
@@ -365,7 +365,7 @@ module LAYER1 = struct
              without_dal;
              dal_node_producers;
              maintenance_delay;
-             migration_offset;
+             migration;
              ppx_profiling_verbosity;
              ppx_profiling_backends;
              signing_delay;
@@ -381,7 +381,7 @@ module LAYER1 = struct
             without_dal,
             dal_node_producers,
             maintenance_delay,
-            migration_offset,
+            migration,
             ppx_profiling_verbosity,
             ppx_profiling_backends ),
           (signing_delay, fixed_random_seed, octez_release, auto_faketime) ))
@@ -392,7 +392,7 @@ module LAYER1 = struct
                without_dal,
                dal_node_producers,
                maintenance_delay,
-               migration_offset,
+               migration,
                ppx_profiling_verbosity,
                ppx_profiling_backends ),
              (signing_delay, fixed_random_seed, octez_release, auto_faketime) )
@@ -405,7 +405,7 @@ module LAYER1 = struct
           without_dal;
           dal_node_producers;
           maintenance_delay;
-          migration_offset;
+          migration;
           ppx_profiling_verbosity;
           ppx_profiling_backends;
           signing_delay;
@@ -422,7 +422,7 @@ module LAYER1 = struct
             (dft "without_dal" bool Default.without_dal)
             (opt "dal_node_producers" (list int31))
             (dft "maintenance_delay" int31 Default.maintenance_delay)
-            (opt "migration_offset" int31)
+            (opt "migration" Protocol_migration.encoding)
             (opt "ppx_profiling_verbosity" string)
             (dft
                "ppx_profiling_backends"

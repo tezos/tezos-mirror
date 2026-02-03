@@ -804,13 +804,15 @@ val get_chain_block_helper_validators :
   unit ->
   JSON.t t
 
+type cycle_levels = {first : int; last : int}
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/levels_in_current_cycle]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_levels_in_current_cycle :
-  ?chain:string -> ?block:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> unit -> cycle_levels t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/total_baking_power]
 
@@ -1549,3 +1551,10 @@ val get_chain_block_context_clst_exchange_rate :
     [block] defaults to ["head"]. *)
 val get_chain_block_context_contract_clst_balance :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/main/blocks/head/context/raw/json/contracts/address_registry/next]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_address_registry :
+  ?chain:string -> ?block:string -> unit -> int t

@@ -458,7 +458,11 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
   in
   let* dal_node =
@@ -544,7 +548,11 @@ let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
   in
   let* () =
@@ -599,7 +607,11 @@ let init_stresstest_i i (configuration : Scenarios_configuration.LAYER1.t) ~pkh
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       (agent, node, name)
       ~tps
   in
@@ -617,7 +629,11 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
-      ~migration_offset:configuration.migration_offset
+      ~migration_offset:
+        (Option.map
+           (fun ({migration_offset; _} : Protocol_migration.t) ->
+             migration_offset)
+           configuration.migration)
       resources
   in
   let* dal_node =
@@ -759,6 +775,41 @@ let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   List.map (fun s -> sum (List.map snd s)) distribution
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
+
+let run_stresstest stresstesters tps seed =
+  (* run the stresstest *)
+  Lwt_list.iteri_p
+    (fun i {agent; client; accounts; _} ->
+      let* filename =
+        (* The list of account is too big to be passed by ssh,
+           so we generate the account list locally,
+           copy it to the agent,
+           and pass the filename to stresstest invocation directly *)
+        let sources =
+          `A
+            (List.map
+               (fun ({public_key_hash = pkh; _} : Account.key) ->
+                 `O [("pkh", `String pkh)])
+               accounts)
+        in
+        (* As we run in parrallel, and as Temp.file does not return a unique file name,
+           we need a different base filename name for each stresstester *)
+        let base = sf "stresstest-%i-sources.json" i in
+        let source = Temp.file ?runner:None base in
+        let destination = Temp.file ?runner:(Agent.runner agent) base in
+        let () = JSON.encode_to_file_u source sources in
+        Tezt_cloud.Agent.copy agent ~destination ~source
+      in
+      let _ =
+        Client.spawn_stresstest_with_filename
+          ~env:yes_crypto_env
+          ~tps
+          ~seed
+          client
+          filename
+      in
+      Lwt.return_unit)
+    stresstesters
 
 let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
   let open Scenarios_configuration.LAYER1 in
@@ -916,39 +967,9 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
             stresstesters
         in
         let* () =
-          (* run the stresstest *)
-          Lwt_list.iteri_p
-            (fun i {agent; client; accounts; _} ->
-              let* filename =
-                (* The list of account is too big to be passed by ssh,
-                   so we generate the account list locally,
-                   copy it the the agent,
-                   and pass the filename to stresstest invocation directly *)
-                let sources =
-                  `A
-                    (List.map
-                       (fun ({public_key_hash = pkh; _} : Account.key) ->
-                         `O [("pkh", `String pkh)])
-                       accounts)
-                in
-                (* As we run in parrallel, and as Temp.file does not return a unique file name,
-                   we need a different base filename name for each stresstester *)
-                let base = sf "stresstest-%i-sources.json" i in
-                let source = Temp.file ?runner:None base in
-                let destination = Temp.file ?runner:(Agent.runner agent) base in
-                let () = JSON.encode_to_file_u source sources in
-                Tezt_cloud.Agent.copy agent ~destination ~source
-              in
-              let _ =
-                Client.spawn_stresstest_with_filename
-                  ~env:yes_crypto_env
-                  ~tps
-                  ~seed
-                  client
-                  filename
-              in
-              Lwt.return_unit)
-            stresstesters
+          match configuration.migration with
+          | None -> run_stresstest stresstesters tps seed
+          | Some _ -> Lwt.return_unit
         in
         Lwt.return stresstesters
   in
@@ -1115,7 +1136,7 @@ let snapshot_timestamp ~snapshot ~(network : Network.t) =
   let* snapshot = local_snapshot ~snapshot ~network in
   Snapshot_helpers.get_snapshot_info_timestamp node snapshot
 
-let number_of_bakers ~snapshot ~(network : Network.t) =
+let init_tmp_node snapshot network =
   let* snapshot = local_snapshot ~snapshot ~network in
   let node =
     let name = "tmp-node" in
@@ -1138,13 +1159,110 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   in
   let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
   let* () = Node.wait_for_ready node in
+  return node
+
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* node = init_tmp_node snapshot network in
+  let* client = Client.init ~endpoint:(Node node) () in
   let* n =
-    RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
-    |> RPC_core.call_json (Node.as_rpc_endpoint node)
-    |> Lwt.map (fun {RPC_core.body; _} -> JSON.(body |> as_list |> List.length))
+    Lwt.map
+      List.length
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegates
+           ~query_string:[("active", "true")]
+           ())
   in
   let* () = Node.terminate node in
+  let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
   Lwt.return n
+
+let get_migration_level_offsets (migration : Protocol_migration.t) ~snapshot
+    ~(network : Network.t) () =
+  let* node = init_tmp_node snapshot network in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* current_level =
+    Lwt.map
+      (fun (current_level : RPC.level) -> current_level.level)
+      (Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ())
+  in
+  let* last_cycle_level =
+    Lwt.map
+      (fun (levels : RPC.cycle_levels) -> levels.last)
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_helper_levels_in_current_cycle ())
+  in
+  let* blocks_per_cycle =
+    Lwt.map
+      (fun constants -> JSON.(constants |-> "blocks_per_cycle" |> as_int))
+      (Client.RPC.call client
+      @@ RPC.get_chain_block_context_constants_parametric ())
+  in
+  let* migration =
+    let migration_level_offset =
+      match migration.migration_offset with
+      | Level_offset l -> l
+      | Cycle_offset c ->
+          last_cycle_level - current_level + (c * blocks_per_cycle)
+    in
+    let termination_level_offset =
+      match migration.migration_offset with
+      | Level_offset l -> l
+      | Cycle_offset c -> c * blocks_per_cycle
+    in
+    return
+      ( {
+          migration with
+          migration_offset = Level_offset migration_level_offset;
+          termination_offset = Level_offset termination_level_offset;
+        },
+        current_level + migration_level_offset,
+        current_level + migration_level_offset + termination_level_offset )
+  in
+  let* () = Node.terminate node in
+  let* () = Tezos_stdlib_unix.Lwt_utils_unix.remove_dir (Node.data_dir node) in
+  Lwt.return migration
+
+let do_migration_checks (state : Tezt_migration_registry.Register.state option)
+    level =
+  match state with
+  | None -> Lwt.return_none
+  | Some state -> (
+      match
+        Tezt_migration_registry.Register.get
+          (sf "%s: checks" (Protocol.name state.next_protocol))
+      with
+      | None -> Lwt.return_none
+      | Some checks ->
+          let* state = checks state level in
+          Lwt.return_some state)
+
+let may_export_snapshot (t : bootstrap)
+    (migration : Protocol_migration.t option) level =
+  match migration with
+  | None -> Lwt.return_unit
+  | Some migration when not migration.export_snapshot -> Lwt.return_unit
+  | Some _ -> (
+      match Tezt_cloud_cli.artifacts_dir with
+      | None -> Lwt.return_unit
+      | Some artifacts_dir ->
+          let snapshot_name = sf "%d.rolling" level in
+          let destination =
+            Artifact_helpers.local_path
+              [artifacts_dir; "migration"; snapshot_name]
+          in
+          let* () =
+            Node.snapshot_export
+              ~history_mode:Rolling_history
+              ~export_format:Tar
+              t.node
+              snapshot_name
+          in
+          Agent.scp
+            t.agent
+            ~is_directory:true
+            ~source:snapshot_name
+            ~destination
+            `FromRunner)
 
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : Scenarios_configuration.LAYER1.t =
@@ -1156,7 +1274,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
       without_dal = Cli.without_dal;
       dal_node_producers = Cli.dal_producers_slot_indices;
       maintenance_delay = Cli.maintenance_delay;
-      migration_offset = Cli.migration_offset;
+      migration = Cli.migration;
       ppx_profiling_verbosity = Cli.ppx_profiling_verbosity;
       ppx_profiling_backends = Cli.ppx_profiling_backends;
       signing_delay = Cli.signing_delay;
@@ -1279,6 +1397,22 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
+  let* configuration, migration_level, termination_level =
+    match configuration.migration with
+    | None -> return (configuration, None, None)
+    | Some migration ->
+        let* migration, migration_level, termination_level =
+          get_migration_level_offsets
+            migration
+            ~snapshot:configuration.snapshot
+            ~network:configuration.network
+            ()
+        in
+        return
+          ( {configuration with migration = Some migration},
+            Some migration_level,
+            Some termination_level )
+  in
   toplog "Prepare artifacts directory and export the full configuration" ;
   Artifact_helpers.prepare_artifacts
     ~scenario_config:
@@ -1311,49 +1445,113 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
-  let produce_slot (t : 'network t) level =
-    Lwt_list.iter_p
-      (fun (producer : Dal_node_helpers.producer) ->
-        let index = producer.slot_index in
-        toplog "Producing DAL commitment for slot %d" index ;
-        let content =
-          Format.asprintf "%d:%d" level index
-          |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
-        in
-        let* _ = Node.wait_for_level producer.node level in
-        let fee = 800 in
-        let* _commitment =
-          (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+  let may_produce_slot (t : 'network t) migration_level level =
+    let produce_slot (t : 'network t) level =
+      Lwt_list.iter_p
+        (fun (producer : Dal_node_helpers.producer) ->
+          let index = producer.slot_index in
+          toplog "Producing DAL commitment for slot %d" index ;
+          let content =
+            Format.asprintf "%d:%d" level index
+            |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
+          in
+          let* _ = Node.wait_for_level producer.node level in
+          let fee = 800 in
+          let* _commitment =
+            (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
              - tz1: fees of 513µtz and 1333 gas consumed
              - tz2: fees of 514µtz and 1318 gas consumed
              - tz3: fees of 543µtz and 1607 gas consumed
              - tz4: fees of 700µtz and 2837 gas consumed
              We added a (quite small) margin to it. *)
-          Dal_common.Helpers.publish_and_store_slot
-            ~fee
-            ~gas_limit:3000
-            ~dont_wait:true
-            producer.client
-            producer.dal_node
-            producer.account
-            ~force:true
-            ~index
-            content
-        in
-        Lwt.return_unit)
-      t.producers
+            Dal_common.Helpers.publish_and_store_slot
+              ~fee
+              ~gas_limit:3000
+              ~dont_wait:true
+              producer.client
+              producer.dal_node
+              producer.account
+              ~force:true
+              ~index
+              content
+          in
+          Lwt.return_unit)
+        t.producers
+    in
+    match migration_level with
+    | None -> produce_slot t level
+    | Some migration_level when level > migration_level - 100 ->
+        produce_slot t level
+    | Some _ -> Lwt.return_unit
+  in
+  let should_terminate level =
+    match termination_level with
+    | None -> false
+    | Some termination_level -> level >= termination_level
+  in
+  let may_start_stresstesting t stresstesting_started migration_level level =
+    if stresstesting_started then Lwt.return_true
+    else
+      match migration_level with
+      | None -> Lwt.return_true
+      | Some migration_level ->
+          if level > migration_level - 100 then
+            match configuration.stresstest with
+            | None -> Lwt.return_true
+            | Some {tps; seed} ->
+                let tps =
+                  tps / Stresstest.nb_stresstester configuration.network tps
+                in
+                let* () = run_stresstest t.stresstesters tps seed in
+                Lwt.return_true
+          else Lwt.return stresstesting_started
+  in
+  let state_opt =
+    Option.bind migration_level (fun migration_level ->
+        match Tezt_cloud_cli.artifacts_dir with
+        | None ->
+            Test.fail
+              "An artifacts directory should be provided for migration tests."
+        | Some artifacts_dir ->
+            let artifacts_dir_path =
+              Artifact_helpers.local_path [artifacts_dir; "migration"]
+            in
+            let next_protocol = Network.next_protocol configuration.network in
+            Some
+              (Tezt_migration_registry.Register.init_state
+                 migration_level
+                 t.bootstrap.node
+                 configuration.network
+                 next_protocol
+                 artifacts_dir_path))
   in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop with_producers level =
+    (let rec loop state_opt stresstesting_started with_producers level =
        let level = succ level in
        toplog "Loop at level %d" level ;
-       let* () =
-         if with_producers then
-           let* _ = Node.wait_for_level t.bootstrap.node level in
-           Lwt.return_unit
-         else produce_slot t level
+       let* stresstesting_started =
+         may_start_stresstesting t stresstesting_started migration_level level
        in
-       loop with_producers level
+       if should_terminate level then (
+         Log.warn
+           "Experiment has reached the termination level, the experiment will \
+            stop after the snapshot export." ;
+         let* () =
+           may_export_snapshot t.bootstrap configuration.migration level
+         in
+         Lwt.return_unit)
+       else
+         let* state_opt = do_migration_checks state_opt level in
+         let* () =
+           if with_producers then
+             let* _ = Node.wait_for_level t.bootstrap.node level in
+             Lwt.return_unit
+           else may_produce_slot t migration_level level
+         in
+         loop state_opt stresstesting_started with_producers level
      in
-     loop (List.compare_length_with t.producers 0 = 0))
+     loop
+       state_opt
+       (migration_level = None)
+       (List.compare_length_with t.producers 0 = 0))

@@ -21,6 +21,8 @@ depends: [
   "tezt-tezos" { = version }
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs" { = version }
+  "tezt-migration-registry" { = version }
+  "octez-alcotezt" { = version }
   "octez-version" { = version }
   "octez-node-config" { = version }
   "tezos-dal-node-services" { = version }
@@ -33,7 +35,6 @@ depends: [
   "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }
   "octez-l2-libs" { = version }
-  "octez-alcotezt" { with-test & = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

@@ -2871,6 +2871,25 @@ let tezt_tezos =
     ~cram:true
     ~release_status:Released
 
+let tezt_migration_registry =
+  public_lib
+    "tezt-migration-registry"
+    ~path:"tezt/lib_migration_test_registry"
+    ~opam:"tezt-migration-registry"
+    ~synopsis:"Octez Protocol migration checks registration"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        tezt_tezos;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        octez_base;
+        octez_base_unix;
+        cohttp_lwt_unix;
+      ]
+    ~cram:true
+    ~release_status:Released
+
 let octez_p2p_test_common =
   octez_shell_lib
     "p2p_test_common"
@@ -6069,6 +6088,8 @@ module Protocol : sig
 
   val test_helpers_exn : t -> target
 
+  val test_migration_exn : t -> target
+
   val genesis : t
 
   val demo_noops : t
@@ -6173,6 +6194,7 @@ end = struct
     dal : target option;
     agnostic_baker : target option;
     test_helpers : target option;
+    test_migration : target option;
     parameters : target option;
     benchmarks_proto : target option;
     baking : target option;
@@ -6183,9 +6205,9 @@ end = struct
 
   let make ?client ?client_commands ?client_commands_registration
       ?baking_commands_registration ?plugin ?plugin_registerer ?dal
-      ?agnostic_baker ?test_helpers ?parameters ?benchmarks_proto
-      ?octez_sc_rollup ?octez_sc_rollup_node ?octez_injector ?baking ~status
-      ~name ~main ~embedded () =
+      ?agnostic_baker ?test_helpers ?test_migration ?parameters
+      ?benchmarks_proto ?octez_sc_rollup ?octez_sc_rollup_node ?octez_injector
+      ?baking ~status ~name ~main ~embedded () =
     {
       status;
       name;
@@ -6200,6 +6222,7 @@ end = struct
       dal;
       agnostic_baker;
       test_helpers;
+      test_migration;
       parameters;
       benchmarks_proto;
       baking;
@@ -6278,6 +6301,8 @@ end = struct
   let octez_injector p = p.octez_injector
 
   let test_helpers_exn p = mandatory "test_helpers" p p.test_helpers
+
+  let test_migration_exn p = mandatory "test_migration" p p.test_migration
 
   (* N as in "protocol number in the Dev family". *)
   module N = struct
@@ -7398,6 +7423,28 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
           ]
         ~dune:[dune_signatures_version_rule]
     in
+    let test_migration =
+      only_if active @@ fun () ->
+      octez_protocol_lib
+        "test-migration"
+        ~path:(path // "lib_protocol/test/migration")
+        ~internal_name:(sf "tezos_%s_test_migration" name_underscore)
+        ~synopsis:"Protocol migration testing checks"
+        ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
+        ~deps:
+          [
+            tezt_migration_registry;
+            alcotezt;
+            octez_base |> open_ ~m:"TzPervasives"
+            |> error_monad_module N.(number <= 018);
+            main |> open_;
+            test_helpers |> if_some |> open_;
+            octez_base_test_helpers |> open_;
+            parameters |> if_some |> open_;
+            plugin |> if_some |> open_;
+          ]
+        ~linkall:true
+    in
     let _plugin_tests =
       opt_map (both plugin test_helpers) @@ fun (plugin, test_helpers) ->
       only_if active @@ fun () ->
@@ -8186,6 +8233,7 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
          ?dal
          ?agnostic_baker
          ?test_helpers
+         ?test_migration
          ?parameters
          ?benchmarks_proto
          ?baking
