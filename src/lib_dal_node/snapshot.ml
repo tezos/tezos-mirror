@@ -135,8 +135,7 @@ module Merge = struct
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
-  let merge_slots ~cryptobox ~src ~dst ~min_published_level ~max_published_level
-      ~slots =
+  let merge_slots ~src ~dst ~min_published_level ~max_published_level ~slots =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -151,9 +150,8 @@ module Merge = struct
       (fun () ->
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
-        let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
         let* file_layout = Store.Slots.get_file_layout ~slot_id in
-        kvs_copy_value src_store dst_store file_layout (slot_id, slot_size) ())
+        kvs_copy_value src_store dst_store file_layout slot_id ())
       (fun () ->
         let open Lwt_syntax in
         let* _ = Key_value_store.Read.close src_store in
@@ -237,7 +235,7 @@ module Merge = struct
       read_from_store ~root_dir:src_root_dir (module Store.First_seen_level)
     in
     (* Initialize crypto as needed by file layouts. *)
-    let* proto_cryptoboxes =
+    let* _proto_cryptoboxes =
       Proto_cryptoboxes.init
         ~cctxt
         ~header
@@ -246,9 +244,6 @@ module Merge = struct
         ~first_seen_level
         profile_ctxt
         proto_plugins
-    in
-    let*? cryptobox, _ =
-      Proto_cryptoboxes.get_for_level proto_cryptoboxes ~level:head_level
     in
     let slots =
       Option.value
@@ -291,7 +286,6 @@ module Merge = struct
       let src_slot_dir = src_root_dir // Store.Stores_dirs.slot in
       let dst_slot_dir = dst_root_dir // Store.Stores_dirs.slot in
       merge_slots
-        ~cryptobox
         ~src:src_slot_dir
         ~dst:dst_slot_dir
         ~min_published_level

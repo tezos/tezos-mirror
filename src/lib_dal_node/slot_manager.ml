@@ -674,7 +674,7 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
   | Ok (cryptobox, _) -> (
       let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
       let*! res_slot_store =
-        Store.Slots.find_slot (Store.slots store) ~slot_size slot_id
+        Store.Slots.find_slot (Store.slots store) slot_id
       in
       match res_slot_store with
       | Ok slot -> return slot
@@ -705,9 +705,7 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
           in
           match res_shard_store with
           | Some (Ok slot) ->
-              let* () =
-                Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id
-              in
+              let* () = Store.Slots.add_slot (Store.slots store) slot slot_id in
               return slot
           | Some (Error _) | None ->
               fetch_slot_from_backup_uris ctxt cryptobox ~slot_size slot_id))
@@ -901,8 +899,8 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
 (** This function publishes the shards of a commitment that is waiting
     for attestation on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
-    proto_parameters commitment slot_id =
+let publish_slot_data ctxt ~level_committee gs_worker proto_parameters
+    commitment slot_id =
   let open Lwt_result_syntax in
   let node_store = Node_context.get_store ctxt in
   let cache = Store.not_yet_published_cache node_store in
@@ -925,7 +923,7 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
         Attestable_slots.may_notify_attestable_slot_or_trap ctxt ~slot_id
       in
       let* () =
-        Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
+        Store.Slots.add_slot (Store.slots node_store) slot slot_id
         |> Errors.to_tzresult
       in
       publish_proved_shards

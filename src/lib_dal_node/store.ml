@@ -570,7 +570,7 @@ module Slots = struct
       (function NoSlotLayout {level} -> Some level | _ -> None)
       (fun level -> NoSlotLayout {level})
 
-  type t = (Types.slot_id * int, unit, bytes) KVS.t
+  type t = (Types.slot_id, unit, bytes) KVS.t
 
   module SlotsLayouts = Map.Make (struct
     type t = Int32.t
@@ -588,8 +588,7 @@ module Slots = struct
     in
     match e with
     | Some (_, v) ->
-        Lwt_result_syntax.return (fun ~root_dir (slot_id, _slot_size) ->
-            v ~root_dir slot_id)
+        Lwt_result_syntax.return (fun ~root_dir slot_id -> v ~root_dir slot_id)
     | None ->
         Lwt_result_syntax.tzfail (NoSlotLayout {level = slot_id.slot_level})
 
@@ -617,11 +616,11 @@ module Slots = struct
     let root_dir = Filename.concat node_store_dir slot_store_dir in
     KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
 
-  let add_slot t ~slot_size slot (slot_id : Types.slot_id) =
+  let add_slot t slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
     let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
     let* () =
-      KVS.write_value ~override:true t file_layout (slot_id, slot_size) () slot
+      KVS.write_value ~override:true t file_layout slot_id () slot
       |> Errors.other_lwt_result
     in
     let*! () =
@@ -631,10 +630,10 @@ module Slots = struct
     in
     return_unit
 
-  let find_slot t ~slot_size slot_id =
+  let find_slot t slot_id =
     let open Lwt_result_syntax in
     let* file_layout = Errors.other_lwt_result @@ get_file_layout ~slot_id in
-    let*! res = KVS.read_value t file_layout (slot_id, slot_size) () in
+    let*! res = KVS.read_value t file_layout slot_id () in
     match res with
     | Ok slot -> return slot
     | Error [KVS.Missing_stored_kvs_data _] | Error [NoSlotLayout _] ->
@@ -643,10 +642,10 @@ module Slots = struct
         let data_kind = Types.Store.Slot in
         fail @@ Errors.decoding_failed data_kind err
 
-  let remove_slot t ~slot_size slot_id =
+  let remove_slot t slot_id =
     let open Lwt_result_syntax in
     let* file_layout = get_file_layout ~slot_id in
-    KVS.remove_file t file_layout (slot_id, slot_size)
+    KVS.remove_file t file_layout slot_id
 end
 
 module Slot_id_cache = struct

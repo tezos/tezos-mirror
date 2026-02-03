@@ -194,7 +194,6 @@ val publish_slot_data :
   level_committee:
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
-  slot_size:int ->
   Gossipsub.Worker.t ->
   Types.proto_parameters ->
   Cryptobox.commitment ->
