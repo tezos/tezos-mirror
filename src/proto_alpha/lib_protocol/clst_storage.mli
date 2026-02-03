@@ -8,6 +8,7 @@
 (** Abstraction for low level storage to handle CLST deposits, unstake requests
     and finalization.
 
+
     This module is responsible for maintaining the
     {!Storage.Clst.Deposits_balance} table.
 *)
