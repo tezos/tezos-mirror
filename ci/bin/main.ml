@@ -313,6 +313,17 @@ let () =
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
+    "octez_packaging_revision"
+    If.(
+      on_tezos_namespace && push
+      && Rules.has_tag_match octez_packaging_revision_tag_re)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~jobs:(Release_tag.octez_packaging_revision_jobs ~test:false ())
+    ~description:
+      "Packaging revision pipeline for Octez.\n\n\
+       This pipeline is created when a packaging revision tag in the format \
+       octez-vX.Y-N is pushed to tezos/tezos." ;
+  register
     "octez_packaging_revision_test"
     If.(
       not_on_tezos_namespace && push
