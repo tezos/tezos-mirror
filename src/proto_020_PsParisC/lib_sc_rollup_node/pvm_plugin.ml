@@ -25,7 +25,6 @@
 (*****************************************************************************)
 open Protocol
 open Alpha_context
-open Context_wrapper
 
 let context = Pvm.context
 
@@ -213,25 +212,12 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
             err)
 
 module Wasm_2_0_0 = struct
-  (* We can use Irmin directly here as the Wasm PVM uses only Irmin *)
-  open Irmin
-
-  let decode_durable_state enc tree =
+  let decode_durable_state =
     Wasm_2_0_0_pvm.Durable_state.Tree_encoding_runner.decode
-      enc
-      (of_node_pvmstate tree)
 
-  let proof_mem_tree tree =
-    Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree (of_node_pvmstate tree)
+  let proof_mem_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.mem_tree
 
-  let proof_fold_tree ?depth tree key ~order ~init ~f =
-    Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
-      ?depth
-      (of_node_pvmstate tree)
-      key
-      ~order
-      ~init
-      ~f:(fun a b c -> f a (to_node_pvmstate b) c)
+  let proof_fold_tree = Wasm_2_0_0_pvm.Wasm_2_0_0_proof_format.Tree.fold
 end
 
 module Unsafe = struct

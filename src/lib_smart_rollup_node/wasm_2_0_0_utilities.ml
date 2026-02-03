@@ -65,8 +65,9 @@ let set_value_instr ~(pvm : (module Pvm_plugin_sig.S)) key tree =
 (* [generate_durable_storage tree] folds on the keys in the durable storage and
    their values and generates as set of instructions out of it. The order is not
    specified. *)
-let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) tree =
+let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) state =
   let open Lwt_syntax in
+  let tree = Context_wrapper.Irmin.of_node_pvmstate state in
   let durable_path = "durable" :: [] in
   let module Plugin : Protocol_plugin_sig.S = (val plugin) in
   let* path_exists = Plugin.Pvm.Wasm_2_0_0.proof_mem_tree tree durable_path in
@@ -158,10 +159,11 @@ let preload_kernel (node_ctxt : _ Node_context.t) header =
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level node_ctxt header.level
   in
+  let tree = Context_wrapper.Irmin.of_node_pvmstate pvm_state in
   let*! durable =
     Plugin.Pvm.Wasm_2_0_0.decode_durable_state
       Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
-      pvm_state
+      tree
   in
   let*! () =
     Tezos_scoru_wasm_fast.Exec.preload_kernel
