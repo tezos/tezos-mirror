@@ -2,4 +2,4 @@
 rustflags = ["-Awarnings"]
 
 [target.'cfg(target_os = "macos")']
-rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+rustflags = ["-Awarnings", "-C", "link-args=-Wl,-undefined,dynamic_lookup"]
