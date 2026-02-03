@@ -35,18 +35,33 @@ create_and_push_manifest() {
   echo "Inspect ${IMAGE_NAME}:${LATEST_TAG}-amd64"
   docker buildx imagetools inspect "${IMAGE_NAME}:${LATEST_TAG}-amd64"
 
+  set +e # Disable exit on error temporarily
+
   echo "Inspect ${IMAGE_NAME}:${LATEST_TAG}-arm64"
   docker buildx imagetools inspect "${IMAGE_NAME}:${LATEST_TAG}-arm64"
+  ARM64_INSPECT=$?
+
+  set -e # Re-enable exit on error
 
   echo "📦 Creating multi-arch manifest for tag: ${TAG}"
 
-  docker manifest create "${IMAGE_NAME}:${TAG}" \
-    --amend "${IMAGE_NAME}:${LATEST_TAG}-amd64" \
-    --amend "${IMAGE_NAME}:${LATEST_TAG}-arm64"
+  echo "Adding ${IMAGE_NAME}:${LATEST_TAG}-amd64 to the manifest."
+  AMEND="--amend ${IMAGE_NAME}:${LATEST_TAG}-amd64"
 
+  # Amend the manifest if the arm64 image exists
+  if [ $ARM64_INSPECT -eq 0 ]; then
+    echo "Adding ${IMAGE_NAME}:${LATEST_TAG}-arm64 to the manifest."
+    AMEND="$AMEND --amend ${IMAGE_NAME}:${LATEST_TAG}-arm64"
+  fi
+
+  #shellcheck disable=SC2086
+  docker manifest create "${IMAGE_NAME}:${TAG}" ${AMEND}
+
+  # Push the manifest
   docker manifest push "${IMAGE_NAME}:${TAG}"
 
   echo "Pushed manifest: ${IMAGE_NAME}:${TAG}"
+
 }
 
 create_and_push_manifest "${LATEST_TAG}"

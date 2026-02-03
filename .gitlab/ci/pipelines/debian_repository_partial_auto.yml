@@ -64,10 +64,46 @@ oc.docker-systemd_tests_debian:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+
+oc.docker-systemd-merge-manifest.debian:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  needs:
+  - oc.docker-systemd_tests_debian
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DISTRIBUTION: debian
+    IMAGE_NAME: $DEP_IMAGE
   parallel:
     matrix:
     - RELEASE:
@@ -98,8 +134,8 @@ oc.docker-build-debian-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
@@ -110,13 +146,49 @@ oc.docker-build-debian-dependencies:
       TAGS:
       - gcp_very_high_cpu
 
+oc.docker-build-merge-manifest.debian:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  needs:
+  - oc.docker-build-debian-dependencies
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: build
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DISTRIBUTION: debian
+    IMAGE_NAME: $DEP_IMAGE
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+
 oc.build-debian:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - oc.docker-build-merge-manifest.debian
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -138,8 +210,8 @@ oc.build-debian:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -156,12 +228,12 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
 
 oc.build-data_packages:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - oc.docker-build-merge-manifest.debian
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -176,8 +248,8 @@ oc.build-data_packages:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     RELEASE: trixie
     TAGS: gcp
@@ -269,7 +341,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
+  - oc.docker-systemd-merge-manifest.debian
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
@@ -289,8 +361,8 @@ oc.install_bin_debian_bookworm_systemd_test:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -321,8 +393,8 @@ oc.upgrade_bin_debian_bookworm-systemd:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -353,8 +425,8 @@ oc.upgrade_bin_debian_bookworm-systemd_no_restart:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm

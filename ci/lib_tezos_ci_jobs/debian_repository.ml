@@ -28,22 +28,27 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     for each combination of [RELEASE] and [TAGS].
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture. *)
-let debian_package_release_matrix ?(ramfs = false) = function
+    one release, and one architecture.
+
+    Specify [ramfs] to select the specific runner for amd64.
+
+    Set [arm64] to false to exclude from the matrix arm64 architecture.
+    *)
+let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Partial ->
       [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full ->
       [
         [
           ("RELEASE", ["unstable"; "bookworm"; "trixie"]);
-          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
   | Release ->
       [
         [
           ("RELEASE", ["bookworm"; "trixie"]);
-          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -53,14 +58,19 @@ let debian_package_release_matrix ?(ramfs = false) = function
     for more information.
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
-    one release, and one architecture. *)
-let ubuntu_package_release_matrix ?(ramfs = false) = function
+    one release, and one architecture.
+
+    Specify [ramfs] to select the specific runner for amd64.
+
+    Set [arm64] to false to exclude from the matrix arm64 architecture.
+    *)
+let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["noble"; "jammy"]);
-          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
 
@@ -148,6 +158,34 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let make_job_build_debian_packages =
     make_job_build_packages ~limit_dune_build_jobs
   in
+  (* docker merge jobs *)
+  let job_merge_build_debian_dependencies =
+    make_job_merge_build_dependencies
+      ~distribution:"debian"
+      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
+      ~matrix:(debian_package_release_matrix ~arm64:false pipeline_type)
+  in
+  let job_merge_build_ubuntu_dependencies =
+    make_job_merge_build_dependencies
+      ~distribution:"ubuntu"
+      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
+      ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
+  in
+
+  let job_merge_systemd_test_debian_dependencies =
+    make_job_merge_systemd_test_dependencies
+      ~distribution:"debian"
+      ~dependencies:
+        (Dependent [Job job_docker_systemd_test_debian_dependencies])
+      ~matrix:(debian_package_release_matrix ~arm64:false pipeline_type)
+  in
+  let job_merge_systemd_test_ubuntu_dependencies =
+    make_job_merge_systemd_test_dependencies
+      ~distribution:"ubuntu"
+      ~dependencies:
+        (Dependent [Job job_docker_systemd_test_ubuntu_dependencies])
+      ~matrix:(ubuntu_package_release_matrix ~arm64:false pipeline_type)
+  in
 
   (* data packages. we build them once *)
   let job_build_data_packages : tezos_job =
@@ -159,7 +197,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~variables:
         (Common.Packaging.make_variables
            [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
-      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
+      ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
@@ -174,7 +212,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~__POS__
       ~name:"oc.build-debian"
       ~distribution:"debian"
-      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
+      ~dependencies:(Dependent [Job job_merge_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
       ()
@@ -184,7 +222,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
       ~__POS__
       ~name:"oc.build-ubuntu"
       ~distribution:"ubuntu"
-      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
+      ~dependencies:(Dependent [Job job_merge_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
       ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
       ()
@@ -299,7 +337,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_ubuntu_dependencies;
+               Job job_merge_systemd_test_ubuntu_dependencies;
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
@@ -317,7 +355,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_ubuntu_dependencies;
+               Job job_merge_systemd_test_ubuntu_dependencies;
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
@@ -353,7 +391,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_ubuntu_dependencies;
+               Job job_merge_systemd_test_ubuntu_dependencies;
                Job job_apt_repo_ubuntu;
              ])
         ~variables:
@@ -406,7 +444,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_debian_dependencies;
+               Job job_merge_systemd_test_debian_dependencies;
                Job job_apt_repo_debian;
              ])
         ~variables:
@@ -471,6 +509,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let debian_jobs =
     [
       job_docker_build_debian_dependencies;
+      job_merge_build_debian_dependencies;
       job_build_debian_package;
       job_build_data_packages;
       job_apt_repo_debian;
@@ -479,18 +518,28 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let ubuntu_jobs =
     [
       job_docker_build_ubuntu_dependencies;
+      job_merge_build_ubuntu_dependencies;
       job_build_ubuntu_package;
       job_apt_repo_ubuntu;
     ]
   in
   match pipeline_type with
   | Partial ->
-      (job_docker_systemd_test_debian_dependencies :: debian_jobs)
+      ([
+         job_docker_systemd_test_debian_dependencies;
+         job_merge_systemd_test_debian_dependencies;
+       ]
+      @ debian_jobs)
       @ test_debian_packages_jobs
   | Full ->
-      job_docker_systemd_test_debian_dependencies
-      :: job_docker_systemd_test_ubuntu_dependencies :: debian_jobs
-      @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs
+      [
+        job_docker_systemd_test_debian_dependencies;
+        job_docker_systemd_test_ubuntu_dependencies;
+        job_merge_systemd_test_debian_dependencies;
+        job_merge_systemd_test_ubuntu_dependencies;
+      ]
+      @ debian_jobs @ ubuntu_jobs @ test_debian_packages_jobs
+      @ test_ubuntu_packages_jobs
   | Release -> debian_jobs @ ubuntu_jobs
 
 let register ~auto ~description pipeline_type =
