@@ -694,12 +694,12 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
-  type delegate_stake_info = Delegate_sampler.delegate_stake_info = {
+  type delegate_stake_info = Raw_context.delegate_stake_info = {
     consensus_pk : Consensus_key.pk;
     stake_weight : Int64.t;
   }
 
-  type stake_info = Delegate_sampler.stake_info = {
+  type stake_info = Raw_context.stake_info = {
     total_stake_weight : Int64.t;
     delegates : delegate_stake_info list;
   }

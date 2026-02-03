@@ -184,27 +184,19 @@ let load_sampler_for_cycle ctxt cycle =
   in
   return ctxt
 
-type delegate_stake_info = {
-  consensus_pk : Delegate_consensus_key.pk;
-  stake_weight : Int64.t;
-}
-
-type stake_info = {
-  total_stake_weight : Int64.t;
-  delegates : delegate_stake_info list;
-}
-
 let sort_stakes_pk_for_stake_info stakes_pk =
   (* The stakes_pk is supposedly already sorted by decreasing stake, from
      the call to get_selected_distribution when it was initialized.
      We sort them here by lexicographical order on the pkh of the delegate instead.
   *)
   List.sort
-    (fun (del1 : delegate_stake_info) (del2 : delegate_stake_info) ->
+    (fun (del1 : Raw_context.delegate_stake_info)
+         (del2 : Raw_context.delegate_stake_info)
+       ->
       Signature.Public_key_hash.compare
         del1.consensus_pk.delegate
         del2.consensus_pk.delegate)
-    (stakes_pk : delegate_stake_info list)
+    (stakes_pk : Raw_context.delegate_stake_info list)
 
 (** [stake_info_for_cycle ctxt cycle] reads the stake info for [cycle] from
     [ctxt] if it has been previously initialized. Otherwise it initializes
@@ -221,11 +213,12 @@ let stake_info_for_cycle ctxt cycle =
         let+ pk =
           Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
         in
-        {consensus_pk = pk; stake_weight = Stake_repr.staking_weight stake})
+        Raw_context.
+          {consensus_pk = pk; stake_weight = Stake_repr.staking_weight stake})
       stakes_pkh
   in
   let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-  return (ctxt, {total_stake_weight; delegates = stakes_pk})
+  return (ctxt, Raw_context.{total_stake_weight; delegates = stakes_pk})
 
 let stake_info ctxt level =
   let cycle = level.Level_repr.cycle in
@@ -345,7 +338,7 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
     let* ctxt, {delegates; _} = stake_info ctxt level in
     let map =
       List.fold_left
-        (fun map_acc {consensus_pk : Raw_context.consensus_pk; stake_weight} ->
+        (fun map_acc Raw_context.{consensus_pk : consensus_pk; stake_weight} ->
           Signature.Public_key_hash.Map.add
             consensus_pk.delegate
             stake_weight

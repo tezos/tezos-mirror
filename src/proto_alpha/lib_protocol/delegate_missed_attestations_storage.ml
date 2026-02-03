@@ -119,7 +119,7 @@ let record_attesting_participation ctxt ~delegate ~participation
           in
           let stake_weight_info =
             List.find
-              (fun {Delegate_sampler.consensus_pk; _} ->
+              (fun Raw_context.{consensus_pk; _} ->
                 Signature.Public_key_hash.equal
                   delegate
                   consensus_pk.Raw_context.delegate)

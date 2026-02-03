@@ -1998,6 +1998,29 @@ let init_stake_distribution_for_current_cycle ctxt
         Some stake_distribution_for_current_cycle;
     }
 
+type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
+
+type stake_info = {
+  total_stake_weight : Int64.t;
+  delegates : delegate_stake_info list;
+}
+
+let delegate_stake_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {consensus_pk; stake_weight} -> (consensus_pk, stake_weight))
+    (fun (consensus_pk, stake_weight) -> {consensus_pk; stake_weight})
+    (obj2 (req "consensus_pk" consensus_pk_encoding) (req "stake_weight" int64))
+
+let stake_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {total_stake_weight; delegates} -> (total_stake_weight, delegates))
+    (fun (total_stake_weight, delegates) -> {total_stake_weight; delegates})
+    (obj2
+       (req "total_stake_weight" int64)
+       (req "delegates" (list delegate_stake_info_encoding)))
+
 module Internal_for_tests = struct
   let add_level ctxt l =
     let new_level = Level_repr.Internal_for_tests.add_level ctxt.back.level l in

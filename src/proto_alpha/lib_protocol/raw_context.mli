@@ -309,6 +309,17 @@ val find_stake_distribution_for_current_cycle :
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
 
+type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
+
+type stake_info = {
+  total_stake_weight : Int64.t;
+  delegates : delegate_stake_info list;
+}
+
+val delegate_stake_info_encoding : delegate_stake_info Data_encoding.encoding
+
+val stake_info_encoding : stake_info Data_encoding.encoding
+
 (** Returns the reward coefficient for the current cycle
     This value is equal to the value in {!Storage.Issuance_coeff} if it exists,
     or equal to [Q.one] otherwise. *)
