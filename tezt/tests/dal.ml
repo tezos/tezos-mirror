@@ -7395,7 +7395,13 @@ module Garbage_collection = struct
     (* Create & configure observer if needed *)
     let* observer_opt =
       if include_observer then
-        let observer = Dal_node.create ~name:"observer" ~node () in
+        (* We disable the amplification for this observer, since it is not the
+           purpose of the current test to test amplification, and if
+           amplification is triggered, it makes the DAL node very late compared
+           to the L1 node, making the test flaky. *)
+        let observer =
+          Dal_node.create ~disable_amplification:true ~name:"observer" ~node ()
+        in
         let* () =
           Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
         in
@@ -7592,8 +7598,6 @@ module Garbage_collection = struct
         attester
     in
 
-    (* We split the [bake_for] in two just in the hope this allows for the slot
-       to be attested (that is, to reduce flakiness). *)
     let wait_block_p =
       List.map
         (fun dal_node ->
@@ -7602,8 +7606,13 @@ module Garbage_collection = struct
             (published_level + dal_parameters.attestation_lag))
         [attester; dal_bootstrap; slot_producer]
     in
-    let* () = bake_for ~count:(dal_parameters.attestation_lag - 2) client in
-    let* () = bake_for ~count:3 client in
+    (* For the slot to be attested (that is, to reduce flakiness), we wait
+       between levels, giving the time for the attester DAL nodes to attest. *)
+    let* () =
+      repeat (dal_parameters.attestation_lag + 1) (fun () ->
+          let* () = bake_for client in
+          Lwt_unix.sleep 1.)
+    in
     let* () = Lwt.join wait_block_p in
     Log.info "Checking that the slot was attested" ;
     let* () =
@@ -8978,7 +8987,7 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
     in
     let* () = bake_for client in
     let* level = Client.level client in
-    let* _level = Sc_rollup_node.wait_for_level ~timeout:10. sc_node level in
+    let* _level = Sc_rollup_node.wait_for_level ~timeout:15. sc_node level in
     wait_inject_dal_slot_from_messages_first_level
   in
 
