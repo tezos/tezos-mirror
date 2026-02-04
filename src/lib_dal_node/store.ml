@@ -681,6 +681,8 @@ module Slot_id_cache = struct
     fun t Types.Slot_id.{slot_level; slot_index} ->
       Levels.find_opt t slot_level
       |> Option.filter_map (Fun.flip get_opt slot_index)
+
+  let fold = Levels.fold
 end
 
 module Traps = struct
@@ -932,17 +934,17 @@ end
 
 (** Store context *)
 type t = {
-  statuses_cache : Statuses_cache.t;
+  mutable statuses_cache : Statuses_cache.t;
   shards : Shards.t;
   slots : Slots.t;
-  traps : Traps.t;
+  mutable traps : Traps.t;
   not_yet_published_cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* Cache of not-yet-published slots, shards, and shard proofs. The length
          of the array is the number of shards per slot *)
   chain_id : Chain_id.rw Chain_id.t;
-  finalized_commitments : Slot_id_cache.t;
+  mutable finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.rw Last_processed_level.t;
   first_seen_level : First_seen_level.rw First_seen_level.t;
   skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
@@ -964,6 +966,54 @@ let shards {shards; _} = shards
 let skip_list_cells t = t.skip_list_cells_store
 
 let statuses_cache {statuses_cache; _} = statuses_cache
+
+let resize_caches t proto_parameters =
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
+  in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let new_statuses_cache =
+    let size =
+      Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Statuses_cache.init size in
+    Slot_map.fold
+      (fun slot_id status () -> Statuses_cache.add_status cache status slot_id)
+      t.statuses_cache
+      () ;
+    cache
+  in
+  let new_finalized_commitments =
+    let capacity =
+      Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Slot_id_cache.create ~capacity in
+    Slot_id_cache.fold
+      (fun level table () -> Slot_id_cache.Levels.replace cache level table)
+      t.finalized_commitments
+      () ;
+    cache
+  in
+  let new_traps =
+    let capacity =
+      Constants.traps_cache_size
+        ~number_of_slots
+        ~number_of_shards
+        ~attestation_lag
+        ~traps_fraction
+    in
+    let cache = Traps.create ~capacity in
+    Traps.Level_map.fold
+      (fun level slots () -> Traps.Level_map.replace cache level slots)
+      t.traps
+      () ;
+    cache
+  in
+  t.statuses_cache <- new_statuses_cache ;
+  t.finalized_commitments <- new_finalized_commitments ;
+  t.traps <- new_traps
 
 let slots {slots; _} = slots
 

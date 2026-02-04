@@ -164,6 +164,7 @@ let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
             | Error (`Fail msg) ->
                 tzfail (Proto_cryptoboxes.Cannot_register_shard_layout {msg})
           in
+          Store.resize_caches ctxt.store params ;
           ctxt.proto_cryptoboxes <- new_cryptoboxes ;
           return_unit)
 
