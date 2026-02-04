@@ -75,7 +75,7 @@
         "feature_enable": true,
         "incentives_enable": false,
         "dynamic_lag_enable": false,
-        "number_of_slots": 32,
+        "number_of_slots": 160,
         "attestation_lag": 8,
         "attestation_lags": [ 8 ],
         "attestation_threshold": 66,
@@ -93,7 +93,7 @@
         },
         "redundancy_factor": 8,
         "page_size": 3967,
-        "slot_size": 126944,
+        "slot_size": 380832,
         "number_of_shards": 512
     },
     "smart_rollup_arith_pvm_enable": true,

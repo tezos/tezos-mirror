@@ -30,14 +30,14 @@
   "cache_sampler_state_cycles": 5,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": false,
-      "dynamic_lag_enable": false, "number_of_slots": 32,
+      "dynamic_lag_enable": false, "number_of_slots": 160,
       "attestation_lag": 5, "attestation_lags": [ 5 ],
       "attestation_threshold": 66,
       "minimal_participation_ratio":
         { "numerator": "16", "denominator": "25" },
       "rewards_ratio": { "numerator": "0", "denominator": "1" },
       "traps_fraction": { "numerator": "1", "denominator": "10000" },
-      "redundancy_factor": 8, "page_size": 3967, "slot_size": 126944,
+      "redundancy_factor": 8, "page_size": 3967, "slot_size": 380832,
       "number_of_shards": 512 }, "smart_rollup_arith_pvm_enable": true,
   "smart_rollup_origination_size": 6314,
   "smart_rollup_challenge_window_in_blocks": 62,
