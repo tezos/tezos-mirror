@@ -5830,7 +5830,6 @@ module Skip_list_rpcs = struct
       number_of_slots
       slot_size ;
     let* starting_level = Client.level client in
-
     let rec publish ~max_level level commitments =
       (* Try to publish a slot at each level *)
       if level > max_level then return commitments
@@ -5875,12 +5874,16 @@ module Skip_list_rpcs = struct
     let* new_proto_params =
       Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
     in
-    let new_lag =
-      JSON.(
-        new_proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    let new_dal_params =
+      (* TODO: We use S023, since we do not parse the attestation_lags field. *)
+      Dal.Parameters.from_protocol_parameters S023 new_proto_params
     in
+    let new_lag = new_dal_params.attestation_lag in
     if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
+    let new_number_of_slots = new_dal_params.number_of_slots in
+    if new_number_of_slots <> number_of_slots then
+      Log.info "new number_of_slots = %d" new_number_of_slots ;
     let last_attested_level = last_confirmed_published_level + new_lag in
     (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
@@ -5906,7 +5909,6 @@ module Skip_list_rpcs = struct
 
     (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
-    let max_level = last_attested_level + 2 in
     let* () =
       let* current_level = Node.get_level node in
       let count = max_level - current_level in
@@ -5965,21 +5967,38 @@ module Skip_list_rpcs = struct
           match check_level with
           | None -> ()
           | Some level ->
+              let expected_published_level =
+                if level = 1 then (* the "level" of genesis *) 0
+                else if level > migration_level then level - new_lag
+                else level - lag
+              in
+              let current_number_of_slots =
+                if expected_published_level > migration_level then
+                  new_number_of_slots
+                else number_of_slots
+              in
               let expected_slot_index =
                 if level = 1 then
                   (* the "slot index" of genesis *)
                   0
-                else number_of_slots - 1
+                else current_number_of_slots - 1
+              in
+              let error_msg =
+                Format.sprintf "For level %d, " level
+                ^ "Unexpected slot index: got %L, expected %R"
               in
               Check.(
-                (cell_slot_index = expected_slot_index)
-                  int
-                  ~__LOC__
-                  ~error_msg:"Unexpected slot index: got %L, expected %R")
+                (cell_slot_index = expected_slot_index) int ~__LOC__ ~error_msg)
         in
         (if cell_index > 0 then
+           let accumulated_nb_of_slots =
+             if cell_level > migration_level then
+               (migration_level * number_of_slots)
+               + ((cell_level - migration_level - 1) * new_number_of_slots)
+             else (cell_level - 1) * number_of_slots
+           in
            let expected_cell_index =
-             ((cell_level - 1) * number_of_slots) + cell_slot_index
+             accumulated_nb_of_slots + cell_slot_index
            in
            Check.(
              (cell_index = expected_cell_index)
@@ -6252,13 +6271,6 @@ module Skip_list_rpcs = struct
       ~tags
       ~description
       ~operator_profiles:[slot_index] (* use the same parameters as Alpha *)
-      ~consensus_committee_size:512
-      ~attestation_lag:8
-      ~number_of_slots:32
-      ~number_of_shards:512
-      ~slot_size:126944
-      ~redundancy_factor:8
-      ~page_size:3967
       ()
 end
 
