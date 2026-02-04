@@ -24,3 +24,18 @@ val finalize :
     error trace )
   result
   Lwt.t
+
+module For_RPC : sig
+  type nonrec prepared_finalize_redemption = {
+    finalizable : Storage.Unstake_request.requests;
+    unfinalizable : Storage.Unstake_request.requests;
+  }
+
+  (** [split_redemption_requests ctxt redemption_requests] splits
+      [redemption_requests] in finalizable and unfinalizable, according to the
+      current cycle and {!Cycle_storage.greatest_unstake_finalization_cycle}. *)
+  val split_redemption_requests :
+    Raw_context.t ->
+    (Cycle_repr.t * Tez_repr.t) list ->
+    (prepared_finalize_redemption option, 'a) result Lwt.t
+end

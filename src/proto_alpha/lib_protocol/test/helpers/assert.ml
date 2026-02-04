@@ -403,7 +403,7 @@ let clst_frozen_redeemed_balance_was_credited ~loc b contract old_balance amount
   let* ctxt = Context.get_alpha_ctxt b in
   let*?@ expected = Alpha_context.Tez.(old_balance +? amount) in
   let*@ frozen_unstaked_balance =
-    Alpha_context.Clst.For_RPC.get_redeemed_balance ctxt contract
+    Alpha_context.Clst.For_RPC.get_unfinalizable_redeemed_balance ctxt contract
   in
   equal_tez
     ~loc

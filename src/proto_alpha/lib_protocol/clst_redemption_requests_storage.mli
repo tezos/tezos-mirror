@@ -29,3 +29,15 @@ val finalize :
     error trace )
   result
   Lwt.t
+
+module For_RPC : sig
+  (** [get_finalizable_redeemed_balance] returns the finalizable tez
+      redeemed by [contract]. *)
+  val get_finalizable_redeemed_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+
+  (** [get_unfinalizable_redeemed_balance] returns the unfinalizable
+      tez redeemed by [contract]. *)
+  val get_unfinalizable_redeemed_balance :
+    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
+end

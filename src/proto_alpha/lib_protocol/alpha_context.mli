@@ -4663,7 +4663,14 @@ module Clst : sig
     (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
 
   module For_RPC : sig
-    val get_redeemed_balance :
+    (** [get_finalizable_redeemed_balance ctxt contract] returns the
+        finalizable tez redeemed by [contract]. *)
+    val get_finalizable_redeemed_balance :
+      context -> Contract.t -> Tez.t option tzresult Lwt.t
+
+    (** [get_unfinalizable_redeemed_balance] returns the unfinalizable
+        tez redeemed by [contract]. *)
+    val get_unfinalizable_redeemed_balance :
       context -> Contract.t -> Tez.t option tzresult Lwt.t
   end
 end

@@ -47,3 +47,50 @@ let finalize ctxt ~clst_contract ~staker =
 
   let*! ctxt = set_stored_requests ctxt staker unfinalizable_requests in
   return (ctxt, balance_updates, total_finalized_amount)
+
+module For_RPC = struct
+  let get_redeemed_balance ctxt =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8227
+       Handle slashing in the RPC. *)
+    let open Lwt_result_syntax in
+    function
+    | Contract_repr.Originated _ -> return_none
+    | Implicit _ as contract -> (
+        let* redemption_requests =
+          Storage.Clst.Redemption_requests.find ctxt contract
+        in
+        let redemption_requests =
+          Option.value ~default:[] redemption_requests
+        in
+        let* redeemed_frozen_requests =
+          Clst_finalization.For_RPC.split_redemption_requests
+            ctxt
+            redemption_requests
+        in
+        match redeemed_frozen_requests with
+        | None -> return_some (Tez_repr.zero, Tez_repr.zero)
+        | Some {finalizable; unfinalizable} ->
+            let*? sum_unfinalizable =
+              List.fold_left_e
+                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+                Tez_repr.zero
+                unfinalizable
+            in
+            let*? sum_finalizable =
+              List.fold_left_e
+                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+                Tez_repr.zero
+                finalizable
+            in
+            return_some (sum_unfinalizable, sum_finalizable))
+
+  let get_finalizable_redeemed_balance ctxt contract =
+    let open Lwt_result_syntax in
+    let* balances = get_redeemed_balance ctxt contract in
+    return (Option.map snd balances)
+
+  let get_unfinalizable_redeemed_balance ctxt contract =
+    let open Lwt_result_syntax in
+    let* balances = get_redeemed_balance ctxt contract in
+    return (Option.map fst balances)
+end

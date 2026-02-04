@@ -214,6 +214,12 @@ val clst_redeemed_frozen_balance :
   Contract.t ->
   Tez.t option shell_tzresult Lwt.t
 
+val clst_redeemed_finalizable_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Tez.t option shell_tzresult Lwt.t
+
 val register : unit -> unit
 
 (** Functions used in the implementation of this file's RPCs, but also

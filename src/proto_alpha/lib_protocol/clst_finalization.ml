@@ -97,3 +97,14 @@ let finalize ctxt ~clst_contract ~staker redemption_requests =
       in
       return
         (ctxt, balance_updates_finalized, total_finalized_amount, unfinalizable)
+
+module For_RPC = struct
+  type requests = Storage.Unstake_request.requests
+
+  type nonrec prepared_finalize_redemption = prepared_finalize_redemption = {
+    finalizable : requests;
+    unfinalizable : requests;
+  }
+
+  let split_redemption_requests = split_redemption_requests_uncarbonated
+end

@@ -516,7 +516,7 @@ module Clst = struct
   let finalize = Clst_redemption_requests_storage.finalize
 
   module For_RPC = struct
-    include Clst_storage.For_RPC
+    include Clst_redemption_requests_storage.For_RPC
   end
 end
 
