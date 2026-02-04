@@ -19,6 +19,11 @@ type ('arg, 'output) view_type = {
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
 
+  (** Michelson representation for tuples. *)
+  type ('a, 'b, 'c) tup3 = 'a * ('b * 'c)
+
+  type ('a, 'b, 'c, 'd) tup4 = 'a * ('b * ('c * 'd))
+
   type deposit = unit
 
   type withdraw = nat
