@@ -661,7 +661,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   in
   (* Trick to provide the global state to the forge worker without
      introducing a circular dependency. *)
-  let forge_worker = Forge_worker.start global_state in
+  let* forge_worker = Forge_worker.start global_state in
   global_state.forge_worker_hooks <-
     {
       push_request = Forge_worker.push_request forge_worker;
