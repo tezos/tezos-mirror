@@ -361,8 +361,8 @@ let jobs pipeline_type =
           [sf "./docs/introduction/compile-sources-setup.sh"]
         |> enable_networked_cargo
       in
-      let job_compile_sources ~__POS__ ~name ~matrix ~project ~branch ?retry ()
-          =
+      let job_compile_sources ~__POS__ ~name ~matrix ~project ~branch ?variables
+          ?retry () =
         job
           ~__POS__
           ~name
@@ -372,6 +372,7 @@ let jobs pipeline_type =
             (Image.mk_external
                ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
           ~parallel:(Matrix matrix)
+          ?variables
           ?retry
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
@@ -393,6 +394,7 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc"
               ~project:"tezos/tezos"
               ~branch:"latest-release"
+              ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
               ~matrix:
                 [
                   [
