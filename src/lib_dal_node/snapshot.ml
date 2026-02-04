@@ -143,9 +143,9 @@ module Merge = struct
         return_unit)
       (fun () ->
         let open Lwt_syntax in
-        let* _ = Dal_store_sqlite3.Skip_list_cells.close src_db in
-        let* _ = Dal_store_sqlite3.Skip_list_cells.close dst_db in
-        return_unit)
+        let* () = Dal_store_sqlite3.Skip_list_cells.close src_db in
+        let* () = Dal_store_sqlite3.Skip_list_cells.close dst_db in
+        Event.emit_skip_lists_exported_successfully ())
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
@@ -172,33 +172,39 @@ module Merge = struct
         (slot_id.slot_level, slot_id.slot_index, "slot ")
         ~key:()
     in
-    Lwt.finalize
-      (fun () ->
-        let* () =
-          fold_levels
-            (fun slot_level ->
-              let slot_level = Int32.of_int slot_level in
-              let*? _, proto_parameters =
-                Proto_plugins.get_plugin_and_parameters_for_level
-                  proto_plugins
-                  ~level:slot_level
-              in
-              let slots =
-                Option.value
-                  ~default:
-                    (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
-                  slots
-              in
-              List.iter_es (copy_slot ~slot_level) slots)
-            ~min_published_level
-            ~max_published_level
-        in
-        return_unit)
-      (fun () ->
-        let open Lwt_syntax in
-        let* _ = Key_value_store.Read.close src_store in
-        let* _ = Key_value_store.close dst_store in
-        return_unit)
+    let close () =
+      let open Lwt_result_syntax in
+      let* () = Key_value_store.Read.close src_store in
+      let* () = Key_value_store.close dst_store in
+      return_unit
+    in
+    let*! res =
+      fold_levels
+        (fun slot_level ->
+          let slot_level = Int32.of_int slot_level in
+          let*? _, proto_parameters =
+            Proto_plugins.get_plugin_and_parameters_for_level
+              proto_plugins
+              ~level:slot_level
+          in
+          let slots =
+            Option.value
+              ~default:
+                (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+              slots
+          in
+          List.iter_es (copy_slot ~slot_level) slots)
+        ~min_published_level
+        ~max_published_level
+    in
+    match res with
+    | Ok () ->
+        let* () = close () in
+        let*! () = Event.emit_slots_exported_successfully () in
+        return_unit
+    | Error e ->
+        let* () = close () in
+        Lwt.return (Error e)
 
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
@@ -245,41 +251,46 @@ module Merge = struct
           in
           copy_shard 0
     in
-    Lwt.finalize
-      (fun () ->
-        (* For each level, we need to check all possible slot indices.
+    let close () =
+      let open Lwt_result_syntax in
+      let* () = Key_value_store.Read.close src_store in
+      Key_value_store.close dst_store
+    in
+    let*! res =
+      (* For each level, we need to check all possible slot indices.
            In practice, we should get this from the skip_list data,
            but for now we'll scan for existing files. *)
-        let* () =
-          fold_levels
-            (fun slot_level ->
-              let slot_level = Int32.of_int slot_level in
-              let*? _, proto_parameters =
-                Proto_plugins.get_plugin_and_parameters_for_level
-                  proto_plugins
-                  ~level:slot_level
-              in
-              let slots =
-                Option.value
-                  ~default:
-                    (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
-                  slots
-              in
-              List.iter_es
-                (copy_shard
-                   ~slot_level
-                   ~number_of_shards:
-                     proto_parameters.cryptobox_parameters.number_of_shards)
-                slots)
-            ~min_published_level
-            ~max_published_level
-        in
-        return_unit)
-      (fun () ->
-        let open Lwt_syntax in
-        let* _ = Key_value_store.Read.close src_store in
-        let* _ = Key_value_store.close dst_store in
-        return_unit)
+      fold_levels
+        (fun slot_level ->
+          let slot_level = Int32.of_int slot_level in
+          let*? _, proto_parameters =
+            Proto_plugins.get_plugin_and_parameters_for_level
+              proto_plugins
+              ~level:slot_level
+          in
+          let slots =
+            Option.value
+              ~default:
+                (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+              slots
+          in
+          List.iter_es
+            (copy_shard
+               ~slot_level
+               ~number_of_shards:
+                 proto_parameters.cryptobox_parameters.number_of_shards)
+            slots)
+        ~min_published_level
+        ~max_published_level
+    in
+    match res with
+    | Ok () ->
+        let* () = close () in
+        let*! () = Event.emit_shards_exported_successfully () in
+        return_unit
+    | Error e ->
+        let* () = close () in
+        Lwt.return (Error e)
 
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
       ~min_published_level ~max_published_level ~slots ~dst_root_dir =
@@ -448,15 +459,19 @@ let export ~data_dir ~config_file ~endpoint ~min_published_level
         dst_root_dir
     else return_unit
   in
-  Merge.merge
-    ~frozen_only:true
-    ~src_root_dir
-    ~config_file
-    ~endpoint
-    ~min_published_level
-    ~max_published_level
-    ~slots
-    ~dst_root_dir
+  let* () =
+    Merge.merge
+      ~frozen_only:true
+      ~src_root_dir
+      ~config_file
+      ~endpoint
+      ~min_published_level
+      ~max_published_level
+      ~slots
+      ~dst_root_dir
+  in
+  let*! () = Event.emit_snapshot_exported_successfully ~dst_root_dir in
+  return_unit
 
 let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
     ~min_published_level ~max_published_level ~slots src =

@@ -1349,6 +1349,38 @@ open struct
       ~level:Info
       ("level", Data_encoding.int32)
 
+  let slots_exported_successfully =
+    declare_0
+      ~section
+      ~name:"slots_exported_successfully"
+      ~msg:"slots exported successfully"
+      ~level:Notice
+      ()
+
+  let shards_exported_successfully =
+    declare_0
+      ~section
+      ~name:"shards_exported_successfully"
+      ~msg:"shards exported successfully"
+      ~level:Notice
+      ()
+
+  let skip_lists_exported_successfully =
+    declare_0
+      ~section
+      ~name:"skip_lists_exported_successfully"
+      ~msg:"skip lists exported successfully"
+      ~level:Notice
+      ()
+
+  let snapshot_exported_successfully =
+    declare_1
+      ~section
+      ~name:"snapshot_exported_successfully"
+      ~msg:"snapshot exported successfully at {path}"
+      ~level:Notice
+      ("path", Data_encoding.string)
+
   let cannot_export_snapshot_data =
     declare_3
       ~section
@@ -1748,3 +1780,13 @@ let emit_cryptobox_registered ~level = emit cryptobox_registered level
 
 let emit_cannot_export_snapshot_data ~level ~index ~kind =
   emit cannot_export_snapshot_data (level, index, kind)
+
+let emit_slots_exported_successfully () = emit slots_exported_successfully ()
+
+let emit_shards_exported_successfully () = emit shards_exported_successfully ()
+
+let emit_skip_lists_exported_successfully () =
+  emit skip_lists_exported_successfully ()
+
+let emit_snapshot_exported_successfully ~dst_root_dir =
+  emit snapshot_exported_successfully dst_root_dir
