@@ -95,7 +95,7 @@ fn make_receipt_info(
 #[inline(always)]
 fn make_object(
     block_number: U256,
-    transaction: &Transaction,
+    transaction: Transaction,
     from: H160,
     index: u32,
     fee_updates: &FeeUpdates,
@@ -111,18 +111,24 @@ fn make_object(
         }
     };
 
+    let hash = transaction.tx_hash;
+    let nonce = transaction.nonce();
+    let to = transaction.to()?;
+    let value = transaction.value();
+    let signature = transaction.signature();
+
     Ok(TransactionObject {
         block_number,
         from,
         gas_used,
         gas_price,
-        hash: transaction.tx_hash,
+        hash,
         input: transaction.data(),
-        nonce: transaction.nonce(),
-        to: transaction.to()?,
+        nonce,
+        to,
         index,
-        value: transaction.value(),
-        signature: transaction.signature(),
+        value,
+        signature,
     })
 }
 
@@ -730,7 +736,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 
     let tx_object = make_object(
         block_constants.number,
-        &transaction,
+        transaction,
         caller,
         index,
         &fee_updates,
