@@ -112,10 +112,11 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
               in
               let previous_lag = prev_proto_parameters.Types.attestation_lag in
               if previous_lag > current_lag then
+                (* See comment in [remove_unattested_slots_and_shards]. *)
                 let rec loop lag =
                   if lag = current_lag then return_unit
                   else
-                    let* () = clean_skip_list_cells lag in
+                    let* () = clean_skip_list_cells (lag - 1) in
                     loop (lag - 1)
                 in
                 loop previous_lag
@@ -174,10 +175,14 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
        which are guaranteed to never be attested when a protocol migration
        reduces the attestation lag. *)
     if previous_lag > current_lag then
+      (* [attested_level] is the activation level. We need to remove published
+         slot for [previous_lag - current_lag] levels. However, the reference
+         point is [attested_level + 1]. We therefore use a one unit smaller
+         lag. *)
       let rec loop lag =
         if lag = current_lag then return_unit
         else
-          let* () = remove_slots_and_shards lag (fun _ -> false) in
+          let* () = remove_slots_and_shards (lag - 1) (fun _ -> false) in
           loop (lag - 1)
       in
       loop previous_lag
