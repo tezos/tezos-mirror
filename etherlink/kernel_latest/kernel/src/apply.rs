@@ -679,7 +679,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
-    transaction: &Transaction,
+    transaction: Transaction,
     index: u32,
     transaction_result: TransactionResult,
     pay_fees: bool,
@@ -692,6 +692,8 @@ pub fn handle_transaction_result<Host: Runtime>(
     } = transaction_result;
 
     let to = transaction.to()?;
+    let tx_hash = transaction.tx_hash;
+    let tx_type = transaction.type_();
 
     let gas_used = execution_outcome.result.gas_used();
 
@@ -728,20 +730,20 @@ pub fn handle_transaction_result<Host: Runtime>(
 
     let tx_object = make_object(
         block_constants.number,
-        transaction,
+        &transaction,
         caller,
         index,
         &fee_updates,
     )?;
 
     let receipt_info = make_receipt_info(
-        transaction.tx_hash,
+        tx_hash,
         index,
         execution_outcome,
         caller,
         to,
         fee_updates.overall_gas_price,
-        transaction.type_(),
+        tx_type,
         fee_updates.overall_gas_used,
     );
 
@@ -749,7 +751,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         receipt_info,
         tx_object,
         runtime,
-        tx_hash: transaction.tx_hash,
+        tx_hash,
     })
 }
 
@@ -911,7 +913,7 @@ pub fn apply_transaction<Host: Runtime>(
                 host,
                 outbox_queue,
                 block_constants,
-                &transaction,
+                transaction,
                 index,
                 tx_result,
                 true,
