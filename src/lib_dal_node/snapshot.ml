@@ -24,17 +24,6 @@ let read_from_store (type value) ~root_dir
   | Some value -> return value
   | None -> failwith "Value not found in store at %s" root_dir
 
-(** Iterate through all levels in the given range, calling [f] for each level. *)
-let iterate_levels ~min_published_level ~max_published_level f =
-  let open Lwt_result_syntax in
-  let rec iterate_levels level =
-    if Compare.Int32.(level > max_published_level) then return_unit
-    else
-      let* () = f level in
-      iterate_levels (Int32.succ level)
-  in
-  iterate_levels min_published_level
-
 (* Folds over the levels, from [min_published_level] to [max_published_level].*)
 let fold_levels ~min_published_level ~max_published_level f =
   List.iter_es
@@ -69,7 +58,7 @@ module Merge = struct
       through levels in the range [min_published_level, max_published_level]
       and copying the data using Dal_store_sqlite3 functions. *)
   let merge_skip_list ~src ~dst ~min_published_level ~max_published_level ~slots
-      =
+      ~proto_plugins =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     (* Initialize destination database with empty schema *)
@@ -87,47 +76,71 @@ module Merge = struct
         ()
     in
     let module SlotsSet = Set.Make (Int) in
-    let slots = SlotsSet.of_list slots in
+    let copy_skip_list ~slot_level slots _slot_index =
+      (* Get all skip list cells for this level from source *)
+      let* cells =
+        Dal_store_sqlite3.Skip_list_cells.find_by_level
+          src_db
+          ~published_level:slot_level
+      in
+      (* For each slot in this level, get complete info and insert into destination *)
+      let* items_with_lag =
+        List.filter_map_es
+          (fun (_cell, hash, slot_index) ->
+            if SlotsSet.mem slot_index slots then
+              let slot_id = Types.Slot_id.{slot_level; slot_index} in
+              let* result =
+                Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
+                  src_db
+                  slot_id
+              in
+              match result with
+              | Some (cell, attestation_lag) ->
+                  return_some (hash, cell, slot_index, attestation_lag)
+              | None ->
+                  failwith
+                    "Cell for slot_id (%ld, %d) not found."
+                    slot_level
+                    slot_index
+            else return_none)
+          cells
+      in
+      match items_with_lag with
+      | [] -> return_unit
+      | (_, _, _, attestation_lag) :: _ ->
+          let attested_level =
+            Int32.(add slot_level (of_int attestation_lag))
+          in
+          Dal_store_sqlite3.Skip_list_cells.insert
+            dst_db
+            ~attested_level
+            items_with_lag
+            Fun.id
+    in
     Lwt.finalize
       (fun () ->
-        iterate_levels ~min_published_level ~max_published_level @@ fun level ->
-        (* Get all skip list cells for this level from source *)
-        let* cells =
-          Dal_store_sqlite3.Skip_list_cells.find_by_level
-            src_db
-            ~published_level:level
+        let* () =
+          fold_levels
+            (fun slot_level ->
+              let slot_level = Int32.of_int slot_level in
+              let*? _, proto_parameters =
+                Proto_plugins.get_plugin_and_parameters_for_level
+                  proto_plugins
+                  ~level:slot_level
+              in
+              let slots =
+                Option.value
+                  ~default:
+                    (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+                  slots
+              in
+              List.iter_es
+                (copy_skip_list ~slot_level (SlotsSet.of_list slots))
+                slots)
+            ~min_published_level
+            ~max_published_level
         in
-        (* For each slot in this level, get complete info and insert into destination *)
-        let* items_with_lag =
-          List.filter_map_es
-            (fun (_cell, hash, slot_index) ->
-              if SlotsSet.mem slot_index slots then
-                let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
-                let* result =
-                  Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
-                    src_db
-                    slot_id
-                in
-                match result with
-                | Some (cell, attestation_lag) ->
-                    return_some (hash, cell, slot_index, attestation_lag)
-                | None ->
-                    failwith
-                      "Cell for slot_id (%ld, %d) not found."
-                      level
-                      slot_index
-              else return_none)
-            cells
-        in
-        match items_with_lag with
-        | [] -> return_unit
-        | (_, _, _, attestation_lag) :: _ ->
-            let attested_level = Int32.(add level (of_int attestation_lag)) in
-            Dal_store_sqlite3.Skip_list_cells.insert
-              dst_db
-              ~attested_level
-              items_with_lag
-              Fun.id)
+        return_unit)
       (fun () ->
         let open Lwt_syntax in
         let* _ = Dal_store_sqlite3.Skip_list_cells.close src_db in
@@ -269,7 +282,7 @@ module Merge = struct
         return_unit)
 
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
-      ~min_published_level ~max_published_level ~slots:slots_arg ~dst_root_dir =
+      ~min_published_level ~max_published_level ~slots ~dst_root_dir =
     let open Lwt_result_syntax in
     let* config =
       Configuration_file.exit_on_configuration_error
@@ -299,11 +312,6 @@ module Merge = struct
         ~first_seen_level
         profile_ctxt
         proto_plugins
-    in
-    let slots =
-      Option.value
-        ~default:(Stdlib.List.init head_proto_parameters.number_of_slots Fun.id)
-        slots_arg
     in
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
@@ -345,7 +353,7 @@ module Merge = struct
         ~dst:dst_slot_dir
         ~min_published_level
         ~max_published_level
-        ~slots:slots_arg
+        ~slots
         proto_plugins
     in
     (* Export shards *)
@@ -361,7 +369,7 @@ module Merge = struct
         ~dst:dst_shard_dir
         ~min_published_level
         ~max_published_level
-        ~slots:slots_arg
+        ~slots
         ~proto_plugins
         ~shards_store_lru_size
     in
@@ -379,6 +387,7 @@ module Merge = struct
         ~min_published_level
         ~max_published_level
         ~slots
+        ~proto_plugins
     in
     let* chain_id_store = Store.Chain_id.init ~root_dir:dst_root_dir in
     let* () = Store.Chain_id.save chain_id_store chain_id in
