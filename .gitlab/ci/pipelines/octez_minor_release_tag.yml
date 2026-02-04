@@ -8,7 +8,7 @@ stages:
 - publish
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -35,7 +35,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
@@ -175,7 +175,7 @@ oc.build:static-arm64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
@@ -204,7 +204,7 @@ oc.docker:amd64:
     EXECUTABLE_FILES: script-inputs/released-executables
 
 oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
@@ -256,7 +256,7 @@ oc.create-homebrew-formula:
     when: on_success
 
 docker:merge_manifests:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -283,7 +283,7 @@ docker:merge_manifests:
   retry: 0
 
 gitlab:release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -329,7 +329,7 @@ trigger:octez_monitoring:
     strategy: depend
 
 oc.docker-build-debian-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -364,7 +364,7 @@ oc.docker-build-debian-dependencies:
       - gcp_arm64
 
 oc.docker-build-merge-manifest.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -507,7 +507,7 @@ apt_repo_debian:
   retry: 0
 
 oc.docker-build-ubuntu-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -542,7 +542,7 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_arm64
 
 oc.docker-build-merge-manifest.ubuntu:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp

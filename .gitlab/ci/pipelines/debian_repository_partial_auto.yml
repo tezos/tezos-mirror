@@ -46,7 +46,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.docker-systemd_tests_debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -80,7 +80,7 @@ oc.docker-systemd_tests_debian:
       - gcp_very_high_cpu
 
 oc.docker-systemd-merge-manifest.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -116,7 +116,7 @@ oc.docker-systemd-merge-manifest.debian:
       - gcp_very_high_cpu
 
 oc.docker-build-debian-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -150,7 +150,7 @@ oc.docker-build-debian-dependencies:
       - gcp_very_high_cpu
 
 oc.docker-build-merge-manifest.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -337,7 +337,7 @@ oc.install_bin_debian_bookworm:
     PREFIX: ""
 
 oc.install_bin_debian_bookworm_systemd_test:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
@@ -369,7 +369,7 @@ oc.install_bin_debian_bookworm_systemd_test:
     RELEASE: bookworm
 
 oc.upgrade_bin_debian_bookworm-systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp

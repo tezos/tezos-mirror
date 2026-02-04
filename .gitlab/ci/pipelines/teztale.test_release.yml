@@ -8,7 +8,7 @@ stages:
 - publish
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -35,7 +35,7 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
@@ -183,7 +183,7 @@ teztale.build-x86_64:
     when: on_success
 
 teztale.gitlab_release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp_not_interruptible
