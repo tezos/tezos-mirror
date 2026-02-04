@@ -17,7 +17,7 @@ let all_products : Tezos_version_parser.product array =
 
 (* Values of Beta x, Beta_dev x, RC x or RC_dev x in additional_info are
    ignored. *)
-let version_generator ?(product = all_products) ?major ?minor
+let version_generator ?(product = all_products) ?major ?minor ?build
     ?(additional_info =
       ([|Dev; Beta 0; Beta_dev 0; RC 0; RC_dev 0; Release|]
         : Tezos_version_parser.additional_info array)) ?additional_info_value ()
@@ -25,6 +25,9 @@ let version_generator ?(product = all_products) ?major ?minor
   let product = QCheck2.Gen.oneofa product in
   let major = Option.fold ~none:QCheck2.Gen.int ~some:QCheck2.Gen.pure major in
   let minor = Option.fold ~none:QCheck2.Gen.int ~some:QCheck2.Gen.pure minor in
+  let build_number =
+    Option.fold ~none:QCheck2.Gen.int ~some:QCheck2.Gen.pure build
+  in
   let additional_info_value =
     Option.fold
       ~none:QCheck2.Gen.int
@@ -45,9 +48,9 @@ let version_generator ?(product = all_products) ?major ?minor
       additional_info_value
   in
   QCheck2.Gen.map
-    (fun (product, major, minor, additional_info) ->
-      Tezos_version_parser.{product; major; minor; additional_info})
-    (QCheck2.Gen.tup4 product major minor additional_info)
+    (fun (product, major, minor, build, additional_info) ->
+      Tezos_version_parser.{product; major; minor; build; additional_info})
+    (QCheck2.Gen.tup5 product major minor build_number additional_info)
 
 let commit_info_opt_generator ?(always_some = false) () =
   let hash = QCheck2.Gen.small_string ?gen:None in

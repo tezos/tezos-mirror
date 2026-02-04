@@ -14,13 +14,14 @@ let print_version version =
       "This script prints out the current version of \n\
        %s as it is deduced from the git tag of the current branch.\n\
        print_version \
-       [--product|--major|--minor|--additional-info|--full|--full-with-commit|--commit|--json]"
+       [--product|--major|--minor|--build|--additional-info|--full|--full-with-commit|--commit|--json]"
     @@ string_of_product version.product
   in
   match Sys.argv with
   | [|_; "--product"|] -> print_endline (string_of_product version.product)
   | [|_; "--major"|] -> print_endline (string_of_int version.major)
   | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
+  | [|_; "--build"|] -> print_endline (string_of_int version.build)
   | [|_; "--additional-info"|] ->
       print_endline (string_of_additional_info version.additional_info)
   | [|_; "--full"|] | [|_|] -> print_endline (to_string version)

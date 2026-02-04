@@ -41,7 +41,7 @@ let evm_executables = ["octez-evm-node"; "etherlink-governance-observer"]
    module, e.g. by exporting make_argument. *)
 let version_flag = "--version"
 
-let version_rex = rex "^[a-f0-9]+ \\([^()]*\\) \\([^()]*\\)\n$"
+let version_rex = rex "^[a-f0-9]+ \\([^()]*\\) \\(.*\\)\n$"
 
 (* TODO: tezos/tezos#4804
    Should we implement this via Component.run commands when possible?
