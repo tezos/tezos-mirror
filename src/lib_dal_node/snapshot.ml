@@ -144,7 +144,8 @@ module Merge = struct
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
-  let merge_slots ~src ~dst ~min_published_level ~max_published_level ~slots =
+  let merge_slots ~src ~dst ~min_published_level ~max_published_level ~slots
+      proto_plugins =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -172,6 +173,17 @@ module Merge = struct
           fold_levels
             (fun slot_level ->
               let slot_level = Int32.of_int slot_level in
+              let*? _, proto_parameters =
+                Proto_plugins.get_plugin_and_parameters_for_level
+                  proto_plugins
+                  ~level:slot_level
+              in
+              let slots =
+                Option.value
+                  ~default:
+                    (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+                  slots
+              in
               List.iter_es (copy_slot ~slot_level) slots)
             ~min_published_level
             ~max_published_level
@@ -237,7 +249,7 @@ module Merge = struct
         return_unit)
 
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
-      ~min_published_level ~max_published_level ~slots ~dst_root_dir =
+      ~min_published_level ~max_published_level ~slots:slots_arg ~dst_root_dir =
     let open Lwt_result_syntax in
     let* config =
       Configuration_file.exit_on_configuration_error
@@ -271,7 +283,7 @@ module Merge = struct
     let slots =
       Option.value
         ~default:(Stdlib.List.init head_proto_parameters.number_of_slots Fun.id)
-        slots
+        slots_arg
     in
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
@@ -313,7 +325,8 @@ module Merge = struct
         ~dst:dst_slot_dir
         ~min_published_level
         ~max_published_level
-        ~slots
+        ~slots:slots_arg
+        proto_plugins
     in
     (* Export shards *)
     let number_of_shards =
