@@ -95,16 +95,25 @@ end
 
     - `published_level`: The level of the block that contains the DAL publish
     commitment operation. Such operations are typically injected on top of the
-    block whose level is `published_level - 1` or earlier.
+    block whose level is `published_level - 1`. But they could have been
+    injected earlier.
 
     - `attested_level`: The level of the block / context that includes the
-    attestation status of a slot published `attestation_lag` levels
-    earlier. Formally, `attested_level = published_level + attestation_lag`.
+    attestation status of a slot published `lag` levels earlier, where [lag] is
+    an element of the [attestation_lags] parameter. Formally, `attested_level =
+    published_level + lag`.
 
    - `attestation_level`: The level of the block on top of which DAL
-   attestations are injected for a commitment published at published_level.
-   Formally, attestation_level = attested_level - 1 = published_level +
-   attestation_lag - 1. *)
+   attestations are injected.  Formally, `attestation_level = attested_level -
+   1`.
+
+    - `committee_level`: The level which determines which attesters are assigned
+    to fetch shards of a slot published at `published_level. `committee_level :=
+    = published_level + attestation_lag - 1`. We note that the committee level
+    for the slots published at the maximum attestation lag (with regard to some
+    attested level) equals `attestation_level`, but for slots published at
+    smaller lags (recall that `attestation_lag = max attestation_lags`), the
+    committee level is bigger than the attestation level.  *)
 module Header : sig
   (** For Layer-1, a slot is identified by the level at which it is published
       and the slot's index. *)
