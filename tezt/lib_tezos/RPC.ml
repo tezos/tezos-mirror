@@ -978,6 +978,24 @@ let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
     ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
     Fun.id
 
+let get_chain_block_context_raw_json_big_maps_index ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "big_maps";
+      "index";
+      id;
+    ]
+    Fun.id
+
 let get_chain_block_context_contracts ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "contracts"] Fun.id
 

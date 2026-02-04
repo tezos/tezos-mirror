@@ -868,6 +868,16 @@ val get_chain_block_context_big_maps :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/json/big_maps/index/<id>]
+
+    Returns big_map info (key_type, value_type, total_bytes, contents).
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+ *)
+val get_chain_block_context_raw_json_big_maps_index :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
 (** {2 Contracts RPC module} *)
 
 (** RPC [GET /chains/<chain>/blocks/<block>/context/contracts]

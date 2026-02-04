@@ -193,6 +193,23 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     Tezlink_durable_storage.big_map_get (read ~block) id key_hash
 
+  let big_map_raw_info chain block id =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let read = read ~block in
+    let* key_type = Tezlink_durable_storage.big_map_key_type read id in
+    let* value_type = Tezlink_durable_storage.big_map_value_type read id in
+    match (key_type, value_type) with
+    | Some kt, Some vt ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8229
+           - total_bytes:
+             Not yet implemented, requires kernel-side tracking
+             (L1 stores this at /big_maps/index/<id>/total_bytes)
+           - contents: intentionally empty, consistent with L1 raw context
+             behavior (L1 never returns big_map contents in this RPC) *)
+        return_some (kt, vt, Z.zero, [])
+    | _ -> return_none
+
   let block chain block =
     let open Lwt_result_syntax in
     let `Main = chain in

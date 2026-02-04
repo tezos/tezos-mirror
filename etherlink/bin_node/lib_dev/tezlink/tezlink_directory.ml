@@ -476,6 +476,12 @@ let build_block_static_directory ~l2_chain_id
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
          Tezlink_mock.storage_cycle ())
+  |> opt_register
+       ~service:Tezos_services.Big_map.raw_info
+       ~impl:(fun ({chain; block}, id) () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         Backend.big_map_raw_info chain block id)
   |> register
        ~service:Tezos_services.operation_hashes
        ~impl:(fun {chain; block} () () ->

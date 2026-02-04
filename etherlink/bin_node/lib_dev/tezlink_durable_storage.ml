@@ -47,6 +47,10 @@ module Path = struct
     in
     let (`Hex key_hex) = Hex.of_bytes raw_hash in
     big_map_id id ^ "/" ^ key_hex
+
+  let big_map_key_type id = big_map_id id ^ "/key_type"
+
+  let big_map_value_type id = big_map_id id ^ "/value_type"
 end
 
 let contract_of_path = Contract.of_hex
@@ -81,6 +85,30 @@ let counter read c =
 let big_map_get read id key_hash =
   let open Lwt_result_syntax in
   let path = Path.big_map_value id key_hash in
+  let decode =
+    Data_encoding.Binary.of_bytes_opt
+      Tezlink_imports.Alpha_context.Script.expr_encoding
+  in
+  let+ result =
+    Durable_storage.inspect_durable_and_decode_opt read path decode
+  in
+  Option.join result
+
+let big_map_key_type read id =
+  let open Lwt_result_syntax in
+  let path = Path.big_map_key_type id in
+  let decode =
+    Data_encoding.Binary.of_bytes_opt
+      Tezlink_imports.Alpha_context.Script.expr_encoding
+  in
+  let+ result =
+    Durable_storage.inspect_durable_and_decode_opt read path decode
+  in
+  Option.join result
+
+let big_map_value_type read id =
+  let open Lwt_result_syntax in
+  let path = Path.big_map_value_type id in
   let decode =
     Data_encoding.Binary.of_bytes_opt
       Tezlink_imports.Alpha_context.Script.expr_encoding
