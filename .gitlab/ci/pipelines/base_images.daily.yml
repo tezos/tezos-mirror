@@ -28,7 +28,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.base-images.debian:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_very_high_cpu
@@ -66,7 +66,7 @@ oc.base-images.debian:
       - trixie
 
 oc.base-images.ubuntu:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_very_high_cpu
@@ -107,7 +107,7 @@ oc.base-images.ubuntu:
       - "25.10"
 
 oc.base-images.fedora:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_very_high_cpu
@@ -145,7 +145,7 @@ oc.base-images.fedora:
       - "42"
 
 oc.base-images.rockylinux:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_very_high_cpu
@@ -182,7 +182,7 @@ oc.base-images.rockylinux:
       - "10"
 
 oc.base-images.rust:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
@@ -224,7 +224,7 @@ oc.base-images.rust:
       - gcp_arm64
 
 oc.base-images.rust.merge:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
@@ -251,7 +251,7 @@ oc.base-images.rust.merge:
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
 oc.base-images.debian-homebrew:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_very_high_cpu
