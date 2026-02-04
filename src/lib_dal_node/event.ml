@@ -1348,6 +1348,17 @@ open struct
       ~msg:"Cryptobox registered starting at level {level}"
       ~level:Info
       ("level", Data_encoding.int32)
+
+  let cannot_export_snapshot_data =
+    declare_3
+      ~section
+      ~name:"cannot_export_snapshot_data"
+      ~msg:"cannot export {kind}{index} for level {level}"
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("index", Data_encoding.int31)
+      ("kind", Data_encoding.string)
+      ~pp3:Format.pp_print_string
 end
 
 (* DAL node event emission functions *)
@@ -1734,3 +1745,6 @@ let emit_publication_failed ~block_level ~error =
   emit publication_failed (block_level, error)
 
 let emit_cryptobox_registered ~level = emit cryptobox_registered level
+
+let emit_cannot_export_snapshot_data ~level ~index ~kind =
+  emit cannot_export_snapshot_data (level, index, kind)

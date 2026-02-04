@@ -45,12 +45,15 @@ let iterate_slots ~min_published_level ~max_published_level ~slots f =
 
 (** Copy a value from source KVS to destination KVS.
     Returns [Ok ()] if the value was copied or if src value is not found. *)
-let kvs_copy_value src_store dst_store file_layout file key =
+let kvs_copy_value src_store dst_store file_layout ~slot_id:file ~key
+    (level, index, kind) =
   let open Lwt_result_syntax in
   let* exists =
     Key_value_store.Read.value_exists src_store file_layout file key
   in
-  if not exists then return_unit
+  if not exists then
+    let*! () = Event.emit_cannot_export_snapshot_data ~level ~index ~kind in
+    return_unit
   else
     let* value =
       Key_value_store.Read.read_value src_store file_layout file key
@@ -151,7 +154,13 @@ module Merge = struct
         iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
         let* file_layout = Store.Slots.get_file_layout ~slot_id in
-        kvs_copy_value src_store dst_store file_layout slot_id ())
+        kvs_copy_value
+          src_store
+          dst_store
+          file_layout
+          ~file:slot_id
+          (slot_id.slot_level, slot_id.slot_index, "slot")
+          ~key:())
       (fun () ->
         let open Lwt_syntax in
         let* _ = Key_value_store.Read.close src_store in
@@ -198,8 +207,9 @@ module Merge = struct
                     src_store
                     dst_store
                     file_layout
-                    slot_id
-                    shard_index
+                    ~file:slot_id
+                    ~key:shard_index
+                    (slot_id.slot_level, shard_index, "shard")
                 in
                 copy_shard (shard_index + 1)
             in
@@ -360,6 +370,15 @@ end
 let export ~data_dir ~config_file ~endpoint ~min_published_level
     ~max_published_level ~slots dst =
   let open Lwt_result_syntax in
+  let*! () =
+    let log_cfg =
+      Tezos_base_unix.Logs_simple_config.create_cfg ~advertise_levels:true ()
+    in
+    let internal_events =
+      Tezos_base_unix.Internal_event_unix.make_with_defaults ~log_cfg ()
+    in
+    Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
+  in
   let store_path data_dir =
     Configuration_file.store_path {Configuration_file.default with data_dir}
   in
