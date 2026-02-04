@@ -13,6 +13,11 @@ open Script_typed_ir
 module Helpers = struct
   open Micheline
 
+  (* Michelson comb-pairs representation *)
+  type ('a, 'b, 'c) tup3 = 'a * ('b * 'c)
+
+  type ('a, 'b, 'c, 'd) tup4 = 'a * ('b, 'c, 'd) tup3
+
   (* Node describing a type in its typed and untyped version, that serves as
      combinator to define native contract types. *)
   type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
@@ -59,6 +64,17 @@ module Helpers = struct
     let+ pair_t = Script_typed_ir.pair_t loc ty1 ty2 in
     {untyped = prim Script.T_pair [unty1; unty2]; typed = pair_t}
 
+  let tup3_ty (type a b c) ty1 ty2 ty3 : (a, b, c) tup3 ty_node tzresult =
+    let open Result_syntax in
+    let* r = pair_ty ty2 ty3 in
+    pair_ty ty1 r
+
+  let tup4_ty (type a b c d) ty1 ty2 ty3 ty4 :
+      (a, b, c, d) tup4 ty_node tzresult =
+    let open Result_syntax in
+    let* r = tup3_ty ty2 ty3 ty4 in
+    pair_ty ty1 r
+
   let or_ty (type l r) ({untyped = untyl; typed = Ty_ex_c tyl; _} : l ty_node)
       ({untyped = untyr; typed = Ty_ex_c tyr; _} : r ty_node) :
       (l, r) or_ ty_node tzresult =
@@ -72,7 +88,7 @@ module Helpers = struct
     let* ty_list = Script_typed_ir.list_t loc ty_elt in
     return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
 
-  (** Nodes and entrypoints combinators *)
+  (** Entrypoints combinator *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
 
@@ -142,6 +158,10 @@ type 'storage view_map = (Script_string.t, 'storage ex_view) map
 module CLST_types = struct
   open Helpers
 
+  type ('a, 'b, 'c) tup3 = ('a, 'b, 'c) Helpers.tup3
+
+  type ('a, 'b, 'c, 'd) tup4 = ('a, 'b, 'c, 'd) Helpers.tup4
+
   type nat = Script_int.n Script_int.num
 
   type deposit = unit
@@ -150,9 +170,9 @@ module CLST_types = struct
 
   type transfer =
     ( address (* from_ *),
-      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
-      Script_list.t
-    (* txs *) )
+      (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
+      Script_list.t )
+    (* txs *)
     pair
     Script_list.t
 
@@ -187,10 +207,12 @@ module CLST_types = struct
 
   let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
     let open Result_syntax in
-    let* token_id_and_amount =
-      pair_ty (add_name "token_id" nat_ty) (add_name "amount" nat_ty)
+    let* tx =
+      tup3_ty
+        (add_name "to_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
     in
-    let* tx = pair_ty (add_name "to_" address_ty) token_id_and_amount in
     let* txs = list_ty tx in
     let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
     let* transfer = list_ty elt in

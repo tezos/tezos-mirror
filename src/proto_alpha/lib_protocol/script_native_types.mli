@@ -19,15 +19,20 @@ type ('arg, 'output) view_type = {
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
 
+  (** Michelson representation for tuples. *)
+  type ('a, 'b, 'c) tup3 = 'a * ('b * 'c)
+
+  type ('a, 'b, 'c, 'd) tup4 = 'a * ('b * ('c * 'd))
+
   type deposit = unit
 
   type withdraw = nat
 
   type transfer =
     ( address (* from_ *),
-      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
-      Script_list.t
-    (* txs *) )
+      (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
+      Script_list.t )
+    (* txs *)
     pair
     Script_list.t
 
