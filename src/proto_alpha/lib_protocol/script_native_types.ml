@@ -170,9 +170,9 @@ module CLST_types = struct
 
   type transfer =
     ( address (* from_ *),
-      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
-      Script_list.t
-    (* txs *) )
+      (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
+      Script_list.t )
+    (* txs *)
     pair
     Script_list.t
 
@@ -207,10 +207,12 @@ module CLST_types = struct
 
   let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
     let open Result_syntax in
-    let* token_id_and_amount =
-      pair_ty (add_name "token_id" nat_ty) (add_name "amount" nat_ty)
+    let* tx =
+      tup3_ty
+        (add_name "to_" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "amount" nat_ty)
     in
-    let* tx = pair_ty (add_name "to_" address_ty) token_id_and_amount in
     let* txs = list_ty tx in
     let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
     let* transfer = list_ty elt in

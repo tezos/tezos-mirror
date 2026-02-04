@@ -30,9 +30,9 @@ module CLST_types : sig
 
   type transfer =
     ( address (* from_ *),
-      (address (* to_ *), (nat (* token_id *), nat (* amount *)) pair) pair
-      Script_list.t
-    (* txs *) )
+      (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
+      Script_list.t )
+    (* txs *)
     pair
     Script_list.t
 
