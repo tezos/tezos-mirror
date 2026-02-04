@@ -299,6 +299,19 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
+let parameters_with_custom_consensus_rights_delay ~protocol
+    ~consensus_rights_delay ?(slashing_delay = 1) parameters =
+  let cache_size = consensus_rights_delay + slashing_delay + 2 in
+  let parameters =
+    (["consensus_rights_delay"], `Int consensus_rights_delay)
+    :: (["cache_sampler_state_cycles"], `Int cache_size)
+    :: (["cache_stake_distribution_cycles"], `Int cache_size)
+    :: parameters
+  in
+  if number protocol >= 025 then
+    (["cache_stake_info_cycles"], `Int cache_size) :: parameters
+  else parameters
+
 let previous_protocol = function
   | Alpha -> Some T024
   | T024 -> Some S023

@@ -91,6 +91,62 @@ module Delegate_sampler_state = struct
     Storage.Delegate_sampler_state.remove_existing ctxt cycle
 end
 
+module Delegate_stake_info = struct
+  module Cache_client = struct
+    type cached_value = Raw_context.stake_info
+
+    let namespace = Cache_repr.create_namespace "stake_info"
+
+    let cache_index = 3
+
+    let value_of_identifier ctxt identifier =
+      let cycle = Cycle_repr.of_string_exn identifier in
+      Storage.Delegate_stake_info.get ctxt cycle
+  end
+
+  module Cache = (val Cache_repr.register_exn (module Cache_client))
+
+  let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
+
+  (* that's symbolic: 1 cycle = 1 entry *)
+  let size = 1
+
+  let init ctxt cycle stake_info =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt = Storage.Delegate_stake_info.init ctxt cycle stake_info in
+    let*? ctxt = Cache.update ctxt id (Some (stake_info, size)) in
+    return ctxt
+
+  let add ctxt cycle stake_info =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let*! ctxt = Storage.Delegate_stake_info.add ctxt cycle stake_info in
+    let*? ctxt = Cache.update ctxt id (Some (stake_info, size)) in
+    return ctxt
+
+  let find ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt, v_opt = Cache.find ctxt id in
+    match v_opt with
+    | Some v -> return (ctxt, Some v)
+    | None -> (
+        let* v = Storage.Delegate_stake_info.find ctxt cycle in
+        match v with
+        | None -> return (ctxt, None)
+        | Some v ->
+            let*? ctxt = Cache.update ctxt id (Some (v, size)) in
+            return (ctxt, Some v))
+
+  let remove ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let*? ctxt = Cache.update ctxt id None in
+    let*! ctxt = Storage.Delegate_stake_info.remove ctxt cycle in
+    return ctxt
+end
+
 module Random = struct
   (* [init_random_state] initialize a random sequence drawing state
      that's unique for a given (seed, level, index) triple. Elements
@@ -204,7 +260,7 @@ let sort_stakes_pk_for_stake_info stakes_pk =
     [Raw_context.set_stake_info_for_cycle]. *)
 let stake_info_for_cycle ctxt cycle =
   let open Lwt_result_syntax in
-  let* r_opt = Storage.Delegate_stake_info.find ctxt cycle in
+  let* ctxt, r_opt = Delegate_stake_info.find ctxt cycle in
   match r_opt with
   | Some s -> return (ctxt, s)
   (* The none case happens if the table hasn't been computed in advance.
@@ -231,7 +287,7 @@ let stake_info_for_cycle ctxt cycle =
       in
       let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
       let r = Raw_context.{total_stake_weight; delegates = stakes_pk} in
-      let*! ctxt = Storage.Delegate_stake_info.add ctxt cycle r in
+      let* ctxt = Delegate_stake_info.add ctxt cycle r in
       return (ctxt, r)
 
 let stake_info ctxt level =
@@ -343,7 +399,7 @@ let select_distribution_for_cycle ctxt cycle =
      initialised before, because it needs the sampler info, which is being done
      is this very function *)
   let* ctxt =
-    Storage.Delegate_stake_info.init ctxt cycle {total_stake_weight; delegates}
+    Delegate_stake_info.init ctxt cycle {total_stake_weight; delegates}
   in
   (* Update all bakers attest activation level if tz4 stake
      is above activation threshold *)
@@ -372,7 +428,7 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
          there exists some cycles for which the storage does not exist.
          This happens because this data doesn't exist for cycles before
          the storage has been introduced. *)
-      let*! ctxt = Storage.Delegate_stake_info.remove ctxt outdated_cycle in
+      let* ctxt = Delegate_stake_info.remove ctxt outdated_cycle in
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
 let attesting_power ~all_bakers_attest_enabled ctxt level =

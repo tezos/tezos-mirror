@@ -794,6 +794,7 @@ let test_in_registration_table_twice =
   --> set S.consensus_rights_delay consensus_rights_delay
   --> set S.cache_stake_distribution_cycles (consensus_rights_delay + 3)
   --> set S.cache_sampler_state_cycles (consensus_rights_delay + 3)
+  --> set S.cache_stake_info_cycles (consensus_rights_delay + 3)
   --> begin_test
         ~default_algo:Bls
         ~force_attest_all:true

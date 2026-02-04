@@ -160,6 +160,22 @@ val write_parameter_file :
   parameter_overrides ->
   string Lwt.t
 
+(** Changes the parameter values that are related to the consensus rights delay.
+
+    The protocol enforces the following restrictions to the parameters, as
+    specified in [constants_repr.ml]:
+    - cache_stake_distribution_cycles = consensus_rights_delay + slashing_delay + 2
+    - cache_sampler_state_cycles = cache_stake_distribution_cycles
+    - cache_stake_info_cycles = cache_stake_distribution_cycles
+
+    This function ensures that the resulting parameters are acceptable by the protocol. *)
+val parameters_with_custom_consensus_rights_delay :
+  protocol:t ->
+  consensus_rights_delay:int ->
+  ?slashing_delay:int ->
+  parameter_overrides ->
+  parameter_overrides
+
 (** Get the predecessor of a protocol.
 
     WARNING: use of this function is discouraged, because it prevents the type-checker

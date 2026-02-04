@@ -388,6 +388,8 @@ let constants_mainnet : Constants.Parametric.t =
     cache_stake_distribution_cycles = 5;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 5;
+    (* One for the stake info for all cycles stored at any moment (as above). *)
+    cache_stake_info_cycles = 5;
     dal = default_dal;
     sc_rollup;
     zk_rollup =

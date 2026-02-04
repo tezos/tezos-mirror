@@ -285,17 +285,17 @@ let signer_highwatermark_test =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["consensus_committee_size"], `Int consensus_committee_size);
-        (["consensus_threshold_size"], `Int 200);
-        (["minimal_block_delay"], `String "2");
-        (["delay_increment_per_round"], `String "0");
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int 200);
+         (["minimal_block_delay"], `String "2");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 2);
+         (["nonce_revelation_threshold"], `Int 1);
+       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol

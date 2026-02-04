@@ -980,6 +980,7 @@ module Constants : sig
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
       cache_sampler_state_cycles : int;
+      cache_stake_info_cycles : int;
       dal : dal;
       sc_rollup : sc_rollup;
       zk_rollup : zk_rollup;

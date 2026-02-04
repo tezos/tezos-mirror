@@ -536,24 +536,26 @@ let attestation_and_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
-         (* Diminish some constants to activate consensus keys faster *)
-         (["blocks_per_cycle"], `Int 2);
-         (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-       ]
-      @
-      (* TODO ABAAB: reactivate test with threshold active *)
-      if Protocol.(number protocol >= 024) then
-        [
-          ( ["all_bakers_attest_activation_threshold"],
-            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+      (([
+          (["allow_tz4_delegate_enable"], `Bool true);
+          (["aggregate_attestation"], `Bool true);
+          (* Diminish some constants to activate consensus keys faster *)
+          (["blocks_per_cycle"], `Int 2);
+          (["nonce_revelation_threshold"], `Int 1);
         ]
-      else [])
+       @
+       if
+         (* TODO ABAAB: reactivate test with threshold active *)
+         Protocol.(number protocol >= 024)
+       then
+         [
+           ( ["all_bakers_attest_activation_threshold"],
+             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+         ]
+       else [])
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -656,24 +658,26 @@ let double_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      ([
-         (["allow_tz4_delegate_enable"], `Bool true);
-         (["aggregate_attestation"], `Bool true);
-         (* Diminish some constants to activate consensus keys faster. *)
-         (["blocks_per_cycle"], `Int 3);
-         (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-       ]
-      @
-      (* TODO ABAAB: reactivate test with threshold active *)
-      if Protocol.(number protocol >= 024) then
-        [
-          ( ["all_bakers_attest_activation_threshold"],
-            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+      (([
+          (["allow_tz4_delegate_enable"], `Bool true);
+          (["aggregate_attestation"], `Bool true);
+          (* Diminish some constants to activate consensus keys faster. *)
+          (["blocks_per_cycle"], `Int 3);
+          (["nonce_revelation_threshold"], `Int 1);
         ]
-      else [])
+       @
+       if
+         (* TODO ABAAB: reactivate test with threshold active *)
+         Protocol.(number protocol >= 024)
+       then
+         [
+           ( ["all_bakers_attest_activation_threshold"],
+             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+         ]
+       else [])
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node1, client1 =
     Client.init_with_protocol
@@ -902,22 +906,24 @@ let preattestation_and_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      ([
-         (* Diminish some constants to activate consensus keys faster. *)
-         (["blocks_per_cycle"], `Int 3);
-         (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-       ]
-      @
-      (* TODO ABAAB: reactivate test with threshold active *)
-      if Protocol.(number protocol >= 024) then
-        [
-          ( ["all_bakers_attest_activation_threshold"],
-            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+      (([
+          (* Diminish some constants to activate consensus keys faster. *)
+          (["blocks_per_cycle"], `Int 3);
+          (["nonce_revelation_threshold"], `Int 1);
         ]
-      else [])
+       @
+       if
+         (* TODO ABAAB: reactivate test with threshold active *)
+         Protocol.(number protocol >= 024)
+       then
+         [
+           ( ["all_bakers_attest_activation_threshold"],
+             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+         ]
+       else [])
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -1055,22 +1061,24 @@ let double_preattestation_aggregation_wrong_payload_hash =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      ([
-         (* Diminish some constants to activate consensus keys faster. *)
-         (["blocks_per_cycle"], `Int 3);
-         (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-       ]
-      @
-      (* TODO ABAAB: reactivate test with threshold active *)
-      if Protocol.(number protocol >= 024) then
-        [
-          ( ["all_bakers_attest_activation_threshold"],
-            `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+      (([
+          (* Diminish some constants to activate consensus keys faster. *)
+          (["blocks_per_cycle"], `Int 3);
+          (["nonce_revelation_threshold"], `Int 1);
         ]
-      else [])
+       @
+       if
+         (* TODO ABAAB: reactivate test with threshold active *)
+         Protocol.(number protocol >= 024)
+       then
+         [
+           ( ["all_bakers_attest_activation_threshold"],
+             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+         ]
+       else [])
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node1, client1 =
     Client.init_with_protocol
