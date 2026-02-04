@@ -621,7 +621,7 @@ clean-kernels:
 .PHONY: wasm_runtime_gen_files
 wasm_runtime_gen_files::
 	@echo 'Building etherlink/lib_wasm_runtime'
-	@cd etherlink/lib_wasm_runtime; RUSTFLAGS=-Awarnings cargo build
+	@cd etherlink/lib_wasm_runtime; cargo build
 
 octez-evm-node: wasm_runtime_gen_files
 
