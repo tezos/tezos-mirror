@@ -223,7 +223,7 @@ module Merge = struct
     let cctxt = Rpc_context.make config.Configuration_file.endpoint in
     let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
     let head_level = header.Block_header.shell.level in
-    let*? (module Plugin : Dal_plugin.T), proto_parameters =
+    let*? (module Plugin : Dal_plugin.T), head_proto_parameters =
       Proto_plugins.get_plugin_and_parameters_for_level
         proto_plugins
         ~level:head_level
@@ -244,7 +244,7 @@ module Merge = struct
     in
     let slots =
       Option.value
-        ~default:(Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+        ~default:(Stdlib.List.init head_proto_parameters.number_of_slots Fun.id)
         slots
     in
     let* chain_id =
@@ -270,8 +270,8 @@ module Merge = struct
             sub
               last_processed_level
               (of_int
-                 (Constants.validation_slack + proto_parameters.attestation_lag
-                + 1)))
+                 (Constants.validation_slack
+                + head_proto_parameters.attestation_lag + 1)))
         else last_processed_level
       in
       match max_published_level with
@@ -291,7 +291,7 @@ module Merge = struct
     in
     (* Export shards *)
     let number_of_shards =
-      proto_parameters.cryptobox_parameters.number_of_shards
+      head_proto_parameters.cryptobox_parameters.number_of_shards
     in
     let shards_store_lru_size =
       Constants.shards_store_lru_size
