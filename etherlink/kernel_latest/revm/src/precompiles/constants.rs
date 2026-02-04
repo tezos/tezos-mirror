@@ -47,6 +47,17 @@ pub const ALWAYS_REVERT_SOL_CONTRACT: PredeployedContract = PredeployedContract 
     ]),
 };
 
+/// AliasForwarder contract deployed at a precompile address.
+/// Alias addresses use EIP-7702 delegation to point to this contract.
+pub const ALIAS_FORWARDER_SOL_CONTRACT: PredeployedContract = PredeployedContract {
+    code: include_bytes!("../../contracts/predeployed/alias_forwarder.bin"),
+    code_hash: FixedBytes::new([
+        0x62, 0x17, 0x64, 0x08, 0xe7, 0x64, 0xcb, 0x78, 0xfc, 0xfd, 0xb9, 0x74, 0x20,
+        0xc4, 0x18, 0x28, 0x1e, 0x98, 0x1b, 0x8a, 0x96, 0x83, 0xd9, 0x25, 0xa0, 0x92,
+        0x8f, 0xe6, 0x5f, 0x67, 0xf1, 0x7b,
+    ]),
+};
+
 pub const SYSTEM_SOL_ADDR: Address = Address::ZERO;
 
 pub const XTZ_BRIDGE_SOL_ADDR: Address = Address(FixedBytes::new([
@@ -92,13 +103,30 @@ pub(crate) const RUNTIME_GATEWAY_PRECOMPILE_ADDRESS: Address =
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
     ]));
 
+/// Address where the AliasForwarder contract is deployed as a precompile.
+/// Alias addresses use EIP-7702 delegation to delegate execution to this address.
+pub const ALIAS_FORWARDER_PRECOMPILE_ADDRESS: Address = Address(FixedBytes::new([
+    0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
+]));
+
+/// Dedicated caller address for TezosX internal transactions.
+///
+/// This address is used when the actual caller doesn't have an Ethereum-format
+/// address (e.g., when initializing aliases for Tezos addresses). We use a specific
+/// non-zero address because the zero address is reserved for simulation.
+pub const TEZOSX_CALLER_ADDRESS: Address = Address::new([
+    0x7e, 0x20, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+]);
+
 #[cfg(test)]
 pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0xde, 0xad,
 ]));
 
-pub(crate) const CUSTOMS: [Address; 7] = [
+pub(crate) const CUSTOMS: [Address; 8] = [
     XTZ_BRIDGE_SOL_ADDR,
     FA_BRIDGE_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
@@ -106,6 +134,7 @@ pub(crate) const CUSTOMS: [Address; 7] = [
     GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
     CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS,
     RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+    ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
 ];
 
 // Rationale regarding the cost:
@@ -166,8 +195,8 @@ pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 #[cfg(test)]
 mod test {
     use super::{
-        PredeployedContract, ALWAYS_REVERT_SOL_CONTRACT, FA_BRIDGE_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
+        PredeployedContract, ALIAS_FORWARDER_SOL_CONTRACT, ALWAYS_REVERT_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_CONTRACT,
     };
 
     use crate::helpers::storage::bytes_hash;
@@ -206,5 +235,10 @@ mod test {
     #[test]
     fn check_always_revert_sol_code_hash() {
         check_code_hash_validity(&ALWAYS_REVERT_SOL_CONTRACT)
+    }
+
+    #[test]
+    fn check_alias_forwarder_sol_code_hash() {
+        check_code_hash_validity(&ALIAS_FORWARDER_SOL_CONTRACT)
     }
 }

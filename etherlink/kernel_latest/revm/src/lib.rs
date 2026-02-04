@@ -456,8 +456,8 @@ mod test {
     use tezosx_interfaces::Registry as RegistryTrait;
 
     use utilities::{
-        block_constants_with_fees, block_constants_with_no_fees, Registry,
-        DEFAULT_SPEC_ID,
+        block_constants_with_fees, block_constants_with_no_fees,
+        test_alias_creation_context, Registry, DEFAULT_SPEC_ID,
     };
 
     use super::Error;
@@ -506,6 +506,7 @@ mod test {
         use tezos_ethereum::block::{BlockConstants, BlockFees};
         use tezos_evm_runtime::runtime::Runtime;
         use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+        use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
             Registry as RegistryTrait, RuntimeId, RuntimeInterface, TezosXRuntimeError,
         };
@@ -513,15 +514,18 @@ mod test {
         use crate::test::GAS_LIMIT;
 
         // Test-only Registry struct that implements the Registry trait from tezosx-interfaces.
-        // It contains a MockTezosRuntime for testing cross-runtime functionality.
+        // It contains a MockTezosRuntime for testing cross-runtime functionality,
+        // and an EthereumRuntime for Ethereum alias creation.
         pub(crate) struct Registry {
             mock_tezos: MockTezosRuntime,
+            ethereum: EthereumRuntime,
         }
 
         impl Registry {
             pub(crate) fn new() -> Self {
                 Self {
                     mock_tezos: MockTezosRuntime,
+                    ethereum: EthereumRuntime,
                 }
             }
 
@@ -570,13 +574,18 @@ mod test {
                 host: &mut Host,
                 native_address: &[u8],
                 runtime_id: RuntimeId,
+                context: tezosx_interfaces::AliasCreationContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 match runtime_id {
-                    RuntimeId::Tezos => {
-                        self.mock_tezos.generate_alias(host, native_address)
-                    }
+                    RuntimeId::Tezos => self.mock_tezos.generate_alias(
+                        self,
+                        host,
+                        native_address,
+                        context,
+                    ),
                     RuntimeId::Ethereum => {
-                        Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
+                        self.ethereum
+                            .generate_alias(self, host, native_address, context)
                     }
                 }
             }
@@ -622,13 +631,25 @@ mod test {
             )
         }
 
+        pub(crate) fn test_alias_creation_context(
+        ) -> tezosx_interfaces::AliasCreationContext {
+            tezosx_interfaces::AliasCreationContext {
+                gas_limit: GAS_LIMIT,
+                chain_id: ETHERLINK_CHAIN_ID,
+                timestamp: PU256::from(1),
+                block_number: PU256::from(1),
+            }
+        }
+
         pub(crate) struct MockTezosRuntime;
 
         impl RuntimeInterface for MockTezosRuntime {
             fn generate_alias<Host: Runtime>(
                 &self,
+                _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 native_address: &[u8],
+                _context: tezosx_interfaces::AliasCreationContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 // Simple mock: prefix with "tz1_" marker and return a hash-like alias
                 let mut alias = vec![0u8; 22]; // tz1 address size
@@ -808,6 +829,7 @@ mod test {
                 &mut host,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
+                test_alias_creation_context(),
             )
             .unwrap();
         store_alias(
@@ -884,6 +906,7 @@ mod test {
                 &mut host,
                 &destination.0 .0,
                 tezosx_interfaces::RuntimeId::Tezos,
+                test_alias_creation_context(),
             )
             .unwrap();
         store_alias(
@@ -2736,6 +2759,231 @@ mod test {
             }
             ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
                 panic!("Simple transfer should have succeeded")
+            }
+        }
+    }
+
+    /// Test that an Ethereum alias is correctly created with the EIP-1167 proxy bytecode
+    /// and that it points to the AliasForwarder implementation.
+    #[test]
+    fn test_alias_forwarder_proxy_is_correctly_deployed() {
+        let mut host = MockKernelHost::default();
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host).unwrap();
+
+        // Native Tezos address
+        let native_address = b"tz1TestForwarder123";
+
+        // Create the Ethereum alias for this native address
+        let registry = Registry::new();
+        let alias_bytes = registry
+            .generate_alias(
+                &mut host,
+                native_address,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+            )
+            .expect("Failed to generate alias");
+        let alias = Address::from_slice(&alias_bytes);
+
+        // Verify the alias has code (delegation bytecode)
+        let alias_account = StorageAccount::from_address(&alias).unwrap();
+        let alias_info = alias_account.info(&mut host).unwrap();
+        assert_ne!(
+            alias_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "Alias should have proxy bytecode"
+        );
+
+        // Verify the alias address is computed deterministically from the native address
+        let expected_alias = {
+            let hash = bytes_hash(native_address);
+            Address::from_slice(&hash.0[0..20])
+        };
+        assert_eq!(
+            alias, expected_alias,
+            "Alias should be at the computed address"
+        );
+
+        // Verify the AliasForwarder precompile has code
+        use crate::precompiles::constants::ALIAS_FORWARDER_PRECOMPILE_ADDRESS;
+        let precompile_account =
+            StorageAccount::from_address(&ALIAS_FORWARDER_PRECOMPILE_ADDRESS).unwrap();
+        let precompile_info = precompile_account.info(&mut host).unwrap();
+        assert_ne!(
+            precompile_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "AliasForwarder precompile should have code"
+        );
+    }
+
+    /// Test that pre-existing balance at the alias address is forwarded to the
+    /// native Tezos address when the alias is created.
+    #[test]
+    fn test_alias_forwarder_transfers_preexisting_balance() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = block_constants_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host).unwrap();
+
+        // Native Tezos address that should receive the funds
+        let native_address = b"tz1PreexistingBal";
+
+        // First, we need to compute the alias address to set pre-existing balance
+        // We use the same algorithm as generate_alias: keccak256(native_address)[0..20]
+        let alias = {
+            let hash = bytes_hash(native_address);
+            Address::from_slice(&hash.0[0..20])
+        };
+
+        // Set pre-existing balance at the alias address BEFORE creating the alias
+        let preexisting_balance = U256::from(5_000_000_000_000_000_000u128); // 5 ETH
+        let mut alias_account = StorageAccount::from_address(&alias).unwrap();
+        let mut alias_info = alias_account.info(&mut host).unwrap();
+        alias_info.balance = preexisting_balance;
+        alias_account
+            .set_info_without_code(&mut host, alias_info)
+            .unwrap();
+
+        // Verify pre-existing balance is set
+        let alias_info_before = alias_account.info(&mut host).unwrap();
+        assert_eq!(
+            alias_info_before.balance, preexisting_balance,
+            "Pre-existing balance should be set"
+        );
+
+        // Create the Ethereum alias - this should forward the pre-existing balance
+        let registry = Registry::new();
+        let alias_bytes = registry
+            .generate_alias(
+                &mut host,
+                native_address,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+            )
+            .expect("Failed to generate alias");
+
+        // Verify the alias was created at the expected address
+        assert_eq!(
+            alias_bytes,
+            alias.0.to_vec(),
+            "Alias should be at the computed address"
+        );
+
+        // Check that the pre-existing balance was forwarded to the Tezos address
+        let native_addr_str = String::from_utf8(native_address.to_vec()).unwrap();
+        let tezos_balance = registry
+            .get_balance(
+                &mut host,
+                native_addr_str.as_bytes(),
+                tezosx_interfaces::RuntimeId::Tezos,
+            )
+            .unwrap_or(primitive_types::U256::zero());
+
+        // The pre-existing balance should have been forwarded
+        assert!(
+            tezos_balance > primitive_types::U256::zero(),
+            "Pre-existing balance should have been forwarded to Tezos. Balance: {tezos_balance:?}"
+        );
+    }
+
+    /// Test that when funds are sent to an existing alias, they are forwarded
+    /// to the associated Tezos account via the AliasForwarder contract.
+    #[test]
+    fn test_alias_forwarder_forwards_funds_after_creation() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = block_constants_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        // Initialize all precompiles (including AliasForwarder)
+        init_precompile_bytecodes(&mut host).unwrap();
+
+        // Native Tezos address that should receive the funds
+        let native_address = b"tz1TestForwarder123";
+
+        // Create the Ethereum alias for this native address
+        let registry = Registry::new();
+        let alias_bytes = registry
+            .generate_alias(
+                &mut host,
+                native_address,
+                tezosx_interfaces::RuntimeId::Ethereum,
+                test_alias_creation_context(),
+            )
+            .expect("Failed to generate alias");
+        let alias = Address::from_slice(&alias_bytes);
+
+        // Verify the alias has code (EIP-7702 delegation bytecode)
+        let alias_account = StorageAccount::from_address(&alias).unwrap();
+        let alias_info = alias_account.info(&mut host).unwrap();
+        assert_ne!(
+            alias_info.code_hash,
+            revm::primitives::KECCAK_EMPTY,
+            "Alias should have delegation bytecode"
+        );
+
+        // Set up a sender with balance
+        let sender = Address::from(&[0xAA; 20]);
+        let sender_info = AccountInfo {
+            balance: U256::from(10_000_000_000_000_000_000u128), // 10 ETH
+            nonce: 0,
+            code_hash: Default::default(),
+            account_id: None,
+            code: None,
+        };
+        let mut sender_account = StorageAccount::from_address(&sender).unwrap();
+        sender_account
+            .set_info_without_code(&mut host, sender_info)
+            .unwrap();
+
+        let value_to_send = U256::from(1_000_000_000_000_000_000u128); // 1 ETH
+
+        // Send funds to the alias address
+        let registry = Registry::new();
+        let execution_result = run_transaction(
+            &mut host,
+            &registry,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            sender,
+            Some(alias),
+            Bytes::new(), // empty calldata triggers receive()
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_to_send,
+            AccessList(vec![]),
+            None,
+            None,
+            false,
+        )
+        .expect("Transaction should not fail");
+
+        // Verify the transaction succeeded and funds were forwarded
+        match execution_result.result {
+            ExecutionResult::Success { .. } => {
+                // Check the mock Tezos balance - funds should have been forwarded
+                let native_addr_str = String::from_utf8(native_address.to_vec()).unwrap();
+                let tezos_balance = registry
+                    .get_balance(
+                        &mut host,
+                        native_addr_str.as_bytes(),
+                        tezosx_interfaces::RuntimeId::Tezos,
+                    )
+                    .unwrap_or(primitive_types::U256::zero());
+
+                assert!(
+                    tezos_balance > primitive_types::U256::zero(),
+                    "Funds should have been forwarded to Tezos. Balance: {tezos_balance:?}"
+                );
+            }
+            ExecutionResult::Revert { output, .. } => {
+                panic!("Transaction reverted: {output:?}");
+            }
+            ExecutionResult::Halt { reason, .. } => {
+                panic!("Transaction halted: {reason:?}");
             }
         }
     }
