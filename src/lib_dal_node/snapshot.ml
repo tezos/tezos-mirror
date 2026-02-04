@@ -43,6 +43,12 @@ let iterate_slots ~min_published_level ~max_published_level ~slots f =
     (fun slot_index -> f Types.Slot_id.{slot_level = level; slot_index})
     slots
 
+(* Folds over the levels, from [min_published_level] to [max_published_level].*)
+let fold_levels ~min_published_level ~max_published_level f =
+  List.iter_es
+    f
+    (Int32.to_int min_published_level -- Int32.to_int max_published_level)
+
 (** Copy a value from source KVS to destination KVS.
     Returns [Ok ()] if the value was copied or if src value is not found. *)
 let kvs_copy_value src_store dst_store file_layout ~slot_id:file ~key
@@ -149,18 +155,28 @@ module Merge = struct
         ~lru_size:Constants.slots_store_lru_size
         ~root_dir:dst
     in
+    let copy_slot ~slot_level slot_index =
+      let slot_id = Types.Slot_id.{slot_level; slot_index} in
+      let* file_layout = Store.Slots.get_file_layout ~slot_id in
+      kvs_copy_value
+        src_store
+        dst_store
+        file_layout
+        ~slot_id
+        (slot_id.slot_level, slot_id.slot_index, "slot ")
+        ~key:()
+    in
     Lwt.finalize
       (fun () ->
-        iterate_slots ~min_published_level ~max_published_level ~slots
-        @@ fun slot_id ->
-        let* file_layout = Store.Slots.get_file_layout ~slot_id in
-        kvs_copy_value
-          src_store
-          dst_store
-          file_layout
-          ~file:slot_id
-          (slot_id.slot_level, slot_id.slot_index, "slot")
-          ~key:())
+        let* () =
+          fold_levels
+            (fun slot_level ->
+              let slot_level = Int32.of_int slot_level in
+              List.iter_es (copy_slot ~slot_level) slots)
+            ~min_published_level
+            ~max_published_level
+        in
+        return_unit)
       (fun () ->
         let open Lwt_syntax in
         let* _ = Key_value_store.Read.close src_store in
