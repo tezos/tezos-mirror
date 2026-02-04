@@ -161,16 +161,14 @@ module Merge = struct
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
   let merge_shards ~src ~dst ~min_published_level ~max_published_level ~slots
-      ~number_of_shards =
+      ~number_of_shards ~shards_store_lru_size =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
-      Key_value_store.Read.init ~lru_size:Constants.shards_store_lru_size src
+      Key_value_store.Read.init ~lru_size:shards_store_lru_size src
     in
     let* dst_store =
-      Key_value_store.init
-        ~lru_size:Constants.shards_store_lru_size
-        ~root_dir:dst
+      Key_value_store.init ~lru_size:shards_store_lru_size ~root_dir:dst
     in
     Lwt.finalize
       (fun () ->
@@ -296,6 +294,10 @@ module Merge = struct
     let number_of_shards =
       proto_parameters.cryptobox_parameters.number_of_shards
     in
+    let shards_store_lru_size =
+      Constants.shards_store_lru_size
+        ~number_of_slots:proto_parameters.number_of_slots
+    in
     let* () =
       let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
       let dst_shard_dir = dst_root_dir // Store.Stores_dirs.shard in
@@ -306,6 +308,7 @@ module Merge = struct
         ~max_published_level
         ~slots
         ~number_of_shards
+        ~shards_store_lru_size
     in
     (* Export skip_list *)
     let* () =

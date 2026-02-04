@@ -366,7 +366,8 @@ module Shards_disk = struct
     in
     return_unit
 
-  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot =
+  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot
+      ~lru_size =
     let open Lwt_result_syntax in
     if min_shards_to_reconstruct_slot <= 0 then
       tzfail
@@ -374,9 +375,7 @@ module Shards_disk = struct
            {given = min_shards_to_reconstruct_slot})
     else
       let root_dir = Filename.concat node_store_dir shard_store_dir in
-      let* shards_store =
-        KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
-      in
+      let* shards_store = KVS.init ~lru_size ~root_dir in
       return {shards_store; min_shards_to_reconstruct_slot}
 end
 
@@ -484,7 +483,8 @@ module Shards = struct
 
   type t = {disk : Disk.t option; cache : Cache.t}
 
-  let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
+  let init ~profile_ctxt ~proto_parameters ~lru_size node_store_dir
+      shard_store_dir =
     let open Lwt_result_syntax in
     let* disk =
       if Profile_manager.is_attester_only_profile profile_ctxt then return_none
@@ -500,6 +500,7 @@ module Shards = struct
             node_store_dir
             shard_store_dir
             ~min_shards_to_reconstruct_slot
+            ~lru_size
         in
         return_some store
     in
@@ -612,9 +613,9 @@ module Slots = struct
     let layout = make_file_layout cryptobox in
     slots_layouts := SlotsLayouts.add level layout !slots_layouts
 
-  let init node_store_dir slot_store_dir =
+  let init node_store_dir slot_store_dir ~lru_size =
     let root_dir = Filename.concat node_store_dir slot_store_dir in
-    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+    KVS.init ~lru_size ~root_dir
 
   let add_slot t slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
@@ -1092,13 +1093,43 @@ let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let* () = check_version_and_may_upgrade base_dir in
-  let statuses_cache = Statuses_cache.init Constants.statuses_cache_size in
-  let* shards =
-    Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
   in
-  let* slots = Slots.init base_dir Stores_dirs.slot in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let statuses_cache_size =
+    Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+  in
+  let shards_store_lru_size =
+    Constants.shards_store_lru_size ~number_of_slots
+  in
+  let slots_store_lru_size = Constants.slots_store_lru_size in
+  let traps_cache_size =
+    Constants.traps_cache_size
+      ~number_of_slots
+      ~number_of_shards
+      ~attestation_lag
+      ~traps_fraction
+  in
+  let slot_id_cache_size =
+    Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+  in
+  let statuses_cache = Statuses_cache.init statuses_cache_size in
+  let* shards =
+    Shards.init
+      ~profile_ctxt
+      ~proto_parameters
+      ~lru_size:shards_store_lru_size
+      base_dir
+      Stores_dirs.shard
+  in
+  let* slots =
+    Slots.init base_dir Stores_dirs.slot ~lru_size:slots_store_lru_size
+  in
   let* () = Version.(write_version_file ~base_dir ~version:current_version) in
-  let traps = Traps.create ~capacity:Constants.traps_cache_size in
+  let traps = Traps.create ~capacity:traps_cache_size in
   let* chain_id = Chain_id.init ~root_dir:base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
@@ -1112,8 +1143,7 @@ let init config profile_ctxt proto_parameters =
       statuses_cache;
       not_yet_published_cache =
         Commitment_indexed_cache.create Constants.not_yet_published_cache_size;
-      finalized_commitments =
-        Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      finalized_commitments = Slot_id_cache.create ~capacity:slot_id_cache_size;
       chain_id;
       last_processed_level;
       first_seen_level;

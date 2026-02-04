@@ -30,7 +30,7 @@ val validation_slack : int
 
 (** [shards_store_lru_size] is the maximum shards store LRU size. See
     {!Key_value_store.init} and {!Store.Shards.init}. *)
-val shards_store_lru_size : int
+val shards_store_lru_size : number_of_slots:int -> int
 
 val slots_store_lru_size : int
 
@@ -45,11 +45,11 @@ val not_yet_published_cache_size : int
 
 (** [slot_id_cache_size] is the size (in number of levels) of the cache to
     associate commitments with slot ids at a given level. *)
-val slot_id_cache_size : int
+val slot_id_cache_size : number_of_slots:int -> attestation_lag:int -> int
 
 (** [statuses_cache_size] is the size (in number of slots) of the cache
     to associate slot ids to slot status. *)
-val statuses_cache_size : int
+val statuses_cache_size : number_of_slots:int -> attestation_lag:int -> int
 
 (** The frequency at which we sample the time spent in shards crypto
     verification. *)
@@ -80,7 +80,12 @@ val crawler_re_processing_delay : float
 val bootstrap_dns_refresh_delay : float
 
 (** The size of the node store's traps cache. *)
-val traps_cache_size : int
+val traps_cache_size :
+  number_of_slots:int ->
+  number_of_shards:int ->
+  attestation_lag:int ->
+  traps_fraction:Q.t ->
+  int
 
 (** The expected time, in levels, sufficient to subscribe and connect to new
     peers on a (new) topic. *)
