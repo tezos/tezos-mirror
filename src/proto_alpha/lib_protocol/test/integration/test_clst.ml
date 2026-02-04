@@ -646,7 +646,7 @@ let () =
   let* clst_contract_hash = get_clst_hash (Context.B b) in
   let expected_balance_updates_container_to_contract =
     [
-      (* First, tez are moved from the unstaked deposits to CLST balance *)
+      (* First, tez are moved from the redeemed deposits to CLST balance *)
       Alpha_context.Receipt.(
         item
           (CLST_redeemed_deposits (sender, redemption_cycle))
@@ -682,6 +682,102 @@ let () =
       expected_balance_updates_contract_to_staker
   in
   return_unit
+
+let () =
+  register_test ~title:"Test redeemed balance with non finalizable requests"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, sender =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+
+  (* First deposit 100_000_000 mutez *)
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  (* Then redeem 30_000_000 mutez *)
+  let first_redeemed_amount_mutez = 30_000_000L in
+  let first_redeemed_amount = Tez.of_mutez_exn first_redeemed_amount_mutez in
+  let* first_redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) sender first_redeemed_amount_mutez
+  in
+  let* b = Block.bake ~operation:first_redeem_tx b in
+
+  let first_redeem_cycle = Block.current_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+
+  (* Now, let's redeem 10_000_000 mutez at the next cycle *)
+  let second_redeemed_amount_mutez = 10_000_000L in
+  let second_redeemed_amount = Tez.of_mutez_exn second_redeemed_amount_mutez in
+  let* second_redeem_tx =
+    Op.clst_redeem ~fee:Tez.zero (B b) sender second_redeemed_amount_mutez
+  in
+  let* b = Block.bake ~operation:second_redeem_tx b in
+  let _second_redeem_cycle = Block.current_cycle b in
+  let* b = Block.bake_until_cycle_end b in
+
+  (* Wait for the first redemption request to be finalizable *)
+  let* b = Block.bake_until_cycle_end b in
+  let finalization_delay =
+    b.constants.consensus_rights_delay + Protocol.Constants_repr.slashing_delay
+    + 1
+  in
+  let* b =
+    Block.bake_until_cycle Cycle.(add first_redeem_cycle finalization_delay) b
+  in
+
+  (* Let's check the frozen and finalizable balances *)
+  let* () =
+    Assert.clst_frozen_redeemed_balance_is
+      ~loc:__LOC__
+      b
+      sender
+      second_redeemed_amount
+  in
+  let* () =
+    Assert.clst_finalizable_redeemed_balance_is
+      ~loc:__LOC__
+      b
+      sender
+      first_redeemed_amount
+  in
+
+  (* Finalize, and look at the balance, and ensure it is:
+     <amount before finalization> + <first redeemed amount>
+  *)
+  let* balance_before_finalization = Context.Contract.balance (B b) sender in
+  let* finalize_tx = Op.clst_finalize ~fee:Tez.zero (Context.B b) sender in
+  let* b = Block.bake b ~operation:finalize_tx in
+  let* balance_after_finalization = Context.Contract.balance (B b) sender in
+
+  let*?@ expected_balance =
+    Tez.(balance_before_finalization +? first_redeemed_amount)
+  in
+  let* () =
+    Assert.equal_tez ~loc:__LOC__ expected_balance balance_after_finalization
+  in
+
+  (* Let's check the frozen and finalizable balances again, frozen shouldn't
+     have changed, but there shouldn't be any finalizable balance anymore. *)
+  let* () =
+    Assert.clst_frozen_redeemed_balance_is
+      ~loc:__LOC__
+      b
+      sender
+      second_redeemed_amount
+  in
+  Assert.clst_finalizable_redeemed_balance_is ~loc:__LOC__ b sender Tez.zero
 
 let () =
   register_test ~title:"Test allowance entrypoint and get_allowance view"
