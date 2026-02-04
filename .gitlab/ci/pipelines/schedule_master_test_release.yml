@@ -377,8 +377,8 @@ oc.docker-build-debian-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
@@ -390,13 +390,49 @@ oc.docker-build-debian-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
+oc.docker-build-merge-manifest.debian:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  needs:
+  - oc.docker-build-debian-dependencies
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: build
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DISTRIBUTION: debian
+    IMAGE_NAME: $DEP_IMAGE
+  parallel:
+    matrix:
+    - RELEASE:
+      - bookworm
+      - trixie
+      TAGS:
+      - gcp_very_high_cpu
+
 oc.build-debian:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - oc.docker-build-merge-manifest.debian
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -418,8 +454,8 @@ oc.build-debian:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -438,12 +474,12 @@ oc.build-debian:
       - gcp_arm64
 
 oc.build-data_packages:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - oc.docker-build-merge-manifest.debian
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -458,8 +494,8 @@ oc.build-data_packages:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: debian
     RELEASE: trixie
     TAGS: gcp
@@ -521,8 +557,8 @@ oc.docker-build-ubuntu-dependencies:
   variables:
     DOCKER_VERSION: 24.0.7
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: ubuntu
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
@@ -534,13 +570,49 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
+oc.docker-build-merge-manifest.ubuntu:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  needs:
+  - oc.docker-build-ubuntu-dependencies
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: build
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DISTRIBUTION: ubuntu
+    IMAGE_NAME: $DEP_IMAGE
+  parallel:
+    matrix:
+    - RELEASE:
+      - noble
+      - jammy
+      TAGS:
+      - gcp_very_high_cpu
+
 oc.build-ubuntu:
-  image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  image: $DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-ubuntu-dependencies
+  - oc.docker-build-merge-manifest.ubuntu
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -562,8 +634,8 @@ oc.build-ubuntu:
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache

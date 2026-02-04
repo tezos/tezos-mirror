@@ -15,12 +15,6 @@ open Tezos_ci
 open Common.Helpers
 open Common.Packaging
 
-(* This is a dynamic image declaration that is going to be instantiated using
-   the values set in the parallel/matrix contruct *)
-let generic_packages_image =
-  Image.mk_external
-    ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
-
 let tag_amd64 ~ramfs =
   if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
   else Runner.Tag.show Gcp_very_high_cpu
@@ -46,10 +40,15 @@ let rockylinux_package_release_matrix ?(ramfs = false) = function
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let fedora_package_release_matrix ?(ramfs = false) = function
+let fedora_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
   | Partial -> [[("RELEASE", ["39"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["39"; "42"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
+      [
+        [
+          ("RELEASE", ["39"; "42"]);
+          ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
+        ];
+      ]
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
 let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
@@ -79,71 +78,39 @@ let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    the list of all jobs, the second is the job building fedora packages artifats
    and the third rockylinux packages artifacts *)
 let jobs ?(limit_dune_build_jobs = false) pipeline_type =
-  let variables ?(kind = "build") add =
-    ("FLAVOUR", kind)
-    :: ( "DEP_IMAGE",
-         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
-       (* This second variable is for a read only registry and we want it to be
-          tezos/tezos *)
-    :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE"
-       )
-    :: add
+  let make_job_docker_systemd_tests =
+    make_job_docker_systemd_tests
+      ~base_image:
+        (Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}")
+      ~script:
+        [
+          "./scripts/ci/build-packages-dependencies.sh \
+           images/packages/rpm-systemd-tests.Dockerfile";
+        ]
   in
-  let make_job_docker_systemd_tests ~__POS__ ~name ~matrix ~distribution =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ~stage:Stages.images
-      ~variables:
-        (variables
-           ~kind:"systemd-tests"
-           [
-             ("DISTRIBUTION", distribution);
-             ( "BASE_IMAGE",
-               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
-           ])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      [
-        "./scripts/ci/build-packages-dependencies.sh \
-         images/packages/rpm-systemd-tests.Dockerfile";
-      ]
-  in
-  let job_docker_systemd_test_rpm_rockylinux_dependencies : tezos_job =
+  let job_docker_systemd_test_rockylinux_dependencies : tezos_job =
     make_job_docker_systemd_tests
       ~__POS__
       ~name:"oc.docker-systemd-tests-rpm-rockylinux"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
   in
-  let job_docker_systemd_test_rpm_fedora_dependencies : tezos_job =
+  let job_docker_systemd_test_fedora_dependencies : tezos_job =
     make_job_docker_systemd_tests
       ~__POS__
       ~name:"oc.docker-systemd-tests-rpm-fedora"
       ~distribution:"fedora"
       ~matrix:(fedora_package_release_matrix pipeline_type)
   in
-
-  let make_job_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution =
-    job_docker_authenticated
-      ~__POS__
-      ~name
-      ~stage:Stages.images
-      ~variables:
-        (variables
-           [
-             ("DISTRIBUTION", distribution);
-             ( "BASE_IMAGE",
-               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
-           ])
-      ~parallel:(Matrix matrix)
-      ~tag:Dynamic
-      [
-        "./scripts/ci/build-packages-dependencies.sh \
-         images/packages/rpm-deps-build.Dockerfile";
-      ]
+  let make_job_docker_build_dependencies =
+    make_docker_build_dependencies
+      ~base_image:
+        (Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}")
+      ~script:
+        [
+          "./scripts/ci/build-packages-dependencies.sh \
+           images/packages/rpm-deps-build.Dockerfile";
+        ]
   in
   let job_docker_build_rockylinux_dependencies : tezos_job =
     make_job_docker_build_dependencies
@@ -151,6 +118,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-rockylinux-dependencies"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
+      ()
   in
   let job_docker_build_fedora_dependencies : tezos_job =
     make_job_docker_build_dependencies
@@ -158,58 +126,81 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~name:"oc.docker-build-fedora-dependencies"
       ~distribution:"fedora"
       ~matrix:(fedora_package_release_matrix pipeline_type)
+      ()
   in
+
+  (* docker merge jobs *)
+  let job_merge_build_fedora_dependencies =
+    make_job_merge_build_dependencies
+      ~distribution:"fedora"
+      ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
+      ~matrix:(fedora_package_release_matrix ~arm64:false pipeline_type)
+  in
+  let job_merge_build_rockylinux_dependencies =
+    make_job_merge_build_dependencies
+      ~distribution:"rockylinux"
+      ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
+      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
+  in
+
+  let job_merge_systemd_test_fedora_dependencies =
+    make_job_merge_systemd_test_dependencies
+      ~distribution:"fedora"
+      ~dependencies:
+        (Dependent [Job job_docker_systemd_test_fedora_dependencies])
+      ~matrix:(fedora_package_release_matrix ~arm64:false pipeline_type)
+  in
+  let job_merge_systemd_test_rockylinux_dependencies =
+    make_job_merge_systemd_test_dependencies
+      ~distribution:"rockylinux"
+      ~dependencies:
+        (Dependent [Job job_docker_systemd_test_rockylinux_dependencies])
+      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
+  in
+
   (* These jobs build the packages in a matrix using the
      build dependencies images *)
   let job_build_rockylinux_package : tezos_job =
     make_job_build_packages
       ~__POS__
       ~name:"oc.build-rockylinux"
-      ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
+      ~distribution:"rockylinux"
+      ~dependencies:(Dependent [Job job_merge_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
       ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
-      ~variables:
-        (variables
-           (("DISTRIBUTION", "rockylinux")
-           ::
-           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-           ))
-      ~image:generic_packages_image
+      ~limit_dune_build_jobs
+      ()
   in
   let job_build_fedora_package : tezos_job =
     make_job_build_packages
       ~__POS__
       ~name:"oc.build-fedora"
-      ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
+      ~distribution:"fedora"
+      ~dependencies:(Dependent [Job job_merge_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
       ~matrix:(fedora_package_release_matrix ~ramfs:true pipeline_type)
-      ~variables:
-        (variables
-           (("DISTRIBUTION", "fedora")
-           ::
-           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
-           ))
-      ~image:generic_packages_image
+      ~limit_dune_build_jobs
+      ()
   in
   let job_build_rockylinux_package_data : tezos_job =
     make_job_build_packages
       ~__POS__
       ~name:"oc.build-rockylinux-data"
-      ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
+      ~distribution:"rockylinux"
+      ~dependencies:(Dependent [Job job_merge_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh zcash"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
-      ~variables:(variables [("DISTRIBUTION", "rockylinux")])
-      ~image:generic_packages_image
+      ()
   in
   let job_build_fedora_package_data : tezos_job =
     make_job_build_packages
       ~__POS__
       ~name:"oc.build-fedora-data"
-      ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
+      ~distribution:"fedora"
+      ~dependencies:(Dependent [Job job_merge_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh zcash"
       ~matrix:(fedora_package_release_matrix pipeline_type)
-      ~variables:(variables [("DISTRIBUTION", "fedora")])
-      ~image:generic_packages_image
+      ()
   in
 
   (* These jobs create the rpm repository for the packages *)
@@ -295,6 +286,8 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   in
   let test_fedora_packages_jobs =
     [
+      job_docker_systemd_test_fedora_dependencies;
+      job_merge_systemd_test_fedora_dependencies;
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_fedora_39.doc"
@@ -308,11 +301,11 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_fedora_dependencies;
+               Job job_docker_systemd_test_fedora_dependencies;
                Job job_rpm_repo_fedora;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
         [
@@ -324,6 +317,8 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   in
   let test_rockylinux_packages_jobs =
     [
+      job_docker_systemd_test_rockylinux_dependencies;
+      job_merge_systemd_test_rockylinux_dependencies;
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_rockylinux_9.3.doc"
@@ -337,11 +332,11 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_rockylinux_dependencies;
+               Job job_docker_systemd_test_rockylinux_dependencies;
                Job job_rpm_repo_rockylinux;
              ])
         ~variables:
-          (variables
+          (Common.Packaging.make_variables
              ~kind:"systemd-tests"
              [("DISTRIBUTION", "rockylinux"); ("RELEASE", "9.3")])
         [
@@ -354,7 +349,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   let rockylinux_jobs =
     [
       job_docker_build_rockylinux_dependencies;
-      job_docker_systemd_test_rpm_rockylinux_dependencies;
+      job_merge_build_rockylinux_dependencies;
       job_build_rockylinux_package;
       job_build_rockylinux_package_data;
       job_rpm_repo_rockylinux;
@@ -363,7 +358,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   let fedora_jobs =
     [
       job_docker_build_fedora_dependencies;
-      job_docker_systemd_test_rpm_fedora_dependencies;
+      job_merge_build_fedora_dependencies;
       job_build_fedora_package;
       job_build_fedora_package_data;
       job_rpm_repo_fedora;
