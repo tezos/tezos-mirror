@@ -35,14 +35,6 @@ let iterate_levels ~min_published_level ~max_published_level f =
   in
   iterate_levels min_published_level
 
-(** Iterate through all levels and slot indices in the given range,
-    calling [f] for each [{slot_level; slot_index}] slot id. *)
-let iterate_slots ~min_published_level ~max_published_level ~slots f =
-  iterate_levels ~min_published_level ~max_published_level @@ fun level ->
-  List.iter_es
-    (fun slot_index -> f Types.Slot_id.{slot_level = level; slot_index})
-    slots
-
 (* Folds over the levels, from [min_published_level] to [max_published_level].*)
 let fold_levels ~min_published_level ~max_published_level f =
   List.iter_es
@@ -198,7 +190,7 @@ module Merge = struct
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
   let merge_shards ~src ~dst ~min_published_level ~max_published_level ~slots
-      ~number_of_shards ~shards_store_lru_size =
+      ~proto_plugins ~shards_store_lru_size =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -207,41 +199,69 @@ module Merge = struct
     let* dst_store =
       Key_value_store.init ~lru_size:shards_store_lru_size ~root_dir:dst
     in
+    let copy_shard ~slot_level ~number_of_shards slot_index =
+      let slot_id = Types.Slot_id.{slot_level; slot_index} in
+      let* file_layout = Store.Shards_disk.get_file_layout ~slot_id in
+      let*! count_result =
+        Key_value_store.Read.count_values src_store file_layout slot_id
+      in
+      match count_result with
+      | Error _ ->
+          (* Slot file doesn't exist, skip *)
+          return_unit
+      | Ok 0 ->
+          (* No shards for this slot *)
+          return_unit
+      | Ok _count ->
+          (* Copy all shards for this slot *)
+          let rec copy_shard shard_index =
+            if shard_index >= number_of_shards then return_unit
+            else
+              let* () =
+                kvs_copy_value
+                  src_store
+                  dst_store
+                  file_layout
+                  ~slot_id
+                  ~key:shard_index
+                  ( slot_id.slot_level,
+                    shard_index,
+                    Format.sprintf "shard %d-" slot_id.slot_index )
+              in
+              copy_shard (shard_index + 1)
+          in
+          copy_shard 0
+    in
     Lwt.finalize
       (fun () ->
         (* For each level, we need to check all possible slot indices.
            In practice, we should get this from the skip_list data,
            but for now we'll scan for existing files. *)
-        iterate_slots ~min_published_level ~max_published_level ~slots
-        @@ fun slot_id ->
-        let* file_layout = Store.Shards_disk.get_file_layout ~slot_id in
-        let*! count_result =
-          Key_value_store.Read.count_values src_store file_layout slot_id
+        let* () =
+          fold_levels
+            (fun slot_level ->
+              let slot_level = Int32.of_int slot_level in
+              let*? _, proto_parameters =
+                Proto_plugins.get_plugin_and_parameters_for_level
+                  proto_plugins
+                  ~level:slot_level
+              in
+              let slots =
+                Option.value
+                  ~default:
+                    (Stdlib.List.init proto_parameters.number_of_slots Fun.id)
+                  slots
+              in
+              List.iter_es
+                (copy_shard
+                   ~slot_level
+                   ~number_of_shards:
+                     proto_parameters.cryptobox_parameters.number_of_shards)
+                slots)
+            ~min_published_level
+            ~max_published_level
         in
-        match count_result with
-        | Error _ ->
-            (* Slot file doesn't exist, skip *)
-            return_unit
-        | Ok 0 ->
-            (* No shards for this slot *)
-            return_unit
-        | Ok _count ->
-            (* Copy all shards for this slot *)
-            let rec copy_shard shard_index =
-              if shard_index >= number_of_shards then return_unit
-              else
-                let* () =
-                  kvs_copy_value
-                    src_store
-                    dst_store
-                    file_layout
-                    ~file:slot_id
-                    ~key:shard_index
-                    (slot_id.slot_level, shard_index, "shard")
-                in
-                copy_shard (shard_index + 1)
-            in
-            copy_shard 0)
+        return_unit)
       (fun () ->
         let open Lwt_syntax in
         let* _ = Key_value_store.Read.close src_store in
@@ -329,12 +349,9 @@ module Merge = struct
         proto_plugins
     in
     (* Export shards *)
-    let number_of_shards =
-      head_proto_parameters.cryptobox_parameters.number_of_shards
-    in
     let shards_store_lru_size =
       Constants.shards_store_lru_size
-        ~number_of_slots:proto_parameters.number_of_slots
+        ~number_of_slots:head_proto_parameters.number_of_slots
     in
     let* () =
       let src_shard_dir = src_root_dir // Store.Stores_dirs.shard in
@@ -344,8 +361,8 @@ module Merge = struct
         ~dst:dst_shard_dir
         ~min_published_level
         ~max_published_level
-        ~slots
-        ~number_of_shards
+        ~slots:slots_arg
+        ~proto_plugins
         ~shards_store_lru_size
     in
     (* Export skip_list *)
