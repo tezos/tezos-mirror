@@ -3475,10 +3475,10 @@ val clst_deposit :
 val spawn_clst_deposit :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t
 
-(** Run [octez-client clst withdraw <amount> for <source>]. *)
-val clst_withdraw :
+(** Run [octez-client clst redeem <amount> for <source>]. *)
+val clst_redeem :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> unit Lwt.t
 
-(** Same as [clst_withdraw], but do not wait for the process to exit. *)
-val spawn_clst_withdraw :
+(** Same as [clst_redeem], but do not wait for the process to exit. *)
+val spawn_clst_redeem :
   ?wait:string -> ?burn_cap:Tez.t -> Tez.t -> src:string -> t -> Process.t

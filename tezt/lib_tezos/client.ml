@@ -4925,10 +4925,10 @@ let spawn_clst_deposit ?(wait = "none") ?burn_cap amount ~src client =
 let clst_deposit ?wait ?burn_cap amount ~src client =
   spawn_clst_deposit ?wait ?burn_cap amount ~src client |> Process.check
 
-let spawn_clst_withdraw ?(wait = "none") ?burn_cap amount ~src client =
+let spawn_clst_redeem ?(wait = "none") ?burn_cap amount ~src client =
   spawn_command client
-  @@ ["--wait"; wait; "clst"; "withdraw"; Tez.to_string amount; "for"; src]
+  @@ ["--wait"; wait; "clst"; "redeem"; Tez.to_string amount; "for"; src]
   @ optional_arg "burn-cap" Tez.to_string burn_cap
 
-let clst_withdraw ?wait ?burn_cap amount ~src client =
-  spawn_clst_withdraw ?wait ?burn_cap amount ~src client |> Process.check
+let clst_redeem ?wait ?burn_cap amount ~src client =
+  spawn_clst_redeem ?wait ?burn_cap amount ~src client |> Process.check

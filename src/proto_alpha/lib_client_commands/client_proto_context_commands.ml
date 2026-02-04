@@ -2290,7 +2290,7 @@ let commands_rw () =
             successor_level ));
     command
       ~group
-      ~desc:"Withdraw the given amount of tez from the CLST contract."
+      ~desc:"Redeem the given amount of tez from the CLST contract."
       (args13
          fee_arg
          dry_run_switch
@@ -2305,8 +2305,8 @@ let commands_rw () =
          fee_parameter_args
          replace_by_fees_arg
          successor_level_arg)
-      (prefixes ["clst"; "withdraw"]
-      @@ tez_param ~name:"qty" ~desc:"amount in tez to withdraw from CLST"
+      (prefixes ["clst"; "redeem"]
+      @@ tez_param ~name:"qty" ~desc:"amount in tez to redeem from CLST"
       @@ prefix "for"
       @@ Public_key_hash.source_param
            ~name:"src"
@@ -2335,7 +2335,7 @@ let commands_rw () =
         in
         let contract = Contract.Implicit source in
         let arg = Some (Int64.to_string (Tez.to_mutez amount)) in
-        let entrypoint = Some (Entrypoint.of_string_strict_exn "withdraw") in
+        let entrypoint = Some (Entrypoint.of_string_strict_exn "redeem") in
         transfer_command
           Tez.zero
           contract
