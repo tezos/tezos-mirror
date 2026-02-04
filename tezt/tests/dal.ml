@@ -681,9 +681,9 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
    writing tests. *)
 let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?additional_bootstrap_accounts ?attestation_lag
-    ?number_of_shards ?number_of_slots ?custom_constants ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable ?traps_fraction
-    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?number_of_shards ?number_of_slots ?slot_size ?custom_constants
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?traps_fraction ?dal_rewards_weight ?event_sections_levels ?node_arguments
     ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
     ?delay_increment_per_round ?blocks_per_cycle ?blocks_per_commitment variant
     scenario =
@@ -708,6 +708,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
         ?attestation_lag
         ?number_of_shards
         ?number_of_slots
+        ?slot_size
         ?incentives_enable
         ?traps_fraction
         ?dal_rewards_weight
@@ -12285,6 +12286,7 @@ let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
     ~additional_bootstrap_accounts:1
+    ~slot_size:190_416
     "dal basic logic"
     test_slot_management_logic
     protocols ;
