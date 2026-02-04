@@ -5709,7 +5709,7 @@ module Skip_list_rpcs = struct
     in
     if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
-    let last_attested_level = last_confirmed_published_level + lag in
+    let last_attested_level = last_confirmed_published_level + new_lag in
     (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
     let max_level = last_attested_level + 2 in
@@ -5923,6 +5923,44 @@ module Skip_list_rpcs = struct
       "Call cells_of_level on each relevant level, and check the number of \
        cells returned" ;
     let* () = call_cells_of_level 1 in
+
+    let rec call_get_metadata attested_level =
+      if attested_level > last_attested_level then unit
+      else
+        let* metadata =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_metadata
+               ~block:(string_of_int attested_level)
+               ()
+        in
+        let attested =
+          match metadata.dal_attestation with
+          | None ->
+              Test.fail
+                "At attested level %d, unexpected missing slot attestability \
+                 information"
+                attested_level
+          | Some vec -> Array.length vec > slot_index && vec.(slot_index)
+        in
+        let expected_attested =
+          if Protocol.number protocol = 025 then
+            attested_level <= migration_level
+            || attested_level > migration_level + new_lag
+          else
+            (* the activation block is not (even consensus) attested *)
+            attested_level != migration_level + 1
+        in
+        Check.(
+          (attested = expected_attested)
+            bool
+            ~__LOC__
+            ~error_msg:
+              (let msg = sf "Attested at level %d? " attested_level in
+               msg ^ "got %L, expected %R")) ;
+        call_get_metadata (attested_level + 1)
+    in
+    Log.info "Check slot availability information" ;
+    let* () = call_get_metadata (2 + lag) in
 
     let rec call_get_commitment level =
       if level > last_confirmed_published_level then unit
