@@ -352,7 +352,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
-        transaction: &Transaction,
         execution_info: ExecutionInfo,
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
@@ -360,6 +359,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
             receipt_info,
             tx_object,
             runtime,
+            tx_hash,
         } = execution_info;
         let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
         // account for gas
@@ -372,7 +372,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
         match runtime {
             RuntimeId::Ethereum => {
                 // register transaction as done
-                self.valid_txs.push(transaction.tx_hash);
+                self.valid_txs.push(tx_hash);
                 self.index += 1;
 
                 // make receipt

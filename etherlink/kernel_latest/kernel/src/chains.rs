@@ -203,29 +203,16 @@ impl Decodable for TezlinkContent {
 }
 
 pub trait TransactionTrait {
-    fn is_delayed(&self) -> bool;
-
     fn tx_hash(&self) -> TransactionHash;
 }
 
 impl TransactionTrait for crate::transaction::Transaction {
-    fn is_delayed(&self) -> bool {
-        self.is_delayed()
-    }
-
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
     }
 }
 
 impl TransactionTrait for TezlinkOperation {
-    fn is_delayed(&self) -> bool {
-        match self.content {
-            TezlinkContent::Tezos(_) => false,
-            TezlinkContent::Deposit(_) => true,
-        }
-    }
-
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
     }

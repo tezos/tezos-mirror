@@ -95,7 +95,7 @@ fn make_receipt_info(
 #[inline(always)]
 fn make_object(
     block_number: U256,
-    transaction: &Transaction,
+    transaction: Transaction,
     from: H160,
     index: u32,
     fee_updates: &FeeUpdates,
@@ -111,18 +111,24 @@ fn make_object(
         }
     };
 
+    let hash = transaction.tx_hash;
+    let nonce = transaction.nonce();
+    let to = transaction.to()?;
+    let value = transaction.value();
+    let signature = transaction.signature();
+
     Ok(TransactionObject {
         block_number,
         from,
         gas_used,
         gas_price,
-        hash: transaction.tx_hash,
+        hash,
         input: transaction.data(),
-        nonce: transaction.nonce(),
-        to: transaction.to()?,
+        nonce,
+        to,
         index,
-        value: transaction.value(),
-        signature: transaction.signature(),
+        value,
+        signature,
     })
 }
 
@@ -656,6 +662,7 @@ pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub tx_object: TransactionObject,
     pub runtime: RuntimeId,
+    pub tx_hash: TransactionHash,
 }
 
 pub enum ExecutionResult<T> {
@@ -678,7 +685,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
-    transaction: &Transaction,
+    transaction: Transaction,
     index: u32,
     transaction_result: TransactionResult,
     pay_fees: bool,
@@ -691,6 +698,8 @@ pub fn handle_transaction_result<Host: Runtime>(
     } = transaction_result;
 
     let to = transaction.to()?;
+    let tx_hash = transaction.tx_hash;
+    let tx_type = transaction.type_();
 
     let gas_used = execution_outcome.result.gas_used();
 
@@ -734,13 +743,13 @@ pub fn handle_transaction_result<Host: Runtime>(
     )?;
 
     let receipt_info = make_receipt_info(
-        transaction.tx_hash,
+        tx_hash,
         index,
         execution_outcome,
         caller,
         to,
         fee_updates.overall_gas_price,
-        transaction.type_(),
+        tx_type,
         fee_updates.overall_gas_used,
     );
 
@@ -748,6 +757,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         receipt_info,
         tx_object,
         runtime,
+        tx_hash,
     })
 }
 
@@ -758,7 +768,7 @@ pub fn apply_transaction<Host: Runtime>(
     registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
-    transaction: &Transaction,
+    transaction: Transaction,
     index: u32,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
