@@ -47,7 +47,7 @@ basically to regenerate them (assuming the conflicting branch is based on
 `master`, otherwise replace it with your branches' upstream):
 
 ```
-scripts/udpate_profiler_patch.sh
+scripts/update_profiler_patch.sh
 ```
 
 and follow its guidance.

@@ -62,7 +62,7 @@ if [ "$CHECKPATCHONLY" = "" ]; then
   # Now commit the patch, generate a patch file, revert the commit then finally
   # commit the newly generated patch file.
 
-  git commit -a -m "Profiler: patch proto_alpha"
+  git commit -a -m "Profiler: patch proto_alpha" --no-verify
 
   OUTPUT_FILE=$(git format-patch -n HEAD^)
 
@@ -72,7 +72,7 @@ if [ "$CHECKPATCHONLY" = "" ]; then
 
   git add scripts/profile_alpha.patch
 
-  git commit -m "Scripts: regenerate protocol alpha patches"
+  git commit -m "Scripts: regenerate protocol alpha patches" --no-verify
 
   # If not resuming after a conflict, this means we are only trying to check the patch
 elif [ "$RESUME" = "" ]; then
