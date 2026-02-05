@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 use tezos_smart_rollup_core::{SmartRollupCore, PREIMAGE_HASH_SIZE};
 
 use crate::dal_parameters::RollupDalParameters;
+use crate::debug::HostDebug;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
 use crate::metadata::RollupMetadata;
@@ -82,12 +83,9 @@ pub enum ValueType {
 /// - methods that take `&self` will not cause changes to the runtime state.
 /// - methods taking `&mut self` are expected to cause changes - either to *input*,
 ///   *output* or *durable storage*.
-pub trait Runtime {
+pub trait Runtime: HostDebug {
     /// Write contents of the given slice to output.
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError>;
-
-    /// Write message to debug log.
-    fn write_debug(&self, msg: &str);
 
     /// Read the next input from the global inbox.
     ///
@@ -258,10 +256,6 @@ where
             Ok(_) => Ok(()),
             Err(e) => Err(RuntimeError::HostErr(e)),
         }
-    }
-
-    fn write_debug(&self, msg: &str) {
-        unsafe { SmartRollupCore::write_debug(self, msg.as_ptr(), msg.len()) };
     }
 
     #[cfg(feature = "alloc")]

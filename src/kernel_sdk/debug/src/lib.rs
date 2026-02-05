@@ -12,14 +12,31 @@
 
 /// Write a formatted message to host debug log. Formats follow [`core::fmt`].
 ///
-/// You can use `debug_msg!` with any variable such that implements [`Runtime`].
-/// This is supported by any type implementing [`SmartRollupCore`] - such as
+/// You can use `debug_msg!` with any variable such that implements [`HostDebug`].
+/// This is supported by any type implementing [`Runtime`] - such as
 /// [`RollupHost`].
 ///
 /// Using `debug_msg!` requires an allocator - so either you will need to include
 /// `extern crate alloc` when writing a kernel in a `no_std` context, or by
 /// depending on `std`. If you want to write debug logs without pulling in the
 /// allocator, use [debug_str] instead.
+///
+/// ```no_run
+/// extern crate alloc;
+/// use tezos_smart_rollup_debug::debug_msg;
+/// use tezos_smart_rollup_host::debug::HostDebug;
+///
+/// fn log_runtime(host: &impl HostDebug) {
+///   debug_msg!(host, "Simple constant string");
+///
+///   debug_msg!(host, "A format {} with argument {}", "test", 5);
+/// }
+/// ```
+///
+/// # Compatability
+///
+/// For compatability with kernels that currently rely heavily on `Runtime` - the
+/// macros exposed here continue to correctly.
 ///
 /// ```no_run
 /// extern crate alloc;
@@ -33,6 +50,7 @@
 /// }
 /// ```
 ///
+/// [`HostDebug`]: tezos_smart_rollup_host::debug::HostDebug
 /// [`Runtime`]: tezos_smart_rollup_host::runtime::Runtime
 /// [`SmartRollupCore`]: tezos_smart_rollup_core::smart_rollup_core::SmartRollupCore
 /// [`RollupHost`]: tezos_smart_rollup_core::rollup_host::RollupHost
@@ -52,8 +70,20 @@ macro_rules! debug_msg {
 /// While this is less powerful than [`debug_msg`] (which supports format strings),
 /// it does _not_ require an allocator in order to be used.
 ///
-/// Just like `debug_msg`, you can use it with any variable implementing the [`Runtime`]
+/// Just like `debug_msg`, you can use it with any variable implementing the [`HostDebug`]
 /// trait.
+///
+/// use tezos_smart_rollup_debug::debug_str;
+/// use tezos_smart_rollup_host::debug::HostDebug;
+///
+/// fn do_something(host: &impl HostDebug) {
+///   debug_str!(host, "Simple constant string");
+/// }
+///
+/// # Compatability
+///
+/// For compatability with kernels that currently rely heavily on [`Runtime`] - the
+/// macros exposed here continue to correctly.
 ///
 /// ```no_run
 /// use tezos_smart_rollup_debug::debug_str;
@@ -65,13 +95,14 @@ macro_rules! debug_msg {
 /// ```
 ///
 /// [`Runtime`]: tezos_smart_rollup_host::runtime::Runtime
+/// [`HostDebug`]: tezos_smart_rollup_host::debug::HostDebug
 #[macro_export]
 macro_rules! debug_str {
     ($host: expr, $msg: expr) => {{
-        use $crate::Runtime;
+        use $crate::HostDebug;
         $host.write_debug($msg);
     }};
 }
 
 #[doc(hidden)]
-pub use tezos_smart_rollup_host::runtime::Runtime;
+pub use tezos_smart_rollup_host::debug::HostDebug;

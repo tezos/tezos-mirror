@@ -32,6 +32,9 @@ pub mod host {
     pub use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
     #[doc(inline)]
     pub use tezos_smart_rollup_host::Error as HostError;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::debug::HostDebug;
 }
 
 /// Lowest level definitions of host functions & associated constants.

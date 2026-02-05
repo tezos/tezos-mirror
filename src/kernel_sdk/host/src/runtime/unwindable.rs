@@ -7,6 +7,7 @@
 #![cfg(pvm_kind = "riscv")]
 
 use super::{Runtime, RuntimeError, ValueType};
+use crate::debug::HostDebug;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
 use crate::{dal_parameters::RollupDalParameters, metadata::RollupMetadata, path::Path};
@@ -68,13 +69,15 @@ impl<R> UnwindSafe for UnwindableRuntime<R> {}
 
 impl<R> RefUnwindSafe for UnwindableRuntime<R> {}
 
+impl<R: HostDebug> HostDebug for UnwindableRuntime<R> {
+    fn write_debug(&self, msg: &str) {
+        self.runtime.read().unwrap().write_debug(msg)
+    }
+}
+
 impl<R: Runtime> Runtime for UnwindableRuntime<R> {
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.runtime.write().unwrap().write_output(from)
-    }
-
-    fn write_debug(&self, msg: &str) {
-        self.runtime.read().unwrap().write_debug(msg)
     }
 
     #[cfg(feature = "alloc")]

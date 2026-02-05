@@ -9,6 +9,8 @@
 //! To create the new [`Runtime`], an existing [`Runtime`] will need to be provided along
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
+use tezos_smart_rollup_host::debug::HostDebug;
+
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
 use crate::host::{Runtime, RuntimeError, ValueType};
 use crate::storage::path::Path;
@@ -45,20 +47,22 @@ impl StaticInbox {
 }
 
 /// A smart rollup [`Runtime`] layer which uses a static inbox on top of another [`Runtime`].
-struct StaticInputHost<'runtime, R: Runtime> {
+struct StaticInputHost<'runtime, R> {
     host: &'runtime mut R,
     inbox: &'runtime mut Inbox,
+}
+
+impl<Host: HostDebug> HostDebug for StaticInputHost<'_, Host> {
+    #[inline(always)]
+    fn write_debug(&self, msg: &str) {
+        self.host.write_debug(msg)
+    }
 }
 
 impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
     }
 
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
