@@ -525,13 +525,13 @@ module Dal : sig
   val record_slot_accountability :
     t -> Dal_attestations_repr.Accountability.t -> t
 
-  (** [register_slot_header ctxt slot_header ~source] returns a new context
-      where the new candidate [slot] published by [source] has been taken into
-      account. Returns [Some (ctxt,updated)] where [updated=true] if the
-      candidate is registered. [Some (ctxt,false)] if another candidate was
-      already registered previously. Returns an error if the slot is invalid. *)
-  val register_slot_header :
-    t -> Dal_slot_repr.Header.t -> source:Contract_repr.t -> t tzresult
+  (** [slot_fee_market ctxt] returns the current DAL slot fee market tracker from [ctxt].
+
+      The tracker registers slot candidates during block application. *)
+  val slot_fee_market : t -> Dal_slot_repr.Slot_market.t
+
+  (** [record_slot_fee_market ctxt slot_fee_market] returns the context updated with the the given [slot_fee_market]. *)
+  val record_slot_fee_market : t -> Dal_slot_repr.Slot_market.t -> t
 
   (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
       with Tenderbake slot [tb_slot] emitted [attestation]. *)

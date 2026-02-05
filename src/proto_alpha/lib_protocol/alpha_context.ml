@@ -166,7 +166,6 @@ module Dal = struct
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
-    include Raw_context.Dal
   end
 
   module Operations = struct

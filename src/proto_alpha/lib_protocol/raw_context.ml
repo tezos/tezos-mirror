@@ -2273,26 +2273,17 @@ module Dal = struct
     let dal = dal ctxt in
     update_dal ctxt {dal with slot_accountability}
 
-  let register_slot_header ctxt slot_header ~source =
-    let open Result_syntax in
-    let dal = dal ctxt in
-    match
-      Dal_slot_repr.Slot_market.register dal.slot_fee_market slot_header ~source
-    with
-    | None ->
-        let length = Dal_slot_repr.Slot_market.length dal.slot_fee_market in
-        tzfail
-          (Dal_errors_repr.Dal_register_invalid_slot_header
-             {length; slot_header})
-    | Some (slot_fee_market, updated) ->
-        if not updated then
-          tzfail
-            (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
-        else return @@ update_dal ctxt {dal with slot_fee_market}
-
   let[@inline] candidates ctxt =
     let dal = dal ctxt in
     Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
+
+  let[@inline] slot_fee_market ctxt =
+    let ({slot_fee_market; _} : Raw_dal.t) = dal ctxt in
+    slot_fee_market
+
+  let[@inline] record_slot_fee_market ctxt slot_fee_market =
+    let dal = dal ctxt in
+    update_dal ctxt {dal with slot_fee_market}
 
   let record_attestation ctxt ~tb_slot attestation =
     let dal = dal ctxt in

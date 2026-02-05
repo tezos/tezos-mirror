@@ -50,6 +50,19 @@
     - For every level below [current_level - attestation_lag], there should not be
    any slot in the storage.  *)
 
+(** [register_slot_header ctxt slot_header ~source] returns a new context
+     where the new candidate [slot] published by [source] has been taken into
+     account.
+
+    Returns [Some (ctxt,updated)] where [updated=true] if the candidate is
+    registered. [Some (ctxt,false)] if another candidate was already registered
+    previously. Returns an error if the slot is invalid. *)
+val register_slot_header :
+  Raw_context.t ->
+  Dal_slot_repr.Header.t ->
+  source:Contract_repr.t ->
+  Raw_context.t tzresult
+
 (** [find_slot_headers ctxt level] returns [Some slot_headers] where
     [slot_headers] are pending slots at level [level] alongside the contracts
     addresses that published them.  [None] is returned if no [slot_header] was
