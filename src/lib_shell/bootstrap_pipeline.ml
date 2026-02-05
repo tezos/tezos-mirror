@@ -364,6 +364,15 @@ let headers_fetch_worker_loop pipeline =
   | Error (Exn Lwt.Canceled :: _)
   | Error (Canceled :: _)
   | Error (Exn Lwt_pipe.Closed :: _) ->
+      (* Explicit cancellation or pipe closed *)
+      Lwt.return_unit
+  | Error
+      (Exn
+         (Unix.Unix_error
+            ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _))
+      :: _)
+    when Lwt_canceler.canceling pipeline.canceler ->
+      (* Only suppress socket errors during shutdown *)
       Lwt.return_unit
   | Error (Distributed_db.Block_header.Timeout bh :: _) ->
       let*! () =
@@ -452,6 +461,16 @@ let rec operations_fetch_worker_loop pipeline =
   | Error (Exn Lwt.Canceled :: _)
   | Error (Canceled :: _)
   | Error (Exn Lwt_pipe.Closed :: _) ->
+      (* Explicit cancellation or pipe closed *)
+      Lwt_pipe.Bounded.close pipeline.fetched_blocks ;
+      Lwt.return_unit
+  | Error
+      (Exn
+         (Unix.Unix_error
+            ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _))
+      :: _)
+    when Lwt_canceler.canceling pipeline.canceler ->
+      (* Only suppress socket errors during shutdown *)
       Lwt_pipe.Bounded.close pipeline.fetched_blocks ;
       Lwt.return_unit
   | Error (Distributed_db.Operations.Timeout (bh, n) :: _) ->
@@ -515,6 +534,15 @@ let rec validation_worker_loop pipeline =
   match r with
   | Ok () -> validation_worker_loop pipeline
   | Error ((Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed) :: _) ->
+      (* Explicit cancellation or pipe closed *)
+      Lwt.return_unit
+  | Error
+      (Exn
+         (Unix.Unix_error
+            ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _))
+      :: _)
+    when Lwt_canceler.canceling pipeline.canceler ->
+      (* Only suppress socket errors during shutdown *)
       Lwt.return_unit
   | Error
       (( Block_validator_errors.Invalid_block _

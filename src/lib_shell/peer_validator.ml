@@ -523,6 +523,18 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
         let* () = Peer_validator_events.(emit peer_disconnection) pv.peer_id in
         Worker.trigger_shutdown w ;
         return_ok_unit
+    | Exn
+        (Unix.Unix_error
+           ((Unix.EPIPE | Unix.ECONNRESET | Unix.ECONNREFUSED), _, _))
+      :: _
+      when Worker.is_shutting_down w ->
+        (* Only suppress socket errors during shutdown *)
+        let* () =
+          Events.(emit terminating_worker)
+            (pv.peer_id, Format.asprintf "connection closed (broken pipe)")
+        in
+        Worker.trigger_shutdown w ;
+        return_ok_unit
     | _ ->
         Prometheus.Counter.inc_one metrics.unknown_error ;
         let* () = Events.(emit request_error) (request_view, st, err) in
