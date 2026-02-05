@@ -145,6 +145,7 @@ module Dal = struct
   module Attestations = struct
     include Dal_attestations_repr.Accountability
     include Dal_attestations_repr
+    include Dal_attestations_storage
     include Raw_context.Dal
   end
 

@@ -511,17 +511,19 @@ module Dal : sig
   val committee_level_of :
     t -> attested_level:Raw_level_repr.t -> lag:int -> Raw_level_repr.t option
 
-  (** [record_number_of_attested_shards ctxt ~attested_level attestations
-      number_of_shards] records for each relevant [level] that the
-      [number_of_shards level] shards were attested (declared available by some
-      attester) for each of the attested slots in [attestations]. *)
-  val record_number_of_attested_shards :
-    t ->
-    delegate:Signature.public_key_hash ->
-    attested_level:Raw_level_repr.t ->
-    Dal_attestations_repr.t ->
-    int Raw_level_repr.Map.t ->
-    t
+  (** [slot_accountability ctxt] returns the current DAL slot accountability
+      tracker from [ctxt].
+
+      The accountability structure keeps track of which shards have been
+      attested by which delegates for each slot index, allowing the protocol to
+      determine whether a slot has received enough attestations to be considered
+      available. *)
+  val slot_accountability : t -> Dal_attestations_repr.Accountability.t
+
+  (** [record_slot_accountability ctxt accountability] stores the given
+      [accountability] state in [ctxt] and returns the updated context. *)
+  val record_slot_accountability :
+    t -> Dal_attestations_repr.Accountability.t -> t
 
   (** [register_slot_header ctxt slot_header ~source] returns a new context
       where the new candidate [slot] published by [source] has been taken into

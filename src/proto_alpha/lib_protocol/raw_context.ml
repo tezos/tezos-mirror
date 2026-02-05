@@ -2265,21 +2265,12 @@ module Dal = struct
     | Some published_level ->
         Some (Raw_level_repr.add published_level (params.attestation_lag - 1))
 
-  let record_number_of_attested_shards ctxt ~delegate ~attested_level
-      attestation committee_level_to_shard_count =
+  let[@inline] slot_accountability ctxt =
+    let ({slot_accountability; _} : Raw_dal.t) = dal ctxt in
+    slot_accountability
+
+  let[@inline] record_slot_accountability ctxt slot_accountability =
     let dal = dal ctxt in
-    let c = (constants ctxt).dal in
-    let slot_accountability =
-      Dal_attestations_repr.Accountability.record_number_of_attested_shards
-        dal.slot_accountability
-        ~number_of_slots:c.number_of_slots
-        ~attestation_lag:c.attestation_lag
-        ~lags:c.attestation_lags
-        ~delegate
-        ~attested_level
-        attestation
-        committee_level_to_shard_count
-    in
     update_dal ctxt {dal with slot_accountability}
 
   let register_slot_header ctxt slot_header ~source =
