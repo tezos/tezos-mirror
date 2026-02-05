@@ -4,6 +4,7 @@
 
 use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
+use crate::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 use primitive_types::H256;
 use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
@@ -63,19 +64,23 @@ pub struct TezBlock {
     pub number: BlockNumber,
     pub previous_hash: BlockHash,
     pub timestamp: Timestamp,
+    pub protocol: Protocol,
+    pub next_protocol: Protocol,
     pub operations: OperationsWithReceipts,
 }
 
-const VERSION: u8 = 0;
+const VERSION: u8 = 1;
 
 impl Encodable for TezBlock {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(6);
+        s.begin_list(8);
         s.append(&VERSION);
         s.append(&self.hash);
         s.append(&self.number);
         s.append(&self.previous_hash);
         s.append(&self.timestamp.i64().to_le_bytes().to_vec());
+        s.append(&self.protocol);
+        s.append(&self.next_protocol);
         s.append(&self.operations);
     }
 }
@@ -114,6 +119,8 @@ impl TezBlock {
             number,
             timestamp,
             previous_hash: BlockHash(previous_hash),
+            protocol: TARGET_TEZOS_PROTOCOL,
+            next_protocol: TARGET_TEZOS_PROTOCOL,
             operations: OperationsWithReceipts { list: operations },
         };
         Ok(Self {
