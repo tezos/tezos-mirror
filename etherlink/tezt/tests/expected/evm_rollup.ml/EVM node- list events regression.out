@@ -2094,6 +2094,19 @@ signal_publisher_untracking:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+single_tx_execution_done:
+  description: single transaction execution done for {txn_hash}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* single_tx_execution_done version 0 */
+      "single_tx_execution_done.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 spawn_rpc_is_ready:
   description: the rpc process is ready
   level: notice

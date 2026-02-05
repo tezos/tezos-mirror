@@ -766,7 +766,8 @@ type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
 let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
     ~title ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
+    ?patch_config ?fail_on_divergence ?websockets
+    ?(sequencer_keys = [Constant.bootstrap1]) body =
   Test.register
     ~__FILE__
     ~title
@@ -797,6 +798,10 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
       ()
   in
   let* observer =
-    Setup.run_new_observer_node ?patch_config ~sc_rollup_node:None sandbox
+    Setup.run_new_observer_node
+      ?patch_config
+      ?fail_on_divergence
+      ~sc_rollup_node:None
+      sandbox
   in
   body {sandbox; observer}

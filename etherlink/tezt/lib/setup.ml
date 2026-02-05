@@ -196,8 +196,8 @@ let observer_counter =
   ref 0
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?tx_queue ?l2_chain
-    evm_node =
+    ?(fail_on_divergence = true) ~sc_rollup_node ?rpc_server ?websockets
+    ?history_mode ?tx_queue ?l2_chain evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
@@ -224,6 +224,20 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
             ?rpc_server
             ()
           @@ patch_config c
+  in
+  let patch_config =
+   fun json ->
+    JSON.update
+      "observer"
+      (fun obs ->
+        let obs =
+          if JSON.is_null obs then JSON.parse ~origin:"" "{}" else obs
+        in
+        JSON.put
+          ( "fail_on_divergence",
+            JSON.annotate ~origin:"" (`Bool fail_on_divergence) )
+          obs)
+      (patch_config json)
   in
   let observer_mode =
     Evm_node.Observer

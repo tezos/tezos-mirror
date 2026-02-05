@@ -291,6 +291,11 @@ val wait_for_next_block_info : ?timeout:float -> t -> string Lwt.t
 
 val wait_for_inclusion : ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
+(** [wait_for_single_tx_execution_done evm_node] waits for the
+    [single_tx_execution_done.v0] event to be emitted. Returns the
+    transaction hash. *)
+val wait_for_single_tx_execution_done : ?timeout:float -> t -> string Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
@@ -440,6 +445,12 @@ val wait_for_evm_event :
     [evm_events_follower_diverged.v0] using {!wait_for} and return the
     diverging blueprint level expected hash, and found hash. *)
 val wait_for_diverged : t -> (int * string * string) Lwt.t
+
+(** [wait_for_assemble_block_diverged ?timeout evm_node] waits for the event
+    [assemble_block_diverged.v0] using {!wait_for} and returns the diverging
+    block level. This event is emitted when the observer detects divergence
+    during instant confirmation processing. *)
+val wait_for_assemble_block_diverged : ?timeout:float -> t -> int Lwt.t
 
 (** [wait_for_reset evm_node] waits for the event [evm_context_reset_at_level]
     using {!wait_for}. It does not wait for a specific level. *)
@@ -641,6 +652,11 @@ val patch_kernel : t -> string -> unit Lwt.t
 (** [patch_kernel evm_node ~key ~value] modifies the state of the [evm_node]
     by writing [value] at [key]. *)
 val patch_state : t -> key:string -> value:string -> unit Lwt.t
+
+(** [execute_single_transaction evm_node ~raw_tx] calls the private
+    executeSingleTransaction RPC to execute a single transaction on the
+    observer's EVM context. This is used for testing divergence scenarios. *)
+val execute_single_transaction : t -> raw_tx:string -> unit Lwt.t
 
 (** [export_snapshot ~desync evm_node] exports a snapshot of the evm node in a
     temporary directory. It returns the path for the produced snapshot file. If

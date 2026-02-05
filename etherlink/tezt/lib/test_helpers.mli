@@ -382,6 +382,7 @@ val register_sandbox_with_observer :
   ?minimum_base_fee_per_gas:Wei.t ->
   tags:string list ->
   ?patch_config:(JSON.t -> JSON.t) ->
+  ?fail_on_divergence:bool ->
   ?websockets:bool ->
   ?sequencer_keys:Account.key list ->
   (sandbox_test -> unit Lwt.t) ->

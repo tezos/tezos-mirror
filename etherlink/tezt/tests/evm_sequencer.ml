@@ -13236,6 +13236,88 @@ let test_block_producer_validation () =
   Check.((txs = 2) int ~error_msg:"block has %L, but expected %R") ;
   unit
 
+let test_observer_divergence_fallback_on_instant_confirmations () =
+  register_sandbox_with_observer
+    ~fail_on_divergence:false
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+    ~__FILE__
+    ~tags:["observer"; "divergence"; "fallback"; "instant_confirmations"]
+    ~title:
+      "Observer divergence fallback recovers correctly on instant confirmations"
+  @@ fun {sandbox; observer} ->
+  (*
+    1. Start sandbox (sequencer) + observer with fail_on_divergence:false
+    2. Send a transaction to the observer, both nodes are aware of this one
+    3. Call executeSingleTransaction private RPC on observer with a different transaction,
+       this adds an extra transaction to the observer's BIP that the sequencer does not have
+    4. Produce block on sandbox, it only includes the first transaction
+    5. Observer detects divergence, its BIP has 2 transactions but the sequencer's block only has 1
+    6. Observer recovers by discarding its BIP state and re-applying the sequencer's blueprint from scratch
+    7. Verify observer continues working correctly for subsequent blocks
+  *)
+
+  (* 1 *)
+  let* _ = produce_block sandbox
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  (* 2 *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:(Wei.of_eth_int 1)
+      ~gas:21000
+      ~gas_price:1_000_000_000
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ _hash = Rpc.send_raw_transaction ~raw_tx observer in
+
+  (* 3 *)
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~value:(Wei.of_eth_int 1)
+      ~gas:21000
+      ~gas_price:1_000_000_000
+      ~address:Eth_account.bootstrap_accounts.(0).address
+      ()
+  in
+  let execution_done_promise =
+    Evm_node.wait_for_single_tx_execution_done observer
+  in
+  let* () = Evm_node.execute_single_transaction observer ~raw_tx in
+  let* _tx_hash = execution_done_promise in
+  Log.info "Correctly executed faulty single transaction on observer" ;
+
+  (* 4, 5, 6 *)
+  let divergence_p = Evm_node.wait_for_assemble_block_diverged observer in
+  let bp_application_p = Evm_node.wait_for_blueprint_applied observer 2 in
+  let*@ _ = produce_block sandbox in
+  let* divergence_level = divergence_p in
+  Log.info
+    "Divergence detected at level %d, observer is recovering by re-executing \
+     the full blueprint"
+    divergence_level ;
+  let* () = bp_application_p in
+  Log.info "Observer has recovered and applied the block after divergence." ;
+
+  (* 7 *)
+  let* _ = produce_block sandbox
+  and* () = Evm_node.wait_for_blueprint_applied observer 3 in
+  let*@ final_observer_block_number = Rpc.block_number observer in
+  Check.(
+    (final_observer_block_number >= 3l)
+      int32
+      ~error_msg:"observer should have recovered and be at block >= 3, got %L") ;
+  unit
+
 (* Test that everyone agrees on what the storage version of the rollup
    is. *)
 let test_durable_storage_consistency =
@@ -14913,6 +14995,7 @@ let () =
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
   test_block_producer_validation () ;
+  test_observer_divergence_fallback_on_instant_confirmations () ;
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_fast_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
