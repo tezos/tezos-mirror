@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    block::{BlockComputationResult, TickCounter},
+    block::BlockComputationResult,
     block_in_progress::BlockInProgress,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -306,7 +306,6 @@ pub trait ChainConfigTrait: Debug {
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
-        tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         maximum_allowed_ticks: u64,
         tracer_input: Option<TracerInput>,
@@ -379,7 +378,6 @@ impl ChainConfigTrait for EvmChainConfig {
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
-        tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
         tracer_input: Option<TracerInput>,
@@ -393,7 +391,6 @@ impl ChainConfigTrait for EvmChainConfig {
             registry,
             outbox_queue,
             block_in_progress,
-            tick_counter,
             sequencer_pool_address,
             &self.limits,
             tracer_input,
@@ -547,7 +544,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
             Self::Transaction,
             Self::TransactionReceipt,
         >,
-        _tick_counter: &mut TickCounter,
         _sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
         _tracer_input: Option<TracerInput>,

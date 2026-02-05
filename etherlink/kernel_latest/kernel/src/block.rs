@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::apply::{apply_transaction, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
+use crate::block_in_progress;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
@@ -23,7 +24,6 @@ use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
-use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
@@ -43,23 +43,6 @@ use tezosx_interfaces::Registry;
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
 pub const GAS_LIMIT: u64 = 1 << 50;
-
-/// Struct used to allow the compiler to check that the tick counter value is
-/// correctly moved and updated. Copy and Clone should NOT be derived.
-pub struct TickCounter {
-    pub c: u64,
-}
-
-impl TickCounter {
-    pub fn new(c: u64) -> Self {
-        Self { c }
-    }
-    pub fn finalize(consumed_ticks: u64) -> Self {
-        Self {
-            c: consumed_ticks + tick_model::constants::FINALIZE_UPPER_BOUND,
-        }
-    }
-}
 
 #[derive(PartialEq, Debug)]
 pub enum BlockInProgressComputationResult {
@@ -90,23 +73,13 @@ pub enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Host: Runtime, Tx: TransactionTrait, Receipt>(
-    host: &mut Host,
+fn on_invalid_transaction<Tx: TransactionTrait, Receipt>(
     transaction: &Tx,
     block_in_progress: &mut BlockInProgress<Tx, Receipt>,
-    data_size: u64,
 ) {
     if transaction.is_delayed() {
         block_in_progress.register_delayed_transaction(transaction.tx_hash());
     }
-
-    block_in_progress.account_for_invalid_transaction(data_size);
-    log!(
-        host,
-        Benchmarking,
-        "Estimated ticks after tx: {}",
-        block_in_progress.estimated_ticks_in_run
-    );
 }
 
 fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
@@ -194,15 +167,9 @@ pub fn compute<Host: Runtime>(
                     execution_info,
                     host,
                 )?;
-                log!(
-                    host,
-                    Benchmarking,
-                    "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks_in_run
-                );
             }
             ExecutionResult::Invalid => {
-                on_invalid_transaction(host, &transaction, block_in_progress, data_size)
+                on_invalid_transaction(&transaction, block_in_progress)
             }
         };
     }
@@ -219,20 +186,14 @@ enum BlueprintParsing<BIP> {
 pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &Host,
     chain_config: &ChainConfig,
-    tick_counter: &TickCounter,
     next_bip_number: U256,
     hash: H256,
     blueprint: Blueprint<ChainConfig::Transaction>,
 ) -> BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
-    let bip = BlockInProgress::from_blueprint(
-        blueprint,
-        next_bip_number,
-        hash,
-        tick_counter.c,
-        gas_price,
-    );
+    let bip =
+        BlockInProgress::from_blueprint(blueprint, next_bip_number, hash, gas_price);
 
     tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
     bip
@@ -241,7 +202,6 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg_attr(feature = "benchmark", inline(never))]
 fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
-    tick_counter: &TickCounter,
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -291,7 +251,6 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
             > = bip_from_blueprint(
                 host,
                 chain_config,
-                tick_counter,
                 next_bip_number,
                 chain_header.hash(),
                 blueprint,
@@ -308,7 +267,6 @@ pub fn compute_bip<Host: Runtime>(
     registry: &impl Registry,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: BlockInProgress<Transaction, TransactionReceipt>,
-    tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
@@ -340,12 +298,6 @@ pub fn compute_bip<Host: Runtime>(
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
             log!(host, Info, "Ask for reboot.");
-            log!(
-                host,
-                Benchmarking,
-                "Ask for reboot. Estimated ticks: {}",
-                &block_in_progress.estimated_ticks_in_run
-            );
             storage::store_block_in_progress(host, &block_in_progress)?;
             Ok(BlockComputationResult::RebootNeeded)
         }
@@ -353,8 +305,6 @@ pub fn compute_bip<Host: Runtime>(
             included_delayed_transactions,
         } => {
             crate::gas_price::register_block(host, &block_in_progress)?;
-            *tick_counter =
-                TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
                 .finalize_and_store(host, &constants)
                 .context("Failed to finalize the block in progress")?;
@@ -456,8 +406,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     // in blocks is set to the pool address.
     let coinbase = sequencer_pool_address.unwrap_or_default();
 
-    let mut tick_counter = TickCounter::new(0u64);
-
     let mut safe_host = SafeStorage {
         host,
         world_state: OwnedPath::from(&chain_config.storage_root_path()),
@@ -482,7 +430,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 // Execute at most one of the stored blueprints
                 let block_in_progress = match next_bip_from_blueprints(
                     safe_host.host,
-                    &tick_counter,
                     chain_config,
                     config,
                     &kernel_upgrade,
@@ -492,12 +439,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                         bip
                     }
                     BlueprintParsing::None => {
-                        log!(
-                            safe_host,
-                            Benchmarking,
-                            "Estimated ticks: {}",
-                            tick_counter.c
-                        );
                         log!(safe_host, Debug, "Creating BIP from Blueprint: Failure.");
                         return Ok(ComputationResult::Finished);
                     }
@@ -515,7 +456,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         &registry,
         &outbox_queue,
         block_in_progress,
-        &mut tick_counter,
         sequencer_pool_address,
         config.maximum_allowed_ticks,
         tracer_input,
@@ -548,14 +488,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         Ok(BlockComputationResult::RebootNeeded) => {
             // The computation will resume at next reboot, we leave the
             // storage untouched.
-            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                )
-            };
             Ok(ComputationResult::RebootNeeded)
         }
         Err(err) => {
@@ -569,14 +501,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             // which point did it fail nor why. We cannot make assumption
             // on how many ticks it consumed before failing. Therefore
             // the safest solution is to simply reboot after a failure.
-            if let BlockInProgressProvenance::Blueprint = &block_in_progress_provenance {
-                log!(
-                    safe_host,
-                    Benchmarking,
-                    "Estimated ticks: {}",
-                    tick_counter.c
-                )
-            };
             Ok(ComputationResult::RebootNeeded)
         }
     }
@@ -1757,10 +1681,6 @@ mod tests {
             host.executed_gas(),
             cumulative_gas_in_run,
             "should not have consumed any gas"
-        );
-        assert_eq!(
-            block_in_progress.estimated_ticks_in_block, 0,
-            "should not have consumed any tick"
         );
 
         // the transaction should not have been processed

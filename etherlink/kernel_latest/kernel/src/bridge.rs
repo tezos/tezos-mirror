@@ -45,7 +45,6 @@ use tezosx_tezos_runtime::TezosRuntime;
 
 use crate::apply::{pure_xtz_deposit, ExecutionResult, TransactionResult};
 use crate::chains::EvmLimits;
-use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
@@ -417,7 +416,6 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                 // System address can only be used as caller for simulations
                 caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
                 execution_outcome,
-                estimated_ticks_used: TICKS_FOR_DEPOSIT,
                 runtime: RuntimeId::Ethereum,
             };
 
@@ -447,7 +445,6 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                     let transaction_result = TransactionResult {
                         caller: H160::zero(),
                         execution_outcome,
-                        estimated_ticks_used: TICKS_FOR_DEPOSIT,
                         runtime: RuntimeId::Tezos,
                     };
 
@@ -466,7 +463,6 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                     let transaction_result = TransactionResult {
                         caller: H160::zero(),
                         execution_outcome,
-                        estimated_ticks_used: TICKS_FOR_DEPOSIT,
                         runtime: RuntimeId::Tezos,
                     };
 

@@ -211,7 +211,6 @@ mod test {
             Default::default(),
             VecDeque::new(),
             // estimated ticks in run (ignored)
-            0,
             timestamp.into(),
             U256::zero(),
         );

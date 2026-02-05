@@ -51,10 +51,6 @@ pub struct BlockInProgress<Transaction, TransactionReceipt> {
     pub index: u32,
     /// hash of the parent
     pub parent_hash: H256,
-    /// Cumulative number of ticks used in current kernel run
-    pub estimated_ticks_in_run: u64,
-    /// Cumulative number of ticks used in the block
-    pub estimated_ticks_in_block: u64,
     /// logs bloom filter
     pub logs_bloom: Bloom,
     /// offset for the first log of the next transaction
@@ -82,8 +78,6 @@ impl<Tx: Encodable, Receipt: Encodable> Encodable for BlockInProgress<Tx, Receip
             cumulative_gas,
             index,
             parent_hash,
-            estimated_ticks_in_run: _,
-            estimated_ticks_in_block,
             logs_bloom,
             logs_offset,
             timestamp,
@@ -92,7 +86,7 @@ impl<Tx: Encodable, Receipt: Encodable> Encodable for BlockInProgress<Tx, Receip
             cumulative_receipts,
             cumulative_tx_objects: cumulative_objects,
         } = self;
-        stream.begin_list(15);
+        stream.begin_list(14);
         stream.append(number);
         append_queue(stream, tx_queue);
         append_txs(stream, valid_txs);
@@ -100,7 +94,6 @@ impl<Tx: Encodable, Receipt: Encodable> Encodable for BlockInProgress<Tx, Receip
         stream.append(cumulative_gas);
         stream.append(index);
         stream.append(parent_hash);
-        stream.append(estimated_ticks_in_block);
         stream.append(logs_bloom);
         stream.append(logs_offset);
         append_timestamp(stream, *timestamp);
@@ -147,7 +140,7 @@ impl<Tx: Decodable, Receipt: Decodable> Decodable for BlockInProgress<Tx, Receip
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 15 {
+        if decoder.item_count()? != 14 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -159,8 +152,6 @@ impl<Tx: Decodable, Receipt: Decodable> Decodable for BlockInProgress<Tx, Receip
         let cumulative_gas: U256 = decode_field(&next(&mut it)?, "cumulative_gas")?;
         let index: u32 = decode_field(&next(&mut it)?, "index")?;
         let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
-        let estimated_ticks_in_block: u64 =
-            decode_field(&next(&mut it)?, "estimated_ticks_in_block")?;
         let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
         let logs_offset: u64 = decode_field(&next(&mut it)?, "logs_offset")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
@@ -179,8 +170,6 @@ impl<Tx: Decodable, Receipt: Decodable> Decodable for BlockInProgress<Tx, Receip
             cumulative_gas,
             index,
             parent_hash,
-            estimated_ticks_in_run: 0,
-            estimated_ticks_in_block,
             logs_bloom,
             logs_offset,
             timestamp,
@@ -259,7 +248,6 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
         number: U256,
         parent_hash: H256,
         transactions: VecDeque<Tx>,
-        estimated_ticks_in_run: u64,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
     ) -> Self {
@@ -271,8 +259,6 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
             cumulative_gas: U256::zero(),
             index: 0,
             parent_hash,
-            estimated_ticks_in_block: 0,
-            estimated_ticks_in_run,
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp,
@@ -290,7 +276,6 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
             number,
             H256::zero(),
             transactions,
-            0u64,
             Timestamp::from(0i64),
             base_fee_per_gas,
         )
@@ -329,7 +314,6 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
         blueprint: crate::blueprint::Blueprint<Tx>,
         number: U256,
         parent_hash: H256,
-        tick_counter: u64,
         base_fee_per_gas: U256,
     ) -> Self {
         // blueprint is turn into a ring to allow popping from the front
@@ -338,7 +322,6 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
             number,
             parent_hash,
             ring,
-            tick_counter,
             blueprint.timestamp,
             base_fee_per_gas,
         )
@@ -352,17 +335,8 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
         Ok(())
     }
 
-    fn add_ticks(&mut self, ticks: u64) {
-        self.estimated_ticks_in_run += ticks;
-        self.estimated_ticks_in_block += ticks;
-    }
-
     pub fn register_delayed_transaction(&mut self, hash: TransactionHash) {
         self.delayed_txs.push(hash);
-    }
-
-    pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
-        self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
     }
 
     pub fn pop_tx(&mut self) -> Option<Tx> {
@@ -385,7 +359,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
         let ExecutionInfo {
             receipt_info,
             tx_object,
-            estimated_ticks_used,
             runtime,
         } = execution_info;
         let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
@@ -394,11 +367,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
 
         self.add_gas(receipt_info.overall_gas_used)?;
 
-        // account for transaction ticks
-        self.add_ticks(tick_model::ticks_of_valid_transaction(
-            transaction,
-            estimated_ticks_used,
-        ));
         // keep track of execution gas used
         self.cumulative_execution_gas += execution_gas_used.into();
         match runtime {
@@ -643,8 +611,6 @@ mod tests {
             cumulative_gas: U256::from(3),
             index: 4,
             parent_hash: H256::from([5; 32]),
-            estimated_ticks_in_block: 99,
-            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 33,
             timestamp: Timestamp::from(0i64),
@@ -655,7 +621,7 @@ mod tests {
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902652af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c0";
+        let expected = "f902642af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -663,13 +629,7 @@ mod tests {
         let decoder = Rlp::new(&bytes);
         let decoded =
             EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
-
-        // the estimated ticks in the current run are not stored
-        let fresh_bip = EthBlockInProgress {
-            estimated_ticks_in_run: 0,
-            ..bip
-        };
-        assert_eq!(decoded, fresh_bip);
+        assert_eq!(decoded, bip);
     }
 
     #[test]
@@ -682,8 +642,6 @@ mod tests {
             cumulative_gas: U256::from(3),
             index: 4,
             parent_hash: H256::from([5; 32]),
-            estimated_ticks_in_block: 99,
-            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp: Timestamp::from(0i64),
@@ -694,7 +652,7 @@ mod tests {
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9021c2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c0";
+        let expected = "f9021b2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -702,13 +660,7 @@ mod tests {
         let decoder = Rlp::new(&bytes);
         let decoded =
             EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
-
-        // the estimated ticks in the current run are not stored
-        let fresh_bip = EthBlockInProgress {
-            estimated_ticks_in_run: 0,
-            ..bip
-        };
-        assert_eq!(decoded, fresh_bip);
+        assert_eq!(decoded, bip);
     }
 
     #[test]
@@ -721,8 +673,6 @@ mod tests {
             cumulative_gas: U256::from(3),
             index: 4,
             parent_hash: H256::from([5; 32]),
-            estimated_ticks_in_block: 99,
-            estimated_ticks_in_run: 199,
             logs_bloom: Bloom::default(),
             logs_offset: 4,
             timestamp: Timestamp::from(0i64),
@@ -734,7 +684,7 @@ mod tests {
 
         let encoded = bip.rlp_bytes();
         let expected =
-            "f902302af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c0";
+            "f9022f2af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -742,12 +692,6 @@ mod tests {
         let decoder = Rlp::new(&bytes);
         let decoded =
             EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
-
-        // the estimated ticks in the run are not stored
-        let fresh_bip = EthBlockInProgress {
-            estimated_ticks_in_run: 0,
-            ..bip
-        };
-        assert_eq!(decoded, fresh_bip);
+        assert_eq!(decoded, bip);
     }
 }
