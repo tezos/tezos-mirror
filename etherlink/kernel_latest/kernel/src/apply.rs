@@ -221,7 +221,6 @@ pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
 pub struct TransactionResult {
     pub caller: H160,
     pub execution_outcome: ExecutionOutcome,
-    pub estimated_ticks_used: u64,
     pub runtime: RuntimeId,
 }
 
@@ -418,7 +417,6 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
-        estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
 
@@ -645,7 +643,6 @@ fn apply_fa_deposit<Host: Runtime>(
         // System address can only be used as caller for simulations
         caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
         execution_outcome,
-        estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
 
@@ -658,7 +655,6 @@ pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
 pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub tx_object: TransactionObject,
-    pub estimated_ticks_used: u64,
     pub runtime: RuntimeId,
 }
 
@@ -691,7 +687,6 @@ pub fn handle_transaction_result<Host: Runtime>(
     let TransactionResult {
         caller,
         mut execution_outcome,
-        estimated_ticks_used: ticks_used,
         runtime,
     } = transaction_result;
 
@@ -752,7 +747,6 @@ pub fn handle_transaction_result<Host: Runtime>(
     Ok(ExecutionInfo {
         receipt_info,
         tx_object,
-        estimated_ticks_used: ticks_used,
         runtime,
     })
 }
@@ -884,7 +878,6 @@ pub fn apply_transaction<Host: Runtime>(
                             },
                             withdrawals: vec![],
                         },
-                        estimated_ticks_used: 0,
                         runtime: RuntimeId::Tezos,
                     }))
                 }

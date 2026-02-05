@@ -223,8 +223,6 @@ pub fn handle_run_transaction<Host: Runtime>(
                 cumulative_gas: U256::zero(),
                 index: 0,
                 parent_hash: read_current_block_hash(&safe_host)?,
-                estimated_ticks_in_block: 0,
-                estimated_ticks_in_run: 0,
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,
                 timestamp: input_data.timestamp,
