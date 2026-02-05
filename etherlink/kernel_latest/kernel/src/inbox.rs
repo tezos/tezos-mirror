@@ -450,7 +450,7 @@ fn read_and_dispatch_input<
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            let registry = RegistryImpl::new();
+            let registry = RegistryImpl::new(chain_configuration.get_chain_id());
             chain_configuration.start_simulation_mode(host, &registry)?;
             Ok(ReadStatus::FinishedIgnore)
         }

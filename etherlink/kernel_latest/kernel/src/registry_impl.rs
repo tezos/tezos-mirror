@@ -5,14 +5,14 @@ pub struct RegistryImpl {
 
 impl Default for RegistryImpl {
     fn default() -> Self {
-        Self::new()
+        Self::new(U256::from(1337))
     }
 }
 
 impl RegistryImpl {
-    pub fn new() -> Self {
+    pub fn new(eth_chain_id: U256) -> Self {
         Self {
-            ethereum: EthereumRuntime {},
+            ethereum: EthereumRuntime::new(eth_chain_id),
             tezos: TezosRuntime {},
         }
     }

@@ -49,13 +49,14 @@ use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
 use crate::mir_ctx::{
-    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
-    TcCtx,
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, HasHost,
+    OperationCtx, TcCtx,
 };
 
 extern crate alloc;
 pub mod account_storage;
 mod address;
+mod alias;
 pub mod context;
 mod enshrined_contracts;
 mod gas;
@@ -848,13 +849,13 @@ where
     }
 }
 
-fn execute_smart_contract<'a>(
+fn execute_smart_contract<'a, Host: Runtime>(
     code: account_storage::Code,
     storage: Vec<u8>,
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut (impl CtxTrait<'a> + HasHost<Host>),
     registry: &impl Registry,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     match code {
@@ -1140,6 +1141,75 @@ fn apply_operation<Host: Runtime, C: Context>(
                 content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Origination(manager_result),
             }
+        }
+    }
+}
+
+/// Shared test utilities for gateway testing
+#[cfg(test)]
+#[allow(clippy::type_complexity)]
+pub(crate) mod test_utils {
+    use primitive_types::U256;
+    use std::cell::RefCell;
+    use tezos_evm_runtime::runtime::Runtime;
+    use tezosx_interfaces::{Registry, RuntimeId, TezosXRuntimeError};
+
+    /// Mock Registry for testing gateway operations.
+    /// Tracks all calls to bridge and generate_alias for verification.
+    pub struct MockRegistry {
+        pub generate_alias_calls: RefCell<Vec<(Vec<u8>, RuntimeId)>>,
+        pub bridge_calls: RefCell<Vec<(RuntimeId, Vec<u8>, Vec<u8>, U256)>>,
+        generated_alias: Vec<u8>,
+    }
+
+    impl MockRegistry {
+        pub fn new(generated_alias: Vec<u8>) -> Self {
+            Self {
+                generate_alias_calls: RefCell::new(Vec::new()),
+                bridge_calls: RefCell::new(Vec::new()),
+                generated_alias,
+            }
+        }
+    }
+
+    impl Registry for MockRegistry {
+        fn bridge<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            destination_runtime: RuntimeId,
+            destination_address: &[u8],
+            source_address: &[u8],
+            amount: U256,
+            _data: &[u8],
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            self.bridge_calls.borrow_mut().push((
+                destination_runtime,
+                destination_address.to_vec(),
+                source_address.to_vec(),
+                amount,
+            ));
+            Ok(vec![])
+        }
+
+        fn generate_alias<Host: Runtime>(
+            &self,
+            _host: &mut Host,
+            native_address: &[u8],
+            runtime_id: RuntimeId,
+            _context: tezosx_interfaces::AliasCreationContext,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            self.generate_alias_calls
+                .borrow_mut()
+                .push((native_address.to_vec(), runtime_id));
+            Ok(self.generated_alias.clone())
+        }
+
+        fn address_from_string(
+            &self,
+            address_str: &str,
+            _runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            Ok(address_str.as_bytes().to_vec())
         }
     }
 }
@@ -5413,5 +5483,87 @@ mod tests {
         let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
             .expect("Typecheck value should succeed");
         assert_eq!(typed_storage, TypedValue::Bool(false));
+    }
+
+    /// Test a successful transfer from a tz1 address to an Ethereum address via the gateway.
+    /// This tests the happy path: source has enough balance, gateway executes, bridge succeeds.
+    #[test]
+    fn apply_transfer_to_gateway_happy_path() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+
+        // Gateway contract address: KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw
+        let gateway_kt1 =
+            ContractKt1Hash::from_base58_check("KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw")
+                .expect("Gateway KT1 address should be valid");
+
+        // Set up source with enough balance (100 mutez: 15 for fees + 50 for transfer + some extra)
+        let source_account = init_account(&mut host, &src.pkh, 100);
+        reveal_account(&mut host, &src);
+
+        // Create Micheline parameters: just the destination Ethereum address
+        // The amount is taken from the operation's amount field via ctx.amount()
+        let eth_destination = "0x1234567890123456789012345678901234567890";
+        let params_micheline = Micheline::String(eth_destination.to_string());
+
+        let operation = make_transfer_operation(
+            15,      // fee
+            1,       // counter
+            100_000, // gas_limit
+            100,     // storage_limit
+            src.clone(),
+            50_u64.into(), // amount to transfer
+            Contract::Originated(gateway_kt1),
+            Parameters {
+                entrypoint: Entrypoint::default(),
+                value: params_micheline.encode(),
+            },
+        );
+
+        let registry = crate::test_utils::MockRegistry::new(vec![0x12; 20]);
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &registry,
+            &context::TezlinkContext::init_context(),
+            OperationHash(H256::zero()),
+            operation,
+            &block_ctx!(),
+            false,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        // Verify the operation succeeded
+        assert_eq!(receipt.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipt[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            ),
+            "Expected Applied Transfer result, got {:?}",
+            receipt[0].receipt
+        );
+
+        // Verify that source balance decreased by fee (15) + transfer amount (50)
+        // Initial: 100, Final: 100 - 15 - 50 = 35
+        assert_eq!(
+            source_account.balance(&host).unwrap(),
+            35_u64.into(),
+            "Source balance should have decreased by fee + transfer amount"
+        );
+
+        // Verify that bridge was called with the correct amount
+        let bridge_calls = registry.bridge_calls.borrow();
+        assert_eq!(bridge_calls.len(), 1, "Bridge should have been called once");
+        assert_eq!(
+            bridge_calls[0].3, // amount is the 4th field in the tuple
+            primitive_types::U256::from(50),
+            "Bridge should have been called with transfer amount of 50"
+        );
     }
 }

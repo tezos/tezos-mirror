@@ -353,7 +353,7 @@ pub fn main() {
     };
 
     let mut host = prepare_host();
-    let registry = kernel::registry_impl::RegistryImpl::new();
+    let registry = kernel::registry_impl::RegistryImpl::default();
 
     for NamedFixture { path, fixtures } in fixtures {
         write_out!(output_file, "---------- Test file: {:?} ----------", path);

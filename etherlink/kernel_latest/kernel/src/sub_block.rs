@@ -199,7 +199,7 @@ pub fn handle_run_transaction<Host: Runtime>(
         host,
         world_state: OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH),
     };
-    let registry = RegistryImpl::new();
+    let registry = RegistryImpl::new(config.get_chain_id());
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
     let mut block_in_progress = match crate::storage::read_block_in_progress(&safe_host)?

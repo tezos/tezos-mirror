@@ -769,7 +769,7 @@ mod tests {
     #[test]
     fn deposit_execution_outcome_contains_event() {
         let mut host = MockKernelHost::default();
-        let registry = &RegistryImpl::new();
+        let registry = &RegistryImpl::default();
         init_precompile_bytecodes(&mut host).unwrap();
 
         let deposit = dummy_deposit();
@@ -822,7 +822,7 @@ mod tests {
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut host = MockKernelHost::default();
-        let registry = &RegistryImpl::new();
+        let registry = &RegistryImpl::default();
         init_precompile_bytecodes(&mut host).unwrap();
 
         let mut deposit = dummy_deposit();

@@ -173,6 +173,8 @@ pub enum TransferError {
     OutOfGas,
     #[error("Unexpected deposit error: {0}")]
     DepositError(String),
+    #[error("Gateway problem: {0}")]
+    GatewayError(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]

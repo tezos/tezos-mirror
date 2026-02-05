@@ -283,8 +283,14 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
     }
 }
 
-impl<Host: Runtime, C: Context> Ctx<'_, '_, Host, C> {
-    pub fn host(&mut self) -> &mut Host {
+pub trait HasHost<Host: Runtime> {
+    fn host(&mut self) -> &mut Host;
+}
+
+impl<'a, 'operation, Host: Runtime, C: Context> HasHost<Host>
+    for Ctx<'a, 'operation, Host, C>
+{
+    fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
 }
@@ -1028,5 +1034,140 @@ pub mod tests {
             ],
         });
         assert_eq!(diff_list, expected, "Receipt should be in reverse order");
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod mock {
+    use super::*;
+    use mir::ast::{ByteReprTrait, Entrypoint};
+    use num_bigint::BigInt;
+    use std::collections::HashMap;
+    use tezos_crypto_rs::hash::HashTrait;
+
+    /// Mock execution context for testing enshrined contracts.
+    /// Implements CtxTrait and HasHost with configurable values.
+    pub struct MockCtx<'a, Host: Runtime> {
+        pub host: &'a mut Host,
+        pub sender: AddressHash,
+        pub amount: i64,
+        pub level: BigUint,
+        pub now: BigInt,
+        pub gas: mir::gas::Gas,
+    }
+
+    impl<'a, Host: Runtime> MockCtx<'a, Host> {
+        pub fn new(host: &'a mut Host, sender: AddressHash, amount: i64) -> Self {
+            Self {
+                host,
+                sender,
+                amount,
+                level: 1u32.into(),
+                now: 0.into(),
+                gas: mir::gas::Gas::default(),
+            }
+        }
+    }
+
+    impl<'a, Host: Runtime> HasHost<Host> for MockCtx<'a, Host> {
+        fn host(&mut self) -> &mut Host {
+            self.host
+        }
+    }
+
+    impl<'a, Host: Runtime> TypecheckingCtx<'a> for MockCtx<'a, Host> {
+        fn gas(&mut self) -> &mut mir::gas::Gas {
+            &mut self.gas
+        }
+
+        fn lookup_entrypoints(
+            &self,
+            _address: &AddressHash,
+        ) -> Option<HashMap<Entrypoint, Type>> {
+            None
+        }
+
+        fn big_map_get_type(
+            &mut self,
+            _id: &BigMapId,
+        ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+            Ok(None)
+        }
+    }
+
+    impl<'a, Host: Runtime> CtxTrait<'a> for MockCtx<'a, Host> {
+        fn sender(&self) -> AddressHash {
+            self.sender.clone()
+        }
+
+        fn source(&self) -> PublicKeyHash {
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()
+        }
+
+        fn amount(&self) -> i64 {
+            self.amount
+        }
+
+        fn self_address(&self) -> AddressHash {
+            // KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
+            AddressHash::from_bytes(&[
+                0x01, 0x29, 0x58, 0x93, 0x60, 0xad, 0xf1, 0x56, 0x94, 0xac, 0x33, 0x0d,
+                0xe5, 0x9f, 0x46, 0x44, 0x15, 0xb5, 0xf7, 0xea, 0x69, 0x00,
+            ])
+            .unwrap()
+        }
+
+        fn balance(&self) -> i64 {
+            0
+        }
+
+        fn level(&self) -> BigUint {
+            self.level.clone()
+        }
+
+        fn min_block_time(&self) -> BigUint {
+            1u32.into()
+        }
+
+        fn chain_id(&self) -> ChainId {
+            ChainId::try_from_bytes(&[0u8; 4]).unwrap()
+        }
+
+        fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
+            0u32.into()
+        }
+
+        fn now(&self) -> BigInt {
+            self.now.clone()
+        }
+
+        fn total_voting_power(&self) -> BigUint {
+            1u32.into()
+        }
+
+        fn operation_group_hash(&self) -> [u8; 32] {
+            [0u8; 32]
+        }
+
+        fn origination_counter(&mut self) -> u32 {
+            0
+        }
+
+        fn operation_counter(&mut self) -> u128 {
+            0
+        }
+
+        fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
+            unimplemented!("MockCtx does not support lazy_storage")
+        }
+
+        fn lookup_view_and_storage(
+            &self,
+            _contract: ContractKt1Hash,
+            _name: &str,
+            _arena: &'a Arena<Micheline<'a>>,
+        ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
+            None
+        }
     }
 }
