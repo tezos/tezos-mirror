@@ -29,6 +29,7 @@ type state = {
   fee_parameters : Configuration.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
+  max_batch_length : int option;
 }
 
 val registry : Prometheus.CollectorRegistry.t

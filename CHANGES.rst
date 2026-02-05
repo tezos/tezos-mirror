@@ -83,6 +83,15 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Added ``max_batch_length`` configuration option in the injector
+  settings to limit the maximum number of operations included in a
+  single L1 batch. This allows operators to control batch length
+  independently of the operation size limit, which can help avoid gas
+  quota exceeded errors when multiple operations of the same type
+  would consume too much gas when batched together. Configure via
+  ``injector.max_batch_length`` in the rollup node configuration file.
+  (MR :gl:`!20670`)
+
 - Remove protocol plugin for Nairobi (17). This still allows to replay Etherlink
   mainnet from genesis but not Etherlink testnet. (MR :gl:`!20301`)
 

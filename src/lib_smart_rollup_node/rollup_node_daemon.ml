@@ -735,6 +735,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
         minimal_block_delay = current_protocol.constants.minimal_block_delay;
         delay_increment_per_round =
           current_protocol.constants.delay_increment_per_round;
+        max_batch_length = configuration.injector.max_batch_length;
       }
       ~data_dir:node_ctxt.data_dir
       ~signers

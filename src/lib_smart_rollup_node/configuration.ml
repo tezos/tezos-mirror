@@ -42,7 +42,12 @@ type batcher = {
   max_batch_size : int option;
 }
 
-type injector = {retention_period : int; attempts : int; injection_ttl : int}
+type injector = {
+  retention_period : int;
+  attempts : int;
+  injection_ttl : int;
+  max_batch_length : int option;
+}
 
 type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
 
@@ -238,7 +243,12 @@ let default_batcher =
   }
 
 let default_injector =
-  {retention_period = 2048; attempts = 10; injection_ttl = 120}
+  {
+    retention_period = 2048;
+    attempts = 10;
+    injection_ttl = 120;
+    max_batch_length = None;
+  }
 
 let max_injector_retention_period =
   5 * 8192 (* Preserved cycles (5) for mainnet *)
@@ -395,9 +405,9 @@ let batcher_encoding =
 let injector_encoding : injector Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {retention_period; attempts; injection_ttl} ->
-      (retention_period, attempts, injection_ttl))
-    (fun (retention_period, attempts, injection_ttl) ->
+    (fun {retention_period; attempts; injection_ttl; max_batch_length} ->
+      (retention_period, attempts, injection_ttl, max_batch_length))
+    (fun (retention_period, attempts, injection_ttl, max_batch_length) ->
       if retention_period > max_injector_retention_period then
         Format.ksprintf
           Stdlib.failwith
@@ -405,11 +415,19 @@ let injector_encoding : injector Data_encoding.t =
           max_injector_retention_period ;
       if injection_ttl < 1 then
         Stdlib.failwith "injector.injection_ttl should be at least 1" ;
-      {retention_period; attempts; injection_ttl})
-  @@ obj3
+      {retention_period; attempts; injection_ttl; max_batch_length})
+  @@ obj4
        (dft "retention_period" uint16 default_injector.retention_period)
        (dft "attempts" uint16 default_injector.attempts)
        (dft "injection_ttl" uint16 default_injector.injection_ttl)
+       (dft
+          "max_batch_length"
+          ~description:
+            "Maximum number of operations to include in a single L1 batch. If \
+             not specified, batches are limited only by the operation size \
+             limit."
+          (option int31)
+          default_injector.max_batch_length)
 
 let fee_parameters_encoding =
   Operation_kind.map_encoding (fun operation_kind ->
@@ -970,6 +988,7 @@ module Cli = struct
               Option.value ~default:default_injector.attempts injector_attempts;
             injection_ttl =
               Option.value ~default:default_injector.injection_ttl injection_ttl;
+            max_batch_length = None;
           };
         l1_blocks_cache_size = default_l1_blocks_cache_size;
         l2_blocks_cache_size = default_l2_blocks_cache_size;
@@ -1076,6 +1095,7 @@ module Cli = struct
               Option.value
                 ~default:configuration.injector.injection_ttl
                 injection_ttl;
+            max_batch_length = configuration.injector.max_batch_length;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
         apply_unsafe_patches;
