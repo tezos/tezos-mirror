@@ -17,11 +17,11 @@ let team = Tag.layer1
 (** Tags shared by all tests in this file. *)
 let clst_tags = [team; "clst"]
 
-let test_deposit_and_withdraw =
+let test_deposit_and_redeem =
   Protocol.register_test
     ~__FILE__
-    ~title:"Test deposit and withdraw"
-    ~tags:(clst_tags @ ["deposit"; "withdraw"])
+    ~title:"Test deposit and redeem"
+    ~tags:(clst_tags @ ["deposit"; "redeem"])
     ~supports:(Protocol.From_protocol 25)
   @@ fun protocol ->
   let* parameter_file =
@@ -58,14 +58,10 @@ let test_deposit_and_withdraw =
     src.alias
     (JSON.as_string clst_balance) ;
 
-  Log.info ~color:Log.Color.FG.green "Withdraw 30000 tez from CLST" ;
-  let withdrawal_amount = Tez.of_int 30_000 in
+  Log.info ~color:Log.Color.FG.green "Redeem 30000 tez from CLST" ;
+  let redeemed_amount = Tez.of_int 30_000 in
   let* () =
-    Client.clst_withdraw
-      ~burn_cap:Tez.one
-      withdrawal_amount
-      ~src:src.alias
-      client
+    Client.clst_redeem ~burn_cap:Tez.one redeemed_amount ~src:src.alias client
   in
   let* () = Client.bake_for_and_wait client in
   let* clst_balance =
@@ -76,7 +72,7 @@ let test_deposit_and_withdraw =
   in
   Check.(
     (JSON.as_int clst_balance
-    = Tez.to_mutez init_amount - Tez.to_mutez withdrawal_amount)
+    = Tez.to_mutez init_amount - Tez.to_mutez redeemed_amount)
       ~__LOC__
       int)
     ~error_msg:"Expected clst balance %R to be equal to %L" ;
@@ -87,4 +83,4 @@ let test_deposit_and_withdraw =
     (JSON.as_string clst_balance) ;
   unit
 
-let register ~protocols = test_deposit_and_withdraw protocols
+let register ~protocols = test_deposit_and_redeem protocols

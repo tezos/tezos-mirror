@@ -79,8 +79,8 @@ module CLST_contract = struct
     in
     return (Script_list.empty, new_storage, balance_updates, ctxt)
 
-  let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
-      (amount : withdraw) (storage : Clst_contract_storage.t) :
+  let execute_redeem (ctxt, (step_constants : Script_typed_ir.step_constants))
+      (amount : redeem) (storage : Clst_contract_storage.t) :
       entrypoint_execution_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let*? () =
@@ -99,9 +99,9 @@ module CLST_contract = struct
           Script_int.(compare (of_int64 Int64.max_int) (int amount)) < 0)
         (Amount_too_large (step_constants.sender, amount))
     in
-    let* typed_account =
+    let* account =
       match step_constants.sender with
-      | Contract (Implicit pkh) -> return (Typed_implicit pkh)
+      | Contract (Implicit _ as implicit) -> return implicit
       | sender -> tzfail (Non_implicit_contract sender)
     in
     let address =
@@ -127,29 +127,16 @@ module CLST_contract = struct
       Tez.of_mutez_exn
         (Option.value ~default:0L (Script_int.to_int64 removed_amount))
     in
-    let* ctxt, balance_updates =
-      Clst_contract_storage.withdraw_from_clst_deposits
-        ctxt
-        ~clst_contract_hash:step_constants.self
-        amount_tez
-    in
-    let gas_counter, outdated_ctxt =
-      Local_gas_counter.local_gas_counter_and_outdated_context ctxt
-    in
-    let* op, outdated_ctxt, gas_counter =
-      Script_interpreter_defs.transfer
-        (outdated_ctxt, step_constants)
-        gas_counter
-        amount_tez
-        Micheline.dummy_location
-        typed_account
-        ()
-    in
-    let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     let*? new_storage =
       Clst_contract_storage.decrement_total_supply new_storage removed_amount
     in
-    return (Script_list.of_list [op], new_storage, balance_updates, ctxt)
+    let* ctxt, balance_updates =
+      Clst_contract_storage.redeem_from_clst_deposits
+        ctxt
+        ~staker:account
+        amount_tez
+    in
+    return (Script_list.of_list [], new_storage, balance_updates, ctxt)
 
   let check_token_id token_id =
     error_unless
@@ -266,7 +253,7 @@ module CLST_contract = struct
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
-    | Withdraw amount -> execute_withdraw (ctxt, step_constants) amount storage
+    | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
 

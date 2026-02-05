@@ -166,7 +166,7 @@ module CLST_types = struct
 
   type deposit = unit
 
-  type withdraw = nat
+  type redeem = nat
 
   type transfer =
     ( address (* from_ *),
@@ -176,7 +176,7 @@ module CLST_types = struct
     pair
     Script_list.t
 
-  type arg = (deposit, (withdraw, transfer) or_) or_
+  type arg = (deposit, (redeem, transfer) or_) or_
 
   type ledger = (address, nat) big_map
 
@@ -186,24 +186,24 @@ module CLST_types = struct
 
   type entrypoint =
     | Deposit of deposit
-    | Withdraw of withdraw
+    | Redeem of redeem
     | Transfer of transfer
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L p -> Deposit p
-    | R (L p) -> Withdraw p
+    | R (L p) -> Redeem p
     | R (R p) -> Transfer p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L p
-    | Withdraw p -> R (L p)
+    | Redeem p -> R (L p)
     | Transfer p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
 
-  let withdraw_type : (withdraw ty_node * withdraw entrypoints_node) tzresult =
-    make_entrypoint_leaf "withdraw" nat_ty
+  let redeem_type : (redeem ty_node * redeem entrypoints_node) tzresult =
+    make_entrypoint_leaf "redeem" nat_ty
 
   let transfer_type : (transfer ty_node * transfer entrypoints_node) tzresult =
     let open Result_syntax in
@@ -221,9 +221,9 @@ module CLST_types = struct
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
-    let* withdraw_type in
+    let* redeem_type in
     let* transfer_type in
-    let* r1 = make_entrypoint_node withdraw_type transfer_type in
+    let* r1 = make_entrypoint_node redeem_type transfer_type in
     let* arg_type = make_entrypoint_node deposit_type r1 in
     return (finalize_entrypoint arg_type)
 

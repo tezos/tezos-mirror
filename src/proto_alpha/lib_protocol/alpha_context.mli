@@ -2225,6 +2225,7 @@ module Receipt : sig
     | Deposits : frozen_staker -> Tez.t balance
     | Unstaked_deposits : unstaked_frozen_staker * Cycle.t -> Tez.t balance
     | CLST_deposits : Tez.t balance
+    | CLST_redeemed_deposits : Contract.t * Cycle.t -> Tez.t balance
     | Nonce_revelation_rewards : Tez.t balance
     | Attesting_rewards : Tez.t balance
     | Baking_rewards : Tez.t balance
@@ -4639,6 +4640,16 @@ module Clst : sig
   (** [total_amount_of_tez ctxt] returns the total amount of tez available for
       staking in the CLST contract. *)
   val total_amount_of_tez : context -> Tez.t tzresult Lwt.t
+
+  (** [add_redemption_request ctxt contract cycle amount] adds a redemption
+      requests from [contract] at the given [cycle] of [amount] tez. *)
+  val add_redemption_request :
+    context -> Contract.t -> Cycle.t -> Tez.t -> context tzresult Lwt.t
+
+  module For_RPC : sig
+    val get_redeemed_balance :
+      context -> Contract.t -> Tez.t option tzresult Lwt.t
+  end
 end
 
 (** See {!Block_payload_repr}. *)
@@ -5753,6 +5764,7 @@ module Token : sig
     | `Frozen_deposits of Receipt.frozen_staker
     | `Unstaked_frozen_deposits of Receipt.unstaked_frozen_staker * Cycle.t
     | `CLST_deposits
+    | `CLST_redeemed_frozen_deposits of Contract.t * Cycle.t
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 

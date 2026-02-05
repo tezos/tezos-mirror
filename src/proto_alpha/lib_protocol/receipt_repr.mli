@@ -50,6 +50,9 @@ type 'token balance =
       Unstaked_frozen_staker_repr.t * Cycle_repr.t
       -> Tez_repr.t balance
   | CLST_deposits : Tez_repr.t balance
+  | CLST_redeemed_deposits :
+      Contract_repr.t * Cycle_repr.t
+      -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance

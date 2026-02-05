@@ -390,6 +390,11 @@ module Sc_rollup : sig
     Lwt.t
 end
 
+module CLST : sig
+  val redeemed_frozen_balance :
+    t -> Alpha_context.Contract.t -> Tez.t option tzresult Lwt.t
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup

@@ -397,6 +397,19 @@ let equal_list_any_order ~loc ~compare msg pp list1 list2 =
     ordered_list1
     ordered_list2
 
+let clst_frozen_redeemed_balance_was_credited ~loc b contract old_balance amount
+    =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Context.get_alpha_ctxt b in
+  let*?@ expected = Alpha_context.Tez.(old_balance +? amount) in
+  let*@ frozen_unstaked_balance =
+    Alpha_context.Clst.For_RPC.get_redeemed_balance ctxt contract
+  in
+  equal_tez
+    ~loc
+    (Option.value ~default:Alpha_context.Tez.zero frozen_unstaked_balance)
+    expected
+
 let to_json_string encoding x =
   x
   |> Data_encoding.Json.construct encoding

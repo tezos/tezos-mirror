@@ -16,3 +16,95 @@ let decrease_deposit_only_call_from_token ctxt amount =
   let* deposited_balance_before = Storage.Clst.Deposits_balance.get ctxt in
   let*? new_deposited_balance = Tez_repr.(deposited_balance_before -? amount) in
   Storage.Clst.Deposits_balance.update ctxt new_deposited_balance
+
+(* See {Unstaked_frozen_deposits_storage.get_all} *)
+let get_all_redeemed_frozen_deposits ctxt =
+  let open Lwt_result_syntax in
+  let* unstaked_frozen_deposits_opt =
+    Storage.Clst.Redeemed_frozen_deposits.find ctxt
+  in
+  let unslashable_cycle =
+    Cycle_storage.greatest_unstake_finalizable_cycle ctxt
+  in
+  match unstaked_frozen_deposits_opt with
+  | None -> return (Unstaked_frozen_deposits_repr.empty ~unslashable_cycle)
+  | Some unstaked_frozen_deposits ->
+      Lwt.return
+      @@ Unstaked_frozen_deposits_repr.squash_unslashable
+           ~unslashable_cycle
+           unstaked_frozen_deposits
+
+(* See {Unstaked_frozen_deposits_storage.update_balance} *)
+let update_frozen_redeemed_deposit ~f ctxt cycle =
+  let open Lwt_result_syntax in
+  let* redeemed_frozen_deposits = get_all_redeemed_frozen_deposits ctxt in
+  let*? redeemed_frozen_deposits =
+    Unstaked_frozen_deposits_repr.update ~f cycle redeemed_frozen_deposits
+  in
+  let*! ctxt =
+    Storage.Clst.Redeemed_frozen_deposits.add ctxt redeemed_frozen_deposits.t
+  in
+  return ctxt
+
+let increase_redeemed_frozen_deposit_only_call_from_token ctxt cycle amount =
+  let f current = Deposits_repr.(current +? amount) in
+  update_frozen_redeemed_deposit ~f ctxt cycle
+
+let decrease_redeemed_frozen_deposit_only_call_from_token ctxt cycle amount =
+  let f Deposits_repr.{initial_amount; current_amount} =
+    let open Result_syntax in
+    let+ current_amount = Tez_repr.(current_amount -? amount) in
+    Deposits_repr.{initial_amount; current_amount}
+  in
+  update_frozen_redeemed_deposit ~f ctxt cycle
+
+(* Adapted from {Unstake_requests_storage.set_stored_requests}.
+
+   Update the storage with the given requests.
+
+   If the given structure contains an empty list of requests, it means that
+   there are no more funds to unstake, and thus there is no need to keep an
+   entry for the contract.
+*)
+let set_stored_requests ctxt contract updated_requests =
+  match updated_requests with
+  | [] -> Storage.Clst.Redemption_requests.remove ctxt contract
+  | _ :: _ ->
+      Storage.Clst.Redemption_requests.add ctxt contract updated_requests
+
+(* At some point, this function will also include implicit finalization of
+   finalizable redemption requests. *)
+let add_redemption_request ctxt contract cycle amount =
+  let open Lwt_result_syntax in
+  let* requests_opt = Storage.Clst.Redemption_requests.find ctxt contract in
+  let requests = Option.value ~default:[] requests_opt in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8228
+
+     Storage.Unstake_request implements the logic to merge requests, but it DOES
+     NOT update anything in the storage.  *)
+  let*? requests = Storage.Unstake_request.add cycle amount requests in
+  let*! ctxt = set_stored_requests ctxt contract requests in
+  return ctxt
+
+module For_RPC = struct
+  let get_redeemed_balance ctxt =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8227
+       Handle slashing in the RPC. *)
+    let open Lwt_result_syntax in
+    function
+    | Contract_repr.Originated _ -> return_none
+    | Implicit _ as contract -> (
+        let* redeemed_frozen_requests =
+          Storage.Clst.Redemption_requests.find ctxt contract
+        in
+        match redeemed_frozen_requests with
+        | None -> return_some Tez_repr.zero
+        | Some redeemed_frozen_requests ->
+            let*? sum =
+              List.fold_left_e
+                (fun acc (_cycle, tz) -> Tez_repr.(acc +? tz))
+                Tez_repr.zero
+                redeemed_frozen_requests
+            in
+            return_some sum)
+end

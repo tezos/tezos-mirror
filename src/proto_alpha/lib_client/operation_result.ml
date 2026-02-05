@@ -440,6 +440,13 @@ let pp_balance_updates ppf balance_updates =
                 Cycle.pp
                 cycle
           | CLST_deposits -> Format.asprintf "clst deposits"
+          | CLST_redeemed_deposits (contract, cycle) ->
+              Format.asprintf
+                "clst_redeemed_deposits(%a,%a)"
+                Contract.pp
+                contract
+                Cycle.pp
+                cycle
           | Nonce_revelation_rewards -> "nonce revelation rewards"
           | Attesting_rewards -> "attesting rewards"
           | Baking_rewards -> "baking rewards"

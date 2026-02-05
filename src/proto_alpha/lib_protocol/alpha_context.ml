@@ -509,7 +509,13 @@ module Address_registry = struct
 end
 
 module Clst = struct
+  let add_redemption_request = Clst_storage.add_redemption_request
+
   let total_amount_of_tez = Storage.Clst.Deposits_balance.get
+
+  module For_RPC = struct
+    include Clst_storage.For_RPC
+  end
 end
 
 module Big_map = struct

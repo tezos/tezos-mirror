@@ -1584,7 +1584,7 @@ let clst_deposit ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (Contract.Originated clst_hash)
     amount
 
-let clst_withdraw ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     (ctxt : Context.t) (src : Contract.t) (amount : int64) =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
@@ -1598,7 +1598,7 @@ let clst_withdraw ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?fee
     ?gas_limit
     ?storage_limit
-    ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
+    ~entrypoint:(Entrypoint.of_string_strict_exn "redeem")
     ~parameters
     ctxt
     src

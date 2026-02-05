@@ -437,6 +437,17 @@ module S = struct
         ~output:q_encoding
         RPC_path.(open_root / "context" / "clst" / "exchange_rate")
 
+    let redeemed_frozen_balance =
+      RPC_service.get_service
+        ~description:
+          "Access the balance of a contract that was requested for a redeem \
+           operation, but is still frozen for the duration of the slashing \
+           period. Returns None if the contract is originated."
+        ~query:RPC_query.empty
+        ~output:(option Tez.encoding)
+        RPC_path.(
+          custom_root /: Contract.rpc_arg / "clst_redeemed_frozen_balance")
+
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
           Contract.get_clst_contract_hash ctxt) ;
@@ -466,7 +477,12 @@ module S = struct
               Q.one
             else Q.div (Q.of_int64 total_amount) (Q.of_bigint total_supply)
           in
-          return rate)
+          return rate) ;
+      register1
+        ~chunked:false
+        redeemed_frozen_balance
+        (fun ctxt contract () () ->
+          Clst.For_RPC.get_redeemed_balance ctxt contract)
   end
 end
 
@@ -979,3 +995,12 @@ let clst_total_amount_of_tez ctxt block =
 
 let clst_exchange_rate ctxt block =
   RPC_context.make_call0 S.CLST.exchange_rate_service ctxt block () ()
+
+let clst_redeemed_frozen_balance ctxt block contract =
+  RPC_context.make_call1
+    S.CLST.redeemed_frozen_balance
+    ctxt
+    block
+    contract
+    ()
+    ()

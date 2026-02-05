@@ -1552,6 +1552,26 @@ module Clst = struct
         let name = ["deposits"]
       end)
       (Tez_repr)
+
+  module Redeemed_frozen_deposits =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["redeemed_frozen_deposits"]
+      end)
+      (Unstaked_frozen_deposits_repr)
+
+  module Redemption_requests =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["redemption_requests"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (struct
+        type t = Unstake_request.requests
+
+        let encoding = Unstake_request.requests_encoding
+      end)
 end
 
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {

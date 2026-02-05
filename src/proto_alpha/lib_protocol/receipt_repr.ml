@@ -76,6 +76,9 @@ type 'token balance =
       Unstaked_frozen_staker_repr.t * Cycle_repr.t
       -> Tez_repr.t balance
   | CLST_deposits : Tez_repr.t balance
+  | CLST_redeemed_deposits :
+      Contract_repr.t * Cycle_repr.t
+      -> Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance
@@ -114,6 +117,7 @@ let token_of_balance : type token. token balance -> token Token.t = function
   | Deposits _ -> Token.Tez
   | Unstaked_deposits _ -> Token.Tez
   | CLST_deposits -> Token.Tez
+  | CLST_redeemed_deposits _ -> Token.Tez
   | Nonce_revelation_rewards -> Token.Tez
   | Attesting_rewards -> Token.Tez
   | Baking_rewards -> Token.Tez
@@ -147,6 +151,9 @@ let compare_balance : type token1 token2.
   | Unstaked_deposits (sa, ca), Unstaked_deposits (sb, cb) ->
       Compare.or_else (Unstaked_frozen_staker_repr.compare sa sb) (fun () ->
           Cycle_repr.compare ca cb)
+  | CLST_redeemed_deposits (ca, cya), CLST_redeemed_deposits (cb, cyb) ->
+      Compare.or_else (Contract_repr.compare ca cb) (fun () ->
+          Cycle_repr.compare cya cyb)
   | Lost_attesting_rewards (pkha, pa, ra), Lost_attesting_rewards (pkhb, pb, rb)
     ->
       let c = Signature.Public_key_hash.compare pkha pkhb in
@@ -195,6 +202,7 @@ let compare_balance : type token1 token2.
         | Dal_attesting_rewards -> 23
         | Lost_dal_attesting_rewards _ -> 24
         | CLST_deposits -> 25
+        | CLST_redeemed_deposits _ -> 26
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
@@ -500,6 +508,20 @@ let balance_and_update_encoding =
               (req "category" (constant "clst_deposits")))
            (function CLST_deposits -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> CLST_deposits);
+         tez_case
+           (Tag 32)
+           ~title:"CLST_redeemed_deposits"
+           (obj4
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "clst_redeemed_deposits"))
+              (req "staker" Contract_repr.encoding)
+              (req "cycle" Cycle_repr.encoding))
+           (function
+             | CLST_redeemed_deposits (contract, cycle) ->
+                 Some ((), (), contract, cycle)
+             | _ -> None)
+           (fun ((), (), contract, cycle) ->
+             CLST_redeemed_deposits (contract, cycle));
        ]
 
 type update_origin =
