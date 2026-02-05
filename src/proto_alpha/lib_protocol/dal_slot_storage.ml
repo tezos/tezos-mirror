@@ -88,7 +88,8 @@ let finalize_current_slot_headers ctxt =
   Storage.Dal.Slot.Headers.add
     ctxt
     (Raw_context.current_level ctxt).level
-    (Raw_context.Dal.candidates ctxt)
+    (Dal_slot_repr.Slot_market.candidates
+    @@ Raw_context.Dal.slot_fee_market ctxt)
 
 let get_slot_headers_history ctxt =
   let open Lwt_result_syntax in

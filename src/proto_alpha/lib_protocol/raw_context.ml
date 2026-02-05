@@ -2273,10 +2273,6 @@ module Dal = struct
     let dal = dal ctxt in
     update_dal ctxt {dal with slot_accountability}
 
-  let[@inline] candidates ctxt =
-    let dal = dal ctxt in
-    Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
-
   let[@inline] slot_fee_market ctxt =
     let ({slot_fee_market; _} : Raw_dal.t) = dal ctxt in
     slot_fee_market

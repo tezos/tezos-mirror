@@ -541,10 +541,6 @@ module Dal : sig
   (** [attestations] returns the recorded attestations *)
   val attestations : t -> Dal_attestations_repr.t Slot_repr.Map.t
 
-  (** [candidates ctxt] returns the current list of slot for which there is at
-      least one candidate alongside the addresses that published them. *)
-  val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list
-
   (** [get_accountability ctxt] returns the current block's accountability data,
       which contains the attestation information accumulated during this block. *)
   val get_accountability : t -> Dal_attestations_repr.Accountability.t
