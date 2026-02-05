@@ -45,6 +45,13 @@ type error +=
       kernel_family : L2_types.ex_chain_family;
     }
   | Dream_rpc_tezlink
+  | Set_next_block_info_while_executing of {
+      new_level : Ethereum_types.quantity;
+      current_level : Ethereum_types.quantity;
+    }
+  | Execute_single_transaction_no_block_info of {
+      transaction_hash : Ethereum_types.hash;
+    }
 
 let () =
   register_error_kind
@@ -189,4 +196,52 @@ let () =
           Some (chain_id, node_family, kernel_family)
       | _ -> None)
     (fun (chain_id, node_family, kernel_family) ->
-      Mismatched_chain_family {chain_id; node_family; kernel_family})
+      Mismatched_chain_family {chain_id; node_family; kernel_family}) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.set_next_block_info_while_executing"
+    ~title:"set_next_block_info called while executing"
+    ~description:
+      "set_next_block_info was called while instant confirmation was in \
+       Executing state. This should never happen — It should have transitioned \
+       to Awaiting_next_block_info first."
+    ~pp:(fun ppf (new_level, current_level) ->
+      Format.fprintf
+        ppf
+        "set_next_block_info called for level %a while still executing \
+         transaction for level %a"
+        Ethereum_types.pp_quantity
+        new_level
+        Ethereum_types.pp_quantity
+        current_level)
+    Data_encoding.(
+      obj2
+        (req "new_level" Ethereum_types.quantity_encoding)
+        (req "current_level" Ethereum_types.quantity_encoding))
+    (function
+      | Set_next_block_info_while_executing {new_level; current_level} ->
+          Some (new_level, current_level)
+      | _ -> None)
+    (fun (new_level, current_level) ->
+      Set_next_block_info_while_executing {new_level; current_level}) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.execute_single_transaction_no_block_info"
+    ~title:"execute_single_transaction called without block info"
+    ~description:
+      "execute_single_transaction was called while instant confirmation was \
+       awaiting block info. This should never happen — It should have \
+       transitioned to Executing first."
+    ~pp:(fun ppf transaction_hash ->
+      Format.fprintf
+        ppf
+        "execute_single_transaction called for %a while awaiting block info"
+        Ethereum_types.pp_hash
+        transaction_hash)
+    Data_encoding.(obj1 (req "transaction_hash" Ethereum_types.hash_encoding))
+    (function
+      | Execute_single_transaction_no_block_info {transaction_hash} ->
+          Some transaction_hash
+      | _ -> None)
+    (fun transaction_hash ->
+      Execute_single_transaction_no_block_info {transaction_hash})
