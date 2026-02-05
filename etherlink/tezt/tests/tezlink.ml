@@ -1624,6 +1624,77 @@ let test_tezlink_pack_data =
   in
   Lwt_list.iter_s check_pack_data test_cases
 
+let test_tezlink_run_operation =
+  register_tezlink_test
+    ~title:"Test of the run_operation RPC"
+    ~tags:["rpc"; "run_operation"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* Get Tezlink chain_id *)
+  let* tezlink_chain_id =
+    Client.RPC.call ~endpoint:tezlink_endpoint client
+    @@ RPC.get_chain_chain_id ()
+  in
+  (* Get Tezlink head hash for branch *)
+  let* tezlink_head =
+    Client.RPC.call ~endpoint:tezlink_endpoint client
+    @@ RPC.get_chain_block_hash ()
+  in
+  (* Create operation JSON manually with counter=1 (fresh account on Tezlink).
+     This has been validated manually in sandbox mode. *)
+  let op_json =
+    `O
+      [
+        ( "operation",
+          `O
+            [
+              ("branch", `String tezlink_head);
+              ( "contents",
+                `A
+                  [
+                    `O
+                      [
+                        ("kind", `String "transaction");
+                        ("source", `String Constant.bootstrap1.public_key_hash);
+                        ("fee", `String "1000");
+                        ("counter", `String "1");
+                        ("gas_limit", `String "10000");
+                        ("storage_limit", `String "0");
+                        ("amount", `String "1000000");
+                        ( "destination",
+                          `String Constant.bootstrap2.public_key_hash );
+                      ];
+                  ] );
+              ( "signature",
+                `String
+                  "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
+              );
+            ] );
+        ("chain_id", `String tezlink_chain_id);
+      ]
+  in
+  (* Call run_operation on Tezlink *)
+  let* tezlink_result =
+    Client.RPC.call ~endpoint:tezlink_endpoint client
+    @@ RPC.post_chain_block_helpers_scripts_run_operation (Data op_json)
+  in
+  (* Check the status is "applied" *)
+  let tezlink_status =
+    JSON.(
+      tezlink_result |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+      |-> "status" |> as_string)
+  in
+  Check.(
+    (tezlink_status = "applied")
+      string
+      ~error_msg:"Tezlink run_operation status: expected %R but got %L") ;
+  unit
+
 let test_tezlink_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   register_tezlink_test
@@ -3721,6 +3792,7 @@ let () =
   test_tezlink_bigmap_counter [Alpha] ;
   test_tezlink_bigmap_rpcs [Alpha] ;
   test_tezlink_pack_data [Alpha] ;
+  test_tezlink_run_operation [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
   test_tezlink_long_batch [Alpha] ;
