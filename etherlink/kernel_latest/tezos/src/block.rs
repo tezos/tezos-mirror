@@ -5,7 +5,7 @@
 use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
 use primitive_types::H256;
-use rlp::Encodable;
+use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::{self as tezos_nom};
@@ -36,6 +36,15 @@ impl Encodable for OperationsWithReceipts {
             operations.to_bytes().unwrap()
         });
         s.append_internal(&bytes);
+    }
+}
+
+impl Decodable for OperationsWithReceipts {
+    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let bytes = rlp.data()?;
+        Self::nom_read_exact(bytes).map_err(|_| {
+            rlp::DecoderError::Custom("Failed to decode OperationsWithReceipts")
+        })
     }
 }
 
