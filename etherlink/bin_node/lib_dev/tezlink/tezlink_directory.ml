@@ -126,6 +126,13 @@ struct
     let open Result_syntax in
     let open Tezlink_mock in
     let* predecessor = ethereum_to_tezos_block_hash block.parent_hash in
+    let round = Tezlink_imports.Imported_protocol.Round_repr.zero in
+    let fitness =
+      Tezlink_constants.fitness
+        ~level:block.level
+        ~predecessor_round:round
+        ~round
+    in
     return
       Block_header.
         {

@@ -22,13 +22,10 @@ let operations_hash =
   Operation_list_list_hash.of_bytes_exn (Bytes.make 32 '\000')
 
 let fitness =
-  [
-    Bytes.make 4 '\255';
-    Bytes.make 4 '\255';
-    Bytes.make 4 '\255';
-    Bytes.make 4 '\255';
-    Bytes.make 4 '\000';
-  ]
+  Tezlink_constants.fitness
+    ~level:0l
+    ~predecessor_round:Imported_protocol.Round_repr.zero
+    ~round:Imported_protocol.Round_repr.zero
 
 (* TODO #7866
    When blocks are populated, this mock value will be unnecessary,
