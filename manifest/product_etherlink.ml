@@ -180,6 +180,44 @@ let supported_installers =
           ];
         ]
 
+let tezlink_node_migrations =
+  octez_evm_node_lib
+    "tezlink_node_migrations"
+    ~path:"etherlink/bin_node/tezlink_migrations"
+    ~synopsis:"SQL migrations for the EVM node store related to Tezlink"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "tezlink_migrations.ml"];
+            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
 let evm_node_migrations =
   octez_evm_node_lib
     "evm_node_migrations"
@@ -362,6 +400,7 @@ let evm_node_lib_dev =
         octez_smart_rollup_lib |> open_;
         octez_smart_rollup_node_store_lib;
         evm_node_migrations;
+        tezlink_node_migrations;
         prometheus_app;
         octez_dal_node_services;
         supported_installers;

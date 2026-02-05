@@ -296,7 +296,13 @@ let check_metadata ~populated ~data_dir metadata : unit tzresult Lwt.t =
         (rollup_address, current_level, Some (history_mode, first_level))
   in
   when_ populated @@ fun () ->
-  let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
+  let* store =
+    Evm_store.init
+      ~chain_family:L2_types.EVM
+      ~data_dir
+      ~perm:(Read_only {pool_size = 1})
+      ()
+  in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.find conn in
   let* () =

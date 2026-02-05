@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezlink_node_migrations)
+ (public_name octez-evm-node-libs.tezlink_node_migrations)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  caqti-lwt
+  re
+  octez-l2-libs.sqlite)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Octez_sqlite))
+
+(rule
+ (target tezlink_migrations.ml)
+ (deps (glob_files *.sql))
+ (action (run ocaml-crunch -e sql -m plain -o %{target} -s .)))

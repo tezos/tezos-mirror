@@ -18,9 +18,9 @@ end
 
 type migration = (module S)
 
-let make_migration path =
+let make_tezlink_migration path =
   let read_exn path =
-    match Migrations.read path with
+    match Tezlink_migrations.read path with
     | Some content -> content
     | None -> raise (Invalid_argument "read_exn")
   in
@@ -32,6 +32,7 @@ let make_migration path =
   in
 
   let migration_step = ( @@ ) (unit ->. unit) in
+
   let make_migration_requests str =
     String.split ';' str
     |> List.filter_map (fun i ->
@@ -44,5 +45,6 @@ let make_migration path =
     let up = make_migration_requests (read_exn path)
   end : S)
 
-let migrations version =
-  List.take_n (version + 1) Migrations.file_list |> List.map make_migration
+let tezlink_migrations version =
+  List.take_n (version + 1) Tezlink_migrations.file_list
+  |> List.map make_tezlink_migration

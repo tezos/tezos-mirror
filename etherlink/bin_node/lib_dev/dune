@@ -35,6 +35,7 @@
   octez-l2-libs.smart-rollup
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-evm-node-libs.evm_node_migrations
+  octez-evm-node-libs.tezlink_node_migrations
   octez-libs.prometheus-app
   tezos-dal-node-services
   octez-evm-node-libs.evm_node_supported_installers
