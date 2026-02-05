@@ -440,13 +440,12 @@ module Packaging = struct
         "$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
   let make_variables ?(kind = "build") add =
-    ("FLAVOUR", kind)
-    :: ( "DEP_IMAGE",
-         "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION" )
-       (* this second variable is for a read only registry and we want it to be
+    ( "DEP_IMAGE",
+      sf "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/%s-$DISTRIBUTION" kind )
+    (* this second variable is for a read only registry and we want it to be
             tezos/tezos *)
     :: ( "DEP_IMAGE_PROTECTED",
-         "${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION" )
+         sf "${GCP_PROTECTED_REGISTRY}/tezos/tezos/%s-$DISTRIBUTION" kind )
     :: add
 
   let make_job_build_packages ~__POS__ ?timeout ?(limit_dune_build_jobs = false)

@@ -52,9 +52,8 @@ oc.docker-build-rockylinux-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-bcfcb772
   parallel:
@@ -90,9 +89,8 @@ oc.docker-build-merge-manifest.rockylinux:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -126,9 +124,8 @@ oc.build-rockylinux:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -172,9 +169,8 @@ oc.build-rockylinux-data:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -249,9 +245,8 @@ oc.docker-build-fedora-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: fedora
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-bcfcb772
   parallel:
@@ -287,9 +282,8 @@ oc.docker-build-merge-manifest.fedora:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: fedora
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -323,9 +317,8 @@ oc.build-fedora:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: fedora
     DUNE_BUILD_JOBS: -j 12
     CARGO_INCREMENTAL: "0"
@@ -369,9 +362,8 @@ oc.build-fedora-data:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: fedora
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -446,9 +438,8 @@ oc.docker-systemd-tests-rpm-fedora:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: fedora
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-bcfcb772
   parallel:
@@ -484,9 +475,8 @@ oc.docker-systemd-merge-manifest.fedora:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: fedora
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -545,9 +535,8 @@ oc.install_bin_fedora_39_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: fedora
     RELEASE: "39"
 
@@ -573,9 +562,8 @@ oc.docker-systemd-tests-rpm-rockylinux:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-bcfcb772
   parallel:
@@ -611,9 +599,8 @@ oc.docker-systemd-merge-manifest.rockylinux:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -672,8 +659,7 @@ oc.install_bin_rockylinux_9_systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: rockylinux
     RELEASE: "9"

@@ -66,9 +66,8 @@ oc.docker-systemd_tests_debian:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: debian
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-bcfcb772
   parallel:
@@ -102,9 +101,8 @@ oc.docker-systemd-merge-manifest.debian:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     DISTRIBUTION: debian
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -136,9 +134,8 @@ oc.docker-build-debian-dependencies:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
     BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-bcfcb772
   parallel:
@@ -172,9 +169,8 @@ oc.docker-build-merge-manifest.debian:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
     IMAGE_NAME: $DEP_IMAGE
   parallel:
@@ -207,9 +203,8 @@ oc.build-debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
@@ -248,9 +243,8 @@ oc.build-data_packages:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    FLAVOUR: build
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
     RELEASE: trixie
     TAGS: gcp
@@ -361,9 +355,8 @@ oc.install_bin_debian_bookworm_systemd_test:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
@@ -393,9 +386,8 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    FLAVOUR: systemd-tests
-    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
-    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/systemd-tests-$DISTRIBUTION
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: debian
     RELEASE: bookworm
