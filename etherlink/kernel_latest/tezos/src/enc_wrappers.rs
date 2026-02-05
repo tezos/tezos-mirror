@@ -8,6 +8,7 @@
 /// `NomReader` and `BinWriter` to enable derivation for more complex encodings in a tezos compatible way.
 use nom::{bytes::complete::take, combinator::map};
 use primitive_types::{H256, U256};
+use rlp::Encodable;
 use std::fmt::Display;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::{
@@ -19,6 +20,12 @@ use thiserror::Error;
 #[derive(PartialEq, Debug, NomReader, BinWriter, Clone, Copy)]
 pub struct BlockNumber {
     pub block_number: u32,
+}
+
+impl Encodable for BlockNumber {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.append_internal(&self.block_number.to_le_bytes().to_vec());
+    }
 }
 
 impl Display for BlockNumber {
@@ -81,6 +88,12 @@ macro_rules! define_h256 {
                     H256::from_slice,
                 )(bytes)?;
                 Ok((remaining, $name(hash)))
+            }
+        }
+
+        impl Encodable for $name {
+            fn rlp_append(&self, s: &mut rlp::RlpStream) {
+                s.append_internal(&self.0);
             }
         }
 

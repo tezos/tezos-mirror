@@ -5,6 +5,7 @@
 use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
 use primitive_types::H256;
+use rlp::Encodable;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::{self as tezos_nom};
@@ -21,15 +22,44 @@ pub struct AppliedOperation {
     pub op_and_receipt: OperationDataAndMetadata,
 }
 
-// WIP: This structure will evolve to look like Tezos block
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
+pub struct OperationsWithReceipts {
+    pub list: Vec<AppliedOperation>,
+}
+
+impl Encodable for OperationsWithReceipts {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        let bytes = self.to_bytes().unwrap_or_else(|_| {
+            let operations = OperationsWithReceipts { list: vec![] };
+            // This is a "safe" unwrap as we know exactly what we're trying to
+            // convert to bytes.
+            operations.to_bytes().unwrap()
+        });
+        s.append_internal(&bytes);
+    }
+}
+
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TezBlock {
     pub hash: BlockHash,
     pub number: BlockNumber,
     pub previous_hash: BlockHash,
     pub timestamp: Timestamp,
-    #[encoding(dynamic, list)]
-    pub operations: Vec<AppliedOperation>,
+    pub operations: OperationsWithReceipts,
+}
+
+const VERSION: u8 = 0;
+
+impl Encodable for TezBlock {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(6);
+        s.append(&VERSION);
+        s.append(&self.hash);
+        s.append(&self.number);
+        s.append(&self.previous_hash);
+        s.append(&self.timestamp.i64().to_le_bytes().to_vec());
+        s.append(&self.operations);
+    }
 }
 
 impl TezBlock {
@@ -46,10 +76,13 @@ impl TezBlock {
 
     // This function must be used on a TezBlock whose hash field is H256::zero()
     fn hash(&self) -> Result<BlockHash, BinError> {
-        let mut encoded_data = vec![];
-        self.bin_write(&mut encoded_data)?;
+        let encoded_data = self.to_bytes();
         let hashed_data = digest_256(&encoded_data);
         Ok(BlockHash(H256::from_slice(&hashed_data)))
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.rlp_bytes().to_vec()
     }
 
     pub fn new(
@@ -63,7 +96,7 @@ impl TezBlock {
             number,
             timestamp,
             previous_hash: BlockHash(previous_hash),
-            operations,
+            operations: OperationsWithReceipts { list: operations },
         };
         Ok(Self {
             hash: block.hash()?,
@@ -87,9 +120,7 @@ mod tests {
     use super::{AppliedOperation, TezBlock};
 
     pub fn block_roundtrip(block: TezBlock) {
-        let bytes = block
-            .to_bytes()
-            .expect("Block encoding should have succeeded");
+        let bytes = BinWriter::to_bytes(&block).expect("Encoding should succeed");
         let decoded_block =
             TezBlock::nom_read_exact(&bytes).expect("Block should be decodable");
         assert_eq!(block, decoded_block, "Roundtrip failed on {block:?}")
