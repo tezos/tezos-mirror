@@ -35,6 +35,15 @@ oc.base-images.debian:
   rules:
   - changes:
     - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-homebrew
+    - images/base-images/Dockerfile.rust
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_sccache_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/docker-merge-base-images.sh
+    - scripts/kiss-fetch.sh
+    - scripts/packaging/homebrew_install.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
@@ -73,6 +82,10 @@ oc.base-images.ubuntu:
   rules:
   - changes:
     - images/base-images/Dockerfile.debian
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
@@ -114,6 +127,11 @@ oc.base-images.fedora:
   rules:
   - changes:
     - images/base-images/Dockerfile.rpm
+    - images/scripts/configure_rpm_proxy.sh
+    - images/scripts/install-gcloud-dnf.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
@@ -152,6 +170,11 @@ oc.base-images.rockylinux:
   rules:
   - changes:
     - images/base-images/Dockerfile.rpm
+    - images/scripts/configure_rpm_proxy.sh
+    - images/scripts/install-gcloud-dnf.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
@@ -190,6 +213,12 @@ oc.base-images.rust:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.rust
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_sccache_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/docker-merge-base-images.sh
+    - scripts/kiss-fetch.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
@@ -228,6 +257,17 @@ oc.base-images.rust.merge:
   stage: images
   tags:
   - gcp
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.rust
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - images/scripts/install_sccache_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/ci/docker-merge-base-images.sh
+    - scripts/kiss-fetch.sh
+    when: on_success
   needs:
   - oc.base-images.rust
   dependencies: []
@@ -259,6 +299,11 @@ oc.base-images.debian-homebrew:
   - changes:
     - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-homebrew
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
+    - scripts/packaging/homebrew_install.sh
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
