@@ -779,7 +779,7 @@ mod tests {
         let gas_limit = 300_000;
         let gas_price = block.base_fee_per_gas() + 1;
         // create contract
-        let registry = RegistryImpl::new();
+        let registry = RegistryImpl::default();
         let outcome = run_transaction(
             host,
             &registry,
@@ -812,7 +812,7 @@ mod tests {
     fn simulation_result() {
         // setup
         let mut host = MockKernelHost::default();
-        let registry = RegistryImpl::new();
+        let registry = RegistryImpl::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num
@@ -871,7 +871,7 @@ mod tests {
     fn evaluation_result_no_gas() {
         // setup
         let mut host = MockKernelHost::default();
-        let registry = RegistryImpl::new();
+        let registry = RegistryImpl::default();
         let new_address = create_contract(&mut host);
 
         // run evaluation num

@@ -4,6 +4,7 @@
 
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
 use alloy_sol_types::SolCall;
+use primitive_types::U256;
 use revm::context::result::ExecutionResult;
 use revm::state::Bytecode;
 use revm_etherlink::{
@@ -28,7 +29,21 @@ alloy_sol_types::sol! {
     function init_tezosx_alias(string nativeAddress) external payable;
 }
 
-pub struct EthereumRuntime;
+pub struct EthereumRuntime {
+    chain_id: primitive_types::U256,
+}
+
+impl Default for EthereumRuntime {
+    fn default() -> Self {
+        Self::new(U256::from(1337))
+    }
+}
+
+impl EthereumRuntime {
+    pub fn new(chain_id: primitive_types::U256) -> Self {
+        Self { chain_id }
+    }
+}
 
 /// Read the sequencer pool address (coinbase) from storage.
 fn read_sequencer_pool_address(host: &impl Runtime) -> Option<primitive_types::H160> {
@@ -124,7 +139,7 @@ impl RuntimeInterface for EthereumRuntime {
                 primitive_types::U256::zero(),
                 primitive_types::U256::zero(),
             ),
-            chain_id: primitive_types::U256::from(context.chain_id),
+            chain_id: self.chain_id,
             tezos_experimental_features: true,
             prevrandao: None,
         };

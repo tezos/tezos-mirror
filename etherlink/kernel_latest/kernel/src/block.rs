@@ -412,7 +412,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
-    let registry = RegistryImpl::new();
+    let registry = RegistryImpl::new(chain_config.get_chain_id());
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
@@ -1625,7 +1625,7 @@ mod tests {
     fn test_stop_computation() {
         // init host
         let mut host = MockKernelHost::default();
-        let registry = RegistryImpl::new();
+        let registry = RegistryImpl::default();
         let block_constants = first_block(&mut host);
 
         //provision sender account

@@ -525,7 +525,7 @@ mod test {
             pub(crate) fn new() -> Self {
                 Self {
                     mock_tezos: MockTezosRuntime,
-                    ethereum: EthereumRuntime,
+                    ethereum: EthereumRuntime::default(),
                 }
             }
 
