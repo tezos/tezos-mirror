@@ -23,3 +23,7 @@ let record_number_of_attested_shards ctxt ~delegate ~attested_level attestation
       committee_level_to_shard_count
   in
   Dal.record_slot_accountability ctxt slot_accountability
+
+let attestations = Dal.attestations
+
+let record_attestation = Dal.record_attestation
