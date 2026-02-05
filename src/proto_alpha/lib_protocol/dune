@@ -212,6 +212,7 @@
   Delegate_slashed_deposits_storage
   Staking
   Clst_finalization
+  Clst_redemption_requests_storage
   Delegate_cycles
   Vote_storage
   Ticket_storage
@@ -524,6 +525,7 @@
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -837,6 +839,7 @@
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli
@@ -1134,6 +1137,7 @@
   delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
   staking.ml staking.mli
   clst_finalization.ml clst_finalization.mli
+  clst_redemption_requests_storage.ml clst_redemption_requests_storage.mli
   delegate_cycles.ml delegate_cycles.mli
   vote_storage.ml vote_storage.mli
   ticket_storage.ml ticket_storage.mli

@@ -195,6 +195,7 @@
         "Delegate_slashed_deposits_storage",
         "Staking",
         "Clst_finalization",
+        "Clst_redemption_requests_storage",
         "Delegate_cycles",
 
         "Vote_storage",
