@@ -269,7 +269,6 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                 // Create context for alias generation using current block constants
                 let context = AliasCreationContext {
                     gas_limit: self.block.gas_limit,
-                    chain_id: self.block.chain_id.as_u64(),
                     timestamp: self.block.timestamp,
                     block_number: self.block.number,
                 };

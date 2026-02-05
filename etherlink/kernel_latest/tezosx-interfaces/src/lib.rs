@@ -12,8 +12,6 @@ use thiserror::Error;
 pub struct AliasCreationContext {
     /// Gas limit
     pub gas_limit: u64,
-    /// Chain ID
-    pub chain_id: u64,
     /// Timestamp for the block
     pub timestamp: U256,
     /// Block number

@@ -635,7 +635,6 @@ mod test {
         ) -> tezosx_interfaces::AliasCreationContext {
             tezosx_interfaces::AliasCreationContext {
                 gas_limit: GAS_LIMIT,
-                chain_id: ETHERLINK_CHAIN_ID,
                 timestamp: PU256::from(1),
                 block_number: PU256::from(1),
             }
