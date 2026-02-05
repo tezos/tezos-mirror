@@ -819,8 +819,9 @@ module Statuses_cache = struct
     in
     (match to_status with
     | `Attested lag ->
-        Dal_metrics.slot_attested ~set:true slot_id.slot_index ;
-        Dal_metrics.slot_attested_with_lag ~lag
+        let slot_index = slot_id.slot_index in
+        Dal_metrics.slot_attested ~set:true slot_index ;
+        Dal_metrics.slot_attested_with_lag ~lag ~slot_index
     | `Unattested ->
         (* per the invariant stated above, the function can only be called once
            per slot_id with the `Unattested value *)

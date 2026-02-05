@@ -226,7 +226,8 @@ module Node_metrics = struct
 
   let attestation_lag_distribution =
     let name = "attestation_lag" in
-    Attestation_lag_histogram.v
+    Attestation_lag_histogram.v_label
+      ~label_name:"slot_index"
       ~help:
         "Distribution of attestation lags for attested slots (in blocks). Use \
          histogram_quantile for percentiles, rate for average."
@@ -649,9 +650,9 @@ let slot_attested ~set i =
 let slot_unattested i =
   Prometheus.Counter.inc_one (Node_metrics.slots_unattested (string_of_int i))
 
-let slot_attested_with_lag ~lag =
+let slot_attested_with_lag ~lag ~slot_index =
   Node_metrics.Attestation_lag_histogram.observe
-    Node_metrics.attestation_lag_distribution
+    (Node_metrics.attestation_lag_distribution (string_of_int slot_index))
     (float_of_int lag)
 
 let attested_slots_for_baker_per_level_ratio ~delegate ratio =

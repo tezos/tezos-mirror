@@ -39,7 +39,7 @@ val slot_unattested : int -> unit
 (** Update attestation lag histogram when a slot is attested.
     Records the lag value in a histogram for distribution analysis.
     The metric name is [dal_node_attestation_lag]. *)
-val slot_attested_with_lag : lag:int -> unit
+val slot_attested_with_lag : lag:int -> slot_index:int -> unit
 
 (** Update the "attestation" ratio for the baker *)
 val attested_slots_for_baker_per_level_ratio :
