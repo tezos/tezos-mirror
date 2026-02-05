@@ -16,6 +16,22 @@ let is_empty = Bitset.is_empty
 
 let to_z = Bitset.to_z
 
+(* A DAL attestation is made of chunks with 1 bit [is_last] followed by
+   [slots_per_chunk] bits to state which slots are attested. *)
+let slots_per_chunk = 7
+
+let bits_per_chunk = slots_per_chunk + 1
+
+let max_chunks ~number_of_slots =
+  let ceil_div a b = (a + b - 1) / b in
+  ceil_div number_of_slots slots_per_chunk
+
+(* [lag_data] contains the information about the representation of a specific
+   lag in the attestation.
+   We assume that the represented lag is non empty, so [nb_chunks > 0] and
+   [offset_start < offset_after] *)
+type lag_data = {offset_start : int; offset_after : int; nb_chunks : int}
+
 (* Helper to safely check membership in a bitset, returning false on error. *)
 let bitset_mem bitset idx =
   match Bitset.mem bitset idx with Ok b -> b | Error _ -> false
@@ -24,8 +40,69 @@ let bitset_mem bitset idx =
 let bitset_add bitset idx =
   match Bitset.add bitset idx with Ok b -> b | Error _ -> bitset
 
+(* Helper to safely remove from a bitset, returning the original bitset on error. *)
+let bitset_remove bitset idx =
+  match Bitset.remove bitset idx with Ok b -> b | Error _ -> bitset
+
 (* Check if the attestation at [lag_index] is empty *)
 let is_empty_at_lag_index t ~lag_index = not @@ bitset_mem t lag_index
+
+(* Shift all bits at or after [from] by [shift] positions. *)
+let shift_bits_after bitset ~from ~shift =
+  if Compare.Int.(shift = 0) then bitset
+  else
+    List.fold_left
+      (fun res index ->
+        let new_index =
+          if Compare.Int.(index >= from) then index + shift else index
+        in
+        bitset_add res new_index)
+      Bitset.empty
+      (Bitset.to_list bitset)
+
+(* Scan chunks starting at [start] and return (chunks_count, end_offset). *)
+let scan_chunks t ~start ~max_chunks =
+  let rec loop nb_chunks offset =
+    if Compare.Int.(nb_chunks >= max_chunks) then
+      assert false (* The last chunk has to have the [is_last] bit to true. *)
+    else
+      let next_offset = offset + bits_per_chunk in
+      let is_last = bitset_mem t offset in
+      if is_last then (nb_chunks + 1, next_offset)
+      else loop (nb_chunks + 1) next_offset
+  in
+  loop 0 start
+
+(* Scan the data section from lag 0 up to [lag_index], returning the lag data
+   for [lag_index] (if any) and its offset.  *)
+let scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index =
+  let max_chunks = max_chunks ~number_of_slots in
+  let rec scan current_lag_index offset =
+    if Compare.Int.(current_lag_index >= number_of_lags) then assert false
+    else if bitset_mem t current_lag_index then
+      let nb_chunks, next_offset = scan_chunks t ~start:offset ~max_chunks in
+      if Compare.Int.(current_lag_index = lag_index) then
+        ( Some {offset_start = offset; offset_after = next_offset; nb_chunks},
+          offset )
+      else scan (current_lag_index + 1) next_offset
+    else if Compare.Int.(current_lag_index = lag_index) then (None, offset)
+    else scan (current_lag_index + 1) offset
+  in
+  scan 0 number_of_lags
+
+let find_lag_data t ~number_of_slots ~number_of_lags ~lag_index =
+  fst (scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index)
+
+(* Return the data offset before [lag_index]. *)
+let data_offset_before_lag t ~number_of_slots ~number_of_lags ~lag_index =
+  snd (scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index)
+
+let slot_bit_position ~offset_start ~slot_index =
+  let chunk_index = slot_index / slots_per_chunk in
+  (* The first bit in each chunk is [is_last] which tells if the chunk is the
+     last associated to current lag. *)
+  let bit_in_chunk = 1 + (slot_index mod slots_per_chunk) in
+  offset_start + (chunk_index * bits_per_chunk) + bit_in_chunk
 
 (* Helper: compute the data bit position for a slot at a given lag_index.
    Returns None if the attestation at lag_index is empty. *)
@@ -35,21 +112,13 @@ let compute_data_bit_position t ~number_of_slots ~number_of_lags ~lag_index
   let is_non_empty = bitset_mem t lag_index in
   if not is_non_empty then None
   else
-    (* Count non-empty attestations before [lag_index] *)
-    let rec count_preceding acc idx =
-      if Compare.Int.(idx >= lag_index) then acc
-      else
-        let is_set = bitset_mem t idx in
-        count_preceding (if is_set then acc + 1 else acc) (idx + 1)
-    in
-    let num_preceding_non_empty = count_preceding 0 0 in
-    let slot_bit_idx = Dal_slot_index_repr.to_int slot_index in
-    let data_bit_pos =
-      number_of_lags
-      + (num_preceding_non_empty * number_of_slots)
-      + slot_bit_idx
-    in
-    Some data_bit_pos
+    match find_lag_data t ~number_of_slots ~number_of_lags ~lag_index with
+    | None -> None
+    | Some {offset_start; nb_chunks = chunks; _} ->
+        let slot_bit_idx = Dal_slot_index_repr.to_int slot_index in
+        let chunk_index = slot_bit_idx / slots_per_chunk in
+        if Compare.Int.(chunk_index >= chunks) then None
+        else Some (slot_bit_position ~offset_start ~slot_index:slot_bit_idx)
 
 let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
   assert (Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)) ;
@@ -79,51 +148,69 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
 let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
   assert (Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)) ;
   assert (Compare.Int.(Dal_slot_index_repr.to_int slot_index < number_of_slots)) ;
-
-  let is_non_empty_at idx = bitset_mem bitset idx in
-
-  (* Count non-empty attestations before [lag_index] *)
-  let rec count_before acc idx =
-    if Compare.Int.(idx >= lag_index) then acc
-    else count_before (if is_non_empty_at idx then acc + 1 else acc) (idx + 1)
+  (* Write chunk data for a lag at [offset_start] into [bitset].
+   [slots] is a list of attested slot indices.
+   [chunks_needed] is the number of chunks to allocate.
+   Sets the [is_last] bit on the last chunk and each slot's bit.
+   Does NOT clear the potentially already existing [is_last] bits.
+   Does NOT set the prefix bit — the caller must do that. *)
+  let write_lag_data bitset ~offset_start ~chunks_needed slots =
+    let result =
+      bitset_add bitset (offset_start + ((chunks_needed - 1) * bits_per_chunk))
+    in
+    List.fold_left
+      (fun acc slot_index ->
+        bitset_add acc (slot_bit_position ~offset_start ~slot_index))
+      result
+      slots
   in
-  let num_before = count_before 0 0 in
+  let is_non_empty_at idx = bitset_mem bitset idx in
+  let slot_idx = Dal_slot_index_repr.to_int slot_index in
+  let chunk_index = slot_idx / slots_per_chunk in
+  let chunks_needed = chunk_index + 1 in
 
   if is_non_empty_at lag_index then
-    (* Fast path: attestation already exists, just set the bit *)
-    let data_start = number_of_lags + (num_before * number_of_slots) in
-    let slot_idx = Dal_slot_index_repr.to_int slot_index in
-    bitset_add bitset (data_start + slot_idx)
-  else
-    (* Slow path: attestation is empty. Build new bitset by copying old bits,
-       shifting those at or after [insertion_point] by [number_of_slots] to make
-       room for the new attestation data. *)
-    let insertion_point = number_of_lags + (num_before * number_of_slots) in
-    (* Copy all existing bits, shifting data bits at or after [insertion_point] *)
-    let result =
-      List.fold_left
-        (fun res index ->
-          let new_index =
-            if Compare.Int.(index >= insertion_point) then
-              index + number_of_slots
-            else index
+    match find_lag_data bitset ~number_of_slots ~number_of_lags ~lag_index with
+    | None -> assert false
+    | Some {offset_start; nb_chunks; offset_after} ->
+        if Compare.Int.(chunk_index < nb_chunks) then
+          (* Fast path: slot is within existing chunks. *)
+          bitset_add
+            bitset
+            (slot_bit_position ~offset_start ~slot_index:slot_idx)
+        else
+          (* Extend the lag with extra chunks. *)
+          let extra_chunks = chunks_needed - nb_chunks in
+          let shift = extra_chunks * bits_per_chunk in
+          let result = shift_bits_after bitset ~from:offset_after ~shift in
+          let result =
+            (* The previously last chunk is not the last anymore. *)
+            bitset_remove
+              result
+              (offset_start + ((nb_chunks - 1) * bits_per_chunk))
           in
-          bitset_add res new_index)
-        Bitset.empty
-        (Bitset.to_list bitset)
+          write_lag_data result ~offset_start ~chunks_needed [slot_idx]
+  else
+    (* Lag is empty: insert its chunks in order. *)
+    let insertion_point =
+      data_offset_before_lag bitset ~number_of_slots ~number_of_lags ~lag_index
     in
-    (* Set the new lag index bit in the prefix *)
+    let shift = chunks_needed * bits_per_chunk in
+    let result = shift_bits_after bitset ~from:insertion_point ~shift in
+    (* The lag index is not empty anymore, so one has to update the prefix. *)
     let result = bitset_add result lag_index in
-    (* Set the new slot bit at the insertion point *)
-    let slot_idx = Dal_slot_index_repr.to_int slot_index in
-    bitset_add result (insertion_point + slot_idx)
+    write_lag_data
+      result
+      ~offset_start:insertion_point
+      ~chunks_needed
+      [slot_idx]
 
 let occupied_size_in_bits = Bitset.occupied_size_in_bits
 
 let expected_max_size_in_bits ~number_of_slots ~number_of_lags =
-  (* [number_of_lags] for the prefix and [number_of_lags * number_of_slots] for
-     the data section. *)
-  number_of_lags * (1 + number_of_slots)
+  (* [number_of_lags] for the prefix and [number_of_lags] chunks of 8 bits. *)
+  let max_chunks = max_chunks ~number_of_slots in
+  number_of_lags + (number_of_lags * max_chunks * bits_per_chunk)
 
 let weight t = Bitset.cardinal t
 

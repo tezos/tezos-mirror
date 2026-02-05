@@ -437,7 +437,7 @@ let test_size_calculation () =
       Int.equal
       "Expected max size"
       Format.pp_print_int
-      (number_of_lags * (1 + number_of_slots))
+      (number_of_lags + (number_of_lags * ((number_of_slots + 6) / 7) * 8))
       expected_max
   in
 

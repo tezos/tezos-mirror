@@ -23,7 +23,7 @@
     {1 Encoding}
 
     The encoding uses a compact bitset representation that minimizes space
-    when attestations are empty:
+    when attestations are sparse:
 
     {2 Bitset structure}
 
@@ -38,7 +38,11 @@
 
     - {b Data section} (starting at bit position [number_of_lags]): For each
     non-empty attestation (in order from lag index [0] to [number_of_lags-1]),
-    exactly [number_of_slots] bits are stored, representing the attested slots.
+    a sequence of 8-bit chunks is stored:
+    - bit 0 of each chunk is an {b is_last} flag (1 iff this is the last chunk
+      for the current lag).
+    - bits 1..7 encode slots, with the first block covering slots 0..6, the
+      next block slots 7..13, etc.
     Empty attestations are not stored in the data section.
 
     - {b Empty case}: An empty bitset (value 0) represents the case where all
@@ -48,31 +52,13 @@
 
     For [number_of_lags = 4] and [number_of_slots = 32]:
     - Attestation at lag index 0: empty
-    - Attestation at lag index 1: slots 1, 5 attested
+    - Attestation at lag index 1: slots 0 and 2 attested
     - Attestation at lag index 2: empty
-    - Attestation at lag index 3: slots 0, 1 attested
+    - Attestation at lag index 3: slots 0 and 1 attested
 
-    The full bitset in standard binary notation (MSB left, LSB right):
-
-{v
-00000000000000000000000000000011 00000000000000000000000000100010 1010
-<-------- lag 3 data ----------> <-------- lag 1 data ----------> <-->
-         (32 bits)                        (32 bits)               prefix
-        slots 0, 1                       slots 1, 5             lags 1, 3
-v}
-
-    Bit positions:
-    - Prefix: bits 0-3 (rightmost 4 bits), value [0b1010 = 10]
-    - Lag 1 data: bits 4-35, with bits 5 and 9 set (slots 1 and 5)
-    - Lag 3 data: bits 36-67, with bits 36 and 37 set (slots 0 and 1)
-    - Total: 68 bits
-
-    {3 Design considerations}
-
-    An {b alternative encoding} would store the actual length of each non-empty
-    attestation (e.g., 5 bits for length, then that many data bits). This would
-    save space when attestations have few bits set, at the cost of additional
-    complexity. *)
+    The prefix has bits 1 and 3 set. The data section contains:
+    - Lag 1: one block (is_last=1) with slot bits for 0..6, where 0 and 2 are set.
+    - Lag 3: one block (is_last=1) with slot bits for 0..6, where 0 and 1 are set. *)
 
 type t = private Bitset.t
 
