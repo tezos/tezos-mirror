@@ -4,7 +4,7 @@
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
   "max_micheline_bytes_limit": 50000,
-  "max_allowed_global_constants_depth": 10000, "cache_layout_size": 3,
+  "max_allowed_global_constants_depth": 10000, "cache_layout_size": 4,
   "michelson_maximum_type_size": 2001, "denunciation_period": 1,
   "slashing_delay": 1, "smart_rollup_max_wrapped_proof_binary_size": 30000,
   "smart_rollup_message_size_limit": 4096,
@@ -37,7 +37,7 @@
   "max_slashing_per_block": 10000,
   "max_slashing_threshold": { "numerator": 1, "denominator": 3 },
   "cache_script_size": 100000000, "cache_stake_distribution_cycles": 5,
-  "cache_sampler_state_cycles": 5,
+  "cache_sampler_state_cycles": 5, "cache_stake_info_cycles": 5,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": true,
       "dynamic_lag_enable": false, "number_of_slots": 16,
