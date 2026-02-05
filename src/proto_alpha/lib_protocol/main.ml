@@ -120,58 +120,22 @@ let can_contain_preattestations mode =
       in
       return (Option.is_some locked_round)
 
-let delegate_to_shard_count ctxt attestations_map ~current_level
-    ~predecessor_level =
+let delegate_to_shard_count ctxt ~attested_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  (* The relevant DAL levels are: [published_level + attestation_lag - 1], where
-     [published_level = dal_attested_level - lag], [dal_attested_level] is the
-     current_level and [lag] is in [attestation_lags]. The relevant level
-     corresponding to the last (and highest) lag in [attestation_lags], which is
-     [attestation_lag], is [predecessor_level], for which we already have the
-     shard count in [attestations_map]. *)
-  let attestation_lag = Constants.dal_attestation_lag ctxt in
-  let dal_levels =
-    let lags =
-      match List.tl @@ List.rev @@ Constants.dal_attestation_lags ctxt with
-      | None -> assert false
-      | Some l -> l
-    in
+  let committee_levels =
     List.filter_map
       (fun lag ->
-        match Level.sub ctxt current_level lag with
-        | None -> None
-        | Some level -> Some (Level.add ctxt level (attestation_lag - 1)))
-      lags
+        let level_opt = Dal.committee_level_of ctxt ~attested_level ~lag in
+        Option.map (Level.from_raw ctxt) level_opt)
+      (Constants.dal_attestation_lags ctxt)
   in
-  let* ctxt, delegate_to_shard_count =
-    List.fold_left_es
-      (fun (ctxt, dal_map) level ->
-        let* ctxt, counts = Baking.delegate_to_shard_count ctxt level in
-        return (ctxt, Raw_level.Map.add level.level counts dal_map))
-      (ctxt, Raw_level.Map.empty)
-      dal_levels
-  in
-  let counts_at_predecessor_level =
-    Slot.Map.fold
-      (fun _first_slot
-           Consensus_key.{consensus_key; dal_power; _}
-           delegate_map
-         ->
-        Signature.Public_key_hash.Map.add
-          consensus_key.delegate
-          dal_power
-          delegate_map)
-      attestations_map
-      Signature.Public_key_hash.Map.empty
-  in
-  let delegate_to_shard_count =
-    Raw_level.Map.add
-      predecessor_level.Level.level
-      counts_at_predecessor_level
-      delegate_to_shard_count
-  in
-  return (ctxt, delegate_to_shard_count)
+  List.fold_left_es
+    (fun (ctxt, dal_map) committee_level ->
+      let* ctxt, counts = Baking.delegate_to_shard_count ctxt committee_level in
+      return (ctxt, Raw_level.Map.add committee_level.level counts dal_map))
+    (ctxt, Raw_level.Map.empty)
+    committee_levels
 
 (** Initialize the consensus rights by first slot for modes that are
     about the validation/application of a block: application, partial
@@ -196,11 +160,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     else return (ctxt, None)
   in
   let* ctxt, delegate_to_shard_count =
-    delegate_to_shard_count
-      ctxt
-      attestations_map
-      ~current_level
-      ~predecessor_level
+    delegate_to_shard_count ctxt ~attested_level:current_level.level
   in
   let ctxt =
     Consensus.initialize_consensus_operation
@@ -208,7 +168,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
       ~allowed_consensus:None
-      ~delegate_to_shard_count:(Some delegate_to_shard_count)
+      ~delegate_to_shard_count
   in
   return ctxt
 
@@ -241,6 +201,10 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       (ctxt, Level.Map.empty)
       allowed_levels
   in
+  let current_level = Level.current ctxt in
+  let* ctxt, delegate_to_shard_count =
+    delegate_to_shard_count ctxt ~attested_level:current_level.level
+  in
   let ctxt =
     (* Store the resulting map in the context as [allowed_consensus]. *)
     Consensus.initialize_consensus_operation
@@ -248,7 +212,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       ~allowed_attestations:None
       ~allowed_preattestations:None
       ~allowed_consensus:(Some minimal_slots)
-      ~delegate_to_shard_count:None
+      ~delegate_to_shard_count
   in
   return ctxt
 

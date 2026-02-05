@@ -360,7 +360,6 @@ end
 type consensus_power = {
   consensus_key : consensus_pk;
   attesting_power : Attesting_power_repr.t;
-  dal_power : int;
 }
 
 module type CONSENSUS = sig
@@ -398,7 +397,7 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+    t -> int Signature.Public_key_hash.Map.t raw_level_map
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -420,8 +419,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:
-      int Signature.Public_key_hash.Map.t raw_level_map option ->
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -502,15 +500,22 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
+  (** [committee_level_of ctxt ~attested_level ~lag] computes the shard
+      assignment level, aka as committee level, for the slots published at
+      [attested_level - lag], referred to as [published_level].
+
+      The committee level for a given [published_level] is defined
+      as [published_level + attestation_lag - 1].
+
+      It returns [None] if [published_level] is negative. *)
+  val committee_level_of :
+    t -> attested_level:Raw_level_repr.t -> lag:int -> Raw_level_repr.t option
+
   (** [record_number_of_attested_shards ctxt attestation ~delegate
-      number_of_shards] records that the [number_of_shards] shards were attested
+      number_of_shards] records that a number of shards were attested
       (declared available) by [delegate]. *)
   val record_number_of_attested_shards :
-    t ->
-    Dal_attestation_repr.t ->
-    delegate:Signature.public_key_hash ->
-    int ->
-    t
+    t -> Dal_attestation_repr.t -> delegate:Signature.public_key_hash -> t
 
   (** [register_slot_header ctxt slot_header ~source] returns a new context
       where the new candidate [slot] published by [source] has been taken into

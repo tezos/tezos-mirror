@@ -2315,7 +2315,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? {consensus_key; attesting_power; dal_power = _} =
+      let*? {consensus_key; attesting_power} =
         find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
@@ -2346,7 +2346,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt ~delegate level slot ~dal_power dal_content_opt =
+let record_dal_content ctxt ~delegate level tb_slot dal_content_opt =
   let open Lwt_result_syntax in
   match dal_content_opt with
   | None -> return ctxt
@@ -2361,12 +2361,7 @@ let record_dal_content ctxt ~delegate level slot ~dal_power dal_content_opt =
         else attestation
       in
       let*? ctxt =
-        Dal_apply.apply_attestation
-          ctxt
-          ~delegate
-          ~tb_slot:slot
-          attestation
-          ~power:dal_power
+        Dal_apply.apply_attestation ctxt ~delegate ~tb_slot attestation
       in
       return ctxt
 
@@ -2393,7 +2388,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? {consensus_key; attesting_power; dal_power} =
+      let*? {consensus_key; attesting_power} =
         find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
@@ -2408,7 +2403,6 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
           ~delegate:consensus_key.delegate
           consensus.level
           consensus.slot
-          ~dal_power
           dal_content_opt
       in
       return (ctxt, mk_attestation_result consensus_key attesting_power)
@@ -2446,7 +2440,6 @@ let record_attestations_aggregate ctxt (mode : mode)
             let*? {
                     consensus_key = {delegate; consensus_pkh; _};
                     attesting_power;
-                    dal_power;
                   } =
               find_in_slot_map slot slot_map
             in
@@ -2457,13 +2450,7 @@ let record_attestations_aggregate ctxt (mode : mode)
                 ~power:attesting_power
             in
             let* ctxt =
-              record_dal_content
-                ctxt
-                ~delegate
-                content.level
-                slot
-                ~dal_power
-                dal
+              record_dal_content ctxt ~delegate content.level slot dal
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
@@ -2520,11 +2507,8 @@ let record_preattestations_aggregate ctxt (mode : mode)
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) slot ->
-            let* {
-                   consensus_key = {delegate; consensus_pkh; _};
-                   attesting_power;
-                   dal_power = _;
-                 } =
+            let* {consensus_key = {delegate; consensus_pkh; _}; attesting_power}
+                =
               find_in_slot_map slot slot_map
             in
             let* ctxt =
@@ -3074,7 +3058,7 @@ let record_attesting_participation ctxt dal_slot_availability =
   | Some validators ->
       Slot.Map.fold_es
         (fun initial_slot
-             ({consensus_key; attesting_power; dal_power} : Consensus_key.power)
+             ({consensus_key; attesting_power} : Consensus_key.power)
              ctxt
            ->
           let participation =
@@ -3093,7 +3077,6 @@ let record_attesting_participation ctxt dal_slot_availability =
             ctxt
             consensus_key.delegate
             initial_slot
-            ~dal_power
             dal_slot_availability)
         validators
         ctxt

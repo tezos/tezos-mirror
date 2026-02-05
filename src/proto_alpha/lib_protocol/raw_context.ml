@@ -95,7 +95,6 @@ let consensus_pk_encoding =
 type consensus_power = {
   consensus_key : consensus_pk;
   attesting_power : Attesting_power_repr.t;
-  dal_power : int;
 }
 
 module Raw_consensus = struct
@@ -124,10 +123,9 @@ module Raw_consensus = struct
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
     delegate_to_shard_count :
-      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t option;
-        (** Holds the number of assigned shards of delegates
-            with at least one assigned shard for all relevant future
-            levels. This is [None] only in mempool mode. *)
+      int Signature.Public_key_hash.Map.t Raw_level_repr.Map.t;
+        (** Holds the number of assigned shards of delegates with at least one
+            assigned shard for all relevant (future) committee levels. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -161,7 +159,7 @@ module Raw_consensus = struct
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
-      delegate_to_shard_count = Some Raw_level_repr.Map.empty;
+      delegate_to_shard_count = Raw_level_repr.Map.empty;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
@@ -2077,7 +2075,7 @@ module type CONSENSUS = sig
   val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val delegate_to_shard_count :
-    t -> int Signature.Public_key_hash.Map.t raw_level_map option
+    t -> int Signature.Public_key_hash.Map.t raw_level_map
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
@@ -2090,8 +2088,7 @@ module type CONSENSUS = sig
     allowed_attestations:consensus_power slot_map option ->
     allowed_preattestations:consensus_power slot_map option ->
     allowed_consensus:consensus_power slot_map level_map option ->
-    delegate_to_shard_count:
-      int Signature.Public_key_hash.Map.t raw_level_map option ->
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t raw_level_map ->
     t
 
   val record_attestation :
@@ -2249,14 +2246,38 @@ module Dal = struct
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let record_number_of_attested_shards ctxt attestation ~delegate number =
+  let committee_level_of ctxt ~attested_level ~lag =
+    let params = (constants ctxt).dal in
+    match Raw_level_repr.sub attested_level lag with
+    | None -> None
+    | Some published_level ->
+        Some (Raw_level_repr.add published_level (params.attestation_lag - 1))
+
+  let record_number_of_attested_shards ctxt attestation ~delegate =
     let dal = dal ctxt in
+    let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
+    let attested_level = (current_level ctxt).level in
+    let number_of_baker_shards =
+      match Raw_level_repr.pred attested_level with
+      | None -> 0
+      | Some committee_level -> (
+          match
+            Raw_level_repr.Map.find committee_level delegate_to_shard_count
+          with
+          | None -> 0
+          | Some delegate_map -> (
+              match
+                Signature.Public_key_hash.Map.find delegate delegate_map
+              with
+              | None -> 0
+              | Some n -> n))
+    in
     let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
         dal.slot_accountability
         ~delegate
         attestation
-        number
+        number_of_baker_shards
     in
     update_dal ctxt {dal with slot_accountability}
 

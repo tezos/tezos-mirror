@@ -2349,11 +2349,7 @@ module Consensus_key : sig
     consensus_pkh : Signature.Public_key_hash.t;
   }
 
-  type power = {
-    consensus_key : pk;
-    attesting_power : Attesting_power.t;
-    dal_power : int;
-  }
+  type power = {consensus_key : pk; attesting_power : Attesting_power.t}
 
   val encoding : t Data_encoding.t
 
@@ -2936,6 +2932,9 @@ module Dal : sig
 
   val only_if_dynamic_lag_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
+  val committee_level_of :
+    t -> attested_level:Raw_level.t -> lag:int -> Raw_level.t option
+
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
     type t
@@ -3031,7 +3030,7 @@ module Dal : sig
     val number_of_attested_slots : t -> int
 
     val record_number_of_attested_shards :
-      context -> t -> delegate:Signature.public_key_hash -> int -> context
+      context -> t -> delegate:Signature.public_key_hash -> context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 
