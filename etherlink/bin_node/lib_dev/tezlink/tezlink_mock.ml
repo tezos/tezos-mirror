@@ -408,3 +408,17 @@ let list_entrypoints code normalize_types =
             ([], ctxt)
         in
         return_some (unreachable_entrypoint, entrypoint_types))
+
+let pack_data ~data ~ty ~gas =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = init_dummy_context () in
+  let*@ result =
+    Imported_protocol_plugin.RPC.Scripts.pack_data_impl
+      ~allow_forged_lazy_storage_id:false
+      ctxt
+      ~gas
+      ~data
+      ~ty
+  in
+  return result

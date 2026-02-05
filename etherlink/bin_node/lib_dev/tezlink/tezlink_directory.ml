@@ -449,6 +449,10 @@ let build_block_static_directory ~l2_chain_id
          in
          return (operation.protocol_data, result))
   |> register
+       ~service:Tezos_services.pack_data
+       ~impl:(fun _ctxt () (data, ty, gas) ->
+         Tezlink_mock.pack_data ~data ~ty ~gas)
+  |> register
        ~service:Tezos_services.preapply_operations
        ~impl:(fun {block; chain} param ops ->
          let*? chain = check_chain chain in
