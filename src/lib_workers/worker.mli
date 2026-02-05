@@ -223,6 +223,9 @@ module type T = sig
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
+  (** Returns true if the worker is shutting down. *)
+  val is_shutting_down : _ t -> bool
+
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
