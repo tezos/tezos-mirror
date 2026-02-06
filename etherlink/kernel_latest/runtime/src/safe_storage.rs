@@ -31,7 +31,8 @@ pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
 
 pub struct SafeStorage<Runtime> {
     pub host: Runtime,
-    pub world_state: OwnedPath,
+    /// Invariant: paths must not overlap (no path is a prefix of another)
+    pub world_states: Vec<OwnedPath>,
 }
 
 impl<Host: Runtime> InternalRuntime for SafeStorage<&mut Host> {
@@ -254,13 +255,19 @@ impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&self.world_state)?;
-        self.host.store_copy(&self.world_state, &tmp_path)
+        for world_state in self.world_states.iter() {
+            let tmp_path = safe_path(world_state)?;
+            self.host.store_copy(world_state, &tmp_path)?;
+        }
+        Ok(())
     }
 
     pub fn promote(&mut self) -> Result<(), RuntimeError> {
-        let tmp_path = safe_path(&self.world_state)?;
-        self.host.store_move(&tmp_path, &self.world_state)
+        for world_state in self.world_states.iter() {
+            let tmp_path = safe_path(world_state)?;
+            self.host.store_move(&tmp_path, world_state)?;
+        }
+        Ok(())
     }
 
     // Only used in tracing mode, so that the trace doesn't polute the world

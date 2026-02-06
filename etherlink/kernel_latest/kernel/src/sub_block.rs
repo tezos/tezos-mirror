@@ -198,7 +198,11 @@ pub fn handle_run_transaction<Host: Runtime>(
 
     let mut safe_host = SafeStorage {
         host,
-        world_state: OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH),
+        world_states: config
+            .storage_root_paths()
+            .into_iter()
+            .map(OwnedPath::from)
+            .collect(),
     };
     let registry = RegistryImpl::new(config.get_chain_id());
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
@@ -306,7 +310,11 @@ pub fn assemble_block<Host: Runtime>(
     let mut configuration = fetch_configuration(host);
     let mut safe_host = SafeStorage {
         host,
-        world_state: OwnedPath::from(ETHERLINK_SAFE_STORAGE_ROOT_PATH),
+        world_states: config
+            .storage_root_paths()
+            .into_iter()
+            .map(OwnedPath::from)
+            .collect(),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
     let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?

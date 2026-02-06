@@ -291,7 +291,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn get_chain_family(&self) -> ChainFamily;
 
-    fn storage_root_path(&self) -> RefPath;
+    fn storage_root_paths(&self) -> Vec<RefPath>;
 
     fn constants(
         &self,
@@ -569,8 +569,8 @@ impl ChainConfigTrait for EvmChainConfig {
         start_simulation_mode(host, registry, &self.spec_id)
     }
 
-    fn storage_root_path(&self) -> RefPath {
-        ETHERLINK_SAFE_STORAGE_ROOT_PATH
+    fn storage_root_paths(&self) -> Vec<RefPath> {
+        vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
     }
 }
 
@@ -642,7 +642,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
         let level = block_in_progress.number.try_into()?;
-        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
+        let context =
+            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
         Ok(TezlinkBlockConstants { level, context })
     }
 
@@ -857,7 +858,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_in_progress.cumulative_tezos_operation_receipts.list,
         )?;
         let new_block = L2Block::Tezlink(tezblock);
-        let root = self.storage_root_path();
+        let root = TEZLINK_SAFE_STORAGE_ROOT_PATH;
         crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
@@ -918,7 +919,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
             operation_bytes.len()
         );
-        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
+        let context =
+            context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?;
 
         let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
         let block_ctx = BlockCtx {
@@ -958,8 +960,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(())
     }
 
-    fn storage_root_path(&self) -> RefPath {
-        TEZLINK_SAFE_STORAGE_ROOT_PATH
+    fn storage_root_paths(&self) -> Vec<RefPath> {
+        vec![TEZLINK_SAFE_STORAGE_ROOT_PATH]
     }
 }
 

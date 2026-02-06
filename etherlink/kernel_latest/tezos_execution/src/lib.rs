@@ -889,7 +889,7 @@ pub fn validate_and_apply_operation<Host: Runtime, C: Context>(
 ) -> Result<Vec<OperationWithMetadata>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
-        world_state: context.path(),
+        world_states: vec![context.path()],
     };
 
     safe_host.start()?;
