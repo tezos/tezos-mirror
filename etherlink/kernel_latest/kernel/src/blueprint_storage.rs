@@ -909,7 +909,9 @@ mod tests {
     use crate::chains::EvmChainConfig;
     use crate::configuration::{DalConfiguration, TezosContracts};
     use crate::delayed_inbox::Hash;
-    use crate::sequencer_blueprint::{rlp_roundtrip, rlp_roundtrip_f};
+    use crate::sequencer_blueprint::{
+        rlp_roundtrip, rlp_roundtrip_f, LATEST_BLUEPRINT_VERSION,
+    };
     use crate::storage::store_last_info_per_level_timestamp;
     use crate::tick_model::constants::MAX_ALLOWED_TICKS;
     use primitive_types::H256;
@@ -960,6 +962,7 @@ mod tests {
 
         let blueprint_with_invalid_hash: BlueprintWithDelayedHashes =
             BlueprintWithDelayedHashes {
+                version: LATEST_BLUEPRINT_VERSION,
                 delayed_hashes: vec![dummy_tx_hash],
                 parent_hash: dummy_parent_hash,
                 timestamp: Timestamp::from(42),
@@ -1028,6 +1031,7 @@ mod tests {
         // Test with invalid parent hash
         let blueprint_with_invalid_parent_hash: BlueprintWithDelayedHashes =
             BlueprintWithDelayedHashes {
+                version: LATEST_BLUEPRINT_VERSION,
                 delayed_hashes: vec![],
                 parent_hash: H256::zero(),
                 timestamp: Timestamp::from(42),
