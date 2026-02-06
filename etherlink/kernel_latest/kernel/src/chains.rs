@@ -24,9 +24,11 @@ use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, DecoderError, Encodable};
+use sha3::{Digest, Keccak256};
 use std::fmt::{Debug, Display};
 use tezos_crypto_rs::hash::{ChainId, UnknownSignature};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
     transaction::TransactionHash,
@@ -48,7 +50,7 @@ use tezos_tezlink::{
         OperationResult, OperationResultSum, OperationWithMetadata,
     },
 };
-use tezosx_interfaces::Registry;
+use tezosx_interfaces::{Registry, RuntimeId};
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state");
@@ -306,9 +308,11 @@ pub trait ChainConfigTrait: Debug {
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>;
 
-    fn transactions_from_bytes(
-        bytes: Vec<Vec<u8>>,
-    ) -> anyhow::Result<Vec<Self::Transaction>>;
+    fn transaction_from_bytes(
+        host: &mut impl Runtime,
+        bytes: &[u8],
+        blueprint_version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>>;
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
@@ -358,6 +362,24 @@ pub trait ChainConfigTrait: Debug {
     ) -> anyhow::Result<()>;
 }
 
+fn ethereum_transaction_from_bytes(
+    bytes: &[u8],
+) -> anyhow::Result<crate::transaction::Transaction> {
+    let tx_hash = Keccak256::digest(bytes).into();
+    let tx_common = EthereumTransactionCommon::from_bytes(bytes)?;
+
+    Ok(crate::transaction::Transaction {
+        tx_hash,
+        content: TransactionContent::Ethereum(tx_common),
+    })
+}
+
+#[derive(Debug)]
+pub enum TezosXTransaction {
+    Ethereum(Box<crate::transaction::Transaction>),
+    Tezos(TezlinkOperation),
+}
+
 impl ChainConfigTrait for EvmChainConfig {
     type BlockConstants = tezos_ethereum::block::BlockConstants;
 
@@ -399,10 +421,58 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn transactions_from_bytes(
-        bytes: Vec<Vec<u8>>,
-    ) -> anyhow::Result<Vec<Self::Transaction>> {
-        crate::blueprint_storage::transactions_from_bytes(bytes)
+    fn transaction_from_bytes(
+        host: &mut impl Runtime,
+        bytes: &[u8],
+        blueprint_version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>> {
+        let tx: TezosXTransaction = match blueprint_version {
+            0 => {
+                // Blueprints version 0 can only contain Ethereum
+                // transactions, they are not prefixed by a tag.
+                let tx = ethereum_transaction_from_bytes(bytes)?;
+                TezosXTransaction::Ethereum(Box::new(tx))
+            }
+            1 => {
+                // Blueprints version 1 can contain both Tezos
+                // operations and Ethereum transactions, prefixed by
+                // 0x00 or 0x01 respectively.
+                let Some((tag, tx_common)) = bytes.split_first() else {
+                    return Err(error::Error::NomReadError(
+                        "Unexpected empty transaction.".to_string(),
+                    ))?;
+                };
+                match RuntimeId::try_from(*tag) {
+                    Ok(RuntimeId::Tezos) => {
+                        let op = tezos_operation_from_bytes(tx_common)?;
+                        TezosXTransaction::Tezos(op)
+                    }
+                    Ok(RuntimeId::Ethereum) => {
+                        let tx = ethereum_transaction_from_bytes(tx_common)?;
+                        TezosXTransaction::Ethereum(Box::new(tx))
+                    }
+                    Err(message) => {
+                        log!(host, Error, "Unknown runtime id tag: {tag}, {message}");
+                        return Ok(None);
+                    }
+                }
+            }
+            _ => {
+                log!(
+                    host,
+                    Debug,
+                    "Unknown blueprint version: {blueprint_version:?}"
+                );
+                return Ok(None);
+            }
+        };
+        match tx {
+            TezosXTransaction::Ethereum(tx) => Ok(Some(*tx)),
+            TezosXTransaction::Tezos(op) => {
+                log!(host, Debug, "Ignoring Tezos operation in blueprint: {op:?}");
+                Ok(None)
+            }
+        }
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -527,6 +597,17 @@ impl EvmChainConfig {
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
     RefPath::assert_from(b"/tezlink/simulation_result");
 
+fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> {
+    let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
+        error::Error::NomReadError(format!("{decode_error:?}"))
+    })?;
+    let tx_hash = operation.hash()?.0 .0;
+    Ok(TezlinkOperation {
+        tx_hash,
+        content: TezlinkContent::Tezos(operation),
+    })
+}
+
 pub struct TezlinkBlockConstants {
     pub level: BlockNumber,
     pub context: context::TezlinkContext,
@@ -605,24 +686,13 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ))
     }
 
-    fn transactions_from_bytes(
-        bytes: Vec<Vec<u8>>,
-    ) -> anyhow::Result<Vec<Self::Transaction>> {
-        let operations = bytes
-            .iter()
-            .map(|bytes| {
-                let operation =
-                    Operation::nom_read_exact(bytes).map_err(|decode_error| {
-                        error::Error::NomReadError(format!("{decode_error:?}"))
-                    })?;
-                let tx_hash = operation.hash()?.0 .0;
-                Ok(TezlinkOperation {
-                    tx_hash,
-                    content: TezlinkContent::Tezos(operation),
-                })
-            })
-            .collect::<Result<Vec<TezlinkOperation>, error::Error>>()?;
-        Ok(operations)
+    fn transaction_from_bytes(
+        _host: &mut impl Runtime,
+        bytes: &[u8],
+        _version: u8,
+    ) -> anyhow::Result<Option<Self::Transaction>> {
+        let operation = tezos_operation_from_bytes(bytes)?;
+        Ok(Some(operation))
     }
 
     fn read_block_in_progress(

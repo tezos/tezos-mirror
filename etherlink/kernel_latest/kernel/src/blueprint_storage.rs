@@ -17,7 +17,6 @@ use crate::transaction::{Transaction, TransactionContent};
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
-use sha3::{Digest, Keccak256};
 use std::fmt::Debug;
 use tezos_ethereum::block::EthBlock;
 use tezos_ethereum::eth_gen::OwnedHash;
@@ -25,7 +24,6 @@ use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u256_le, decode_field, decode_field_u256_le,
     decode_timestamp,
 };
-use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
@@ -558,21 +556,20 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
     ))
 }
 
-pub fn transactions_from_bytes(
+fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
+    host: &mut impl Runtime,
     transactions: Vec<Vec<u8>>,
-) -> anyhow::Result<Vec<Transaction>> {
-    transactions
-        .into_iter()
-        .map(|tx_common| {
-            let tx_hash = Keccak256::digest(&tx_common).into();
-            let tx_common = EthereumTransactionCommon::from_bytes(&tx_common)?;
-
-            Ok(Transaction {
-                tx_hash,
-                content: TransactionContent::Ethereum(tx_common),
-            })
-        })
-        .collect::<anyhow::Result<Vec<Transaction>>>()
+    blueprint_version: u8,
+) -> anyhow::Result<Vec<ChainConfig::Transaction>> {
+    let mut result = vec![];
+    for tx_common in transactions.iter() {
+        if let Some(transaction) =
+            ChainConfig::transaction_from_bytes(host, tx_common, blueprint_version)?
+        {
+            result.push(transaction)
+        }
+    }
+    Ok(result)
 }
 
 pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
@@ -599,8 +596,11 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
             }
         };
 
-    let transactions_with_hashes =
-        ChainConfig::transactions_from_bytes(blueprint_with_hashes.transactions)?;
+    let transactions_with_hashes = transactions_from_bytes::<ChainConfig>(
+        host,
+        blueprint_with_hashes.transactions,
+        blueprint_with_hashes.version,
+    )?;
 
     delayed_txs.extend(transactions_with_hashes);
     Ok((
