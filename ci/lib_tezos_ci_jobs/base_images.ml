@@ -226,42 +226,43 @@ let jobs =
       ~changes:(Changeset.make Files.rpm_base)
       "images/base-images/Dockerfile.rpm"
   in
-  let job_rust_based_images, job_rust_based_images_merge =
+  let job_rust_based_images =
     (* Adding the changeset of debian job as we want to test the
        build of [debian-rust] if [debian] is rebuild. *)
     let changes =
       Changeset.make
         (Files.debian_base @ Files.debian_rust_build @ Files.debian_rust_merge)
     in
-
-    let images =
-      make_job_base_images
-        ~__POS__
-        ~name:"oc.base-images.rust"
-        ~image_name:"debian-rust"
-        ~base_name:(Pipeline_dep "debian")
-        ~matrix:[("RELEASE", ["trixie"])]
-        ~dependencies:(Dependent [Job job_debian_based_images])
-        ~compilation:Native
-        ~changes
-        "images/base-images/Dockerfile.rust"
+    make_job_base_images
+      ~__POS__
+      ~name:"oc.base-images.rust"
+      ~image_name:"debian-rust"
+      ~base_name:(Pipeline_dep "debian")
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~dependencies:(Dependent [Job job_debian_based_images])
+      ~compilation:Native
+      ~changes
+      "images/base-images/Dockerfile.rust"
+  in
+  let job_rust_based_images_merge =
+    (* Adding the changeset of debian job as we want to test the
+       build of [debian-rust] if [debian] is rebuild. *)
+    let changes =
+      Changeset.make
+        (Files.debian_base @ Files.debian_rust_build @ Files.debian_rust_merge)
     in
-    let merge =
-      job_docker_authenticated
-        ~__POS__
-        ~name:"oc.base-images.rust.merge"
-        ~stage:Stages.images
-        ~dependencies:(Dependent [Job images])
-        ~rules:
-          [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
-        ~variables:
-          [
-            ("RELEASE", "trixie");
-            ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
-          ]
-        ["scripts/ci/docker-merge-base-images.sh"]
-    in
-    (images, merge)
+    job_docker_authenticated
+      ~__POS__
+      ~name:"oc.base-images.rust.merge"
+      ~stage:Stages.images
+      ~dependencies:(Dependent [Job job_rust_based_images])
+      ~rules:[job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
+      ~variables:
+        [
+          ("RELEASE", "trixie");
+          ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+        ]
+      ["scripts/ci/docker-merge-base-images.sh"]
   in
   let job_debian_homebrew_base_images =
     make_job_base_images
