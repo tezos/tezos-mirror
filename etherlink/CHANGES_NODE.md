@@ -15,6 +15,17 @@
 
 ### Command-line interface changes
 
+- Add `--dal-publishers-whitelist` argument to `octez-evm-node make kernel
+  installer config` command. Accepts a comma-separated list of Tezos public key
+  hashes (e.g., `tz1abc...,tz1def...`) to configure which DAL publishers
+  (batching operators) are authorized to have their slots processed by the
+  kernel. The whitelist is stored in kernel durable storage using RLP
+  encoding. (!20143)
+- Add `--disable-legacy-dal-signals` flag to `octez-evm-node make kernel
+  installer config` command. When enabled, the kernel ignores legacy external
+  DAL slot import signals and relies exclusively on `DalAttestedSlots` internal
+  inbox messages for importing DAL data (requires protocol U). (!20143)
+
 ### Execution changes
 
 - Supports executing Farfadet-r2 natively. (!20604)
