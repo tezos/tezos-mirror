@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `serde::Deserialize` and `serde::Serialize` impls for hashes now go via `Vec<u8>` directly, instead of a newtype struct, for binary encodings.
   This may be backwards compatible, depending on the format being serialised to/from. The `serde` docs encourage this to be the case - see
   [Serializer::serialize_newtype_struct](https://docs.rs/serde/latest/serde/trait.Serializer.html#tymethod.serialize_newtype_struct).
+- Refactor `blake2b` digest methods to return fixed-size arrays for improved consistency and type safety
+- Refactor `Hasher` trait to use fixed-size arrays for hash outputs and update `TezosHasher` implementation
 
 ### Fixed
 
