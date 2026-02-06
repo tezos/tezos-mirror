@@ -29,7 +29,7 @@ touch /tmp/kiss.log
 chmod a+rw /tmp/kiss.log
 
 KISSFAIL=0
-CURL_RETRY="--retry 2 --retry-delay 5 --retry-max-time 60"
+CURL_RETRY="--ipv4 --max-time 20 --retry 2 --retry-delay 5 --retry-max-time 60"
 # shellcheck disable=SC2086
 if curl $CURL_RETRY --output /dev/null --silent --head --fail "$KISSCACHE"; then
   # Use curl to fetch the mangled URL
