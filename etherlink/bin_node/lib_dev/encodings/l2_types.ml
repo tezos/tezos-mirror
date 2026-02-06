@@ -59,6 +59,23 @@ module Chain_family = struct
 end
 
 module Tezos_block = struct
+  module Version = struct
+    type t = V0
+
+    let from_bytes (bytes : bytes) : t =
+      match Rlp.decode_int bytes with
+      | Ok 0 -> V0
+      | Ok _ -> raise (Invalid_argument "Expected a valid version")
+      | Error _ ->
+          (* TODO: Instead of raising an exception, return the Result *)
+          raise
+            (Invalid_argument "Unexpected version read for a L2 Tezos block")
+
+    let to_bytes (version : t) : bytes =
+      let version = match version with V0 -> 0 in
+      Rlp.encode_int version
+  end
+
   type t = {
     hash : Ethereum_types.block_hash;
     level : int32;
@@ -105,15 +122,6 @@ module Tezos_block = struct
 
   let () = Data_encoding.Registration.register block_encoding
 
-  let version_from_bytes bytes =
-    match Rlp.decode_int bytes with
-    | Ok version -> version
-    | Error _ ->
-        (* TODO: Instead of raising an exception, return the Result *)
-        raise (Invalid_argument "Unexpected version read for a L2 Tezos block")
-
-  let version_to_bytes version = Rlp.encode_int version
-
   let block_from_v0 block_rlp =
     let open Rlp in
     match block_rlp with
@@ -140,22 +148,21 @@ module Tezos_block = struct
 
   let block_from_kernel bytes =
     match Rlp.decode bytes with
-    | Ok (Rlp.List (Value version :: block_rlp)) ->
-        let version = version_from_bytes version in
-        if version = 0 then block_from_v0 block_rlp
-        else raise (Invalid_argument "Expected a valid version")
+    | Ok (Rlp.List (Value version :: block_rlp)) -> (
+        let version = Version.from_bytes version in
+        match version with V0 -> block_from_v0 block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
         Data_encoding.Binary.of_bytes_exn legacy_encoding bytes
 
   (* Latest version of the block. It is used for block RLP encoding *)
-  let latest_version = 0
+  let latest_version = Version.V0
 
   (* Serialize a block using the latest version of the block RLP format. *)
   let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
     let open Rlp in
     let level = Helpers.encode_i32_le level in
-    let version = version_to_bytes latest_version in
+    let version = Version.to_bytes latest_version in
     let hash = Ethereum_types.encode_block_hash hash in
     let previous_hash = Ethereum_types.encode_block_hash parent_hash in
     let timestamp = Ethereum_types.timestamp_to_bytes timestamp in
