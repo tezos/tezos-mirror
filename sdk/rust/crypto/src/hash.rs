@@ -252,7 +252,7 @@ macro_rules! define_hash {
                 if serializer.is_human_readable() {
                     serializer.serialize_str(&self.to_base58_check())
                 } else {
-                    serializer.serialize_newtype_struct(stringify!($name), &self.0.to_vec())
+                    self.0.to_vec().serialize(serializer)
                 }
             }
         }
@@ -262,66 +262,12 @@ macro_rules! define_hash {
             where
                 D: serde::de::Deserializer<'de>,
             {
-                struct HashVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for HashVisitor {
-                    type Value = $name;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        formatter
-                            .write_str("eigher sequence of bytes or base58 encoded data expected")
-                    }
-
-                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        Self::Value::from_b58check(v).map_err(|e| {
-                            E::custom(format!("error constructing hash from base58check: {}", e))
-                        })
-                    }
-
-                    fn visit_newtype_struct<E>(self, e: E) -> Result<Self::Value, E::Error>
-                    where
-                        E: serde::Deserializer<'de>,
-                    {
-                        let field0: Vec<u8> = match <Vec<u8> as serde::Deserialize>::deserialize(e)
-                        {
-                            Ok(val) => val,
-                            Err(err) => {
-                                return Err(err);
-                            }
-                        };
-                        let arr = field0
-                            .try_into()
-                            .map_err(|_| serde::de::Error::custom("invalid hash size"))?;
-                        Ok($name(arr))
-                    }
-
-                    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-                    where
-                        A: serde::de::SeqAccess<'de>,
-                    {
-                        let hash = match seq.next_element::<Vec<u8>>() {
-                            Ok(Some(val)) => val,
-                            Ok(None) => {
-                                return Err(serde::de::Error::custom("no hash bytes".to_string()))
-                            }
-                            Err(err) => return Err(err),
-                        };
-                        Self::Value::try_from_bytes(&hash).map_err(|e| {
-                            serde::de::Error::custom(format!(
-                                "error constructing hash from bytes: {}",
-                                e
-                            ))
-                        })
-                    }
-                }
-
                 if deserializer.is_human_readable() {
-                    deserializer.deserialize_str(HashVisitor)
+                    let s = <&str>::deserialize(deserializer)?;
+                    Self::from_b58check(s).map_err(serde::de::Error::custom)
                 } else {
-                    deserializer.deserialize_newtype_struct(stringify!($name), HashVisitor)
+                    let bytes = Vec::<u8>::deserialize(deserializer)?;
+                    Self::try_from(bytes).map_err(serde::de::Error::custom)
                 }
             }
         }
