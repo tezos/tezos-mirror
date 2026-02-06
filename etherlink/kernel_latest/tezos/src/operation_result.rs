@@ -11,7 +11,6 @@ use crate::operation::{
 };
 use mir::ast::Entrypoint;
 use mir::gas;
-use mir::gas::interpret_cost::SigCostError;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
@@ -88,15 +87,6 @@ impl From<gas::OutOfGas> for ValidityError {
 impl From<CryptoError> for ValidityError {
     fn from(_: CryptoError) -> Self {
         ValidityError::InvalidSignature
-    }
-}
-
-impl From<SigCostError> for ValidityError {
-    fn from(e: SigCostError) -> Self {
-        match e {
-            SigCostError::OutOfGas(_) => ValidityError::OutOfGas,
-            SigCostError::Crypto(_) => ValidityError::InvalidSignature,
-        }
     }
 }
 
