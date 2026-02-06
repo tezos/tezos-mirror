@@ -84,6 +84,15 @@ let make_blueprint ~delayed_transactions ~transactions =
   in
   return blueprint
 
+let hash_tez_block ~encode block_without_hash =
+  let block_bytes =
+    Bytes.of_string
+    @@ expect_ok "could not encode the tez block"
+    @@ encode block_without_hash
+  in
+  let block_hash = Block_hash.hash_bytes [block_bytes] in
+  Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
+
 let make_tez_block ~level ~timestamp ~parent_hash () =
   let block_without_hash =
     L2_types.Tezos_block.
@@ -95,14 +104,10 @@ let make_tez_block ~level ~timestamp ~parent_hash () =
         operations = Bytes.empty;
       }
   in
-  let block_bytes =
-    Bytes.of_string
-    @@ expect_ok "could not encode the tez block"
-    @@ L2_types.Tezos_block.encode_block_for_store block_without_hash
-  in
-  let block_hash = Block_hash.hash_bytes [block_bytes] in
   let hash =
-    Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
+    hash_tez_block
+      ~encode:L2_types.Tezos_block.encode_block_for_store
+      block_without_hash
   in
   return
     L2_types.Tezos_block.
