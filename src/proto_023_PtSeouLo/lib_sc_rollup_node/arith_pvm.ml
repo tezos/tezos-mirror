@@ -69,7 +69,9 @@ module Impl : Pvm_sig.S = struct
 
     let of_patch (p : Pvm_patches.unsafe_patch) =
       match p with
-      | Increase_max_nb_ticks _ | Patch_durable_storage _ -> assert false
+      | Increase_max_nb_ticks _ | Patch_durable_storage _ | Patch_PVM_version _
+        ->
+          assert false
 
     let apply _state (x : t) = match x with _ -> .
   end

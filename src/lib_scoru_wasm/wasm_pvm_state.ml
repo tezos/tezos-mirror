@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+type version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | VExperimental
 
 let versions =
   [
@@ -35,7 +35,11 @@ let versions =
     ("2.0.0-r4", V4);
     ("2.0.0-r5", V5);
     ("2.0.0-r6", V6);
+    ("2.0.0-experimental", VExperimental);
   ]
+
+let version_of_string version_str =
+  List.assoc ~equal:String.equal version_str versions
 
 let versions_flip = List.map (fun (x, y) -> (y, x)) versions
 

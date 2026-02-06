@@ -358,6 +358,7 @@ let make ~version ~reveal_builtins ~write_debug state =
   let v4 = v3 in
   let v5 = v4 in
   let v6 = v5 @ [("ec_pairing_check_bls12_381", ec_pairing_check_bls12_381)] in
+  let v_experimental = v6 in
   let extra =
     match version with
     | Wasm_pvm_state.V0 -> []
@@ -367,6 +368,7 @@ let make ~version ~reveal_builtins ~write_debug state =
     | V4 -> v4
     | V5 -> v5
     | V6 -> v6
+    | VExperimental -> v_experimental
   in
   List.map
     (fun (name, impl) -> (Constants.wasm_host_funcs_virual_module, name, impl))

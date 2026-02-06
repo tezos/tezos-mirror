@@ -97,7 +97,7 @@ let get_wasm_version {durable; _} =
 
 let stack_size_limit = function
   | Wasm_pvm_state.V0 -> 300
-  | V1 | V2 | V3 | V4 | V5 | V6 -> 60_000
+  | V1 | V2 | V3 | V4 | V5 | V6 | VExperimental -> 60_000
 (* The limit 60_000 has been chosen such that the simplest WASM program
    consisting in trying to recursively call 60,000 times the same function
    results in Wasmer raising a runtime error.
@@ -702,7 +702,7 @@ let update_output_buffer pvm_state level =
 
 let apply_migration version pvm_state =
   match version with
-  | Wasm_pvm_state.V5 | V6 -> pvm_state
+  | Wasm_pvm_state.V5 | V6 | VExperimental -> pvm_state
   | V4 ->
       {
         pvm_state with
@@ -797,3 +797,7 @@ let get_info ({current_tick; last_input_info; _} as pvm_state) =
   return
   @@ Wasm_pvm_state.
        {current_tick; last_input_read = last_input_info; input_request}
+
+module Unsafe = struct
+  let apply_migration = apply_migration
+end

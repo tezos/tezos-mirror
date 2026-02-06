@@ -408,6 +408,22 @@ module Make_machine_with_vm
       let* durable = Durable.set_value_exn pvm_state.durable key value in
       let pvm_state = {pvm_state with durable} in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let set_pvm_version ~(version : Wasm_pvm_state.version) tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* durable =
+        Durable.set_value_exn
+          ~edit_readonly:true
+          pvm_state.durable
+          Constants.version_key
+          (Data_encoding.Binary.to_string_exn
+             Wasm_pvm_state.version_encoding
+             version)
+      in
+      let pvm_state = {pvm_state with durable} in
+      let pvm_state = Wasm_vm.Unsafe.apply_migration version pvm_state in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
   end
 
   module Internal_for_tests = struct

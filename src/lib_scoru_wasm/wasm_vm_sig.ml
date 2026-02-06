@@ -87,6 +87,16 @@ module type Generic = sig
   (** [get_wasm_version pvm_state] returns the current version at
       which the WASM PVM operates. *)
   val get_wasm_version : state -> version Lwt.t
+
+  module Unsafe : sig
+    (** [apply_migration version state] migrates [state] to the given [version],
+        applying any necessary state transformations. This is called when the
+        PVM version changes (either via protocol upgrade or unsafe patch).
+
+        Note: This function only transforms the in-memory state. It does not
+        persist the version to the durable storage. *)
+    val apply_migration : Wasm_pvm_state.version -> state -> state
+  end
 end
 
 module type S = sig
