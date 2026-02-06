@@ -4,7 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::chains::{ChainConfigTrait, ChainHeaderTrait, ExperimentalFeatures};
+use crate::chains::{
+    ChainConfigTrait, ChainHeaderTrait, ExperimentalFeatures, TezosXTransaction,
+};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
@@ -13,7 +15,7 @@ use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::{Transaction, TransactionContent};
+use crate::transaction::TransactionContent;
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
@@ -313,9 +315,9 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint_by_number<Host: Runtime, Tx: Encodable>(
+pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<Tx>,
+    blueprint: Blueprint<TezosXTransaction>,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
@@ -327,9 +329,9 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime, Tx: Encodable>(
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
 }
 
-pub fn store_inbox_blueprint<Host: Runtime, Tx: Encodable>(
+pub fn store_inbox_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<Tx>,
+    blueprint: Blueprint<TezosXTransaction>,
 ) -> anyhow::Result<()> {
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
@@ -514,7 +516,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(DelayedTransactionFetchingResult<Transaction>, usize)> {
+) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
@@ -553,7 +555,12 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
         }
     }
     Ok((
-        DelayedTransactionFetchingResult::Ok(delayed_txs),
+        DelayedTransactionFetchingResult::Ok(
+            delayed_txs
+                .into_iter()
+                .map(|tx| TezosXTransaction::Ethereum(Box::new(tx)))
+                .collect(),
+        ),
         total_size,
     ))
 }
@@ -579,7 +586,7 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transaction>, usize)> {
+) -> anyhow::Result<(BlueprintValidity<TezosXTransaction>, usize)> {
     let (mut delayed_txs, total_size) =
         match ChainConfig::fetch_hashes_from_delayed_inbox(
             host,
@@ -604,7 +611,7 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
         blueprint_with_hashes.version,
     )?;
 
-    delayed_txs.extend(transactions_with_hashes);
+    delayed_txs.extend(transactions_with_hashes.into_iter().map(|tx| tx.into()));
     Ok((
         BlueprintValidity::Valid(Blueprint {
             transactions: delayed_txs,
@@ -631,7 +638,7 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     max_blueprint_lookahead_in_seconds: i64,
     parent_chain_header: &ChainConfig::ChainHeader,
     head_timestamp: Timestamp,
-) -> anyhow::Result<(BlueprintValidity<ChainConfig::Transaction>, usize)> {
+) -> anyhow::Result<(BlueprintValidity<TezosXTransaction>, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
@@ -716,11 +723,11 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     config: &mut Configuration,
     previous_chain_header: &ChainConfig::ChainHeader,
     previous_timestamp: Timestamp,
-) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
-        invalidate_blueprint::<_, ChainConfig::Transaction>(
+        invalidate_blueprint::<_, TezosXTransaction>(
             host,
             blueprint_path,
             &BlueprintValidity::BlueprintTooLarge,
@@ -756,7 +763,7 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
             max_blueprint_lookahead_in_seconds,
             ..
         } => {
-            let validity: (BlueprintValidity<ChainConfig::Transaction>, usize) =
+            let validity: (BlueprintValidity<TezosXTransaction>, usize) =
                 parse_and_validate_blueprint::<_, ChainConfig>(
                     host,
                     chunks.concat().as_slice(),
@@ -791,7 +798,7 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &ChainConfig::ChainHeader,
-) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = blueprint_exists(host, &blueprint_path)?;
     if exists {
@@ -840,7 +847,7 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint<crate::transaction::Transaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<_, EVMBlockHeader>(host) {
             Ok(BlockHeader {

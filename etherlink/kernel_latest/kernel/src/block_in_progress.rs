@@ -8,7 +8,8 @@
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{
-    TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+    TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+    TEZOS_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -330,14 +331,20 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     }
 
     pub fn from_blueprint(
-        blueprint: crate::blueprint::Blueprint<Tx>,
+        blueprint: crate::blueprint::Blueprint<TezosXTransaction>,
         number: U256,
         ethereum_parent_hash: H256,
         tezos_parent_hash: H256,
         base_fee_per_gas: U256,
     ) -> Self {
+        // filter transactions, dropping any transaction from other runtimes
+        let transactions: Vec<Tx> = blueprint
+            .transactions
+            .into_iter()
+            .filter_map(|tx| Tx::try_from(tx).ok())
+            .collect();
         // blueprint is turn into a ring to allow popping from the front
-        let ring = blueprint.transactions.into();
+        let ring = transactions.into();
         Self::new_with_ticks(
             number,
             ethereum_parent_hash,
