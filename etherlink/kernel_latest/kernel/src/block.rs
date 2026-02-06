@@ -7,6 +7,7 @@
 
 use crate::apply::{ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::block_in_progress;
+use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
@@ -186,12 +187,18 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     next_bip_number: U256,
     hash: H256,
+    tezos_parent_hash: H256,
     blueprint: Blueprint<ChainConfig::Transaction>,
 ) -> BlockInProgress<ChainConfig::Transaction> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
-    let bip =
-        BlockInProgress::from_blueprint(blueprint, next_bip_number, hash, gas_price);
+    let bip = BlockInProgress::from_blueprint(
+        blueprint,
+        next_bip_number,
+        hash,
+        tezos_parent_hash,
+        gas_price,
+    );
 
     tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
     bip
@@ -239,11 +246,17 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     return Ok(BlueprintParsing::None);
                 }
             }
+            let tezos_parent_hash =
+                block_storage::read_current_hash(host, &crate::chains::TEZOS_BLOCKS_PATH)
+                    .unwrap_or_else(|_| {
+                        tezos_tezlink::block::TezBlock::genesis_block_hash()
+                    });
             let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
                 host,
                 chain_config,
                 next_bip_number,
                 chain_header.hash(),
+                tezos_parent_hash,
                 blueprint,
             );
             Ok(BlueprintParsing::Next(Box::new(bip)))

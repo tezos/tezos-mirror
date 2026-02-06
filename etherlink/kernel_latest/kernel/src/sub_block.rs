@@ -223,7 +223,7 @@ pub fn handle_run_transaction<Host: Runtime>(
                 delayed_txs: Vec::new(),
                 cumulative_gas: U256::zero(),
                 index: 0,
-                parent_hash: read_current_block_hash(&safe_host)?,
+                ethereum_parent_hash: read_current_block_hash(&safe_host)?,
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,
                 timestamp: input_data.timestamp,
@@ -232,6 +232,11 @@ pub fn handle_run_transaction<Host: Runtime>(
                 cumulative_receipts: Vec::new(),
                 cumulative_tx_objects: Vec::new(),
                 cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
+                tezos_parent_hash: crate::block_storage::read_current_hash(
+                    &safe_host,
+                    &crate::chains::TEZOS_BLOCKS_PATH,
+                )
+                .unwrap_or_else(|_| tezos_tezlink::block::TezBlock::genesis_block_hash()),
             }
         }
     };
@@ -307,7 +312,11 @@ pub fn assemble_block<Host: Runtime>(
     let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
         .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
-    let block = block_in_progress.finalize_and_store(&mut safe_host, &block_constants)?;
+    let block = block_in_progress.finalize_and_store(
+        &mut safe_host,
+        &block_constants,
+        config.enable_tezos_runtime(),
+    )?;
 
     let timestamp = block.timestamp();
     promote_block(

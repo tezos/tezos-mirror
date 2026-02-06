@@ -57,6 +57,10 @@ pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
 
 pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
 
+/// Path for TezBlock storage within the EVM world state (used by EVM chain config).
+/// This path is under ETHERLINK_SAFE_STORAGE_ROOT_PATH so it's included in SafeStorage transactions.
+pub const TEZOS_BLOCKS_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/tezlink");
+
 #[derive(Clone, Copy, Debug)]
 pub enum ChainFamily {
     Evm,
@@ -550,7 +554,11 @@ impl ChainConfigTrait for EvmChainConfig {
         block_in_progress: BlockInProgress<Self::Transaction>,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
-        block_in_progress.finalize_and_store(host, block_constants)
+        block_in_progress.finalize_and_store(
+            host,
+            block_constants,
+            self.enable_tezos_runtime(),
+        )
     }
 
     fn start_simulation_mode(
@@ -792,7 +800,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
                 let applied_operation = AppliedOperation {
                     hash: H256::from_slice(&operation.tx_hash).into(),
-                    branch: block_in_progress.parent_hash.into(),
+                    branch: block_in_progress.ethereum_parent_hash.into(),
                     op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                         OperationBatchWithMetadata {
                             operations: vec![OperationWithMetadata {
@@ -845,7 +853,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let tezblock = TezBlock::new(
             block_constants.level,
             block_in_progress.timestamp,
-            block_in_progress.parent_hash,
+            block_in_progress.ethereum_parent_hash,
             block_in_progress.cumulative_tezos_operation_receipts.list,
         )?;
         let new_block = L2Block::Tezlink(tezblock);
