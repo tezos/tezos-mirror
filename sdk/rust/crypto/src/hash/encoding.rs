@@ -60,7 +60,7 @@ macro_rules! hash_nom_reader {
             fn nom_read(input: &[u8]) -> NomResult<Self> {
                 use nom::{bytes::complete::take, combinator::map};
 
-                map(take(Self::hash_size()), |bytes| {
+                map(take(Self::SIZE), |bytes| {
                     Self::try_from_bytes(bytes).unwrap()
                 })(input)
             }

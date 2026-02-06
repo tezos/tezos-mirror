@@ -79,10 +79,8 @@ pub trait HashTrait<const N: usize>:
     /// Returns this hash type.
     fn hash_type() -> HashType;
 
-    /// Returns the size of this hash.
-    fn hash_size() -> usize {
-        Self::hash_type().size()
-    }
+    /// The size of this hash in bytes.
+    const SIZE: usize = N;
 
     /// Tries to create this hash from the `bytes`.
     fn try_from_bytes(bytes: &[u8]) -> Result<Self, FromBytesError>;

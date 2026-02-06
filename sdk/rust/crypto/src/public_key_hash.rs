@@ -40,7 +40,7 @@ impl Display for PublicKeyHash {
 
 impl PublicKeyHash {
     /// Size of the underlying byte array.
-    const SIZE: usize = 20;
+    pub const SIZE: usize = ContractTz1Hash::SIZE;
     /// Conversion from base58-encoding string (with prefix).
     pub fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
         let bytes = data.from_base58check()?;

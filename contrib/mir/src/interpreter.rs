@@ -1943,7 +1943,7 @@ pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -
     input[..32].copy_from_slice(operation_group_hash);
     // append bytes representing o_index
     input[32..36].copy_from_slice(&o_index.to_be_bytes());
-    let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
+    let digest = blake2bdigest(&input, ContractKt1Hash::SIZE).unwrap();
     HashTrait::try_from_bytes(digest.as_slice()).unwrap()
 }
 
