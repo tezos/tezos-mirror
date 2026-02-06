@@ -17,6 +17,10 @@ open Evm_node_lib_dev_encoding
 
 let hash_typ = Check.(convert Ethereum_types.hash_to_string string)
 
+let block_hash_typ = Check.(convert Ethereum_types.block_hash_to_bytes string)
+
+let timestamp_typ = Check.(convert Time.Protocol.to_seconds int64)
+
 let register ?(tags = []) =
   Test.register
     ~uses_node:false
@@ -146,17 +150,15 @@ let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
       ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
   Check.(
     (decoding_result.timestamp = block.timestamp)
-      (convert Time.Protocol.to_seconds int64)
+      timestamp_typ
       ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
   Check.(
-    (Ethereum_types.block_hash_to_bytes decoding_result.parent_hash
-    = Ethereum_types.block_hash_to_bytes block.parent_hash)
-      string
+    (decoding_result.parent_hash = block.parent_hash)
+      block_hash_typ
       ~error_msg:"Wrong decoded of parent_hash for block: got %L instead of %R") ;
   Check.(
-    (Ethereum_types.block_hash_to_bytes decoding_result.hash
-    = Ethereum_types.block_hash_to_bytes block.hash)
-      string
+    (decoding_result.hash = block.hash)
+      block_hash_typ
       ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
   unit
 
