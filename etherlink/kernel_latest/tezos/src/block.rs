@@ -31,7 +31,7 @@ impl Encodable for AppliedOperation {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, Default, BinWriter, NomReader)]
 pub struct OperationsWithReceipts {
     pub list: Vec<AppliedOperation>,
 }

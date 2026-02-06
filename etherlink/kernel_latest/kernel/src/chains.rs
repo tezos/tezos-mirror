@@ -277,8 +277,6 @@ pub trait ChainConfigTrait: Debug {
 
     type Transaction: TransactionTrait + Encodable + Decodable + Debug;
 
-    type TransactionReceipt: Debug + Encodable;
-
     type ChainHeader: ChainHeaderTrait + Decodable;
 
     type ExecutionInfo;
@@ -291,7 +289,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants>;
@@ -316,9 +314,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<
-        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
-    >;
+    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>>;
 
     fn can_fit_in_reboot(
         &self,
@@ -330,7 +326,7 @@ pub trait ChainConfigTrait: Debug {
     #[allow(clippy::too_many_arguments)]
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -343,10 +339,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<
-            Self::Transaction,
-            Self::TransactionReceipt,
-        >,
+        block_in_progress: &mut BlockInProgress<Self::Transaction>,
         execution_info: Self::ExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()>;
@@ -354,7 +347,7 @@ pub trait ChainConfigTrait: Debug {
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: BlockInProgress<Self::Transaction>,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block>;
 
@@ -370,8 +363,6 @@ impl ChainConfigTrait for EvmChainConfig {
 
     type Transaction = crate::transaction::Transaction;
 
-    type TransactionReceipt = tezos_ethereum::transaction::TransactionReceipt;
-
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 
     type ExecutionInfo = crate::apply::ExecutionInfo;
@@ -386,7 +377,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -431,9 +422,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<
-        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
-    > {
+    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
         crate::storage::read_block_in_progress(host)
     }
 
@@ -452,7 +441,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn apply_transaction(
         &self,
-        _block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        _block_in_progress: &BlockInProgress<Self::Transaction>,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -478,10 +467,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<
-            Self::Transaction,
-            Self::TransactionReceipt,
-        >,
+        block_in_progress: &mut BlockInProgress<Self::Transaction>,
         execution_info: Self::ExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
@@ -491,7 +477,7 @@ impl ChainConfigTrait for EvmChainConfig {
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: BlockInProgress<Self::Transaction>,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         block_in_progress.finalize_and_store(host, block_constants)
@@ -549,7 +535,6 @@ pub struct TezlinkBlockConstants {
 impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
     type Transaction = TezlinkOperation;
-    type TransactionReceipt = AppliedOperation;
     type ChainHeader = TezBlockHeader;
     type ExecutionInfo = AppliedOperation;
 
@@ -563,7 +548,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         _da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -642,9 +627,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn read_block_in_progress(
         _host: &impl Runtime,
-    ) -> anyhow::Result<
-        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
-    > {
+    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
         Ok(None)
     }
 
@@ -659,7 +642,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         host: &mut impl Runtime,
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -771,21 +754,21 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<
-            Self::Transaction,
-            Self::TransactionReceipt,
-        >,
+        block_in_progress: &mut BlockInProgress<Self::Transaction>,
         execution_info: Self::ExecutionInfo,
         _host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
-        block_in_progress.cumulative_receipts.push(execution_info);
+        block_in_progress
+            .cumulative_tezos_operation_receipts
+            .list
+            .push(execution_info);
         Ok(())
     }
 
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_in_progress: BlockInProgress<Self::Transaction>,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         // Create a Tezos block from the block in progress
@@ -793,7 +776,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             block_constants.level,
             block_in_progress.timestamp,
             block_in_progress.parent_hash,
-            block_in_progress.cumulative_receipts,
+            block_in_progress.cumulative_tezos_operation_receipts.list,
         )?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();

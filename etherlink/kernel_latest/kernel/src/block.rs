@@ -70,10 +70,10 @@ pub enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Tx: TransactionTrait, Receipt>(
+fn on_invalid_transaction<Tx: TransactionTrait>(
     is_delayed: bool,
     tx_hash: TransactionHash,
-    block_in_progress: &mut BlockInProgress<Tx, Receipt>,
+    block_in_progress: &mut BlockInProgress<Tx>,
 ) {
     if is_delayed {
         block_in_progress.register_delayed_transaction(tx_hash);
@@ -102,10 +102,7 @@ pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut BlockInProgress<
-        ChainConfig::Transaction,
-        ChainConfig::TransactionReceipt,
-    >,
+    block_in_progress: &mut BlockInProgress<ChainConfig::Transaction>,
     block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -190,7 +187,7 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     next_bip_number: U256,
     hash: H256,
     blueprint: Blueprint<ChainConfig::Transaction>,
-) -> BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt> {
+) -> BlockInProgress<ChainConfig::Transaction> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
     let bip =
@@ -206,11 +203,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> anyhow::Result<
-    BlueprintParsing<
-        BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt>,
-    >,
-> {
+) -> anyhow::Result<BlueprintParsing<BlockInProgress<ChainConfig::Transaction>>> {
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -246,10 +239,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     return Ok(BlueprintParsing::None);
                 }
             }
-            let bip: BlockInProgress<
-                ChainConfig::Transaction,
-                ChainConfig::TransactionReceipt,
-            > = bip_from_blueprint(
+            let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
                 host,
                 chain_config,
                 next_bip_number,
@@ -268,10 +258,7 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: BlockInProgress<
-        ChainConfig::Transaction,
-        ChainConfig::TransactionReceipt,
-    >,
+    mut block_in_progress: BlockInProgress<ChainConfig::Transaction>,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
@@ -298,7 +285,12 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
         BlockInProgressComputationResult::Finished {
             included_delayed_transactions,
         } => {
-            crate::gas_price::register_block(host, &block_in_progress)?;
+            crate::gas_price::register_block(
+                host,
+                block_in_progress.cumulative_execution_gas,
+                block_in_progress.timestamp,
+                block_in_progress.queue_length(),
+            )?;
             let new_block = chain_config
                 .finalize_and_store(host, block_in_progress, &constants)
                 .context("Failed to finalize the block in progress")?;
