@@ -16,7 +16,8 @@ type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
 
 let register_sandbox_with_observer ?tx_queue_tx_per_addr_limit ~title
     ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
+    ?patch_config ?websockets ?genesis_timestamp
+    ?(sequencer_keys = [Constant.bootstrap1]) body =
   Test.register
     ~__FILE__
     ~title
@@ -39,6 +40,7 @@ let register_sandbox_with_observer ?tx_queue_tx_per_addr_limit ~title
       ?minimum_base_fee_per_gas
       ?patch_config
       ?websockets
+      ?genesis_timestamp
       ~sequencer_keys
       ()
   in

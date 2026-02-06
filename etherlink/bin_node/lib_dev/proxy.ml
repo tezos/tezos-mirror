@@ -66,9 +66,9 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
       let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
         Lwt_result_syntax.return_unit
 
-      let lock_transactions () = Lwt_result_syntax.return_unit
+      let lock_block_production () = Lwt_result_syntax.return_unit
 
-      let unlock_transactions () = Lwt_result_syntax.return_unit
+      let unlock_block_production () = Lwt_result_syntax.return_unit
 
       let is_locked () = Lwt_result_syntax.return_false
 

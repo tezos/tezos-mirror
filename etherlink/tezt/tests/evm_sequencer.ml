@@ -14827,6 +14827,41 @@ let test_evm_events_cleanup () =
             pp_print_string)
         l
 
+let test_locked_tx_queue_timestamp () =
+  register_sandbox_with_observer
+    ~genesis_timestamp
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "locked"; "timestamp"]
+    ~title:"Locked tx queue produces blocks with correct timestamp"
+  @@ fun {sandbox; observer} ->
+  (* Use a stale timestamp after genesis (2020-01-01) so that if the fix
+     regresses, the kernel accepts it and the assertion catches the error
+     instead of a TimestampFromPast crash. *)
+  let*@ () = Rpc.lock_block_production sandbox in
+  let stale_timestamp = "2020-01-02T00:00:00Z" in
+  let*@ () =
+    Rpc.propose_next_block_timestamp ~timestamp:stale_timestamp sandbox
+  in
+
+  (* produce_block fails while locked, but the fix refreshes the timestamp *)
+  let* _ = Rpc.produce_block sandbox in
+
+  let*@ () = Rpc.unlock_block_production sandbox in
+
+  (* After unlock, the block should use a current timestamp, not the stale one *)
+  let*@ _ = produce_block sandbox in
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  let*@ block = Rpc.get_block_by_number ~block:"1" sandbox in
+  let block_timestamp = Tezos_base.Time.Protocol.to_notation block.timestamp in
+  Check.((block_timestamp <> stale_timestamp) string)
+    ~error_msg:"Block timestamp should be current, not stale (got %L)" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -15011,4 +15046,5 @@ let () =
   test_eip3607_disabled_for_simulation [Alpha] ;
   test_fa_deposit_watchtower [Alpha] ;
   test_xtz_deposit_watchtower [Alpha] ;
-  test_evm_events_cleanup ()
+  test_evm_events_cleanup () ;
+  test_locked_tx_queue_timestamp ()

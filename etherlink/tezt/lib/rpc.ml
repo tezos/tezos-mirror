@@ -96,6 +96,12 @@ module Request = struct
     let parameters = `String timestamp in
     {method_ = "proposeNextBlockTimestamp"; parameters}
 
+  let lockBlockProduction =
+    {method_ = "lockBlockProduction"; parameters = `O []}
+
+  let unlockBlockProduction =
+    {method_ = "unlockBlockProduction"; parameters = `O []}
+
   let stateValue ?block path =
     let parameters =
       match block with
@@ -545,6 +551,36 @@ let propose_next_block_timestamp ?websocket ~timestamp evm_node =
       ~private_:true
       evm_node
       (Request.proposeNextBlockTimestamp ~timestamp)
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
+       json
+
+let lock_block_production ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      Request.lockBlockProduction
+  in
+  return
+  @@ decode_or_error
+       (fun json ->
+         Evm_node.extract_result json |> fun json ->
+         if JSON.is_null json then () else ())
+       json
+
+let unlock_block_production ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc
+      ?websocket
+      ~private_:true
+      evm_node
+      Request.unlockBlockProduction
   in
   return
   @@ decode_or_error

@@ -1794,6 +1794,46 @@ let dispatch_private_request (type f) ~websocket
           rpc_ok ()
         in
         build_with_input ~f module_ parameters
+    | Method (Lock_block_production.Method, _module_)
+      when block_production <> `Single_node ->
+        unsupported ()
+    | Method (Lock_block_production.Method, module_) ->
+        let f (_ : unit option) =
+          let open Lwt_result_syntax in
+          process_based_on_mode
+            mode
+            ~on_stateful_evm:(fun (module Tx_container) ->
+              let* () = Tx_container.lock_block_production () in
+              rpc_ok ())
+            ~on_stateful_michelson:(fun (module Tx_container) ->
+              let* () = Tx_container.lock_block_production () in
+              rpc_ok ())
+            ~on_rpc:(fun _ ->
+              rpc_error
+                (Rpc_errors.internal_error
+                   "lockTransactions not supported in RPC mode"))
+        in
+        build ~f module_ parameters
+    | Method (Unlock_block_production.Method, _module_)
+      when block_production <> `Single_node ->
+        unsupported ()
+    | Method (Unlock_block_production.Method, module_) ->
+        let f (_ : unit option) =
+          let open Lwt_result_syntax in
+          process_based_on_mode
+            mode
+            ~on_stateful_evm:(fun (module Tx_container) ->
+              let* () = Tx_container.unlock_block_production () in
+              rpc_ok ())
+            ~on_stateful_michelson:(fun (module Tx_container) ->
+              let* () = Tx_container.unlock_block_production () in
+              rpc_ok ())
+            ~on_rpc:(fun _ ->
+              rpc_error
+                (Rpc_errors.internal_error
+                   "unlockTransactions not supported in RPC mode"))
+        in
+        build ~f module_ parameters
     | Method (Wait_transaction_confirmation.Method, module_) ->
         let open Lwt_result_syntax in
         let f hash =

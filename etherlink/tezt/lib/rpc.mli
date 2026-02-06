@@ -213,6 +213,17 @@ val propose_next_block_timestamp :
   Evm_node.t ->
   (unit, error) result Lwt.t
 
+(** [lock_block_production evm_node] calls the private RPC [lockBlockProduction]
+    to lock the block producer worker. When locked, [produce_block] returns
+    [No_block]. This is a test-only RPC. *)
+val lock_block_production :
+  ?websocket:Websocket.t -> Evm_node.t -> (unit, error) result Lwt.t
+
+(** [unlock_block_production evm_node] calls the private RPC [unlockBlockProduction]
+    to unlock the block producer worker. This is a test-only RPC. *)
+val unlock_block_production :
+  ?websocket:Websocket.t -> Evm_node.t -> (unit, error) result Lwt.t
+
 (** [produce_proposal ?timestamp evm_node] calls the private RPC [produceProposal].
     If provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_proposal :

@@ -523,8 +523,8 @@ struct
         }
           -> (unit, tztrace) t
       | Clear : (unit, tztrace) t
-      | Lock_transactions : (unit, tztrace) t
-      | Unlock_transactions : (unit, tztrace) t
+      | Lock_block_production : (unit, tztrace) t
+      | Unlock_block_production : (unit, tztrace) t
       | Is_locked : (bool, tztrace) t
       | Content : (Transaction_object.txqueue_content, tztrace) t
       | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
@@ -558,8 +558,8 @@ struct
       | Tick _ -> "Tick"
       | Injection_confirmation _ -> "Injection_confirmation"
       | Clear -> "Clear"
-      | Lock_transactions -> "Lock_transactions"
-      | Unlock_transactions -> "Unlock_transactions"
+      | Lock_block_production -> "Lock_block_production"
+      | Unlock_block_production -> "Unlock_block_production"
       | Is_locked -> "Is_locked"
       | Content -> "Content"
       | Size_info -> "Size_info"
@@ -659,15 +659,15 @@ struct
             (fun _ -> assert false);
           case
             Json_only
-            ~title:"Lock_transactions"
-            (obj1 (req "request" (constant "lock_transactions")))
-            (function View Lock_transactions -> Some () | _ -> None)
+            ~title:"Lock_block_production"
+            (obj1 (req "request" (constant "lock_block_production")))
+            (function View Lock_block_production -> Some () | _ -> None)
             (fun _ -> assert false);
           case
             Json_only
-            ~title:"Unlock_transactions"
-            (obj1 (req "request" (constant "unlock_transactions")))
-            (function View Unlock_transactions -> Some () | _ -> None)
+            ~title:"Unlock_block_production"
+            (obj1 (req "request" (constant "unlock_block_production")))
+            (function View Unlock_block_production -> Some () | _ -> None)
             (fun _ -> assert false);
           case
             Json_only
@@ -751,8 +751,9 @@ struct
       | Clear -> fprintf fmt "Clear"
       | Nonce {next_nonce = _; address} ->
           fprintf fmt "Nonce %s" (Tx.address_to_string address)
-      | Lock_transactions -> Format.fprintf fmt "Locking the transactions"
-      | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
+      | Lock_block_production -> Format.fprintf fmt "Locking the transactions"
+      | Unlock_block_production ->
+          Format.fprintf fmt "Unlocking the transactions"
       | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
       | Content -> fprintf fmt "Content"
       | Size_info -> fprintf fmt "Size_info"
@@ -967,9 +968,9 @@ struct
       state.waiting_injection <- Inflight_transactions.empty ;
       ()
 
-    let lock_transactions state = state.locked <- true
+    let lock_block_production state = state.locked <- true
 
-    let unlock_transactions state = state.locked <- false
+    let unlock_block_production state = state.locked <- false
 
     let is_locked state = state.locked
 
@@ -1323,10 +1324,10 @@ struct
               ~next_nonce
           in
           return @@ Ethereum_types.Qty next_gap
-      | Lock_transactions ->
-          protect @@ fun () -> return (lock_transactions state)
-      | Unlock_transactions ->
-          protect @@ fun () -> return (unlock_transactions state)
+      | Lock_block_production ->
+          protect @@ fun () -> return (lock_block_production state)
+      | Unlock_block_production ->
+          protect @@ fun () -> return (unlock_block_production state)
       | Is_locked -> protect @@ fun () -> return (is_locked state)
       | Content ->
           protect @@ fun () ->
@@ -1617,11 +1618,11 @@ struct
     let*? w = Lazy.force worker in
     push_request w (Dropped_transaction {dropped_tx; reason})
 
-  let lock_transactions () =
-    bind_worker @@ fun w -> push_request w Lock_transactions
+  let lock_block_production () =
+    bind_worker @@ fun w -> push_request w Lock_block_production
 
-  let unlock_transactions () =
-    bind_worker @@ fun w -> push_request w Unlock_transactions
+  let unlock_block_production () =
+    bind_worker @@ fun w -> push_request w Unlock_block_production
 
   let is_locked () =
     let open Lwt_result_syntax in
