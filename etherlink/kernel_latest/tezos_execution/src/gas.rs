@@ -9,7 +9,9 @@
 ///
 /// Every Gas Related Function or Constant should be defined here.
 use mir::gas;
+use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::types::Narith;
+use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
 pub struct TezlinkOperationGas {
@@ -27,7 +29,7 @@ pub enum GasLimitError {
     CannotConvertToU32(num_bigint::TryFromBigIntError<num_bigint::BigUint>),
 }
 
-pub struct Cost(pub u32);
+pub struct Cost(u32);
 impl Cost {
     /// This corresponds to the defaults costs in gas.
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
@@ -40,6 +42,10 @@ impl Cost {
 
     pub fn transaction() -> Self {
         Cost(Self::GAS_COST_TRANSACTION)
+    }
+
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<Self, CryptoError> {
+        mir::gas::interpret_cost::check_signature(k, msg).map(Cost)
     }
 }
 
