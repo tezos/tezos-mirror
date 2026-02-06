@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `DelegationContent` defining operation content for delegation.
 - Add `OriginationContent` defining operation content for origination.
 - Implement trait `BinWriter` for `&T` whenever `T` implements `BinWriter`.
+- `HashType::b58check_to_sized_hash` method has been added to `HashType`. Conversion chains like `.as_ref().try_into().unwrap()` can be replaced by `.into()`.
 
 ### Changed
 
@@ -29,6 +30,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `#[encoding]` attribute support for enum fields, in addition to struct fields.
 - `tezos_data_encoding_derive`: derivations of `NomReader` and `BinWriter` require those same constraints on their fields. If such a field doesn't meet the constraint, the implementation will not be available for use, however compilation will still succeed.
 - `nom::optional_field` no longer requires inner type to be `Clone`.
+- Hash types now use fixed-size arrays (`[u8; N]`) instead of `Vec<u8>`, providing compile-time size guarantees.
+- `HashTrait` is now generic over size (`HashTrait<const N: usize>`).
+- `hash::Hash` type alias has been removed, in favour of byte arrays.
+- `serde::Deserialize` and `serde::Serialize` impls for hashes now go via `Vec<u8>` directly, instead of a newtype struct, for binary encodings.
+  This may be backwards compatible, depending on the format being serialised to/from. The `serde` docs encourage this to be the case - see
+  [Serializer::serialize_newtype_struct](https://docs.rs/serde/latest/serde/trait.Serializer.html#tymethod.serialize_newtype_struct).
 
 ### Fixed
 
