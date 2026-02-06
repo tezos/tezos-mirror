@@ -152,7 +152,7 @@ module Tezos_block = struct
   let latest_version = 0
 
   (* Serialize a block using the latest version of the block RLP format. *)
-  let _block_to_rlp {hash; level; timestamp; parent_hash; operations} =
+  let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
     let open Rlp in
     let level = Helpers.encode_i32_le level in
     let version = version_to_bytes latest_version in
@@ -173,18 +173,11 @@ module Tezos_block = struct
     encode item
 
   let encode_block_for_store (block : t) : (string, string) result =
-    Result.map_error
-      (Format.asprintf
-         "Not a valid block: %a"
-         Data_encoding.Binary.pp_write_error)
-      (Data_encoding.Binary.to_string block_encoding block)
+    Ok (Bytes.to_string (block_to_rlp block))
 
   let decode_block_for_store (block : string) : (t, string) result =
-    Result.map_error
-      (Format.asprintf
-         "Not a valid block: %a"
-         Data_encoding.Binary.pp_read_error)
-      (Data_encoding.Binary.of_string block_encoding block)
+    try Ok (block_from_kernel (Bytes.of_string block))
+    with exn -> Error (Printexc.to_string exn)
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
