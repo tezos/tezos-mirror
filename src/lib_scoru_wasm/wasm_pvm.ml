@@ -245,10 +245,8 @@ end
 module Make_machine_with_vm
     (Wasm_vm : Wasm_vm_sig.S)
     (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.Machine with type tree = T.tree = struct
-  type tree = T.tree
-
-  type state = tree
+  Wasm_pvm_sig.Machine with type state = T.tree = struct
+  type state = T.tree
 
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
@@ -509,8 +507,7 @@ module Make_pvm_machine_with_vm
     (Wasm_vm : Wasm_vm_sig.S)
     (Context : CONTEXT_PROOF) :
   Wasm_pvm_sig.S
-    with type tree = Context.Wrapped_tree.tree
-     and type context = Context.context
+    with type context = Context.context
      and type state = Context.Wrapped_tree.tree
      and type proof = Context.proof = struct
   include Make_machine_with_vm (Wasm_vm) (Context.Wrapped_tree)
@@ -623,7 +620,6 @@ end
 module Wasm_pvm_in_memory :
   Wasm_pvm_sig.S
     with type context = Context_in_memory.context
-     and type tree = Context_in_memory.Wrapped_tree.tree
      and type state = Context_in_memory.Wrapped_tree.tree
      and type proof = Context_in_memory.proof =
   Make_pvm_machine (Context_in_memory)

@@ -109,15 +109,11 @@ let read_message name =
   read_file kernel_file
 
 let initial_boot_sector_from_kernel ?(max_tick = 1000000000000L) kernel =
-  let open Lwt_syntax in
-  let+ tree =
-    Wasm_utils.initial_tree
-      ~version:V1
-      ~ticks_per_snapshot:max_tick
-      ~from_binary:true
-      kernel
-  in
-  tree
+  Wasm_utils.initial_state
+    ~version:V1
+    ~ticks_per_snapshot:max_tick
+    ~from_binary:true
+    kernel
 
 type input = File of string | Str of string
 

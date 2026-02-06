@@ -26,18 +26,19 @@
 (** PVM instance used in benchmark*)
 module Wasm :
   Tezos_scoru_wasm.Wasm_pvm_sig.Machine
-    with type tree = Tezos_scoru_wasm_helpers.Encodings_util.Tree.tree
+    with type state = Tezos_scoru_wasm_helpers.Encodings_util.Tree.tree
 
 module Wasm_fast_vm : Tezos_scoru_wasm.Wasm_vm_sig.S
 
 open Tezos_scoru_wasm
 open Wasm_pvm_state
 
-val encode_pvm_state : Internal_state.pvm_state -> Wasm.tree -> Wasm.tree Lwt.t
+val encode_pvm_state :
+  Internal_state.pvm_state -> Wasm.state -> Wasm.state Lwt.t
 
-val decode_pvm_state : Wasm.tree -> Internal_state.pvm_state Lwt.t
+val decode_pvm_state : Wasm.state -> Internal_state.pvm_state Lwt.t
 
-val get_tick_from_tree : Wasm.tree -> Z.t Lwt.t
+val get_tick_from_tree : Wasm.state -> Z.t Lwt.t
 
 val get_tick_from_pvm_state : Internal_state.pvm_state -> Z.t Lwt.t
 

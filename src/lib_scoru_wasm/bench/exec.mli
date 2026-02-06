@@ -74,7 +74,7 @@ val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t
         "src/lib_scoru_wasm/bench/inputs/my_kernel.wasm"]
        initialize a state from a kernel (byte format) *)
 val initial_boot_sector_from_kernel :
-  ?max_tick:int64 -> string -> Wasm.tree Lwt.t
+  ?max_tick:int64 -> string -> Wasm.state Lwt.t
 
 (** Inputs can be given :
     as a filename containing the input,
@@ -89,4 +89,4 @@ type message = Transfer of input | Other of input | Encoded of input
 (** [load_messages messages level state] sends messages to the inbox,
     at a given level. Will fail if the VM is not accepting input,
     and advance until next Snapshot.*)
-val load_messages : message list -> int32 -> Wasm.tree -> Wasm.tree Lwt.t
+val load_messages : message list -> int32 -> Wasm.state -> Wasm.state Lwt.t

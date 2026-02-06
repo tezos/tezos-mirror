@@ -45,7 +45,7 @@ let test_execution_correspondance ~version skip count () =
     (fun kernel ->
       let open Lwt_result_syntax in
       let*! tree =
-        initial_tree
+        initial_state
           ~version
           ~from_binary:true
           ~ticks_per_snapshot:40_000L

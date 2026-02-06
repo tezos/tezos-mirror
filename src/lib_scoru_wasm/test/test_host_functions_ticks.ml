@@ -93,7 +93,7 @@ let test_tickified_host_function ~version () =
  )
 |}
     in
-    let* tree = initial_tree ~version ~from_binary:false module_ in
+    let* tree = initial_state ~version ~from_binary:false module_ in
     (* Feeding it with one input *)
     let* tree = set_empty_inbox_step 0l tree in
     (* running until waiting for input *)
