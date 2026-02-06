@@ -213,6 +213,27 @@ module Node_metrics = struct
       ~namespace
       ~subsystem
       name
+
+  (* Custom histogram for attestation lag with buckets matching possible lag values *)
+  module Attestation_lag_histogram = Prometheus.Histogram (struct
+    let spec =
+      let max_attestation_lag = 8 in
+      let lags =
+        Stdlib.List.init max_attestation_lag (fun i -> float_of_int (i + 1))
+      in
+      Prometheus.Histogram_spec.of_list lags
+  end)
+
+  let attestation_lag_distribution =
+    let name = "attestation_lag" in
+    Attestation_lag_histogram.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Distribution of attestation lags for attested slots (in blocks). Use \
+         histogram_quantile for percentiles, rate for average."
+      ~namespace
+      ~subsystem
+      name
 end
 
 module GS = struct
@@ -628,6 +649,11 @@ let slot_attested ~set i =
 
 let slot_unattested i =
   Prometheus.Counter.inc_one (Node_metrics.slots_unattested (string_of_int i))
+
+let slot_attested_with_lag ~lag ~slot_index =
+  Node_metrics.Attestation_lag_histogram.observe
+    (Node_metrics.attestation_lag_distribution (string_of_int slot_index))
+    (float_of_int lag)
 
 let attested_slots_for_baker_per_level_ratio ~delegate ratio =
   let attester = Format.asprintf "%a@." Signature.Public_key_hash.pp delegate in

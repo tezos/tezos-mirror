@@ -36,6 +36,17 @@ val slot_attested : set:bool -> int -> unit
 (** Increment the count of unattested slots. *)
 val slot_unattested : int -> unit
 
+(** Update attestation lag histogram when a slot is attested.
+    Records the lag value in a histogram for distribution analysis.
+    The metric name is [dal_node_attestation_lag].
+
+    It defines buckets for lag values from 1 to 8 (inclusive), which is the
+    maximum possible lag.
+
+    Note: metric is labelled by the slot id. Increasing the number of slots
+    by 1 will increase the number of tracked metrics by 8. *)
+val slot_attested_with_lag : lag:int -> slot_index:int -> unit
+
 (** Update the "attestation" ratio for the baker *)
 val attested_slots_for_baker_per_level_ratio :
   delegate:Signature.Public_key_hash.t -> float -> unit
