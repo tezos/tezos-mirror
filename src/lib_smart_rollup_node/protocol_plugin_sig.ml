@@ -232,7 +232,8 @@ module type REFUTATION_GAME_HELPERS = sig
     (module PARTIAL) ->
     _ Node_context.t ->
     Pvm_plugin_sig.state_cache ->
-    start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
+    start_state:
+      (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->
     default_number_of_sections:int ->

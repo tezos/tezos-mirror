@@ -103,7 +103,7 @@ let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
   let* index =
     Pvm.Context.(
       load
-        (module Irmin_context)
+        (module Pvm.Irmin_context)
         ~cache_size:100_000
         Read_only
         (Evm_state.irmin_store_path ~data_dir:configuration.data_dir))

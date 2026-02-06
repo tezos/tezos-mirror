@@ -30,8 +30,11 @@
     corresponding to the used pvm. *)
 
 (** See {!module:Tezos_protocol_environment.Environement_context.ops} *)
-type ('repo, 'tree) pvm_context_impl =
-  (module Context_sigs.S with type repo = 'repo and type tree = 'tree)
+type ('repo, 'state, 'mut_state) pvm_context_impl =
+  (module Context_sigs.S
+     with type repo = 'repo
+      and type state = 'state
+      and type mut_state = 'mut_state)
 
 (* Context existential that embeds the context_module associated to
    pvm protocol_plugins *)
@@ -61,7 +64,7 @@ type hash = Hash.t
     in use (for instance, the LRU cache size of Irmin (100_000 by
     default at irmin-pack/config.ml) *)
 val load :
-  ('repo, 'tree) pvm_context_impl ->
+  ('repo, 'state, 'mut_state) pvm_context_impl ->
   cache_size:int ->
   ([< `Read | `Write > `Read] as 'a) Access_mode.t ->
   string ->
@@ -124,6 +127,10 @@ module PVMState : sig
   (** The value of a PVM state *)
   type value = pvmstate
 
+  (** Immutable representation of {!value}. In practice these are copies of
+      values. *)
+  type immutable_value
+
   (** [empty ()] is the empty PVM state. *)
   val empty : 'a index -> value
 
@@ -141,7 +148,18 @@ module PVMState : sig
   (** [set context state] saves the PVM state [state] in the context and returns
       the updated context. Note: [set] does not perform any write on disk, this
       information must be committed using {!val:commit}. *)
-  val set : 'a t -> value -> 'a t Lwt.t
+  val set : 'a t -> value -> unit Lwt.t
+
+  (** Copy a PVM state. WARNING: Can incur a significant memory allocation. *)
+  val copy : value -> value
+
+  (** Create an immutable copy.
+      WARNING: Can incur a significant memory allocation. *)
+  val imm_copy : value -> immutable_value
+
+  (** Create a mutable copy.
+      WARNING: Can incur a significant memory allocation. *)
+  val mut_copy : immutable_value -> value
 end
 
 module Version : sig
@@ -175,7 +193,7 @@ module Wrapper : sig
   module type S = sig
     type repo
 
-    type tree
+    type state
 
     (** Type used by the mutable API for PVMs *)
     type mut_state
@@ -184,28 +202,20 @@ module Wrapper : sig
 
     val to_node_context : ('a, repo) Context_sigs.index -> 'a index
 
-    val of_node_pvmstate : pvmstate -> tree
+    val of_node_pvmstate : pvmstate -> mut_state
 
-    val to_node_pvmstate : tree -> pvmstate
+    val to_node_pvmstate : mut_state -> pvmstate
 
-    val from_imm : tree -> mut_state
+    val from_imm : state -> mut_state
 
-    val to_imm : mut_state -> tree
+    val to_imm : mut_state -> state
   end
 
   (** Specialized module to handle translation to/from a specific context
       backend implementation *)
-  module Make (C : sig
-    include Context_sigs.S
-
-    type mut_state
-
-    val from_imm : tree -> mut_state
-
-    val to_imm : mut_state -> tree
-  end) :
+  module Make (C : Context_sigs.S) :
     S
       with type repo = C.repo
-       and type tree = C.tree
+       and type state = C.state
        and type mut_state = C.mut_state
 end

@@ -49,7 +49,9 @@ type repo = IStore.Repo.t
 
 type tree = IStore.tree
 
-type mut_state = tree ref
+type state = tree
+
+type mut_state = state ref
 
 type 'a raw_index = ('a, repo) Context_sigs.raw_index
 
@@ -59,7 +61,7 @@ type rw_index = [`Read | `Write] index
 
 type ro_index = [`Read] index
 
-type 'a t = ('a, repo, tree) Context_sigs.t
+type 'a t = ('a, repo, mut_state) Context_sigs.t
 
 type rw = [`Read | `Write] t
 
@@ -76,10 +78,8 @@ module Tree :
     with type tree = IStore.tree
      and type key = string list
      and type value = bytes
-     and type t = rw = struct
+     and type t := unit = struct
   include IStoreTree
-
-  type t = rw
 
   type tree = IStore.tree
 
@@ -92,8 +92,10 @@ let () = assert (Context_hash.size = IStore.Hash.hash_size)
 
 let impl_name = "Irmin"
 
-let equality_witness : (repo, tree) Context_sigs.equality_witness =
-  (Context_sigs.Equality_witness.make (), Context_sigs.Equality_witness.make ())
+let equality_witness : (repo, tree, mut_state) Context_sigs.equality_witness =
+  ( Context_sigs.Equality_witness.make (),
+    Context_sigs.Equality_witness.make (),
+    Context_sigs.Equality_witness.make () )
 
 let from_imm imm_state = ref imm_state
 
@@ -140,7 +142,7 @@ let raw_commit ?(message = "") index tree =
 let commit ?message ctxt =
   let open Lwt_syntax in
   Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "commit" @@ fun _ ->
-  let+ commit = raw_commit ?message ctxt.index ctxt.tree in
+  let+ commit = raw_commit ?message ctxt.index (to_imm ctxt.state) in
   IStore.Commit.hash commit
 
 let checkout index key =
@@ -151,7 +153,7 @@ let checkout index key =
   | None -> return_none
   | Some commit ->
       let tree = IStore.Commit.tree commit in
-      return_some {index; tree}
+      return_some {index; state = from_imm tree}
 
 let checkout_exn index key =
   let open Lwt_syntax in
@@ -160,9 +162,9 @@ let checkout_exn index key =
   | Some context -> return context
   | None -> Lwt.fail_with "No store found"
 
-let empty index = {index; tree = IStore.Tree.empty ()}
+let empty index = {index; state = from_imm (IStore.Tree.empty ())}
 
-let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
+let is_empty ctxt = IStore.Tree.is_empty (to_imm ctxt.state)
 
 let split ctxt = IStore.split ctxt.repo
 
@@ -299,15 +301,18 @@ end
 
 (** State of the PVM that this rollup node deals with. *)
 module PVMState = struct
-  type value = tree
+  type value = mut_state
 
   let key = ["pvm_state"]
 
-  let empty () = IStore.Tree.empty ()
+  let empty () = IStore.Tree.empty () |> from_imm
 
   let find ctxt =
     Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.find"
-    @@ fun _ -> IStore.Tree.find_tree ctxt.tree key
+    @@ fun _ ->
+    let open Lwt_syntax in
+    let+ pvm_state = IStore.Tree.find_tree (to_imm ctxt.state) key in
+    Option.map from_imm pvm_state
 
   let get ctxt =
     let open Lwt_syntax in
@@ -318,14 +323,14 @@ module PVMState = struct
 
   let lookup tree path =
     Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.lookup"
-    @@ fun _ -> IStore.Tree.find tree path
+    @@ fun _ -> IStore.Tree.find (to_imm tree) path
 
   let set ctxt state =
     let open Lwt_syntax in
     Opentelemetry_lwt.Trace.with_ ~service_name:"Irmin" "PVMState.set"
     @@ fun _ ->
-    let+ tree = IStore.Tree.add_tree ctxt.tree key state in
-    {ctxt with tree}
+    let+ tree = IStore.Tree.add_tree (to_imm ctxt.state) key (to_imm state) in
+    ctxt.state := tree
 end
 
 let load ~cache_size ?async_domain mode path =

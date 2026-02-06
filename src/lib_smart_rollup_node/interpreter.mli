@@ -30,7 +30,11 @@
     [ctxt] is the updated layer 2 context (with the new PVM state),
     [num_messages] is the number of [messages], [num_ticks] is the number of
     ticks taken by the PVM for the evaluation and [tick] is the tick reached by
-    the PVM after the evaluation. *)
+    the PVM after the evaluation.
+    NOTE: [ctxt] is modified in place by [process_head]. It is the
+    responsibility of the caller to make a copy and revert if needed in case of
+    error.
+*)
 val process_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
@@ -38,9 +42,27 @@ val process_head :
   predecessor:Layer1.head ->
   Layer1.head ->
   Octez_smart_rollup.Inbox.t * string list ->
-  ('a Context.t * int * int64 * Z.t) tzresult Lwt.t
+  (int * int64 * Z.t) tzresult Lwt.t
 
-type original_genesis_state = Original of Context.pvmstate
+type patched = Patched
+
+type unpatched = Unpatched
+
+type both = Both
+
+type _ genesis_state =
+  | Patched : Context.pvmstate -> patched genesis_state
+  | Unpatched : Context.pvmstate -> unpatched genesis_state
+  | Both : {
+      patched : Context.pvmstate;
+      original : Context.pvmstate;
+    }
+      -> both genesis_state
+
+type _ genesis_state_mode =
+  | Patched : patched genesis_state_mode
+  | Unpatched : unpatched genesis_state_mode
+  | Both : both genesis_state_mode
 
 (** [genesis_state plugin ?genesis_block node_ctxt] returns a pair [s1, s2]
     where [s1] is the PVM state at the genesis block and [s2] is the genesis
@@ -48,10 +70,12 @@ type original_genesis_state = Original of Context.pvmstate
     genesis commitment. If there are no unsafe patches for the rollup [s2] is
     the same as [s1]. *)
 val genesis_state :
+  'm genesis_state_mode ->
   (module Protocol_plugin_sig.PARTIAL) ->
   ?genesis_block:Block_hash.t ->
   _ Node_context.t ->
-  (Context.pvmstate * original_genesis_state) tzresult Lwt.t
+  Context.pvmstate ->
+  'm genesis_state tzresult Lwt.t
 
 (** [state_of_tick plugin node_ctxt cache ?start_state ~tick level] returns [Some
     state] for a given [tick] if this [tick] happened before [level] and where
@@ -62,10 +86,11 @@ val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
   Pvm_plugin_sig.state_cache ->
-  ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
+  ?start_state:(Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->
-  Fuel.Accounted.t Pvm_plugin_sig.eval_state option tzresult Lwt.t
+  (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state option tzresult
+  Lwt.t
 
 (** [state_of_head plugin node_ctxt ctxt head] returns the state corresponding
     to the block [head], or the state at rollup genesis if the block is before

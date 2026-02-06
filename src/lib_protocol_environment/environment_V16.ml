@@ -1726,7 +1726,7 @@ struct
 
     let state_hash state = Backend.state_hash state
 
-    let empty_state () = Storage.empty ()
+    let empty_state () = Backend.Mutable_state.to_imm @@ Storage.empty ()
 
     let proof_start_state proof = Backend.proof_start_state proof
 

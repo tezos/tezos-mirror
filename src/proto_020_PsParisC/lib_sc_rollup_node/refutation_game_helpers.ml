@@ -66,7 +66,7 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
   in
   let*! input_request =
     let open (val Pvm.of_kind node_ctxt.kind) in
-    is_input_state
+    Mutable_state.is_input_state
       ~is_reveal_enabled
       (Ctxt_wrapper.of_node_pvmstate start_state)
   in
@@ -187,7 +187,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
 
     let context : context = Ctxt_wrapper.of_node_context context
 
-    let state = Ctxt_wrapper.of_node_pvmstate start_state
+    let state = PVM.Ctxt_wrapper.(to_imm @@ of_node_pvmstate start_state)
 
     let reveal hash =
       let open Lwt_syntax in
@@ -253,7 +253,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
   end in
   let metadata = metadata node_ctxt in
   let*! start_tick =
-    PVM.get_tick (PVM.Ctxt_wrapper.of_node_pvmstate start_state)
+    PVM.Mutable_state.get_tick (PVM.Ctxt_wrapper.of_node_pvmstate start_state)
   in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
@@ -326,7 +326,7 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
       ~tick:(Z.add (Sc_rollup.Tick.to_z tick) commitment_period_tick_offset)
       last_level
   in
-  let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} = state_hash in
+  let state_hash_of_eval_state s = s.Pvm_plugin_sig.info.state_hash in
   let start_chunk =
     Sc_rollup_proto_types.Game.dissection_chunk_of_octez start_chunk
   in

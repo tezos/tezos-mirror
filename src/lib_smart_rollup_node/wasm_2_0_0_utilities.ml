@@ -67,7 +67,7 @@ let set_value_instr ~(pvm : (module Pvm_plugin_sig.S)) key tree =
    specified. *)
 let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) state =
   let open Lwt_syntax in
-  let tree = Context_wrapper.Irmin.of_node_pvmstate state in
+  let tree = !(Context_wrapper.Irmin.of_node_pvmstate state) in
   let durable_path = "durable" :: [] in
   let module Plugin : Protocol_plugin_sig.S = (val plugin) in
   let* path_exists = Plugin.Pvm.Wasm_2_0_0.proof_mem_tree tree durable_path in
@@ -159,7 +159,7 @@ let preload_kernel (node_ctxt : _ Node_context.t) header =
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level node_ctxt header.level
   in
-  let tree = Context_wrapper.Irmin.of_node_pvmstate pvm_state in
+  let tree = !(Context_wrapper.Irmin.of_node_pvmstate pvm_state) in
   let*! durable =
     Plugin.Pvm.Wasm_2_0_0.decode_durable_state
       Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
@@ -198,15 +198,16 @@ let patch_durable_storage ~data_dir ~key ~value =
   in
 
   (* Patches the state via an unsafe patch. *)
-  let* patched_state =
+  let* () =
     Plugin.Pvm.Unsafe.apply_patch
       Kind.Wasm_2_0_0
       state
       (Pvm_patches.Patch_durable_storage {key; value})
   in
 
-  (* Replaces the PVM state. *)
-  let*! context = Context.PVMState.set context patched_state in
+  (* PVM state is was modified in place, replace it in Irmin context or check
+     integrity in RISC-V context. *)
+  let*! () = Context.PVMState.set context state in
   let*! new_commit = Context.commit context in
   let new_l2_block =
     {l2_block with header = {l2_block.header with context = new_commit}}

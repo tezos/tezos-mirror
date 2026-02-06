@@ -229,13 +229,17 @@ let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
       ~data_dir:dest
       ~apply_unsafe_patches
   in
-  Interpreter.genesis_state plugin node_context
+  Interpreter.genesis_state
+    Both
+    plugin
+    node_context
+    (Context.PVMState.empty context)
 
 let check_genesis_pvm_state_and_return cctxt dest store context header
     (module Plugin : Protocol_plugin_sig.PARTIAL) (metadata : Metadata.t)
     head_ctxt hash ~apply_unsafe_patches =
   let open Lwt_result_syntax in
-  let* patched_pvm_state, Original pvm_state =
+  let* (Both {patched = patched_pvm_state; original = pvm_state}) =
     compute_pvm_state_for_genenis
       cctxt
       dest
@@ -467,8 +471,8 @@ let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
 let hash_level_of_l2_block (b : Sc_rollup_block.t) =
   Layer1.{hash = b.header.block_hash; level = b.header.level}
 
-let reconstruct_level_context rollup_ctxt ~predecessor
-    (node_ctxt : _ Node_context.t) level =
+let reconstruct_level_context ctxt ~predecessor (node_ctxt : _ Node_context.t)
+    level =
   let open Lwt_result_syntax in
   let* block = Node_context.get_l2_block_by_level node_ctxt level in
   let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash
@@ -478,11 +482,11 @@ let reconstruct_level_context rollup_ctxt ~predecessor
   let* (module Plugin) =
     Protocol_plugins.proto_plugin_for_level node_ctxt level
   in
-  let* ctxt, _num_messages, _num_ticks, _initial_tick =
+  let* _num_messages, _num_ticks, _initial_tick =
     Interpreter.process_head
       (module Plugin)
       node_ctxt
-      rollup_ctxt
+      ctxt
       ~predecessor:(hash_level_of_l2_block predecessor)
       (hash_level_of_l2_block block)
       (inbox, messages)

@@ -10,7 +10,13 @@ open Pvm_types
 let config = Octez_smart_rollup_wasm_debugger_lib.Config.config
 
 module Bare_context = struct
-  module Tree = Irmin_context.Tree
+  module Tree = struct
+    include Irmin_context.Tree
+
+    let empty _ = empty ()
+
+    let of_value _ = of_value ()
+  end
 
   type t = Irmin_context.rw
 

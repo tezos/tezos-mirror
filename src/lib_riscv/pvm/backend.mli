@@ -70,6 +70,8 @@ module Mutable_state : sig
   val get_reveal_request : t -> string Lwt.t
 
   val insert_failure : t -> unit Lwt.t
+
+  val install_boot_sector : t -> string -> unit Lwt.t
 end
 
 val compute_step_many :

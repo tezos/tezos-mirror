@@ -82,7 +82,19 @@ let inject_next_move node_ctxt ~refutation ~opponent =
 
 type pvm_intermediate_state =
   | Hash of State_hash.t
-  | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
+  | Evaluated of {
+      head : (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state;
+          (** The working head which we are currently updating to go forwards
+              during dissection traversal. *)
+      snapshot :
+        ( Fuel.Accounted.t,
+          Context.PVMState.immutable_value )
+        Pvm_plugin_sig.eval_state;
+          (** A fixed view of the most recent agreement point. We must make a
+              copy of the current pvm state computed during traversal because we
+              use the previous state we agree with as a starting point of the
+              following dissection. *)
+    }
 
 let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
     ~default_number_of_sections ~commitment_period_tick_offset node_ctxt
@@ -91,13 +103,16 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
   let start_hash, start_tick, start_state =
     match ok with
     | Hash hash, tick -> (hash, tick, None)
-    | Evaluated ({state_hash; _} as state), tick ->
-        (state_hash, tick, Some state)
+    | Evaluated state, tick ->
+        (* Only use immutable copy because mutable version has been modified *)
+        ( state.snapshot.info.state_hash,
+          tick,
+          Some (Pvm_plugin_sig.to_mut_eval_state state.snapshot) )
   in
   let start_chunk = Game.{state_hash = Some start_hash; tick = start_tick} in
   let our_state, our_tick = our_view in
   let our_state_hash =
-    Option.map (fun Pvm_plugin_sig.{state_hash; _} -> state_hash) our_state
+    Option.map (fun s -> s.Pvm_plugin_sig.info.state_hash) our_state
   in
   let our_stop_chunk = Game.{state_hash = our_state_hash; tick = our_tick} in
   let* dissection =
@@ -144,7 +159,7 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
         let start_state =
           match ok with
           | Hash _, _ -> None
-          | Evaluated ok_state, _ -> Some ok_state
+          | Evaluated ok_state, _ -> Some ok_state.head
         in
         let* our =
           Interpreter.state_of_tick
@@ -161,9 +176,20 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
                end and the two players disagree about the end. *)
             assert false
         | Some _, None | None, Some _ -> return (ok, (our, tick))
-        | Some their_hash, Some ({state_hash = our_hash; _} as our_state) ->
-            if Octez_smart_rollup.State_hash.equal our_hash their_hash then
-              traverse (Evaluated our_state, tick) dissection
+        | Some their_hash, Some our_state ->
+            if
+              Octez_smart_rollup.State_hash.equal
+                our_state.info.state_hash
+                their_hash
+            then
+              let ok =
+                Evaluated
+                  {
+                    head = our_state;
+                    snapshot = Pvm_plugin_sig.to_imm_eval_state our_state;
+                  }
+              in
+              traverse (ok, tick) dissection
             else return (ok, (our, tick)))
   in
   match dissection with

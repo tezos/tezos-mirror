@@ -71,7 +71,7 @@ let get_state (node_ctxt : _ Node_context.t) block_hash =
   let*! state = Context.PVMState.find ctxt in
   match state with
   | None -> failwith "No state"
-  | Some state -> return (state, of_node_pvmstate state)
+  | Some state -> return (state, !(of_node_pvmstate state))
 
 let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     ~insight_requests ~log_kernel_debug_file messages =
@@ -112,18 +112,20 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     List.map_p
       (function
         | Sc_rollup_services.Pvm_state_key key ->
-            PVM.State.lookup (of_node_pvmstate state) key
+            PVM.Mutable_state.lookup (of_node_pvmstate state) key
         | Durable_storage_key key ->
-            PVM.Inspect_durable_state.lookup (of_node_pvmstate state) key)
+            PVM.Mutable_state.Inspect_durable_state.lookup
+              (of_node_pvmstate state)
+              key)
       insight_requests
   in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
   let level = Raw_level.of_int32_exn inbox_level in
-  let*! outbox = PVM.get_outbox level (of_node_pvmstate state) in
+  let*! outbox = PVM.get_outbox level !(of_node_pvmstate state) in
   let output =
     List.filter (fun Sc_rollup.{outbox_level; _} -> outbox_level = level) outbox
   in
-  let*! state_hash = PVM.state_hash (of_node_pvmstate state) in
+  let*! state_hash = PVM.state_hash !(of_node_pvmstate state) in
   let* constants =
     Protocol_plugins.get_constants_of_level node_ctxt inbox_level
   in
@@ -133,7 +135,7 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status = PVM.get_status ~is_reveal_enabled (of_node_pvmstate state) in
+  let*! status = PVM.get_status ~is_reveal_enabled !(of_node_pvmstate state) in
   let status = PVM.string_of_status status in
   return
     Sc_rollup_services.

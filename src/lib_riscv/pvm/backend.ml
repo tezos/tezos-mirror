@@ -126,6 +126,11 @@ module Mutable_state = struct
 
   let insert_failure state =
     Lwt.return @@ Api.octez_riscv_mut_insert_failure state
+
+  let install_boot_sector state boot_sector =
+    Lwt.return
+    @@ Api.octez_riscv_mut_install_boot_sector state
+    @@ Bytes.of_string boot_sector
 end
 
 let compute_step_many ?reveal_builtins:_ ?write_debug ?stop_at_snapshot:_

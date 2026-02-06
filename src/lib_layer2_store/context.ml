@@ -32,26 +32,34 @@ let err_implementation_mismatch ~expected ~got =
 
 open Context_sigs
 
-type ('repo, 'tree) pvm_context_impl =
-  (module Context_sigs.S with type repo = 'repo and type tree = 'tree)
+type ('repo, 'state, 'mut_state) pvm_context_impl =
+  (module Context_sigs.S
+     with type repo = 'repo
+      and type state = 'state
+      and type mut_state = 'mut_state)
 
-let equiv (a, b) (c, d) = (Equality_witness.eq a c, Equality_witness.eq b d)
+let equiv (r1, s1, m1) (r2, s2, m2) =
+  ( Equality_witness.eq r1 r2,
+    Equality_witness.eq s1 s2,
+    Equality_witness.eq m1 m2 )
 
 module Hash = Smart_rollup_context_hash
 
 type hash = Hash.t
 
-type ('a, 'repo, 'tree, 'loaded_tree) container = {
+type ('a, 'repo, 'state, 'mut_state, 'loaded_state) container = {
   index : ('a, 'repo) index;
-  pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+  pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
   impl_name : string;
-  tree : 'loaded_tree;
-  equality_witness : ('repo, 'tree) equality_witness;
+  state : 'loaded_state;
+  equality_witness : ('repo, 'state, 'mut_state) equality_witness;
 }
 
-type 'a index = Index : ('a, 'repo, 'tree, unit) container -> 'a index
+type 'a index =
+  | Index : ('a, 'repo, 'state, 'mut_state, unit) container -> 'a index
 
-type 'a t = Context : ('a, 'repo, 'tree, 'tree) container -> 'a t
+type 'a t =
+  | Context : ('a, 'repo, 'state, 'mut_state, 'mut_state) container -> 'a t
 
 type ro = [`Read] t
 
@@ -62,10 +70,10 @@ type ro_index = [`Read] index
 type rw_index = [`Read | `Write] index
 
 let make_index ~index ~pvm_context_impl ~equality_witness ~impl_name =
-  Index {index; tree = (); pvm_context_impl; equality_witness; impl_name}
+  Index {index; state = (); pvm_context_impl; equality_witness; impl_name}
 
-let load : type tree repo.
-    (repo, tree) pvm_context_impl ->
+let load : type state mut_state repo.
+    (repo, state, mut_state) pvm_context_impl ->
     cache_size:int ->
     'a Access_mode.t ->
     string ->
@@ -81,7 +89,7 @@ let load : type tree repo.
     ~impl_name
     ~equality_witness
 
-let index (type a) (Context o : a t) : a index = Index {o with tree = ()}
+let index (type a) (Context o : a t) : a index = Index {o with state = ()}
 
 let close (type a)
     (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a index) :
@@ -102,19 +110,19 @@ let checkout (type a)
   in
   match ctx with
   | None -> None
-  | Some {index; tree} -> Some (Context {o with index; tree})
+  | Some {index; state} -> Some (Context {o with index; state})
 
 let empty (type a)
     (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
       a index) : a t =
-  let {Context_sigs.index; tree} = Pvm_Context_Impl.empty index in
-  Context {o with index; tree}
+  let {Context_sigs.index; state} = Pvm_Context_Impl.empty index in
+  Context {o with index; state}
 
 let commit ?message
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} :
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; state; _} :
       [> `Write] t) =
   let open Lwt_syntax in
-  let+ hash = Pvm_Context_Impl.commit ?message {index; tree} in
+  let+ hash = Pvm_Context_Impl.commit ?message {index; state} in
   Pvm_Context_Impl.context_hash_of_hash hash
 
 let is_gc_finished
@@ -153,12 +161,21 @@ let export_snapshot (type a)
 
 type pvmstate =
   | PVMState : {
-      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+      pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
       impl_name : string;
-      pvmstate : 'tree;
-      equality_witness : ('repo, 'tree) equality_witness;
+      pvmstate : 'mut_state;
+      equality_witness : ('repo, 'state, 'mut_state) equality_witness;
     }
       -> pvmstate
+
+type imm_pvmstate =
+  | Imm_PVMState : {
+      pvm_context_impl : ('repo, 'state, 'mut_state) pvm_context_impl;
+      impl_name : string;
+      pvmstate : 'state;
+      equality_witness : ('repo, 'state, 'mut_state) equality_witness;
+    }
+      -> imm_pvmstate
 
 let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
   PVMState {pvm_context_impl; impl_name; pvmstate; equality_witness}
@@ -166,6 +183,8 @@ let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
 (** State of the PVM that this rollup node deals with *)
 module PVMState = struct
   type value = pvmstate
+
+  type immutable_value = imm_pvmstate
 
   let empty : type a. a index -> value =
    fun (Index
@@ -186,13 +205,13 @@ module PVMState = struct
           {
             pvm_context_impl = (module Pvm_Context_Impl);
             index;
-            tree;
+            state;
             equality_witness;
             impl_name;
             _;
           }) ->
     let open Lwt_syntax in
-    let+ pvmstate = Pvm_Context_Impl.PVMState.find {index; tree} in
+    let+ pvmstate = Pvm_Context_Impl.PVMState.find {index; state} in
     match pvmstate with
     | None -> None
     | Some pvmstate ->
@@ -217,28 +236,69 @@ module PVMState = struct
        path ->
     Pvm_Context_Impl.PVMState.lookup pvmstate path
 
-  let set : type a. a t -> value -> a t Lwt.t =
+  let set : type a. a t -> value -> unit Lwt.t =
    fun (Context
-          ({pvm_context_impl = (module Pvm_Context_Impl); index; tree; _} as o1))
+          ({pvm_context_impl = (module Pvm_Context_Impl); index; state; _} as o1))
        (PVMState o2) ->
-    let open Lwt_syntax in
     match equiv o1.equality_witness o2.equality_witness with
-    | Some Refl, Some Refl ->
-        let+ ctxt = Pvm_Context_Impl.PVMState.set {index; tree} o2.pvmstate in
-        Context {o1 with index = ctxt.index; tree = ctxt.tree}
+    | Some Refl, _, Some Refl ->
+        Pvm_Context_Impl.PVMState.set {index; state} o2.pvmstate
     | _ -> err_implementation_mismatch ~expected:o1.impl_name ~got:o2.impl_name
+
+  let copy : value -> value =
+   fun (PVMState
+          ({pvm_context_impl = (module Pvm_Context_Impl); pvmstate; _} as o)) ->
+    PVMState
+      {
+        o with
+        pvmstate =
+          pvmstate |> Pvm_Context_Impl.to_imm |> Pvm_Context_Impl.from_imm;
+      }
+
+  let imm_copy : value -> immutable_value =
+   fun (PVMState
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            pvmstate;
+            impl_name;
+            equality_witness;
+          }) ->
+    Imm_PVMState
+      {
+        pvm_context_impl = (module Pvm_Context_Impl);
+        pvmstate = Pvm_Context_Impl.to_imm pvmstate;
+        impl_name;
+        equality_witness;
+      }
+
+  let mut_copy : immutable_value -> value =
+   fun (Imm_PVMState
+          {
+            pvm_context_impl = (module Pvm_Context_Impl);
+            pvmstate;
+            impl_name;
+            equality_witness;
+          }) ->
+    PVMState
+      {
+        pvm_context_impl = (module Pvm_Context_Impl);
+        pvmstate = Pvm_Context_Impl.from_imm pvmstate;
+        impl_name;
+        equality_witness;
+      }
+    |> copy
 end
 
 module Internal_for_tests = struct
   let get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t =
    fun (module Pvm_Context_Impl) key ->
     let open Lwt_syntax in
-    let+ tree = Pvm_Context_Impl.Internal_for_tests.get_a_tree key in
+    let+ state = Pvm_Context_Impl.Internal_for_tests.get_a_tree key in
     make_pvmstate
       ~pvm_context_impl:(module Pvm_Context_Impl)
       ~equality_witness:Pvm_Context_Impl.equality_witness
       ~impl_name:Pvm_Context_Impl.impl_name
-      ~pvmstate:tree
+      ~pvmstate:(Pvm_Context_Impl.from_imm state)
 end
 
 module Version = struct
@@ -264,7 +324,7 @@ module Wrapper = struct
   module type S = sig
     type repo
 
-    type tree
+    type state
 
     type mut_state
 
@@ -272,22 +332,23 @@ module Wrapper = struct
 
     val to_node_context : ('a, repo) Context_sigs.index -> 'a index
 
-    val of_node_pvmstate : pvmstate -> tree
+    val of_node_pvmstate : pvmstate -> mut_state
 
-    val to_node_pvmstate : tree -> pvmstate
+    val to_node_pvmstate : mut_state -> pvmstate
 
-    val from_imm : tree -> mut_state
+    val from_imm : state -> mut_state
 
-    val to_imm : mut_state -> tree
+    val to_imm : mut_state -> state
   end
 
   (* Context *)
-  let of_node_context : type repo tree.
-      (repo, tree) equality_witness -> 'a index -> ('a, repo) Context_sigs.index
-      =
+  let of_node_context : type repo state mut_state.
+      (repo, state, mut_state) equality_witness ->
+      'a index ->
+      ('a, repo) Context_sigs.index =
    fun eqw (Index {equality_witness; index; _}) ->
     match equiv equality_witness eqw with
-    | Some Refl, Some Refl -> index
+    | Some Refl, _, _ -> index
     | _ ->
         (* This could happen if the context backend was to change for a
          given pvm/rollup. For now we only use Irmin, if this changes,
@@ -295,8 +356,11 @@ module Wrapper = struct
          pmv_context to the next one. *)
         assert false
 
-  let to_node_context : type repo tree.
-      (module Context_sigs.S with type tree = tree and type repo = repo) ->
+  let to_node_context : type repo state mut_state.
+      (module Context_sigs.S
+         with type repo = repo
+          and type state = state
+          and type mut_state = mut_state) ->
       ('a, repo) Context_sigs.index ->
       'a index =
    fun (module C) index ->
@@ -307,15 +371,17 @@ module Wrapper = struct
       ~impl_name:C.impl_name
 
   (* PVMState *)
-  let of_node_pvmstate : type repo tree.
-      (repo, tree) equality_witness -> pvmstate -> tree =
+  let of_node_pvmstate : type repo state mut_state.
+      (repo, state, mut_state) equality_witness -> pvmstate -> mut_state =
    fun eqw (PVMState {equality_witness; pvmstate; _}) ->
     match equiv equality_witness eqw with
-    | Some Refl, Some Refl -> pvmstate
+    | _, _, Some Refl -> pvmstate
     | _ -> assert false
 
-  let to_node_pvmstate : type tree.
-      (module Context_sigs.S with type tree = tree) -> tree -> pvmstate =
+  let to_node_pvmstate : type mut_state.
+      (module Context_sigs.S with type mut_state = mut_state) ->
+      mut_state ->
+      pvmstate =
    fun (module C) pvmstate ->
     make_pvmstate
       ~pvmstate
@@ -323,22 +389,14 @@ module Wrapper = struct
       ~equality_witness:C.equality_witness
       ~impl_name:C.impl_name
 
-  module Make (C : sig
-    include Context_sigs.S
-
-    type mut_state
-
-    val from_imm : tree -> mut_state
-
-    val to_imm : mut_state -> tree
-  end) :
+  module Make (C : Context_sigs.S) :
     S
       with type repo = C.repo
-       and type tree = C.tree
+       and type state = C.state
        and type mut_state = C.mut_state = struct
     type repo = C.repo
 
-    type tree = C.tree
+    type state = C.state
 
     type mut_state = C.mut_state
 
@@ -348,13 +406,13 @@ module Wrapper = struct
     let to_node_context : ('a, repo) Context_sigs.index -> 'a index =
      fun ctxt -> to_node_context (module C) ctxt
 
-    let of_node_pvmstate : pvmstate -> tree =
+    let of_node_pvmstate : pvmstate -> mut_state =
      fun c -> of_node_pvmstate C.equality_witness c
 
-    let to_node_pvmstate : tree -> pvmstate = to_node_pvmstate (module C)
+    let to_node_pvmstate : mut_state -> pvmstate = to_node_pvmstate (module C)
 
-    let from_imm : tree -> mut_state = C.from_imm
+    let from_imm : state -> mut_state = C.from_imm
 
-    let to_imm : mut_state -> tree = C.to_imm
+    let to_imm : mut_state -> state = C.to_imm
   end
 end

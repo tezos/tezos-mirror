@@ -165,14 +165,14 @@ let generate_proof (node_ctxt : _ Node_context.t)
       ~inbox_level:game.inbox_level
       node_ctxt
       dal_parameters
-      (of_node_pvmstate start_state)
+      !(of_node_pvmstate start_state)
   in
   let module P = struct
     include PVM
 
     let context = of_node_context context
 
-    let state = of_node_pvmstate start_state
+    let state = !(of_node_pvmstate start_state)
 
     let reveal hash =
       let open Lwt_syntax in
@@ -235,7 +235,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     end
   end in
   let metadata = metadata node_ctxt in
-  let*! start_tick = PVM.get_tick (of_node_pvmstate start_state) in
+  let*! start_tick = PVM.get_tick !(of_node_pvmstate start_state) in
   let is_reveal_enabled =
     match constants.sc_rollup.reveal_activation_level with
     | Some reveal_activation_level ->
@@ -305,7 +305,7 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) state_cache
       ~tick:(Z.add (Sc_rollup.Tick.to_z tick) commitment_period_tick_offset)
       last_level
   in
-  let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} = state_hash in
+  let state_hash_of_eval_state s = s.Pvm_plugin_sig.info.state_hash in
   let start_chunk =
     Sc_rollup_proto_types.Game.dissection_chunk_of_octez start_chunk
   in

@@ -27,6 +27,76 @@
 open Protocol
 open Alpha_context
 
+(** Mutable API for the PVM.
+    - PVM functions which update the state in-place instead of returning a new
+    state.
+
+    This API helps the RISC-V PVM avoid unnecessary state copying. *)
+module type MUTABLE_STATE_S = sig
+  type t
+
+  type repo
+
+  type hash
+
+  type status
+
+  (** [empty ()] is the empty state.  *)
+  val empty : unit -> t
+
+  (** [find context] returns the PVM state stored in the [context], if any. *)
+  val find : ('a, repo, t) Context_sigs.t -> t option Lwt.t
+
+  (** [lookup state path] returns the data stored for the path [path] in the
+      PVM state [state].  *)
+  val lookup : t -> string list -> bytes option Lwt.t
+
+  (** [set context state] saves the PVM state [state] in the context and
+      returns the updated context. Note: [set] does not perform any write on
+      disk, this information must be committed using {!val:Context.commit}. *)
+  val set : ('a, repo, t) Context_sigs.t -> t -> unit Lwt.t
+
+  val get_tick : t -> Sc_rollup.Tick.t Lwt.t
+
+  val get_current_level : t -> int32 option Lwt.t
+
+  val get_outbox : int32 -> t -> Sc_rollup.output list Lwt.t
+
+  val get_status :
+    is_reveal_enabled:Sc_rollup.is_reveal_enabled -> t -> status Lwt.t
+
+  val state_hash : t -> hash Lwt.t
+
+  val set_initial_state : empty:t -> unit Lwt.t
+
+  val install_boot_sector : t -> string -> unit Lwt.t
+
+  val is_input_state :
+    is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
+    t ->
+    Sc_rollup.input_request Environment.Lwt.t
+
+  val set_input : Sc_rollup.input -> t -> unit Lwt.t
+
+  val eval_many :
+    ?check_invalid_kernel:bool ->
+    reveal_builtins:Tezos_scoru_wasm.Builtins.reveals ->
+    write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
+    is_reveal_enabled:Sc_rollup.is_reveal_enabled ->
+    ?stop_at_snapshot:bool ->
+    max_steps:int64 ->
+    t ->
+    int64 Lwt.t
+
+  module Inspect_durable_state : sig
+    val lookup : t -> string list -> bytes option Lwt.t
+  end
+
+  module Internal_for_tests : sig
+    val insert_failure : t -> unit Lwt.t
+  end
+end
+
 (** Desired module type of a PVM from the L2 node's perspective *)
 module type S = sig
   type repo
@@ -34,7 +104,7 @@ module type S = sig
   type tree
 
   module Ctxt_wrapper :
-    Context.Wrapper.S with type repo = repo and type tree = tree
+    Context.Wrapper.S with type repo = repo and type state = tree
 
   include
     Sc_rollup.PVM.S
@@ -80,28 +150,13 @@ module type S = sig
     our_stop_chunk:Sc_rollup.Dissection_chunk.t ->
     Sc_rollup.Tick.t list
 
-  (** State storage for this PVM. *)
-  module State : sig
-    type value = state
-
-    (** [empty ()] is the empty state.  *)
-    val empty : unit -> state
-
-    (** [find context] returns the PVM state stored in the [context], if any. *)
-    val find : ('a, repo, tree) Context_sigs.t -> state option Lwt.t
-
-    (** [lookup state path] returns the data stored for the path [path] in the
-        PVM state [state].  *)
-    val lookup : state -> string list -> bytes option Lwt.t
-
-    (** [set context state] saves the PVM state [state] in the context and
-        returns the updated context. Note: [set] does not perform any write on
-        disk, this information must be committed using {!val:Context.commit}. *)
-    val set :
-      ('a, repo, tree) Context_sigs.t ->
-      state ->
-      ('a, repo, tree) Context_sigs.t Lwt.t
-  end
+  (** Mutable state API which allows updating the PVM state in-place. *)
+  module Mutable_state :
+    MUTABLE_STATE_S
+      with type t = Ctxt_wrapper.mut_state
+       and type repo = repo
+       and type hash = hash
+       and type status = status
 
   (** Inspect durable state using a more specialised way of reading the
       PVM state.
@@ -125,5 +180,7 @@ module type S = sig
 
     (** [apply state patch] applies the unsafe patch [patch] on the state. *)
     val apply : state -> t -> state Lwt.t
+
+    val apply_mutable : Mutable_state.t -> t -> unit Lwt.t
   end
 end

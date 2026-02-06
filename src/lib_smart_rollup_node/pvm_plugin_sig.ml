@@ -24,9 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Evaluation state for the PVM.  *)
-type 'fuel eval_state = {
-  state : Context.pvmstate;  (** The actual PVM state. *)
+(** Evaluation state information for the PVM.  *)
+type 'fuel eval_state_info = {
   state_hash : State_hash.t;  (** Hash of [state]. *)
   tick : Z.t;  (** Tick of [state]. *)
   inbox_level : int32;  (** Inbox level in which messages are evaluated. *)
@@ -39,19 +38,33 @@ type 'fuel eval_state = {
       (** Messages of the inbox that remain to be evaluated.  *)
 }
 
-(** Evaluation result for the PVM which contains the evaluation state and
-      additional information.  *)
+type ('fuel, 'state) eval_state = {
+  state : 'state;  (** The actual PVM state. *)
+  info : 'fuel eval_state_info;
+      (** Information about [state]. These become invalid as soon as [state] is
+          modified.  *)
+}
+
+(** Evaluation result for the PVM which contains information about the final
+    state. *)
 type 'fuel eval_result = {
-  state : 'fuel eval_state;
+  state_info : 'fuel eval_state_info;
   num_ticks : Z.t;
   num_messages : int;
 }
+
+let to_mut_eval_state s = {s with state = Context.PVMState.mut_copy s.state}
+
+let to_imm_eval_state s = {s with state = Context.PVMState.imm_copy s.state}
 
 (* The cache allows cache intermediate states of the PVM in e.g. dissections. *)
 module Tick_state_cache : Aches_lwt.Lache.MAP_RESULT with type key = Z.t =
   Aches_lwt.Lache.Make_result (Aches.Rache.Transfer (Aches.Rache.LRU) (Z))
 
-type state_cache = (Fuel.Accounted.t eval_state, tztrace) Tick_state_cache.t
+type state_cache =
+  ( (Fuel.Accounted.t, Context.PVMState.immutable_value) eval_state,
+    tztrace )
+  Tick_state_cache.t
 
 let make_state_cache n = Tick_state_cache.create n
 
@@ -60,8 +73,8 @@ module type FUELED_PVM = sig
 
   (** [eval_block_inbox ~fuel node_ctxt (inbox, messages) state] evaluates the
       [messages] for the [inbox] in the given [state] of the PVM and returns the
-      evaluation result containing the new state, the number of messages, the
-      inbox level and the remaining fuel. *)
+      evaluation result containing the number of messages, the inbox level and
+      the remaining fuel. [state] is modified in place. *)
   val eval_block_inbox :
     fuel:fuel ->
     _ Node_context.t ->
@@ -72,16 +85,17 @@ module type FUELED_PVM = sig
   (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
       inbox_level messages] evaluates the [messages] for inbox level
       [inbox_level] in the given [state] of the PVM and returns the evaluation
-      results containing the new state, the remaining fuel, and the number of
-      ticks for the evaluation of these messages. If [messages] is empty, the
-      PVM progresses until the next input request (within the allocated
+      results containing the remaining fuel, and the number of ticks for the
+      evaluation of these messages. If [messages] is empty, the PVM progresses
+      until the next input request (within the allocated
       [fuel]). [message_counter_offset] is used when we evaluate partial
       inboxes, such as during simulation. When [reveal_map] is provided, it is
-      used as an additional source of data for revelation ticks. *)
+      used as an additional source of data for revelation ticks. [state] is
+      modified in place. *)
   val eval_messages :
     ?reveal_map:string Utils.Reveal_hash_map.t ->
     _ Node_context.t ->
-    fuel eval_state ->
+    (fuel, Context.pvmstate) eval_state ->
     fuel eval_result tzresult Lwt.t
 end
 
@@ -92,12 +106,11 @@ module type S = sig
 
   val state_hash : Kind.t -> Context.pvmstate -> State_hash.t Lwt.t
 
-  val initial_state : Kind.t -> Context.pvmstate Lwt.t
+  val set_initial_state : Kind.t -> empty:Context.pvmstate -> unit Lwt.t
 
   val parse_boot_sector : Kind.t -> string -> string option
 
-  val install_boot_sector :
-    Kind.t -> Context.pvmstate -> string -> Context.pvmstate Lwt.t
+  val install_boot_sector : Kind.t -> Context.pvmstate -> string -> unit Lwt.t
 
   val get_status : _ Node_context.t -> Context.pvmstate -> string tzresult Lwt.t
 
@@ -136,7 +149,7 @@ module type S = sig
       Kind.t ->
       Context.pvmstate ->
       Pvm_patches.unsafe_patch ->
-      Context.pvmstate tzresult Lwt.t
+      unit tzresult Lwt.t
   end
 
   module Wasm_2_0_0 : sig

@@ -57,7 +57,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! value = Durable_state.lookup (of_node_pvmstate state) key in
+      let*! value = Durable_state.lookup !(of_node_pvmstate state) key in
       return value ) ;
 
     ( Block_directory.register0
@@ -65,7 +65,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! leng = Durable_state.value_length (of_node_pvmstate state) key in
+      let*! leng = Durable_state.value_length !(of_node_pvmstate state) key in
       return leng ) ;
 
     ( Block_directory.register0
@@ -73,7 +73,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
       let open Lwt_result_syntax in
       let* state = get_state node_ctxt block in
-      let*! subkeys = Durable_state.list (of_node_pvmstate state) key in
+      let*! subkeys = Durable_state.list !(of_node_pvmstate state) key in
       return subkeys ) ;
 
     Block_directory.register0
@@ -81,7 +81,7 @@ struct
     @@ fun (node_ctxt, block) {key} () ->
     let open Lwt_result_syntax in
     let* state = get_state node_ctxt block in
-    let tree = of_node_pvmstate state in
+    let tree = !(of_node_pvmstate state) in
     let*! subkeys = Durable_state.list tree key in
     let*! bindings =
       List.filter_map_s

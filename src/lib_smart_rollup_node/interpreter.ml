@@ -48,7 +48,7 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
     (node_ctxt.unsafe_patches
       :> (Pvm_patches.unsafe_patch * Pvm_patches.kind) list)
   with
-  | [] -> return state
+  | [] -> return_unit
   | patches ->
       let has_user_provided_patches =
         List.exists
@@ -74,17 +74,35 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
           private_rollup
           Rollup_node_errors.Cannot_patch_pvm_of_public_rollup
       in
-      List.fold_left_es
-        (fun state (patch, _kind) ->
+      List.iter_es
+        (fun (patch, _kind) ->
           let*! () = Interpreter_event.patching_genesis_state patch in
           Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
-        state
         patches
 
-type original_genesis_state = Original of Context.pvmstate
+type patched = Patched
 
-let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block
-    node_ctxt =
+type unpatched = Unpatched
+
+type both = Both
+
+type _ genesis_state =
+  | Patched : Context.pvmstate -> patched genesis_state
+  | Unpatched : Context.pvmstate -> unpatched genesis_state
+  | Both : {
+      patched : Context.pvmstate;
+      original : Context.pvmstate;
+    }
+      -> both genesis_state
+
+type _ genesis_state_mode =
+  | Patched : patched genesis_state_mode
+  | Unpatched : unpatched genesis_state_mode
+  | Both : both genesis_state_mode
+
+let genesis_state (type m) (mode : m genesis_state_mode)
+    (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block node_ctxt empty
+    : m genesis_state tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* genesis_block_hash =
     match genesis_block with
@@ -94,18 +112,26 @@ let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block
   let* boot_sector =
     get_boot_sector (module Plugin) genesis_block_hash node_ctxt
   in
-  let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
-  let*! unpatched_genesis_state =
-    Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
-  in
-  let* genesis_state =
-    apply_unsafe_patches
-      (module Plugin)
-      node_ctxt
-      ~genesis_block_hash
-      unpatched_genesis_state
-  in
-  return (genesis_state, Original unpatched_genesis_state)
+  (* Genesis state *)
+  let state = empty in
+  let*! () = Plugin.Pvm.set_initial_state node_ctxt.kind ~empty:state in
+  (* Unpatched genesis state *)
+  let*! () = Plugin.Pvm.install_boot_sector node_ctxt.kind state boot_sector in
+  match mode with
+  | Unpatched -> return (Unpatched state : m genesis_state)
+  | Patched ->
+      (* Patch genesis state *)
+      let* () =
+        apply_unsafe_patches (module Plugin) node_ctxt ~genesis_block_hash state
+      in
+      return (Patched state : m genesis_state)
+  | Both ->
+      (* Copy and patch genesis state *)
+      let original = Context.PVMState.copy state in
+      let* () =
+        apply_unsafe_patches (module Plugin) node_ctxt ~genesis_block_hash state
+      in
+      return (Both {patched = state; original} : m genesis_state)
 
 let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
   let open Lwt_result_syntax in
@@ -114,7 +140,10 @@ let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
   | None ->
       let genesis_level = node_ctxt.Node_context.genesis_info.level in
       if level = genesis_level then
-        let+ state, _ = genesis_state plugin ~genesis_block:hash node_ctxt in
+        let empty = Context.PVMState.empty node_ctxt.context in
+        let+ (Patched state) =
+          genesis_state Patched plugin ~genesis_block:hash node_ctxt empty
+        in
         state
       else tzfail (Rollup_node_errors.Missing_PVM_state (hash, level))
   | Some state -> return state
@@ -126,12 +155,10 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     predecessor Layer1.{hash = _; _} inbox_messages =
   let open Lwt_result_syntax in
   (* Retrieve the previous PVM state from store. *)
-  let* predecessor_state =
-    state_of_head (module Plugin) node_ctxt ctxt predecessor
-  in
-  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind predecessor_state in
+  let* state = state_of_head (module Plugin) node_ctxt ctxt predecessor in
+  let*! initial_tick = Plugin.Pvm.get_tick node_ctxt.kind state in
   let* {
-         state = {state; state_hash; inbox_level; tick; _};
+         state_info = {state_hash; inbox_level; tick; _};
          num_messages;
          num_ticks;
        } =
@@ -142,14 +169,14 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
       ~fuel:(Fuel.Free.of_ticks 0L)
       node_ctxt
       inbox_messages
-      predecessor_state
+      state
   in
-  let*! ctxt = Context.PVMState.set ctxt state in
+  let*! () = Context.PVMState.set ctxt state in
   (* Produce events. *)
   let*! () =
     Interpreter_event.transitioned_pvm inbox_level state_hash tick num_messages
   in
-  return (ctxt, num_messages, Z.to_int64 num_ticks, initial_tick)
+  return (num_messages, Z.to_int64 num_ticks, initial_tick)
 
 (** [process_head plugin node_ctxt ctxt ~predecessor head inbox_and_messages] runs the PVM for the given
     head. *)
@@ -160,10 +187,18 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
   if head.level >= first_inbox_level then
     transition_pvm plugin node_ctxt ctxt predecessor head inbox_and_messages
   else if head.level = node_ctxt.genesis_info.level then
-    let* state, _ = genesis_state plugin ~genesis_block:head.hash node_ctxt in
-    let*! ctxt = Context.PVMState.set ctxt state in
-    return (ctxt, 0, 0L, Z.zero)
-  else return (ctxt, 0, 0L, Z.zero)
+    let*! empty =
+      let*! state = Context.PVMState.find ctxt in
+      match state with
+      | None -> Lwt.return (Context.PVMState.empty (Context.index ctxt))
+      | Some s -> Lwt.return s
+    in
+    let* (Patched state) =
+      genesis_state Patched plugin ~genesis_block:head.hash node_ctxt empty
+    in
+    let*! () = Context.PVMState.set ctxt state in
+    return (0, 0L, Z.zero)
+  else return (0, 0L, Z.zero)
 
 (** Returns the starting evaluation before the evaluation of the block. It
     contains the PVM state at the end of the execution of the previous block and
@@ -189,10 +224,9 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let* messages =
     Node_context.get_messages node_ctxt block.header.inbox_witness
   in
-  return
+  let info =
     Pvm_plugin_sig.
       {
-        state;
         state_hash;
         inbox_level;
         tick;
@@ -200,6 +234,8 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
         remaining_fuel = Fuel.Accounted.of_ticks 0L;
         remaining_messages = messages;
       }
+  in
+  return Pvm_plugin_sig.{state; info}
 
 (** [run_for_ticks plugin node_ctxt start_state tick_distance] starts the
     evaluation of messages in the [start_state] for at most [tick_distance]. *)
@@ -207,16 +243,21 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
     start_state tick =
   let open Lwt_result_syntax in
   let tick_distance =
-    Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
+    Z.sub tick start_state.Pvm_plugin_sig.info.tick |> Z.to_int64
   in
   let+ eval_result =
     Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_messages"
     @@ fun _ ->
-    Plugin.Pvm.Fueled.Accounted.eval_messages
-      node_ctxt
-      {start_state with remaining_fuel = Fuel.Accounted.of_ticks tick_distance}
+    (* Set remaining fuel to needed tick for evaluation *)
+    let info =
+      {
+        start_state.info with
+        remaining_fuel = Fuel.Accounted.of_ticks tick_distance;
+      }
+    in
+    Plugin.Pvm.Fueled.Accounted.eval_messages node_ctxt {start_state with info}
   in
-  eval_result.state
+  eval_result.state_info
 
 let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
     tick =
@@ -224,17 +265,31 @@ let state_of_tick_aux plugin node_ctxt ~start_state (event : Sc_rollup_block.t)
   let* start_state =
     match start_state with
     | Some start_state
-      when start_state.Pvm_plugin_sig.inbox_level = event.header.level ->
+      when start_state.Pvm_plugin_sig.info.inbox_level = event.header.level ->
         return start_state
     | _ ->
         (* Recompute start state on level change or if we don't have a
            starting state on hand. *)
         start_state_of_block plugin node_ctxt event
   in
+  let state = start_state.state in
   (* TODO: #3384
      We should test that we always have enough blocks to find the tick
      because [state_of_tick] is a critical function. *)
-  run_to_tick plugin node_ctxt start_state tick
+  let+ run_info = run_to_tick plugin node_ctxt start_state tick in
+  Pvm_plugin_sig.{state; info = run_info}
+
+(** This function memoizes [f tick], but puts an immutable state copy in the
+    cache, and returns a mutable version. Either the one obtained from [f]
+    directly or a copy of the one in the cache. *)
+let memo_tick_state cache tick f =
+  match Pvm_plugin_sig.Tick_state_cache.bind cache tick Lwt.return with
+  | Some p_imm -> Lwt_result.map Pvm_plugin_sig.to_mut_eval_state p_imm
+  | None ->
+      let p_mut = f tick in
+      let p_imm = Lwt_result.map Pvm_plugin_sig.to_imm_eval_state p_mut in
+      Pvm_plugin_sig.Tick_state_cache.put cache tick p_imm ;
+      p_mut
 
 (* Global cache to share states between different parallel refutation games. *)
 let global_tick_state_cache =
@@ -243,20 +298,14 @@ let global_tick_state_cache =
 (* Memoized version of [state_of_tick_aux] using global cache. *)
 let global_memo_state_of_tick_aux plugin node_ctxt ~start_state
     (event : Sc_rollup_block.t) tick =
-  Pvm_plugin_sig.Tick_state_cache.bind_or_put
-    global_tick_state_cache
-    tick
-    (state_of_tick_aux plugin node_ctxt ~start_state event)
-    Lwt.return
+  memo_tick_state global_tick_state_cache tick
+  @@ state_of_tick_aux plugin node_ctxt ~start_state event
 
 (* Memoized version of [state_of_tick_aux] using both global and local caches. *)
 let memo_state_of_tick_aux plugin node_ctxt state_cache ~start_state
     (event : Sc_rollup_block.t) tick =
-  Pvm_plugin_sig.Tick_state_cache.bind_or_put
-    state_cache
-    tick
-    (global_memo_state_of_tick_aux plugin node_ctxt ~start_state event)
-    Lwt.return
+  memo_tick_state state_cache tick
+  @@ global_memo_state_of_tick_aux plugin node_ctxt ~start_state event
 
 (** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
     end_state] for [tick] if [tick] happened before
@@ -266,7 +315,7 @@ let state_of_tick plugin node_ctxt state_cache ?start_state ~tick level =
   let min_level =
     match start_state with
     | None -> None
-    | Some s -> Some s.Pvm_plugin_sig.inbox_level
+    | Some s -> Some s.Pvm_plugin_sig.info.inbox_level
   in
   let* event =
     Node_context.block_with_tick node_ctxt ?min_level ~max_level:level tick

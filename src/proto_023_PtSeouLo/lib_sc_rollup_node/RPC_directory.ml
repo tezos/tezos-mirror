@@ -105,29 +105,25 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
   in
   let* sim, num_ticks_0 = Simulation.simulate_messages sim messages in
   let* {state; inbox_level; _}, num_ticks_end = Simulation.end_simulation sim in
+  let state = PVM.Ctxt_wrapper.of_node_pvmstate state in
   let*! insights =
     let open PVM in
     List.map_p
       (function
-        | Sc_rollup_services.Pvm_state_key key ->
-            State.lookup (Ctxt_wrapper.of_node_pvmstate state) key
+        | Sc_rollup_services.Pvm_state_key key -> Mutable_state.lookup state key
         | Durable_storage_key key ->
-            Inspect_durable_state.lookup
-              (Ctxt_wrapper.of_node_pvmstate state)
-              key)
+            Mutable_state.Inspect_durable_state.lookup state key)
       insight_requests
   in
   let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
   let level = Raw_level.of_int32_exn inbox_level in
-  let*! outbox =
-    PVM.get_outbox level (PVM.Ctxt_wrapper.of_node_pvmstate state)
-  in
+  let*! outbox = PVM.Mutable_state.get_outbox inbox_level state in
   let output =
     List.filter
       (fun out -> out.Sc_rollup.output_info.outbox_level = level)
       outbox
   in
-  let*! state_hash = PVM.state_hash (PVM.Ctxt_wrapper.of_node_pvmstate state) in
+  let*! state_hash = PVM.Mutable_state.state_hash state in
   let* constants =
     Protocol_plugins.get_constants_of_level node_ctxt inbox_level
   in
@@ -137,9 +133,7 @@ let simulate_messages (node_ctxt : Node_context.ro) block ~reveal_pages
     |> Sc_rollup_proto_types.Constants.reveal_activation_level_of_octez
     |> Protocol.Alpha_context.Sc_rollup.is_reveal_enabled_predicate
   in
-  let*! status =
-    PVM.get_status ~is_reveal_enabled (PVM.Ctxt_wrapper.of_node_pvmstate state)
-  in
+  let*! status = PVM.Mutable_state.get_status ~is_reveal_enabled state in
   let status = PVM.string_of_status status in
   return
     Sc_rollup_services.
@@ -161,7 +155,9 @@ let () =
   in
   let open (val Pvm.of_kind node_ctxt.kind) in
   let*! status =
-    get_status ~is_reveal_enabled (Ctxt_wrapper.of_node_pvmstate state)
+    Mutable_state.get_status
+      ~is_reveal_enabled
+      (Ctxt_wrapper.of_node_pvmstate state)
   in
   return (string_of_status status)
 
@@ -179,7 +175,9 @@ let get_outbox_messages node_ctxt block outbox_level =
   let* state = get_state node_ctxt block in
   let open (val Pvm.of_kind node_ctxt.kind) in
   let*! outbox =
-    get_outbox outbox_level (Ctxt_wrapper.of_node_pvmstate state)
+    Mutable_state.get_outbox
+      outbox_level_int32
+      (Ctxt_wrapper.of_node_pvmstate state)
   in
   return outbox
 

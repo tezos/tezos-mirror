@@ -1922,7 +1922,7 @@ module State = struct
       | _ -> return_unit
     in
     Pvm.Context.load
-      (module Irmin_context)
+      (module Pvm.Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write
@@ -2724,7 +2724,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   in
   let* evm_node_index =
     Pvm.Context.load
-      (module Irmin_context)
+      (module Pvm.Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write
