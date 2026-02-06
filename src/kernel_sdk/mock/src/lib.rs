@@ -358,7 +358,7 @@ fn info_for_level(level: i32) -> inbox::InfoPerLevel {
     let hash = crypto::blake2b::digest_256(&timestamp.to_le_bytes());
 
     inbox::InfoPerLevel {
-        predecessor: crypto::hash::BlockHash::try_from_bytes(&hash).unwrap(),
+        predecessor: crypto::hash::BlockHash::from(hash),
         predecessor_timestamp: Timestamp::from(timestamp),
     }
 }

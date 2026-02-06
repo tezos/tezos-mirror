@@ -101,7 +101,7 @@ impl TezBlock {
     fn hash(&self) -> Result<BlockHash, BinError> {
         let encoded_data = self.to_bytes();
         let hashed_data = digest_256(&encoded_data);
-        Ok(BlockHash(H256::from_slice(&hashed_data)))
+        Ok(BlockHash(H256(hashed_data)))
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

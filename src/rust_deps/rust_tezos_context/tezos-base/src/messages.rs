@@ -1,12 +1,12 @@
 use getset::{CopyGetters, Getters};
 
 use nom::{
+    Finish,
     branch::alt,
     bytes::complete::{tag, take},
     combinator::{all_consuming, complete, flat_map, into, map, success, verify},
     multi::many_till,
     sequence::preceded,
-    Finish,
 };
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     encoding::{Encoding, HasEncoding},
     has_encoding,
-    nom::{error::convert_error, NomError, NomInput, NomReader, NomResult},
+    nom::{NomError, NomInput, NomReader, NomResult, error::convert_error},
     types::Bytes,
 };
 
@@ -147,15 +147,7 @@ impl<T: BinaryMessage> MessageHash for T {
     #[inline]
     fn message_hash(&self) -> Result<[u8; 32], MessageHashError> {
         let bytes = self.as_bytes()?;
-        let digest = blake2b::digest_256(&bytes);
-        let hash: [u8; 32] =
-            digest
-                .as_slice()
-                .try_into()
-                .map_err(|_| MessageHashError::FromBytesError {
-                    error: tezos_crypto_rs::hash::FromBytesError::InvalidSize,
-                })?;
-        Ok(hash)
+        Ok(blake2b::digest_256(&bytes))
     }
 
     #[inline]
@@ -164,8 +156,7 @@ impl<T: BinaryMessage> MessageHash for T {
         H: tezos_crypto_rs::hash::HashTrait<32>,
     {
         let bytes = self.as_bytes()?;
-        let digest = blake2b::digest_256(&bytes);
-        Ok(H::try_from_bytes(digest.as_slice())?)
+        Ok(H::from(blake2b::digest_256(&bytes)))
     }
 }
 

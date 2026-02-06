@@ -310,7 +310,7 @@ impl<Host: Runtime, C: Context> TcCtx<'_, Host, C> {
     fn big_map_diff_update(
         &mut self,
         id: &Zarith,
-        key_hash: Vec<u8>,
+        key_hash: [u8; 32],
         key: Vec<u8>,
         value: Option<Vec<u8>>,
     ) {
@@ -396,13 +396,13 @@ pub fn clear_temporary_big_maps<Host: Runtime, C: Context>(
 /// Hashes a Micheline expression using the packed format (with 0x05 prefix)
 /// to match L1's Script_expr_hash.
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
-fn hash_micheline_expr(expr: &Micheline<'_>) -> Vec<u8> {
+fn hash_micheline_expr(expr: &Micheline<'_>) -> [u8; 32] {
     digest_256(&expr.encode_for_pack())
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
 /// See [hash_micheline_expr] for details on the hashing format.
-fn hash_key(key: TypedValue<'_>) -> Vec<u8> {
+fn hash_key(key: TypedValue<'_>) -> [u8; 32] {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena);
     hash_micheline_expr(&key_micheline)

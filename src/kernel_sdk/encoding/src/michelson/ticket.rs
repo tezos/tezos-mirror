@@ -316,7 +316,6 @@ impl<Expr: MichelsonTicketContent> Ticket<Expr> {
         self.contents().bin_write(&mut bytes)?;
 
         let digest = digest_256(bytes.as_slice());
-        let digest: [u8; TICKET_HASH_SIZE] = digest.try_into().unwrap();
 
         Ok(TicketHash {
             inner: SizedBytes(digest),
