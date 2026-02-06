@@ -1019,7 +1019,7 @@ mod tests {
                     block_number: U256::from(532532),
                     from: address_of_str("3535353535353535353535353535353535353535")
                         .unwrap(),
-                    gas_used: U256::from(32523),
+                    gas: U256::from(32523),
                     gas_price: U256::from(100432432),
                     hash: [5; 32],
                     input: vec![],

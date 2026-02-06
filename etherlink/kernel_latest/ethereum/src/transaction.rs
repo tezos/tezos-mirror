@@ -280,8 +280,8 @@ pub struct TransactionObject {
     pub block_number: U256,
     /// Address of the sender.
     pub from: H160,
-    /// The amount of gas used by this specific transaction alone.
-    pub gas_used: U256,
+    /// gas provided by the sender
+    pub gas: U256,
     /// The amount of gas price provided by the sender in Wei.
     pub gas_price: U256,
     /// Hash of the transaction.
@@ -308,7 +308,7 @@ impl Decodable for TransactionObject {
                 let block_number: U256 =
                     decode_field_u256_le(&next(&mut it)?, "block_number")?;
                 let from: H160 = decode_field(&next(&mut it)?, "from")?;
-                let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
+                let gas: U256 = decode_field_u256_le(&next(&mut it)?, "gas")?;
                 let gas_price: U256 = decode_field_u256_le(&next(&mut it)?, "gas_price")?;
                 let hash: TransactionHash = decode_transaction_hash(&next(&mut it)?)?;
                 let input: Vec<u8> = decode_field(&next(&mut it)?, "input")?;
@@ -320,7 +320,7 @@ impl Decodable for TransactionObject {
                 Ok(Self {
                     block_number,
                     from,
-                    gas_used,
+                    gas,
                     gas_price,
                     hash,
                     input,
@@ -344,7 +344,7 @@ impl Encodable for TransactionObject {
         stream.begin_list(13);
         append_u256_le(stream, &self.block_number);
         stream.append(&self.from);
-        append_u256_le(stream, &self.gas_used);
+        append_u256_le(stream, &self.gas);
         append_u256_le(stream, &self.gas_price);
         stream.append(&self.hash.to_vec());
         stream.append(&self.input);
@@ -453,7 +453,7 @@ mod test {
         let v = TransactionObject {
             block_number: U256::from(532532),
             from: address_of_str("3535353535353535353535353535353535353535"),
-            gas_used: U256::from(32523),
+            gas: U256::from(32523),
             gas_price: U256::from(100432432),
             hash: [5; TRANSACTION_HASH_SIZE],
             input: vec![],
