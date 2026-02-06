@@ -73,9 +73,9 @@ mod prefix_bytes {
     pub const SCRIPT_EXPR_HASH: [u8; 4] = [13, 44, 64, 27];
 }
 
-pub type Hash = Vec<u8>;
-
-pub trait HashTrait: Into<Hash> + AsRef<[u8]> {
+pub trait HashTrait<const N: usize>:
+    Into<Vec<u8>> + Into<[u8; N]> + AsRef<[u8]> + std::ops::Deref<Target = [u8; N]> + From<[u8; N]>
+{
     /// Returns this hash type.
     fn hash_type() -> HashType;
 
@@ -106,12 +106,12 @@ pub enum FromBytesError {
 macro_rules! define_hash {
     ($name:ident) => {
         #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $name(pub(crate) Hash);
+        pub struct $name(pub(crate) [u8; { HashType::$name.size() }]);
 
         impl $name {
             fn from_bytes(data: &[u8]) -> Result<Self, FromBytesError> {
                 if data.len() == HashType::$name.size() {
-                    Ok($name(data.into()))
+                    Ok($name(data.try_into().unwrap()))
                 } else {
                     Err(FromBytesError::InvalidSize)
                 }
@@ -119,7 +119,7 @@ macro_rules! define_hash {
 
             fn from_vec(hash: Vec<u8>) -> Result<Self, FromBytesError> {
                 if hash.len() == HashType::$name.size() {
-                    Ok($name(hash))
+                    Ok($name(hash.try_into().unwrap()))
                 } else {
                     Err(FromBytesError::InvalidSize)
                 }
@@ -160,7 +160,7 @@ macro_rules! define_hash {
             }
         }
 
-        impl HashTrait for $name {
+        impl HashTrait<{ HashType::$name.size() }> for $name {
             fn hash_type() -> HashType {
                 HashType::$name
             }
@@ -170,7 +170,15 @@ macro_rules! define_hash {
             }
 
             fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
-                HashType::$name.b58check_to_hash(data).map(Self)
+                let hash = HashType::$name.b58check_to_hash(data)?;
+                if hash.len() == HashType::$name.size() {
+                    Ok($name(hash.try_into().unwrap()))
+                } else {
+                    Err(FromBase58CheckError::MismatchedLength {
+                        expected: HashType::$name.size(),
+                        actual: hash.len(),
+                    })
+                }
             }
 
             fn to_b58check(&self) -> String {
@@ -183,15 +191,29 @@ macro_rules! define_hash {
             }
         }
 
+        impl std::ops::Deref for $name {
+            type Target = [u8; { HashType::$name.size() }];
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
         impl std::convert::AsRef<[u8]> for $name {
             fn as_ref(&self) -> &[u8] {
                 &self.0
             }
         }
 
-        impl std::convert::From<$name> for Hash {
+        impl std::convert::From<$name> for [u8; { HashType::$name.size() }] {
             fn from(typed_hash: $name) -> Self {
                 typed_hash.0
+            }
+        }
+
+        impl std::convert::From<$name> for Vec<u8> {
+            fn from(typed_hash: $name) -> Self {
+                typed_hash.0.to_vec()
             }
         }
 
@@ -202,9 +224,9 @@ macro_rules! define_hash {
             }
         }
 
-        impl std::convert::TryFrom<Hash> for $name {
+        impl std::convert::TryFrom<Vec<u8>> for $name {
             type Error = FromBytesError;
-            fn try_from(h: Hash) -> Result<Self, Self::Error> {
+            fn try_from(h: Vec<u8>) -> Result<Self, Self::Error> {
                 Self::from_vec(h)
             }
         }
@@ -216,6 +238,12 @@ macro_rules! define_hash {
             }
         }
 
+        impl std::convert::From<[u8; { HashType::$name.size() }]> for $name {
+            fn from(h: [u8; { HashType::$name.size() }]) -> Self {
+                $name(h)
+            }
+        }
+
         impl Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -224,7 +252,7 @@ macro_rules! define_hash {
                 if serializer.is_human_readable() {
                     serializer.serialize_str(&self.to_base58_check())
                 } else {
-                    serializer.serialize_newtype_struct(stringify!($name), &self.0)
+                    serializer.serialize_newtype_struct(stringify!($name), &self.0.to_vec())
                 }
             }
         }
@@ -264,7 +292,10 @@ macro_rules! define_hash {
                                 return Err(err);
                             }
                         };
-                        Ok($name(field0))
+                        let arr = field0
+                            .try_into()
+                            .map_err(|_| serde::de::Error::custom("invalid hash size"))?;
+                        Ok($name(arr))
                     }
 
                     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -552,7 +583,7 @@ impl HashType {
     }
 
     /// Convert string representation of the hash to bytes form.
-    pub fn b58check_to_hash(&self, data: &str) -> Result<Hash, FromBase58CheckError> {
+    pub fn b58check_to_hash(&self, data: &str) -> Result<Vec<u8>, FromBase58CheckError> {
         let mut hash = data.from_base58check()?;
 
         if !hash.starts_with(self.base58check_prefix()) {
@@ -637,8 +668,8 @@ impl SeedEd25519 {
         let sk = SigningKey::from_bytes(&secret_key);
         let pk = sk.verifying_key();
         Ok((
-            PublicKeyEd25519(pk.to_bytes().to_vec()),
-            SecretKeyEd25519(sk.to_bytes().to_vec()),
+            PublicKeyEd25519(pk.to_bytes()),
+            SecretKeyEd25519(sk.to_bytes()),
         ))
     }
 }
@@ -679,7 +710,7 @@ impl SecretKeyEd25519 {
 
         let payload = crate::blake2b::digest_256(data.as_ref());
         let signature = sk.sign(&payload);
-        Ok(Ed25519Signature(signature.to_bytes().to_vec()))
+        Ok(Ed25519Signature(signature.to_bytes()))
     }
 }
 
@@ -693,11 +724,7 @@ impl PublicKeySignatureVerifier for PublicKeyEd25519 {
         signature: &Self::Signature,
         bytes: &[u8],
     ) -> Result<bool, Self::Error> {
-        let signature = signature
-            .as_ref()
-            .try_into()
-            .map(ed25519_dalek::Signature::from_bytes)
-            .map_err(|_| CryptoError::InvalidSignature)?;
+        let signature = ed25519_dalek::Signature::from_bytes(signature);
 
         let pk = ed25519_dalek::VerifyingKey::try_from(self)
             .map_err(|_| CryptoError::InvalidPublicKey)?;
@@ -796,10 +823,10 @@ impl PublicKeySignatureVerifier for PublicKeyP256 {
 
         let pk = p256::ecdsa::VerifyingKey::from_sec1_bytes(&self.0)
             .map_err(|_| CryptoError::InvalidPublicKey)?;
-        let r: [u8; 32] = signature.as_ref()[..32]
+        let r: [u8; 32] = signature.0[..32]
             .try_into()
             .map_err(|_| CryptoError::InvalidSignature)?;
-        let s: [u8; 32] = signature.as_ref()[32..]
+        let s: [u8; 32] = signature.0[32..]
             .try_into()
             .map_err(|_| CryptoError::InvalidSignature)?;
         let sig = p256::ecdsa::Signature::from_scalars(r, s)
@@ -828,7 +855,8 @@ impl PublicKeySignatureVerifier for PublicKeyBls {
 
 impl OperationListHash {
     pub fn calculate(list: &[OperationHash]) -> Self {
-        OperationListHash(blake2b::merkle_tree(list))
+        OperationListHash::from_vec(blake2b::merkle_tree(list))
+            .expect("Hash size is correct as blake2b::merkle_tree returns hash of size 32")
     }
 }
 
@@ -844,7 +872,11 @@ impl BlockPayloadHash {
             round.as_ref(),
             operation_list_hash.0.as_ref(),
         ];
-        blake2b::digest_all(input, 32).map(BlockPayloadHash)
+        let digest = blake2b::digest_all(input, 32)?;
+        BlockPayloadHash::from_bytes(&digest).map_err(|_| {
+            // should never happen as digest size is correct
+            Blake2bError::InvalidLength
+        })
     }
 }
 
@@ -1173,7 +1205,7 @@ mod tests {
     proptest! {
         #[test]
         fn test_ed255519_signature_verification_roundtrip(seed in any::<[u8; 32]>(), message in any::<Vec<u8>>()) {
-            let seed = super::SeedEd25519(seed.to_vec());
+            let seed = super::SeedEd25519(seed);
 
             let (pk, sk) = seed.keypair().unwrap();
 

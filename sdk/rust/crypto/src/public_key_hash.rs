@@ -11,7 +11,7 @@ use tezos_data_encoding::nom::NomReader;
 
 use crate::base58::{FromBase58Check, FromBase58CheckError};
 use crate::hash::{
-    ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, Hash, HashTrait, HashType,
+    ContractTz1Hash, ContractTz2Hash, ContractTz3Hash, ContractTz4Hash, HashTrait, HashType,
 };
 
 /// Hash of Layer1 contract ids.
@@ -39,6 +39,8 @@ impl Display for PublicKeyHash {
 }
 
 impl PublicKeyHash {
+    /// Size of the underlying byte array.
+    const SIZE: usize = 20;
     /// Conversion from base58-encoding string (with prefix).
     pub fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
         let bytes = data.from_base58check()?;
@@ -70,7 +72,18 @@ impl PublicKeyHash {
     }
 }
 
-impl From<PublicKeyHash> for Hash {
+impl From<PublicKeyHash> for [u8; PublicKeyHash::SIZE] {
+    fn from(pkh: PublicKeyHash) -> Self {
+        match pkh {
+            PublicKeyHash::Ed25519(tz1) => tz1.into(),
+            PublicKeyHash::Secp256k1(tz2) => tz2.into(),
+            PublicKeyHash::P256(tz3) => tz3.into(),
+            PublicKeyHash::Bls(tz4) => tz4.into(),
+        }
+    }
+}
+
+impl From<PublicKeyHash> for Vec<u8> {
     fn from(pkh: PublicKeyHash) -> Self {
         match pkh {
             PublicKeyHash::Ed25519(tz1) => tz1.into(),

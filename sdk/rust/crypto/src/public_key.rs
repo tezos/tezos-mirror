@@ -6,7 +6,7 @@
 //! Public Key of Layer1.
 
 use crate::base58::{FromBase58Check, FromBase58CheckError};
-use crate::hash::{Hash, HashTrait, HashType};
+use crate::hash::{HashTrait, HashType};
 use crate::hash::{PublicKeyBls, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1};
 use crate::signature::Signature;
 use crate::{CryptoError, PublicKeySignatureVerifier};
@@ -68,7 +68,7 @@ impl PublicKey {
     }
 }
 
-impl From<PublicKey> for Hash {
+impl From<PublicKey> for Vec<u8> {
     fn from(pkh: PublicKey) -> Self {
         match pkh {
             PublicKey::Ed25519(tz1) => tz1.into(),
