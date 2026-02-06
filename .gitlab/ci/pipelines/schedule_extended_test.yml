@@ -615,7 +615,7 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/telemetry/octez-client
 
 test_sdk_rust:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: test
   tags:
   - gcp
@@ -744,8 +744,8 @@ oc.compile_sources_doc_deps:
   parallel:
     matrix:
     - IMAGE:
-      - debian:trixie-master-bcfcb772
-      - ubuntu:noble-master-bcfcb772
+      - debian:trixie-master-03271731
+      - ubuntu:noble-master-03271731
 
 oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
@@ -785,7 +785,7 @@ oc.compile_sources_doc:
       - build-ubuntu-noble:master
 
 check_riscv_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: test
   tags:
   - gcp
@@ -823,7 +823,7 @@ check_riscv_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 audit_riscv_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: test
   tags:
   - gcp
@@ -860,7 +860,7 @@ audit_riscv_deps:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: test
   tags:
   - gcp
@@ -898,7 +898,7 @@ test_kernels:
     SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -1067,7 +1067,7 @@ check_jsonnet:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 check_rust_fmt:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
   stage: sanity
   tags:
   - gcp

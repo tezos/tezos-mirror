@@ -233,7 +233,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables
 
 oc.create-homebrew-formula:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie-master-03271731
   stage: build
   tags:
   - gcp
@@ -352,7 +352,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-bcfcb772
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
   parallel:
     matrix:
     - RELEASE:
@@ -471,7 +471,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie-master-03271731
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -526,7 +526,7 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/build-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-$DISTRIBUTION
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-bcfcb772
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE-master-03271731
   parallel:
     matrix:
     - RELEASE:
@@ -616,7 +616,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-bcfcb772
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
   stage: publish
   tags:
   - gcp_not_interruptible
