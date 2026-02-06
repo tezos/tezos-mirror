@@ -178,6 +178,15 @@ module Tezos_block = struct
   let decode_block_for_store (block : string) : (t, string) result =
     try Ok (block_from_kernel (Bytes.of_string block))
     with exn -> Error (Printexc.to_string exn)
+
+  module Internal_for_test = struct
+    let legacy_encode_block_for_store block =
+      Result.map_error
+        (Format.asprintf
+           "Not a valid block: %a"
+           Data_encoding.Binary.pp_write_error)
+        (Data_encoding.Binary.to_string legacy_encoding block)
+  end
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t

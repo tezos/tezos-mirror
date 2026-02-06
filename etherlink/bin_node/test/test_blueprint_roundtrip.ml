@@ -113,6 +113,27 @@ let make_tez_block ~level ~timestamp ~parent_hash () =
     L2_types.Tezos_block.
       {level; hash; timestamp; parent_hash; operations = Bytes.empty}
 
+let make_tez_legacy_block ~level ~timestamp ~parent_hash () =
+  let block_without_hash =
+    L2_types.Tezos_block.
+      {
+        level;
+        hash = zero_hash;
+        timestamp;
+        parent_hash;
+        operations = Bytes.empty;
+      }
+  in
+  let hash =
+    hash_tez_block
+      ~encode:
+        L2_types.Tezos_block.Internal_for_test.legacy_encode_block_for_store
+      block_without_hash
+  in
+  return
+    L2_types.Tezos_block.
+      {level; hash; timestamp; parent_hash; operations = Bytes.empty}
+
 let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
   @@ fun () ->
@@ -147,6 +168,37 @@ let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
   in
   let decoding_result =
     expect_ok "could not decode the tez block"
+    @@ L2_types.Tezos_block.decode_block_for_store encoding_result
+  in
+  Check.(
+    (decoding_result.level = block.level)
+      int32
+      ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
+  Check.(
+    (decoding_result.timestamp = block.timestamp)
+      timestamp_typ
+      ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
+  Check.(
+    (decoding_result.parent_hash = block.parent_hash)
+      block_hash_typ
+      ~error_msg:"Wrong decoded of parent_hash for block: got %L instead of %R") ;
+  Check.(
+    (decoding_result.hash = block.hash)
+      block_hash_typ
+      ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
+  unit
+
+let test_tez_legacy_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
+  register ~title:(sf "Tez legacy block producer decoder roundtrip (%s)" title)
+  @@ fun () ->
+  let* block = make_tez_legacy_block ~level ~timestamp ~parent_hash () in
+  let encoding_result =
+    expect_ok "could not encode the tez legacy block"
+    @@ L2_types.Tezos_block.Internal_for_test.legacy_encode_block_for_store
+         block
+  in
+  let decoding_result =
+    expect_ok "could not decode the tez legacy block"
     @@ L2_types.Tezos_block.decode_block_for_store encoding_result
   in
   Check.(
@@ -210,6 +262,20 @@ let () =
     () ;
 
   test_tez_block_roundtrip
+    ~title:"genesis successor"
+    ~level:0l
+    ~timestamp:Time.Protocol.epoch
+    ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+    () ;
+
+  test_tez_legacy_block_roundtrip
+    ~title:"all zeros tez block"
+    ~level:0l
+    ~timestamp:Time.Protocol.epoch
+    ~parent_hash:zero_hash
+    () ;
+
+  test_tez_legacy_block_roundtrip
     ~title:"genesis successor"
     ~level:0l
     ~timestamp:Time.Protocol.epoch
