@@ -525,17 +525,16 @@ pub fn n_bignum(mut input: NomInput) -> NomResult<BigUint> {
     Ok((input, BigUint::from_bytes_be(&bitvec.into_vec())))
 }
 
-pub trait Hasher {
-    fn hash(&self, input: &[u8]) -> Vec<u8>;
+pub trait Hasher<const N: usize> {
+    fn hash(&self, input: &[u8]) -> [u8; N];
 }
 
-pub fn hashed<'a, O, F, H>(
+pub fn hashed<'a, O, F, const N: usize, H: Hasher<N>>(
     hasher: H,
     mut parser: F,
-) -> impl FnMut(NomInput<'a>) -> NomResult<'a, (O, Vec<u8>)>
+) -> impl FnMut(NomInput<'a>) -> NomResult<'a, (O, [u8; N])>
 where
     F: FnMut(NomInput<'a>) -> NomResult<'a, O>,
-    H: Hasher,
 {
     move |input| {
         let (rest, result) = parser(input)?;

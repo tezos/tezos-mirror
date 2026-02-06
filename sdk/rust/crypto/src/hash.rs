@@ -20,9 +20,9 @@ use tezos_data_encoding::nom::Hasher;
 
 pub struct TezosHasher;
 
-impl Hasher for TezosHasher {
-    fn hash(&self, input: &[u8]) -> Vec<u8> {
-        self::blake2b::digest_256(input).to_vec()
+impl Hasher<32> for TezosHasher {
+    fn hash(&self, input: &[u8]) -> [u8; 32] {
+        self::blake2b::digest_256(input)
     }
 }
 
