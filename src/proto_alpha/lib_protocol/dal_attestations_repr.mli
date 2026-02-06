@@ -23,7 +23,7 @@
     {1 Encoding}
 
     The encoding uses a compact bitset representation that minimizes space
-    when attestations are sparse:
+    when small slot indices are attested:
 
     {2 Bitset structure}
 
@@ -41,8 +41,8 @@
     a sequence of 8-bit chunks is stored:
     - bit 0 of each chunk is an {b is_last} flag (1 iff this is the last chunk
       for the current lag).
-    - bits 1..7 encode slots, with the first block covering slots 0..6, the
-      next block slots 7..13, etc.
+    - bits 1..7 encode slots, with the first chunk covering slots 0..6, the
+      next chunk slots 7..13, etc.
     Empty attestations are not stored in the data section.
 
     - {b Empty case}: An empty bitset (value 0) represents the case where all
@@ -50,15 +50,29 @@
 
     {3 Example}
 
-    For [number_of_lags = 4] and [number_of_slots = 32]:
+    For [number_of_lags = 4] and [number_of_slots = 160]:
     - Attestation at lag index 0: empty
-    - Attestation at lag index 1: slots 0 and 2 attested
+    - Attestation at lag index 1: slots 1 and 5 attested
     - Attestation at lag index 2: empty
-    - Attestation at lag index 3: slots 0 and 1 attested
+    - Attestation at lag index 3: slots 0 and 11 attested
 
     The prefix has bits 1 and 3 set. The data section contains:
-    - Lag 1: one block (is_last=1) with slot bits for 0..6, where 0 and 2 are set.
-    - Lag 3: one block (is_last=1) with slot bits for 0..6, where 0 and 1 are set. *)
+    - Lag 1: one chunk (is_last=1) with slot bits for 0..6, where 1 and 5 are set.
+    - Lag 3: two chunks with slot bits for 0..6 and 7..13 respectively, where 0 and 11 are set.
+
+{v
+00100001 00000010 01000101    1010
+<- lag 3 data --> <-lag 1>    <-->
+  (16 bits)       (8 bits)    prefix
+  slots 0, 11     slots 1, 5  lags 1, 3
+v}
+
+The order of the bits is:
+{v
+[slot13]...[slot7][is_last] [slot6]...[slot0][is_last] [slot6]...[slot0][is_last] [lag3]...[lag0]
+<-------------- lag 3 data (2 chunks) ---------------> <---- lag 1 (1 chunk) ---> <-- prefix --->
+v}
+    *)
 
 type t = private Bitset.t
 
