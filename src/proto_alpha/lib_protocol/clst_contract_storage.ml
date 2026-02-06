@@ -85,6 +85,8 @@ let get_total_supply ctxt =
   in
   return (total_supply, ctxt)
 
+let get_total_supply_from_storage {total_supply; _} = total_supply
+
 let increment_total_supply storage added_amount =
   {
     storage with
