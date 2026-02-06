@@ -1561,8 +1561,8 @@ module Images = struct
     let make_img distro version =
       Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2292147217 *)
-    let common_version = "master-bcfcb772"
+    (* Version created by https://gitlab.com/tezos/tezos/-/pipelines/2300621337 *)
+    let common_version = "master-03271731"
 
     let debian_version = common_version
 
