@@ -152,6 +152,7 @@
   Carbonated_map_costs
   Carbonated_map
   Staking_parameters_repr
+  Clst_delegates_parameters_repr
   Misbehaviour_repr
   Denunciations_repr
   Raw_context_intf
@@ -463,6 +464,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
@@ -777,6 +779,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
@@ -1075,6 +1078,7 @@
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
   staking_parameters_repr.ml staking_parameters_repr.mli
+  clst_delegates_parameters_repr.ml clst_delegates_parameters_repr.mli
   misbehaviour_repr.ml misbehaviour_repr.mli
   denunciations_repr.ml denunciations_repr.mli
   raw_context_intf.ml
