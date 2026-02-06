@@ -11377,11 +11377,13 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     let expected_bitset =
       if Protocol.number protocol <= 024 then 1024
       else
-        (* For the new multi-lag encoding with 1 lag and slot 10:
-           bit 0 = 1 (prefix for lag 0)
-           bit 11 = 1 (slot 10 at position 1 + 10)
-           Result: 2^0 + 2^11 = 1 + 2048 = 2049 *)
-        2049
+        (* For the compact multi-lag encoding with 1 lag and slot 10:
+           - prefix bit 0 = 1
+           - chunks of 8 bits (is_last + 7 slots), slot 10 is in chunk 1
+           - is_last bit for chunk 1 at position 1 + 8 = 9
+           - slot 10 bit at position 1 + 8 + (1 + (10 mod 7)) = 13
+           Result: 2^0 + 2^9 + 2^13 = 1 + 512 + 8192 = 8705 *)
+        8705
     in
     if block_dal_attestation_bitset = expected_bitset then
       incr count_set_dal_attestation_bitset ;
@@ -12518,9 +12520,7 @@ let test_attestations_encode_decode_multiple_lags =
           arr.(1) <- true ;
         arr)
   in
-  let encoded =
-    Dal.Attestations.encode protocol dal_parameters attestations_per_lag
-  in
+  let encoded = Dal.Attestations.encode protocol attestations_per_lag in
   Log.info "Encoded multi-lag: %s" encoded ;
 
   let decoded = Dal.Attestations.decode protocol dal_parameters encoded in

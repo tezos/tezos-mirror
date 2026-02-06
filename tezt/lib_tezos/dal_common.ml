@@ -157,9 +157,32 @@ end
    Encoding format:
    - Prefix: first [number_of_lags] bits indicate which lag indices have non-empty
      attestations
-   - Data: for each non-empty lag (in order), [number_of_slots] bits representing
-     which slots are attested for that lag *)
+   - Data: for each non-empty lag (in order), a sequence of chunks. Each chunk
+     is [bits_per_chunk] bits: 1 bit [is_last] followed by [slots_per_chunk]
+     slot bits. The last chunk has [is_last]=1. *)
 module Attestations = struct
+  let slots_per_chunk = 7
+
+  let bits_per_chunk = slots_per_chunk + 1
+
+  let max_chunks ~number_of_slots =
+    (number_of_slots + slots_per_chunk - 1) / slots_per_chunk
+
+  let max_attested_slot dal_attestation =
+    let max_idx = ref (-1) in
+    Array.iteri
+      (fun idx is_attested -> if is_attested then max_idx := max !max_idx idx)
+      dal_attestation ;
+    !max_idx
+
+  let set_slot_bit ~offset_start ~slot_index z =
+    let chunk_index = slot_index / slots_per_chunk in
+    let bit_in_chunk = 1 + (slot_index mod slots_per_chunk) in
+    let bit_pos =
+      offset_start + (chunk_index * bits_per_chunk) + bit_in_chunk
+    in
+    Z.logor z (Z.shift_left Z.one bit_pos)
+
   (* Encode using the before 025 simple bitset format. *)
   let encode_single_lag_before_025 dal_attestation =
     let aux (acc, n) b =
@@ -168,27 +191,26 @@ module Attestations = struct
     in
     Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
 
-  (* Encode using the post-025 multi-lag format.
-
-     [lag_index] specifies the only lag index to encode the attestations for.
-     This determines the position of the prefix bit and the data offset.
+  (* Encode using the post-025 compact multi-lag format.
 
      For a single set of attestations (bool array), we encode them at the
      specified [lag_index]. *)
   let encode_single_lag_after_025 ~lag_index ~number_of_lags dal_attestation =
-    (* Check if any slot is attested *)
-    let has_attestation = Array.exists Fun.id dal_attestation in
-    if not has_attestation then "0"
+    let max_slot = max_attested_slot dal_attestation in
+    if max_slot < 0 then "0"
     else
-      (* Prefix: set the bit at [lag_index] to indicate this lag has data *)
+      let chunks_needed = (max_slot / slots_per_chunk) + 1 in
       let prefix = Z.shift_left Z.one lag_index in
-      (* Add data bits at offset [number_of_lags] *)
-      let result =
+      let offset_start = number_of_lags in
+      let last_chunk_bit =
+        offset_start + ((chunks_needed - 1) * bits_per_chunk)
+      in
+      let z =
         Array.fold_left
           (fun (slot_idx, z) is_attested ->
             let z' =
               if is_attested then
-                Z.logor z (Z.shift_left Z.one (number_of_lags + slot_idx))
+                set_slot_bit ~offset_start ~slot_index:slot_idx z
               else z
             in
             (slot_idx + 1, z'))
@@ -196,7 +218,8 @@ module Attestations = struct
           dal_attestation
         |> snd
       in
-      Z.to_string result
+      let z = Z.logor z (Z.shift_left Z.one last_chunk_bit) in
+      Z.to_string z
 
   let encode_for_one_lag protocol ?lag_index dal_parameters dal_attestation =
     if Protocol.number protocol < 025 then
@@ -209,58 +232,68 @@ module Attestations = struct
       let lag_index = Option.value ~default:(number_of_lags - 1) lag_index in
       encode_single_lag_after_025 ~lag_index ~number_of_lags dal_attestation
 
-  let encode_multiple_lags_after_025 ~number_of_slots attestations_per_lag =
+  let encode_multiple_lags_after_025 attestations_per_lag =
     let number_of_lags = Array.length attestations_per_lag in
     let lag_indices = List.init number_of_lags Fun.id in
-    (* Build the prefix: bit i is set if lag_index i has any attestations *)
-    let prefix =
+    (* Build the prefix: bit i is set if lag_index i has any attestations. *)
+    let prefix, max_slots =
       List.fold_left
-        (fun acc lag_index ->
+        (fun (acc, max_slots) lag_index ->
           let slots_array = attestations_per_lag.(lag_index) in
-          let has_attestation = Array.exists Fun.id slots_array in
-          if has_attestation then Z.logor acc (Z.shift_left Z.one lag_index)
-          else acc)
-        Z.zero
+          let max_slot = max_attested_slot slots_array in
+          let acc =
+            if max_slot >= 0 then Z.logor acc (Z.shift_left Z.one lag_index)
+            else acc
+          in
+          (acc, max_slot :: max_slots))
+        (Z.zero, [])
         lag_indices
     in
     if Z.equal prefix Z.zero then "0"
     else
-      (* Build the data segments: for each non-empty lag, add number_of_slots bits *)
-      let slot_indices = List.init number_of_slots Fun.id in
+      let max_slots = Array.of_list (List.rev max_slots) in
       let _, result =
         List.fold_left
           (fun (data_offset, acc) lag_index ->
             let slots_array = attestations_per_lag.(lag_index) in
-            let has_attestation = Array.exists Fun.id slots_array in
-            if not has_attestation then (data_offset, acc)
+            let max_slot = max_slots.(lag_index) in
+            if max_slot < 0 then (data_offset, acc)
             else
-              (* Add bits for each attested slot *)
-              let acc' =
-                List.fold_left
-                  (fun z slot_idx ->
-                    if slots_array.(slot_idx) then
-                      Z.logor z (Z.shift_left Z.one (data_offset + slot_idx))
-                    else z)
-                  acc
-                  slot_indices
+              let chunks_needed = (max_slot / slots_per_chunk) + 1 in
+              let last_chunk_bit =
+                data_offset + ((chunks_needed - 1) * bits_per_chunk)
               in
-              (data_offset + number_of_slots, acc'))
+              let acc' =
+                Array.fold_left
+                  (fun (slot_idx, z) is_attested ->
+                    let z' =
+                      if is_attested then
+                        set_slot_bit
+                          ~offset_start:data_offset
+                          ~slot_index:slot_idx
+                          z
+                      else z
+                    in
+                    (slot_idx + 1, z'))
+                  (0, acc)
+                  slots_array
+                |> snd
+              in
+              let acc'' = Z.logor acc' (Z.shift_left Z.one last_chunk_bit) in
+              (data_offset + (chunks_needed * bits_per_chunk), acc''))
           (number_of_lags, prefix)
           lag_indices
       in
       Z.to_string result
 
-  let encode protocol parameters attestations_per_lag =
+  let encode protocol attestations_per_lag =
     if Protocol.number protocol < 025 then
       match attestations_per_lag with
       | [|dal_attestation|] -> encode_single_lag_before_025 dal_attestation
       | _ ->
           Test.fail
             "Multiple lags encoding only supported for protocols >= 025."
-    else
-      encode_multiple_lags_after_025
-        ~number_of_slots:parameters.Parameters.number_of_slots
-        attestations_per_lag
+    else encode_multiple_lags_after_025 attestations_per_lag
 
   (* Decode before 025 format: simple bitset where bit[i] = slot i is attested *)
   let decode_before_025 str =
@@ -272,7 +305,7 @@ module Attestations = struct
       (range 0 (length - 1)) ;
     array
 
-  (* Decode post-025 multi-lag format into per-lag arrays.
+  (* Decode post-025 compact multi-lag format into per-lag arrays.
 
      Returns an array of size [number_of_lags], where element [i] is a bool
      array of size [number_of_slots] representing the attested slots at lag
@@ -281,29 +314,43 @@ module Attestations = struct
      The encoded format is:
      - Prefix: first [number_of_lags] bits indicate which lag indices have
        non-empty attestations (bit [i] set means lag index [i] has data)
-     - Data: for each non-empty lag (in order of lag_index), [number_of_slots]
-       bits representing attested slots. *)
+     - Data: for each non-empty lag (in order of lag_index), a sequence of
+       chunks. Each chunk is [bits_per_chunk] bits: 1 bit [is_last] followed
+       by [slots_per_chunk] slot bits. The last chunk has [is_last]=1. *)
   let decode_after_025 ~number_of_lags ~number_of_slots str =
     let z = Z.of_string str in
     let result =
       Array.init number_of_lags (fun _ -> Array.make number_of_slots false)
     in
     let lag_indices = List.init number_of_lags Fun.id in
-    let slot_indices = List.init number_of_slots Fun.id in
-    (* Parse prefix to find which lags have data, then extract slot bits.
-       We track [data_offset] which advances by [number_of_slots] for each
-       lag that has data. *)
+    let max_chunks = max_chunks ~number_of_slots in
+    (* Parse prefix to find which lags have data, then extract chunked slot bits.
+       We track [data_offset] which advances by [bits_per_chunk] for each chunk
+       consumed. *)
     let _final_offset =
       List.fold_left
         (fun data_offset lag_index ->
           let lag_has_data = Z.testbit z lag_index in
-          if lag_has_data then (
-            List.iter
-              (fun slot_index ->
-                if Z.testbit z (data_offset + slot_index) then
-                  result.(lag_index).(slot_index) <- true)
-              slot_indices ;
-            data_offset + number_of_slots)
+          if lag_has_data then
+            let rec scan_chunks chunk_index offset =
+              if chunk_index >= max_chunks then
+                Test.fail
+                  "Malformed DAL attestations: missing last chunk marker."
+              else
+                let chunk_start = offset + (chunk_index * bits_per_chunk) in
+                let is_last = Z.testbit z chunk_start in
+                for bit_in_chunk = 1 to slots_per_chunk do
+                  let slot_index =
+                    (chunk_index * slots_per_chunk) + (bit_in_chunk - 1)
+                  in
+                  if slot_index < number_of_slots then
+                    if Z.testbit z (chunk_start + bit_in_chunk) then
+                      result.(lag_index).(slot_index) <- true
+                done ;
+                if is_last then offset + ((chunk_index + 1) * bits_per_chunk)
+                else scan_chunks (chunk_index + 1) offset
+            in
+            scan_chunks 0 data_offset
           else data_offset)
         number_of_lags
         lag_indices
