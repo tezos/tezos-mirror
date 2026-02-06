@@ -285,6 +285,7 @@ mod test {
     use tezos_data_encoding::nom::NomReader;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     #[test]
     fn flushing_empty_queue_no_op() {

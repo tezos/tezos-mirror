@@ -17,6 +17,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::Path,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    storage::StorageV1,
 };
 
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -45,17 +46,7 @@ impl HostDebug for EvalHost {
     }
 }
 
-impl SdkRuntime for EvalHost {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
-    }
-
+impl StorageV1 for EvalHost {
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.host.store_has(path)
@@ -139,17 +130,28 @@ impl SdkRuntime for EvalHost {
     }
 
     #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.host.store_value_size(path)
+    }
+}
+
+impl SdkRuntime for EvalHost {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    #[inline(always)]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.read_input()
+    }
+    #[inline(always)]
     fn reveal_preimage(
         &self,
         hash: &[u8; PREIMAGE_HASH_SIZE],
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError> {
         self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.host.store_value_size(path)
     }
 
     #[inline(always)]

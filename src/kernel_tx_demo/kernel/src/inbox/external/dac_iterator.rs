@@ -273,7 +273,7 @@ mod tests {
     use proptest::prelude::*;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
-    use tezos_smart_rollup_host::runtime::Runtime;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::MockHost;
 
     use crate::inbox::dac_iterator::IteratorState;

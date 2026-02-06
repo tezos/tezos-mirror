@@ -554,6 +554,7 @@ mod tests {
     }
 
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::ManagerOperationContent;

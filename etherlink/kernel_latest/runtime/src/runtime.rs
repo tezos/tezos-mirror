@@ -28,6 +28,7 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::{Path, RefPath},
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
+    storage::StorageV1,
 };
 use tezos_smart_rollup_mock::MockHost;
 
@@ -85,18 +86,9 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> H
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> SdkRuntime
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> StorageV1
     for KernelHost<R, Host, Internal>
 {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.borrow_mut().write_output(from)
-    }
-    #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.borrow_mut().read_input()
-    }
-
     #[instrument(skip(self), fields(res))]
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
@@ -211,6 +203,25 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow_mut().store_copy(from_path, to_path)
     }
 
+    #[instrument(skip(self))]
+    #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.host.borrow().store_value_size(path)
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> SdkRuntime
+    for KernelHost<R, Host, Internal>
+{
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.borrow_mut().write_output(from)
+    }
+    #[inline(always)]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.borrow_mut().read_input()
+    }
+
     #[inline(always)]
     fn reveal_preimage(
         &self,
@@ -218,12 +229,6 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError> {
         self.host.borrow().reveal_preimage(hash, destination)
-    }
-
-    #[instrument(skip(self))]
-    #[inline(always)]
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.host.borrow().store_value_size(path)
     }
 
     #[inline(always)]

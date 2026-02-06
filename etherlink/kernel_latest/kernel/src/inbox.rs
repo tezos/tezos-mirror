@@ -639,7 +639,7 @@ mod tests {
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::runtime::Runtime;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [

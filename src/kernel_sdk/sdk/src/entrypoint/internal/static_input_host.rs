@@ -10,6 +10,7 @@
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
 use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
 use crate::host::{Runtime, RuntimeError, ValueType};
@@ -59,25 +60,7 @@ impl<Host: HostDebug> HostDebug for StaticInputHost<'_, Host> {
     }
 }
 
-impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        let message = if let Some((level, id, bytes)) = self.inbox.next() {
-            Some(Message::new(level, id, bytes))
-        } else {
-            // We want to consume the rollup's inbox, but not polute the kernel's view of the inbox
-            // with that.
-            self.host.read_input()?;
-            None
-        };
-
-        Ok(message)
-    }
-
+impl<Host: StorageV1> StorageV1 for StaticInputHost<'_, Host> {
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.host.store_has(path)
     }
@@ -160,17 +143,37 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     }
 
     #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.host.store_value_size(path)
+    }
+}
+
+impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        let message = if let Some((level, id, bytes)) = self.inbox.next() {
+            Some(Message::new(level, id, bytes))
+        } else {
+            // We want to consume the rollup's inbox, but not polute the kernel's view of the inbox
+            // with that.
+            self.host.read_input()?;
+            None
+        };
+
+        Ok(message)
+    }
+
+    #[inline(always)]
     fn reveal_preimage(
         &self,
         hash: &[u8; PREIMAGE_HASH_SIZE],
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError> {
         self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.host.store_value_size(path)
     }
 
     #[inline(always)]

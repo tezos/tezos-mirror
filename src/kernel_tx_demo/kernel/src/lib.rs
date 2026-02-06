@@ -344,6 +344,7 @@ mod test {
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::OwnedPath;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::MockHost;
     use tezos_smart_rollup_mock::TransferMetadata;
 

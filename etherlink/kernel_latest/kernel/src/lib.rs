@@ -466,7 +466,7 @@ mod tests {
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::RefPath;
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();

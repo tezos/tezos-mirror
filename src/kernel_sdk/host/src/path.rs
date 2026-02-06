@@ -38,10 +38,10 @@ pub const PATH_KERNEL_BOOT: RefPath = RefPath::assert_from(b"/kernel/boot.wasm")
 /// [PATH_MAX_SIZE] bytes.
 ///
 /// # Safety
-/// [`Path`] is unsafe to implement, as other code (e.g. [`Runtime`]) rely on any
+/// [`Path`] is unsafe to implement, as other code (e.g. [`StorageV1`]) rely on any
 /// `T: impl Path` being correctly path-encoded.
 ///
-/// [`Runtime`]: crate::runtime::Runtime
+/// [`StorageV1`]: crate::storage::StorageV1
 pub unsafe trait Path: core::fmt::Debug + core::fmt::Display {
     /// Returns a read-only reference to the underlying path-encoded byte-slice.
     fn as_bytes(&self) -> &[u8];

@@ -163,8 +163,10 @@ impl Certificate {
     /// and to perform your own benchmarking.
     ///
     /// If `reveal_to_store` returns an error, any content succesfully revealed
-    /// up until the error occurred will remain in storage; use [Runtime::store_value_size] to
+    /// up until the error occurred will remain in storage; use [StorageV1::store_value_size] to
     /// determine the size of this value.
+    ///
+    /// [StorageV1::store_value_size]: tezos_smart_rollup_host::storage::StorageV1::store_value_size
     pub fn reveal_to_store<Host: Runtime>(
         &self,
         host: &mut Host,
