@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name etherlink_tezt_tests_tezt_lib)
+ (name etherlink_tezt_tezt_cloud_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -11,11 +11,7 @@
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt-cloud
-  tezt_etherlink
-  etherlink_lib_wasm_runtime_callbacks_test_tezt_lib
-  octez-evm-node-libs.evm_node_lib_dev_encoding
-  tezos-protocol-alpha.protocol)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
+  tezt_etherlink)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -28,23 +24,13 @@
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_cloud
   -open Tezt_etherlink)
- (modules
-  evm_rollup
-  evm_sequencer
-  validate
-  dal_sequencer
-  eth_call
-  gc
-  tezlink
-  preconfirmation
-  tezosx))
+ (modules instant_confirmations))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  octez-rust-deps
-  etherlink_tezt_tests_tezt_lib
+  etherlink_tezt_tezt_cloud_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -53,12 +39,7 @@
 
 (rule
  (alias runtest)
- (package tezt-etherlink)
- (deps
-  (glob_files evm_kernel_inputs/*)
-  (glob_files ../../tezos_contracts/*)
-  (glob_files ../../config/*)
-  (glob_files_rec ../../kernel_latest/*))
+ (package tezt-cloud-etherlink)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

@@ -497,6 +497,7 @@ let _etherlink_tezts =
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
         tezt_etherlink |> open_;
         (* This executable includes the tests of [lib_wasm_runtime_callbacks]. *)
         wasm_runtime_callbacks_tests;
@@ -508,6 +509,22 @@ let _etherlink_tezts =
       ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
     ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
+
+let _etherlink_tezt_cloud_scenarios =
+  tezt
+    ["instant_confirmations"]
+    ~path:"etherlink/tezt/tezt-cloud"
+    ~opam:"tezt-cloud-etherlink"
+    ~synopsis:"Tezt-cloud scenarios for Etherlink"
+    ~deps:
+      [
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
+        tezt_etherlink |> open_;
+      ]
+    ~with_macos_security_framework:true
 
 let _courier =
   public_exe
