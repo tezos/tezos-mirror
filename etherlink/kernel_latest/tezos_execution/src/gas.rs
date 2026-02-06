@@ -14,9 +14,11 @@ use tezos_data_encoding::types::Narith;
 use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
+/// Container used to track the gas left during the execution of an operation (including internal operations)
 pub struct TezlinkOperationGas {
-    // in milligas
+    /// Maximum gas the current operation could consume, in milligas
     limit: u32,
+    /// Gas remaining for the current operation, in milligas
     pub remaining: gas::Gas,
 }
 
@@ -38,14 +40,17 @@ impl Cost {
     const GAS_COST_MANAGER_OPERATION: u32 = 100_000;
     const GAS_COST_TRANSACTION: u32 = 2_000_000;
 
+    /// Cost for a manager operation in gas units.
     pub fn manager_operation() -> Self {
         Cost(Self::GAS_COST_MANAGER_OPERATION)
     }
 
+    /// Cost for a transaction in gas units.
     pub fn transaction() -> Self {
         Cost(Self::GAS_COST_TRANSACTION)
     }
 
+    /// Returns the gas cost of checking a signature for the given payload.
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<Self, CryptoError> {
         mir::gas::interpret_cost::check_signature(k, msg).map(Cost)
     }
@@ -56,6 +61,8 @@ impl TezlinkOperationGas {
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
     pub const MAX_LIMIT: u32 = 1_040_000_000;
 
+    /// Initializes operation gas from the provided limit and validates it
+    /// against the per-operation and remaining block limits.
     pub fn start(
         limit_in_gas_unit: &tezos_data_encoding::types::Narith,
     ) -> Result<Self, GasLimitError> {
@@ -78,6 +85,7 @@ impl TezlinkOperationGas {
         })
     }
 
+    /// Resets the internal limit to the current remaining milligas.
     fn start_internal(&mut self) {
         self.limit = self.remaining.milligas();
     }
@@ -91,7 +99,7 @@ impl TezlinkOperationGas {
     ///
     /// # Returns
     ///
-    /// The number of milligas consumed by the operation as a `u64`.
+    /// The number of milligas consumed by the operation as a [`Narith`].
     ///
     /// # Side Effects
     ///
@@ -101,16 +109,17 @@ impl TezlinkOperationGas {
     /// # Example
     ///
     /// ```ignore
-    /// # use tezos_data_encoding::types::Narith;
     /// # use num_bigint::BigUint;
+    /// # use tezos_data_encoding::types::Narith;
+    /// # use tezos_execution_latest::gas::TezlinkOperationGas;
     /// let limit = Narith(BigUint::from(1000u32));
     /// let mut gas = TezlinkOperationGas::start(&limit).unwrap();
     ///
     /// // Simulate some gas consumption here
-    /// // gas.current_gas.consume(...);
+    /// // gas.remaining.consume(...);
     ///
     /// let consumed = gas.milligas_consumed_by_operation();
-    /// println!("Operation consumed {} milligas", consumed);
+    /// println!("Operation consumed {:?} milligas", consumed);
     /// ```
     pub fn milligas_consumed_by_operation(&mut self) -> Narith {
         let consumed = self.limit - self.remaining.milligas();
@@ -118,6 +127,7 @@ impl TezlinkOperationGas {
         Narith::from(consumed as u64)
     }
 
+    /// Consumes the provided cost from the operation gas tracker.
     pub fn consume(&mut self, cost: Cost) -> Result<(), gas::OutOfGas> {
         self.remaining.consume(cost.0)
     }
