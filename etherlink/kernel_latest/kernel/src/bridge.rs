@@ -43,7 +43,10 @@ use tezos_tracing::trace_kernel;
 use tezosx_interfaces::{Registry, RuntimeId};
 use tezosx_tezos_runtime::TezosRuntime;
 
-use crate::apply::{pure_xtz_deposit, ExecutionResult, TransactionResult};
+use crate::apply::{
+    pure_xtz_deposit, EthereumTransactionResult, ExecutionResult,
+    RuntimeTransactionResult,
+};
 use crate::chains::EvmLimits;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
@@ -397,7 +400,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, crate::Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, crate::Error> {
     match &deposit.receiver {
         DepositReceiver::Ethereum(_) => {
             let execution_outcome = pure_xtz_deposit(
@@ -411,13 +414,13 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                 tracer_input,
             )?;
 
-            let transaction_result = TransactionResult {
-                // A specific address is allocated for queue call
-                // System address can only be used as caller for simulations
-                caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
-                execution_outcome,
-                runtime: RuntimeId::Ethereum,
-            };
+            // A specific address is allocated for queue call
+            // System address can only be used as caller for simulations
+            let transaction_result =
+                RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+                    caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
+                    execution_outcome,
+                });
 
             Ok(ExecutionResult::Valid(transaction_result))
         }
@@ -442,11 +445,11 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         withdrawals: vec![],
                     };
 
-                    let transaction_result = TransactionResult {
-                        caller: H160::zero(),
-                        execution_outcome,
-                        runtime: RuntimeId::Tezos,
-                    };
+                    let transaction_result =
+                        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+                            caller: H160::zero(),
+                            execution_outcome,
+                        });
 
                     Ok(ExecutionResult::Valid(transaction_result))
                 }
@@ -460,11 +463,11 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         withdrawals: vec![],
                     };
 
-                    let transaction_result = TransactionResult {
-                        caller: H160::zero(),
-                        execution_outcome,
-                        runtime: RuntimeId::Tezos,
-                    };
+                    let transaction_result =
+                        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+                            caller: H160::zero(),
+                            execution_outcome,
+                        });
 
                     Ok(ExecutionResult::Valid(transaction_result))
                 }
@@ -566,7 +569,7 @@ mod tests {
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
     use crate::{
-        apply::{ExecutionResult, TransactionResult},
+        apply::{EthereumTransactionResult, ExecutionResult, RuntimeTransactionResult},
         bridge::{DepositInfo, DepositReceiver, DEPOSIT_EVENT_TOPIC},
         chains::EvmLimits,
     };
@@ -796,10 +799,11 @@ mod tests {
             &limits,
         )
         .unwrap();
-        let outcome = if let ExecutionResult::Valid(TransactionResult {
-            execution_outcome,
-            ..
-        }) = execution_result
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
         {
             execution_outcome
         } else {
@@ -850,10 +854,11 @@ mod tests {
             &limits,
         )
         .unwrap();
-        let outcome = if let ExecutionResult::Valid(TransactionResult {
-            execution_outcome,
-            ..
-        }) = execution_result
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
         {
             execution_outcome
         } else {
@@ -882,10 +887,11 @@ mod tests {
             &limits,
         )
         .unwrap();
-        let outcome = if let ExecutionResult::Valid(TransactionResult {
-            execution_outcome,
-            ..
-        }) = execution_result
+        let outcome = if let ExecutionResult::Valid(RuntimeTransactionResult::Ethereum(
+            EthereumTransactionResult {
+                execution_outcome, ..
+            },
+        )) = execution_result
         {
             execution_outcome
         } else {

@@ -387,7 +387,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 
-    type ExecutionInfo = crate::apply::ExecutionInfo;
+    type ExecutionInfo = crate::apply::RuntimeExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id

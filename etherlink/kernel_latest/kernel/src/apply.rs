@@ -45,10 +45,13 @@ use tezos_execution::mir_ctx::BlockCtx;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_tezlink::block::AppliedOperation;
 use tezos_tezlink::enc_wrappers::BlockNumber;
-use tezos_tezlink::operation_result::OperationError;
+use tezos_tezlink::operation_result::{
+    OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+};
 use tezos_tracing::trace_kernel;
-use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_interfaces::Registry;
 use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 use crate::bridge::{apply_tezosx_xtz_deposit, Deposit};
@@ -234,10 +237,16 @@ pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
     Ok(Validity::Valid(caller, capped_gas_limit))
 }
 
-pub struct TransactionResult {
+/// Result of executing an Ethereum transaction.
+pub struct EthereumTransactionResult {
     pub caller: H160,
     pub execution_outcome: ExecutionOutcome,
-    pub runtime: RuntimeId,
+}
+
+/// Enum distinguishing between Ethereum and Tezos transaction results.
+pub enum RuntimeTransactionResult {
+    Ethereum(EthereumTransactionResult),
+    Tezos(AppliedOperation),
 }
 
 /// Technically incorrect: it is possible to do a call without sending any data,
@@ -382,7 +391,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
         host,
@@ -430,11 +439,11 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let transaction_result = TransactionResult {
-        caller,
-        execution_outcome,
-        runtime: RuntimeId::Ethereum,
-    };
+    let transaction_result =
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller,
+            execution_outcome,
+        });
 
     Ok(ExecutionResult::Valid(transaction_result))
 }
@@ -642,7 +651,7 @@ fn apply_fa_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, Error> {
+) -> Result<ExecutionResult<RuntimeTransactionResult>, Error> {
     let execution_outcome = pure_fa_deposit(
         host,
         registry,
@@ -654,13 +663,13 @@ fn apply_fa_deposit<Host: Runtime>(
         tracer_input,
     )?;
 
-    let transaction_result = TransactionResult {
-        // A specific address is allocated for queue call
-        // System address can only be used as caller for simulations
-        caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
-        execution_outcome,
-        runtime: RuntimeId::Ethereum,
-    };
+    // A specific address is allocated for queue call
+    // System address can only be used as caller for simulations
+    let transaction_result =
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
+            execution_outcome,
+        });
 
     Ok(ExecutionResult::Valid(transaction_result))
 }
@@ -668,11 +677,17 @@ fn apply_fa_deposit<Host: Runtime>(
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
     RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
-pub struct ExecutionInfo {
+/// Execution info for an Ethereum transaction.
+pub struct EthereumExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub tx_object: TransactionObject,
-    pub runtime: RuntimeId,
-    pub tx_hash: TransactionHash,
+}
+
+/// Enum distinguishing between Ethereum and Tezos execution info.
+#[allow(clippy::large_enum_variant)]
+pub enum RuntimeExecutionInfo {
+    Ethereum(EthereumExecutionInfo),
+    Tezos(AppliedOperation),
 }
 
 pub enum ExecutionResult<T> {
@@ -697,78 +712,81 @@ pub fn handle_transaction_result<Host: Runtime>(
     block_constants: &BlockConstants,
     transaction: Transaction,
     index: u32,
-    transaction_result: TransactionResult,
+    transaction_result: RuntimeTransactionResult,
     pay_fees: bool,
     sequencer_pool_address: Option<H160>,
-) -> Result<ExecutionInfo, anyhow::Error> {
-    let TransactionResult {
-        caller,
-        mut execution_outcome,
-        runtime,
-    } = transaction_result;
+) -> Result<RuntimeExecutionInfo, anyhow::Error> {
+    match transaction_result {
+        RuntimeTransactionResult::Ethereum(EthereumTransactionResult {
+            caller,
+            mut execution_outcome,
+        }) => {
+            let to = transaction.to()?;
 
-    let to = transaction.to()?;
-    let tx_hash = transaction.tx_hash;
-    let tx_type = transaction.type_();
+            let tx_hash = transaction.tx_hash;
+            let tx_type = transaction.type_();
+            let gas_used = execution_outcome.result.gas_used();
 
-    let gas_used = execution_outcome.result.gas_used();
+            let fee_updates = transaction
+                .content
+                .fee_updates(&block_constants.block_fees, gas_used.into());
 
-    let fee_updates = transaction
-        .content
-        .fee_updates(&block_constants.block_fees, gas_used.into());
-
-    log!(
-        host,
-        Debug,
-        "Transaction executed, outcome: {:?}",
-        execution_outcome
-    );
-    log!(host, Benchmarking, "gas_used: {:?}", gas_used);
-    log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
-    for message in execution_outcome.withdrawals.drain(..) {
-        match message {
-            Withdrawal::Standard(message) => {
-                let outbox_message: OutboxMessage<RouterInterface> = message;
-                let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+            log!(
+                host,
+                Debug,
+                "Transaction executed, outcome: {:?}",
+                execution_outcome
+            );
+            log!(host, Benchmarking, "gas_used: {:?}", gas_used);
+            log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
+            for message in execution_outcome.withdrawals.drain(..) {
+                match message {
+                    Withdrawal::Standard(message) => {
+                        let outbox_message: OutboxMessage<RouterInterface> = message;
+                        let len = outbox_queue.queue_message(host, outbox_message)?;
+                        log!(host, Debug, "Length of the outbox queue: {}", len);
+                    }
+                    Withdrawal::Fast(message) => {
+                        let outbox_message: OutboxMessage<FastWithdrawalInterface> =
+                            message;
+                        let len = outbox_queue.queue_message(host, outbox_message)?;
+                        log!(host, Debug, "Length of the outbox queue: {}", len);
+                    }
+                }
             }
-            Withdrawal::Fast(message) => {
-                let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
-                let len = outbox_queue.queue_message(host, outbox_message)?;
-                log!(host, Debug, "Length of the outbox queue: {}", len);
+
+            if pay_fees {
+                fee_updates.apply(host, caller, sequencer_pool_address)?;
             }
+
+            let tx_object = make_object(
+                block_constants.number,
+                transaction,
+                caller,
+                index,
+                &fee_updates,
+            )?;
+
+            let receipt_info = make_receipt_info(
+                tx_hash,
+                index,
+                execution_outcome,
+                caller,
+                to,
+                fee_updates.overall_gas_price,
+                tx_type,
+                fee_updates.overall_gas_used,
+            );
+
+            Ok(RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
+                receipt_info,
+                tx_object,
+            }))
+        }
+        RuntimeTransactionResult::Tezos(applied_operation) => {
+            Ok(RuntimeExecutionInfo::Tezos(applied_operation))
         }
     }
-
-    if pay_fees {
-        fee_updates.apply(host, caller, sequencer_pool_address)?;
-    }
-
-    let tx_object = make_object(
-        block_constants.number,
-        transaction,
-        caller,
-        index,
-        &fee_updates,
-    )?;
-
-    let receipt_info = make_receipt_info(
-        tx_hash,
-        index,
-        execution_outcome,
-        caller,
-        to,
-        fee_updates.overall_gas_price,
-        tx_type,
-        fee_updates.overall_gas_used,
-    );
-
-    Ok(ExecutionInfo {
-        receipt_info,
-        tx_object,
-        runtime,
-        tx_hash,
-    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -784,7 +802,7 @@ pub fn apply_transaction<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
     limits: &EvmLimits,
-) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
+) -> Result<ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
     let tracer_input = get_tracer_configuration(
         revm::primitives::B256::from_slice(&transaction.tx_hash),
         tracer_input,
@@ -854,15 +872,14 @@ pub fn apply_transaction<Host: Runtime>(
             block_constants
                 .chain_id
                 .to_little_endian(&mut chain_id_bytes);
+            let op_hash = op.hash().map_err(|e| {
+                Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
+            })?;
             match tezos_execution::validate_and_apply_operation(
                 host,
                 registry,
                 &context,
-                op.hash().map_err(|e| {
-                    Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                        e.to_string(),
-                    ))
-                })?,
+                op_hash.clone(),
                 // TODO: !20198 avoid this clone.
                 op.clone(),
                 &BlockCtx {
@@ -878,28 +895,26 @@ pub fn apply_transaction<Host: Runtime>(
                 },
                 skip_signature_check,
             ) {
-                Ok(res) => {
+                Ok(operations_with_metadata) => {
                     log!(
                         host,
                         Debug,
                         "Delayed Tezos operation status: SUCCESS - {:?}",
-                        res
+                        operations_with_metadata
                     );
-                    Ok::<_, anyhow::Error>(ExecutionResult::Valid(TransactionResult {
-                        caller: H160::zero(),
-                        execution_outcome: ExecutionOutcome {
-                            result: revm::context::result::ExecutionResult::Success {
-                                // TODO: use `Revert` when the operation isn't applied.
-                                reason: revm::context::result::SuccessReason::Return,
-                                gas_used: 0,
-                                gas_refunded: 0,
-                                logs: vec![],
-                                output: revm::context::result::Output::Call(Bytes::new()),
+                    let operation_and_receipt = AppliedOperation {
+                        hash: op_hash,
+                        branch: op.branch.clone(),
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations: operations_with_metadata,
+                                signature: op.signature.clone(),
                             },
-                            withdrawals: vec![],
-                        },
-                        runtime: RuntimeId::Tezos,
-                    }))
+                        ),
+                    };
+                    Ok::<_, anyhow::Error>(ExecutionResult::Valid(
+                        RuntimeTransactionResult::Tezos(operation_and_receipt),
+                    ))
                 }
                 Err(OperationError::Validation(err)) => {
                     log!(

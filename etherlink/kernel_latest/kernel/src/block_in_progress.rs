@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{ExecutionInfo, TransactionReceiptInfo};
+use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
@@ -34,7 +34,6 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_tezlink::block::OperationsWithReceipts;
-use tezosx_interfaces::RuntimeId;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
@@ -363,27 +362,23 @@ impl BlockInProgress<Transaction> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
-        execution_info: ExecutionInfo,
+        execution_info: RuntimeExecutionInfo,
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
-        let ExecutionInfo {
-            receipt_info,
-            tx_object,
-            runtime,
-            tx_hash,
-        } = execution_info;
-        let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
-        // account for gas
-        host.add_execution_gas(execution_gas_used);
+        match execution_info {
+            RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
+                receipt_info,
+                tx_object,
+            }) => {
+                let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
+                // account for gas
+                host.add_execution_gas(execution_gas_used);
+                self.add_gas(receipt_info.overall_gas_used)?;
+                // keep track of execution gas used
+                self.cumulative_execution_gas += execution_gas_used.into();
 
-        self.add_gas(receipt_info.overall_gas_used)?;
-
-        // keep track of execution gas used
-        self.cumulative_execution_gas += execution_gas_used.into();
-        match runtime {
-            RuntimeId::Ethereum => {
                 // register transaction as done
-                self.valid_txs.push(tx_hash);
+                self.valid_txs.push(receipt_info.tx_hash);
                 self.index += 1;
 
                 // make receipt
@@ -397,7 +392,13 @@ impl BlockInProgress<Transaction> {
                 self.cumulative_receipts.push(receipt);
                 self.cumulative_tx_objects.push(tx_object);
             }
-            RuntimeId::Tezos => (),
+            RuntimeExecutionInfo::Tezos(operation_and_receipt) => {
+                // TODO: Add gas used for Tezos transactions to the cumulative gas
+                // https://linear.app/tezos/issue/L2-841/add-gas-used-for-tezos-transactions-to-the-cumulative-gas
+                self.cumulative_tezos_operation_receipts
+                    .list
+                    .push(operation_and_receipt);
+            }
         };
         Ok(())
     }
