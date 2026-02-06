@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    block::BlockComputationResult,
     block_in_progress::BlockInProgress,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -42,6 +41,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
+    enc_wrappers::BlockNumber,
     operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
@@ -203,18 +203,41 @@ impl Decodable for TezlinkContent {
 }
 
 pub trait TransactionTrait {
+    fn is_delayed(&self) -> bool;
+
     fn tx_hash(&self) -> TransactionHash;
+
+    fn data_size(&self) -> u64;
 }
 
 impl TransactionTrait for crate::transaction::Transaction {
+    fn is_delayed(&self) -> bool {
+        self.is_delayed()
+    }
+
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
+    }
+
+    fn data_size(&self) -> u64 {
+        self.data_size()
     }
 }
 
 impl TransactionTrait for TezlinkOperation {
+    fn is_delayed(&self) -> bool {
+        match self.content {
+            TezlinkContent::Tezos(_) => false,
+            TezlinkContent::Deposit(_) => true,
+        }
+    }
+
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
+    }
+
+    fn data_size(&self) -> u64 {
+        0
     }
 }
 
@@ -250,17 +273,28 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 }
 
 pub trait ChainConfigTrait: Debug {
+    type BlockConstants;
+
     type Transaction: TransactionTrait + Encodable + Decodable + Debug;
 
-    type TransactionReceipt: Debug;
+    type TransactionReceipt: Debug + Encodable;
 
     type ChainHeader: ChainHeaderTrait + Decodable;
+
+    type ExecutionInfo;
 
     fn get_chain_id(&self) -> U256;
 
     fn get_chain_family(&self) -> ChainFamily;
 
     fn storage_root_path(&self) -> RefPath;
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<Self::BlockConstants>;
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
@@ -286,33 +320,61 @@ pub trait ChainConfigTrait: Debug {
         Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
     >;
 
-    #[allow(clippy::too_many_arguments)]
-    fn compute_bip<Host: Runtime>(
+    fn can_fit_in_reboot(
         &self,
-        host: &mut Host,
+        executed_gas: U256,
+        tx: &Self::Transaction,
+        block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<bool>;
+
+    #[allow(clippy::too_many_arguments)]
+    fn apply_transaction(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_constants: &Self::BlockConstants,
+        transaction: Self::Transaction,
+        index: u32,
         sequencer_pool_address: Option<H160>,
-        maximum_allowed_ticks: u64,
         tracer_input: Option<TracerInput>,
-        da_fee_per_byte: U256,
-        coinbase: H160,
-    ) -> anyhow::Result<BlockComputationResult>;
+    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error>;
 
-    fn start_simulation_mode<Host: Runtime>(
+    fn register_valid_transaction(
         &self,
-        host: &mut Host,
+        block_in_progress: &mut BlockInProgress<
+            Self::Transaction,
+            Self::TransactionReceipt,
+        >,
+        execution_info: Self::ExecutionInfo,
+        host: &mut impl Runtime,
+    ) -> anyhow::Result<()>;
+
+    fn finalize_and_store(
+        &self,
+        host: &mut impl Runtime,
+        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<L2Block>;
+
+    fn start_simulation_mode(
+        &self,
+        host: &mut impl Runtime,
         registry: &impl Registry,
     ) -> anyhow::Result<()>;
 }
 
 impl ChainConfigTrait for EvmChainConfig {
+    type BlockConstants = tezos_ethereum::block::BlockConstants;
+
     type Transaction = crate::transaction::Transaction;
 
     type TransactionReceipt = tezos_ethereum::transaction::TransactionReceipt;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
+
+    type ExecutionInfo = crate::apply::ExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
@@ -320,6 +382,22 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn get_chain_family(&self) -> ChainFamily {
         ChainFamily::Evm
+    }
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        da_fee_per_byte: U256,
+        coinbase: H160,
+    ) -> anyhow::Result<Self::BlockConstants> {
+        Ok(block_in_progress.constants(
+            self.chain_id,
+            self.limits.minimum_base_fee_per_gas,
+            da_fee_per_byte,
+            crate::block::GAS_LIMIT,
+            coinbase,
+            self.enable_tezos_runtime(),
+        ))
     }
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
@@ -359,39 +437,69 @@ impl ChainConfigTrait for EvmChainConfig {
         crate::storage::read_block_in_progress(host)
     }
 
-    fn compute_bip<Host: Runtime>(
+    fn can_fit_in_reboot(
         &self,
-        host: &mut Host,
+        executed_gas: U256,
+        transaction: &Self::Transaction,
+        block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<bool> {
+        Ok(crate::block::can_fit_in_reboot(
+            &self.limits,
+            executed_gas,
+            transaction.execution_gas_limit(&block_constants.block_fees)?,
+        ))
+    }
+
+    fn apply_transaction(
+        &self,
+        _block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_constants: &tezos_ethereum::block::BlockConstants,
+        transaction: Self::Transaction,
+        index: u32,
         sequencer_pool_address: Option<H160>,
-        _maximum_allowed_ticks: u64,
         tracer_input: Option<TracerInput>,
-        da_fee_per_byte: U256,
-        coinbase: H160,
-    ) -> anyhow::Result<BlockComputationResult> {
-        log!(host, Debug, "Computing the BlockInProgress for Etherlink");
-
-        crate::block::compute_bip(
+    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
+        crate::apply::apply_transaction(
             host,
             registry,
             outbox_queue,
-            block_in_progress,
+            block_constants,
+            transaction,
+            index,
             sequencer_pool_address,
-            &self.limits,
             tracer_input,
-            self.chain_id,
-            da_fee_per_byte,
-            coinbase,
             &self.spec_id,
-            self.enable_tezos_runtime(),
+            &self.limits,
         )
     }
 
-    fn start_simulation_mode<Host: Runtime>(
+    fn register_valid_transaction(
         &self,
-        host: &mut Host,
+        block_in_progress: &mut BlockInProgress<
+            Self::Transaction,
+            Self::TransactionReceipt,
+        >,
+        execution_info: Self::ExecutionInfo,
+        host: &mut impl Runtime,
+    ) -> anyhow::Result<()> {
+        block_in_progress.register_valid_transaction(execution_info, host)
+    }
+
+    fn finalize_and_store(
+        &self,
+        host: &mut impl Runtime,
+        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<L2Block> {
+        block_in_progress.finalize_and_store(host, block_constants)
+    }
+
+    fn start_simulation_mode(
+        &self,
+        host: &mut impl Runtime,
         registry: &impl Registry,
     ) -> anyhow::Result<()> {
         start_simulation_mode(host, registry, &self.spec_id)
@@ -433,10 +541,17 @@ impl EvmChainConfig {
 const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
     RefPath::assert_from(b"/tezlink/simulation_result");
 
+pub struct TezlinkBlockConstants {
+    pub level: BlockNumber,
+    pub context: context::TezlinkContext,
+}
+
 impl ChainConfigTrait for MichelsonChainConfig {
+    type BlockConstants = TezlinkBlockConstants;
     type Transaction = TezlinkOperation;
     type TransactionReceipt = AppliedOperation;
     type ChainHeader = TezBlockHeader;
+    type ExecutionInfo = AppliedOperation;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
@@ -444,6 +559,17 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn get_chain_family(&self) -> ChainFamily {
         ChainFamily::Michelson
+    }
+
+    fn constants(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        _da_fee_per_byte: U256,
+        _coinbase: H160,
+    ) -> anyhow::Result<Self::BlockConstants> {
+        let level = block_in_progress.number.try_into()?;
+        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
+        Ok(TezlinkBlockConstants { level, context })
     }
 
     fn base_fee_per_gas(&self, _host: &impl Runtime, _timestamp: Timestamp) -> U256 {
@@ -522,31 +648,30 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(None)
     }
 
-    fn compute_bip<Host: Runtime>(
+    fn can_fit_in_reboot(
         &self,
-        host: &mut Host,
+        _executed_gas: U256,
+        _tx: &Self::Transaction,
+        _block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<bool> {
+        Ok(true)
+    }
+
+    fn apply_transaction(
+        &self,
+        block_in_progress: &BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        host: &mut impl Runtime,
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
-        mut block_in_progress: BlockInProgress<
-            Self::Transaction,
-            Self::TransactionReceipt,
-        >,
+        block_constants: &Self::BlockConstants,
+        operation: Self::Transaction,
+        _index: u32,
         _sequencer_pool_address: Option<H160>,
-        _maximum_allowed_ticks: u64,
         _tracer_input: Option<TracerInput>,
-        _da_fee_per_byte: U256,
-        _coinbase: H160,
-    ) -> anyhow::Result<BlockComputationResult> {
-        log!(
-            host,
-            Debug,
-            "Computing the BlockInProgress for Tezlink at level {}",
-            block_in_progress.number
-        );
+    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
+        let context = &block_constants.context;
 
-        let context = context::TezlinkContext::from_root(&self.storage_root_path())?;
-
-        let level = block_in_progress.number.try_into()?;
+        let level = block_constants.level;
         let now = block_in_progress.timestamp;
         let block_ctx = BlockCtx {
             level: &level,
@@ -554,112 +679,118 @@ impl ChainConfigTrait for MichelsonChainConfig {
             chain_id: &self.chain_id,
         };
 
-        let mut included_delayed_transactions = vec![];
-        // Compute operations that are in the block in progress
-        while block_in_progress.has_tx() {
-            let operation = block_in_progress.pop_tx().ok_or(error::Error::Reboot)?;
+        match operation.content {
+            TezlinkContent::Tezos(operation) => {
+                // Compute the hash of the operation
+                let hash = operation.hash()?;
 
-            match operation.content {
-                TezlinkContent::Tezos(operation) => {
-                    // Compute the hash of the operation
-                    let hash = operation.hash()?;
+                let skip_signature_check = false;
 
-                    let skip_signature_check = false;
+                let branch = operation.branch.clone();
+                let signature = operation.signature.clone();
 
-                    let branch = operation.branch.clone();
-                    let signature = operation.signature.clone();
-
-                    // Try to apply the operation with the tezos_execution crate, return a receipt
-                    // on whether it failed or not
-                    let processed_operations =
-                        match tezos_execution::validate_and_apply_operation(
-                            host,
-                            registry,
-                            &context,
-                            hash.clone(),
-                            operation,
-                            &block_ctx,
-                            skip_signature_check,
-                        ) {
-                            Ok(receipt) => receipt,
-                            Err(OperationError::Validation(err)) => {
-                                log!(
-                                    host,
-                                    Error,
-                                    "Found an invalid operation, dropping it: {:?}",
-                                    err
-                                );
-                                continue;
-                            }
-                            Err(OperationError::RuntimeError(err)) => {
-                                return Err(err.into());
-                            }
-                        };
-
-                    // Add the applied operation in the block in progress
-                    let applied_operation = AppliedOperation {
-                        hash,
-                        branch,
-                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                            OperationBatchWithMetadata {
-                                operations: processed_operations,
-                                signature,
-                            },
-                        ),
+                // Try to apply the operation with the tezos_execution crate, return a receipt
+                // on whether it failed or not
+                let processed_operations =
+                    match tezos_execution::validate_and_apply_operation(
+                        host,
+                        registry,
+                        context,
+                        hash.clone(),
+                        operation,
+                        &block_ctx,
+                        skip_signature_check,
+                    ) {
+                        Ok(receipt) => receipt,
+                        Err(OperationError::Validation(err)) => {
+                            log!(
+                                host,
+                                Error,
+                                "Found an invalid operation, dropping it: {:?}",
+                                err
+                            );
+                            return Ok(crate::apply::ExecutionResult::Invalid);
+                        }
+                        Err(OperationError::RuntimeError(err)) => {
+                            return Err(err.into());
+                        }
                     };
-                    block_in_progress
-                        .cumulative_receipts
-                        .push(applied_operation);
-                }
-                TezlinkContent::Deposit(deposit) => {
-                    log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
 
-                    let deposit_result =
-                        execute_tezlink_deposit(host, &context, &deposit)?;
+                // Add the applied operation in the block in progress
+                let applied_operation = AppliedOperation {
+                    hash,
+                    branch,
+                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                        OperationBatchWithMetadata {
+                            operations: processed_operations,
+                            signature,
+                        },
+                    ),
+                };
+                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+            }
+            TezlinkContent::Deposit(deposit) => {
+                log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
 
-                    let source =
-                        PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+                let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
 
-                    let applied_operation = AppliedOperation {
-                        hash: H256::from_slice(&operation.tx_hash).into(),
-                        branch: block_in_progress.parent_hash.into(),
-                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                            OperationBatchWithMetadata {
-                                operations: vec![OperationWithMetadata {
-                                    content: ManagerOperationContent::Transaction(
-                                        ManagerOperation {
-                                            source,
-                                            fee: 0.into(),
-                                            counter: 0.into(),
-                                            gas_limit: 0.into(),
-                                            storage_limit: 0.into(),
-                                            operation: deposit_result.outcome.1,
-                                        },
-                                    ),
-                                    receipt: OperationResultSum::Transfer(
-                                        OperationResult {
-                                            balance_updates: vec![],
-                                            result: deposit_result.outcome.0,
-                                            internal_operation_results: vec![],
-                                        },
-                                    ),
-                                }],
-                                signature: UnknownSignature::nom_read_exact(&[0u8; 64])
-                                    .unwrap(),
-                            },
-                        ),
-                    };
-                    block_in_progress
-                        .cumulative_receipts
-                        .push(applied_operation);
-                    included_delayed_transactions.push(operation.tx_hash);
-                }
-            };
+                let source =
+                    PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+
+                let applied_operation = AppliedOperation {
+                    hash: H256::from_slice(&operation.tx_hash).into(),
+                    branch: block_in_progress.parent_hash.into(),
+                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                        OperationBatchWithMetadata {
+                            operations: vec![OperationWithMetadata {
+                                content: ManagerOperationContent::Transaction(
+                                    ManagerOperation {
+                                        source,
+                                        fee: 0.into(),
+                                        counter: 0.into(),
+                                        gas_limit: 0.into(),
+                                        storage_limit: 0.into(),
+                                        operation: deposit_result.outcome.1,
+                                    },
+                                ),
+                                receipt: OperationResultSum::Transfer(OperationResult {
+                                    balance_updates: vec![],
+                                    result: deposit_result.outcome.0,
+                                    internal_operation_results: vec![],
+                                }),
+                            }],
+                            signature: UnknownSignature::nom_read_exact(&[0u8; 64])
+                                .unwrap(),
+                        },
+                    ),
+                };
+                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+            }
         }
+    }
 
+    fn register_valid_transaction(
+        &self,
+        block_in_progress: &mut BlockInProgress<
+            Self::Transaction,
+            Self::TransactionReceipt,
+        >,
+        execution_info: Self::ExecutionInfo,
+        _host: &mut impl Runtime,
+    ) -> anyhow::Result<()> {
+        block_in_progress.cumulative_receipts.push(execution_info);
+        Ok(())
+    }
+
+    fn finalize_and_store(
+        &self,
+        host: &mut impl Runtime,
+        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
+        block_constants: &Self::BlockConstants,
+    ) -> anyhow::Result<L2Block> {
         // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(
-            level,
+            block_constants.level,
             block_in_progress.timestamp,
             block_in_progress.parent_hash,
             block_in_progress.cumulative_receipts,
@@ -668,15 +799,12 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
-        Ok(BlockComputationResult::Finished {
-            included_delayed_transactions,
-            block: new_block,
-        })
+        Ok(new_block)
     }
 
-    fn start_simulation_mode<Host: Runtime>(
+    fn start_simulation_mode(
         &self,
-        host: &mut Host,
+        host: &mut impl Runtime,
         registry: &impl Registry,
     ) -> anyhow::Result<()> {
         fn read_inbox_message(

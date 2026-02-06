@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{apply_transaction, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
+use crate::apply::{ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::block_in_progress;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
@@ -20,17 +20,14 @@ use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::registry_impl::RegistryImpl;
 use crate::storage;
-use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use anyhow::Context;
 use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
-use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::transaction::{TransactionHash, TransactionReceipt};
+use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
 use tezos_evm_runtime::safe_storage::SafeStorage;
@@ -89,7 +86,7 @@ fn max_gas_per_reboot(limits: &EvmLimits) -> u64 {
     limits.maximum_gas_limit * 61 / 60
 }
 
-fn can_fit_in_reboot(
+pub fn can_fit_in_reboot(
     limits: &EvmLimits,
     used_gas_in_run: U256,
     tx_gas_limit: u64,
@@ -100,16 +97,18 @@ fn can_fit_in_reboot(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute<Host: Runtime>(
+pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     registry: &impl Registry,
+    chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut BlockInProgress<Transaction, TransactionReceipt>,
-    block_constants: &BlockConstants,
+    block_in_progress: &mut BlockInProgress<
+        ChainConfig::Transaction,
+        ChainConfig::TransactionReceipt,
+    >,
+    block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
-    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
     log!(
         host,
@@ -126,11 +125,11 @@ pub fn compute<Host: Runtime>(
 
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
 
-        if !can_fit_in_reboot(
-            limits,
+        if !chain_config.can_fit_in_reboot(
             host.executed_gas().into(),
-            transaction.execution_gas_limit(&block_constants.block_fees)?,
-        ) {
+            &transaction,
+            block_constants,
+        )? {
             log!(
                 host,
                 Debug,
@@ -147,7 +146,8 @@ pub fn compute<Host: Runtime>(
         match __trace_kernel!(
             host,
             "apply_transaction",
-            apply_transaction(
+            chain_config.apply_transaction(
+                block_in_progress,
                 host,
                 registry,
                 outbox_queue,
@@ -156,8 +156,6 @@ pub fn compute<Host: Runtime>(
                 block_in_progress.index,
                 sequencer_pool_address,
                 tracer_input,
-                spec_id,
-                limits,
             )?
         ) {
             ExecutionResult::Valid(execution_info) => {
@@ -165,7 +163,11 @@ pub fn compute<Host: Runtime>(
                     block_in_progress.register_delayed_transaction(tx_hash);
                 }
 
-                block_in_progress.register_valid_transaction(execution_info, host)?;
+                chain_config.register_valid_transaction(
+                    block_in_progress,
+                    execution_info,
+                    host,
+                )?;
             }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(is_delayed, tx_hash, block_in_progress)
@@ -261,38 +263,31 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn compute_bip<Host: Runtime>(
+pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     registry: &impl Registry,
+    chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: BlockInProgress<Transaction, TransactionReceipt>,
+    mut block_in_progress: BlockInProgress<
+        ChainConfig::Transaction,
+        ChainConfig::TransactionReceipt,
+    >,
     sequencer_pool_address: Option<H160>,
-    limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    chain_id: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
-    spec_id: &SpecId,
-    tezos_experimental_features: bool,
 ) -> anyhow::Result<BlockComputationResult> {
-    let constants: BlockConstants = block_in_progress.constants(
-        chain_id,
-        limits.minimum_base_fee_per_gas,
-        da_fee_per_byte,
-        GAS_LIMIT,
-        coinbase,
-        tezos_experimental_features,
-    );
+    let constants: ChainConfig::BlockConstants =
+        chain_config.constants(&block_in_progress, da_fee_per_byte, coinbase)?;
     let result = compute(
         host,
         registry,
+        chain_config,
         outbox_queue,
         &mut block_in_progress,
         &constants,
         sequencer_pool_address,
-        limits,
         tracer_input,
-        spec_id,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
@@ -304,8 +299,8 @@ pub fn compute_bip<Host: Runtime>(
             included_delayed_transactions,
         } => {
             crate::gas_price::register_block(host, &block_in_progress)?;
-            let new_block = block_in_progress
-                .finalize_and_store(host, &constants)
+            let new_block = chain_config
+                .finalize_and_store(host, block_in_progress, &constants)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -450,13 +445,13 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         };
 
     let processed_blueprint = block_in_progress.number;
-    let computation_result = chain_config.compute_bip(
+    let computation_result = compute_bip(
         &mut safe_host,
         &registry,
+        chain_config,
         &outbox_queue,
         block_in_progress,
         sequencer_pool_address,
-        config.maximum_allowed_ticks,
         tracer_input,
         da_fee_per_byte,
         coinbase,
@@ -531,6 +526,7 @@ mod tests {
     use crate::transaction::TransactionContent::EthereumDelayed;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use sha3::{Digest, Keccak256};
@@ -539,7 +535,7 @@ mod tests {
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
-    use tezos_ethereum::block::BlockFees;
+    use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
@@ -1649,17 +1645,18 @@ mod tests {
         let cumulative_gas_in_run = max_gas_per_reboot(&limits) - 1000;
         host.add_execution_gas(cumulative_gas_in_run);
 
+        let chain_config = dummy_evm_config(SpecId::default());
+
         // act
         let result = compute(
             &mut host,
             &registry,
+            &chain_config,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
             None,
-            &EvmLimits::default(),
             None,
-            &SpecId::default(),
         )
         .expect("Should safely ask for a reboot");
 

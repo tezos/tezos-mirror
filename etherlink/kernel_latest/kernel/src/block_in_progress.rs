@@ -346,6 +346,10 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
     pub fn has_tx(&self) -> bool {
         !self.tx_queue.is_empty()
     }
+
+    pub fn repush_tx(&mut self, tx: Tx) {
+        self.tx_queue.push_front(tx)
+    }
 }
 
 impl BlockInProgress<Transaction, TransactionReceipt> {
@@ -468,10 +472,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
         block_storage::store_current(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, &new_block)
             .context("Failed to store the current block")?;
         Ok(new_block)
-    }
-
-    pub fn repush_tx(&mut self, tx: Transaction) {
-        self.tx_queue.push_front(tx)
     }
 
     pub fn make_receipt(

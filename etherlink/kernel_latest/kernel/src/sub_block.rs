@@ -239,13 +239,12 @@ pub fn handle_run_transaction<Host: Runtime>(
     let result = compute(
         &mut safe_host,
         &registry,
+        &config,
         &outbox_queue,
         &mut block_in_progress,
         &block_constants,
         sequencer_pool_address,
-        &config.limits,
         None,
-        &config.spec_id,
     )?;
 
     match result {
