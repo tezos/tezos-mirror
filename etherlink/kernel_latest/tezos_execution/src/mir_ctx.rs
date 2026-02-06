@@ -120,7 +120,7 @@ impl ExecCtx {
 
 impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
-        &mut self.operation_gas.current_gas
+        &mut self.operation_gas.remaining
     }
 
     fn lookup_entrypoints(

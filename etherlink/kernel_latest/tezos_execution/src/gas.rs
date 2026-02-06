@@ -15,10 +15,12 @@ use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
 pub struct TezlinkOperationGas {
-    milligas_limit: u32,
-    pub current_gas: gas::Gas,
+    // in milligas
+    limit: u32,
+    pub remaining: gas::Gas,
 }
 
+/// Every error should express the gas in unit (1 gas unit = 1000 milligas).
 #[derive(Debug, Error)]
 pub enum GasLimitError {
     #[error(
@@ -52,31 +54,32 @@ impl Cost {
 impl TezlinkOperationGas {
     /// This corresponds to the default value of the `hard_gas_limit_per_operation` parametric constant.
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
-    pub const MAX_GAS_UNIT_AMOUNT: u32 = 1_040_000;
+    pub const MAX_LIMIT: u32 = 1_040_000_000;
 
     pub fn start(
-        operation_gas_limit: &tezos_data_encoding::types::Narith,
+        limit_in_gas_unit: &tezos_data_encoding::types::Narith,
     ) -> Result<Self, GasLimitError> {
-        if operation_gas_limit.0 > num_bigint::BigUint::from(Self::MAX_GAS_UNIT_AMOUNT) {
+        let limit_in_milligas = &limit_in_gas_unit.0 * 1000u32;
+        if limit_in_milligas > num_bigint::BigUint::from(Self::MAX_LIMIT) {
             return Err(GasLimitError::GasLimitTooHigh(
-                Self::MAX_GAS_UNIT_AMOUNT,
-                operation_gas_limit.0.clone(),
+                Self::MAX_LIMIT / 1000,
+                limit_in_milligas / 1000u32,
             ));
         }
 
-        let operation_miligas_limit = &operation_gas_limit.0 * 1000u32;
         // Should never fail because of the previous check
-        let milligas_limit = operation_miligas_limit
+        let limit = limit_in_milligas
             .try_into()
             .map_err(GasLimitError::CannotConvertToU32)?;
+
         Ok(Self {
-            milligas_limit,
-            current_gas: gas::Gas::new(milligas_limit),
+            limit,
+            remaining: gas::Gas::new(limit),
         })
     }
 
     fn start_internal(&mut self) {
-        self.milligas_limit = self.current_gas.milligas();
+        self.limit = self.remaining.milligas();
     }
 
     /// Calculates the amount of milligas consumed by the current operation and resets the gas tracker.
@@ -110,23 +113,23 @@ impl TezlinkOperationGas {
     /// println!("Operation consumed {} milligas", consumed);
     /// ```
     pub fn milligas_consumed_by_operation(&mut self) -> Narith {
-        let consumed = self.milligas_limit - self.current_gas.milligas();
+        let consumed = self.limit - self.remaining.milligas();
         self.start_internal();
         Narith::from(consumed as u64)
     }
 
     pub fn consume(&mut self, cost: Cost) -> Result<(), gas::OutOfGas> {
-        self.current_gas.consume(cost.0)
+        self.remaining.consume(cost.0)
     }
 }
 
 #[cfg(test)]
 impl Default for TezlinkOperationGas {
-    /// Constructs [Gas] with [MAX_GAS_UNIT_AMOUNT] gas remaining.
+    /// Constructs [Gas] with [MAX_LIMIT] gas remaining.
     fn default() -> Self {
         Self {
-            milligas_limit: Self::MAX_GAS_UNIT_AMOUNT * 1000,
-            current_gas: gas::Gas::new(Self::MAX_GAS_UNIT_AMOUNT * 1000),
+            limit: Self::MAX_LIMIT,
+            remaining: gas::Gas::new(Self::MAX_LIMIT),
         }
     }
 }
