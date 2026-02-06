@@ -569,14 +569,12 @@ fn transactions_from_bytes<ChainConfig: ChainConfigTrait>(
     host: &mut impl Runtime,
     transactions: Vec<Vec<u8>>,
     blueprint_version: u8,
-) -> anyhow::Result<Vec<ChainConfig::Transaction>> {
+) -> anyhow::Result<Vec<TezosXTransaction>> {
     let mut result = vec![];
     for tx_common in transactions.iter() {
-        if let Some(transaction) =
-            ChainConfig::transaction_from_bytes(host, tx_common, blueprint_version)?
-        {
-            result.push(transaction)
-        }
+        let transaction =
+            ChainConfig::transaction_from_bytes(host, tx_common, blueprint_version)?;
+        result.push(transaction)
     }
     Ok(result)
 }
@@ -611,7 +609,7 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
         blueprint_with_hashes.version,
     )?;
 
-    delayed_txs.extend(transactions_with_hashes.into_iter().map(|tx| tx.into()));
+    delayed_txs.extend(transactions_with_hashes);
     Ok((
         BlueprintValidity::Valid(Blueprint {
             transactions: delayed_txs,

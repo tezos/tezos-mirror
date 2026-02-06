@@ -350,7 +350,7 @@ pub trait ChainConfigTrait: Debug {
         host: &mut impl Runtime,
         bytes: &[u8],
         blueprint_version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>>;
+    ) -> anyhow::Result<TezosXTransaction>;
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
@@ -505,13 +505,13 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut impl Runtime,
         bytes: &[u8],
         blueprint_version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>> {
-        let tx: TezosXTransaction = match blueprint_version {
+    ) -> anyhow::Result<TezosXTransaction> {
+        match blueprint_version {
             0 => {
                 // Blueprints version 0 can only contain Ethereum
                 // transactions, they are not prefixed by a tag.
                 let tx = ethereum_transaction_from_bytes(bytes)?;
-                TezosXTransaction::Ethereum(Box::new(tx))
+                Ok(TezosXTransaction::Ethereum(Box::new(tx)))
             }
             1 => {
                 // Blueprints version 1 can contain both Tezos
@@ -525,32 +525,25 @@ impl ChainConfigTrait for EvmChainConfig {
                 match RuntimeId::try_from(*tag) {
                     Ok(RuntimeId::Tezos) => {
                         let op = tezos_operation_from_bytes(tx_common)?;
-                        TezosXTransaction::Tezos(op)
+                        Ok(TezosXTransaction::Tezos(op))
                     }
                     Ok(RuntimeId::Ethereum) => {
                         let tx = ethereum_transaction_from_bytes(tx_common)?;
-                        TezosXTransaction::Ethereum(Box::new(tx))
+                        Ok(TezosXTransaction::Ethereum(Box::new(tx)))
                     }
                     Err(message) => {
                         log!(host, Error, "Unknown runtime id tag: {tag}, {message}");
-                        return Ok(None);
+                        Err(DecoderError::Custom("Unknown runtime id").into())
                     }
                 }
             }
             _ => {
                 log!(
                     host,
-                    Debug,
+                    Error,
                     "Unknown blueprint version: {blueprint_version:?}"
                 );
-                return Ok(None);
-            }
-        };
-        match tx {
-            TezosXTransaction::Ethereum(tx) => Ok(Some(*tx)),
-            TezosXTransaction::Tezos(op) => {
-                log!(host, Debug, "Ignoring Tezos operation in blueprint: {op:?}");
-                Ok(None)
+                Err(DecoderError::Custom("Unknown blueprint version").into())
             }
         }
     }
@@ -784,9 +777,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _host: &mut impl Runtime,
         bytes: &[u8],
         _version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>> {
+    ) -> anyhow::Result<TezosXTransaction> {
         let operation = tezos_operation_from_bytes(bytes)?;
-        Ok(Some(operation))
+        Ok(operation.into())
     }
 
     fn read_block_in_progress(
