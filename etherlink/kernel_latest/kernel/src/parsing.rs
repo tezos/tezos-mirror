@@ -177,7 +177,8 @@ pub type RollupType = MichelsonOr<
 pub trait Parsable {
     type Context;
 
-    fn parse_external(
+    fn parse_external<Host: Runtime>(
+        host: &mut Host,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -274,7 +275,12 @@ impl ProxyInput {
 impl Parsable for ProxyInput {
     type Context = ();
 
-    fn parse_external(tag: &u8, input: &[u8], _: &mut ()) -> InputResult<Self> {
+    fn parse_external<Host: Runtime>(
+        _host: &mut Host,
+        tag: &u8,
+        input: &[u8],
+        _: &mut (),
+    ) -> InputResult<Self> {
         // External transactions are only allowed in proxy mode
         match *tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(input),
@@ -406,7 +412,8 @@ impl SequencerInput {
         InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(res)))
     }
 
-    pub fn parse_dal_slot_import_signal(
+    pub fn parse_dal_slot_import_signal<Host: Runtime>(
+        host: &mut Host,
         bytes: &[u8],
         context: &mut SequencerParsingContext,
     ) -> InputResult<Self> {
@@ -420,8 +427,14 @@ impl SequencerInput {
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
         // If legacy DAL signals are disabled, ignore this message.
-        // The kernel now relies on DalAttestedSlots internal messages from the protocol.
+        // The kernel would then rely entirely on DalAttestedSlots internal
+        // messages from the protocol.
         if context.legacy_dal_signals_disabled {
+            log!(
+                host,
+                Error,
+                "Legacy DAL slot import signal ignored (disable_legacy_dal_signals is enabled)"
+            );
             return InputResult::Unparsable;
         }
 
@@ -609,7 +622,8 @@ mod delayed_chunked_transaction {
 impl Parsable for SequencerInput {
     type Context = SequencerParsingContext;
 
-    fn parse_external(
+    fn parse_external<Host: Runtime>(
+        host: &mut Host,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -620,7 +634,7 @@ impl Parsable for SequencerInput {
                 Self::parse_sequencer_blueprint_input(input, context)
             }
             DAL_SLOT_IMPORT_SIGNAL_TAG => {
-                Self::parse_dal_slot_import_signal(input, context)
+                Self::parse_dal_slot_import_signal(host, input, context)
             }
             _ => InputResult::Unparsable,
         }
@@ -731,7 +745,8 @@ impl<Mode: Parsable> InputResult<Mode> {
     ///
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    pub fn parse_external(
+    pub fn parse_external<Host: Runtime>(
+        host: &mut Host,
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,
@@ -750,7 +765,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
-            _ => Mode::parse_external(transaction_tag, remaining, context),
+            _ => Mode::parse_external(host, transaction_tag, remaining, context),
         }
     }
 
@@ -973,7 +988,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
-                    Self::parse_external(message, &smart_rollup_address, context)
+                    Self::parse_external(host, message, &smart_rollup_address, context)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
                     host,
