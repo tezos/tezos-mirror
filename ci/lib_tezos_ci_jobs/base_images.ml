@@ -227,12 +227,6 @@ let jobs =
       "images/base-images/Dockerfile.rpm"
   in
   let job_rust_based_images =
-    (* Adding the changeset of debian job as we want to test the
-       build of [debian-rust] if [debian] is rebuild. *)
-    let changes =
-      Changeset.make
-        (Files.debian_base @ Files.debian_rust_build @ Files.debian_rust_merge)
-    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.rust"
@@ -241,22 +235,38 @@ let jobs =
       ~matrix:[("RELEASE", ["trixie"])]
       ~dependencies:(Dependent [Job job_debian_based_images])
       ~compilation:Native
-      ~changes
+      ~changes:
+        (Changeset.make
+           (Files.debian_rust_build
+          (* Adding the changeset of debian job as we want to test the
+             build of [debian-rust] if [debian] is rebuild. *)
+          @ Files.debian_base
+           (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
+           @ Files.debian_rust_merge))
       "images/base-images/Dockerfile.rust"
   in
   let job_rust_based_images_merge =
-    (* Adding the changeset of debian job as we want to test the
-       build of [debian-rust] if [debian] is rebuild. *)
-    let changes =
-      Changeset.make
-        (Files.debian_base @ Files.debian_rust_build @ Files.debian_rust_merge)
-    in
     job_docker_authenticated
       ~__POS__
       ~name:"oc.base-images.rust.merge"
       ~stage:Stages.images
       ~dependencies:(Dependent [Job job_rust_based_images])
-      ~rules:[job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
+      ~rules:
+        [
+          job_rule
+            ~changes:
+              (Changeset.encode
+                 (Changeset.make
+                    (Files.debian_rust_merge
+                   (* Adding changesets of [debian] and
+                        [debian-rust] build jobs as if we rebuild one
+                        of these images, we want to test the
+                        [debian-rust] merge job *)
+                   @ Files.debian_rust_build
+                    @ Files.debian_base)))
+            ~when_:On_success
+            ();
+        ]
       ~variables:
         [
           ("RELEASE", "trixie");
