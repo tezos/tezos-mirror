@@ -11,6 +11,7 @@ use crate::runtime::{IsEvmNode, Runtime};
 use tezos_evm_logging::Verbosity;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
+use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
@@ -55,15 +56,17 @@ impl<Host: Runtime> ExtendedRuntime for SafeStorage<&mut Host> {
     }
 }
 
+impl<Host: HostDebug> HostDebug for SafeStorage<&mut Host> {
+    #[inline(always)]
+    fn write_debug(&self, msg: &str) {
+        self.host.write_debug(msg)
+    }
+}
+
 impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.write_debug(msg)
     }
 
     #[inline(always)]

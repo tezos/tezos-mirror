@@ -634,12 +634,12 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::michelson::{MichelsonBytes, MichelsonOr};
     use tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+    use tezos_smart_rollup_host::runtime::Runtime;
     use tezos_smart_rollup_mock::TransferMetadata;
 
     const SMART_ROLLUP_ADDRESS: [u8; 20] = [

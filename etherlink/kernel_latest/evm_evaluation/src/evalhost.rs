@@ -12,6 +12,7 @@ use tezos_evm_runtime::{
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
+    debug::HostDebug,
     input::Message,
     metadata::RollupMetadata,
     path::Path,
@@ -34,18 +35,20 @@ impl EvalHost {
     }
 }
 
-impl SdkRuntime for EvalHost {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
+impl HostDebug for EvalHost {
     #[inline(always)]
     fn write_debug(&self, data: &str) {
         let mut unboxed_buffer = self.buffer.borrow_mut();
         if let Err(e) = write!(*unboxed_buffer, "{data}") {
             eprint!("Error due to: {e}")
         }
+    }
+}
+
+impl SdkRuntime for EvalHost {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
     }
 
     #[inline(always)]

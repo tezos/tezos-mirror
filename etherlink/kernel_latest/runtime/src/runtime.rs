@@ -23,6 +23,7 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
+    debug::HostDebug,
     input::Message,
     metadata::RollupMetadata,
     path::{Path, RefPath},
@@ -75,6 +76,15 @@ pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
     pub _pd: PhantomData<R>,
 }
 
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> HostDebug
+    for KernelHost<R, Host, Internal>
+{
+    #[inline(always)]
+    fn write_debug(&self, msg: &str) {
+        self.host.borrow().write_debug(msg)
+    }
+}
+
 impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> SdkRuntime
     for KernelHost<R, Host, Internal>
 {
@@ -82,12 +92,6 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.borrow_mut().write_output(from)
     }
-
-    #[inline(always)]
-    fn write_debug(&self, msg: &str) {
-        self.host.borrow().write_debug(msg)
-    }
-
     #[inline(always)]
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
         self.host.borrow_mut().read_input()
