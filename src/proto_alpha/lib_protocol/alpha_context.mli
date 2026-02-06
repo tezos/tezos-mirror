@@ -4690,6 +4690,26 @@ module Clst : sig
     staker:Contract.t ->
     (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
 
+  module Delegates : sig
+    val get_delegate_parameters :
+      context ->
+      Signature.Public_key_hash.t ->
+      Clst_delegates_parameters_repr.t option tzresult Lwt.t
+
+    val get_pending_parameters :
+      context ->
+      Signature.Public_key_hash.t ->
+      (Cycle.t * Clst_delegates_parameters_repr.t) list tzresult Lwt.t
+
+    val register_pending_parameters :
+      context ->
+      Signature.Public_key_hash.t ->
+      Clst_delegates_parameters_repr.t ->
+      context tzresult Lwt.t
+
+    val activate_parameters : context -> new_cycle:Cycle.t -> context Lwt.t
+  end
+
   module For_RPC : sig
     (** [get_finalizable_redeemed_balance ctxt contract] returns the
         finalizable tez redeemed by [contract]. *)

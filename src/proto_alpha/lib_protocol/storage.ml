@@ -1519,6 +1519,15 @@ module Cycle = struct
          end))
          (Make_index (Contract_repr.Index))
       (Staking_parameters_repr)
+
+  module Pending_CLST_delegate_parameters =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_clst_delegate_parameters"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Clst_delegates_parameters_repr)
 end
 
 module Already_denounced = Cycle.Already_denounced
@@ -1592,6 +1601,8 @@ module Clst = struct
          end))
          (Make_index (Contract_repr.Index))
       (Clst_delegates_parameters_repr)
+
+  module Pending_delegate_parameters = Cycle.Pending_CLST_delegate_parameters
 end
 
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {

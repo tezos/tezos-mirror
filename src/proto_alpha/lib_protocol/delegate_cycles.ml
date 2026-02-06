@@ -273,6 +273,7 @@ let cycle_end ctxt last_cycle =
   let* ctxt = Delegate_sampler.clear_outdated_sampling_data ctxt ~new_cycle in
   (* activate delegate parameters for the cycle to come.  *)
   let*! ctxt = Delegate_staking_parameters.activate ctxt ~new_cycle in
+  let*! ctxt = Clst_delegates_storage.activate_parameters ctxt ~new_cycle in
   (* updating AI coefficient. It should remain after all balance changes of the
      cycle-end operations *)
   let* ctxt =

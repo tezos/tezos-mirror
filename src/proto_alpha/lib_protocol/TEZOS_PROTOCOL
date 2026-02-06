@@ -181,6 +181,7 @@
         "Fees_storage",
         "Adaptive_issuance_storage",
         "Delegate_staking_parameters",
+        "Clst_delegates_storage",
         "Shared_stake",
         "Delegate_consensus_key",
         "Delegate_storage",
