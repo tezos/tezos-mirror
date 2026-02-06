@@ -570,7 +570,14 @@ impl ChainConfigTrait for EvmChainConfig {
     }
 
     fn storage_root_paths(&self) -> Vec<RefPath> {
-        vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
+        if self.enable_tezos_runtime() {
+            vec![
+                ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                TEZLINK_SAFE_STORAGE_ROOT_PATH,
+            ]
+        } else {
+            vec![ETHERLINK_SAFE_STORAGE_ROOT_PATH]
+        }
     }
 }
 
