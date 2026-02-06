@@ -38,6 +38,7 @@ use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_tezlink::block::OperationsWithReceipts;
 use tezos_tracing::trace_kernel;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
@@ -230,6 +231,7 @@ pub fn handle_run_transaction<Host: Runtime>(
                 cumulative_execution_gas: U256::zero(),
                 cumulative_receipts: Vec::new(),
                 cumulative_tx_objects: Vec::new(),
+                cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
             }
         }
     };

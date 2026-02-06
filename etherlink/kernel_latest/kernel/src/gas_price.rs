@@ -4,8 +4,6 @@
 
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
-use crate::block_in_progress::BlockInProgress;
-use crate::chains::TransactionTrait;
 use primitive_types::U256;
 use softfloat::F64;
 use tezos_evm_runtime::runtime::Runtime;
@@ -20,22 +18,24 @@ const TOLERANCE: u64 = 10 * TARGET;
 const ALPHA: F64 = softfloat::f64!(0.000_000_000_99);
 
 /// Register a completed block into the tick backlog
-pub fn register_block<Tx: TransactionTrait, Receipt>(
+pub fn register_block(
     host: &mut impl Runtime,
-    bip: &BlockInProgress<Tx, Receipt>,
+    bip_cumulative_execution_gas: U256,
+    bip_timestamp: Timestamp,
+    bip_queue_length: usize,
 ) -> anyhow::Result<()> {
-    if bip.queue_length() > 0 {
+    if bip_queue_length > 0 {
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    let cumulative_execution_gas = if bip.cumulative_execution_gas >= U256::from(u64::MAX)
+    let cumulative_execution_gas = if bip_cumulative_execution_gas >= U256::from(u64::MAX)
     {
         u64::MAX
     } else {
-        bip.cumulative_execution_gas.low_u64()
+        bip_cumulative_execution_gas.low_u64()
     };
 
-    update_backlog(host, cumulative_execution_gas, bip.timestamp)?;
+    update_backlog(host, cumulative_execution_gas, bip_timestamp)?;
 
     Ok(())
 }
@@ -159,6 +159,8 @@ fn f64_to_u64(f: F64) -> u64 {
 
 #[cfg(test)]
 mod test {
+    use crate::block_in_progress::BlockInProgress;
+
     use super::*;
     use primitive_types::H160;
     use proptest::prelude::*;
@@ -215,9 +217,14 @@ mod test {
         );
         bip.cumulative_execution_gas = U256::from(TOLERANCE);
 
-        register_block(&mut host, &bip).unwrap();
-        bip.clone()
-            .finalize_and_store(&mut host, &dummy_block_constants)
+        register_block(
+            &mut host,
+            bip.cumulative_execution_gas,
+            bip.timestamp,
+            bip.queue_length(),
+        )
+        .unwrap();
+        bip.finalize_and_store(&mut host, &dummy_block_constants)
             .unwrap();
 
         // At tolerance, gas price should be min.
@@ -228,8 +235,22 @@ mod test {
         assert_eq!(gas_price, gas_price_now);
 
         // register more blocks - now double tolerance
+        let mut bip = BlockInProgress::new_with_ticks(
+            U256::zero(),
+            Default::default(),
+            VecDeque::new(),
+            timestamp.into(),
+            timestamp.into(),
+        );
+        bip.cumulative_execution_gas = U256::from(TOLERANCE);
         bip.number = 1.into();
-        register_block(&mut host, &bip).unwrap();
+        register_block(
+            &mut host,
+            bip.cumulative_execution_gas,
+            bip.timestamp,
+            bip.queue_length(),
+        )
+        .unwrap();
         bip.finalize_and_store(&mut host, &dummy_block_constants)
             .unwrap();
         let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
