@@ -87,6 +87,10 @@ module Chain_family : sig
 end
 
 module Tezos_block : sig
+  module Protocol : sig
+    type t = S023
+  end
+
   type t = {
     hash : Ethereum_types.block_hash;
     level : int32;

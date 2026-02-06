@@ -76,6 +76,22 @@ module Tezos_block = struct
       Rlp.encode_int version
   end
 
+  module Protocol = struct
+    type t = S023
+
+    let from_bytes (bytes : bytes) : t =
+      match Rlp.decode_int bytes with
+      | Ok 23 -> S023
+      | Ok _ -> raise (Invalid_argument "Expected a valid protocol")
+      | Error _ ->
+          (* TODO: Instead of raising an exception, return the Result *)
+          raise (Invalid_argument "Unexpected protocol read")
+
+    let to_bytes (protocol : t) : bytes =
+      let protocol = match protocol with S023 -> 23 in
+      Rlp.encode_int protocol
+  end
+
   let decode_block_hash = Ethereum_types.decode_block_hash
 
   let genesis_parent_hash =
