@@ -512,8 +512,8 @@ let only_if_dal_feature_enabled state ~default_value f =
       state.global_state.dal_node_rpc_ctxt
   else return default_value
 
-let process_dal_rpc_result state = function
-  | None -> Dal.Attestation.empty
+let process_dal_rpc_result state ~number_of_lags = function
+  | None -> Dal.Attestations.empty
   | Some slots ->
       let number_of_slots =
         state.global_state.constants.parametric.dal.number_of_slots
@@ -521,9 +521,15 @@ let process_dal_rpc_result state = function
       List.fold_left_i
         (fun i acc flag ->
           match Dal.Slot_index.of_int_opt ~number_of_slots i with
-          | Some index when flag -> Dal.Attestation.commit acc index
+          | Some index when flag ->
+              Dal.Attestations.commit
+                acc
+                ~number_of_slots
+                ~number_of_lags
+                ~lag_index:(number_of_lags - 1)
+                index
           | None | Some _ -> acc)
-        Dal.Attestation.empty
+        Dal.Attestations.empty
         slots
 
 let may_get_dal_content state consensus_vote =
@@ -547,7 +553,10 @@ let may_get_dal_content state consensus_vote =
             (succ level)
             (of_int state.global_state.constants.parametric.dal.attestation_lag))
       in
-      let* dal_attestation =
+      let number_of_lags =
+        List.length state.global_state.constants.parametric.dal.attestation_lags
+      in
+      let* dal_attestations =
         if
           Dal_attestable_slots_worker.is_not_in_committee
             dal_attestable_slots_worker
@@ -555,7 +564,7 @@ let may_get_dal_content state consensus_vote =
             ~committee_level:level
         then
           let* () = Events.(emit not_in_dal_committee (delegate_id, level)) in
-          return Dal.Attestation.empty
+          return Dal.Attestations.empty
         else
           let* dal_attestable_slots =
             (Dal_attestable_slots_worker.get_dal_attestable_slots
@@ -570,11 +579,11 @@ let may_get_dal_content state consensus_vote =
                     delegate_id)])
           in
           let dal_attestation =
-            process_dal_rpc_result state dal_attestable_slots
+            process_dal_rpc_result state ~number_of_lags dal_attestable_slots
           in
           return dal_attestation
       in
-      let dal_content = {attestation = dal_attestation} in
+      let dal_content = {attestations = dal_attestations} in
       let* () =
         Events.(
           emit
@@ -791,7 +800,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Some _, None ->
         (* only possible in non-BLS mode *)
         return consensus_sig
-    | Some {attestation = dal_attestation}, Some companion_key -> (
+    | Some {attestations = dal_attestation}, Some companion_key -> (
         let sk_companion_uri = companion_key.secret_key_uri in
         let* companion_sig =
           Utils.event_on_stalling_promise
@@ -823,7 +832,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
             Signature.Bls consensus_pk,
             Signature.Bls companion_pk ) -> (
             let dal_dependent_bls_sig_opt =
-              Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+              Alpha_context.Dal.Attestations.Dal_dependent_signing.aggregate_sig
                 ~subgroup_check:false
                 ~consensus_pk
                 ~companion_pk

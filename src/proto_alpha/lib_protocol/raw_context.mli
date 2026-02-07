@@ -511,11 +511,17 @@ module Dal : sig
   val committee_level_of :
     t -> attested_level:Raw_level_repr.t -> lag:int -> Raw_level_repr.t option
 
-  (** [record_number_of_attested_shards ctxt attestation ~delegate
-      number_of_shards] records that a number of shards were attested
-      (declared available) by [delegate]. *)
+  (** [record_number_of_attested_shards ctxt ~attested_level attestations
+      number_of_shards] records for each relevant [level] that the
+      [number_of_shards level] shards were attested (declared available by some
+      attester) for each of the attested slots in [attestations]. *)
   val record_number_of_attested_shards :
-    t -> Dal_attestation_repr.t -> delegate:Signature.public_key_hash -> t
+    t ->
+    delegate:Signature.public_key_hash ->
+    attested_level:Raw_level_repr.t ->
+    Dal_attestations_repr.t ->
+    int Raw_level_repr.Map.t ->
+    t
 
   (** [register_slot_header ctxt slot_header ~source] returns a new context
       where the new candidate [slot] published by [source] has been taken into
@@ -528,27 +534,18 @@ module Dal : sig
   (** [record_attestation ctxt ~tb_slot attestation] records that the delegate
       with Tenderbake slot [tb_slot] emitted [attestation]. *)
   val record_attestation :
-    t -> tb_slot:Slot_repr.t -> Dal_attestation_repr.t -> t
+    t -> tb_slot:Slot_repr.t -> Dal_attestations_repr.t -> t
 
   (** [attestations] returns the recorded attestations *)
-  val attestations : t -> Dal_attestation_repr.t Slot_repr.Map.t
+  val attestations : t -> Dal_attestations_repr.t Slot_repr.Map.t
 
   (** [candidates ctxt] returns the current list of slot for which there is at
       least one candidate alongside the addresses that published them. *)
   val candidates : t -> (Dal_slot_repr.Header.t * Contract_repr.t) list
 
-  (** [is_slot_index_attested ctxt slot_index] returns [true] if the
-      [slot_index] is declared available by the protocol. [false] otherwise. If
-      the [index] is out of the interval [0;number_of_slots - 1], returns
-      [false].
-
-      Whether the slot is attested by the protocol or not, the function also
-      returns the ratio of attested shards w.r.t. total shards, as a rational
-      number. *)
-  val is_slot_index_attested :
-    t ->
-    Dal_slot_index_repr.t ->
-    Dal_attestation_repr.Accountability.attestation_status
+  (** [get_accountability ctxt] returns the current block's accountability data,
+      which contains the attestation information accumulated during this block. *)
+  val get_accountability : t -> Dal_attestations_repr.Accountability.t
 
   (* Check whether the DAL feature flag is set and return the error
      {!Dal_feature_disabled} if not. *)

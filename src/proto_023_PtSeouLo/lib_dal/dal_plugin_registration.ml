@@ -33,7 +33,7 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Environment.Bitset.t
+  type dal_attestations = Environment.Bitset.t
 
   type slot_availability = Environment.Bitset.t
 
@@ -267,7 +267,7 @@ module Plugin = struct
                let dal_attestation =
                  Option.map
                    (fun dal_content ->
-                     (dal_content.attestation :> dal_attestation))
+                     (dal_content.attestation :> dal_attestations))
                    attestation.dal_content
                in
                Ok [(tb_slot, packed_operation, dal_attestation)]
@@ -285,7 +285,7 @@ module Plugin = struct
                      ( slot,
                        Option.map
                          (fun dal_content ->
-                           (dal_content.attestation :> dal_attestation))
+                           (dal_content.attestation :> dal_attestations))
                          dal_content_opt ))
                    committee
                in
@@ -337,12 +337,14 @@ module Plugin = struct
     in
     return (metadata.protocol_data.dal_attestation :> Environment.Bitset.t)
 
-  let is_baker_attested attestation slot_index =
+  let is_baker_attested attestation ~number_of_slots:_ ~number_of_lags:_
+      ~lag_index:_ slot_index =
     match Environment.Bitset.mem attestation slot_index with
     | Ok b -> b
     | Error _ -> false
 
-  let is_protocol_attested slot_availability slot_index =
+  let is_protocol_attested slot_availability ~number_of_slots:_
+      ~number_of_lags:_ ~lag_index:_ slot_index =
     match Environment.Bitset.mem slot_availability slot_index with
     | Ok b -> b
     | Error _ -> false

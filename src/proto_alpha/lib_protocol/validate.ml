@@ -798,13 +798,13 @@ module Consensus = struct
 
   let check_dal_content vi level slot consensus_key = function
     | None -> return_unit
-    | Some {attestation} ->
-        Dal_apply.validate_attestation
+    | Some {attestations} ->
+        Dal_apply.validate_attestations
           vi.ctxt
           level
           slot
           consensus_key
-          attestation
+          attestations
 
   let check_attestation_signature vi consensus_key
       (operation : Kind.attestation operation) =
@@ -814,7 +814,7 @@ module Consensus = struct
     in
     let* dal_dependent_pk =
       match (consensus_key.Consensus_key.consensus_pk, dal_content) with
-      | Bls consensus_bls_pk, Some {attestation = dal_attestation}
+      | Bls consensus_bls_pk, Some {attestations = dal_attestation}
         when Constants.aggregate_attestation vi.ctxt -> (
           match consensus_key.companion_pk with
           | None ->
@@ -829,7 +829,7 @@ module Consensus = struct
                     operation)
               in
               let dal_dependent_bls_pk_opt =
-                Dal.Attestation.Dal_dependent_signing.aggregate_pk
+                Dal.Attestations.Dal_dependent_signing.aggregate_pk
                   ~subgroup_check:false
                     (* We disable subgroup check (for better
                        performances) because the context only contains
@@ -1447,13 +1447,13 @@ module Consensus = struct
                   let pks = consensus_pk :: pks in
                   match (dal, consensus_key.companion_pk) with
                   | None, _ -> return (pks, weighted_pks, total_power)
-                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                  | Some {attestations = dal_attestations}, Some companion_pk ->
                       let weight =
-                        Dal.Attestation.Dal_dependent_signing.weight
+                        Dal.Attestations.Dal_dependent_signing.weight
                           ~consensus_pk
                           ~companion_pk
                           ~op:serialized_op
-                          dal_attestation
+                          dal_attestations
                       in
                       if Z.(equal weight one) then
                         return (companion_pk :: pks, weighted_pks, total_power)
@@ -2010,9 +2010,9 @@ module Anonymous = struct
                   let pks = consensus_pk :: pks in
                   match (dal, consensus_key.companion_pk) with
                   | None, _ -> return (ctxt, pks, weighted_pks)
-                  | Some {attestation = dal_attestation}, Some companion_pk ->
+                  | Some {attestations = dal_attestation}, Some companion_pk ->
                       let weight =
-                        Dal.Attestation.Dal_dependent_signing.weight
+                        Dal.Attestations.Dal_dependent_signing.weight
                           ~consensus_pk
                           ~companion_pk
                           ~op:serialized_op
@@ -2470,9 +2470,28 @@ module Anonymous = struct
         let*? () =
           check_shard_index_is_in_range ~number_of_shards shard_index
         in
-        let*? () =
-          error_unless
-            (Dal.Attestation.is_attested dal_content.attestation slot_index)
+        let* () =
+          let* protocol_activation_level =
+            Protocol_activation_level.get vi.ctxt
+          in
+          let is_attested =
+            if Raw_level.(raw_level <= protocol_activation_level) then
+              let attestation =
+                Dal.Attestation.of_attestations dal_content.attestations
+              in
+              Dal.Attestation.is_attested attestation slot_index
+            else
+              let number_of_lags = List.length dal_params.attestation_lags in
+              Dal.Attestations.is_attested
+                dal_content.attestations
+                ~number_of_slots
+                ~number_of_lags
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218 *)
+                ~lag_index:0
+                slot_index
+          in
+          fail_unless
+            is_attested
             (Invalid_accusation_slot_not_attested
                {tb_slot = consensus_slot; level = raw_level; slot_index})
         in

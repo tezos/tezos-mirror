@@ -52,7 +52,7 @@ struct
   end)
 
   let mk_attested =
-    Dal_attestation_repr.Accountability.
+    Dal_attestations_repr.Accountability.
       {
         total_shards = 1;
         attested_shards = 1;

@@ -2346,22 +2346,45 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt ~delegate level tb_slot dal_content_opt =
+let record_dal_content ctxt ~delegate level slot
+    (dal_content_opt : dal_content option) =
   let open Lwt_result_syntax in
   match dal_content_opt with
   | None -> return ctxt
-  | Some {attestation} ->
+  | Some {attestations} ->
       let* proto_activation_level = Protocol_activation_level.get ctxt in
       let lag = Constants.dal_attestation_lag ctxt in
-      let attestation =
+      let attestations =
         if Raw_level.(level < add proto_activation_level lag) then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
-           CODE TO BE REVERTED IN PROTOCOL V *)
-          Dal.Attestation.empty
-        else attestation
+             CODE TO BE REVERTED IN PROTOCOL V *)
+          Dal.Attestations.empty
+        else attestations
+      in
+      let attested_level = Raw_level.succ level in
+      let committee_level_to_shard_count =
+        let level_map = Consensus.delegate_to_shard_count ctxt in
+        Raw_level.Map.fold
+          (fun level delegate_map map ->
+            let power =
+              match
+                Signature.Public_key_hash.Map.find delegate delegate_map
+              with
+              | None -> 0
+              | Some v -> v
+            in
+            Raw_level.Map.add level power map)
+          level_map
+          Raw_level.Map.empty
       in
       let*? ctxt =
-        Dal_apply.apply_attestation ctxt ~delegate ~tb_slot attestation
+        Dal_apply.apply_attestations
+          ctxt
+          ~delegate
+          ~attested_level
+          ~tb_slot:slot
+          attestations
+          ~committee_level_to_shard_count
       in
       return ctxt
 

@@ -212,14 +212,13 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
-(** The DAL content in an attestation operation having some level [l] refers to a
-   slot published at level [l - attestation_lag + 1]. Whenever there is a need
-   to disambiguate, one should use "attestation level" for the level inside the
-   operation and "attested level" for the level of the block including the
-   operation. We have:
-   - [attestation_level + 1 = attested_level]
-   - [published_level + attestation_lag = attested_level] *)
-type dal_content = {attestation : Dal_attestation_repr.t}
+(** The DAL content in an attestation operation having some level [l] refers to
+    slots published at levels [l + 1 - lag], where [lag] is an element of the
+    protocol parameter [attestation_lags]. Whenever there is a need to
+    disambiguate, one should use "attestation level" for the level inside the
+    operation and "attested level" for the level of the block including the
+    operation. We have [attestation_level + 1 = attested_level]. *)
+type dal_content = {attestations : Dal_attestations_repr.t}
 
 type consensus_watermark =
   | Attestation of Chain_id.t

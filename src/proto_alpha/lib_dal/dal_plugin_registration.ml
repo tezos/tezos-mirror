@@ -33,9 +33,9 @@ module Plugin = struct
 
   type block_info = Protocol_client_context.Alpha_block_services.block_info
 
-  type dal_attestation = Environment.Bitset.t
+  type dal_attestations = Alpha_context.Dal.Attestations.t
 
-  type slot_availability = Environment.Bitset.t
+  type slot_availability = Alpha_context.Dal.Slot_availability.t
 
   type attestation_operation =
     | Op : 'a Kind.consensus Alpha_context.operation -> attestation_operation
@@ -319,13 +319,13 @@ module Plugin = struct
                    }
                in
                let tb_slot = attestation.consensus_content.slot in
-               let dal_attestation =
+               let dal_attestations =
                  Option.map
                    (fun dal_content ->
-                     (dal_content.attestation :> dal_attestation))
+                     (dal_content.attestations :> dal_attestations))
                    attestation.dal_content
                in
-               Ok [(tb_slot, packed_operation, dal_attestation)]
+               Ok [(tb_slot, packed_operation, dal_attestations)]
            | Single (Attestations_aggregate {committee; _}) ->
                let packed_operation =
                  Op
@@ -340,14 +340,14 @@ module Plugin = struct
                      ( slot,
                        Option.map
                          (fun dal_content ->
-                           (dal_content.attestation :> dal_attestation))
+                           (dal_content.attestations :> dal_attestations))
                          dal_content_opt ))
                    committee
                in
                Ok
                  (List.map
-                    (fun (tb_slot, dal_attestation) ->
-                      (tb_slot, packed_operation, dal_attestation))
+                    (fun (tb_slot, dal_attestations) ->
+                      (tb_slot, packed_operation, dal_attestations))
                     slots_and_dal_attestations)
            | _ -> Ok [])
          consensus_ops
@@ -412,21 +412,31 @@ module Plugin = struct
         ~none:
           (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
-    return
-      (metadata.protocol_data.dal_slot_availability :> Environment.Bitset.t)
+    return metadata.protocol_data.dal_slot_availability
 
-  let is_baker_attested attestation slot_index =
-    match Environment.Bitset.mem attestation slot_index with
-    | Ok b -> b
-    | Error _ -> false
+  let is_baker_attested attestations ~number_of_slots ~number_of_lags ~lag_index
+      slot_index =
+    match Dal.Slot_index.of_int_opt ~number_of_slots slot_index with
+    | None -> false
+    | Some slot_index ->
+        Dal.Attestations.is_attested
+          attestations
+          ~number_of_slots
+          ~number_of_lags
+          ~lag_index
+          slot_index
 
-  let is_protocol_attested slot_availability slot_index =
-    match Environment.Bitset.mem slot_availability slot_index with
-    | Ok b -> b
-    | Error _ -> false
-
-  let number_of_attested_slots attestation =
-    Environment.Bitset.cardinal attestation
+  let is_protocol_attested slot_availability ~number_of_slots ~number_of_lags
+      ~lag_index slot_index =
+    match Dal.Slot_index.of_int_opt ~number_of_slots slot_index with
+    | None -> false
+    | Some slot_index ->
+        Alpha_context.Dal.Slot_availability.is_attested
+          slot_availability
+          ~number_of_slots
+          ~number_of_lags
+          ~lag_index
+          slot_index
 
   let is_delegate ctxt ~pkh =
     let open Lwt_result_syntax in
@@ -473,48 +483,29 @@ module Plugin = struct
        cells of the skip list by calling the appropriate DAL function in the
        protocol. *)
 
-    let cells_of_level ~attested_level ctxt ~dal_constants
+    let cells_of_level ~attested_level ctxt ~dal_constants:_
         ~pred_publication_level_dal_constants:_ =
       let open Lwt_result_syntax in
       let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
-      let published_level =
-        Int32.sub
-          attested_level
-          (Int32.of_int
-             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
+      let* cells =
+        Plugin.RPC.Dal.skip_list_cells_of_level
+          cpctxt
+          (`Main, `Level attested_level)
+          ()
       in
-      (* 1. There are no cells for [published_level = 0]. *)
-      if published_level <= 0l then return []
-      else
-        let* cells =
-          Plugin.RPC.Dal.skip_list_cells_of_level
-            cpctxt
-            (`Main, `Level attested_level)
-            ()
-        in
-        (* 2. For other levels, fetch the cells and retrieve the slot indices
-           from the cells' content. *)
-        let module H = Dal.Slots_history in
-        List.map_es
-          (fun (hash, cell) ->
-            let cell_id = H.(content cell |> content_id) in
-            let slot_id = cell_id.H.header_id in
-            let slot_index = Dal.Slot_index.to_int slot_id.index in
-            let attestation_lag =
-              H.attestation_lag_value cell_id.attestation_lag
-            in
-            let* () =
-              let expected_attested_level =
-                Raw_level.(
-                  add slot_id.published_level attestation_lag |> to_int32)
-              in
-              fail_unless
-                (Int32.equal attested_level expected_attested_level)
-                (Attested_level_mismatch
-                   {attested_level; published_level; attestation_lag})
-            in
-            return (hash, cell, slot_index, attestation_lag))
-          cells
+      (* With dynamic lags, cells at a given block level can have different
+         attested levels. We return all cells and let the DAL node handle them. *)
+      let module H = Dal.Slots_history in
+      List.map_es
+        (fun (hash, cell) ->
+          let cell_id = H.(content cell |> content_id) in
+          let slot_id = cell_id.H.header_id in
+          let slot_index = Dal.Slot_index.to_int slot_id.index in
+          let attestation_lag =
+            H.attestation_lag_value cell_id.attestation_lag
+          in
+          return (hash, cell, slot_index, attestation_lag))
+        cells
 
     let slot_header_of_cell cell =
       match Dal.Slots_history.(content cell) with

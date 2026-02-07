@@ -33,16 +33,17 @@ module Parameters : sig
     cryptobox : Cryptobox.parameters;
     number_of_slots : int;
     attestation_lag : int;
+    attestation_lags : int list;
     attestation_threshold : int;
   }
 
   val parameter_file : Protocol.t -> string Lwt.t
 
-  val from_protocol_parameters : JSON.t -> t
+  val from_protocol_parameters : Protocol.t -> JSON.t -> t
 
-  val from_client : ?block:string -> Client.t -> t Lwt.t
+  val from_client : Protocol.t -> ?block:string -> Client.t -> t Lwt.t
 
-  val from_endpoint : Endpoint.t -> t Lwt.t
+  val from_endpoint : Protocol.t -> Endpoint.t -> t Lwt.t
 
   (* This function computes the period (in cycles) during which the node stores
      data about attested slots assuming the node supports refutations and it has
@@ -67,6 +68,37 @@ module Parameters : sig
      [Daemon.get_proto_plugins] src/lib_dal_node/. *)
   val storage_period_without_refutation_in_cycles :
     proto_parameters:JSON.t -> int
+end
+
+(** Decoding of the slot availability bitset used in block metadata. It currently
+    has the same behaviour as the [Attestations] module. *)
+module Slot_availability : sig
+  val decode : Protocol.t -> Parameters.t -> string -> bool array array
+end
+
+(** Encoding/decoding of the DAL content included in attestation operations. *)
+module Attestations : sig
+  (** [encode_for_one_lag protocol ?lag_index dal_parameters slot_array] encodes
+      an array of Booleans into a string, the format depending on the [protocol]
+      and [dal_parameters]. The latter is necessary for [protocol] values >= 025,
+      [?lag_index] being an optional parameter to set the offset for the encoding,
+      defaulting to the last position in the [attestation_lags] list. *)
+  val encode_for_one_lag :
+    Protocol.t -> ?lag_index:int -> Parameters.t -> bool array -> string
+
+  (** [encode protocol parameters attestations_per_lag] encodes
+      attestations for multiple lag indices in a single call.
+      [attestations_per_lag] is an array of bool arrays, one per lag index,
+      where element [i] contains the slot attestations for lag index [i].
+      For protocols < 025, the [attestations_per_lag] array must
+      only contain a single element and will be encoded using the pre-025
+      single-lag format. *)
+  val encode : Protocol.t -> Parameters.t -> bool array array -> string
+
+  (** [decode protocol parameters str] decodes and returns an array of
+      size [number_of_lags], where each element is a bool array of size
+      [number_of_slots] representing attested slots at that lag index. *)
+  val decode : Protocol.t -> Parameters.t -> string -> bool array array
 end
 
 module Helpers : sig

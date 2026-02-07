@@ -3491,7 +3491,9 @@ let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
           Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
         in
         let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
-        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let* dal_parameters =
+          Dal_common.Parameters.from_client protocol tezos_client
+        in
         let attestation_lag = dal_parameters.attestation_lag in
         let slot_size = dal_parameters.cryptobox.slot_size in
         if expected_attestation_lag <> attestation_lag then
@@ -3510,8 +3512,7 @@ let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
             (Dal_common.Helpers.make_slot
                ~slot_size
                (String.make slot_size 'T'))
-          ~attestation_lag
-          ~number_of_slots:dal_parameters.number_of_slots
+          dal_parameters
   in
   (* Whether we published and attested a slot or not, we advance the L1 chain
      until [kernel_imported_publish_level + expected_attestation_lag] is

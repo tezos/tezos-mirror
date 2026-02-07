@@ -299,7 +299,7 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_attestation : bool Array.t option;
+  dal_attestation : string option;
       (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
   balance_updates : balance_update list;
 }

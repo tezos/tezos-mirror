@@ -71,11 +71,21 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
 
 let content_slot_id cell = (Hist.content_id cell).header_id
 
-let dal_attestation slot_indexes =
+let dal_attestations slot_indexes =
   let open Alpha_context.Dal in
+  let number_of_slots = Default_parameters.constants_test.dal.number_of_slots in
+  let number_of_lags =
+    List.length Default_parameters.constants_test.dal.attestation_lags
+  in
   List.fold_left
-    (fun acc slot_index -> Attestation.commit acc slot_index)
-    Attestation.empty
+    (fun acc slot_index ->
+      Attestations.commit
+        acc
+        ~number_of_slots
+        ~number_of_lags
+        ~lag_index:(number_of_lags - 1)
+        slot_index)
+    Attestations.empty
     slot_indexes
 
 let has_assigned_shards ctxt ?level pkh =
@@ -321,26 +331,35 @@ end
 
 let dal_content_of_z z =
   let open Lwt_result_wrap_syntax in
-  let*?@ attestation =
-    Alpha_context.Dal.Attestation.Internal_for_tests.of_z z
+  let*?@ attestations =
+    Alpha_context.Dal.Attestations.Internal_for_tests.of_z z
   in
-  return Alpha_context.{attestation}
+  return Alpha_context.{attestations}
 
 let dal_content_of_int_list
     ?(number_of_slots = Default_parameters.constants_test.dal.number_of_slots)
     attested_slots =
   let open Alpha_context in
-  let dal_attestation =
+  let number_of_lags =
+    List.length Default_parameters.constants_test.dal.attestation_lags
+  in
+  let dal_attestations =
     List.fold_left
-      (fun dal_attestation slot ->
+      (fun dal_attestations slot ->
         match Dal.Slot_index.of_int ~number_of_slots slot with
-        | Ok slot_index -> Dal.Attestation.commit dal_attestation slot_index
+        | Ok slot_index ->
+            Dal.Attestations.commit
+              dal_attestations
+              ~number_of_slots
+              ~number_of_lags
+              ~lag_index:(number_of_lags - 1)
+              slot_index
         | Error err ->
             Test.fail ~__LOC__ "%a" Environment.Error_monad.pp_trace err)
-      Dal.Attestation.empty
+      Dal.Attestations.empty
       attested_slots
   in
-  {attestation = dal_attestation}
+  {attestations = dal_attestations}
 
 let various_dal_contents =
   let number_of_slots = Default_parameters.constants_test.dal.number_of_slots in

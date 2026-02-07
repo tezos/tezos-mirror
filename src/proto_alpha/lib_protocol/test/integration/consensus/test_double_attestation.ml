@@ -663,8 +663,20 @@ let test_invalid_double_attestation_duplicate_in_committee () =
       Default_parameters.constants_test.dal.number_of_slots
     in
     let*?@ slot_index = Dal.Slot_index.of_int ~number_of_slots 3 in
+    let number_of_lags =
+      List.length Default_parameters.constants_test.dal.attestation_lags
+    in
     let dal_content =
-      {attestation = Dal.Attestation.(commit empty slot_index)}
+      {
+        attestations =
+          Dal.Attestations.(
+            commit
+              empty
+              ~number_of_slots
+              ~number_of_lags
+              ~lag_index:(number_of_lags - 1)
+              slot_index);
+      }
     in
     Op.raw_attestations_aggregate
       ~committee_with_dal:

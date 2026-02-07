@@ -5,12 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* [get_attestation_map] retrieves DAL attestation operations from a
-   block and transforms them into a map where delegates are mapped to
-   their corresponding attestation operation and DAL attestation. *)
+(* [get_attestation_map] transforms DAL attestation operations from a block into
+   a map where delegates are mapped to their corresponding attestation operation
+   and DAL attestations. *)
 let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
   List.fold_left
-    (fun map (tb_slot, operation, dal_attestation) ->
+    (fun map (tb_slot, operation, dal_attestations) ->
       match
         List.find
           (fun (v, _) -> v = tb_slot_to_int tb_slot)
@@ -20,7 +20,7 @@ let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
       | Some (_, (delegate, _)) ->
           Signature.Public_key_hash.Map.add
             delegate
-            (operation, dal_attestation, tb_slot)
+            (operation, dal_attestations, tb_slot)
             map)
     Signature.Public_key_hash.Map.empty
     attestations
@@ -28,14 +28,14 @@ let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
 (* [filter_injectable_traps] filters a list of traps to identify which
    ones are injectable by checking if each trap's delegate has both an
    attestation and DAL attestation in [attestation_map]. *)
-let filter_injectable_traps attestation_map traps =
+let filter_injectable_traps attestations_map traps =
   List.filter_map
     (fun trap ->
       let Types.{delegate; slot_index; shard; shard_proof} = trap in
-      let attestation_opt =
-        Signature.Public_key_hash.Map.find delegate attestation_map
+      let attestations_opt =
+        Signature.Public_key_hash.Map.find delegate attestations_map
       in
-      match attestation_opt with
+      match attestations_opt with
       | None ->
           (* The delegate did not TB attest or we have not found the delegate in
              the attestation operation's receipt. *)
@@ -43,12 +43,12 @@ let filter_injectable_traps attestation_map traps =
       | Some (_attestation, None, _tb_slot) ->
           (* The delegate did not DAL attest. *)
           None
-      | Some (attestation, Some dal_attestation, tb_slot) ->
+      | Some (attestation, Some dal_attestations, tb_slot) ->
           Some
             ( delegate,
               slot_index,
               attestation,
-              dal_attestation,
+              dal_attestations,
               shard,
               shard_proof,
               tb_slot ))
@@ -62,10 +62,10 @@ let filter_injectable_traps attestation_map traps =
    Guarded by [proto_parameters.incentives_enable].
 *)
 let inject_entrapment_evidences
-    (type attestation_operation dal_attestation tb_slot)
+    (type attestation_operation dal_attestations tb_slot)
     (module Plugin : Dal_plugin.T
       with type attestation_operation = attestation_operation
-       and type dal_attestation = dal_attestation
+       and type dal_attestations = dal_attestations
        and type tb_slot = tb_slot) attestations slot_to_committee_pkh node_ctxt
     rpc_ctxt ~attested_level tb_slot_to_int =
   let open Lwt_result_syntax in
@@ -110,6 +110,7 @@ let inject_entrapment_evidences
                 if deleg_comp = 0 then compare slot_index1 slot_index2
                 else deleg_comp)
           in
+          let*? () = Node_context.assert_single_lag node_ctxt in
           List.iter_es
             (fun ( delegate,
                    slot_index,
@@ -119,7 +120,19 @@ let inject_entrapment_evidences
                    shard_proof,
                    tb_slot )
                ->
-              if Plugin.is_baker_attested dal_attestation slot_index then
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+                 Checks for traps for each lag *)
+              let number_of_lags =
+                List.length proto_parameters.attestation_lags
+              in
+              if
+                Plugin.is_baker_attested
+                  dal_attestation
+                  ~number_of_slots:proto_parameters.number_of_slots
+                  ~number_of_lags
+                  ~lag_index:(number_of_lags - 1)
+                  slot_index
+              then
                 let*! () =
                   Event.emit_trap_injection
                     ~delegate

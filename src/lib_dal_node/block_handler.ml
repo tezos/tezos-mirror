@@ -182,7 +182,9 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
       let rec loop lag =
         if lag = current_lag then return_unit
         else
-          let* () = remove_slots_and_shards (lag - 1) (fun _ -> false) in
+          let* () =
+            remove_slots_and_shards (lag - 1) (fun _slot_index : _ -> false)
+          in
           loop (lag - 1)
       in
       loop previous_lag
@@ -556,13 +558,18 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       ~attested_level:block_level
       skip_list_cells
   in
+  let number_of_lags = List.length proto_parameters.Types.attestation_lags in
   let*! () =
     (remove_unattested_slots_and_shards
        ~prev_proto_parameters
        proto_parameters
        ctxt
        ~attested_level:block_level
-       (Plugin.is_protocol_attested slot_availability)
+       (Plugin.is_protocol_attested
+          slot_availability
+          ~number_of_slots:proto_parameters.number_of_slots
+          ~number_of_lags
+          ~lag_index:(number_of_lags - 1))
      [@profiler.record_s
        {verbosity = Notice} "remove_unattested_slots_and_shards"])
   in
@@ -584,6 +591,9 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       []
   in
   let* () =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+       Generalize for multiple lags *)
+    let*? () = Node_context.assert_single_lag ctxt in
     (check_attesters_attested
        ctxt
        committees
@@ -591,7 +601,10 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        proto_parameters
        ~block_level
        attestations
-       Plugin.is_baker_attested
+       (Plugin.is_baker_attested
+          ~number_of_slots:proto_parameters.Types.number_of_slots
+          ~number_of_lags
+          ~lag_index:(number_of_lags - 1))
        Plugin.tb_slot_to_int
      [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
   in

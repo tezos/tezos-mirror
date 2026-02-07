@@ -43,8 +43,8 @@ val content_slot_id :
   Dal_slot_repr.History.cell_content -> Dal_slot_repr.Header.id
 
 (** Builds a DAL attestation bitset containing the provided slot indexes. *)
-val dal_attestation :
-  Alpha_context.Dal.Slot_index.t list -> Alpha_context.Dal.Attestation.t
+val dal_attestations :
+  Alpha_context.Dal.Slot_index.t list -> Alpha_context.Dal.Attestations.t
 
 (** Returns [true] iff the given delegate has at least one assigned shard at the
     given level. *)

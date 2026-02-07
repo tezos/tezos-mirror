@@ -24,35 +24,40 @@
 (*****************************************************************************)
 
 (** This modules handles all the validation/application/finalisation
-   of any operation related to the DAL. *)
+    of any operation related to the DAL. *)
 
 open Alpha_context
 
-(** [validate_attestation ctxt level slot consensus_key attestation] checks
-    whether the DAL attestation [attestation] emitted at given [level] by the
-    attester with the given [consensus_key] and given [slot] is valid. If an
+(** [validate_attestations ctxt level slot consensus_key attestations] checks
+    whether the DAL attestations [attestations] emitted at given [level] by the
+    attester with the given [consensus_key] and given TB [slot] is valid. If an
     [Error _] is returned, the [op] is not valid. The checks made are:
-    * the attestation size does not exceed the maximum;
+    * the attestations' size does not exceed the maximum;
     * the delegate is in the DAL committee.
 
     These are checks done for the DAL part alone, checks on other fields of an
     attestation (like level, round) are done by the caller. *)
-val validate_attestation :
+val validate_attestations :
   t ->
   Raw_level.t ->
   Slot.t ->
   Consensus_key.pk ->
-  Dal.Attestation.t ->
+  Dal.Attestations.t ->
   unit tzresult Lwt.t
 
-(** [apply_attestation ctxt attestation ~delegate ~tb_slot] records in
-    the context that the given [attestation] was issued by [delegate] with
-    initial Tenderbake slot [tb_slot]. *)
-val apply_attestation :
+(** [apply_attestations ctxt ~current_level attestations ~tb_slot
+    ~committee_level_to_shard_count] records in the context that the given
+    [attestations] were issued by the delegate with initial Tenderbake slot
+    [tb_slot] and the corresponding attester has the for each relevant committee
+    level a number of assigned shards as given by
+    [committee_level_to_shard_count]. *)
+val apply_attestations :
   t ->
   delegate:Signature.public_key_hash ->
-  Dal.Attestation.t ->
+  attested_level:Raw_level.t ->
+  Dal.Attestations.t ->
   tb_slot:Slot.t ->
+  committee_level_to_shard_count:int Raw_level.Map.t ->
   t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
@@ -81,10 +86,7 @@ val record_participation :
   Dal.Slot_availability.t ->
   t tzresult Lwt.t
 
-(** [finalisation ctxt] should be executed at block finalisation
-   time. A set of slots attested at level [ctxt.current_level - lag]
-   is returned encapsulated into the attestation data-structure.
-
-   [lag] is a parametric constant specific to the data-availability
-   layer.  *)
+(** [finalisation ctxt] should be executed at block finalisation time. A set of
+    slots attested at level [ctxt.current_level] is returned encapsulated into
+    the attestation data-structure. *)
 val finalisation : t -> (t * Dal.Slot_availability.t) tzresult Lwt.t

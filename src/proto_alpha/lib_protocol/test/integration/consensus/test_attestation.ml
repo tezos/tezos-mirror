@@ -633,8 +633,8 @@ let test_two_attestations_with_same_attester () =
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
   let* op1 = Op.raw_attestation attested_block in
   let dal_content =
-    let attestation = Dal_helpers.dal_attestation [Dal.Slot_index.zero] in
-    {attestation}
+    let attestations = Dal_helpers.dal_attestations [Dal.Slot_index.zero] in
+    {attestations}
   in
   let* op2 = Op.raw_attestation ~dal_content attested_block in
   let*! res =
@@ -707,8 +707,16 @@ let test_attester_with_no_assigned_shards () =
         Stdlib.Option.get
           (Dal.Slot_index.of_int_opt ~number_of_slots:dal.number_of_slots 0)
       in
-      let attestation = Dal.Attestation.(commit empty slot_index) in
-      let dal_content = {attestation} in
+      let attestations =
+        Dal.Attestations.(
+          commit
+            empty
+            ~number_of_slots:dal.number_of_slots
+            ~number_of_lags:(List.length dal.attestation_lags)
+            ~lag_index:0
+            slot_index)
+      in
+      let dal_content = {attestations} in
       let* op = Op.attestation ~manager_pkh:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
       let expect_apply_failure = function
@@ -751,6 +759,7 @@ let test_dal_attestation_threshold () =
              dal =
                {
                  attestation_lag;
+                 attestation_lags;
                  attestation_threshold;
                  cryptobox_parameters = {number_of_shards; _};
                  _;
@@ -771,8 +780,8 @@ let test_dal_attestation_threshold () =
   let* b = Block.bake genesis ~operation:op in
   let* b = Block.bake_n (attestation_lag - 1) b in
   let* dal_committee = Context.Dal.shards (B b) () in
-  let attestation = Dal_helpers.dal_attestation [slot_index] in
-  let dal_content = {attestation} in
+  let attestations = Dal_helpers.dal_attestations [slot_index] in
+  let dal_content = {attestations} in
   let min_power = attestation_threshold * number_of_shards / 100 in
   Log.info "Number of minimum required attested shards: %d" min_power ;
   let* _ =
@@ -787,9 +796,14 @@ let test_dal_attestation_threshold () =
           Block.bake_with_metadata ~operations:ops b
         in
         let attested_expected = power >= min_power in
+        let number_of_slots = genesis.constants.dal.number_of_slots in
+        let number_of_lags = List.length attestation_lags in
         let attested =
           Dal.Slot_availability.is_attested
             metadata.dal_slot_availability
+            ~number_of_slots
+            ~number_of_lags
+            ~lag_index:(number_of_lags - 1)
             slot_index
         in
         Log.info "With %d power, the slot is attested: %b " power attested ;
@@ -857,7 +871,7 @@ let slot_substitution_do_not_affect_signature_check () =
     (* attestation with dal signed with slot zero *)
     Op.raw_attestation
       ~attesting_slot:{slot = Slot.zero; consensus_pkh}
-      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~dal_content:{attestations = Dal.Attestations.empty}
       b
   in
   let* () =
@@ -940,7 +954,7 @@ let encoding_incompatibility () =
   let* raw_attestation_with_dal =
     Op.raw_attestation
       ~attesting_slot
-      ~dal_content:{attestation = Dal.Attestation.empty}
+      ~dal_content:{attestations = Dal.Attestations.empty}
       b
   in
   let* () = check_encodings_incompatibily raw_attestation_with_dal in

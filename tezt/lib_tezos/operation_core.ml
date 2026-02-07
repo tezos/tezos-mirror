@@ -406,7 +406,7 @@ module Consensus = struct
     block_payload_hash : string;
   }
 
-  type dal_content = {attestation : bool array}
+  type dal_content = {attestation : string}
 
   type t =
     | CPreattestation of {consensus : consensus_content}
@@ -433,13 +433,6 @@ module Consensus = struct
     let consensus = {slot; level; round; block_payload_hash} in
     CPreattestation {consensus}
 
-  let string_of_bool_vector dal_attestation =
-    let aux (acc, n) b =
-      let bit = if b then 1 else 0 in
-      (acc lor (bit lsl n), n + 1)
-    in
-    Array.fold_left aux (0, 0) dal_attestation |> fst |> string_of_int
-
   let kind_to_string kind =
     match kind with
     | Attestation {with_dal; _} ->
@@ -464,10 +457,7 @@ module Consensus = struct
           match dal with
           | None -> []
           | Some {attestation} ->
-              [
-                ( "dal_attestation",
-                  Ezjsonm.string (string_of_bool_vector attestation) );
-              ])
+              [("dal_attestation", Ezjsonm.string attestation)])
     | CPreattestation {consensus} ->
         `O
           [

@@ -53,7 +53,7 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
     Data_encoding.Binary.to_bytes_exn encoding ({branch}, Contents_list contents)
   in
   match (contents, sk, companion_key) with
-  | ( Single (Attestation {dal_content = Some {attestation = dal_content}; _}),
+  | ( Single (Attestation {dal_content = Some {attestations = dal_content}; _}),
       (Bls _ : Signature.secret_key),
       Some companion_key ) -> (
       let* companion_signer =
@@ -70,7 +70,7 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
       | Bls consensus_pk, Bls companion_pk, Bls consensus_sig, Bls companion_sig
         -> (
           let dal_dependent_bls_sig_opt =
-            Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+            Alpha_context.Dal.Attestations.Dal_dependent_signing.aggregate_sig
               ~subgroup_check:false
               ~consensus_pk
               ~companion_pk

@@ -175,7 +175,7 @@ type consensus_content = {
          important but could make things easier for debugging *)
 }
 
-type dal_content = {attestation : Dal_attestation_repr.t}
+type dal_content = {attestations : Dal_attestations_repr.t}
 
 let consensus_aggregate_content_encoding =
   let open Data_encoding in
@@ -1164,9 +1164,9 @@ module Encoding = struct
 
   let dal_content_encoding =
     conv
-      (fun {attestation} -> attestation)
-      (fun attestation -> {attestation})
-      Dal_attestation_repr.encoding
+      (fun {attestations} -> attestations)
+      (fun attestations -> {attestations})
+      Dal_attestations_repr.encoding
 
   let consensus_content_with_dal_encoding =
     merge_objs
@@ -2315,11 +2315,11 @@ type preattestation_infos = {round : round_infos; slot : int}
 type aggregate_infos = {round : round_infos; committee : int list}
 
 (** [attestation_infos] is the tuple consisting of a {!round_infos} value, a
-    [slot], and the number of DAL slots in the DAL attestation. *)
+    [slot], and the weight of the DAL content in the attestation. *)
 type attestation_infos = {
   round_infos : round_infos;
   slot : int;
-  number_of_dal_attested_slots : int;
+  dal_weight : int;
 }
 
 (** [double_baking_infos] is the pair of a {!round_infos} and a
@@ -2377,11 +2377,10 @@ let attestation_infos_from_content (c : consensus_content)
   {
     round_infos;
     slot;
-    number_of_dal_attested_slots =
+    dal_weight =
       Option.fold
         ~none:0
-        ~some:(fun d ->
-          Dal_attestation_repr.number_of_attested_slots d.attestation)
+        ~some:(fun d -> Dal_attestations_repr.weight d.attestations)
         d;
   }
 
@@ -2444,7 +2443,7 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
   in
   {round; bh_hash}
 
-type dal_entrapment_info = {level : int32; number_of_attested_slots : int}
+type dal_entrapment_info = {level : int32; weight : int}
 
 let dal_entrapment_info
     (Dal_entrapment_evidence {attestation; consensus_slot; _}) =
@@ -2468,11 +2467,10 @@ let dal_entrapment_info
   in
   {
     level = Raw_level_repr.to_int32 level;
-    number_of_attested_slots =
+    weight =
       Option.fold
         ~none:0
-        ~some:(fun d ->
-          Dal_attestation_repr.number_of_attested_slots d.attestation)
+        ~some:(fun d -> Dal_attestations_repr.weight d.attestations)
         dal_content;
   }
 
@@ -2728,8 +2726,8 @@ let compare_baking_infos infos1 infos2 =
     smaller the better. When the slots are also equal they are compared
     according to the number of attested DAL slots: the more the better. *)
 let compare_attestation_infos
-    {round_infos = infos1; slot = slot1; number_of_dal_attested_slots = n1}
-    {round_infos = infos2; slot = slot2; number_of_dal_attested_slots = n2} =
+    {round_infos = infos1; slot = slot1; dal_weight = n1}
+    {round_infos = infos2; slot = slot2; dal_weight = n2} =
   compare_pair_in_lexico_order
     ~cmp_fst:
       (compare_pair_in_lexico_order
@@ -2743,8 +2741,8 @@ let compare_dal_entrapment_infos infos1 infos2 =
   compare_pair_in_lexico_order
     ~cmp_fst:Compare.Int32.compare
     ~cmp_snd:Compare.Int.compare
-    (infos1.level, infos1.number_of_attested_slots)
-    (infos2.level, infos2.number_of_attested_slots)
+    (infos1.level, infos1.weight)
+    (infos2.level, infos2.weight)
 
 (** Two {!Attestations_aggregate} are compared by their {!aggregate_infos}. When their
     {!round_infos} are equal, they are compared according to their [committee]

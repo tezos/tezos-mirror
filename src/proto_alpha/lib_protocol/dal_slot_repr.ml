@@ -939,7 +939,7 @@ module History = struct
         | i :: indices', (s, publisher, status) :: slots' ->
             if I.(i = s.Header.id.index) then
               let* res = aux indices' slots' in
-              let Dal_attestation_repr.Accountability.
+              let Dal_attestations_repr.Accountability.
                     {
                       is_proto_attested;
                       attested_shards;

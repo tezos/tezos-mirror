@@ -406,7 +406,7 @@ module History : sig
     attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
-    * Dal_attestation_repr.Accountability.attestation_status)
+    * Dal_attestations_repr.Accountability.attestation_status)
     list ->
     (t * History_cache.t) tzresult
 
@@ -419,7 +419,7 @@ module History : sig
     attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
-    * Dal_attestation_repr.Accountability.attestation_status)
+    * Dal_attestations_repr.Accountability.attestation_status)
     list ->
     t tzresult
 

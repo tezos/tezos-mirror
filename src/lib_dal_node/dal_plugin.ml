@@ -40,7 +40,7 @@ module type T = sig
 
   type block_info
 
-  type dal_attestation
+  type dal_attestations
 
   type slot_availability
 
@@ -71,7 +71,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot * attestation_operation * dal_attestation option) list tzresult
+    (tb_slot * attestation_operation * dal_attestations option) list tzresult
     Lwt.t
 
   val get_committees :
@@ -81,11 +81,21 @@ module type T = sig
 
   val slot_availability : block_info -> slot_availability tzresult
 
-  val is_baker_attested : dal_attestation -> slot_index -> bool
+  val is_baker_attested :
+    dal_attestations ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
-  val is_protocol_attested : slot_availability -> slot_index -> bool
-
-  val number_of_attested_slots : dal_attestation -> int
+  val is_protocol_attested :
+    slot_availability ->
+    number_of_slots:int ->
+    number_of_lags:int ->
+    lag_index:int ->
+    slot_index ->
+    bool
 
   val get_round : Fitness.t -> int32 tzresult
 

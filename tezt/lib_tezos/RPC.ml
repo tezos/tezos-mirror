@@ -313,7 +313,7 @@ type block_metadata = {
   next_protocol : string;
   proposer : string;
   max_operations_ttl : int;
-  dal_attestation : bool Array.t option;
+  dal_attestation : string option;
   balance_updates : balance_update list;
 }
 
@@ -321,18 +321,7 @@ let get_chain_block_metadata ?(chain = "main") ?(block = "head") ?version () =
   let query_string = Query_arg.opt "version" Fun.id version in
   make ~query_string GET ["chains"; chain; "blocks"; block; "metadata"]
   @@ fun json ->
-  let dal_attestation =
-    match JSON.(json |-> "dal_attestation" |> as_string_opt) with
-    | None -> None
-    | Some slots ->
-        let attestation = Z.of_string slots in
-        let length = Z.numbits attestation in
-        let array = Array.make length false in
-        List.iter
-          (fun i -> if Z.testbit attestation i then array.(i) <- true)
-          (range 0 (length - 1)) ;
-        Some array
-  in
+  let dal_attestation = JSON.(json |-> "dal_attestation" |> as_string_opt) in
   let protocol = JSON.(json |-> "protocol" |> as_string) in
   let next_protocol = JSON.(json |-> "next_protocol" |> as_string) in
   let proposer =

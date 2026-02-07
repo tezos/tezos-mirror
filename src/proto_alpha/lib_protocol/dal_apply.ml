@@ -28,54 +28,52 @@
 open Alpha_context
 open Dal_errors
 
-let slot_of_int_e ~number_of_slots n =
-  let open Result_syntax in
-  match Dal.Slot_index.of_int_opt ~number_of_slots n with
-  | None ->
-      tzfail
-      @@ Dal_slot_index_above_hard_limit
-           {given = n; limit = number_of_slots - 1}
-  | Some slot_index -> return slot_index
-
 (* Use this function to select the pkh used in the DAL committee. As long as an
    epoch does not span across multiple cycles, we could use as well the pkh of
    the consensus key. *)
 let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
   consensus_key.delegate
 
-let validate_attestation ctxt level slot consensus_key attestation =
+let validate_attestations ctxt level slot consensus_key attestations =
   let open Lwt_result_syntax in
   let*? () = Dal.assert_feature_enabled ctxt in
   let number_of_slots = Constants.dal_number_of_slots ctxt in
-  let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
-  let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
-  let size = Dal.Attestation.occupied_size_in_bits attestation in
+  let number_of_lags = Constants.dal_number_of_lags ctxt in
+  let maximum_size =
+    Dal.Attestations.expected_max_size_in_bits ~number_of_slots ~number_of_lags
+  in
+  let size = Dal.Attestations.occupied_size_in_bits attestations in
   let*? () =
     error_unless
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
   let number_of_shards = Constants.dal_number_of_shards ctxt in
+  (* TODO-DL: check for each lag index *)
   fail_when
     (Compare.Int.(Slot.to_int slot >= number_of_shards)
-    && not (Dal.Attestation.is_empty attestation))
+    && not (Dal.Attestations.is_empty attestations))
     (let attester = pkh_of_consensus_key consensus_key in
      Dal_data_availibility_attester_not_in_committee {attester; level; slot})
 
-let apply_attestation ctxt ~delegate attestation ~tb_slot =
+let apply_attestations ctxt ~delegate ~attested_level attestations ~tb_slot
+    ~committee_level_to_shard_count =
   let open Result_syntax in
   let* () = Dal.assert_feature_enabled ctxt in
   let ctxt =
     Dal.only_if_incentives_enabled
       ctxt
       ~default:(fun ctxt -> ctxt)
-      (fun ctxt -> Dal.Attestation.record_attestation ctxt ~tb_slot attestation)
+      (fun ctxt ->
+        Dal.Attestations.record_attestation ctxt ~tb_slot attestations)
   in
   return
-    (Dal.Attestation.record_number_of_attested_shards
+    (Dal.Attestations.record_number_of_attested_shards
        ctxt
        ~delegate
-       attestation)
+       ~attested_level
+       attestations
+       committee_level_to_shard_count)
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager
@@ -110,17 +108,39 @@ let record_participation ctxt delegate tb_slot slot_availability =
     ctxt
     ~default:(fun ctxt -> return ctxt)
     (fun ctxt ->
+      let attestation_lags = Constants.dal_attestation_lags ctxt in
+      let number_of_lags = List.length attestation_lags in
+      let number_of_slots = Constants.dal_number_of_slots ctxt in
       let number_of_slots_attested_by_delegate =
-        match Slot.Map.find_opt tb_slot (Dal.Attestation.attestations ctxt) with
+        match
+          Slot.Map.find_opt tb_slot (Dal.Attestations.attestations ctxt)
+        with
         | None -> 0
-        | Some delegate_attestation ->
+        | Some delegate_attestations ->
+            (* Note: there is no double-counting because [dal_attestations] are
+                 different in each block. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+                 This is not sufficient (too restrictive) for dynamic lags: we
+                 need to aggregate the baker's attestations during the whole
+                 attestation window, and then perform the intersection with the
+                 protocol-attested slots.  *)
             Dal.Slot_availability.(
-              intersection slot_availability delegate_attestation
-              |> number_of_attested_slots)
+              intersection
+                slot_availability
+                delegate_attestations
+                ~number_of_slots
+                ~attestation_lags
+              |> number_of_attested_slots ~number_of_lags)
       in
       let number_of_protocol_attested_slots =
-        Dal.Slot_availability.number_of_attested_slots slot_availability
+        Dal.Slot_availability.number_of_attested_slots
+          slot_availability
+          ~number_of_lags
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
+           Similarly to the above, [number_of_protocol_attested_slots] may
+           include slots at levels which are not attestable by the delegate
+           because he's not in the committee? *)
       Delegate.record_dal_participation
         ctxt
         ~delegate
