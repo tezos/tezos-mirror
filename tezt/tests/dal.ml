@@ -12698,8 +12698,6 @@ let register ~protocols =
     "garbage collection of shards for all profiles"
     Garbage_collection.test_gc_with_all_profiles
     protocols ;
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7561
-     Adapt the test for the SQLite3 backend. *)
   Garbage_collection.test_gc_skip_list_cells ~protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["crawler"; "reconnection"]
