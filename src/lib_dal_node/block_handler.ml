@@ -139,12 +139,12 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
    remove it from the store. *)
-let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
-    ctxt ~attested_level attested =
+let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
+    ~prev_proto_parameters ctxt ~attested_level attested =
   let open Lwt_syntax in
-  let number_of_slots = proto_parameters.Types.number_of_slots in
-  let previous_lag = prev_proto_parameters.Types.attestation_lag in
-  let current_lag = proto_parameters.attestation_lag in
+  let number_of_slots = prev_prev_proto_parameters.Types.number_of_slots in
+  let previous_lag = prev_prev_proto_parameters.attestation_lag in
+  let current_lag = prev_proto_parameters.Types.attestation_lag in
   let store = Node_context.get_store ctxt in
   let* first_seen_level =
     let* fsl = Store.First_seen_level.load (Store.first_seen_level store) in
@@ -173,17 +173,17 @@ let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
        Remove after dynamic lag is active.
        This code removes all slots and shards associated to the "orphan" levels
        which are guaranteed to never be attested when a protocol migration
-       reduces the attestation lag. *)
+       reduces the attestation lag.
+
+       Note that skip-list migration (which is what is relevant for the DAL
+       node) happens at the successor of the activation level. This why we need
+       to use [prev_prev_proto_parameters]. *)
     if previous_lag > current_lag then
-      (* [attested_level] is the activation level. We need to remove published
-         slot for [previous_lag - current_lag] levels. However, the reference
-         point is [attested_level + 1]. We therefore use a one unit smaller
-         lag. *)
       let rec loop lag =
         if lag = current_lag then return_unit
         else
           let* () =
-            remove_slots_and_shards (lag - 1) (fun _slot_index : _ -> false)
+            remove_slots_and_shards lag (fun _slot_index : _ -> false)
           in
           loop (lag - 1)
       in
@@ -558,11 +558,18 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       ~attested_level:block_level
       skip_list_cells
   in
+  let*? prev_prev_proto_parameters =
+    if block_level > 2l then
+      Node_context.get_proto_parameters
+        ctxt
+        ~level:(`Level (Int32.sub block_level 2l))
+    else Result_syntax.return prev_proto_parameters
+  in
   let number_of_lags = List.length proto_parameters.Types.attestation_lags in
   let*! () =
     (remove_unattested_slots_and_shards
+       ~prev_prev_proto_parameters
        ~prev_proto_parameters
-       proto_parameters
        ctxt
        ~attested_level:block_level
        (Plugin.is_protocol_attested
