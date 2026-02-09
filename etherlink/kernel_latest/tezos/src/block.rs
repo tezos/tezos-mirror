@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
+use crate::enc_wrappers::{BlockHash, BlockNumber};
 use crate::operation_result::OperationDataAndMetadata;
 use crate::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 use primitive_types::H256;
 use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::{self as tezos_nom};
 use tezos_enc::{BinError, BinWriter};

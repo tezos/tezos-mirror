@@ -451,7 +451,7 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
             };
 
             let applied_operation = AppliedOperation {
-                hash: H256::from(transaction_hash).into(),
+                hash: transaction_hash.into(),
                 branch: H256::zero().into(),
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {

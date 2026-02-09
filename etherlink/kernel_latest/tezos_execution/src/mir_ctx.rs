@@ -21,7 +21,7 @@ use mir::{
 };
 use num_bigint::BigUint;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, ScriptExprHash};
+use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
@@ -223,8 +223,8 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         1u32.into()
     }
 
-    fn operation_group_hash(&self) -> [u8; 32] {
-        self.operation_ctx.origination_nonce.operation.0 .0
+    fn operation_group_hash(&self) -> &OperationHash {
+        &self.operation_ctx.origination_nonce.operation
     }
 
     fn origination_counter(&mut self) -> u32 {
@@ -1050,6 +1050,7 @@ pub(crate) mod mock {
         pub amount: i64,
         pub level: BigUint,
         pub now: BigInt,
+        pub operation_group_hash: OperationHash,
         pub gas: mir::gas::Gas,
     }
 
@@ -1061,6 +1062,7 @@ pub(crate) mod mock {
                 amount,
                 level: 1u32.into(),
                 now: 0.into(),
+                operation_group_hash: OperationHash::from([0u8; 32]),
                 gas: mir::gas::Gas::default(),
             }
         }
@@ -1142,8 +1144,8 @@ pub(crate) mod mock {
             1u32.into()
         }
 
-        fn operation_group_hash(&self) -> [u8; 32] {
-            [0u8; 32]
+        fn operation_group_hash(&self) -> &OperationHash {
+            &self.operation_group_hash
         }
 
         fn origination_counter(&mut self) -> u32 {

@@ -118,5 +118,4 @@ macro_rules! define_h256 {
     };
 }
 
-define_h256!(OperationHash);
 define_h256!(BlockHash);

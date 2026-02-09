@@ -616,7 +616,7 @@ fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> 
     let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
         error::Error::NomReadError(format!("{decode_error:?}"))
     })?;
-    let tx_hash = operation.hash()?.0 .0;
+    let tx_hash = operation.hash()?.into();
     Ok(TezlinkOperation {
         tx_hash,
         content: TezlinkContent::Tezos(operation),
@@ -807,7 +807,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 
                 let applied_operation = AppliedOperation {
-                    hash: H256::from_slice(&operation.tx_hash).into(),
+                    hash: operation.tx_hash.into(),
                     branch: block_in_progress.ethereum_parent_hash.into(),
                     op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                         OperationBatchWithMetadata {

@@ -13,6 +13,7 @@ use num_traits::{Signed, ToPrimitive, Zero};
 use std::cmp::min;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{
     blake2b::digest_160, hash::ContractKt1Hash, CryptoError, PublicKeySignatureVerifier,
     PublicKeyWithHash,
@@ -1850,8 +1851,7 @@ fn interpret_one<'a>(
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
-            let address =
-                compute_contract_address(&ctx.operation_group_hash(), origination_counter);
+            let address = compute_contract_address(ctx.operation_group_hash(), origination_counter);
             stack.push(TypedValue::Address(Address {
                 hash: AddressHash::Kt1(address.clone()),
                 entrypoint: Entrypoint::default(),
@@ -1937,9 +1937,12 @@ fn interpret_one<'a>(
 /// # Returns
 ///
 /// Returns a `ContractKt1Hash` struct containing the computed contract address.
-pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> ContractKt1Hash {
+pub fn compute_contract_address(
+    operation_group_hash: &OperationHash,
+    o_index: u32,
+) -> ContractKt1Hash {
     let mut input: [u8; 36] = [0; 36];
-    input[..32].copy_from_slice(operation_group_hash);
+    input[..32].copy_from_slice(operation_group_hash.as_ref());
     // append bytes representing o_index
     input[32..36].copy_from_slice(&o_index.to_be_bytes());
     ContractKt1Hash::from(digest_160(&input))

@@ -4,12 +4,11 @@
 
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
-use crate::enc_wrappers::{BlockHash, OperationHash};
+use crate::enc_wrappers::BlockHash;
 use crate::operation_result::ValidityError;
-use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{SecretKeyEd25519, UnknownSignature};
+use tezos_crypto_rs::hash::{OperationHash, SecretKeyEd25519, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
@@ -80,7 +79,7 @@ impl Operation {
     pub fn hash(&self) -> Result<OperationHash, BinError> {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
-        Ok(OperationHash(H256(op_hash)))
+        Ok(OperationHash::from(op_hash))
     }
 }
 

@@ -87,7 +87,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
 
     fn total_voting_power(&self) -> BigUint;
 
-    fn operation_group_hash(&self) -> [u8; 32];
+    fn operation_group_hash(&self) -> &OperationHash;
 
     fn origination_counter(&mut self) -> u32;
 
@@ -163,7 +163,7 @@ pub struct Ctx<'a> {
     /// contract addresses for newly-created contracts (via `CREATE_CONTRACT`
     /// instruction). Defaults to
     /// `onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D`.
-    pub operation_group_hash: [u8; 32],
+    pub operation_group_hash: OperationHash,
     // NB: lifetime is mandatory if we want to use types implementing with
     // references inside for LazyStorage, and we do due to how Runtime is passed
     // as &mut
@@ -324,8 +324,8 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         self.total_voting_power.clone()
     }
 
-    fn operation_group_hash(&self) -> [u8; 32] {
-        self.operation_group_hash
+    fn operation_group_hash(&self) -> &OperationHash {
+        &self.operation_group_hash
     }
 
     fn origination_counter(&mut self) -> u32 {
