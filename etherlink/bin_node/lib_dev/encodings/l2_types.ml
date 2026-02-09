@@ -76,17 +76,6 @@ module Tezos_block = struct
       Rlp.encode_int version
   end
 
-  type t = {
-    hash : Ethereum_types.block_hash;
-    level : int32;
-    timestamp : Time.Protocol.t;
-    parent_hash : Ethereum_types.block_hash;
-        (* Deserialization of operation and receipts is delayed to
-           avoid introducing a dependency from this lib_encodings to
-           the protocol. *)
-    operations : bytes;
-  }
-
   let decode_block_hash = Ethereum_types.decode_block_hash
 
   let genesis_parent_hash =
@@ -95,30 +84,43 @@ module Tezos_block = struct
     Ethereum_types.Block_hash
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
-  let block_from_v0 block_rlp =
-    let open Rlp in
-    match block_rlp with
-    | [
-     Value hash;
-     Value level;
-     Value previous_hash;
-     Value timestamp;
-     Value operations;
-    ] ->
-        let level = Bytes.get_int32_le level 0 in
-        let hash = decode_block_hash hash in
-        let parent_hash = decode_block_hash previous_hash in
-        let timestamp = Ethereum_types.timestamp_of_bytes timestamp in
-        {hash; level; timestamp; parent_hash; operations}
-    | _ ->
-        raise
-          (Invalid_argument
-             "Expected a RLP list of 6 elements (including the version field)")
+  module V0 = struct
+    type t = {
+      hash : Ethereum_types.block_hash;
+      level : int32;
+      timestamp : Time.Protocol.t;
+      parent_hash : Ethereum_types.block_hash;
+          (* Deserialization of operation and receipts is delayed to
+             avoid introducing a dependency from this lib_encodings to
+             the protocol. *)
+      operations : bytes;
+    }
+
+    let from_rlp (block_rlp : Rlp.item list) : t =
+      let open Rlp in
+      match block_rlp with
+      | [
+       Value hash;
+       Value level;
+       Value previous_hash;
+       Value timestamp;
+       Value operations;
+      ] ->
+          let level = Bytes.get_int32_le level 0 in
+          let hash = decode_block_hash hash in
+          let parent_hash = decode_block_hash previous_hash in
+          let timestamp = Ethereum_types.timestamp_of_bytes timestamp in
+          {hash; level; timestamp; parent_hash; operations}
+      | _ ->
+          raise
+            (Invalid_argument
+               "Expected a RLP list of 6 elements (including the version field)")
+  end
+
+  module Latest = V0
 
   module Legacy = struct
-    (* For now legacy encoding is the same as block encoding but this might
-       change in the future, for example when we'll add protocol fields *)
-    type nonrec t = t = {
+    type t = V0.t = {
       hash : Ethereum_types.block_hash;
       level : int32;
       timestamp : Time.Protocol.t;
@@ -157,11 +159,13 @@ module Tezos_block = struct
     let () = Data_encoding.Registration.register encoding
   end
 
+  include Latest
+
   let block_from_kernel bytes =
     match Rlp.decode bytes with
     | Ok (Rlp.List (Value version :: block_rlp)) -> (
         let version = Version.from_bytes version in
-        match version with V0 -> block_from_v0 block_rlp)
+        match version with V0 -> V0.from_rlp block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
         Data_encoding.Binary.of_bytes_exn Legacy.encoding bytes
