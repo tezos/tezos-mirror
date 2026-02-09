@@ -2003,8 +2003,22 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
-    =
+(** This function checks that the status of the slot at
+    [(~slot_level, ~slot_index)] on [dal_node] matches [?expected_status].
+
+    [?check_attested_lag] controls how the lag value is compared when both
+    the actual and expected statuses are [Attested]. This is particularly
+    relevant for multi-lag configurations where a slot can be attested at
+    different lags (e.g., with [attestation_lags = [2; 3; 5]], a slot could be
+    attested at lag 2, 3, or 5). The possible values are:
+
+    - [`Exact] (default): The actual lag must equal the expected lag exactly;
+    - [`At_most]: The actual lag must be less than or equal to the expected lag.
+
+    For non-[Attested] statuses, [?check_attested_lag] has no effect and exact
+    equality is always used. *)
+let check_slot_status ~__LOC__ ?expected_status ?(check_attested_lag = `Exact)
+    dal_node ~slot_level ~slot_index =
   match expected_status with
   | None -> unit
   | Some expected_status ->
@@ -2014,16 +2028,33 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
       let prefix =
         sf "Unexpected slot status at level %d, index %d " slot_level slot_index
       in
-      Check.(status = expected_status)
-        ~__LOC__
-        Dal.Check.slot_id_status_typ
-        ~error_msg:(prefix ^ "(got = %L, expected = %R)") ;
+      let status_matches =
+        match (status, expected_status, check_attested_lag) with
+        | Dal_RPC.Attested lag, Dal_RPC.Attested expected_lag, `At_most ->
+            lag <= expected_lag
+        | _ -> status = expected_status
+      in
+      if not status_matches then
+        Test.fail
+          ~__LOC__
+          "%s(got = %a, expected = %a)"
+          prefix
+          Dal_RPC.pp_slot_id_status
+          status
+          Dal_RPC.pp_slot_id_status
+          expected_status ;
       unit
 
-let check_slots_statuses ~__LOC__ ?expected_status dal_node ~slot_level
-    slots_info =
+let check_slots_statuses ~__LOC__ ?expected_status ?check_attested_lag dal_node
+    ~slot_level slots_info =
   let test (slot_index, _commitment) =
-    check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
+    check_slot_status
+      ~__LOC__
+      ?expected_status
+      ?check_attested_lag
+      dal_node
+      ~slot_level
+      ~slot_index
   in
   Lwt_list.iter_s test slots_info
 
@@ -2109,8 +2140,13 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
        period is not over, so they are not yet present in the skip-list. *)
     check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let check_slots_statuses ?expected_status l =
-    check_slots_statuses ?expected_status dal_node ~slot_level:pub_level l
+  let check_slots_statuses ?expected_status ?check_attested_lag l =
+    check_slots_statuses
+      ?expected_status
+      ?check_attested_lag
+      dal_node
+      ~slot_level:pub_level
+      l
   in
   let check_get_commitment =
     check_get_commitment dal_node ~slot_level:pub_level
@@ -2161,6 +2197,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
     check_slots_statuses
       ~__LOC__
       ~expected_status:(Dal_RPC.Attested lag)
+      ~check_attested_lag:`At_most
       attested
   in
   (* Slots not published or not included in blocks. *)
@@ -2486,22 +2523,15 @@ let test_dal_node_snapshot_aux ~operators ~name ?slots_exported ?slots_imported
           Dal_RPC.(
             call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
         in
-        let* status_fresh =
-          Dal_RPC.(
-            call fresh_dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+        let* () =
+          check_slot_status
+            ~__LOC__
+            ~expected_status:status_orig
+            ~check_attested_lag:`Exact
+            fresh_dal_node
+            ~slot_level
+            ~slot_index
         in
-        let pp_status s = Format.asprintf "%a" Dal_RPC.pp_slot_id_status s in
-        Check.(status_fresh = status_orig)
-          ~__LOC__
-          Dal.Check.slot_id_status_typ
-          ~error_msg:
-            (Format.sprintf
-               "Snapshot import mismatch for slot (level=%d,index=%d): got %s, \
-                expected %s"
-               slot_level
-               slot_index
-               (pp_status status_fresh)
-               (pp_status status_orig)) ;
         let* content_orig =
           Dal_RPC.(
             call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
@@ -3230,6 +3260,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
           ~__LOC__
           dal_node
           ~expected_status
+          ~check_attested_lag:`Exact
           ~slot_level:level
           ~slot_index:(slot_idx parameters level)
       in
@@ -3317,6 +3348,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
           ~__LOC__
           dal_node
           ~expected_status
+          ~check_attested_lag:`At_most
           ~slot_level:level
           ~slot_index:(slot_idx parameters level)
       in
@@ -5731,6 +5763,7 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
       ~__LOC__
       attester
       ~expected_status:(Dal_RPC.Attested attestation_lag)
+      ~check_attested_lag:`At_most
       ~slot_level:publication_level
       ~slot_index:index
   in
@@ -6115,6 +6148,7 @@ module Skip_list_rpcs = struct
             ~__LOC__
             dal_node
             ~expected_status
+            ~check_attested_lag:`At_most
             ~slot_level:level
             ~slot_index
         in
@@ -7521,18 +7555,13 @@ module Garbage_collection = struct
     let* () = Lwt.join wait_block_p in
     Log.info "Checking that the slot was attested" ;
     let* () =
-      let* status =
-        Dal_RPC.(
-          call slot_producer
-          @@ get_level_slot_status ~slot_level:published_level ~slot_index)
-      in
-      Check.(status = Dal_RPC.Attested dal_parameters.attestation_lag)
+      check_slot_status
         ~__LOC__
-        Dal.Check.slot_id_status_typ
-        ~error_msg:
-          "The value of the fetched status should match the expected one \
-           (current = %L, expected = %R)" ;
-      unit
+        slot_producer
+        ~expected_status:(Dal_RPC.Attested dal_parameters.attestation_lag)
+        ~check_attested_lag:`At_most
+        ~slot_level:published_level
+        ~slot_index
     in
 
     let wait_remove_shards_attester_promise =
@@ -9978,10 +10007,15 @@ let test_producer_attester (protocol : Protocol.t)
   in
   Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final check." ;
-  Check.(
-    (status = Dal_RPC.Attested lag)
-      Dal.Check.slot_id_status_typ
-      ~error_msg:"Published slot was supposed to be attested.") ;
+  let* () =
+    check_slot_status
+      ~__LOC__
+      producer_node
+      ~expected_status:(Dal_RPC.Attested lag)
+      ~check_attested_lag:`At_most
+      ~slot_level:(lvl_publish + 1)
+      ~slot_index:index
+  in
   unit
 
 (* Check if the [attester_did_not_attest] warning is correctly emitted.
@@ -10131,12 +10165,15 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   in
   Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final checks." ;
-  Check.(
-    (status = Dal_RPC.Attested lag)
-      Dal.Check.slot_id_status_typ
-      ~error_msg:"Published slot was supposed to be attested.") ;
-  (* If the [not_attested_by_bootstrap2_promise] is not fulfilled yet, it means that
-     the [attester_did_not_attest_slot] warning has never been emitted. *)
+  let* () =
+    check_slot_status
+      ~__LOC__
+      producer_node
+      ~expected_status:(Dal_RPC.Attested lag)
+      ~check_attested_lag:`At_most
+      ~slot_level:(lvl_publish + 1)
+      ~slot_index:index
+  in
   let not_attested_by_bootstrap2 =
     match Lwt.state not_attested_by_bootstrap2_promise with
     | Sleep -> false
