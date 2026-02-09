@@ -18,6 +18,9 @@ module CLST_contract : sig
     | Amount_too_large of Destination.t * CLST_types.nat
     | Only_owner_can_change_operator of Destination.t * Destination.t
     | Empty_ticket
+    | Contract_is_not_delegate of Destination.t
+    | Delegate_is_not_registered of Destination.t
+    | Delegate_is_already_registered of Destination.t
 end
 
 val get_views :

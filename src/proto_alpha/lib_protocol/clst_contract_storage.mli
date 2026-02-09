@@ -135,3 +135,19 @@ val get_token_info :
   t ->
   token_id:CLST_types.nat ->
   ((CLST_types.nat * CLST_types.token_info) option * context) tzresult Lwt.t
+
+(** [is_delegate_registered ctxt delegate] returns [true] if
+    [delegate] has active or pending parameters. *)
+val is_delegate_registered : context -> public_key_hash -> bool tzresult Lwt.t
+
+(** [register_delegate context ~delegate
+    ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth] registers new
+    [delegate's] parameters, to be activated after
+    {!Constants_storage.consensus_rights_delay} cycles. *)
+val register_delegate :
+  context ->
+  delegate:public_key_hash ->
+  edge_of_clst_staking_over_baking_millionth:CLST_types.nat ->
+  ratio_of_clst_staking_over_direct_staking_billionth:CLST_types.nat ->
+  (context, error trace) result Lwt.t

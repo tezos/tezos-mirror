@@ -418,7 +418,7 @@ module CLST_types = struct
       tzresult =
     let open Result_syntax in
     let* delegate_parameters_type in
-    make_entrypoint_leaf "register_delegate" delegate_parameters_type
+    make_entrypoint_leaf "update_delegate_parameters" delegate_parameters_type
 
   let approval_type : approval ty_node tzresult =
     let open Result_syntax in

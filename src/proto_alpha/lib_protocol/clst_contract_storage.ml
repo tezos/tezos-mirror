@@ -177,3 +177,44 @@ let set_account_operator_allowance context storage ~owner ~spender new_allowance
 
 let get_token_info context storage ~token_id =
   Script_big_map.get context token_id storage.token_metadata
+
+let is_delegate_registered ctxt delegate =
+  let open Lwt_result_syntax in
+  let* registered_parameters =
+    Clst.Delegates.get_delegate_parameters ctxt delegate
+  in
+  let* pending_parameters =
+    Clst.Delegates.get_pending_parameters ctxt delegate
+  in
+  return
+    (not
+       (Option.is_none registered_parameters && List.is_empty pending_parameters))
+
+let register_delegate ctxt ~delegate ~edge_of_clst_staking_over_baking_millionth
+    ~ratio_of_clst_staking_over_direct_staking_billionth =
+  let open Lwt_result_syntax in
+  let edge_of_clst_staking_over_baking_millionth =
+    Script_int.to_zint edge_of_clst_staking_over_baking_millionth
+  in
+  let ratio_of_clst_staking_over_direct_staking_billionth =
+    Script_int.to_zint ratio_of_clst_staking_over_direct_staking_billionth
+  in
+  let*? parameters =
+    if
+      not
+        (Z.fits_int32 edge_of_clst_staking_over_baking_millionth
+        || Z.fits_int32 ratio_of_clst_staking_over_direct_staking_billionth)
+    then
+      Result_syntax.tzfail
+        Clst_delegates_parameters_repr.Invalid_clst_delegates_parameters
+    else
+      Clst_delegates_parameters_repr.make
+        ~edge_of_clst_staking_over_baking_millionth:
+          (Z.to_int32 edge_of_clst_staking_over_baking_millionth)
+        ~ratio_of_clst_staking_over_direct_staking_billionth:
+          (Z.to_int32 ratio_of_clst_staking_over_direct_staking_billionth)
+  in
+  Alpha_context.Clst.Delegates.register_pending_parameters
+    ctxt
+    delegate
+    parameters

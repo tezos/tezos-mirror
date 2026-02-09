@@ -31,6 +31,9 @@ module CLST_contract = struct
     | Amount_too_large of Destination.t * nat
     | Only_owner_can_change_operator of Destination.t * Destination.t
     | Empty_ticket
+    | Contract_is_not_delegate of Destination.t
+    | Delegate_is_not_registered of Destination.t
+    | Delegate_is_already_registered of Destination.t
 
   let is_implicit : Destination.t -> bool = function
     | Destination.Contract (Contract.Implicit _) -> true
@@ -781,14 +784,111 @@ module CLST_contract = struct
       entrypoint_execution_result tzresult Lwt.t =
     tzfail (standard_error ~mnemonic:"FA2.1 lambda_export is not implemented")
 
+  let execute_register_delegate (ctxt, (step_constants : step_constants))
+      parameters (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        Tez.(step_constants.amount <> zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let* pkh =
+      match step_constants.sender with
+      | Contract (Implicit pkh) ->
+          let* is_delegate = Contract.is_delegate ctxt pkh in
+          let*? () =
+            error_unless
+              is_delegate
+              (Contract_is_not_delegate step_constants.sender)
+          in
+          let* is_delegate_registered =
+            Clst_contract_storage.is_delegate_registered ctxt pkh
+          in
+          let*? () =
+            error_unless
+              (not is_delegate_registered)
+              (Delegate_is_already_registered step_constants.sender)
+          in
+          return pkh
+      | sender -> tzfail (Non_implicit_contract sender)
+    in
+    let ( edge_of_clst_staking_over_baking_millionth,
+          ratio_of_clst_staking_over_direct_staking_billionth ) =
+      match parameters with
+      | Some params -> params
+      | None ->
+          (* We trust the default values to not be negative. *)
+          ( Clst_delegates_parameters_repr.default
+              .edge_of_clst_staking_over_baking_millionth |> Script_int.of_int32
+            |> Script_int.abs,
+            Clst_delegates_parameters_repr.default
+              .ratio_of_clst_staking_over_direct_staking_billionth
+            |> Script_int.of_int32 |> Script_int.abs )
+    in
+    let* ctxt =
+      Clst_contract_storage.register_delegate
+        ctxt
+        ~delegate:pkh
+        ~edge_of_clst_staking_over_baking_millionth
+        ~ratio_of_clst_staking_over_direct_staking_billionth
+    in
+    return (Script_list.empty, storage, [], ctxt)
+
+  let execute_update_delegate_parameters
+      (ctxt, (step_constants : step_constants))
+      ( edge_of_clst_staking_over_baking_millionth,
+        ratio_of_clst_staking_over_direct_staking_billionth )
+      (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        Tez.(step_constants.amount <> zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let* pkh =
+      match step_constants.sender with
+      | Contract (Implicit pkh) ->
+          let* is_delegate = Contract.is_delegate ctxt pkh in
+          let*? () =
+            error_unless
+              is_delegate
+              (Contract_is_not_delegate step_constants.sender)
+          in
+          let* is_delegate_registered =
+            Clst_contract_storage.is_delegate_registered ctxt pkh
+          in
+          let*? () =
+            error_unless
+              is_delegate_registered
+              (Delegate_is_not_registered step_constants.sender)
+          in
+          return pkh
+      | sender -> tzfail (Non_implicit_contract sender)
+    in
+    let* ctxt =
+      Clst_contract_storage.register_delegate
+        ctxt
+        ~delegate:pkh
+        ~edge_of_clst_staking_over_baking_millionth
+        ~ratio_of_clst_staking_over_direct_staking_billionth
+    in
+    return (Script_list.empty, storage, [], ctxt)
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
     | Finalize () -> execute_finalize (ctxt, step_constants) () storage
-    | Register_delegate _parameters -> assert false
-    | Update_delegate_parameters _parameters -> assert false
+    | Register_delegate parameters ->
+        execute_register_delegate (ctxt, step_constants) parameters storage
+    | Update_delegate_parameters parameters ->
+        execute_update_delegate_parameters
+          (ctxt, step_constants)
+          parameters
+          storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
     | Balance_of requests ->
@@ -1135,4 +1235,57 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Zero tickets are forbidden.")
     Data_encoding.unit
     (function CLST_contract.Empty_ticket -> Some () | _ -> None)
-    (fun () -> CLST_contract.Empty_ticket)
+    (fun () -> CLST_contract.Empty_ticket) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.contract_is_not_delegate"
+    ~title:"Contract is not a delegate"
+    ~description:"A non-delegate contract cannot register on CLST contract"
+    ~pp:(fun ppf address ->
+      Format.fprintf
+        ppf
+        "Only bakers can register to get staking power on CLST. Contract %a is \
+         not a baker."
+        Destination.pp
+        address)
+    Data_encoding.(obj1 (req "address" Destination.encoding))
+    (function
+      | CLST_contract.Contract_is_not_delegate address -> Some address
+      | _ -> None)
+    (fun address -> CLST_contract.Contract_is_not_delegate address) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.delegate_is_not_registered"
+    ~title:"Delegate is not registered on CLST contract"
+    ~description:
+      "A delegate cannot update its parameters without being registered on \
+       CLST contract"
+    ~pp:(fun ppf address ->
+      Format.fprintf
+        ppf
+        "Delegate %a cannot update its parameters without being registered on \
+         CLST contract"
+        Destination.pp
+        address)
+    Data_encoding.(obj1 (req "address" Destination.encoding))
+    (function
+      | CLST_contract.Delegate_is_not_registered address -> Some address
+      | _ -> None)
+    (fun address -> CLST_contract.Delegate_is_not_registered address) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.delegate_is_already_registered"
+    ~title:"Delegate is already registered on CLST contract"
+    ~description:"A registered delegate cannot register again on CLST contract"
+    ~pp:(fun ppf address ->
+      Format.fprintf
+        ppf
+        "Delegate %a is already registered on CLST contract, no need to \
+         refresh it"
+        Destination.pp
+        address)
+    Data_encoding.(obj1 (req "address" Destination.encoding))
+    (function
+      | CLST_contract.Delegate_is_already_registered address -> Some address
+      | _ -> None)
+    (fun address -> CLST_contract.Delegate_is_already_registered address)
