@@ -104,47 +104,15 @@ let block_directory_path =
        chain_directory_path
        Tezos_shell_services.Block_services.path
 
-module type HEADER = sig
-  module Block_services : BLOCK_SERVICES
-
-  val tezlink_block_to_shell_header :
-    L2_types.Tezos_block.t -> Block_header.shell_header tzresult
-
-  val tezlink_block_to_block_header :
-    l2_chain_id:L2_types.chain_id ->
-    L2_types.Tezos_block.t * 'b ->
-    Block_services.block_header tzresult
-
-  val tezlink_block_to_block_info :
-    l2_chain_id:L2_types.chain_id ->
-    (module Tezlink_backend_sig.S) ->
-    Tezos_types.level
-    * Tezos_shell_services.Block_services.version
-    * [`Main]
-    * L2_types.Tezos_block.t ->
-    (Tezos_shell_services.Block_services.version * Block_services.block_info)
-    tzresult
-    Lwt.t
-
-  val tezlink_block_metadata :
-    Tezos_types.level * Tezos_shell_services.Block_services.version ->
-    (Tezos_shell_services.Block_services.version
-    * Block_services.block_metadata)
-    tzresult
-
-  val protocols : Tezlink_protocols.protocols
-end
-
-module Make_block_header (Block_services : BLOCK_SERVICES) :
-  HEADER with module Block_services = Block_services = struct
-  module Block_services = Block_services
+module Make_block_header
+    (Proto : Tezlink_protocol)
+    (Next_proto : Tezlink_protocol) =
+struct
+  module Block_services = Make_block_service (Proto) (Next_proto)
 
   let protocols =
     Tezlink_protocols.Shell_impl.
-      {
-        current_protocol = Block_services.Proto.hash;
-        next_protocol = Block_services.Next_proto.hash;
-      }
+      {current_protocol = Proto.hash; next_protocol = Next_proto.hash}
 
   let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
       Block_header.shell_header tzresult =
@@ -286,9 +254,42 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     (version, metadata)
 end
 
-module Current_block_header = Make_block_header (Current_block_services)
-module Zero_block_header = Make_block_header (Zero_block_services)
-module Genesis_block_header = Make_block_header (Genesis_block_services)
+module type HEADER = sig
+  module Block_services : Tezlink_block_service
+
+  val tezlink_block_to_shell_header :
+    L2_types.Tezos_block.t -> Block_header.shell_header tzresult
+
+  val tezlink_block_to_block_header :
+    l2_chain_id:L2_types.chain_id ->
+    L2_types.Tezos_block.t * 'b ->
+    Block_services.block_header tzresult
+
+  val tezlink_block_to_block_info :
+    l2_chain_id:L2_types.chain_id ->
+    (module Tezlink_backend_sig.S) ->
+    Tezos_types.level
+    * Tezos_shell_services.Block_services.version
+    * [`Main]
+    * L2_types.Tezos_block.t ->
+    (Tezos_shell_services.Block_services.version * Block_services.block_info)
+    tzresult
+    Lwt.t
+
+  val tezlink_block_metadata :
+    Tezos_types.level * Tezlink_protocols.Shell_impl.version ->
+    ( Tezlink_protocols.Shell_impl.version * Block_services.block_metadata,
+      tztrace )
+    result
+
+  val protocols : Tezlink_protocols.protocols
+end
+
+module Current_block_header =
+  Make_block_header (Imported_protocol) (Imported_protocol)
+module Zero_block_header = Make_block_header (Zero_protocol) (Genesis_protocol)
+module Genesis_block_header =
+  Make_block_header (Genesis_protocol) (Imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
