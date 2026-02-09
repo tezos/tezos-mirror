@@ -446,7 +446,8 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         configuration.experimental_features.drop_duplicate_on_injection
       ~order_enabled:
         configuration.experimental_features.blueprints_publisher_order_enabled
-      ~tx_container
+      ~lock_block_production:Block_producer.lock_block_production
+      ~unlock_block_production:Block_producer.unlock_block_production
       ()
   in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in

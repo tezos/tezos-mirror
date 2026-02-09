@@ -19,7 +19,8 @@ val start :
   keep_alive:bool ->
   drop_duplicate:bool ->
   order_enabled:bool ->
-  tx_container:_ Services_backend_sig.tx_container ->
+  lock_block_production:(unit -> unit tzresult Lwt.t) ->
+  unlock_block_production:(unit -> unit tzresult Lwt.t) ->
   unit ->
   unit tzresult Lwt.t
 

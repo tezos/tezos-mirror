@@ -86,6 +86,7 @@ module Types = struct
     tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
+    mutable locked : bool;
     mutable preconfirmation_state : preconfirmation;
   }
 end
@@ -124,12 +125,16 @@ module Request = struct
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
         -> (preconfirmed_transactions_result, tztrace) t
+    | Lock_block_production : (unit, tztrace) t
+    | Unlock_block_production : (unit, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
     | Produce_genesis _ -> "Produce_genesis"
     | Produce_block _ -> "Produce_block"
     | Propose_next_block_timestamp _ -> "Propose_next_block_timestamp"
     | Preconfirm_transactions _ -> "Preconfirm_transactions"
+    | Lock_block_production -> "Lock_block_production"
+    | Unlock_block_production -> "Unlock_block_production"
 
   type view = View : _ t -> view
 
@@ -222,6 +227,18 @@ module Request = struct
             | _ -> None)
           (fun ((), transactions) ->
             View (Preconfirm_transactions transactions));
+        case
+          Json_only
+          ~title:"Lock_block_production"
+          (obj1 (req "request" (constant "lock_block_production")))
+          (function View Lock_block_production -> Some () | _ -> None)
+          (fun () -> View Lock_block_production);
+        case
+          Json_only
+          ~title:"Unlock_block_production"
+          (obj1 (req "request" (constant "unlock_block_production")))
+          (function View Unlock_block_production -> Some () | _ -> None)
+          (fun () -> View Unlock_block_production);
       ]
 
   let pp _ppf (View _) = ()
@@ -678,10 +695,11 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
         (* We stop producing blocks ahead of the upgrade *)
         let*! () = Block_producer_events.sunset () in
         state.sunset <- true ;
-        Tx_container.lock_block_production ()
+        state.locked <- true ;
+        return_unit
     | _ -> return_unit
   in
-  let* is_locked = Tx_container.is_locked () in
+  let is_locked = state.locked in
   let has_preconfirmed_txs =
     match state.preconfirmation_state with
     | Enabled (Selecting_delayed_txs _ | Validating_txs _) -> true
@@ -935,14 +953,9 @@ module Handlers = struct
     | Request.Preconfirm_transactions transactions -> (
         let open Lwt_result_syntax in
         protect @@ fun () ->
-        let (Ex_tx_container tx_container) = state.tx_container in
-        let (module Tx_container) =
-          Services_backend_sig.tx_container_module tx_container
-        in
-        let* is_locked = Tx_container.is_locked () in
-        (* Refuse preconfirmations when tx queue is locked, before the first
+        (* Refuse preconfirmations when locked, before the first
            created block, or when preconfirmations are explicitly disabled *)
-        if is_locked then tzfail IC_disabled
+        if state.locked then tzfail IC_disabled
         else
           match state.preconfirmation_state with
           | Disabled -> tzfail IC_disabled
@@ -957,6 +970,14 @@ module Handlers = struct
               in
               set_preconfirmation_state state preconfirmation_state ;
               return selected_txns_hashes)
+    | Request.Lock_block_production ->
+        protect @@ fun () ->
+        state.locked <- true ;
+        Lwt_result_syntax.return_unit
+    | Request.Unlock_block_production ->
+        protect @@ fun () ->
+        state.locked <- false ;
+        Lwt_result_syntax.return_unit
 
   type launch_error = error trace
 
@@ -973,6 +994,7 @@ module Handlers = struct
       Types.
         {
           sunset = false;
+          locked = false;
           signer;
           maximum_number_of_chunks;
           tx_container;
@@ -1083,6 +1105,22 @@ let preconfirm_transactions ~transactions =
     worker
     (Request.Preconfirm_transactions transactions)
   |> handle_request_error
+
+let lock_block_production () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request worker Request.Lock_block_production
+  in
+  return_unit
+
+let unlock_block_production () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request worker Request.Unlock_block_production
+  in
+  return_unit
 
 module Internal_for_tests = struct
   let produce_block ~with_delayed_transactions =

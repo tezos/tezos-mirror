@@ -472,7 +472,6 @@ struct
     address_nonce : Address_nonce.t;
     config : Configuration.tx_queue;
     keep_alive : bool;
-    mutable locked : bool;
     timeout : float;
   }
 
@@ -523,9 +522,6 @@ struct
         }
           -> (unit, tztrace) t
       | Clear : (unit, tztrace) t
-      | Lock_block_production : (unit, tztrace) t
-      | Unlock_block_production : (unit, tztrace) t
-      | Is_locked : (bool, tztrace) t
       | Content : (Transaction_object.txqueue_content, tztrace) t
       | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
       | Pop_transactions : {
@@ -558,9 +554,6 @@ struct
       | Tick _ -> "Tick"
       | Injection_confirmation _ -> "Injection_confirmation"
       | Clear -> "Clear"
-      | Lock_block_production -> "Lock_block_production"
-      | Unlock_block_production -> "Unlock_block_production"
-      | Is_locked -> "Is_locked"
       | Content -> "Content"
       | Size_info -> "Size_info"
       | Pop_transactions _ -> "Pop_transactions"
@@ -659,24 +652,6 @@ struct
             (fun _ -> assert false);
           case
             Json_only
-            ~title:"Lock_block_production"
-            (obj1 (req "request" (constant "lock_block_production")))
-            (function View Lock_block_production -> Some () | _ -> None)
-            (fun _ -> assert false);
-          case
-            Json_only
-            ~title:"Unlock_block_production"
-            (obj1 (req "request" (constant "unlock_block_production")))
-            (function View Unlock_block_production -> Some () | _ -> None)
-            (fun _ -> assert false);
-          case
-            Json_only
-            ~title:"Is_locked"
-            (obj1 (req "request" (constant "is_locked")))
-            (function View Is_locked -> Some () | _ -> None)
-            (fun _ -> assert false);
-          case
-            Json_only
             ~title:"Content"
             (obj1 (req "request" (constant "content")))
             (function View Content -> Some () | _ -> None)
@@ -751,10 +726,6 @@ struct
       | Clear -> fprintf fmt "Clear"
       | Nonce {next_nonce = _; address} ->
           fprintf fmt "Nonce %s" (Tx.address_to_string address)
-      | Lock_block_production -> Format.fprintf fmt "Locking the transactions"
-      | Unlock_block_production ->
-          Format.fprintf fmt "Unlocking the transactions"
-      | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
       | Content -> fprintf fmt "Content"
       | Size_info -> fprintf fmt "Size_info"
       | Pop_transactions {validation_state = _; validate_tx = _} ->
@@ -953,7 +924,6 @@ struct
            address_nonce;
            config = _;
            keep_alive = _;
-           locked = _;
            waiting_injection = _;
            timeout = _;
          } as state :
@@ -967,12 +937,6 @@ struct
       Queue.clear queue ;
       state.waiting_injection <- Inflight_transactions.empty ;
       ()
-
-    let lock_block_production state = state.locked <- true
-
-    let unlock_block_production state = state.locked <- false
-
-    let is_locked state = state.locked
 
     let pop_queue_until state ~validation_state ~validate_tx =
       let open Lwt_result_syntax in
@@ -1324,11 +1288,6 @@ struct
               ~next_nonce
           in
           return @@ Ethereum_types.Qty next_gap
-      | Lock_block_production ->
-          protect @@ fun () -> return (lock_block_production state)
-      | Unlock_block_production ->
-          protect @@ fun () -> return (unlock_block_production state)
-      | Is_locked -> protect @@ fun () -> return (is_locked state)
       | Content ->
           protect @@ fun () ->
           let process_transactions tx_map lookup_fn acc =
@@ -1383,8 +1342,7 @@ struct
           return (Tx.make_txpool ~pending ~queued)
       | Pop_transactions {validation_state; validate_tx} ->
           protect @@ fun () ->
-          if is_locked state then return []
-          else pop_queue_until state ~validate_tx ~validation_state
+          pop_queue_until state ~validate_tx ~validation_state
       | Confirm_transactions {confirmed_txs; clear_pending_queue_after} ->
           protect @@ fun () ->
           let*! () =
@@ -1455,7 +1413,6 @@ struct
              be revisited if needs be. *)
           config;
           keep_alive;
-          locked = false;
           timeout;
         }
 
@@ -1617,17 +1574,6 @@ struct
     let open Lwt_result_syntax in
     let*? w = Lazy.force worker in
     push_request w (Dropped_transaction {dropped_tx; reason})
-
-  let lock_block_production () =
-    bind_worker @@ fun w -> push_request w Lock_block_production
-
-  let unlock_block_production () =
-    bind_worker @@ fun w -> push_request w Unlock_block_production
-
-  let is_locked () =
-    let open Lwt_result_syntax in
-    let*? worker = Lazy.force worker in
-    Worker.Queue.push_request_and_wait worker Is_locked |> handle_request_error
 
   let pop_transactions ~maximum_cumulative_size:_ ~validate_tx
       ~initial_validation_state =
