@@ -6,15 +6,10 @@
 
 /// Wrapper types over used in Tezlink, implementing
 /// `NomReader` and `BinWriter` to enable derivation for more complex encodings in a tezos compatible way.
-use nom::{bytes::complete::take, combinator::map};
-use primitive_types::{H256, U256};
+use primitive_types::U256;
 use rlp::Encodable;
 use std::fmt::Display;
-use tezos_data_encoding::enc as tezos_enc;
-use tezos_data_encoding::{
-    enc::{BinResult, BinWriter},
-    nom::{NomError, NomReader, NomResult},
-};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use thiserror::Error;
 
 #[derive(PartialEq, Debug, NomReader, BinWriter, Clone, Copy)]
@@ -75,47 +70,3 @@ impl TryFrom<U256> for BlockNumber {
         }
     }
 }
-
-macro_rules! define_h256 {
-    ($name:ident) => {
-        #[derive(PartialEq, Debug, Clone)]
-        pub struct $name(pub H256);
-
-        impl NomReader<'_> for $name {
-            fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
-                let (remaining, hash) = map(
-                    take::<usize, &[u8], NomError>(32_usize),
-                    H256::from_slice,
-                )(bytes)?;
-                Ok((remaining, $name(hash)))
-            }
-        }
-
-        impl Encodable for $name {
-            fn rlp_append(&self, s: &mut rlp::RlpStream) {
-                s.append_internal(&self.0);
-            }
-        }
-
-        impl BinWriter for $name {
-            fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-                tezos_enc::put_bytes(&self.0.to_fixed_bytes(), data);
-                Ok(())
-            }
-        }
-
-        impl From<H256> for $name {
-            fn from(hash: H256) -> Self {
-                Self(hash)
-            }
-        }
-
-        impl From<$name> for H256 {
-            fn from(hash: $name) -> Self {
-                hash.0
-            }
-        }
-    };
-}
-
-define_h256!(BlockHash);

@@ -227,7 +227,7 @@ pub struct ValidatedBatch<A: TezosImplicitAccount> {
 pub fn verify_signature(
     content: &[ManagerOperationContent],
     signature: tezos_crypto_rs::hash::UnknownSignature,
-    branch: tezos_tezlink::enc_wrappers::BlockHash,
+    branch: tezos_crypto_rs::hash::BlockHash,
     pk: &PublicKey,
     validation_gas: &mut TezlinkOperationGas,
 ) -> Result<bool, ValidityError> {

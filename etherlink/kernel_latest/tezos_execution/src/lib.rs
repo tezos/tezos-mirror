@@ -1479,7 +1479,7 @@ mod tests {
         source: Bootstrap,
         content: Vec<OperationContent>,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash().into();
+        let branch = TezBlock::genesis_block_hash();
         let content = content
             .into_iter()
             .enumerate()

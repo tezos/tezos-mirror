@@ -249,7 +249,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
             let tezos_parent_hash =
                 block_storage::read_current_hash(host, &crate::chains::TEZOS_BLOCKS_PATH)
                     .unwrap_or_else(|_| {
-                        tezos_tezlink::block::TezBlock::genesis_block_hash()
+                        H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
                     });
             let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
                 host,
@@ -628,7 +628,7 @@ mod tests {
         source: Bootstrap,
         content: Vec<OperationContent>,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash().into();
+        let branch = TezBlock::genesis_block_hash();
         let content = content
             .into_iter()
             .map(|c| -> ManagerOperationContent {
