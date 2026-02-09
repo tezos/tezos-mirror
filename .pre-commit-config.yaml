@@ -45,3 +45,11 @@ repos:
       - id: check-gitlab-ci
         args: ["--verbose"]
         files: '(\.gitlab-ci\.yml|\.gitlab/ci/.*\.yml)'
+  - repo: local
+    hooks:
+      - id: check-gpg-signature
+        name: Check GPG signature configuration
+        entry: scripts/pre-commit-hooks/check-gpg-signature.sh
+        language: script
+        pass_filenames: false
+        always_run: true
