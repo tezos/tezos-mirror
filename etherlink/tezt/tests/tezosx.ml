@@ -447,11 +447,51 @@ let test_eth_rpc_with_alias ~runtime =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezos_block_stored_after_deposit =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"TezosX Tezos block is stored and accessible via Tezlink RPC"
+    ~tags:["tezos_block"; "tezosx"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let* receiver_account = Client.gen_and_show_keys client in
+  let* () =
+    deposit
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~sequencer
+      ~client
+      ~depositor
+      ~receiver_account
+      ~amount
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  (* Query the Tezlink block header RPC to verify the Tezos block was stored *)
+  let path = "/tezlink/chains/main/blocks/head/header" in
+  let* res =
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      ~args:["-v"]
+      (Evm_node.endpoint sequencer ^ path)
+    |> Runnable.run
+  in
+  let header = JSON.parse ~origin:"tezlink_block_header" res in
+  let level = JSON.(header |-> "level" |> as_int) in
+  Check.((level = 2) int ~error_msg:"Expected Tezos block level = 2 but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
   test_reveal [Alpha] ;
   test_transfer [Alpha] ;
+  test_tezos_block_stored_after_deposit [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
