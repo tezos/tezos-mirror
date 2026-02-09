@@ -1104,8 +1104,7 @@ mod tests {
                 ctx.operation_group_hash = OperationHash::from_base58_check(
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
                 )
-                .unwrap()
-                .into();
+                .unwrap();
                 ctx
             },
         );

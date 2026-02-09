@@ -120,17 +120,3 @@ macro_rules! define_h256 {
 
 define_h256!(OperationHash);
 define_h256!(BlockHash);
-define_h256!(ScriptExprHash);
-
-impl From<tezos_crypto_rs::hash::ScriptExprHash> for ScriptExprHash {
-    fn from(value: tezos_crypto_rs::hash::ScriptExprHash) -> Self {
-        ScriptExprHash(H256::from_slice(value.as_ref()))
-    }
-}
-
-impl From<ScriptExprHash> for tezos_crypto_rs::hash::ScriptExprHash {
-    fn from(value: ScriptExprHash) -> Self {
-        // This unwrap will always succeed as we're converting an H256 into a ScriptExprHash (that holds 256 bit)
-        tezos_crypto_rs::hash::ScriptExprHash::try_from(value.0.as_ref()).unwrap()
-    }
-}

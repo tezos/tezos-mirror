@@ -5,7 +5,7 @@
 
 //! Tezos operations
 
-use crate::enc_wrappers::ScriptExprHash;
+use tezos_crypto_rs::hash::ScriptExprHash;
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::Zarith;
@@ -84,7 +84,6 @@ mod tests {
     use std::str::FromStr;
 
     use crate::{
-        enc_wrappers::ScriptExprHash,
         encoding_test_data_helper::test_helpers::fetch_generated_data,
         lazy_storage_diff::{
             Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff,
@@ -93,7 +92,7 @@ mod tests {
         protocol::TARGET_TEZOS_PROTOCOL,
     };
     use mir::ast::BinWriter;
-    use primitive_types::H256;
+    use tezos_crypto_rs::hash::ScriptExprHash;
 
     #[test]
     pub fn big_map_alloc_compatibility() {
@@ -171,7 +170,10 @@ mod tests {
         let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
             id: 0u64.into(),
             storage_diff: StorageDiff::Update(vec![Update {
-                key_hash: ScriptExprHash(H256::from_str("cffedbaf00cb581448a5683abdefe0d5cd4d4ba4923f1a489791810c3fec3325").unwrap()),
+                key_hash: ScriptExprHash::from_str(
+                    "exprv6UsC1sN3Fk2XfgcJCL8NCerP5rCGy1PRESZAqr7L2JdzX55EN",
+                )
+                .unwrap(),
                 key,
                 value,
             }]),

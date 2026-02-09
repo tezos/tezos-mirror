@@ -253,8 +253,7 @@ impl Default for Ctx<'_> {
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
                 // "2EouXpxkPGxAvVKCpdCJnfp2wEMWR7Up5DERRZ1Yo99xCLjkCVuq",
             )
-            .unwrap()
-            .into(),
+            .unwrap(),
             origination_counter: 0,
         }
     }

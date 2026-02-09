@@ -7359,8 +7359,7 @@ mod interpreter_tests {
                 &OperationHash::from_base58_check(
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D"
                 )
-                .unwrap()
-                .into(),
+                .unwrap(),
                 0
             ),
             ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
