@@ -4134,7 +4134,7 @@ let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
     ?custom_constants ?attestation_lag ?attestation_threshold ?number_of_slots
     ?number_of_shards ?slot_size ?page_size ?redundancy_factor ?traps_fraction
     ?consensus_committee_size ?blocks_per_cycle ?minimal_block_delay
-    ?activation_timestamp () =
+    ?parameter_overrides ?activation_timestamp () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4166,6 +4166,7 @@ let test_l1_migration_scenario ?(tags = []) ?(uses = []) ~migrate_from
     @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
     @ make_int_parameter ["dal_parametric"; "page_size"] page_size
     @ make_q_parameter ["dal_parametric"; "traps_fraction"] traps_fraction
+    @ Option.value ~default:[] parameter_overrides
   in
   let* node, client, dal_parameters =
     setup_node
@@ -4828,6 +4829,152 @@ let test_migration_with_rollup ~migrate_from ~migrate_to =
     ~migration_level
     ~migrate_from
     ~migrate_to
+    ()
+
+(* Test that the DAL node's skip-list store contains the expected published
+   levels after a protocol migration. This verifies that the data store is
+   correctly maintained across the migration boundary. *)
+let test_skip_list_store_with_migration ~migrate_from ~migrate_to
+    ~migration_level =
+  let slot_index = 3 in
+  let non_gc_period, parameter_overrides =
+    (* We choose some arbitrary, small values *)
+    let a = 1 in
+    let b = 2 in
+    let c = 2 in
+    (* The period in blocks for which cells are kept. *)
+    let non_gc_period = 2 * (a + b + c) in
+    ( non_gc_period,
+      make_int_parameter ["smart_rollup_commitment_period_in_blocks"] (Some a)
+      @ make_int_parameter ["smart_rollup_challenge_window_in_blocks"] (Some b)
+      @ make_int_parameter
+          [
+            "smart_rollup_reveal_activation_level";
+            "dal_attested_slots_validity_lag";
+          ]
+          (Some c) )
+  in
+  let scenario ~migration_level dal_parameters client node dal_node =
+    Log.info "The \"non-GC period\" is %d" non_gc_period ;
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let rec publish_and_store ~max_level level =
+      (* Try to publish a slot at each level *)
+      if level > max_level then unit
+      else
+        let wait_mempool_injection =
+          Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+        in
+        let wait_for_dal_node =
+          wait_for_layer1_final_block dal_node (level - 1)
+        in
+        let* _commitment =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:slot_index
+            ~force:true
+          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+        in
+        let* () = wait_mempool_injection in
+        let* () = bake_for client in
+        let* _level = Node.wait_for_level node (level + 1) in
+        let* () = if level > 2 then wait_for_dal_node else unit in
+        publish_and_store ~max_level (level + 1)
+    in
+    let lag = dal_parameters.Dal.Parameters.attestation_lag in
+    Check.(
+      (migration_level > lag)
+        int
+        ~error_msg:
+          "The migration level (%L) should be greater than the attestation lag \
+           (%R)") ;
+
+    (* We bake enough blocks past migration so that the cells for the levels
+       before migration should have been GC-ed. *)
+    let last_final_level = migration_level + lag + 1 + non_gc_period in
+    let target_head = last_final_level + 2 in
+
+    let* starting_level = Client.level client in
+    Log.info
+      "Publishing in the previous protocol, from published level %d to %d"
+      (starting_level + 1)
+      migration_level ;
+    let* () =
+      publish_and_store ~max_level:(migration_level - 1) starting_level
+    in
+
+    Log.info "Migrated to the next protocol." ;
+
+    let* new_proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let new_dal_params =
+      Dal.Parameters.from_protocol_parameters new_proto_params
+    in
+    let new_lag = new_dal_params.attestation_lag in
+
+    let last_confirmed_published_level = migration_level + 3 in
+    let last_attested_level = last_confirmed_published_level + new_lag in
+    (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+    let max_level = last_attested_level + 2 in
+    Log.info
+      "last published_level = %d, last attested_level = %d, last level = %d"
+      last_confirmed_published_level
+      last_attested_level
+      max_level ;
+
+    let* second_level_new_proto = Client.level client in
+    assert (second_level_new_proto = migration_level) ;
+    Log.info
+      "Publish commitments in the new protocol, from published level %d to %d"
+      (second_level_new_proto + 1)
+      last_confirmed_published_level ;
+    let* () =
+      publish_and_store
+        ~max_level:(last_confirmed_published_level - 1)
+        second_level_new_proto
+    in
+
+    let wait_for_dal_node =
+      wait_for_layer1_final_block dal_node last_final_level
+    in
+    let* current_level = Client.level client in
+    let* () = bake_for client ~count:(target_head - current_level) in
+    let* () = wait_for_dal_node in
+    Log.info "Baked until level %d " target_head ;
+
+    let first_level_with_cells =
+      last_final_level - new_lag - non_gc_period + 1
+    in
+    assert (first_level_with_cells > migration_level) ;
+    Log.info
+      "Checking skip-list store for expected published levels %d to %d"
+      first_level_with_cells
+      last_final_level ;
+    let expected_levels =
+      let number_of_levels =
+        if Protocol.number migrate_to >= 025 then non_gc_period + new_lag
+        else non_gc_period
+      in
+      List.init number_of_levels (fun i ->
+          string_of_int (first_level_with_cells + i))
+    in
+    check_skip_list_store
+      dal_node
+      ~number_of_slots:new_dal_params.number_of_slots
+      ~expected_levels
+  in
+  test_l1_migration_scenario
+    ~migrate_from
+    ~migrate_to
+    ~migration_level
+    ~scenario
+    ~tags:["skip_list"; "store"]
+    ~description:"test skip-list store across migration"
+    ~operator_profiles:[slot_index]
+    ~parameter_overrides
     ()
 
 let get_delegate client ~protocol ~level ~tb_index =
@@ -12977,7 +13124,11 @@ let register_migration ~migrate_from ~migrate_to =
   test_accusation_migration_with_attestation_lag_decrease
     ~migrate_from
     ~migrate_to ;
-  test_migration_with_rollup ~migrate_from ~migrate_to
+  test_migration_with_rollup ~migrate_from ~migrate_to ;
+  test_skip_list_store_with_migration
+    ~migration_level:11
+    ~migrate_from
+    ~migrate_to
 
 let () =
   Regression.register
