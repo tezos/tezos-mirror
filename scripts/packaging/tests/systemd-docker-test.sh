@@ -22,6 +22,7 @@ GCP_LINUX_PACKAGES_BUCKET=${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}
 if [ ! -z ${DEP_IMAGE+x} ]; then
   IMAGE="$DEP_IMAGE:${RELEASE}-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
   docker pull "$IMAGE"
+  echo "Using $IMAGE"
 else
   # for local execution, we assume the image name is "systemd"
   IMAGE="systemd"
