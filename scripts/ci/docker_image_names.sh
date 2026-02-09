@@ -29,7 +29,9 @@ if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] 
 else
   # default docker image name prefix. For example it is used to prefix the images
   # tezos/tezos , tezos/tezos-bare, tezos/tezos-debug
-  docker_image_name="${GCP_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
+  # The GCP_RELEASE_REGISTRY has a different value for protected and not
+  # protected branches and it's configured in the gitlab CI
+  docker_image_name="${GCP_RELEASE_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
 
 docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | sanitizeTag)
