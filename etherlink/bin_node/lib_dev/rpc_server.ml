@@ -157,7 +157,7 @@ let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
   | Ok {next_nonce; transaction_object} ->
       let* hash_res =
         match mode with
-        | Observer | Proxy | Sequencer ->
+        | Observer | Sequencer ->
             Tx_queue.add
               ~next_nonce
               (Tx_queue_types.Michelson transaction_object)

@@ -126,13 +126,6 @@ let configuration_handler config =
         {observer with evm_node_endpoint = Uri.of_string hidden})
       config.observer
   in
-  let proxy : proxy =
-    let evm_node_endpoint =
-      Option.map (fun _ -> Uri.of_string hidden) config.proxy.evm_node_endpoint
-    in
-    {config.proxy with evm_node_endpoint}
-  in
-
   let config =
     {
       config with
@@ -140,7 +133,6 @@ let configuration_handler config =
       rollup_node_endpoint = Uri.of_string hidden;
       kernel_execution;
       sequencer;
-      proxy;
       observer;
       private_rpc = None;
     }
@@ -153,7 +145,7 @@ let configuration_handler config =
 
 let health_check_handler config mode db_liveness_check query =
   match mode with
-  | Mode.Sequencer | Observer | Proxy ->
+  | Mode.Sequencer | Observer ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -190,7 +182,6 @@ let evm_mode_handler config evm_mode =
   match evm_mode with
   | Mode.Sequencer -> return "sequencer"
   | Observer -> return "observer"
-  | Proxy -> return "proxy"
   | Rpc {evm_node_endpoint; _} ->
       let+ evm_node_mode =
         Rollup_services.call_service
@@ -815,11 +806,9 @@ let inject_rpc_call (config : Configuration.t) request method_
   | Ok output -> rpc_ok output
   | Error reason -> rpc_error (Rpc_errors.internal_error reason)
 
-let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_proxy
-    ~on_stateful =
+let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful =
   match mode with
   | Mode.Rpc rpc -> on_rpc rpc
-  | Proxy -> on_proxy ()
   | Sequencer | Observer -> on_stateful ()
 
 let wait_confirmation_callback wait_confirmation_wakener =
@@ -929,24 +918,6 @@ let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
         process_based_on_mode
           mode
           ~on_rpc:(on_rpc raw_tx transaction_object)
-          ~on_proxy:(fun () ->
-            match config.proxy.evm_node_endpoint with
-            | Some evm_node_private_endpoint ->
-                let inject ~keep_alive ~timeout ~base =
-                  Injector.inject_transaction
-                    ~wait_confirmation:false
-                    ~keep_alive
-                    ~timeout
-                    ~base
-                    ~tx_object:transaction_object
-                    ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-                in
-                inject_on_rpc
-                  config
-                  ~evm_node_private_endpoint
-                  ?wait_confirmation_wakener
-                  inject
-            | None -> enqueue_tx ~next_nonce ~raw_tx transaction_object)
           ~on_stateful:(fun () ->
             enqueue_tx ~next_nonce ~raw_tx transaction_object)
   in
@@ -1008,23 +979,6 @@ let send_raw_tezlink_operation (type f) (config : Configuration.t)
         process_based_on_mode
           mode
           ~on_rpc:(on_rpc raw_tx transaction_object)
-          ~on_proxy:(fun () ->
-            match config.proxy.evm_node_endpoint with
-            | Some evm_node_private_endpoint ->
-                let inject ~keep_alive ~timeout ~base =
-                  Injector.inject_tezlink_operation
-                    ~keep_alive
-                    ~timeout
-                    ~base
-                    ~op:transaction_object
-                    ~raw_op:(Ethereum_types.hex_to_real_bytes raw_tx)
-                in
-                inject_on_rpc
-                  config
-                  ~evm_node_private_endpoint
-                  ?wait_confirmation_wakener
-                  inject
-            | None -> enqueue_op ~next_nonce ~raw_tx transaction_object)
           ~on_stateful:(fun () ->
             enqueue_op ~next_nonce ~raw_tx transaction_object)
   in
@@ -1215,11 +1169,6 @@ let dispatch_request (type f) ~websocket
                   process_based_on_mode
                     mode
                     ~on_rpc:(inject_rpc_call config request module_)
-                    ~on_proxy:(fun () ->
-                      let* nonce =
-                        Backend_rpc.Etherlink.nonce address block_param
-                      in
-                      rpc_ok (Option.value ~default:Qty.zero nonce))
                     ~on_stateful:(fun () ->
                       let* next_nonce =
                         Backend_rpc.Etherlink.nonce address block_param
@@ -1338,12 +1287,6 @@ let dispatch_request (type f) ~websocket
               process_based_on_mode
                 mode
                 ~on_rpc:(inject_rpc_call config request module_)
-                ~on_proxy:(fun () ->
-                  let* transaction_object =
-                    Backend_rpc.Etherlink_block_storage.transaction_object
-                      tx_hash
-                  in
-                  rpc_ok transaction_object)
                 ~on_stateful:(fun () ->
                   let* transaction_object = Tx_queue.find tx_hash in
                   match transaction_object with
@@ -1509,17 +1452,6 @@ let dispatch_request (type f) ~websocket
                   | Rpc {evm_node_endpoint; _} ->
                       (* For the RPC mode, forward the call directly. *)
                       forward_call ~evm_node_endpoint
-                  | Proxy -> (
-                      match config.proxy.evm_node_endpoint with
-                      | Some evm_node_endpoint ->
-                          (* Proxy forwarding mode behaves like RPC mode. *)
-                          forward_call ~evm_node_endpoint
-                      | None ->
-                          return
-                          @@ rpc_error
-                               (Rpc_errors.invalid_request
-                                  "Proxy mode does not support \
-                                   eth_sendRawTransactionSync."))
                   | _ -> run_with_local_stream ())
               | Ethereum_types.Block_parameter.Latest -> (
                   (* Use normal execution infos *)
@@ -1623,10 +1555,6 @@ let dispatch_request (type f) ~websocket
               process_based_on_mode
                 mode
                 ~on_rpc:(inject_rpc_call config request module_)
-                ~on_proxy:(fun () ->
-                  rpc_error
-                    (Rpc_errors.invalid_request
-                       "Proxy mode does not support txpool_content."))
                 ~on_stateful:(fun () ->
                   let* txpool_content = Tx_queue.content () in
                   rpc_ok txpool_content)
@@ -1881,11 +1809,6 @@ let dispatch_private_request (type f) ~websocket
             add_attrs (fun () -> Telemetry.Attributes.[Transaction.hash hash])) ;
           process_based_on_mode
             mode
-            ~on_proxy:(fun () ->
-              return
-              @@ failwith
-                   "Unsupported JSONRPC method in Proxy: \
-                    Wait_transaction_confirmation")
             ~on_stateful:(fun () ->
               let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
               let callback = function
@@ -1955,10 +1878,6 @@ let dispatch_private_request (type f) ~websocket
           let transaction = Ethereum_types.hex_encode_string raw_txn in
           process_based_on_mode
             mode
-            ~on_proxy:(fun () ->
-              return
-              @@ failwith
-                   "Unsupported JSONRPC method in Proxy: injectTransaction")
             ~on_stateful:(fun () ->
               if wait_confirmation then
                 let wait_confirmation, wait_confirmation_wakener =
@@ -2023,9 +1942,6 @@ let dispatch_private_request (type f) ~websocket
               ~on_rpc:(fun _ ->
                 failwith
                   "Unsupported JSONRPC method in Rpc: injectTezlinkOperation")
-              ~on_proxy:(fun () ->
-                failwith
-                  "Unsupported JSONRPC method in Proxy: injectTezlinkOperation")
               ~on_stateful:(fun () ->
                 Tx_queue.add
                   ~next_nonce:(Ethereum_types.Qty op.first_counter)

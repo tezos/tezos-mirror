@@ -9,7 +9,7 @@
    family.
 
    For the sequencer, only very few JSON RPCs need to be supported.
-   For the observer, proxy, and RPC modes, we assume that a single
+   For the observer and RPC modes, we assume that a single
    chain is followed even when the multichain feature is activated and
    the set of supported RPCs depends on the chain family.
 

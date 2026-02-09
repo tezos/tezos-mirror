@@ -156,14 +156,6 @@
         boolean
         /* Activate or not the preconfirmation stream. This includes the sequencer as well as
            the observer. */ },
-  "proxy"?:
-    { "finalized_view"?:
-        boolean
-        /* When enabled, the node only expose blocks that are finalized, i.e., the `latest`
-           block parameter becomes a synonym for `finalized`. DEPRECATED: use the top level
-           `finalized_view` option instead. */,
-      "evm_node_endpoint"?: $unistring,
-      "ignore_block_param"?: boolean },
   "gcp_kms"?:
     { "connection_pool_size"?:
         integer ∈ [1, 2^30]

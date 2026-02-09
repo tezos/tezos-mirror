@@ -579,12 +579,9 @@ module Make (Reader : READER) = struct
 end
 
 (**
-  This module is only used by the proxy mode, which is deprecated and
-  scheduled to be removed. Therefore, this module will also be removed in the
-  near future.
+  This module is deprecated and scheduled to be removed.
   For now, after storage version 40, it still support serving data that are available
   in the last block only. It does not support querying historical blocks anymore.
-  It would be removed after the proxy mode removal.
   See https://linear.app/tezos/issue/L2-301/drop-the-proxy-mode
   for more details.
 *)
