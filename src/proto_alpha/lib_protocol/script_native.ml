@@ -787,6 +787,8 @@ module CLST_contract = struct
     | Deposit () -> execute_deposit (ctxt, step_constants) () storage
     | Redeem amount -> execute_redeem (ctxt, step_constants) amount storage
     | Finalize () -> execute_finalize (ctxt, step_constants) () storage
+    | Register_delegate _parameters -> assert false
+    | Update_delegate_parameters _parameters -> assert false
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
     | Balance_of requests ->

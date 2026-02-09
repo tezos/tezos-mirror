@@ -38,7 +38,19 @@ module CLST_types : sig
 
   type finalize = unit
 
-  type clst_entrypoints = ((deposit, redeem) or_, finalize) or_
+  type staker_entrypoints = ((deposit, redeem) or_, finalize) or_
+
+  type delegate_parameters =
+    nat (* edge_of_clst_staking *) * nat (* ratio_of_clst_staking *)
+
+  type register_delegate = delegate_parameters option
+
+  type update_delegate_parameters = delegate_parameters
+
+  type delegate_entrypoints =
+    (register_delegate, update_delegate_parameters) or_
+
+  type clst_entrypoints = (staker_entrypoints, delegate_entrypoints) or_
 
   type transfer =
     ( address (* from_ *),
@@ -152,6 +164,8 @@ module CLST_types : sig
     | Deposit of deposit
     | Redeem of redeem
     | Finalize of finalize
+    | Register_delegate of register_delegate
+    | Update_delegate_parameters of update_delegate_parameters
     | Transfer of transfer
     | Balance_of of balance_of
     | Approve of approve
