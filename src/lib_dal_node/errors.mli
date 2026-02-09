@@ -37,6 +37,11 @@ type error +=
       current_chain_id : Chain_id.t;
       stored_chain_id : Chain_id.t;
     }
+  | Unexpected_slot_status of {
+      published_level : int32;
+      slot_id : Types.Slot_id.t;
+      status : Types.header_status;
+    }
   | Unexpected_slot_status_transition of {
       slot_id : Types.Slot_id.t;
       from_status_opt : Types.header_status option;
