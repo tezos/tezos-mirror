@@ -325,7 +325,7 @@ module Current_block_services = struct
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
 
-  let transfer_receipt account balance : operation_receipt =
+  let transfer_receipt account balance : Imported_protocol.operation_receipt =
     let open Alpha_context.Receipt in
     let open Imported_protocol.Apply_results in
     let contract = Tezos_types.Contract.of_implicit account in
@@ -364,7 +364,7 @@ module Current_block_services = struct
         (Manager_operation_result
            {balance_updates = []; operation_result; internal_operation_results})
     in
-    Receipt (Operation_metadata {contents})
+    Operation_metadata {contents}
 
   let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
     Tezos_types.convert_using_serialization
@@ -373,8 +373,8 @@ module Current_block_services = struct
       ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
       Z.zero
 
-  let create_transfer ~chain_id (account : Alpha_context.public_key_hash)
-      (balance : Alpha_context.Tez.t) : operation tzresult =
+  let create_transfer (account : Alpha_context.public_key_hash)
+      (balance : Alpha_context.Tez.t) =
     let open Result_syntax in
     let open Imported_protocol.Alpha_context in
     let operation =
@@ -400,21 +400,17 @@ module Current_block_services = struct
            })
     in
     let signature = None in
-    let protocol_data = Operation_data {contents; signature} in
-    let shell : Tezos_base.Operation.shell_header =
-      {branch = Tezos_crypto.Hashed.Block_hash.zero}
-    in
     let receipt = transfer_receipt account balance in
-    let hash = Operation_hash.zero in
-    return {chain_id; hash; receipt; shell; protocol_data}
 
-  let activate_bootstraps_with_transfers ~chain_id
+    return (receipt, Operation_data {contents; signature})
+
+  let activate_bootstraps_with_transfers
       (module Backend : Tezlink_backend_sig.S) =
     let open Lwt_result_syntax in
     let* bootstrap_accounts = Backend.bootstrap_accounts () in
     let*? ops =
       List.map_e
-        (fun (account, balance) -> create_transfer ~chain_id account balance)
+        (fun (account, balance) -> create_transfer account balance)
         bootstrap_accounts
     in
     return ops

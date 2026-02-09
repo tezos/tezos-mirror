@@ -202,7 +202,47 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
           operation_list_quota = [];
         }
 
-  let tezlink_block_to_block_info ~l2_chain_id _backend
+  let bootstrap_transfers_receipt chain_id backend =
+    let open Lwt_result_syntax in
+    let* transfers =
+      Current_block_services.activate_bootstraps_with_transfers backend
+    in
+    let*? transfers =
+      List.fold_left
+        (fun acc (receipt, operation) ->
+          let open Result_syntax in
+          let* acc = acc in
+          let* receipt =
+            Tezos_types.convert_using_serialization
+              ~name:"operation_receipt"
+              ~src:Imported_protocol.operation_receipt_encoding
+              ~dst:Block_services.Proto.operation_receipt_encoding
+              receipt
+          in
+          let* operation =
+            Tezos_types.convert_using_serialization
+              ~name:"operation_data"
+              ~src:Imported_protocol.operation_data_encoding
+              ~dst:Block_services.Proto.operation_data_encoding
+              operation
+          in
+          let item =
+            Block_services.
+              {
+                chain_id;
+                hash = Operation_hash.zero;
+                shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
+                protocol_data = operation;
+                receipt = Receipt receipt;
+              }
+          in
+          Ok (item :: acc))
+        (Ok [])
+        transfers
+    in
+    return transfers
+
+  let tezlink_block_to_block_info ~l2_chain_id backend
       (level_info, version, chain, block) =
     let open Lwt_result_syntax in
     let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
@@ -216,6 +256,13 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let*? manager_operations =
       Block_services.deserialize_operations ~chain_id block.operations
     in
+    let* bootstrap_transfers =
+      (* To allow tzkt to index the bootstrap accounts, we add dummy transfers
+       from a faucet address to all the accounts present in durable storage at
+       block 0 (ie accounts added by an installer kernel). *)
+      if block.level = 2l then bootstrap_transfers_receipt chain_id backend
+      else return_nil
+    in
     let block_info : Block_services.block_info =
       {
         chain_id;
@@ -227,7 +274,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
             consensus_opperations;
             voting_operations;
             anonymous_operations;
-            manager_operations;
+            bootstrap_transfers @ manager_operations;
           ];
       }
     in
@@ -239,52 +286,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     (version, metadata)
 end
 
-module Current_block_header = struct
-  include Make_block_header (Current_block_services)
-
-  let tezlink_block_to_block_info ~l2_chain_id backend
-      (level_info, version, chain, block) =
-    let open Lwt_result_syntax in
-    let* version, block_info =
-      tezlink_block_to_block_info
-        ~l2_chain_id
-        backend
-        (level_info, version, chain, block)
-    in
-    (* To allow tzkt to index the bootstrap accounts, we add dummy transfers
-       from a faucet address to all the accounts present in durable storage at
-       block 0 (ie accounts added by an installer kernel). *)
-    if level_info.Tezos_types.level = 2l then
-      let* block_info =
-        match block_info.operations with
-        | [
-         consensus_opperations;
-         voting_operations;
-         anonymous_operations;
-         manager_operations;
-        ] ->
-            let* bootstrap_transfers =
-              Current_block_services.activate_bootstraps_with_transfers
-                ~chain_id:block_info.chain_id
-                backend
-            in
-            return
-              {
-                block_info with
-                operations =
-                  [
-                    consensus_opperations;
-                    voting_operations;
-                    anonymous_operations;
-                    bootstrap_transfers @ manager_operations;
-                  ];
-              }
-        | _ -> assert false
-      in
-      return (version, block_info)
-    else return (version, block_info)
-end
-
+module Current_block_header = Make_block_header (Current_block_services)
 module Zero_block_header = Make_block_header (Zero_block_services)
 module Genesis_block_header = Make_block_header (Genesis_block_services)
 
