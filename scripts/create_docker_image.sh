@@ -248,9 +248,21 @@ if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
     echo "Failed to pull CI image $image_test."
     echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
     exit 1
+  else
+    echo "Pull of $image_test succeeded"
   fi
 fi
 
+# ${BASE_IMAGE}/${BASE_IMAGE_VERSION} is the CI image that is built on master
+# using the latest tag from ./images/image_tag.sh images/ci  that corresponds
+# to the state of the repo specified in version.sh .
+#
+# $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to assign
+# the correct version to the octez binaries at compile time
+#
+# ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
+# to build L2 binaries.
+#
 echo "### Building tezos..."
 
 docker buildx build \
