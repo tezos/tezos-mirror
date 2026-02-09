@@ -10,6 +10,7 @@ use super::{Runtime, RuntimeError, ValueType};
 use crate::debug::HostDebug;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
+use crate::storage::StorageV1;
 use crate::{dal_parameters::RollupDalParameters, metadata::RollupMetadata, path::Path};
 use alloc::rc::Rc;
 use core::panic::{RefUnwindSafe, UnwindSafe};
@@ -75,16 +76,7 @@ impl<R: HostDebug> HostDebug for UnwindableRuntime<R> {
     }
 }
 
-impl<R: Runtime> Runtime for UnwindableRuntime<R> {
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.runtime.write().unwrap().write_output(from)
-    }
-
-    #[cfg(feature = "alloc")]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.runtime.write().unwrap().read_input()
-    }
-
+impl<R: StorageV1> StorageV1 for UnwindableRuntime<R> {
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         self.runtime.read().unwrap().store_has(path)
     }
@@ -167,6 +159,21 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
         self.runtime.write().unwrap().store_copy(from_path, to_path)
     }
 
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        self.runtime.read().unwrap().store_value_size(path)
+    }
+}
+
+impl<R: Runtime> Runtime for UnwindableRuntime<R> {
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.runtime.write().unwrap().write_output(from)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.runtime.write().unwrap().read_input()
+    }
+
     fn reveal_preimage(
         &self,
         hash: &[u8; PREIMAGE_HASH_SIZE],
@@ -196,10 +203,6 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
 
     fn reveal_dal_parameters(&self) -> RollupDalParameters {
         self.runtime.read().unwrap().reveal_dal_parameters()
-    }
-
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        self.runtime.read().unwrap().store_value_size(path)
     }
 
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {

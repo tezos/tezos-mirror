@@ -314,6 +314,7 @@ mod tests {
         metadata::RollupMetadata,
         path::RefPath,
         runtime::{Runtime, RuntimeError},
+        storage::StorageV1,
     };
 
     #[test]
@@ -448,10 +449,10 @@ mod tests {
             .map(|v| (v % 100).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &value)
+        StorageV1::store_write_all(&mut mock, &PATH, &value)
             .expect("Could not write value to store");
 
-        let value_in_durable = Runtime::store_read_all(&mock, &PATH)
+        let value_in_durable = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         let size = mock.store_value_size(&PATH);
@@ -470,10 +471,10 @@ mod tests {
             .map(|v| (v % 100).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &initial_value)
+        StorageV1::store_write_all(&mut mock, &PATH, &initial_value)
             .expect("Could not write value to store");
         let initial_size = mock.store_value_size(&PATH).expect("Could not read size");
-        let initial_value_in_store = Runtime::store_read_all(&mock, &PATH)
+        let initial_value_in_store = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         // Then write a new value of size ~2.1 KB
@@ -481,10 +482,10 @@ mod tests {
             .map(|v| (v % 50).try_into().unwrap())
             .collect();
 
-        Runtime::store_write_all(&mut mock, &PATH, &smaller_value)
+        StorageV1::store_write_all(&mut mock, &PATH, &smaller_value)
             .expect("Could not write value to store");
         let new_size = mock.store_value_size(&PATH).expect("Could not read size");
-        let new_value_in_store = Runtime::store_read_all(&mock, &PATH)
+        let new_value_in_store = StorageV1::store_read_all(&mock, &PATH)
             .expect("Could not read the value from the store");
 
         // The size of the value in the storage should have been shrinked, and

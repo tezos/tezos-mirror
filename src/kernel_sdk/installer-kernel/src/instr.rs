@@ -31,7 +31,8 @@ pub fn read_instruction_bytes(
     mut buffer: &mut [u8],
 ) -> Result<(), &'static str> {
     while !buffer.is_empty() {
-        let read_size = Runtime::store_read_slice(host, path, *offset, buffer)
+        let read_size = host
+            .store_read_slice(path, *offset, buffer)
             .map_err(|_| "Failed to read kernel boot path in read_instruction")?;
         *offset += read_size;
         buffer = &mut buffer[read_size..];

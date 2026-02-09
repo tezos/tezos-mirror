@@ -10,6 +10,7 @@ use tezos_smart_rollup_encoding::dac::certificate::*;
 use tezos_smart_rollup_encoding::dac::pages::*;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 const MAX_DAC_ONE_SHOT_SIZE: usize = 10063860;
 

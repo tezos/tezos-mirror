@@ -13,7 +13,7 @@ use crate::{delayed_inbox::DelayedInbox, sub_block, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{internal_runtime::InternalRuntime, runtime::KernelHost};
-use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+use tezos_smart_rollup_host::{path::RefPath, storage::StorageV1};
 
 #[cfg(target_arch = "wasm32")]
 use tezos_evm_runtime::internal_runtime::WasmInternalHost;

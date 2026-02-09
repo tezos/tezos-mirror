@@ -66,7 +66,8 @@ mod test {
     use super::reveal_root_hash_to_store;
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
     use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
-    use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
+    use tezos_smart_rollup_host::path::RefPath;
+    use tezos_smart_rollup_host::storage::StorageV1;
     use tezos_smart_rollup_mock::MockHost;
 
     const TMP_REVEAL_PATH: RefPath = RefPath::assert_from(b"/__sdk/installer/reveal");

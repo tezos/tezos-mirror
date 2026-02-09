@@ -12,6 +12,7 @@ use tezos_evm_logging::Verbosity;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
@@ -63,17 +64,7 @@ impl<Host: HostDebug> HostDebug for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
-        self.host.write_output(from)
-    }
-
-    #[inline(always)]
-    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
-        self.host.read_input()
-    }
-
+impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         let path = safe_path(path)?;
@@ -170,18 +161,30 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
     }
 
     #[inline(always)]
+    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
+        let path = safe_path(path)?;
+        self.host.store_value_size(&path)
+    }
+}
+
+impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
+    #[inline(always)]
+    fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
+        self.host.write_output(from)
+    }
+
+    #[inline(always)]
+    fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
+        self.host.read_input()
+    }
+
+    #[inline(always)]
     fn reveal_preimage(
         &self,
         hash: &[u8; PREIMAGE_HASH_SIZE],
         destination: &mut [u8],
     ) -> Result<usize, RuntimeError> {
         self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
-    fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
-        let path = safe_path(path)?;
-        self.host.store_value_size(&path)
     }
 
     #[inline(always)]

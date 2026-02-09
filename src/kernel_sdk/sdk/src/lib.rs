@@ -35,6 +35,9 @@ pub mod host {
 
     #[doc(inline)]
     pub use tezos_smart_rollup_host::debug::HostDebug;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::storage::StorageV1;
 }
 
 /// Lowest level definitions of host functions & associated constants.

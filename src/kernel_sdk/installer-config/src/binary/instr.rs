@@ -160,14 +160,12 @@ pub mod evaluation {
                     .map_err(|_| "Invalid hash conversion.")?;
                 reveal_root_hash_to_store(host, hash, to)
             }
-            ConfigInstruction::Move(MoveInstruction { from, to }) => {
-                Runtime::store_move(host, from, to)
-                    .map_err(|_| "Couldn't move path during config application")
-            }
-            ConfigInstruction::Set(SetInstruction { value, to }) => {
-                Runtime::store_write(host, to, value.as_ref(), 0)
-                    .map_err(|_| "Couldn't set key during config application")
-            }
+            ConfigInstruction::Move(MoveInstruction { from, to }) => host
+                .store_move(from, to)
+                .map_err(|_| "Couldn't move path during config application"),
+            ConfigInstruction::Set(SetInstruction { value, to }) => host
+                .store_write(to, value.as_ref(), 0)
+                .map_err(|_| "Couldn't set key during config application"),
         }
     }
 }
