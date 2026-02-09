@@ -99,10 +99,9 @@ let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
 let chain_directory_path = Tezos_shell_services.Chain_services.path
 
 let block_directory_path =
-  Tezos_rpc.Path.subst2
-  @@ Tezos_rpc.Path.prefix
-       chain_directory_path
-       Tezos_shell_services.Block_services.path
+  Tezos_rpc.Path.prefix
+    chain_directory_path
+    Tezos_shell_services.Block_services.path
 
 module Make_block_header
     (Proto : Tezlink_protocol)
@@ -254,37 +253,6 @@ struct
     (version, metadata)
 end
 
-module type HEADER = sig
-  module Block_services : Tezlink_block_service
-
-  val tezlink_block_to_shell_header :
-    L2_types.Tezos_block.t -> Block_header.shell_header tzresult
-
-  val tezlink_block_to_block_header :
-    l2_chain_id:L2_types.chain_id ->
-    L2_types.Tezos_block.t * 'b ->
-    Block_services.block_header tzresult
-
-  val tezlink_block_to_block_info :
-    l2_chain_id:L2_types.chain_id ->
-    (module Tezlink_backend_sig.S) ->
-    Tezos_types.level
-    * Tezos_shell_services.Block_services.version
-    * [`Main]
-    * L2_types.Tezos_block.t ->
-    (Tezos_shell_services.Block_services.version * Block_services.block_info)
-    tzresult
-    Lwt.t
-
-  val tezlink_block_metadata :
-    Tezos_types.level * Tezlink_protocols.Shell_impl.version ->
-    ( Tezlink_protocols.Shell_impl.version * Block_services.block_metadata,
-      tztrace )
-    result
-
-  val protocols : Tezlink_protocols.protocols
-end
-
 module Current_block_header =
   Make_block_header (Imported_protocol) (Imported_protocol)
 module Zero_block_header = Make_block_header (Zero_protocol) (Genesis_protocol)
@@ -310,12 +278,10 @@ let opt_register ~service ~impl dir =
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
   opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
-let register_dynamic ~root_dir ~path dir_of_path =
-  Tezos_rpc.Directory.register_dynamic_directory root_dir path dir_of_path
-
 (** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
 let build_block_static_directory ~l2_chain_id
-    (module Backend : Tezlink_backend_sig.S) =
+    (module Backend : Tezlink_backend_sig.S) :
+    tezlink_rpc_context Imported_env.RPC_directory.t =
   let open Lwt_result_syntax in
   Tezos_rpc.Directory.empty
   |> register_with_conversion
@@ -588,6 +554,35 @@ let build_block_static_directory ~l2_chain_id
            let operation_opt = List.nth_opt operations operation_index in
            return (Option.map (fun op -> (o#version, op)) operation_opt))
 
+let retrieve_level (module Backend : Tezlink_backend_sig.S) chain block =
+  let open Lwt_result_syntax in
+  let*? chain = check_chain chain in
+  let*? block = check_block block in
+  let* tezlink_level = Backend.current_level chain block ~offset:0l in
+  return tezlink_level.level
+
+let protocol_for_block_or_level level_result :
+    (module Tezlink_protocol) * (module Tezlink_protocol) =
+  let imported =
+    ( (module Tezos_services.Imported_protocol : Tezlink_protocol),
+      (module Tezos_services.Imported_protocol : Tezlink_protocol) )
+  in
+  match level_result with
+  | Ok level -> (
+      match level with
+      | 0l ->
+          ( (module Zero_protocol : Tezlink_protocol),
+            (module Genesis_protocol : Tezlink_protocol) )
+      | 1l ->
+          ( (module Genesis_protocol : Tezlink_protocol),
+            (module Tezos_services.Imported_protocol : Tezlink_protocol) )
+      | _ -> imported)
+  | _ ->
+      (* TezosX PoC also uses the same backend as Tezlink for now. So when
+        requesting the current_level, it fails as blocks are not stored at the same path.
+        Until TezosX Poc has its own backend, we should return imported to prevent the failure.*)
+      imported
+
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
     block headers and block metadata at these levels to indicate the hashes of the genesis protocols.
@@ -597,15 +592,19 @@ let build_block_static_directory ~l2_chain_id
 
     To ensure consistency, we register all the services returning block infos and block headers the same way. *)
 let register_dynamic_block_services ~l2_chain_id
-    (module Backend : Tezlink_backend_sig.S) base_dir =
+    (module Backend : Tezlink_backend_sig.S) (chain : chain) (block : block) =
   let open Lwt_result_syntax in
+  let*! tezlink_level = retrieve_level (module Backend) chain block in
+  let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
+      =
+    protocol_for_block_or_level tezlink_level
+  in
+  let module Block_header = Make_block_header (Proto) (Next_proto) in
+  let module S = Block_header.Block_services.S in
   let static_dir = build_block_static_directory ~l2_chain_id (module Backend) in
-  let make_dir (module Block_header : HEADER) =
-    let module S = Block_header.Block_services.S in
+  let dir =
     static_dir
-    |> register
-         ~service:(import_service S.info)
-         ~impl:(fun (((), chain), block) q () ->
+    |> register ~service:S.info ~impl:(fun (((), chain), block) q () ->
            let*? chain = check_chain chain in
            let*? block = check_block block in
            let* tezlink_block = Backend.block chain block in
@@ -651,23 +650,7 @@ let register_dynamic_block_services ~l2_chain_id
     |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
            make_env chain block)
   in
-  let dynamic_dir =
-    register_dynamic
-      ~root_dir:Tezos_rpc.Directory.empty
-      ~path:block_directory_path
-      (fun (((), _chain), block) ->
-        match block with
-        (* Trying to access the first blocks info using `Head offset will lead
-           to incoherent results. If it becomes a pb we will need to ignore
-           potential errors from Backend.current_level. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
-        (* RPCs at directory level don't appear properly in the describe RPC *)
-        | `Genesis | `Level 0l ->
-            Lwt.return @@ make_dir (module Zero_block_header)
-        | `Level 1l -> Lwt.return @@ make_dir (module Genesis_block_header)
-        | _ -> Lwt.return @@ make_dir (module Current_block_header))
-  in
-  Tezos_rpc.Directory.merge base_dir dynamic_dir
+  Lwt.return dir
 
 let register_chain_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
@@ -730,8 +713,14 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
 (** Builds the root directory. *)
 let build_dir ~l2_chain_id ~add_operation backend =
   let (module Backend : Tezlink_backend_sig.S) = backend in
-  Tezos_rpc.Directory.empty
-  |> register_dynamic_block_services ~l2_chain_id backend
+  let base_dir =
+    Tezos_rpc.Directory.register_dynamic_directory
+      Tezos_rpc.Directory.empty
+      block_directory_path
+      (fun (((), chain), block) ->
+        register_dynamic_block_services ~l2_chain_id backend chain block)
+  in
+  base_dir
   |> register_chain_services ~l2_chain_id backend
   |> register_with_conversion
        ~service:Tezos_services.bootstrapped
