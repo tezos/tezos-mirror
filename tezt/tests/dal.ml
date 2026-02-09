@@ -70,6 +70,29 @@ let init_logger () : logger =
   in
   {log_step}
 
+let store_path dal_node store_kind =
+  Format.sprintf
+    "/%s/store/%s_store"
+    (Dal_node.data_dir dal_node)
+    (match store_kind with
+    | `Slots -> "slot"
+    | `Shards -> "shard"
+    | `Skip_list -> "skip_list")
+
+let data_path store_path store_kind ~slot_size ~published_level ~slot_index =
+  match store_kind with
+  | `Slots ->
+      Format.sprintf
+        "%s/%d_%d_%d"
+        store_path
+        published_level
+        slot_index
+        slot_size
+  | `Shards -> Format.sprintf "%s/%d_%d" store_path published_level slot_index
+  | `Skip_list ->
+      failwith
+        "Skip-list are store in an sqlite DB; cannot access data this way"
+
 (* This function checks that in the skip list store of the given
    [dal_node]:
    (1) the 'hashes' coincides with [expected_levels] (up to ordering)
@@ -5527,17 +5550,11 @@ let dal_slots_retrievability =
     let mk_dal_pub ~idx ~name =
       make_dal_node ~operator_profiles:[idx] ~name l1_node
     in
-    let store_path dal_node =
-      Format.sprintf
-        "/%s/store/%s_store"
-        (Dal_node.data_dir dal_node)
-        (match store_kind with `Slots -> "slot" | `Shards -> "shard")
-    in
     let store_uri dal_node =
       let fragment =
         match store_kind with `Slots -> "#slots" | `Shards -> "#shards"
       in
-      Format.sprintf "file://%s%s" (store_path dal_node) fragment
+      Format.sprintf "file://%s%s" (store_path dal_node store_kind) fragment
     in
 
     let* dal_pub1 = mk_dal_pub ~idx:1 ~name:"dal_pub1" in
@@ -5677,27 +5694,20 @@ let dal_slots_retrievability =
       |> fetch_404_expected ~__LOC__
     in
 
-    let data_path dal ~slot_index =
-      match store_kind with
-      | `Slots ->
-          Format.sprintf
-            "%s/%d_%d_%d"
-            (store_path dal)
-            published_level
-            slot_index
-            slot_size
-      | `Shards ->
-          Format.sprintf "%s/%d_%d" (store_path dal) published_level slot_index
+    let store_path1 = store_path dal_pub1 store_kind in
+    let store_path2 = store_path dal_pub2 store_kind in
+    let data_path1 =
+      data_path store_path1 store_kind ~slot_size ~published_level ~slot_index:1
     in
+    let data_path2 =
+      data_path store_path2 store_kind ~slot_size ~published_level ~slot_index:2
+    in
+
     (* C.6 Tamper slot1 content: expect 404 + event *)
     let* () =
       Log.info "C.6: Tamper data content" ;
       let () =
-        Sys.command
-          (Format.sprintf
-             "cp %s %s"
-             (data_path dal_pub2 ~slot_index:2)
-             (data_path dal_pub1 ~slot_index:1))
+        Sys.command (Format.sprintf "cp %s %s" data_path2 data_path1)
         |> fun exit_code -> assert (exit_code = 0)
       in
       let expected_event =
@@ -5718,10 +5728,7 @@ let dal_slots_retrievability =
         unit
       else
         let () = Log.info "C.7: Tamper slot2 size" in
-        let () =
-          Sys.command ("echo bad > " ^ data_path dal_pub2 ~slot_index:2)
-          |> ignore
-        in
+        let () = Sys.command ("echo bad > " ^ data_path2) |> ignore in
         let expected_event =
           wait_for_event_promise
             valid_dal_fetcher_1_2
