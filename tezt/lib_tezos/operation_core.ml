@@ -1204,7 +1204,7 @@ let inject_error_check_recommended_fee ~loc ~rex ~expected_fee op client =
 let dal_data_availibility_attester_not_in_committee protocol =
   if Protocol.number protocol >= 025 then
     rex
-      {|The attester (tz[\w\d]+), with slot ([\d]+), is not part of the DAL committee for the level ([\d]+), and included a non-empty DAL attestation\.|}
+      {|The attester (tz[\w\d]+) is not part of the DAL committee for the committee level ([\d]+) and included a non-empty DAL attestation at attested level ([\d]+) and lag index ([\d]+)\.|}
   else
     rex
       {|The attester (tz[\w\d]+), with slot ([\d]+), is not part of the DAL committee for the level ([\d]+)\.|}
