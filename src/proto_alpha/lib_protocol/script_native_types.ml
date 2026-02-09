@@ -175,6 +175,8 @@ module CLST_types = struct
 
   type redeem = nat
 
+  type clst_entrypoints = (deposit, redeem) or_
+
   type transfer =
     ( address (* from_ *),
       (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
@@ -183,7 +185,9 @@ module CLST_types = struct
     pair
     Script_list.t
 
-  type arg = (deposit, (redeem, transfer) or_) or_
+  type fa21_entrypoints = transfer
+
+  type arg = (clst_entrypoints, fa21_entrypoints) or_
 
   type ledger = (address, nat) big_map
 
@@ -197,14 +201,14 @@ module CLST_types = struct
     | Transfer of transfer
 
   let entrypoint_from_arg : arg -> entrypoint = function
-    | L p -> Deposit p
-    | R (L p) -> Redeem p
-    | R (R p) -> Transfer p
+    | L (L p) -> Deposit p
+    | L (R p) -> Redeem p
+    | R p -> Transfer p
 
   let entrypoint_to_arg : entrypoint -> arg = function
-    | Deposit p -> L p
-    | Redeem p -> R (L p)
-    | Transfer p -> R (R p)
+    | Deposit p -> L (L p)
+    | Redeem p -> L (R p)
+    | Transfer p -> R p
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -230,8 +234,13 @@ module CLST_types = struct
     let* deposit_type in
     let* redeem_type in
     let* transfer_type in
-    let* r1 = make_entrypoint_node redeem_type transfer_type in
-    let* arg_type = make_entrypoint_node deposit_type r1 in
+    let* clst_entrypoints_type =
+      make_entrypoint_node deposit_type redeem_type
+    in
+    let fa21_entrypoints_type = transfer_type in
+    let* arg_type =
+      make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type
+    in
     return (finalize_entrypoint arg_type)
 
   let storage_type : storage ty_node tzresult =
