@@ -627,16 +627,6 @@ let version :
     Tezos_rpc.Service.t =
   Tezos_shell_services.Version_services.S.version
 
-let protocols :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Tezlink_protocols.protocols )
-    Tezos_rpc.Service.t =
-  import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
-
 (* Queries will be ignored for now. *)
 let contract_info :
     ( [`GET],
@@ -722,66 +712,9 @@ let constants :
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.Constants_services.S.all
 
-let hash :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Block_hash.t )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.hash
-
 let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Chain_services.S.chain_id
-
-let operation_hashes :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Operation_hash.t list list )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.Operation_hashes.operation_hashes
-
-let operation_hashes_in_pass :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context * int,
-      unit,
-      unit,
-      Operation_hash.t list )
-    Tezos_rpc.Service.t =
-  import_service_with_arg
-    Current_block_services.S.Operation_hashes.operation_hashes_in_pass
-
-let operation :
-    ( [`GET],
-      tezlink_rpc_context,
-      (tezlink_rpc_context * int) * int,
-      < force_metadata : bool
-      ; metadata : [`Always | `Never] option
-      ; version : Tezos_shell_services.Block_services.version >,
-      unit,
-      Tezos_shell_services.Block_services.version
-      * Current_block_services.operation )
-    Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
-
-let operations :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      < force_metadata : bool
-      ; metadata : [`Always | `Never] option
-      ; version : Tezlink_protocols.Shell_impl.version >,
-      unit,
-      Tezos_shell_services.Block_services.version
-      * Current_block_services.operation list list )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.Operations.operations
 
 let bootstrapped :
     ( [`GET],

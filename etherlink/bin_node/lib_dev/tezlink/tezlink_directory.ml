@@ -278,7 +278,9 @@ let opt_register ~service ~impl dir =
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
   opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
-(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
+(** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`.
+    This part is based on the current protocol supported by Tezlink, which means that if we request the counter
+    of a tz1 on an old block the encoding used will be the one of the current live protocol. *)
 let build_block_static_directory ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) :
     tezlink_rpc_context Imported_env.RPC_directory.t =
@@ -366,13 +368,6 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.constants chain block)
-  |> opt_register_with_conversion
-       ~service:Tezos_services.hash
-       ~impl:(fun (((), chain), block) () () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         Backend.block_hash chain block)
-       ~convert_output:ethereum_to_tezos_block_hash
   |> register
        ~service:Tezos_services.expected_issuance
        ~impl:(fun (((), chain), block) () () ->
@@ -472,87 +467,6 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.big_map_raw_info chain block id)
-  |> register
-       ~service:Tezos_services.operation_hashes
-       ~impl:(fun (((), chain), block) () () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         let consensus_operation_hashes = [] in
-         let voting_operation_hashes = [] in
-         let anonymous_operation_hashes = [] in
-         let* manager_operation_hashes =
-           let* block = Backend.block chain block in
-           let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations_header
-               block.operations
-           in
-           return
-           @@ List.map (fun (hash, _header, _op_and_receipt) -> hash) operations
-         in
-         return
-           [
-             consensus_operation_hashes;
-             voting_operation_hashes;
-             anonymous_operation_hashes;
-             manager_operation_hashes;
-           ])
-  |> register
-       ~service:Tezos_services.operation_hashes_in_pass
-       ~impl:(fun ((((), chain), block), list_offset) () () ->
-         if list_offset <> Imported_protocol.Operation_repr.manager_pass
-         (* All tezlink operations are manager operations *)
-         then return_nil
-         else
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* block = Backend.block chain block in
-           let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations_header
-               block.operations
-           in
-           return (List.map (fun (hash, _, _) -> hash) operations))
-  |> register
-       ~service:Tezos_services.operations
-       ~impl:(fun (((), chain), block) o () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-         let* block = Backend.block chain block in
-         let consensus_operations = [] in
-         let voting_operations = [] in
-         let anonymous_operations = [] in
-         let*? manager_operations =
-           Tezos_services.Current_block_services.deserialize_operations
-             ~chain_id
-             block.operations
-         in
-         return
-           ( o#version,
-             [
-               consensus_operations;
-               voting_operations;
-               anonymous_operations;
-               manager_operations;
-             ] ))
-  |> opt_register
-       ~service:Tezos_services.operation
-       ~impl:(fun
-           (((((), chain), block), operation_pass), operation_index) o () ->
-         let*? chain = check_chain chain in
-         let*? block = check_block block in
-         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-         if operation_pass <> Imported_protocol.Operation_repr.manager_pass then
-           (* All tezlink operations are manager operations *)
-           return_none
-         else
-           let* block = Backend.block chain block in
-           let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations
-               ~chain_id
-               block.operations
-           in
-           let operation_opt = List.nth_opt operations operation_index in
-           return (Option.map (fun op -> (o#version, op)) operation_opt))
 
 let retrieve_level (module Backend : Tezlink_backend_sig.S) chain block =
   let open Lwt_result_syntax in
@@ -634,7 +548,7 @@ let register_dynamic_block_services ~l2_chain_id
            Lwt_result_syntax.return tezlink_block)
          ~convert_output:Block_header.tezlink_block_to_shell_header
     |> register
-         ~service:Tezos_services.protocols
+         ~service:S.protocols
          ~impl:(fun (((), chain), block) _query () ->
            let*? `Main = check_chain chain in
            let*? _block = check_block block in
@@ -647,8 +561,97 @@ let register_dynamic_block_services ~l2_chain_id
            let* level = Backend.current_level chain block ~offset:0l in
            Lwt_result_syntax.return (level, q#version))
          ~convert_output:Block_header.tezlink_block_metadata
-    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
-           make_env chain block)
+    |> opt_register_with_conversion
+         ~service:S.hash
+         ~impl:(fun (((), chain), block) () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           Backend.block_hash chain block)
+         ~convert_output:ethereum_to_tezos_block_hash
+    |> register
+         ~service:S.Operations.operations
+         ~impl:(fun (((), chain), block) o () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+           let* block = Backend.block chain block in
+           let consensus_operations = [] in
+           let voting_operations = [] in
+           let anonymous_operations = [] in
+           let*? manager_operations =
+             Block_header.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
+           return
+             ( o#version,
+               [
+                 consensus_operations;
+                 voting_operations;
+                 anonymous_operations;
+                 manager_operations;
+               ] ))
+    |> opt_register
+         ~service:S.Operations.operation
+         ~impl:(fun
+             (((((), chain), block), operation_pass), operation_index) o () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+           if operation_pass <> Imported_protocol.Operation_repr.manager_pass
+           then
+             (* All tezlink operations are manager operations *)
+             return_none
+           else
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations
+                 ~chain_id
+                 block.operations
+             in
+             let operation_opt = List.nth_opt operations operation_index in
+             return (Option.map (fun op -> (o#version, op)) operation_opt))
+    |> register
+         ~service:S.Operation_hashes.operation_hashes
+         ~impl:(fun (((), chain), block) () () ->
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let consensus_operation_hashes = [] in
+           let voting_operation_hashes = [] in
+           let anonymous_operation_hashes = [] in
+           let* manager_operation_hashes =
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations_header
+                 block.operations
+             in
+             return
+             @@ List.map
+                  (fun (hash, _header, _op_and_receipt) -> hash)
+                  operations
+           in
+           return
+             [
+               consensus_operation_hashes;
+               voting_operation_hashes;
+               anonymous_operation_hashes;
+               manager_operation_hashes;
+             ])
+    |> register
+         ~service:S.Operation_hashes.operation_hashes_in_pass
+         ~impl:(fun ((((), chain), block), list_offset) () () ->
+           if list_offset <> Imported_protocol.Operation_repr.manager_pass
+           (* All tezlink operations are manager operations *)
+           then return_nil
+           else
+             let*? chain = check_chain chain in
+             let*? block = check_block block in
+             let* block = Backend.block chain block in
+             let*? operations =
+               Block_header.Block_services.deserialize_operations_header
+                 block.operations
+             in
+             return (List.map (fun (hash, _, _) -> hash) operations))
   in
   Lwt.return dir
 
