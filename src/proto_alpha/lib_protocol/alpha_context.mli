@@ -1316,6 +1316,8 @@ module Level : sig
   val may_compute_randao : context -> bool
 
   module Map : Map.S with type key = t
+
+  module Set : Set.S with type elt = t
 end
 
 (** This module re-exports definitions from {!Fitness_repr}. *)
