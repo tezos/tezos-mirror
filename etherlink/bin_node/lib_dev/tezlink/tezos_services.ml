@@ -537,11 +537,11 @@ type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
 
-type tezlink_rpc_context = {block : block; chain : chain}
+type tezlink_rpc_context = (unit * chain) * block
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : chain) (block : block) : tezlink_rpc_context Lwt.t =
-  Lwt.return {block; chain}
+  Lwt.return (((), chain), block)
 
 module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
