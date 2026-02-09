@@ -13756,6 +13756,258 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   in
   tests ~migrate_from ~migrate_to ~check_rpc:true
 
+let test_dal_node_snapshot_over_migration ~operators ~migration_level
+    ~migrate_to parameters node client dal_node =
+  let* () = Helpers.init_prover ~__LOC__ () in
+  let* old_cryptobox =
+    Helpers.make_cryptobox parameters.Dal_common.Parameters.cryptobox
+  in
+  (* Get the new protocol's DAL parameters and create a second cryptobox *)
+  let base = Either.right (migrate_to, None) in
+  let* new_proto_parameters = generate_protocol_parameters base migrate_to [] in
+  let new_parameters =
+    Dal.Parameters.from_protocol_parameters new_proto_parameters
+  in
+  let* new_cryptobox = Helpers.make_cryptobox new_parameters.cryptobox in
+  let* () = bake_for client in
+  let* start = Lwt.map succ (Node.get_level node) in
+  let to_bake = 10 in
+  let old_attestation_lag = parameters.Dal_common.Parameters.attestation_lag in
+  let new_attestation_lag =
+    new_parameters.Dal_common.Parameters.attestation_lag
+  in
+  let snapshot_window = start + to_bake + 2 in
+  (* We add +2 because, DAL node deals with finalized blocks, which are
+     described by the DAL node's block_hanadler as: A slot header is considered
+     finalized when it is in a block with at least two other blocks on top of
+     it, as guaranteed by Tenderbake. *)
+  (* The snapshot export caps max_published_level at:
+       last_processed_level - (validation_slack + head_attestation_lag + 1)
+     where head_attestation_lag is the NEW protocol's attestation_lag.
+     We also account for finality (DAL node processes blocks 2 behind head). *)
+  let snapshot_exclusion_window =
+    new_attestation_lag + Tezos_dal_node_lib.Constants.validation_slack
+    + 2 (* finality: DAL node processes finalized blocks, 2 behind head *)
+    + 1 (* the export's frozen level formula uses attestation_lag + slack + 1 *)
+  in
+  let stop = snapshot_window + snapshot_exclusion_window in
+  let num_bakers = Array.length Account.Bootstrap.keys in
+  let num_slots = List.length operators in
+  let rec publish_loop acc level =
+    if level > stop then return acc
+    else
+      let current_cryptobox =
+        if level <= migration_level then old_cryptobox else new_cryptobox
+      in
+      let current_params =
+        if level <= migration_level then parameters else new_parameters
+      in
+      let index =
+        List.nth operators (slot_idx current_params level mod num_slots)
+      in
+      let source = Account.Bootstrap.keys.(level mod num_bakers) in
+      let slot_content =
+        Format.asprintf "content at level %d index %d" level index
+      in
+      let* predecessor = Node.wait_for_level node (pred level) in
+      if predecessor >= level then
+        Test.fail
+          "Tried to publish a slot header at level %d but the predecessor \
+           level is %d"
+          level
+          predecessor ;
+      let* _op_hash =
+        publish_dummy_slot
+          ~source
+          ~index
+          ~message:slot_content
+          current_cryptobox
+          client
+      in
+      let slot_size = current_params.Dal.Parameters.cryptobox.slot_size in
+      let* _commitment, _proof =
+        Helpers.(
+          store_slot dal_node ~slot_index:index
+          @@ make_slot ~slot_size slot_content)
+      in
+      let* () =
+        bake_for ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node) client
+      and* _ = Node.wait_for_level node level
+      and* () =
+        if level > 3 then wait_for_layer1_final_block dal_node (level - 2)
+        else unit
+      in
+      publish_loop ((level, index) :: acc) (level + 1)
+  in
+  let* published = publish_loop [] start in
+  (* Select an arbitrary subset of slots to actually export. *)
+  let slots_exported = [List.hd operators] in
+  let expected ~level ~index =
+    let is_index_ok i = List.mem i slots_exported in
+    (* Level is ok when it fits the snapshot window and is not excluded by the
+       attestation_lag window (in which slots are unattested). *)
+    let is_level_ok i =
+      (i < migration_level - old_attestation_lag || i > migration_level)
+      && i >= start && i <= snapshot_window
+    in
+    is_index_ok index && is_level_ok level
+  in
+  let expected_exported_levels =
+    List.filter (fun (level, index) -> expected ~level ~index) published
+  in
+  let expected_missing_levels =
+    (* We exclude the [stop] level in which no slot was published*)
+    List.filter
+      (fun ((level, _) as e) ->
+        (not (List.mem e expected_exported_levels))
+        (* Remove all unattested_levels*)
+        && level != stop
+        && level != start
+        && (level < migration_level - old_attestation_lag
+           || level > migration_level))
+      published
+  in
+  Log.info
+    "Expected exported levels/slots: %a"
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+       (fun fmt (x, y) -> Format.fprintf fmt "(%d,%d)" x y))
+    expected_exported_levels ;
+  Log.info
+    "Expected missing levels/slots: %a"
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+       (fun fmt (x, y) -> Format.fprintf fmt "(%d,%d)" x y))
+    expected_missing_levels ;
+  let min_published_level = Int32.of_int start in
+  let max_published_level = Int32.of_int stop in
+  let file = Temp.file "snapshot-over_migration" in
+  let* () =
+    Dal_node.snapshot_export
+      ~min_published_level
+      ~max_published_level
+      ~slots:slots_exported
+      ~endpoint:(Node.as_rpc_endpoint node)
+      dal_node
+      file
+  in
+  let fresh_dal_node = Dal_node.create ~node () in
+  let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
+  let* () =
+    Dal_node.snapshot_import
+      ~no_check:true (* Snapshot data validation is not implemented yet *)
+      ~min_published_level
+      ~max_published_level
+      ~slots:slots_exported
+      ~endpoint:(Node.as_rpc_endpoint node)
+      fresh_dal_node
+      file
+  in
+  let* () = Dal_node.run fresh_dal_node in
+  (* Compare slot statuses between the original node and the fresh one built from snapshot. *)
+  let* () =
+    Log.info
+      "Checking that the DAL node bootstrapped from snapshot has the expected \
+       slot data..." ;
+    Lwt_list.iter_s
+      (fun (slot_level, slot_index) ->
+        let* status_orig =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+        in
+        let* status_fresh =
+          Dal_RPC.(
+            call fresh_dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+        in
+        let pp_status s = Format.asprintf "%a" Dal_RPC.pp_slot_id_status s in
+        Check.(status_fresh = status_orig)
+          ~__LOC__
+          Dal.Check.slot_id_status_typ
+          ~error_msg:
+            (Format.sprintf
+               "Snapshot import mismatch for slot (level=%d,index=%d): got %s, \
+                expected %s"
+               slot_level
+               slot_index
+               (pp_status status_fresh)
+               (pp_status status_orig)) ;
+        let* content_orig =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        let* content_fresh =
+          Dal_RPC.(
+            call fresh_dal_node
+            @@ get_level_slot_content ~slot_level ~slot_index)
+          |> Lwt.map Helpers.content_of_slot
+        in
+        Check.(content_fresh = content_orig)
+          ~__LOC__
+          Check.string
+          ~error_msg:
+            (Format.sprintf
+               "Snapshot import mismatch for slot (level=%d,index=%d)"
+               slot_level
+               slot_index) ;
+        unit)
+      expected_exported_levels
+  in
+  let unexpected_success = Failure "Should not succeed" in
+  let* () =
+    Log.info
+      "Checking that the DAL node bootstrapped from snapshot lacks the \
+       expected slot data..." ;
+    Lwt_list.iter_s
+      (fun (slot_level, slot_index) ->
+        (* Check that the source node has data *)
+        let* _ =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+        in
+        (* Check that the node bootstrapped from snapshot does not have data *)
+        let* () =
+          Lwt.catch
+            (fun () ->
+              let* _ =
+                Dal_RPC.(
+                  call fresh_dal_node
+                  @@ get_level_slot_content ~slot_level ~slot_index)
+              in
+              Lwt.fail unexpected_success)
+            (fun e ->
+              if e = unexpected_success then
+                Test.fail
+                  "After snapshot import: expected failure for \
+                   /levels/%d/slot/%d/content"
+                  slot_level
+                  slot_index
+              else Lwt.return_unit)
+        in
+        unit)
+      expected_missing_levels
+  in
+  Dal_node.terminate fresh_dal_node
+
+let test_snapshot_export_over_migration ~migrate_from ~migrate_to =
+  let operators = [0; 3] in
+  test_l1_migration_scenario
+    ~description:"snapshot over migration"
+    ~migrate_from
+    ~migrate_to
+    ~migration_level:10
+    ~operator_profiles:operators
+    ~scenario:(fun ~migration_level dal_params client node dal_node ->
+      test_dal_node_snapshot_over_migration
+        ~operators
+        ~migration_level
+        ~migrate_to
+        dal_params
+        node
+        client
+        dal_node)
+    ()
+
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
   Skip_list_rpcs.test_skip_list_rpcs_with_migration
@@ -13784,7 +14036,8 @@ let register_migration ~migrate_from ~migrate_to =
     ~migration_level:3
     ~migrate_from
     ~migrate_to
-    ()
+    () ;
+  test_snapshot_export_over_migration ~migrate_from ~migrate_to
 
 let () =
   Regression.register
