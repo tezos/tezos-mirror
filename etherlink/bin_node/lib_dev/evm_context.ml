@@ -784,11 +784,11 @@ module State = struct
     let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
     Z.sub gas_used da_fees
 
-  let store_block_unsafe ~base_fee_per_gas ~da_fee_per_byte conn evm_state block
-      =
+  let store_block_unsafe ?tez_block ~base_fee_per_gas ~da_fee_per_byte conn
+      evm_state block =
     let open Lwt_result_syntax in
     (* Store the block itself. *)
-    let* () = Evm_store.Blocks.store conn block in
+    let* () = Evm_store.Blocks.store ?tez_block conn block in
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
@@ -1172,6 +1172,25 @@ module State = struct
         {number = block_number; timestamp; payload}
     in
 
+    (* TezosX: if the Tezos runtime is active, retrieve the Tezos block
+       produced alongside the primary EVM block so we can store both in a
+       single INSERT. *)
+    let* tezosx_tez_block =
+      let* runtimes =
+        Durable_storage.list_runtimes (read_from_state evm_state)
+      in
+      if List.mem ~equal:( = ) Tezosx.Tezos runtimes then
+        let* tez_block =
+          Evm_state.retrieve_block_at_root
+            ~chain_family:Michelson
+            ~root:Durable_storage_path.tezosx_tezos_blocks_root
+            evm_state
+        in
+        return
+          (match tez_block with Some (Tez block) -> Some block | _ -> None)
+      else return_none
+    in
+
     (* Store block and share receipts *)
     let* evm_state, receipts, execution_gas =
       let* execution_gas, receipts =
@@ -1186,6 +1205,7 @@ module State = struct
                 (read_from_state evm_state)
             in
             store_block_unsafe
+              ?tez_block:tezosx_tez_block
               ~da_fee_per_byte
               ~base_fee_per_gas
               conn

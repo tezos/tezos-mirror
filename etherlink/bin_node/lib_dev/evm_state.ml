@@ -413,9 +413,8 @@ let execute_single_transaction ~data_dir ~pool ~native_execution ~config
       failwith
         "No value found in context where transactions receipts should be stored"
 
-let retrieve_block ~chain_family evm_state =
+let retrieve_block_at_root ~chain_family ~root evm_state =
   let open Lwt_result_syntax in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
   let* storage_version = storage_version evm_state in
   if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let*! bytes =
@@ -430,6 +429,10 @@ let retrieve_block ~chain_family evm_state =
         (Durable_storage_path.Block.by_hash ~root current_block_hash)
     in
     return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+
+let retrieve_block ~chain_family evm_state =
+  let root = Durable_storage_path.root_of_chain_family chain_family in
+  retrieve_block_at_root ~chain_family ~root evm_state
 
 let assemble_block (type f) ~pool ~data_dir
     ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number

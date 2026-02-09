@@ -18,6 +18,10 @@ val etherlink_root : path
 
 val etherlink_safe_root : path
 
+(** TezosX: root for Tezos blocks stored under the EVM world state
+    ([/evm/world_state/tezlink]). *)
+val tezosx_tezos_blocks_root : path
+
 val root_of_chain_family : _ L2_types.chain_family -> path
 
 val reboot_counter : string
