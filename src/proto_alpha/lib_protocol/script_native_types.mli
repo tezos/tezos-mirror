@@ -32,6 +32,8 @@ module CLST_types : sig
 
   type redeem = nat
 
+  type clst_entrypoints = (deposit, redeem) or_
+
   type transfer =
     ( address (* from_ *),
       (address (* to_ *), nat (* token_id *), nat (* amount *)) tup3
@@ -40,7 +42,9 @@ module CLST_types : sig
     pair
     Script_list.t
 
-  type arg = (deposit, (redeem, transfer) or_) or_
+  type fa21_entrypoints = transfer
+
+  type arg = (clst_entrypoints, fa21_entrypoints) or_
 
   type ledger = (address, nat) big_map
 
