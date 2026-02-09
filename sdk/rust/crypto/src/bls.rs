@@ -110,7 +110,7 @@ impl BlsSignature {
             .validate()
             .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
-        Ok(Self(aggregate.to_signature().compress().to_vec()))
+        Ok(Self(aggregate.to_signature().compress()))
     }
 }
 
@@ -131,7 +131,7 @@ impl SecretKeyBls {
 
         let pk = sk.sk_to_pk();
 
-        Ok(PublicKeyBls(pk.to_bytes().to_vec()))
+        Ok(PublicKeyBls(pk.to_bytes()))
     }
 
     /// Sign the given data.
@@ -140,10 +140,10 @@ impl SecretKeyBls {
             .map_err(|e| CryptoError::AlgorithmError(format!("BLST_ERROR: {e:?}")))?;
 
         let pk = sk.sk_to_pk();
-        let msg = prepend_public_key(message.as_ref(), &PublicKeyBls(pk.to_bytes().to_vec()));
+        let msg = prepend_public_key(message.as_ref(), &PublicKeyBls(pk.to_bytes()));
         let sig = sk.sign(&msg, AUG_CIPHER_SUITE.as_bytes(), &[]);
 
-        Ok(BlsSignature(sig.to_bytes().to_vec()))
+        Ok(BlsSignature(sig.to_bytes()))
     }
 }
 
@@ -163,8 +163,8 @@ pub fn keypair_from_ikm(ikm: [u8; 32]) -> Result<(SecretKeyBls, PublicKeyBls), C
 
     let pk = sk.sk_to_pk();
 
-    let pk = PublicKeyBls(pk.to_bytes().to_vec());
-    let sk = SecretKeyBls(sk.to_bytes().to_vec());
+    let pk = PublicKeyBls(pk.to_bytes());
+    let sk = SecretKeyBls(sk.to_bytes());
 
     Ok((sk, pk))
 }
@@ -249,7 +249,7 @@ mod tests {
             11, 255,
         ];
 
-        let sig = BlsSignature(bytes.to_vec());
+        let sig = BlsSignature(bytes);
         let sig = min_pk::Signature::try_from(&sig);
 
         assert!(matches!(sig, Err(CryptoError::InvalidSignature)));
@@ -266,7 +266,7 @@ mod tests {
             48, 52, 211, 178,
         ];
 
-        let sig = BlsSignature(bytes.to_vec());
+        let sig = BlsSignature(bytes);
         let sig = min_pk::Signature::try_from(&sig);
 
         assert!(sig.is_ok());
@@ -282,7 +282,7 @@ mod tests {
             181, 190, 79, 226, 209, 166, 137, 54, 88, 14, 28,
         ];
 
-        let pk = PublicKeyBls(bytes.to_vec());
+        let pk = PublicKeyBls(bytes);
         let pk = min_pk::PublicKey::try_from(&pk);
 
         assert!(matches!(pk, Err(CryptoError::InvalidPublicKey)));
@@ -296,7 +296,7 @@ mod tests {
             241, 82, 161, 86, 161, 40, 141, 57, 145, 123,
         ];
 
-        let pk = PublicKeyBls(bytes.to_vec());
+        let pk = PublicKeyBls(bytes);
         let pk = min_pk::PublicKey::try_from(&pk);
 
         assert!(pk.is_ok());
@@ -313,7 +313,7 @@ mod tests {
         ];
 
         let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
-        let pk = PublicKeyBls(sk.sk_to_pk().to_bytes().to_vec());
+        let pk = PublicKeyBls(sk.sk_to_pk().to_bytes());
 
         let dst = AUG_CIPHER_SUITE.as_bytes();
 
@@ -322,7 +322,7 @@ mod tests {
         signed_bytes.extend_from_slice(&pk.0);
         signed_bytes.extend_from_slice(msg);
 
-        let sig = BlsSignature(sk.sign(&signed_bytes, dst, &[]).to_bytes().to_vec());
+        let sig = BlsSignature(sk.sign(&signed_bytes, dst, &[]).to_bytes());
 
         let msg_keys = [(&msg[..], &pk)];
         let res = sig.aggregate_verify(&mut msg_keys.into_iter());
@@ -400,10 +400,10 @@ mod tests {
         ];
 
         let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
-        let pk = PublicKeyBls(sk.sk_to_pk().to_bytes().to_vec());
+        let pk = PublicKeyBls(sk.sk_to_pk().to_bytes());
 
         let msg = b"blst is such a blast";
-        let sig = BlsSignature(signature_bytes.to_vec());
+        let sig = BlsSignature(signature_bytes);
 
         let msg_keys = [(&msg[..], &pk)];
         let res = sig.aggregate_verify(&mut msg_keys.into_iter());
@@ -441,7 +441,7 @@ mod tests {
             let pk_bytes: [u8; 48] = pk_bytes[4..] // remove prefix of `BLpk`
                 .try_into()
                 .expect("pk_bytes should be 48 bytes long");
-            let pk = PublicKeyBls(pk_bytes.to_vec());
+            let pk = PublicKeyBls(pk_bytes);
 
             let tz4 = pk.pk_hash();
 

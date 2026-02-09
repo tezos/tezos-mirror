@@ -254,9 +254,7 @@ impl Default for Ctx<'_> {
                 // "2EouXpxkPGxAvVKCpdCJnfp2wEMWR7Up5DERRZ1Yo99xCLjkCVuq",
             )
             .unwrap()
-            .as_ref()
-            .try_into()
-            .unwrap(),
+            .into(),
             origination_counter: 0,
         }
     }

@@ -7362,9 +7362,7 @@ mod interpreter_tests {
                     "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D"
                 )
                 .unwrap()
-                .as_ref()
-                .try_into()
-                .unwrap(),
+                .into(),
                 0
             ),
             ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),

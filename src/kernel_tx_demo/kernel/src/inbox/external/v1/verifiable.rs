@@ -304,7 +304,7 @@ mod test {
             assert_eq!(remaining_input, remaining, "Incorrect remaining bytes");
 
             assert_eq!(operation, decoded.operation, "Operations do not match");
-            assert_eq!(sig.as_slice(), decoded.signature.as_ref(), "Sigs do not match");
+            assert_eq!(sig, decoded.signature.as_ref(), "Sigs do not match");
         }
     }
 }

@@ -47,9 +47,7 @@ impl Default for HostState {
         let raw_rollup_address: [u8; 20] =
             SmartRollupHash::from_base58_check("sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h")
                 .unwrap()
-                .as_ref()
-                .try_into()
-                .unwrap();
+                .into();
 
         let metadata = RollupMetadata {
             raw_rollup_address,
