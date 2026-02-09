@@ -115,6 +115,8 @@ module Tezos_block = struct
           raise
             (Invalid_argument
                "Expected a RLP list of 6 elements (including the version field)")
+
+    let to_latest = Fun.id
   end
 
   module Latest = V0
@@ -157,6 +159,8 @@ module Tezos_block = struct
               (req "operations" bytes))
 
     let () = Data_encoding.Registration.register encoding
+
+    let to_latest : t -> Latest.t = V0.to_latest
   end
 
   include Latest
@@ -165,10 +169,11 @@ module Tezos_block = struct
     match Rlp.decode bytes with
     | Ok (Rlp.List (Value version :: block_rlp)) -> (
         let version = Version.from_bytes version in
-        match version with V0 -> V0.from_rlp block_rlp)
+        match version with V0 -> V0.to_latest @@ V0.from_rlp block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
-        Data_encoding.Binary.of_bytes_exn Legacy.encoding bytes
+        Legacy.to_latest
+        @@ Data_encoding.Binary.of_bytes_exn Legacy.encoding bytes
 
   (* Latest version of the block. It is used for block RLP encoding *)
   let latest_version = Version.V0
