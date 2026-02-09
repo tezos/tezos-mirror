@@ -279,6 +279,11 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=debug \
       --tag "${image_name}debug:$image_version" \
       "$src_dir"
@@ -294,6 +299,11 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=bare \
       --tag "${image_name}bare:$image_version" \
       "$src_dir"
@@ -309,6 +319,11 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=minimal \
       --tag "${image_name%?}:$image_version" \
       "$src_dir"
