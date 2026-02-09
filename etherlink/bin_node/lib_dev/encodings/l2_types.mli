@@ -106,7 +106,11 @@ module Tezos_block : sig
   val decode_block_for_store : string -> (t, string) result
 
   module Internal_for_test : sig
-    val legacy_encode_block_for_store : t -> (string, string) result
+    module Legacy : sig
+      type nonrec t = t
+
+      val encode_block_for_store : t -> (string, string) result
+    end
   end
 end
 

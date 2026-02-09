@@ -95,33 +95,6 @@ module Tezos_block = struct
     Ethereum_types.Block_hash
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
-  let block_encoding : t Data_encoding.t =
-    let open Data_encoding in
-    let timestamp_encoding = Time.Protocol.encoding in
-    let block_hash_encoding =
-      let open Ethereum_types in
-      conv
-        (fun (Block_hash (Hex s)) -> Hex.to_bytes_exn (`Hex s))
-        (fun b ->
-          let (`Hex s) = Hex.of_bytes b in
-          Block_hash (Hex s))
-        (Fixed.bytes 32)
-    in
-    def "tezlink_block"
-    @@ conv
-         (fun {hash; level; parent_hash; timestamp; operations} ->
-           (hash, level, parent_hash, timestamp, operations))
-         (fun (hash, level, parent_hash, timestamp, operations) ->
-           {hash; level; parent_hash; timestamp; operations})
-         (obj5
-            (req "hash" block_hash_encoding)
-            (req "level" int32)
-            (req "parent_hash" block_hash_encoding)
-            (req "timestamp" timestamp_encoding)
-            (req "operations" bytes))
-
-  let () = Data_encoding.Registration.register block_encoding
-
   let block_from_v0 block_rlp =
     let open Rlp in
     match block_rlp with
@@ -142,9 +115,47 @@ module Tezos_block = struct
           (Invalid_argument
              "Expected a RLP list of 6 elements (including the version field)")
 
-  (* For now legacy encoding is the same as block encoding but this might
-      change in the future, for example when we'll add protocol fields*)
-  let legacy_encoding = block_encoding
+  module Legacy = struct
+    (* For now legacy encoding is the same as block encoding but this might
+       change in the future, for example when we'll add protocol fields *)
+    type nonrec t = t = {
+      hash : Ethereum_types.block_hash;
+      level : int32;
+      timestamp : Time.Protocol.t;
+      parent_hash : Ethereum_types.block_hash;
+          (* Deserialization of operation and receipts is delayed to
+           avoid introducing a dependency from this lib_encodings to
+           the protocol. *)
+      operations : bytes;
+    }
+
+    let encoding : t Data_encoding.t =
+      let open Data_encoding in
+      let timestamp_encoding = Time.Protocol.encoding in
+      let block_hash_encoding =
+        let open Ethereum_types in
+        conv
+          (fun (Block_hash (Hex s)) -> Hex.to_bytes_exn (`Hex s))
+          (fun b ->
+            let (`Hex s) = Hex.of_bytes b in
+            Block_hash (Hex s))
+          (Fixed.bytes 32)
+      in
+      def "legacy_tezlink_block"
+      @@ conv
+           (fun {hash; level; parent_hash; timestamp; operations} ->
+             (hash, level, parent_hash, timestamp, operations))
+           (fun (hash, level, parent_hash, timestamp, operations) ->
+             {hash; level; parent_hash; timestamp; operations})
+           (obj5
+              (req "hash" block_hash_encoding)
+              (req "level" int32)
+              (req "parent_hash" block_hash_encoding)
+              (req "timestamp" timestamp_encoding)
+              (req "operations" bytes))
+
+    let () = Data_encoding.Registration.register encoding
+  end
 
   let block_from_kernel bytes =
     match Rlp.decode bytes with
@@ -153,7 +164,7 @@ module Tezos_block = struct
         match version with V0 -> block_from_v0 block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
-        Data_encoding.Binary.of_bytes_exn legacy_encoding bytes
+        Data_encoding.Binary.of_bytes_exn Legacy.encoding bytes
 
   (* Latest version of the block. It is used for block RLP encoding *)
   let latest_version = Version.V0
@@ -187,12 +198,16 @@ module Tezos_block = struct
     with exn -> Error (Printexc.to_string exn)
 
   module Internal_for_test = struct
-    let legacy_encode_block_for_store block =
-      Result.map_error
-        (Format.asprintf
-           "Not a valid block: %a"
-           Data_encoding.Binary.pp_write_error)
-        (Data_encoding.Binary.to_string legacy_encoding block)
+    module Legacy = struct
+      include Legacy
+
+      let encode_block_for_store (block : t) : (string, string) result =
+        Result.map_error
+          (Format.asprintf
+             "Not a valid block: %a"
+             Data_encoding.Binary.pp_write_error)
+          (Data_encoding.Binary.to_string encoding block)
+    end
   end
 end
 

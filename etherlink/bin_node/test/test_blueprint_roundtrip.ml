@@ -127,7 +127,7 @@ let make_tez_legacy_block ~level ~timestamp ~parent_hash () =
   let hash =
     hash_tez_block
       ~encode:
-        L2_types.Tezos_block.Internal_for_test.legacy_encode_block_for_store
+        L2_types.Tezos_block.Internal_for_test.Legacy.encode_block_for_store
       block_without_hash
   in
   return
@@ -194,7 +194,7 @@ let test_tez_legacy_block_roundtrip ~title ~level ~timestamp ~parent_hash () =
   let* block = make_tez_legacy_block ~level ~timestamp ~parent_hash () in
   let encoding_result =
     expect_ok "could not encode the tez legacy block"
-    @@ L2_types.Tezos_block.Internal_for_test.legacy_encode_block_for_store
+    @@ L2_types.Tezos_block.Internal_for_test.Legacy.encode_block_for_store
          block
   in
   let decoding_result =
