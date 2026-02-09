@@ -253,11 +253,7 @@ fi
 
 echo "### Building tezos..."
 
-docker build \
-  --network host \
-  -t "$build_image_name:$image_version" \
-  -f build.Dockerfile \
-  --target "$docker_target" \
+docker buildx build \
   --build-arg "BASE_IMAGE=$ci_image_name" \
   --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
@@ -266,6 +262,9 @@ docker build \
   --build-arg "GIT_VERSION=${commit_tag}" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
+  --target "$docker_target" \
+  --tag "$build_image_name:$image_version" \
+  -f build.Dockerfile \
   "$src_dir"
 
 echo "### Successfully built docker image: $build_image_name:$image_version"
@@ -273,9 +272,7 @@ echo "### Successfully built docker image: $build_image_name:$image_version"
 for variant in $variants; do
   case "$variant" in
   debug)
-    docker build \
-      --network host \
-      -t "${image_name}debug:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
@@ -283,15 +280,14 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
       --target=debug \
+      --tag "${image_name}debug:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}debug:$image_version"
     ;;
 
   bare)
-    docker build \
-      --network host \
-      -t "${image_name}bare:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
@@ -299,15 +295,14 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
       --target=bare \
+      --tag "${image_name}bare:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}bare:$image_version"
     ;;
 
   minimal)
-    docker build \
-      --network host \
-      -t "${image_name%?}:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
@@ -315,6 +310,7 @@ for variant in $variants; do
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
       --target=minimal \
+      --tag "${image_name%?}:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name%?}:$image_version"
