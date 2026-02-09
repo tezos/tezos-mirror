@@ -225,6 +225,8 @@ Available services:
         All the metadata associated to the block. 
     - GET /chains/main/blocks/head/operation_hashes
         The hashes of all the operations included in the block. 
+    - GET /chains/main/blocks/head/operation_hashes/<list_offset>
+        All the operations included in `n-th` validation pass of the block. 
     - GET /chains/main/blocks/head/operations
         All the operations included in the block. 
     - GET /chains/main/blocks/head/operations/<list_offset>/<operation_offset>

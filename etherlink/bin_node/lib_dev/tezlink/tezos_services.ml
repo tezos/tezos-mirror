@@ -708,6 +708,17 @@ let operation_hashes :
     Tezos_rpc.Service.t =
   import_service Current_block_services.S.Operation_hashes.operation_hashes
 
+let operation_hashes_in_pass :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * int,
+      unit,
+      unit,
+      Operation_hash.t list )
+    Tezos_rpc.Service.t =
+  import_service_with_arg
+    Current_block_services.S.Operation_hashes.operation_hashes_in_pass
+
 let operation :
     ( [`GET],
       tezlink_rpc_context,
