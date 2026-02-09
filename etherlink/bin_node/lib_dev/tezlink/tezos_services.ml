@@ -283,14 +283,14 @@ module Current_block_services = struct
     let proposer =
       Imported_protocol.Alpha_context.Consensus_key.
         {
-          delegate = Tezlink_mock.baker_account.public_key_hash;
-          consensus_pkh = Tezlink_mock.baker_account.public_key_hash;
+          delegate = Tezlink_mock.baker_account.pkh;
+          consensus_pkh = Tezlink_mock.baker_account.pkh;
         }
     in
     let balance_updates =
       let amount = Alpha_context.Tez.of_mutez_exn 0L in
       Tezlink_mock.balance_udpdate_rewards
-        ~baker:Tezlink_mock.baker_account.public_key_hash
+        ~baker:Tezlink_mock.baker_account.pkh
         ~amount
     in
 
@@ -442,9 +442,17 @@ module Genesis_block_services = struct
   include Make_block_service (Genesis_protocol) (Imported_protocol)
 
   let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
+    let bootstrap_account =
+      Imported_protocol_parameters.Default_parameters.make_bootstrap_account
+        ( baker_account.pkh,
+          baker_account.pk,
+          Alpha_context.Tez.of_mutez_exn baker_account.balance,
+          None,
+          None )
+    in
     let parameter =
       Imported_protocol_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts:[Tezlink_mock.baker_account]
+        ~bootstrap_accounts:[bootstrap_account]
         Tezlink_constants.all_constants.parametric
     in
     let parameter_format_json =
