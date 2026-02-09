@@ -112,11 +112,10 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
               in
               let previous_lag = prev_proto_parameters.Types.attestation_lag in
               if previous_lag > current_lag then
-                (* See comment in [remove_unattested_slots_and_shards]. *)
                 let rec loop lag =
                   if lag = current_lag then return_unit
                   else
-                    let* () = clean_skip_list_cells (lag - 1) in
+                    let* () = clean_skip_list_cells lag in
                     loop (lag - 1)
                 in
                 loop previous_lag
