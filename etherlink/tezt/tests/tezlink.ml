@@ -92,7 +92,7 @@ let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
         ~title:Format.(sprintf "%s (%s -> %s)" title from_tag to_tag)
         ~additional_uses:(to_use :: additional_uses)
           (* No need to wait in an upgrade scenario. *)
-          (* If this boolean is set to true, upgrade test 
+          (* If this boolean is set to true, upgrade test
              will fail because blueprint are produced at
              an unexpected timestamp. *)
         ~wait_for_valid_block:false
@@ -437,13 +437,13 @@ let test_tezlink_contract_info =
     ~tags:["rpc"; "contract"; "info"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  (* call the balance rpc and check the result *)
+  (* call the contract info rpc and check the result *)
   let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
   let balance = JSON.(valid_info |-> "balance" |> as_int) in
-  let counter = JSON.(valid_info |-> "counter" |> as_int_opt) in
+  let counter = JSON.(valid_info |-> "counter" |> as_int) in
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
-  Check.((counter = None) (option int) ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_list_entrypoints =
@@ -475,13 +475,13 @@ let test_tezlink_contract_info_script =
   (* call the contract info rpc and check the result *)
   let* valid_info = account_str_rpc sequencer contract.address "" in
   let balance = JSON.(valid_info |-> "balance" |> as_int) in
-  let counter = JSON.(valid_info |-> "counter" |> as_int) in
+  let counter = JSON.(valid_info |-> "counter" |> as_int_opt) in
   let script = JSON.(valid_info |-> "script") in
   let storage = JSON.(script |-> "storage" |> as_list) in
   let code = JSON.(script |-> "code" |> as_list) in
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
-  Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = None) (option int) ~error_msg:"Expected %R but got %L") ;
   Check.(
     (List.length storage = 1)
       int
@@ -516,11 +516,20 @@ let test_tezlink_counter =
     ~tags:["evm"; "rpc"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
-  let* valid_res = account_rpc sequencer Constant.bootstrap1 "counter" in
-  Check.(JSON.(valid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
-  let* invalid_res = account_rpc sequencer Constant.bootstrap2 "counter" in
+  let* res = account_rpc sequencer Constant.bootstrap1 "counter" in
+  Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
+  let* res = account_rpc sequencer Constant.bootstrap1 "" in
   Check.(
-    JSON.(invalid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
+    JSON.(res |-> "counter" |> as_int = 0)
+      int
+      ~error_msg:"Expected %R but got %L") ;
+  let* res = account_rpc sequencer Constant.bootstrap2 "counter" in
+  Check.(JSON.(res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
+  let* res = account_rpc sequencer Constant.bootstrap2 "" in
+  Check.(
+    JSON.(res |-> "counter" |> as_int = 0)
+      int
+      ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_contract_info_on_liquidity_baking =

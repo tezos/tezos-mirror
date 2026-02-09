@@ -285,6 +285,17 @@ let opt_register ~service ~impl dir =
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
   opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
+(* On not-yet-allocated implicit accounts, L1 returns the current
+   global counter instead of [None]. We don't have a global counter so
+   we return 0 in this case instead. See also
+   https://gitlab.com/tezos/tezos/-/issues/7960. *)
+let get_counter (module Backend : Tezlink_backend_sig.S) chain block contract =
+  let open Lwt_result_syntax in
+  let* counter_opt = Backend.counter chain block contract in
+  match (counter_opt, contract) with
+  | None, Implicit _ -> return_some Z.zero
+  | counter_opt, _ -> return counter_opt
+
 (** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`.
     This part is based on the current protocol supported by Tezlink, which means that if we request the counter
     of a tz1 on an old block the encoding used will be the one of the current live protocol. *)
@@ -306,7 +317,7 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* balance = Backend.balance chain block contract in
-         let* counter = Backend.counter chain block contract in
+         let* counter = get_counter (module Backend) chain block contract in
          let* script = Backend.get_script chain block contract in
          make_contract_info balance counter script)
   |> opt_register
@@ -367,14 +378,7 @@ let build_block_static_directory ~l2_chain_id
        ~impl:(fun ((((), chain), block), contract) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         (* On not-yet-allocated implicit accounts, L1 returns the
-            current global counter instead of [None]. We don't have a
-            global counter so we return 0 in this case instead. See
-            also https://gitlab.com/tezos/tezos/-/issues/7960. *)
-         let* counter_opt = Backend.counter chain block contract in
-         match (counter_opt, contract) with
-         | None, Implicit _ -> return_some Z.zero
-         | counter_opt, _ -> return counter_opt)
+         get_counter (module Backend) chain block contract)
        ~convert_output:Protocol_types.Counter.of_z
   |> register
        ~service:Tezos_services.constants
