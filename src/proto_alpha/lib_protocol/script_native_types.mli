@@ -47,8 +47,12 @@ module CLST_types : sig
 
   type update_delegate_parameters = delegate_parameters
 
+  type unregister_delegate = unit
+
   type delegate_entrypoints =
-    (register_delegate, update_delegate_parameters) or_
+    ( register_delegate,
+      (update_delegate_parameters, unregister_delegate) or_ )
+    or_
 
   type clst_entrypoints = (staker_entrypoints, delegate_entrypoints) or_
 
@@ -170,6 +174,7 @@ module CLST_types : sig
     | Finalize of finalize
     | Register_delegate of register_delegate
     | Update_delegate_parameters of update_delegate_parameters
+    | Unregister_delegate of unregister_delegate
     | Transfer of transfer
     | Balance_of of balance_of
     | Approve of approve

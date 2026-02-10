@@ -247,8 +247,12 @@ module CLST_types = struct
 
   type update_delegate_parameters = delegate_parameters
 
+  type unregister_delegate = unit
+
   type delegate_entrypoints =
-    (register_delegate, update_delegate_parameters) or_
+    ( register_delegate,
+      (update_delegate_parameters, unregister_delegate) or_ )
+    or_
 
   type clst_entrypoints = (staker_entrypoints, delegate_entrypoints) or_
 
@@ -345,6 +349,7 @@ module CLST_types = struct
     | Finalize of finalize
     | Register_delegate of register_delegate
     | Update_delegate_parameters of update_delegate_parameters
+    | Unregister_delegate of unregister_delegate
     | Transfer of transfer
     | Balance_of of balance_of
     | Approve of approve
@@ -359,7 +364,8 @@ module CLST_types = struct
     | L (L (L (R p))) -> Redeem p
     | L (L (R p)) -> Finalize p
     | L (R (L p)) -> Register_delegate p
-    | L (R (R p)) -> Update_delegate_parameters p
+    | L (R (R (L p))) -> Update_delegate_parameters p
+    | L (R (R (R p))) -> Unregister_delegate p
     | R (L (L p)) -> Transfer p
     | R (L (R p)) -> Balance_of p
     | R (R (L (L p))) -> Approve p
@@ -374,7 +380,8 @@ module CLST_types = struct
     | Redeem p -> L (L (L (R p)))
     | Finalize p -> L (L (R p))
     | Register_delegate p -> L (R (L p))
-    | Update_delegate_parameters p -> L (R (R p))
+    | Update_delegate_parameters p -> L (R (R (L p)))
+    | Unregister_delegate p -> L (R (R (R p)))
     | Transfer p -> R (L (L p))
     | Balance_of p -> R (L (R p))
     | Approve p -> R (R (L (L p)))
@@ -426,6 +433,9 @@ module CLST_types = struct
     let open Result_syntax in
     let* delegate_parameters_type in
     make_entrypoint_leaf "update_delegate_parameters" delegate_parameters_type
+
+  let unregister_delegate_type =
+    make_entrypoint_leaf "unregister_delegate" unit_ty
 
   let approval_type : approval ty_node tzresult =
     let open Result_syntax in
@@ -576,6 +586,7 @@ module CLST_types = struct
     let* finalize_type in
     let* register_delegate_type in
     let* update_delegate_parameters_type in
+    let* unregister_delegate_type in
     let* transfer_type in
     let* balance_of_type in
     let* approve_type in
@@ -590,10 +601,15 @@ module CLST_types = struct
     let* clst_staker_entrypoints_type =
       make_entrypoint_node clst_staker_entrypoints_type_l finalize_type
     in
+    let* clst_delegate_entrypoints_type_r =
+      make_entrypoint_node
+        update_delegate_parameters_type
+        unregister_delegate_type
+    in
     let* clst_delegate_entrypoints_type =
       make_entrypoint_node
         register_delegate_type
-        update_delegate_parameters_type
+        clst_delegate_entrypoints_type_r
     in
     let* clst_entrypoints_type =
       make_entrypoint_node

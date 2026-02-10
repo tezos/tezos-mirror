@@ -977,6 +977,7 @@ module CLST_contract = struct
           (ctxt, step_constants)
           parameters
           storage
+    | Unregister_delegate () -> assert false
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
     | Balance_of requests ->
