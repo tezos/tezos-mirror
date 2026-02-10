@@ -103,6 +103,30 @@ let account_str_rpc sequencer account key =
 let account_rpc sequencer account key =
   account_str_rpc sequencer account.Account.public_key_hash key
 
+(** [send_tezos_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
+    delayed inbox and waits until it is included and the delayed inbox is
+    empty. *)
+let send_tezos_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
+    ~client ~l1_contracts ~sequencer operation =
+  let* _hash =
+    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      operation
+  and* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
