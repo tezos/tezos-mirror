@@ -125,94 +125,88 @@ let add_slots_and_shards_layouts ~layout_level ~proto_parameters =
 (* This function aims to associate a cryptobox to every block, and thus, for
    each relevant protocols associated; the relevant ones being all covering the
    level from [first_seen_level] to the current head level. *)
-let init ~cctxt ~header ~config ~current_head_proto_parameters ~first_seen_level
-    profile_ctxt proto_plugins =
+let init ~cctxt ~header ~config ~first_seen_level profile_ctxt proto_plugins =
   let open Lwt_result_syntax in
-  let* l1_known_protocols = L1_helpers.fetch_l1_known_protocols cctxt in
-  let head_protocol_info =
-    List.find
-      (fun e ->
-        e.Chain_services.proto_level = header.Block_header.shell.proto_level)
-      l1_known_protocols
+  let* l1_known_protocols =
+    let* res = L1_helpers.fetch_l1_known_protocols cctxt in
+    (* Invariant: must be ordered with the oldest protocols first. *)
+    List.sort
+      (fun x y -> Int.compare x.Chain_services.proto_level y.proto_level)
+      res
+    |> return
   in
-  let* head_proto_first_block =
-    match head_protocol_info with
-    | Some p -> return (snd p.Chain_services.activation_block)
-    | None -> tzfail No_cryptobox
-  in
-  (* Init Proto_cryptoboxes state with the current head's cryptobox. *)
-  let* head_cryptobox =
-    init_state
-      config
-      current_head_proto_parameters
-      profile_ctxt
-      ~level:head_proto_first_block
-  in
-  let* () =
-    (* If the activation block is <= to the first_seen_level, we associate the
-       first_seen_level to that protocol's layout. Thus, the first_seen_level is
-       associated to a layout.
-
-       For a given activation block, the layout associated to it always start at
-       the next level. Indeed, the shards and slots of the activation block have
-       been created with the protocol running before the activation. *)
-    let head_layout_level =
-      if head_proto_first_block <= first_seen_level then first_seen_level
-      else Int32.add head_proto_first_block 1l
-    in
-    add_slots_and_shards_layouts
-      ~layout_level:head_layout_level
-      ~proto_parameters:current_head_proto_parameters.cryptobox_parameters
-  in
-  (* Retrieve the protocol_info needed to handle all blocks above
-     [first_seen_level]. *)
-  let additional_protocols_info =
-    let sorted_protocol_info =
-      List.sort
-        (fun p1 p2 -> Int.compare p1.Chain_services.proto_level p2.proto_level)
+  let needed_protocols =
+    let biggest_below_first_seen_opt =
+      List.fold_left
+        (fun acc ({Chain_services.activation_block; _} as p) ->
+          let activation_level = snd activation_block in
+          if Int32.succ activation_level <= first_seen_level then Some p
+          else acc)
+        None
         l1_known_protocols
     in
-    (* Loop over protocols activation block and stop as soon as the
-       [first_seen_block] fits into a protocol interval. *)
-    let rec aux acc = function
-      | [] -> []
-      | hd :: tl ->
-          if snd hd.Chain_services.activation_block < first_seen_level then
-            aux [hd] tl
-          else acc @ (hd :: tl)
+    (* all activation levels between first_seen_level and head *)
+    let in_between =
+      List.filter
+        (fun {Chain_services.activation_block; _} ->
+          let activation_level = snd activation_block in
+          activation_level > 0l
+          && Int32.succ activation_level > first_seen_level
+          && activation_level <= header.Block_header.shell.level)
+        l1_known_protocols
     in
-    let tmp = aux [] sorted_protocol_info in
-    (* Remove the current head protocol_info as it was already added above. *)
-    List.filter
-      (fun e ->
-        e.Chain_services.proto_level != header.Block_header.shell.proto_level)
-      tmp
+    match biggest_below_first_seen_opt with
+    | None -> in_between
+    | Some proto ->
+        let level = snd proto.Chain_services.activation_block in
+        if level > 0l then proto :: in_between else in_between
   in
-  List.fold_left_es
-    (fun box pi ->
-      let activation_level = snd pi.Chain_services.activation_block in
-      if activation_level = 0l then
-        (* Do not register any cryptobox for level 0. *)
-        return box
-      else
-        let first_proto_level = activation_level in
-        let current_layout_level =
-          if activation_level <= first_seen_level then first_seen_level
-          else Int32.add first_proto_level 1l
-        in
-        let*? _, proto_params =
-          Proto_plugins.get_plugin_and_parameters_for_level
-            proto_plugins
-            ~level:first_proto_level
-        in
-        let* () =
-          add_slots_and_shards_layouts
-            ~layout_level:current_layout_level
-            ~proto_parameters:proto_params.cryptobox_parameters
-        in
-        add proto_params ~level:first_proto_level box)
-    head_cryptobox
-    additional_protocols_info
+  let* proto_cryptoboxes_opt =
+    List.fold_left_es
+      (fun box pi ->
+        let activation_level = snd pi.Chain_services.activation_block in
+        if activation_level = 0l then
+          (* Do not register any cryptobox for level 0. *)
+          return box
+        else
+          let first_proto_level = activation_level in
+          (* For a given activation block, the layout associated to it always
+             start at the next level. Indeed, the shards and slots of the
+             activation block have been created with the protocol running before
+             the activation. *)
+          let current_layout_level =
+            if activation_level <= first_seen_level then first_seen_level
+            else Int32.add first_proto_level 1l
+          in
+          let*? _, proto_params =
+            Proto_plugins.get_plugin_and_parameters_for_level
+              proto_plugins
+              ~level:first_proto_level
+          in
+          let* () =
+            add_slots_and_shards_layouts
+              ~layout_level:current_layout_level
+              ~proto_parameters:proto_params.cryptobox_parameters
+          in
+          match box with
+          | Some box ->
+              let* new_state = add proto_params ~level:first_proto_level box in
+              return_some new_state
+          | None ->
+              let* new_state =
+                init_state
+                  config
+                  proto_params
+                  profile_ctxt
+                  ~level:first_proto_level
+              in
+              return_some new_state)
+      None
+      needed_protocols
+  in
+  match proto_cryptoboxes_opt with
+  | Some v -> return v
+  | None -> tzfail No_cryptobox
 
 let get_as_pair f t =
   let open Result_syntax in
