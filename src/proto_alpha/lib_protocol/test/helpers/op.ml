@@ -1606,3 +1606,48 @@ let clst_redeem ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let clst_approve ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(src : Contract.t) ?(owner = src)
+    ~(spender : Contract.t) (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let elm =
+    (* (owner, spender, token_id, increase or decrease amount) *)
+    let amount =
+      let l_or_r = if amount < 0L then Script.D_Right else Script.D_Left in
+      Prim
+        ( dummy_location,
+          l_or_r,
+          [Int (dummy_location, Z.of_int64 (Int64.abs amount))],
+          [] )
+    in
+    Prim
+      ( dummy_location,
+        Script.D_Pair,
+        [
+          String (dummy_location, Contract.to_b58check owner);
+          String (dummy_location, Contract.to_b58check spender);
+          Int (dummy_location, Z.zero);
+          amount;
+        ],
+        [] )
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "approve")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero

@@ -267,6 +267,15 @@ let expect_clst_balance_too_low ~loc errs =
         true
     | _ -> false)
 
+let expect_clst_only_owner_can_change_operator ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Only_owner_can_change_operator _ :: _ ->
+        true
+    | _ -> false)
+
 let expect_tz5_account_disabled ~loc errs =
   Assert.expect_error ~loc errs (function
     | [Validate_errors.Manager.Tz5_account_disabled] -> true
