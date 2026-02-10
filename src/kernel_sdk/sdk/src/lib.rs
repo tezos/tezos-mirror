@@ -41,6 +41,9 @@ pub mod host {
 
     #[doc(inline)]
     pub use tezos_smart_rollup_host::storage::StorageV1;
+
+    #[doc(inline)]
+    pub use tezos_smart_rollup_host::wasm::WasmHost;
 }
 
 /// Lowest level definitions of host functions & associated constants.

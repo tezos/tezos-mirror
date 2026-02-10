@@ -311,11 +311,8 @@ mod tests {
     use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, MAX_INPUT_MESSAGE_SIZE};
     use tezos_smart_rollup_host::input::Message;
     use tezos_smart_rollup_host::{
-        metadata::RollupMetadata,
-        path::RefPath,
-        reveal::HostReveal,
-        runtime::{Runtime, RuntimeError},
-        storage::StorageV1,
+        metadata::RollupMetadata, path::RefPath, reveal::HostReveal,
+        runtime::RuntimeError, storage::StorageV1, wasm::WasmHost,
     };
 
     #[test]

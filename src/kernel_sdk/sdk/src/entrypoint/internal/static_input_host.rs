@@ -12,6 +12,7 @@
 use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
 use crate::host::{Runtime, RuntimeError, ValueType};
@@ -182,7 +183,7 @@ impl<R: HostReveal> HostReveal for StaticInputHost<'_, R> {
     }
 }
 
-impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
+impl<R: WasmHost> WasmHost for StaticInputHost<'_, R> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
@@ -231,3 +232,5 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
         self.host.runtime_version()
     }
 }
+
+impl<R: Runtime> Runtime for StaticInputHost<'_, R> {}

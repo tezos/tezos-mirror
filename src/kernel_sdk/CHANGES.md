@@ -40,12 +40,13 @@
 - Remove `tezos-smart-rollup-encoding::contract::Contract`. One may continue to use `tezos-smart-rollup::types::Contract`, which is exported
   from `tezos-protocol::contract::Contract`. This is a drop-in replacement that is fully backwards compatible.
 - Add `tezos-smart-rollup-keyspace` crate which defines the `KeySpace` high-level durable storage API
-- Split `write_debug` from `Runtime` to new `HostDebug` supertrait.  Will allow kernels to restrict scope to just to
-  host's debug messaging capabilities if desired.
-- Split `store_` functions from `Runtime` to new `StorageV1` supertrait. Will allow kernels to restrict scope to just
-  WASM-pvm flavour durable storage capabilities if desired.
-- Split `reveal_` functions from `Runtime` to new `HostReveal` supertrait. Will allow kernels to restrict scope to just
-  host's reveal capabilities if desired.
+- Move functionality from `Runtime` into new supertraits. This allows kernels to restrict capabilities certain parts of their
+  codebase are able to use.
+  - Move `write_debug` to new `HostDebug` supertrait.
+  - Move `store_` functions to new `StorageV1` supertrait.
+  - Move `reveal_` functions from `Runtime` to new `HostReveal` supertrait.
+  - Move all other functions (input/ouput, reboots, runtime version) to new `WasmHost` supertrait. Experimental support
+    for using `WasmHost` on RISC-V still exists.
 
 ### Installer client/kernel
 

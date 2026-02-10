@@ -30,6 +30,7 @@ use tezos_smart_rollup_host::{
     reveal::HostReveal,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
     storage::StorageV1,
+    wasm::WasmHost,
 };
 use tezos_smart_rollup_mock::MockHost;
 
@@ -78,7 +79,7 @@ pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
     pub _pd: PhantomData<R>,
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> HostDebug
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> HostDebug
     for KernelHost<R, Host, Internal>
 {
     #[inline(always)]
@@ -250,7 +251,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> StorageV1
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> SdkRuntime
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> WasmHost
     for KernelHost<R, Host, Internal>
 {
     #[inline(always)]
@@ -299,6 +300,11 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         // need to modify the WASM Runtime.
         unimplemented!()
     }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> SdkRuntime
+    for KernelHost<R, Host, Internal>
+{
 }
 
 impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>, Internal: InternalRuntime>
