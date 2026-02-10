@@ -112,6 +112,8 @@ module Tezos_block = struct
         (* TODO: Instead of raising an exception, return the Result *)
         raise (Invalid_argument "Unexpected version read for a L2 Tezos block")
 
+  let version_to_bytes version = Rlp.encode_int version
+
   let block_from_v0 block_rlp =
     let open Rlp in
     match block_rlp with
@@ -125,11 +127,12 @@ module Tezos_block = struct
         let level = Bytes.get_int32_le level 0 in
         let hash = decode_block_hash hash in
         let parent_hash = decode_block_hash previous_hash in
-        let timestamp =
-          Time.Protocol.of_seconds @@ Bytes.get_int64_le timestamp 0
-        in
+        let timestamp = Ethereum_types.timestamp_of_bytes timestamp in
         {hash; level; timestamp; parent_hash; operations}
-    | _ -> raise (Invalid_argument "Expected a List of 5 elements")
+    | _ ->
+        raise
+          (Invalid_argument
+             "Expected a RLP list of 6 elements (including the version field)")
 
   (* For now legacy encoding is the same as block encoding but this might
       change in the future, for example when we'll add protocol fields*)
@@ -145,19 +148,45 @@ module Tezos_block = struct
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
         Data_encoding.Binary.of_bytes_exn legacy_encoding bytes
 
+  (* Latest version of the block. It is used for block RLP encoding *)
+  let latest_version = 0
+
+  (* Serialize a block using the latest version of the block RLP format. *)
+  let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
+    let open Rlp in
+    let level = Helpers.encode_i32_le level in
+    let version = version_to_bytes latest_version in
+    let hash = Ethereum_types.encode_block_hash hash in
+    let previous_hash = Ethereum_types.encode_block_hash parent_hash in
+    let timestamp = Ethereum_types.timestamp_to_bytes timestamp in
+    let item =
+      List
+        [
+          Value version;
+          Value hash;
+          Value level;
+          Value previous_hash;
+          Value timestamp;
+          Value operations;
+        ]
+    in
+    encode item
+
   let encode_block_for_store (block : t) : (string, string) result =
-    Result.map_error
-      (Format.asprintf
-         "Not a valid block: %a"
-         Data_encoding.Binary.pp_write_error)
-      (Data_encoding.Binary.to_string block_encoding block)
+    Ok (Bytes.to_string (block_to_rlp block))
 
   let decode_block_for_store (block : string) : (t, string) result =
-    Result.map_error
-      (Format.asprintf
-         "Not a valid block: %a"
-         Data_encoding.Binary.pp_read_error)
-      (Data_encoding.Binary.of_string block_encoding block)
+    try Ok (block_from_kernel (Bytes.of_string block))
+    with exn -> Error (Printexc.to_string exn)
+
+  module Internal_for_test = struct
+    let legacy_encode_block_for_store block =
+      Result.map_error
+        (Format.asprintf
+           "Not a valid block: %a"
+           Data_encoding.Binary.pp_write_error)
+        (Data_encoding.Binary.to_string legacy_encoding block)
+  end
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t

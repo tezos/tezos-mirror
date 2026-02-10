@@ -104,6 +104,10 @@ module Tezos_block : sig
   val encode_block_for_store : t -> (string, string) result
 
   val decode_block_for_store : string -> (t, string) result
+
+  module Internal_for_test : sig
+    val legacy_encode_block_for_store : t -> (string, string) result
+  end
 end
 
 type 'a block = Eth of 'a Ethereum_types.block | Tez of Tezos_block.t
