@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -ex
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
@@ -258,7 +258,6 @@ docker build \
   -t "$build_image_name:$image_version" \
   -f build.Dockerfile \
   --target "$docker_target" \
-  --cache-from "$build_image_name:$image_version" \
   --build-arg "BASE_IMAGE=$ci_image_name" \
   --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
