@@ -216,25 +216,15 @@ let test_reveal =
         ])
       client
   in
-  let* _ =
-    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+  let* () =
+    send_tezos_op_to_delayed_inbox_and_wait
       ~sc_rollup_address
       ~sc_rollup_node
       ~client
       ~l1_contracts
-      ~tezosx_format:true
+      ~sequencer
       reveal
   in
-  let* () =
-    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
-      ~sequencer
-      ~sc_rollup_node
-      ~client
-  in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* manager_key = account_rpc sequencer receiver_account "manager_key" in
   Check.(
     JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
@@ -268,25 +258,15 @@ let test_transfer =
         ])
       client
   in
-  let* _ =
-    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+  let* () =
+    send_tezos_op_to_delayed_inbox_and_wait
       ~sc_rollup_address
       ~sc_rollup_node
       ~client
       ~l1_contracts
-      ~tezosx_format:true
+      ~sequencer
       transfer
   in
-  let* () =
-    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
-      ~sequencer
-      ~sc_rollup_node
-      ~client
-  in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   let* client = tezos_client sequencer in
   let* balance =
     Client.get_balance_for ~account:receiver_account.public_key_hash client
