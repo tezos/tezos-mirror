@@ -19,7 +19,8 @@ type parameters = {
   keep_alive : bool;
   drop_duplicate : bool;
   order_enabled : bool;
-  tx_container : Services_backend_sig.ex_tx_container;
+  lock_block_production : unit -> unit tzresult Lwt.t;
+  unlock_block_production : unit -> unit tzresult Lwt.t;
 }
 
 type state = {
@@ -41,7 +42,8 @@ type state = {
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
-  tx_container : Services_backend_sig.ex_tx_container;
+  lock_block_production : unit -> unit tzresult Lwt.t;
+  unlock_block_production : unit -> unit tzresult Lwt.t;
 }
 
 module Types = struct
@@ -115,8 +117,6 @@ module Worker = struct
 
   let on_cooldown worker = 0 < current_cooldown worker
 
-  let tx_container worker = (state worker).tx_container
-
   let decrement_cooldown worker =
     let current = current_cooldown worker in
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
@@ -175,12 +175,7 @@ module Worker = struct
     in
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit
-    | Needs_lock ->
-        let (Ex_tx_container tx_container) = tx_container self in
-        let (module Tx_container) =
-          Services_backend_sig.tx_container_module tx_container
-        in
-        Tx_container.lock_block_production ()
+    | Needs_lock -> state.lock_block_production ()
 
   let catch_up worker =
     let open Lwt_result_syntax in
@@ -302,7 +297,8 @@ module Handlers = struct
          keep_alive;
          drop_duplicate;
          order_enabled;
-         tx_container;
+         lock_block_production;
+         unlock_block_production;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -334,7 +330,8 @@ module Handlers = struct
         keep_alive;
         enable_dal = Option.is_some dal_slots;
         order_enabled;
-        tx_container;
+        lock_block_production;
+        unlock_block_production;
       }
 
   let on_request : type r request_error.
@@ -363,11 +360,7 @@ module Handlers = struct
             Worker.decrement_cooldown self ;
             (* If there is no lag or the worker just needs to republish we
                unlock the transaction pool in case it was locked. *)
-            let (Ex_tx_container tx_container) = Worker.tx_container self in
-            let (module Tx_container) =
-              Services_backend_sig.tx_container_module tx_container
-            in
-            Tx_container.unlock_block_production ())
+            (Worker.state self).unlock_block_production ())
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -396,7 +389,7 @@ let worker_promise, worker_waker = Lwt.task ()
 
 let start ~blueprints_range ~rollup_node_endpoint ~rollup_node_endpoint_timeout
     ~config ~latest_level_seen ~keep_alive ~drop_duplicate ~order_enabled
-    ~tx_container () =
+    ~lock_block_production ~unlock_block_production () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -411,7 +404,8 @@ let start ~blueprints_range ~rollup_node_endpoint ~rollup_node_endpoint_timeout
         keep_alive;
         drop_duplicate;
         order_enabled;
-        tx_container = Ex_tx_container tx_container;
+        lock_block_production;
+        unlock_block_production;
       }
       (module Handlers)
   in

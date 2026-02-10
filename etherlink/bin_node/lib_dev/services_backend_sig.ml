@@ -263,17 +263,6 @@ module type Tx_container = sig
   val tx_queue_beacon :
     evm_node_endpoint:endpoint -> tick_interval:float -> unit tzresult Lwt.t
 
-  (** [lock_block_production] locks the block production, new
-    transactions can be added but no block will be created. *)
-  val lock_block_production : unit -> unit tzresult Lwt.t
-
-  (** [unlock_block_production] unlocks the block production if it was locked by
-    {!lock_block_production}. *)
-  val unlock_block_production : unit -> unit tzresult Lwt.t
-
-  (** [is_locked] checks if the queue is locked. *)
-  val is_locked : unit -> bool tzresult Lwt.t
-
   (** The Tx_queue has a table of pending transactions. There are two
       ways for transactions to be removed from this table; either they
       are confirmed because they have been seen in a block or they are

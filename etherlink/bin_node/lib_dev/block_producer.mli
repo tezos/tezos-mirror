@@ -63,6 +63,14 @@ val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->
   preconfirmed_transactions_result tzresult Lwt.t
 
+(** [lock_block_production ()] locks block production. While locked, produce_block
+    will not produce blocks and preconfirmations will be refused. *)
+val lock_block_production : unit -> unit tzresult Lwt.t
+
+(** [unlock_block_production ()] unlocks block production if it was locked by
+    {!lock_block_production}. *)
+val unlock_block_production : unit -> unit tzresult Lwt.t
+
 module Internal_for_tests : sig
   val produce_block :
     with_delayed_transactions:bool ->
