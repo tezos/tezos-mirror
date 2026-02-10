@@ -1527,7 +1527,11 @@ module Cycle = struct
            let name = ["pending_clst_delegate_parameters"]
          end))
          (Make_index (Contract_repr.Index))
-      (Clst_delegates_parameters_repr)
+      (struct
+        type t = Clst_delegates_parameters_repr.update
+
+        let encoding = Clst_delegates_parameters_repr.update_encoding
+      end)
 end
 
 module Already_denounced = Cycle.Already_denounced

@@ -4699,7 +4699,7 @@ module Clst : sig
     val get_pending_parameters :
       context ->
       Signature.Public_key_hash.t ->
-      (Cycle.t * Clst_delegates_parameters_repr.t) list tzresult Lwt.t
+      (Cycle.t * Clst_delegates_parameters_repr.update) list tzresult Lwt.t
 
     val register_pending_parameters :
       context ->

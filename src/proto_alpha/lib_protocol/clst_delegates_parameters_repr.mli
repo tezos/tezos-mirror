@@ -22,6 +22,10 @@ type t = private {
 
 val default : t
 
+(** Value used in the Pending_parameters storage, to distinguish between new
+    parameters and unregistration. *)
+type update = Update of t | Unregister
+
 type error += Invalid_clst_delegates_parameters
 
 val make :
@@ -30,3 +34,8 @@ val make :
   t tzresult
 
 val encoding : t Data_encoding.t
+
+(** [update_encoding] is the encoding for update instructions. Note that the
+    binary encoding reuse the option encoding, while the JSON encoding aims to
+    be more explicit as it is used as RPCs output. *)
+val update_encoding : update Data_encoding.t

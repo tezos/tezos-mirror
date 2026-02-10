@@ -248,14 +248,14 @@ let pending_staking_parameters_encoding :
     (req "parameters" Staking_parameters_repr.encoding)
 
 type pending_clst_staking_parameters =
-  Cycle.t * Clst_delegates_parameters_repr.t
+  Cycle.t * Clst_delegates_parameters_repr.update
 
 let pending_clst_staking_parameters_encoding :
     pending_clst_staking_parameters Data_encoding.t =
   let open Data_encoding in
   obj2
     (req "cycle" Cycle.encoding)
-    (req "parameters" Clst_delegates_parameters_repr.encoding)
+    (req "parameters" Clst_delegates_parameters_repr.update_encoding)
 
 let min_delegated_in_current_cycle_encoding =
   let open Data_encoding in

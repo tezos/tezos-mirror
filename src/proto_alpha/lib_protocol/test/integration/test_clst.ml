@@ -194,6 +194,28 @@ let check_expected_parameters ~loc expected parameters =
       .Clst_delegates_parameters_repr
        .ratio_of_clst_staking_over_direct_staking_billionth
 
+let check_expected_pending_parameters ~loc expected parameters =
+  let open Lwt_result_syntax in
+  match (expected, parameters) with
+  | ( Clst_delegates_parameters_repr.Update expected,
+      Clst_delegates_parameters_repr.Update parameters ) ->
+      check_expected_parameters ~loc expected parameters
+  | ( Clst_delegates_parameters_repr.Unregister,
+      Clst_delegates_parameters_repr.Unregister ) ->
+      return_unit
+  | _, _ ->
+      let parameter_to_string parameters =
+        Data_encoding.Json.construct
+          Clst_delegates_parameters_repr.update_encoding
+          parameters
+        |> Data_encoding.Json.to_string
+      in
+      Test.fail
+        ~__LOC__:loc
+        "Expected parameter:\n%s\ngot:\n%s"
+        (parameter_to_string expected)
+        (parameter_to_string parameters)
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -1264,7 +1286,10 @@ let check_pending_parameters_and_return_next_activation_cycle ~loc b
     | ( (activation_cycle, pending_parameters) :: pending_parameters_list',
         expected_parameters :: expected_parameters_list' ) ->
         let* () =
-          check_expected_parameters ~loc expected_parameters pending_parameters
+          check_expected_pending_parameters
+            ~loc
+            expected_parameters
+            pending_parameters
         in
         let first_cycle =
           match first_cycle with
@@ -1325,7 +1350,7 @@ let () =
       ~loc:__LOC__
       b
       delegate_pkh
-      [parameters]
+      [Clst_delegates_parameters_repr.Update parameters]
   in
   let activation_cycle =
     Option.value_f ~default:(fun _ -> assert false) activation_cycle
@@ -1409,7 +1434,7 @@ let () =
       ~loc:__LOC__
       b
       delegate_pkh
-      [parameters]
+      [Clst_delegates_parameters_repr.Update parameters]
   in
   let first_params_activation_cycle_minus_one =
     Option.value_f
@@ -1430,7 +1455,7 @@ let () =
       ~loc:__LOC__
       b
       delegate_pkh
-      [parameters; next_parameters]
+      [Update parameters; Update next_parameters]
   in
   let first_params_activation_cycle =
     Option.value_f
@@ -1459,7 +1484,7 @@ let () =
       ~loc:__LOC__
       b
       delegate_pkh
-      [next_parameters]
+      [Update next_parameters]
   in
   let next_params_activation_cycle =
     Option.value_f ~default:(fun _ -> assert false) next_params_activation_cycle

@@ -21,7 +21,7 @@ val get_delegate_parameters :
 val get_pending_parameters :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  (Cycle_repr.t * Clst_delegates_parameters_repr.t) list tzresult Lwt.t
+  (Cycle_repr.t * Clst_delegates_parameters_repr.update) list tzresult Lwt.t
 
 (** [register_pending_parameters ctxt delegate parameters] updates [delegate]'s
     [parameters] to be activated after
