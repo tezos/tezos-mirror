@@ -85,6 +85,8 @@ module Tezos_block = struct
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
 
   module V0 = struct
+    let version = Version.V0
+
     type t = {
       hash : Ethereum_types.block_hash;
       level : int32;
@@ -117,6 +119,30 @@ module Tezos_block = struct
                "Expected a RLP list of 6 elements (including the version field)")
 
     let to_latest = Fun.id
+
+    (* Serialize a block using the V0 version of the block RLP format. *)
+    let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
+      let open Rlp in
+      let level = Helpers.encode_i32_le level in
+      let version = Version.to_bytes version in
+      let hash = Ethereum_types.encode_block_hash hash in
+      let previous_hash = Ethereum_types.encode_block_hash parent_hash in
+      let timestamp = Ethereum_types.timestamp_to_bytes timestamp in
+      let item =
+        List
+          [
+            Value version;
+            Value hash;
+            Value level;
+            Value previous_hash;
+            Value timestamp;
+            Value operations;
+          ]
+      in
+      encode item
+
+    let encode_block_for_store (block : t) : (string, string) result =
+      Ok (Bytes.to_string (block_to_rlp block))
   end
 
   module Latest = V0
@@ -161,6 +187,13 @@ module Tezos_block = struct
     let () = Data_encoding.Registration.register encoding
 
     let to_latest : t -> Latest.t = V0.to_latest
+
+    let encode_block_for_store (block : t) : (string, string) result =
+      Result.map_error
+        (Format.asprintf
+           "Not a valid block: %a"
+           Data_encoding.Binary.pp_write_error)
+        (Data_encoding.Binary.to_string encoding block)
   end
 
   include Latest
@@ -175,48 +208,12 @@ module Tezos_block = struct
         Legacy.to_latest
         @@ Data_encoding.Binary.of_bytes_exn Legacy.encoding bytes
 
-  (* Latest version of the block. It is used for block RLP encoding *)
-  let latest_version = Version.V0
-
-  (* Serialize a block using the latest version of the block RLP format. *)
-  let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
-    let open Rlp in
-    let level = Helpers.encode_i32_le level in
-    let version = Version.to_bytes latest_version in
-    let hash = Ethereum_types.encode_block_hash hash in
-    let previous_hash = Ethereum_types.encode_block_hash parent_hash in
-    let timestamp = Ethereum_types.timestamp_to_bytes timestamp in
-    let item =
-      List
-        [
-          Value version;
-          Value hash;
-          Value level;
-          Value previous_hash;
-          Value timestamp;
-          Value operations;
-        ]
-    in
-    encode item
-
-  let encode_block_for_store (block : t) : (string, string) result =
-    Ok (Bytes.to_string (block_to_rlp block))
-
   let decode_block_for_store (block : string) : (t, string) result =
     try Ok (block_from_kernel (Bytes.of_string block))
     with exn -> Error (Printexc.to_string exn)
 
   module Internal_for_test = struct
-    module Legacy = struct
-      include Legacy
-
-      let encode_block_for_store (block : t) : (string, string) result =
-        Result.map_error
-          (Format.asprintf
-             "Not a valid block: %a"
-             Data_encoding.Binary.pp_write_error)
-          (Data_encoding.Binary.to_string encoding block)
-    end
+    module Legacy = Legacy
   end
 end
 
