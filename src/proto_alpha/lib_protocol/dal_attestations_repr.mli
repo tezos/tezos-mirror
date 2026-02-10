@@ -88,6 +88,9 @@ val empty : t
 (** [is_empty t] returns [true] if all attestations at all lags are empty. *)
 val is_empty : t -> bool
 
+(** [is_empty t] returns [true] if the attestation at [lag_index] is empty. *)
+val is_empty_at_lag_index : t -> lag_index:int -> bool
+
 (** [is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index] returns
     [true] if the attestation at [lag_index] commits that the slot at
     [slot_index] is available. [lag_index] must satisfy [0 <= lag_index <

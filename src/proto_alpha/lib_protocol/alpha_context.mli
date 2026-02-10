@@ -2986,6 +2986,8 @@ module Dal : sig
 
     val is_empty : t -> bool
 
+    val is_empty_at_lag_index : t -> lag_index:int -> bool
+
     val commit :
       t ->
       number_of_slots:int ->
