@@ -328,9 +328,11 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
-  let execute_approval (step_constants : step_constants) (storage, ctxt)
+  let execute_approval (step_constants : step_constants)
+      (operations, storage, ctxt)
       ((owner, (spender, (token_id, delta))) : approval) =
     let open Lwt_result_syntax in
+    let*? entrypoint_str = Entrypoint.of_string_lax "approve" in
     (* Restrict operator updates only to the owner of the token. *)
     let*? () =
       error_when
@@ -347,15 +349,15 @@ module CLST_contract = struct
         ~owner
         ~spender
     in
-    let new_allowance =
+    let new_allowance, diff =
       match (allowance, delta) with
       (* "Operator has precedence over spender" (cf TZIP26), i.e. if an
        infinite allowance is set, then only the [update_operators]
        entrypoint will have an effect on it. *)
-      | Some None, _ -> None
+      | Some None, _ -> (None, Script_int.zero)
       (* Operator already has an allowance *)
       | Some (Some allowance), L increase ->
-          Some (Script_int.add_n allowance increase)
+          (Some (Script_int.add_n allowance increase), Script_int.int increase)
       (* If the allowance would underflow, TZIP26 considers it as zero,
        and not an error. *)
       | Some (Some allowance), R decrease ->
@@ -364,10 +366,10 @@ module CLST_contract = struct
             |> Script_int.is_nat
             |> Option.value ~default:Script_int.zero_n
           in
-          Some new_allowance
+          (Some new_allowance, Script_int.sub new_allowance allowance)
       (* The operator has no allowance defined already. *)
-      | None, L increase -> Some increase
-      | None, R _decrease -> Some Script_int.zero_n
+      | None, L increase -> (Some increase, Script_int.int increase)
+      | None, R _decrease -> (Some Script_int.zero_n, Script_int.zero)
     in
     let* storage, ctxt =
       Clst_contract_storage.set_account_operator_allowance
@@ -377,18 +379,34 @@ module CLST_contract = struct
         ~spender
         (Some new_allowance)
     in
-    return (storage, ctxt)
+    match new_allowance with
+    | Some new_allowance ->
+        let* op_allowance_update_event, ctxt =
+          Clst_events.allowance_update_event
+            (ctxt, step_constants)
+            ~entrypoint:entrypoint_str
+            ~owner
+            ~spender
+            ~token_id:Clst_contract_storage.token_id
+            ~new_allowance
+            ~diff
+        in
+        return (op_allowance_update_event :: operations, storage, ctxt)
+    | None ->
+        (* the allowance_update event is not issued iff the allowance
+           is infinite *)
+        return (operations, storage, ctxt)
 
   let execute_approve (ctxt, (step_constants : step_constants))
       (value : approve) (storage : Clst_contract_storage.t) =
     let open Lwt_result_syntax in
-    let* storage, ctxt =
+    let* rev_ops, storage, ctxt =
       List.fold_left_es
         (execute_approval step_constants)
-        (storage, ctxt)
+        ([], storage, ctxt)
         (Script_list.to_list value)
     in
-    return (Script_list.empty, storage, [], ctxt)
+    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
