@@ -3073,8 +3073,8 @@ let are_attestations_required ctxt ~level =
   let level_position_in_protocol = Raw_level.diff level first_level in
   Compare.Int32.(level_position_in_protocol > 1l)
 
-(* It also records participation in the DAL. *)
-let record_attesting_participation ctxt dal_slot_availability =
+(* It does not record participation in the DAL. *)
+let record_attesting_participation ctxt =
   let open Lwt_result_syntax in
   match Consensus.allowed_attestations ctxt with
   | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
@@ -3089,18 +3089,11 @@ let record_attesting_participation ctxt dal_slot_availability =
               Delegate.Participated
             else Delegate.Didn't_participate
           in
-          let* ctxt =
-            Delegate.record_attesting_participation
-              ctxt
-              ~delegate:consensus_key.delegate
-              ~participation
-              ~attesting_slots:(Attesting_power.get_slots attesting_power)
-          in
-          Dal_apply.record_participation
+          Delegate.record_attesting_participation
             ctxt
-            consensus_key.delegate
-            initial_slot
-            dal_slot_availability)
+            ~delegate:consensus_key.delegate
+            ~participation
+            ~attesting_slots:(Attesting_power.get_slots attesting_power))
         validators
         ctxt
 
@@ -3322,7 +3315,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       are_attestations_required ctxt ~level:current_level.level
     in
     if required_attestations then
-      let* ctxt = record_attesting_participation ctxt dal_slot_availability in
+      let* ctxt = record_attesting_participation ctxt in
       (* The attested level is the predecessor of the block's level. *)
       match Level.pred ctxt current_level with
       | None ->
