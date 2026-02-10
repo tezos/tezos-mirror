@@ -180,7 +180,7 @@ module Worker = struct
         let (module Tx_container) =
           Services_backend_sig.tx_container_module tx_container
         in
-        Tx_container.lock_transactions ()
+        Tx_container.lock_block_production ()
 
   let catch_up worker =
     let open Lwt_result_syntax in
@@ -367,7 +367,7 @@ module Handlers = struct
             let (module Tx_container) =
               Services_backend_sig.tx_container_module tx_container
             in
-            Tx_container.unlock_transactions ())
+            Tx_container.unlock_block_production ())
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =

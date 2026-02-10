@@ -1053,6 +1053,34 @@ module Replay_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Lock_block_production = struct
+  type input = unit
+
+  type output = unit
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "lockBlockProduction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Unlock_block_production = struct
+  type input = unit
+
+  type output = unit
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "unlockBlockProduction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Trace_transaction = struct
   type input = Tracer_types.input
 
@@ -1289,6 +1317,8 @@ let evm_supported_methods : (module METHOD) list =
     (module Wait_transaction_confirmation);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
+    (module Lock_block_production);
+    (module Unlock_block_production);
     (module Trace_transaction);
     (module Eth_fee_history);
     (module Coinbase);
@@ -1367,6 +1397,8 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Replay_block);
+    (module Lock_block_production);
+    (module Unlock_block_production);
   ]
 
 let michelson_unsupported_methods = evm_unsupported_methods

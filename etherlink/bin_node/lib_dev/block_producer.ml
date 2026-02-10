@@ -678,13 +678,21 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
         (* We stop producing blocks ahead of the upgrade *)
         let*! () = Block_producer_events.sunset () in
         state.sunset <- true ;
-        Tx_container.lock_transactions ()
+        Tx_container.lock_block_production ()
     | _ -> return_unit
   in
   let* is_locked = Tx_container.is_locked () in
-  if is_locked then
+  let has_preconfirmed_txs =
+    match state.preconfirmation_state with
+    | Enabled (Selecting_delayed_txs _ | Validating_txs _) -> true
+    | _ -> false
+  in
+  if is_locked && not has_preconfirmed_txs then (
     let*! () = Block_producer_events.production_locked () in
-    return `No_block
+    set_preconfirmation_state
+      state
+      (Potential_next_block_timestamp (compute_next_block_timestamp ~now)) ;
+    return `No_block)
   else
     let is_going_to_upgrade_kernel =
       match head_info.pending_upgrade with
@@ -927,21 +935,28 @@ module Handlers = struct
     | Request.Preconfirm_transactions transactions -> (
         let open Lwt_result_syntax in
         protect @@ fun () ->
-        (* If we are before the first created block and block producer
-          is not aware of its future timestamp, preconfirmation are disabled *)
-        match state.preconfirmation_state with
-        | Disabled -> tzfail IC_disabled
-        | Awaiting_first_timestamp -> tzfail IC_disabled
-        | Enabled preconfirmation_state ->
-            let* preconfirmation_state, selected_txns_hashes =
-              preconfirm_transactions
-                ~maximum_number_of_chunks:state.maximum_number_of_chunks
-                ~transactions
-                ~tx_container:state.tx_container
-                preconfirmation_state
-            in
-            set_preconfirmation_state state preconfirmation_state ;
-            return selected_txns_hashes)
+        let (Ex_tx_container tx_container) = state.tx_container in
+        let (module Tx_container) =
+          Services_backend_sig.tx_container_module tx_container
+        in
+        let* is_locked = Tx_container.is_locked () in
+        (* Refuse preconfirmations when tx queue is locked, before the first
+           created block, or when preconfirmations are explicitly disabled *)
+        if is_locked then tzfail IC_disabled
+        else
+          match state.preconfirmation_state with
+          | Disabled -> tzfail IC_disabled
+          | Awaiting_first_timestamp -> tzfail IC_disabled
+          | Enabled preconfirmation_state ->
+              let* preconfirmation_state, selected_txns_hashes =
+                preconfirm_transactions
+                  ~maximum_number_of_chunks:state.maximum_number_of_chunks
+                  ~transactions
+                  ~tx_container:state.tx_container
+                  preconfirmation_state
+              in
+              set_preconfirmation_state state preconfirmation_state ;
+              return selected_txns_hashes)
 
   type launch_error = error trace
 

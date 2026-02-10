@@ -365,6 +365,12 @@ module Replay_block :
      and type output =
       Ethereum_types.legacy_transaction_object Ethereum_types.block
 
+module Lock_block_production :
+  METHOD with type input = unit and type output = unit
+
+module Unlock_block_production :
+  METHOD with type input = unit and type output = unit
+
 module Trace_transaction :
   METHOD
     with type input = Tracer_types.input

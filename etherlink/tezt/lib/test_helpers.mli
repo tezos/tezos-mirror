@@ -384,6 +384,7 @@ val register_sandbox_with_observer :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?fail_on_divergence:bool ->
   ?websockets:bool ->
+  ?genesis_timestamp:Client.timestamp ->
   ?sequencer_keys:Account.key list ->
   (sandbox_test -> unit Lwt.t) ->
   unit
