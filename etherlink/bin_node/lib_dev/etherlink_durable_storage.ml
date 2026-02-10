@@ -433,10 +433,20 @@ let block_receipts read n =
   let*! receipts = block_receipts_of_block read block in
   Lwt.return_ok receipts
 
+let base_fee_per_gas_opt read =
+  let open Lwt_result_syntax in
+  Lwt.catch
+    (fun () ->
+      let* block = current_block read ~full_transaction_object:false in
+      return block.baseFeePerGas)
+    (function
+      | Durable_storage.Invalid_block_structure _ -> return_none
+      | exn -> Lwt.reraise exn)
+
 let base_fee_per_gas read =
   let open Lwt_result_syntax in
-  let* block = current_block read ~full_transaction_object:false in
-  match block.baseFeePerGas with
+  let* base_fee_per_gas = base_fee_per_gas_opt read in
+  match base_fee_per_gas with
   | Some base_fee_per_gas -> return base_fee_per_gas
   | None ->
       Error_monad.failwith
@@ -451,6 +461,12 @@ let backlog read =
       Z.of_int64_unsigned
         Data_encoding.(Binary.of_bytes_exn Little_endian.int64 backlog_bytes)
   | None -> Z.zero
+
+let minimum_base_fee_per_gas_opt read =
+  inspect_durable_and_decode_opt
+    read
+    Durable_storage_path.minimum_base_fee_per_gas
+    Helpers.decode_z_le
 
 let minimum_base_fee_per_gas read =
   inspect_durable_and_decode
@@ -531,6 +547,11 @@ module Make (Reader : READER) = struct
     let* read = read_with_state () in
     base_fee_per_gas read
 
+  let base_fee_per_gas_opt () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    base_fee_per_gas_opt read
+
   let backlog () =
     let open Lwt_result_syntax in
     let* read = read_with_state () in
@@ -540,6 +561,11 @@ module Make (Reader : READER) = struct
     let open Lwt_result_syntax in
     let* read = read_with_state () in
     minimum_base_fee_per_gas read
+
+  let minimum_base_fee_per_gas_opt () =
+    let open Lwt_result_syntax in
+    let* read = read_with_state () in
+    minimum_base_fee_per_gas_opt read
 
   let storage_at address pos block =
     let open Lwt_result_syntax in

@@ -6,6 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Default minimum base fee per gas, set to 1 Gwei.
+    This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
+    the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
+val default_minimum_base_fee_per_gas : Z.t
+
 (** [gas_used_for_da_fees ~da_fee_per_byte ~base_fee_per_gas ?access_list
     tx_data] computes the amount of gas unit taken by the kernel to reimburse
     the sequencer for its L1 costs, given the provided [base_fee_per_gas]. *)

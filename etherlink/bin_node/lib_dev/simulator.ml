@@ -146,7 +146,8 @@ module MakeEtherlink (SimulationBackend : SimulationBackend) = struct
       let* minimum_base_feer_per_gas_opt = read_qty path in
       match minimum_base_feer_per_gas_opt with
       | None ->
-          return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
+          return
+            (Ethereum_types.quantity_of_z Fees.default_minimum_base_fee_per_gas)
       | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
     in
     let da_fee =

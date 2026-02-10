@@ -399,20 +399,35 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
       else
         let read = Evm_state.read head_info.evm_state in
         let* minimum_base_fee_per_gas =
-          Etherlink_durable_storage.minimum_base_fee_per_gas read
+          Etherlink_durable_storage.minimum_base_fee_per_gas_opt read
         in
         let* base_fee_per_gas =
-          Etherlink_durable_storage.base_fee_per_gas read
+          Etherlink_durable_storage.base_fee_per_gas_opt read
         in
         let* maximum_gas_limit =
           Etherlink_durable_storage.maximum_gas_per_transaction read
         in
         let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
+        (* TODO #8236 / L2-862
+           Using optional values for [minimum_base_fee_per_gas] and
+           [base_fee_per_gas] is a temporary work around. In the context of
+           Tezlink, no EVM block exists yet so reading these values from the
+           block header raises [Invalid_block_structure]. Once the kernel writes
+           an initial EVM block for all chain families, this fallback can be
+           removed. *)
         let evm_config =
           Validation_types.
             {
-              minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-              base_fee_per_gas;
+              minimum_base_fee_per_gas =
+                Ethereum_types.Qty
+                  (Option.value
+                     ~default:Fees.default_minimum_base_fee_per_gas
+                     minimum_base_fee_per_gas);
+              base_fee_per_gas =
+                Option.value
+                  ~default:
+                    (Ethereum_types.Qty Fees.default_minimum_base_fee_per_gas)
+                  base_fee_per_gas;
               maximum_gas_limit;
               da_fee_per_byte;
               next_nonce =

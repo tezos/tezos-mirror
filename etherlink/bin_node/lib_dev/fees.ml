@@ -6,6 +6,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* This value must stay in sync with [MINIMUM_BASE_FEE_PER_GAS] defined in
+   the kernel (etherlink/kernel_latest/kernel/src/fees.rs). *)
+let default_minimum_base_fee_per_gas = Z.of_int 1_000_000_000
+
 (*
 
   On Etherlink, the gas serves two purposes:
@@ -74,7 +78,7 @@ let gas_used_for_da_fees ~da_fee_per_byte:(Ethereum_types.Qty da_fee_per_byte)
     Z.mul da_fee_per_byte size
   in
   let fees = da_fee ?access_list da_fee_per_byte tx_data in
-  Z.cdiv fees base_fee_per_gas
+  if Compare.Z.(fees <= Z.zero) then Z.zero else Z.cdiv fees base_fee_per_gas
 
 let da_fees_gas_limit_overhead ~da_fee_per_byte ~minimum_base_fee_per_gas
     ?access_list tx_data =
