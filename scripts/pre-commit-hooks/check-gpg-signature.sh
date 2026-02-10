@@ -32,7 +32,24 @@ fi
 
 # ✓ commit signing is properly configured
 # Check if all commits since branch creation are signed
-base_branch=$(git merge-base HEAD "$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)")")
+current_branch_ref=$(git symbolic-ref -q HEAD || true)
+upstream_branch=""
+
+if [ -n "$current_branch_ref" ]; then
+  upstream_branch=$(git for-each-ref --format='%(upstream:short)' "$current_branch_ref")
+fi
+
+if [ -z "$upstream_branch" ]; then
+  echo "⚠️  Warning: No upstream branch configured. Skipping commit signature check."
+  exit 0
+fi
+
+if ! git rev-parse --verify --quiet "$upstream_branch^{commit}" > /dev/null; then
+  echo "⚠️  Warning: Upstream branch '$upstream_branch' is not a valid commit. Skipping commit signature check."
+  exit 0
+fi
+
+base_branch=$(git merge-base HEAD "$upstream_branch" 2> /dev/null || true)
 if [ -z "$base_branch" ]; then
   echo "⚠️  Warning: Could not determine base branch. Skipping commit signature check."
   exit 0
