@@ -5,9 +5,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{ExecutionInfo, TransactionReceiptInfo};
+use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
-use crate::chains::{TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
+use crate::chains::{
+    TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+};
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
@@ -33,8 +35,8 @@ use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
-use tezos_tezlink::block::OperationsWithReceipts;
-use tezosx_interfaces::RuntimeId;
+use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
+use tezos_tezlink::enc_wrappers::BlockNumber;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
@@ -50,8 +52,8 @@ pub struct BlockInProgress<Transaction> {
     pub cumulative_gas: U256,
     /// index for next transaction
     pub index: u32,
-    /// hash of the parent
-    pub parent_hash: H256,
+    /// hash of the parent ethereum block
+    pub ethereum_parent_hash: H256,
     /// logs bloom filter
     pub logs_bloom: Bloom,
     /// offset for the first log of the next transaction
@@ -69,6 +71,8 @@ pub struct BlockInProgress<Transaction> {
     pub cumulative_tx_objects: Vec<TransactionObject>,
     /// Cumulative Tezos operation receipts
     pub cumulative_tezos_operation_receipts: OperationsWithReceipts,
+    /// Hash of the previous Tezos block (used for TezBlock chaining in EVM mode)
+    pub tezos_parent_hash: H256,
 }
 
 impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
@@ -80,7 +84,7 @@ impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
             delayed_txs,
             cumulative_gas,
             index,
-            parent_hash,
+            ethereum_parent_hash,
             logs_bloom,
             logs_offset,
             timestamp,
@@ -89,15 +93,16 @@ impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
             cumulative_receipts,
             cumulative_tx_objects: cumulative_objects,
             cumulative_tezos_operation_receipts,
+            tezos_parent_hash,
         } = self;
-        stream.begin_list(15);
+        stream.begin_list(16);
         stream.append(number);
         append_queue(stream, tx_queue);
         append_txs(stream, valid_txs);
         append_txs(stream, delayed_txs);
         stream.append(cumulative_gas);
         stream.append(index);
-        stream.append(parent_hash);
+        stream.append(ethereum_parent_hash);
         stream.append(logs_bloom);
         stream.append(logs_offset);
         append_timestamp(stream, *timestamp);
@@ -106,6 +111,7 @@ impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
         append_receipts(stream, cumulative_receipts);
         append_tx_objects(stream, cumulative_objects);
         stream.append(cumulative_tezos_operation_receipts);
+        stream.append(tezos_parent_hash);
     }
 }
 
@@ -142,7 +148,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 15 {
+        if decoder.item_count()? != 16 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -153,7 +159,8 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
         let delayed_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let cumulative_gas: U256 = decode_field(&next(&mut it)?, "cumulative_gas")?;
         let index: u32 = decode_field(&next(&mut it)?, "index")?;
-        let parent_hash: H256 = decode_field(&next(&mut it)?, "parent_hash")?;
+        let ethereum_parent_hash: H256 =
+            decode_field(&next(&mut it)?, "ethereum_parent_hash")?;
         let logs_bloom: Bloom = decode_field(&next(&mut it)?, "logs_bloom")?;
         let logs_offset: u64 = decode_field(&next(&mut it)?, "logs_offset")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
@@ -166,6 +173,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
             decode_tx_objects(&next(&mut it)?)?;
         let cumulative_tezos_operation_receipts: OperationsWithReceipts =
             decode_field(&next(&mut it)?, "cumulative_tezos_operation_receipts")?;
+        let tezos_parent_hash: H256 = decode_field(&next(&mut it)?, "tezos_parent_hash")?;
 
         let bip = Self {
             number,
@@ -174,7 +182,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
             delayed_txs,
             cumulative_gas,
             index,
-            parent_hash,
+            ethereum_parent_hash,
             logs_bloom,
             logs_offset,
             timestamp,
@@ -183,6 +191,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
             cumulative_receipts,
             cumulative_tx_objects,
             cumulative_tezos_operation_receipts,
+            tezos_parent_hash,
         };
         Ok(bip)
     }
@@ -252,7 +261,8 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_ticks(
         number: U256,
-        parent_hash: H256,
+        ethereum_parent_hash: H256,
+        tezos_parent_hash: H256,
         transactions: VecDeque<Tx>,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
@@ -264,7 +274,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
             delayed_txs: Vec::new(),
             cumulative_gas: U256::zero(),
             index: 0,
-            parent_hash,
+            ethereum_parent_hash,
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp,
@@ -273,6 +283,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
             cumulative_receipts: Vec::new(),
             cumulative_tx_objects: Vec::new(),
             cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
+            tezos_parent_hash,
         }
     }
 
@@ -281,6 +292,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     pub fn new(number: U256, transactions: VecDeque<Tx>, base_fee_per_gas: U256) -> Self {
         Self::new_with_ticks(
             number,
+            H256::zero(),
             H256::zero(),
             transactions,
             Timestamp::from(0i64),
@@ -320,14 +332,16 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     pub fn from_blueprint(
         blueprint: crate::blueprint::Blueprint<Tx>,
         number: U256,
-        parent_hash: H256,
+        ethereum_parent_hash: H256,
+        tezos_parent_hash: H256,
         base_fee_per_gas: U256,
     ) -> Self {
         // blueprint is turn into a ring to allow popping from the front
         let ring = blueprint.transactions.into();
         Self::new_with_ticks(
             number,
-            parent_hash,
+            ethereum_parent_hash,
+            tezos_parent_hash,
             ring,
             blueprint.timestamp,
             base_fee_per_gas,
@@ -363,27 +377,23 @@ impl BlockInProgress<Transaction> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
-        execution_info: ExecutionInfo,
+        execution_info: RuntimeExecutionInfo,
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
-        let ExecutionInfo {
-            receipt_info,
-            tx_object,
-            runtime,
-            tx_hash,
-        } = execution_info;
-        let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
-        // account for gas
-        host.add_execution_gas(execution_gas_used);
+        match execution_info {
+            RuntimeExecutionInfo::Ethereum(EthereumExecutionInfo {
+                receipt_info,
+                tx_object,
+            }) => {
+                let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
+                // account for gas
+                host.add_execution_gas(execution_gas_used);
+                self.add_gas(receipt_info.overall_gas_used)?;
+                // keep track of execution gas used
+                self.cumulative_execution_gas += execution_gas_used.into();
 
-        self.add_gas(receipt_info.overall_gas_used)?;
-
-        // keep track of execution gas used
-        self.cumulative_execution_gas += execution_gas_used.into();
-        match runtime {
-            RuntimeId::Ethereum => {
                 // register transaction as done
-                self.valid_txs.push(tx_hash);
+                self.valid_txs.push(receipt_info.tx_hash);
                 self.index += 1;
 
                 // make receipt
@@ -397,7 +407,13 @@ impl BlockInProgress<Transaction> {
                 self.cumulative_receipts.push(receipt);
                 self.cumulative_tx_objects.push(tx_object);
             }
-            RuntimeId::Tezos => (),
+            RuntimeExecutionInfo::Tezos(operation_and_receipt) => {
+                // TODO: Add gas used for Tezos transactions to the cumulative gas
+                // https://linear.app/tezos/issue/L2-841/add-gas-used-for-tezos-transactions-to-the-cumulative-gas
+                self.cumulative_tezos_operation_receipts
+                    .list
+                    .push(operation_and_receipt);
+            }
         };
         Ok(())
     }
@@ -443,6 +459,7 @@ impl BlockInProgress<Transaction> {
         self,
         host: &mut Host,
         block_constants: &BlockConstants,
+        enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root();
@@ -462,11 +479,24 @@ impl BlockInProgress<Transaction> {
             self.timestamp,
             block_constants.block_fees.minimum_base_fee_per_gas(),
         );
+
+        if enable_tezos_runtime {
+            let tez_block = Self::create_tez_block(
+                self.number,
+                self.timestamp,
+                self.tezos_parent_hash,
+                self.cumulative_tezos_operation_receipts.list,
+            )?;
+            let tez_block = L2Block::Tezlink(tez_block);
+            block_storage::store_current(host, &TEZOS_BLOCKS_PATH, &tez_block)
+                .context("Failed to store the Tezos block")?;
+        }
+
         let new_block = EthBlock::new(
             self.number,
             self.valid_txs,
             self.timestamp,
-            self.parent_hash,
+            self.ethereum_parent_hash,
             self.logs_bloom,
             transactions_root,
             state_root,
@@ -478,7 +508,23 @@ impl BlockInProgress<Transaction> {
         let new_block = L2Block::Etherlink(Box::new(new_block));
         block_storage::store_current(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, &new_block)
             .context("Failed to store the current block")?;
+
         Ok(new_block)
+    }
+
+    /// Creates a TezBlock from the accumulated Tezos operations.
+    fn create_tez_block(
+        block_number: U256,
+        timestamp: Timestamp,
+        previous_hash: H256,
+        operations: Vec<tezos_tezlink::block::AppliedOperation>,
+    ) -> Result<TezBlock, anyhow::Error> {
+        let block_number: BlockNumber = block_number
+            .try_into()
+            .context("Block number overflow when converting to Tezos block number")?;
+
+        TezBlock::new(block_number, timestamp, previous_hash, operations)
+            .context("Failed to create TezBlock")
     }
 
     pub fn make_receipt(
@@ -617,7 +663,7 @@ mod tests {
             delayed_txs: vec![],
             cumulative_gas: U256::from(3),
             index: 4,
-            parent_hash: H256::from([5; 32]),
+            ethereum_parent_hash: H256::from([5; 32]),
             logs_bloom: Bloom::default(),
             logs_offset: 33,
             timestamp: Timestamp::from(0i64),
@@ -626,10 +672,11 @@ mod tests {
             cumulative_receipts: vec![],
             cumulative_tx_objects: vec![],
             cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
+            tezos_parent_hash: H256::zero(),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902652af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c080";
+        let expected = "f902862af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -649,7 +696,7 @@ mod tests {
             delayed_txs: vec![[2; TRANSACTION_HASH_SIZE]],
             cumulative_gas: U256::from(3),
             index: 4,
-            parent_hash: H256::from([5; 32]),
+            ethereum_parent_hash: H256::from([5; 32]),
             logs_bloom: Bloom::default(),
             logs_offset: 0,
             timestamp: Timestamp::from(0i64),
@@ -658,10 +705,11 @@ mod tests {
             cumulative_receipts: vec![],
             cumulative_tx_objects: vec![],
             cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
+            tezos_parent_hash: H256::zero(),
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9021c2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c080";
+        let expected = "f9023d2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -681,7 +729,7 @@ mod tests {
             delayed_txs: vec![],
             cumulative_gas: U256::from(3),
             index: 4,
-            parent_hash: H256::from([5; 32]),
+            ethereum_parent_hash: H256::from([5; 32]),
             logs_bloom: Bloom::default(),
             logs_offset: 4,
             timestamp: Timestamp::from(0i64),
@@ -690,11 +738,12 @@ mod tests {
             cumulative_receipts: vec![],
             cumulative_tx_objects: vec![],
             cumulative_tezos_operation_receipts: OperationsWithReceipts::default(),
+            tezos_parent_hash: H256::zero(),
         };
 
         let encoded = bip.rlp_bytes();
         let expected =
-            "f902302af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c080";
+            "f902512af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 

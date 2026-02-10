@@ -7,6 +7,7 @@
 
 use crate::apply::{ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::block_in_progress;
+use crate::block_storage;
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
@@ -186,12 +187,18 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     next_bip_number: U256,
     hash: H256,
+    tezos_parent_hash: H256,
     blueprint: Blueprint<ChainConfig::Transaction>,
 ) -> BlockInProgress<ChainConfig::Transaction> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
-    let bip =
-        BlockInProgress::from_blueprint(blueprint, next_bip_number, hash, gas_price);
+    let bip = BlockInProgress::from_blueprint(
+        blueprint,
+        next_bip_number,
+        hash,
+        tezos_parent_hash,
+        gas_price,
+    );
 
     tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
     bip
@@ -239,11 +246,17 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     return Ok(BlueprintParsing::None);
                 }
             }
+            let tezos_parent_hash =
+                block_storage::read_current_hash(host, &crate::chains::TEZOS_BLOCKS_PATH)
+                    .unwrap_or_else(|_| {
+                        tezos_tezlink::block::TezBlock::genesis_block_hash()
+                    });
             let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
                 host,
                 chain_config,
                 next_bip_number,
                 chain_header.hash(),
+                tezos_parent_hash,
                 blueprint,
             );
             Ok(BlueprintParsing::Next(Box::new(bip)))
@@ -506,7 +519,7 @@ mod tests {
     use crate::chains::TezlinkOperation;
     use crate::chains::{
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
-        TEZLINK_SAFE_STORAGE_ROOT_PATH,
+        TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
@@ -1050,6 +1063,170 @@ mod tests {
             .expect("Retrieve manager should have succeeded");
 
         assert_eq!(Manager::Revealed(pk), manager);
+    }
+
+    fn dummy_evm_config_with_tezos_runtime(host: &mut impl Runtime) -> EvmChainConfig {
+        host.store_write(&crate::storage::ENABLE_TEZOS_RUNTIME, &[], 0)
+            .expect("Should have written feature flag");
+        let experimental_features = ExperimentalFeatures::read_from_storage(host);
+        EvmChainConfig::create_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits::default(),
+            SpecId::default(),
+            experimental_features,
+        )
+    }
+
+    #[test]
+    // Test that a TezBlock is created and stored when Tezos operations are executed via EVM chain config
+    fn test_tezblock_stored_after_tezos_operation() {
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let bootstrap = bootstrap1();
+
+        // Initialize the Tezos account in the TezosX storage path
+        // (used by TezosRuntimeContext in apply.rs for TezosDelayed operations)
+        let account_info = TezosAccountInfo {
+            balance: U256::from(10),
+            nonce: 0,
+            pub_key: None,
+        };
+        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+            .expect("Should have set account info");
+
+        // Create a Tezos reveal operation wrapped as TezosDelayed for EVM chain
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
+        let tx_hash = reveal.hash().unwrap().0 .0;
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(reveal),
+        };
+
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        // Produce the block
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Verify that a TezBlock was stored (at TEZOS_BLOCKS_PATH which is under /evm/world_state)
+        let tez_block_number =
+            block_storage::read_current_number(&host, &TEZOS_BLOCKS_PATH)
+                .expect("TezBlock number should be readable");
+        // Block number is 0 for the first block (same as EVM block numbering)
+        assert_eq!(U256::from(0), tez_block_number);
+
+        let tez_block_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+            .expect("TezBlock hash should be readable");
+        // The hash should not be zero (it's computed from the block content)
+        assert_ne!(H256::zero(), tez_block_hash);
+    }
+
+    #[test]
+    fn test_tezblocks_are_chained() {
+        use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
+
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        let bootstrap = bootstrap1();
+
+        let account_info = TezosAccountInfo {
+            balance: U256::from(100),
+            nonce: 0,
+            pub_key: None,
+        };
+        set_tezos_account_info(&mut host, &bootstrap.pkh, account_info)
+            .expect("Should have set account info");
+
+        // Block 0: reveal operation
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap.clone());
+        let tx_hash = reveal.hash().unwrap().0 .0;
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(reveal),
+        };
+
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![tezos_tx])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Record block 0 hash
+        let block_0_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+            .expect("TezBlock 0 hash should be readable");
+        assert_ne!(H256::zero(), block_0_hash);
+
+        // Block 1: transfer operation
+        let bootstrap2 = bootstrap2();
+        let transfer = make_transaction_operation(
+            1,
+            2,
+            3000,
+            0,
+            bootstrap,
+            10_u64.into(),
+            Contract::Implicit(bootstrap2.pkh),
+            Parameters::default(),
+        );
+        let tx_hash = transfer.hash().unwrap().0 .0;
+        let tezos_tx = Transaction {
+            tx_hash,
+            content: TransactionContent::TezosDelayed(transfer),
+        };
+
+        store_inbox_blueprint_by_number(
+            &mut host,
+            blueprint(vec![tezos_tx]),
+            U256::from(1),
+        )
+        .expect("Should have stored blueprint");
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        // Block 1 hash should be different from block 0
+        let block_1_hash = block_storage::read_current_hash(&host, &TEZOS_BLOCKS_PATH)
+            .expect("TezBlock 1 hash should be readable");
+        assert_ne!(block_0_hash, block_1_hash);
+
+        // Read block 1 from storage and check its previous_hash equals block 0's hash
+        let block_path = concat(
+            &TEZOS_BLOCKS_PATH,
+            &RefPath::assert_from(b"/blocks/current/block"),
+        )
+        .expect("Block path should be valid");
+        let block_bytes = host
+            .store_read_all(&block_path)
+            .expect("Should read block bytes");
+        let rlp = rlp::Rlp::new(&block_bytes);
+        // TezBlock RLP layout: [version, hash, number, previous_hash, timestamp, operations]
+        let previous_hash: H256 = rlp
+            .at(3)
+            .expect("Should decode previous_hash element")
+            .as_val()
+            .expect("Should decode previous_hash");
+        assert_eq!(
+            block_0_hash, previous_hash,
+            "Block 1's previous_hash should be block 0's hash"
+        );
     }
 
     #[test]

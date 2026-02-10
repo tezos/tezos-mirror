@@ -210,6 +210,7 @@ mod test {
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
+            Default::default(),
             VecDeque::new(),
             // estimated ticks in run (ignored)
             timestamp.into(),
@@ -224,7 +225,7 @@ mod test {
             bip.queue_length(),
         )
         .unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants)
+        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
             .unwrap();
 
         // At tolerance, gas price should be min.
@@ -237,6 +238,7 @@ mod test {
         // register more blocks - now double tolerance
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
+            Default::default(),
             Default::default(),
             VecDeque::new(),
             timestamp.into(),
@@ -251,7 +253,7 @@ mod test {
             bip.queue_length(),
         )
         .unwrap();
-        bip.finalize_and_store(&mut host, &dummy_block_constants)
+        bip.finalize_and_store(&mut host, &dummy_block_constants, false)
             .unwrap();
         let gas_price_now = base_fee_per_gas(&host, timestamp.into(), min);
 
