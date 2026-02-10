@@ -501,6 +501,84 @@ let test_deposit =
   | Empty -> unit
   | _ -> failwith "Latest block should be empty"
 
+(** Originate a Michelson contract via the delayed inbox, call it, and verify
+    that its storage is updated.
+
+    Uses [store_input.tz] from [michelson_test_scripts/opcodes]: a minimal
+    contract that stores its string parameter as the new storage.
+
+    Steps:
+    1. Originate the store_input contract with an initial balance,
+       check that exactly fee + init_balance + origination burn was consumed.
+    2. Call the contract with a string parameter and some XTZ,
+       check that exactly fee + call_amount was consumed.
+    3. Read the contract storage and verify it matches the parameter *)
+let test_michelson_origination_and_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson origination and call on tezos X"
+    ~tags:["origination"; "call"; "michelson"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sequencer in
+
+  (* Step 1: Originate a Michelson contract (store_input.tz) *)
+  let init_balance = 1_234_567 in
+  let* contract_hex, kt1_address =
+    with_check_source_delta_balance
+      ~source
+      ~tez_client
+        (* 72500 = origination burn: 257 * 250 (base) + 33 * 250 (script) *)
+      ~expected_consumed:(1000 + init_balance + 72500)
+      (fun () ->
+        originate_michelson_contract_via_delayed_inbox
+          ~sc_rollup_address
+          ~sc_rollup_node
+          ~client
+          ~l1_contracts
+          ~sequencer
+          ~source
+          ~counter:1
+          ~script_name:["opcodes"; "store_input"]
+          ~init_storage_data:{|""|}
+          ~init_balance
+          protocol)
+  in
+
+  (* Step 2: Call the contract with a string parameter and send XTZ *)
+  let expected_storage = "Hello Tezos X" in
+  let call_amount = 1_234_567 in
+  let* () =
+    with_check_source_delta_balance
+      ~source
+      ~tez_client
+      ~expected_consumed:(1000 + call_amount)
+      (fun () ->
+        call_michelson_contract_via_delayed_inbox
+          ~sc_rollup_address
+          ~sc_rollup_node
+          ~client
+          ~l1_contracts
+          ~sequencer
+          ~source
+          ~counter:2
+          ~dest:kt1_address
+          ~arg_data:(sf {|"%s"|} expected_storage)
+          ~amount:call_amount
+          ())
+  in
+
+  (* Step 3: Read the contract storage and verify *)
+  check_michelson_storage_value
+    ~sc_rollup_node
+    ~contract_hex
+    ~expected:(`O [("string", `String expected_storage)])
+    ()
+
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test
     ~title:"Test the tez_getTezosEthereumAddress RPC"
@@ -673,6 +751,7 @@ let () =
   test_reveal [Alpha] ;
   test_transfer [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
+  test_michelson_origination_and_call [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
