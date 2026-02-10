@@ -150,15 +150,25 @@ let test_tez_block_roundtrip (type block)
   Block_tool.check_match ~expected:block decoding_result ;
   unit
 
+let protocol_typ =
+  Check.equalable
+    (fun fmt protocol ->
+      let string_protocol =
+        match protocol with L2_types.Tezos_block.Protocol.S023 -> "S023"
+      in
+      Format.pp_print_string fmt string_protocol)
+    ( = )
+
 module Tezos_block_latest_tool = struct
   include L2_types.Tezos_block
 
   let name = "Tez block"
 
-  let make ~level ~timestamp ~parent_hash ~operations () =
+  let make ~level ~timestamp ~parent_hash ~protocol ~next_protocol ~operations
+      () =
     let hash = zero_hash in
     let block_without_hash =
-      {level; hash; timestamp; parent_hash; operations}
+      {level; hash; timestamp; parent_hash; protocol; next_protocol; operations}
     in
     let hash =
       hash_tez_block ~encode:encode_block_for_store block_without_hash
@@ -166,7 +176,16 @@ module Tezos_block_latest_tool = struct
     {block_without_hash with hash}
 
   let check_match ~(expected : t)
-      L2_types.Tezos_block.{level; hash; timestamp; parent_hash; operations} =
+      L2_types.Tezos_block.
+        {
+          level;
+          hash;
+          timestamp;
+          parent_hash;
+          protocol;
+          next_protocol;
+          operations;
+        } =
     Check.(
       (level = expected.level)
         int32
@@ -185,6 +204,15 @@ module Tezos_block_latest_tool = struct
         block_hash_typ
         ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
     Check.(
+      (protocol = expected.protocol)
+        protocol_typ
+        ~error_msg:"Wrong decoded of protocol for block: got %L instead of %R") ;
+    Check.(
+      (next_protocol = expected.next_protocol)
+        protocol_typ
+        ~error_msg:
+          "Wrong decoded of next-protocol for block: got %L instead of %R") ;
+    Check.(
       (operations = expected.operations)
         bytes_typ
         ~error_msg:"Wrong decoded of operations for block: got %L instead of %R") ;
@@ -194,8 +222,70 @@ end
 let test_tez_latest_block_roundtrip =
   test_tez_block_roundtrip (module Tezos_block_latest_tool)
 
+module Tezos_block_v0_tool = struct
+  include L2_types.Tezos_block.Internal_for_test.V0
+
+  let name = "Tez V0 block"
+
+  let make ~level ~timestamp ~parent_hash ~operations () =
+    let hash = zero_hash in
+    let block_without_hash =
+      {level; hash; timestamp; parent_hash; operations}
+    in
+    let hash =
+      hash_tez_block ~encode:encode_block_for_store block_without_hash
+    in
+    {block_without_hash with hash}
+
+  let check_match ~(expected : t)
+      L2_types.Tezos_block.
+        {
+          level;
+          hash;
+          timestamp;
+          parent_hash;
+          protocol;
+          next_protocol;
+          operations;
+        } =
+    Check.(
+      (expected.level = level)
+        int32
+        ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
+    Check.(
+      (timestamp = expected.timestamp)
+        timestamp_typ
+        ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
+    Check.(
+      (parent_hash = expected.parent_hash)
+        block_hash_typ
+        ~error_msg:
+          "Wrong decoded of parent_hash for block: got %L instead of %R") ;
+    Check.(
+      (hash = expected.hash)
+        block_hash_typ
+        ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
+    Check.(
+      (protocol = L2_types.Tezos_block.Protocol.S023)
+        protocol_typ
+        ~error_msg:"Wrong decoded of protocol for block: got %L instead of %R") ;
+    Check.(
+      (next_protocol = L2_types.Tezos_block.Protocol.S023)
+        protocol_typ
+        ~error_msg:
+          "Wrong decoded of next-protocol for block: got %L instead of %R") ;
+    Check.(
+      (operations = expected.operations)
+        bytes_typ
+        ~error_msg:"Wrong decoded of operations for block: got %L instead of %R") ;
+    ()
+end
+
+let test_tez_v0_block_roundtrip =
+  test_tez_block_roundtrip (module Tezos_block_v0_tool)
+
 module Tezos_block_legacy_tool = struct
-  include Tezos_block_latest_tool
+  include Tezos_block_v0_tool
   include L2_types.Tezos_block.Internal_for_test.Legacy
 
   let name = "Tez legacy block"
@@ -254,6 +344,8 @@ let () =
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:zero_hash
+       ~protocol:S023
+       ~next_protocol:S023
        ~operations:Bytes.empty
        () ;
 
@@ -262,11 +354,39 @@ let () =
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~protocol:S023
+       ~next_protocol:S023
        ~operations:Bytes.empty
        () ;
 
   test_tez_latest_block_roundtrip ~title:"with operations"
   @@ Tezos_block_latest_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~protocol:S023
+       ~next_protocol:S023
+       ~operations:(Bytes.of_string "txntxntxn")
+       () ;
+
+  test_tez_v0_block_roundtrip ~title:"all zeros tez block"
+  @@ Tezos_block_v0_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:zero_hash
+       ~operations:Bytes.empty
+       () ;
+
+  test_tez_v0_block_roundtrip ~title:"genesis successor"
+  @@ Tezos_block_v0_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~operations:Bytes.empty
+       () ;
+
+  test_tez_v0_block_roundtrip ~title:"with operations"
+  @@ Tezos_block_v0_tool.make
        ~level:0l
        ~timestamp:Time.Protocol.epoch
        ~parent_hash:L2_types.Tezos_block.genesis_parent_hash

@@ -60,11 +60,12 @@ end
 
 module Tezos_block = struct
   module Version = struct
-    type t = V0
+    type t = V0 | V1
 
     let from_bytes (bytes : bytes) : t =
       match Rlp.decode_int bytes with
       | Ok 0 -> V0
+      | Ok 1 -> V1
       | Ok _ -> raise (Invalid_argument "Expected a valid version")
       | Error _ ->
           (* TODO: Instead of raising an exception, return the Result *)
@@ -72,7 +73,7 @@ module Tezos_block = struct
             (Invalid_argument "Unexpected version read for a L2 Tezos block")
 
     let to_bytes (version : t) : bytes =
-      let version = match version with V0 -> 0 in
+      let version = match version with V0 -> 0 | V1 -> 1 in
       Rlp.encode_int version
   end
 
@@ -99,6 +100,98 @@ module Tezos_block = struct
     (* That is the ghostnet genesis hash according to 'devtools/get_contracts/config.ml' *)
     Ethereum_types.Block_hash
       (Hex "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934")
+
+  module V1 = struct
+    let version = Version.V1
+
+    type t = {
+      hash : Ethereum_types.block_hash;
+      level : int32;
+      timestamp : Time.Protocol.t;
+      parent_hash : Ethereum_types.block_hash;
+      protocol : Protocol.t;
+      next_protocol : Protocol.t;
+          (* Deserialization of operation and receipts is delayed to
+             avoid introducing a dependency from this lib_encodings to
+             the protocol. *)
+      operations : bytes;
+    }
+
+    let from_rlp (block_rlp : Rlp.item list) : t =
+      let open Rlp in
+      match block_rlp with
+      | [
+       Value hash;
+       Value level;
+       Value previous_hash;
+       Value timestamp;
+       Value protocol;
+       Value next_protocol;
+       Value operations;
+      ] ->
+          let level = Bytes.get_int32_le level 0 in
+          let hash = decode_block_hash hash in
+          let parent_hash = decode_block_hash previous_hash in
+          let timestamp =
+            Time.Protocol.of_seconds @@ Bytes.get_int64_le timestamp 0
+          in
+          let protocol = Protocol.from_bytes protocol in
+          let next_protocol = Protocol.from_bytes next_protocol in
+          {
+            hash;
+            level;
+            timestamp;
+            parent_hash;
+            protocol;
+            next_protocol;
+            operations;
+          }
+      | _ ->
+          raise
+            (Invalid_argument
+               "Expected a RLP list of 8 elements (including the version field)")
+
+    let to_latest = Fun.id
+
+    (* Serialize a block using the V1 version of the block RLP format. *)
+    let block_to_rlp
+        {
+          hash;
+          level;
+          timestamp;
+          parent_hash;
+          protocol;
+          next_protocol;
+          operations;
+        } =
+      let open Rlp in
+      let level = Helpers.encode_i32_le level in
+      let version = Version.to_bytes version in
+      let hash = Ethereum_types.encode_block_hash hash in
+      let previous_hash = Ethereum_types.encode_block_hash parent_hash in
+      let timestamp = Ethereum_types.timestamp_to_bytes timestamp in
+      let protocol = Protocol.to_bytes protocol in
+      let next_protocol = Protocol.to_bytes next_protocol in
+      let item =
+        List
+          [
+            Value version;
+            Value hash;
+            Value level;
+            Value previous_hash;
+            Value timestamp;
+            Value protocol;
+            Value next_protocol;
+            Value operations;
+          ]
+      in
+      encode item
+
+    let encode_block_for_store (block : t) : (string, string) result =
+      Ok (Bytes.to_string (block_to_rlp block))
+  end
+
+  module Latest = V1
 
   module V0 = struct
     let version = Version.V0
@@ -134,7 +227,17 @@ module Tezos_block = struct
             (Invalid_argument
                "Expected a RLP list of 6 elements (including the version field)")
 
-    let to_latest = Fun.id
+    let to_latest ({hash; level; timestamp; parent_hash; operations} : t) :
+        Latest.t =
+      {
+        hash;
+        level;
+        timestamp;
+        parent_hash;
+        operations;
+        protocol = Protocol.S023;
+        next_protocol = Protocol.S023;
+      }
 
     (* Serialize a block using the V0 version of the block RLP format. *)
     let block_to_rlp {hash; level; timestamp; parent_hash; operations} =
@@ -160,8 +263,6 @@ module Tezos_block = struct
     let encode_block_for_store (block : t) : (string, string) result =
       Ok (Bytes.to_string (block_to_rlp block))
   end
-
-  module Latest = V0
 
   module Legacy = struct
     type t = V0.t = {
@@ -218,7 +319,9 @@ module Tezos_block = struct
     match Rlp.decode bytes with
     | Ok (Rlp.List (Value version :: block_rlp)) -> (
         let version = Version.from_bytes version in
-        match version with V0 -> V0.to_latest @@ V0.from_rlp block_rlp)
+        match version with
+        | V0 -> V0.to_latest @@ V0.from_rlp block_rlp
+        | V1 -> V1.to_latest @@ V1.from_rlp block_rlp)
     | _ ->
         (* The octez-evm-node needs to be retro compatible with legacy Data_encoding *)
         Legacy.to_latest
@@ -229,6 +332,7 @@ module Tezos_block = struct
     with exn -> Error (Printexc.to_string exn)
 
   module Internal_for_test = struct
+    module V0 = V0
     module Legacy = Legacy
   end
 end
