@@ -367,7 +367,7 @@ module Request = struct
   let tez_getEthereumTezosAddress ethereum_address =
     {
       method_ = "tez_getEthereumTezosAddress";
-      parameters = `String ethereum_address;
+      parameters = `A [`String ethereum_address];
     }
 end
 

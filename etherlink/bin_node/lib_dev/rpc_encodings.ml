@@ -1247,7 +1247,7 @@ module Tezosx = struct
 
     type output = Tezos_types.Contract.t
 
-    let input_encoding = address_encoding
+    let input_encoding = Data_encoding.tup1 address_encoding
 
     let output_encoding = Tezos_types.Contract.encoding
 
