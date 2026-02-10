@@ -168,15 +168,6 @@ module Slot_availability : sig
     lag_index:int ->
     Dal_slot_index_repr.t ->
     t
-
-  (** [number_of_attested_slots t ~number_of_lags] returns the number of
-      attested slots in the given attestations. *)
-  val number_of_attested_slots : t -> number_of_lags:int -> int
-
-  (** [intersection sa attestations ~number_of_slots ~attestation_lags] returns
-      the slots attested in both [sa] and [attestations]. *)
-  val intersection :
-    t -> attestation -> number_of_slots:int -> attestation_lags:int list -> t
 end
 
 (** This module is used to record the shard attestations.
