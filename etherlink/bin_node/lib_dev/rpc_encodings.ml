@@ -1231,7 +1231,8 @@ module Tezosx = struct
 
     type output = address
 
-    let input_encoding = Signature.V2.Public_key_hash.encoding
+    let input_encoding =
+      Data_encoding.tup1 Signature.V2.Public_key_hash.encoding
 
     let output_encoding = address_encoding
 
