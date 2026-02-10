@@ -707,13 +707,14 @@ let test_attester_with_no_assigned_shards () =
         Stdlib.Option.get
           (Dal.Slot_index.of_int_opt ~number_of_slots:dal.number_of_slots 0)
       in
+      let number_of_lags = List.length dal.attestation_lags in
       let attestations =
         Dal.Attestations.(
           commit
             empty
             ~number_of_slots:dal.number_of_slots
-            ~number_of_lags:(List.length dal.attestation_lags)
-            ~lag_index:0
+            ~number_of_lags
+            ~lag_index:(number_of_lags - 1)
             slot_index)
       in
       let dal_content = {attestations} in
@@ -724,10 +725,12 @@ let test_attester_with_no_assigned_shards () =
             Environment.Ecoproto_error
               (Alpha_context.Dal_errors
                .Dal_data_availibility_attester_not_in_committee
-                 {attester; level; slot = _});
+                 {attester; committee_level; attested_level; lag_index});
           ]
           when Signature.Public_key_hash.equal attester pkh
-               && Raw_level.to_int32 level = b.header.shell.level ->
+               && Raw_level.to_int32 committee_level = b.header.shell.level
+               && attested_level = Raw_level.succ committee_level
+               && lag_index = number_of_lags - 1 ->
             return_unit
         | errs ->
             failwith
@@ -745,6 +748,9 @@ let test_attester_with_no_assigned_shards () =
       else iter b (i + 1)
   in
   let* b = Block.bake genesis in
+  (* We bake a few blocks so that there is a published level for all tested
+     attested levels. *)
+  let* b = Block.bake_n dal.attestation_lag b in
   let* _ = iter b 0 in
   return_unit
 

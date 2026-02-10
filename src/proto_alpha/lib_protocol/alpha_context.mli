@@ -3357,8 +3357,9 @@ module Dal_errors : sig
       }
     | Dal_data_availibility_attester_not_in_committee of {
         attester : Signature.Public_key_hash.t;
-        level : Raw_level.t;
-        slot : Slot.t;
+        committee_level : Raw_level.t;
+        attested_level : Raw_level.t;
+        lag_index : int;
       }
     | Dal_cryptobox_error of {explanation : string}
 end

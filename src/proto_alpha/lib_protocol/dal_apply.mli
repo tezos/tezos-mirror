@@ -28,22 +28,23 @@
 
 open Alpha_context
 
-(** [validate_attestations ctxt level slot consensus_key attestations] checks
-    whether the DAL attestations [attestations] emitted at given [level] by the
-    attester with the given [consensus_key] and given TB [slot] is valid. If an
-    [Error _] is returned, the [op] is not valid. The checks made are:
+(** [validate_attestations ctxt ~attestation_level consensus_key attestations]
+    checks whether the DAL attestations [attestations] emitted at the given
+    [attestation_level] by the attester with the given [consensus_key] is valid. 
+    If an [Error _] is returned, the [op] is not valid.
+    The checks made are:
     * the attestations' size does not exceed the maximum;
-    * the delegate is in the DAL committee.
+    * for all lags, the delegate is in the DAL committee if for a given lag it
+      attached a non-empty attestation.
 
     These are checks done for the DAL part alone, checks on other fields of an
     attestation (like level, round) are done by the caller. *)
 val validate_attestations :
   t ->
-  Raw_level.t ->
-  Slot.t ->
+  attestation_level:Raw_level.t ->
   Consensus_key.pk ->
   Dal.Attestations.t ->
-  unit tzresult Lwt.t
+  unit tzresult
 
 (** [apply_attestations ctxt ~current_level attestations ~tb_slot
     ~committee_level_to_shard_count] records in the context that the given

@@ -796,13 +796,14 @@ module Consensus = struct
     let*? () = check_payload_hash kind expected_payload_hash bph in
     return_unit
 
-  let check_dal_content vi level slot consensus_key = function
+  let check_dal_content vi ~attestation_level consensus_key =
+    let open Result_syntax in
+    function
     | None -> return_unit
     | Some {attestations} ->
         Dal_apply.validate_attestations
           vi.ctxt
-          level
-          slot
+          ~attestation_level
           consensus_key
           attestations
 
@@ -903,11 +904,10 @@ module Consensus = struct
                consensus_content
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
-    let* () =
+    let*? () =
       check_dal_content
         vi
-        consensus_content.level
-        consensus_content.slot
+        ~attestation_level:consensus_content.level
         consensus_key
         dal_content
     in
@@ -1438,7 +1438,13 @@ module Consensus = struct
               let* () =
                 check_delegate_is_not_forbidden info.ctxt consensus_key.delegate
               in
-              let* () = check_dal_content info level slot consensus_key dal in
+              let*? () =
+                check_dal_content
+                  info
+                  ~attestation_level:level
+                  consensus_key
+                  dal
+              in
               let total_power =
                 Attesting_power.add attesting_power total_power
               in

@@ -43,8 +43,9 @@ type error +=
     }
   | Dal_data_availibility_attester_not_in_committee of {
       attester : Signature.Public_key_hash.t;
-      level : Raw_level_repr.t;
-      slot : Slot_repr.t;
+      committee_level : Raw_level_repr.t;
+      attested_level : Raw_level_repr.t;
+      lag_index : int;
     }
   | Dal_cryptobox_error of {explanation : string}
   | Dal_register_invalid_slot_header of {
@@ -209,31 +210,35 @@ let () =
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_attester_not_in_committee"
-    ~title:"The attester is not part of the DAL committee for this level"
-    ~description:"The attester is not part of the DAL committee for this level"
-    ~pp:(fun ppf (attester, level, slot) ->
+    ~title:"The attester is not part of the DAL committee"
+    ~description:"The attester is not part of the DAL committee"
+    ~pp:(fun ppf (attester, committee_level, attested_level, lag_index) ->
       Format.fprintf
         ppf
-        "The attester %a, with slot %a, is not part of the DAL committee for \
-         the level %a, and included a non-empty DAL attestation."
+        "The attester %a is not part of the DAL committee for the committee \
+         level %a and included a non-empty DAL attestation at attested level \
+         %a and lag index %d."
         Signature.Public_key_hash.pp
         attester
-        Slot_repr.pp
-        slot
         Raw_level_repr.pp
-        level)
+        committee_level
+        Raw_level_repr.pp
+        attested_level
+        lag_index)
     Data_encoding.(
-      obj3
+      obj4
         (req "attester" Signature.Public_key_hash.encoding)
-        (req "level" Raw_level_repr.encoding)
-        (req "slot" Slot_repr.encoding))
+        (req "committee_level" Raw_level_repr.encoding)
+        (req "attested_level" Raw_level_repr.encoding)
+        (req "lag_index" int8))
     (function
-      | Dal_data_availibility_attester_not_in_committee {attester; level; slot}
-        ->
-          Some (attester, level, slot)
+      | Dal_data_availibility_attester_not_in_committee
+          {attester; committee_level; attested_level; lag_index} ->
+          Some (attester, committee_level, attested_level, lag_index)
       | _ -> None)
-    (fun (attester, level, slot) ->
-      Dal_data_availibility_attester_not_in_committee {attester; level; slot}) ;
+    (fun (attester, committee_level, attested_level, lag_index) ->
+      Dal_data_availibility_attester_not_in_committee
+        {attester; committee_level; attested_level; lag_index}) ;
   register_error_kind
     `Permanent
     ~id:"dal_cryptobox_error"
