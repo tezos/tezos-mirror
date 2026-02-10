@@ -168,6 +168,64 @@ let send_tezos_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
   in
   Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
+(** [originate_michelson_contract_via_delayed_inbox] originates a Michelson
+    contract via the delayed inbox. Loads the script from
+    [michelson_test_scripts], converts code and initial storage to JSON,
+    forges and sends the origination operation, then returns the hex key and
+    KT1 address of the new contract. *)
+let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
+    ~sc_rollup_node ~client ~l1_contracts ~sequencer ~source ~counter
+    ~script_name ~init_storage_data ?(init_balance = 0) protocol =
+  let* contracts_before =
+    Delayed_inbox.subkeys
+      tezosx_michelson_contracts_index
+      (Sc_rollup_node sc_rollup_node)
+  in
+  let script_path = Michelson_script.(find script_name protocol |> path) in
+  let* code = Client.convert_script_to_json ~script:script_path client in
+  let* init_storage =
+    Client.convert_data_to_json ~data:init_storage_data client
+  in
+  let* origination_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter
+            ~gas_limit:10000
+            ~storage_limit:1000
+            ~source
+            (origination ~code ~init_storage ~init_balance ());
+        ])
+      client
+  in
+  let* () =
+    send_tezos_op_to_delayed_inbox_and_wait
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      origination_op
+  in
+  let* contracts_after =
+    Delayed_inbox.subkeys
+      tezosx_michelson_contracts_index
+      (Sc_rollup_node sc_rollup_node)
+  in
+  let new_contracts =
+    List.filter (fun c -> not (List.mem c contracts_before)) contracts_after
+  in
+  Check.(
+    (List.length new_contracts = 1)
+      int
+      ~error_msg:"Expected %R new contract but got %L") ;
+  let contract_hex = List.hd new_contracts in
+  let kt1_address = decode_michelson_contract_address contract_hex in
+  Log.info "Originated contract: %s" kt1_address ;
+  return (contract_hex, kt1_address)
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
