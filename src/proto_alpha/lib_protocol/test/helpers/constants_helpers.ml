@@ -120,6 +120,9 @@ module Set = struct
     let number_of_slots number_of_slots (c : t) =
       dal {c.dal with number_of_slots} c
 
+    let attestation_lags attestation_lags (c : t) =
+      dal {c.dal with attestation_lags} c
+
     let cryptobox_parameters cryptobox_parameters (c : t) =
       dal {c.dal with cryptobox_parameters} c
 
