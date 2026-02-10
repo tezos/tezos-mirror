@@ -255,6 +255,28 @@ let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
     ~sequencer
     call_op
 
+(** [check_michelson_storage_value] reads the storage of a Michelson contract
+    from the durable storage and checks that it matches the expected JSON
+    value. *)
+let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
+  let* storage_raw =
+    read_michelson_contract_storage sc_rollup_node contract_hex
+  in
+  match storage_raw with
+  | None ->
+      let kt1 = decode_michelson_contract_address contract_hex in
+      Test.fail "Storage not found for contract %s" kt1
+  | Some hex_str ->
+      let expected =
+        JSON.annotate ~origin:"check_michelson_storage_value" expected
+        |> Option.some
+      in
+      Check.(
+        (decode_micheline_storage hex_str = expected)
+          (option json)
+          ~error_msg:"Expected storage %R but got %L") ;
+      unit
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
