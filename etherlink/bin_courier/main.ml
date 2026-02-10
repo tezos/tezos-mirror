@@ -135,7 +135,7 @@ module Constant = struct
     Efunc_core.Types.a "ff00000000000000000000000000000000000001"
 end
 
-let start_blueprint_follower ~container ~relay_endpoint ~rpc_endpoint =
+let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
   let open Lwt_result_syntax in
   let* next_blueprint_number =
     Batch.call
@@ -152,10 +152,6 @@ let start_blueprint_follower ~container ~relay_endpoint ~rpc_endpoint =
       ~timeout:Network_info.timeout
       ()
   in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
@@ -168,7 +164,7 @@ let start_blueprint_follower ~container ~relay_endpoint ~rpc_endpoint =
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
-            Tx_container.confirm_transactions
+            Evm_node_lib_dev.Tx_queue.confirm_transactions
               ~clear_pending_queue_after:false
               ~confirmed_txs:(List.to_seq hashes)
         | Error _ -> return_unit
@@ -185,12 +181,8 @@ let withdraw_data receiver =
   let receiver = Tezos_crypto.Signature.Public_key_hash.to_b58check receiver in
   Efunc_core.Evm.encode ~name:"withdraw_base58" [`string] [`string receiver]
 
-let withdraw ~container ~endpoint ~infos value from receiver =
+let withdraw ~endpoint ~infos value from receiver =
   let open Lwt_result_syntax in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let result, rwaker = Lwt.task () in
   let gas_limit = Z.of_int 16_150_912 in
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
@@ -225,7 +217,11 @@ let withdraw ~container ~endpoint ~infos value from receiver =
   in
   let next_nonce = Ethereum_types.quantity_of_z from.nonce in
   let* add_res =
-    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
   in
   let* () =
     match add_res with
@@ -275,13 +271,6 @@ let command =
     @@ stop)
     (fun network amount signer receiver _ ->
       let open Lwt_result_syntax in
-      let start_container, container =
-        Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-      in
-      let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-             (module Tx_container)) =
-        container
-      in
       let max_size = 999_999 in
       let tx_per_addr_limit = Int64.of_int 999_999 in
       let max_transaction_batch_length = Some 300 in
@@ -295,7 +284,7 @@ let command =
         }
       in
       let* () =
-        start_container
+        Evm_node_lib_dev.Tx_queue.start
           ~config
           ~keep_alive:true
           ~timeout:10.
@@ -304,12 +293,11 @@ let command =
       in
       let _ =
         start_blueprint_follower
-          ~container
           ~relay_endpoint:(Network.relay network)
           ~rpc_endpoint:(Network.endpoint network)
       in
       let _ =
-        Tx_container.tx_queue_beacon
+        Evm_node_lib_dev.Tx_queue.tx_queue_beacon
           ~evm_node_endpoint:(Rpc (Network.endpoint network))
           ~tick_interval:0.1
       in
@@ -321,13 +309,7 @@ let command =
       let* from =
         Account.from_signer ~evm_node_endpoint:(Network.endpoint network) signer
       in
-      withdraw
-        ~container
-        ~endpoint:(Network.endpoint network)
-        ~infos
-        amount
-        from
-        receiver)
+      withdraw ~endpoint:(Network.endpoint network) ~infos amount from receiver)
 
 let global_options = Tezos_clic.no_options
 
