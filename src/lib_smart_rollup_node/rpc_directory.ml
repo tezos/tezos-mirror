@@ -77,8 +77,7 @@ module Global_directory = Make_directory (struct
     Lwt_result.return (Node_context.readonly node_ctxt)
 end)
 
-(* The block directory needs to be registered in the protocol plugin. *)
-module Block_directory = Make_sub_directory (struct
+module Make_block_directory (X : sig end) = Make_sub_directory (struct
   include Rollup_node_services.Block
 
   type context = Node_context.rw
@@ -90,6 +89,29 @@ module Block_directory = Make_sub_directory (struct
     let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
     (Node_context.readonly node_ctxt, block)
 end)
+
+(* The block directory needs to be registered in the protocol plugin. *)
+module Block_directory = Make_block_directory (struct end)
+
+module Make_block_helpers_directory (X : sig end) = Make_sub_directory (struct
+  include Rollup_node_services.Block.Helpers
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type context = Node_context.rw
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type subcontext = Node_context.rw * Block_hash.t
+
+  let context_of_prefix node_ctxt (((), block) : prefix) =
+    let open Lwt_result_syntax in
+    let+ block = Block_directory_helpers.block_of_prefix node_ctxt block in
+    (node_ctxt, block)
+end)
+
+(* The block helpers directory needs to be registered in the protocol plugin. *)
+module Block_helpers_directory = Make_block_helpers_directory (struct end)
 
 module Local_directory = Make_directory (struct
   include Rollup_node_services.Local

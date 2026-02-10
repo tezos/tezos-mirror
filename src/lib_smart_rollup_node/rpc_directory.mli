@@ -40,3 +40,17 @@ val generate_openapi :
 val build_block_subdirectory :
   Node_context.rw ->
   (unit * Rollup_node_services.Arg.block_id) Tezos_rpc.Directory.t
+
+(** {2 Exported directories for protocol plugins} *)
+
+module Make_block_directory (X : sig end) :
+  Rpc_directory_helpers.SUBDIRECTORY
+    with type prefix := unit * Rollup_node_services.Arg.block_id
+     and type context := Node_context.rw
+     and type subcontext := Node_context.ro * Block_hash.t
+
+module Make_block_helpers_directory (X : sig end) :
+  Rpc_directory_helpers.SUBDIRECTORY
+    with type prefix := unit * Rollup_node_services.Arg.block_id
+     and type context := Node_context.rw
+     and type subcontext := Node_context.rw * Block_hash.t
