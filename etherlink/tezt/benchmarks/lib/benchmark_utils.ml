@@ -317,9 +317,9 @@ let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
            pp_evm_value)
         l
 
-let call ~container infos rpc_node contract sender ?gas_limit ?nonce
-    ?total_confirmed ?(value = Z.zero) ?name ?(check_success = false) abi params
-    : [> `Confirmed | `Dropped | `Refused] Lwt.t =
+let call infos rpc_node contract sender ?gas_limit ?nonce ?total_confirmed
+    ?(value = Z.zero) ?name ?(check_success = false) abi params :
+    [> `Confirmed | `Dropped | `Refused] Lwt.t =
   let open Evm_node_lib_dev_encoding.Ethereum_types in
   let open Tezos_error_monad.Error_monad in
   let pp_tx fmt () =
@@ -415,12 +415,12 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
         unit
   in
   let next_nonce = quantity_of_z sender.nonce in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let*? add_res =
-    Tx_container.add ~callback ~next_nonce transaction_object ~raw_tx
+    Evm_node_lib_dev.Tx_queue.add
+      ~callback
+      ~next_nonce
+      (Evm_node_lib_dev.Tx_queue_types.Evm transaction_object)
+      ~raw_tx
   in
   let* () =
     match add_res with
