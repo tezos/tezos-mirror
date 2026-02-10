@@ -6027,7 +6027,6 @@ module Skip_list_rpcs = struct
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
     let lag = dal_parameters.attestation_lag in
     let number_of_slots = dal_parameters.number_of_slots in
-    let number_of_lags = List.length dal_parameters.attestation_lags in
 
     Log.info
       "attestation_lag = %d, number_of_slots = %d, slot_size = %d"
@@ -6083,7 +6082,20 @@ module Skip_list_rpcs = struct
       Dal.Parameters.from_protocol_parameters new_proto_params
     in
     let new_lag = new_dal_params.attestation_lag in
+    let new_attestation_lags =
+      JSON.(
+        new_proto_params |-> "dal_parametric" |-> "attestation_lags" |> as_list
+        |> List.map as_int)
+    in
     if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
+
+    let new_dal_parameters =
+      {
+        dal_parameters with
+        attestation_lag = new_lag;
+        attestation_lags = new_attestation_lags;
+      }
+    in
 
     let new_number_of_slots = new_dal_params.number_of_slots in
     if new_number_of_slots <> number_of_slots then
@@ -6388,6 +6400,11 @@ module Skip_list_rpcs = struct
                ~block:(string_of_int attested_level)
                ()
         in
+        let protocol, params_to_use =
+          if attested_level <= migration_level then
+            (migrate_from, dal_parameters)
+          else (migrate_to, new_dal_parameters)
+        in
         let attested =
           match metadata.dal_attestation with
           | None ->
@@ -6396,23 +6413,49 @@ module Skip_list_rpcs = struct
                  information"
                 attested_level
           | Some str ->
-              let protocol =
-                if attested_level <= migration_level then migrate_from
-                else migrate_to
+              let decoded =
+                Dal.Slot_availability.decode protocol params_to_use str
               in
-              let vec =
-                (Dal.Slot_availability.decode protocol dal_parameters str).(number_of_lags
-                                                                            - 1)
-              in
-              Array.length vec > slot_index && vec.(slot_index)
+              List.mapi
+                (fun lag_index attestation_lag ->
+                  let published_level = attested_level - attestation_lag in
+                  if
+                    published_level > starting_level
+                    && published_level <= last_confirmed_published_level
+                  then
+                    let vec = decoded.(lag_index) in
+                    Array.length vec > slot_index && vec.(slot_index)
+                  else false)
+                params_to_use.attestation_lags
+              |> List.exists Fun.id
+        in
+        (* Checks if a [level] is in the migration transition gap *)
+        let in_migration_gap level lag =
+          level > migration_level && level <= migration_level + lag
+        in
+        (* Checks if a slot at [published_level] would be attested at
+           a smaller lag before reaching the current attested_level *)
+        let already_attested_at_smaller_lag published_level current_lag =
+          List.exists
+            (fun smaller_lag ->
+              smaller_lag < current_lag
+              && not (in_migration_gap (published_level + smaller_lag) new_lag))
+            params_to_use.attestation_lags
         in
         let expected_attested =
-          if Protocol.number migrate_to = 025 then
-            attested_level <= migration_level
-            || attested_level > migration_level + new_lag
+          if in_migration_gap attested_level new_lag then false
           else
-            (* the activation block is not (even consensus) attested *)
-            attested_level != migration_level + 1
+            List.exists
+              (fun attestation_lag ->
+                let published_level = attested_level - attestation_lag in
+                published_level > starting_level
+                && published_level <= last_confirmed_published_level
+                && Map_int.mem published_level commitments
+                && not
+                     (already_attested_at_smaller_lag
+                        published_level
+                        attestation_lag))
+              params_to_use.attestation_lags
         in
         Check.(
           (attested = expected_attested)
