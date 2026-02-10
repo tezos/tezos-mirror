@@ -98,19 +98,6 @@ let hash_tez_block ~encode block_without_hash =
   let block_hash = Block_hash.hash_bytes [block_bytes] in
   Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
 
-let make_tez_legacy_block ~level ~timestamp ~parent_hash ~operations () =
-  let hash = zero_hash in
-  let block_without_hash =
-    L2_types.Tezos_block.{level; hash; timestamp; parent_hash; operations}
-  in
-  let hash =
-    hash_tez_block
-      ~encode:
-        L2_types.Tezos_block.Internal_for_test.Legacy.encode_block_for_store
-      block_without_hash
-  in
-  return L2_types.Tezos_block.{block_without_hash with hash}
-
 let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
   @@ fun () ->
@@ -207,43 +194,25 @@ end
 let test_tez_latest_block_roundtrip =
   test_tez_block_roundtrip (module Tezos_block_latest_tool)
 
-let test_tez_legacy_block_roundtrip ~title ~level ~timestamp ~parent_hash
-    ~operations () =
-  register ~title:(sf "Tez legacy block producer decoder roundtrip (%s)" title)
-  @@ fun () ->
-  let* block =
-    make_tez_legacy_block ~level ~timestamp ~parent_hash ~operations ()
-  in
-  let encoding_result =
-    expect_ok "could not encode the tez legacy block"
-    @@ L2_types.Tezos_block.Internal_for_test.Legacy.encode_block_for_store
-         block
-  in
-  let decoding_result =
-    expect_ok "could not decode the tez legacy block"
-    @@ L2_types.Tezos_block.decode_block_for_store encoding_result
-  in
-  Check.(
-    (decoding_result.level = block.level)
-      int32
-      ~error_msg:"Wrong decoded of number for block: got %L instead of %R") ;
-  Check.(
-    (decoding_result.timestamp = block.timestamp)
-      timestamp_typ
-      ~error_msg:"Wrong decoded of timestamp for block: got %L instead of %R") ;
-  Check.(
-    (decoding_result.parent_hash = block.parent_hash)
-      block_hash_typ
-      ~error_msg:"Wrong decoded of parent_hash for block: got %L instead of %R") ;
-  Check.(
-    (decoding_result.hash = block.hash)
-      block_hash_typ
-      ~error_msg:"Wrong decoded of hash for block: got %L instead of %R") ;
-  Check.(
-    (decoding_result.operations = operations)
-      bytes_typ
-      ~error_msg:"Wrong decoded of operations for block: got %L instead of %R") ;
-  unit
+module Tezos_block_legacy_tool = struct
+  include Tezos_block_latest_tool
+  include L2_types.Tezos_block.Internal_for_test.Legacy
+
+  let name = "Tez legacy block"
+
+  let make ~level ~timestamp ~parent_hash ~operations () =
+    let hash = zero_hash in
+    let block_without_hash =
+      {level; hash; timestamp; parent_hash; operations}
+    in
+    let hash =
+      hash_tez_block ~encode:encode_block_for_store block_without_hash
+    in
+    {block_without_hash with hash}
+end
+
+let test_tez_legacy_block_roundtrip =
+  test_tez_block_roundtrip (module Tezos_block_legacy_tool)
 
 let () =
   test_blueprint_roundtrip
@@ -304,28 +273,28 @@ let () =
        ~operations:(Bytes.of_string "txntxntxn")
        () ;
 
-  test_tez_legacy_block_roundtrip
-    ~title:"all zeros tez block"
-    ~level:0l
-    ~timestamp:Time.Protocol.epoch
-    ~parent_hash:zero_hash
-    ~operations:Bytes.empty
-    () ;
+  test_tez_legacy_block_roundtrip ~title:"all zeros tez block"
+  @@ Tezos_block_legacy_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:zero_hash
+       ~operations:Bytes.empty
+       () ;
 
-  test_tez_legacy_block_roundtrip
-    ~title:"genesis successor"
-    ~level:0l
-    ~timestamp:Time.Protocol.epoch
-    ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
-    ~operations:Bytes.empty
-    () ;
+  test_tez_legacy_block_roundtrip ~title:"genesis successor"
+  @@ Tezos_block_legacy_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~operations:Bytes.empty
+       () ;
 
-  test_tez_legacy_block_roundtrip
-    ~title:"with operations"
-    ~level:0l
-    ~timestamp:Time.Protocol.epoch
-    ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
-    ~operations:(Bytes.of_string "txntxntxn")
-    ()
+  test_tez_legacy_block_roundtrip ~title:"with operations"
+  @@ Tezos_block_legacy_tool.make
+       ~level:0l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~operations:(Bytes.of_string "txntxntxn")
+       ()
 
 let () = Test.run ()
