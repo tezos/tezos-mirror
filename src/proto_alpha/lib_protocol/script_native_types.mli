@@ -28,6 +28,8 @@ module CLST_types : sig
 
   type ('a, 'b, 'c, 'd) tup4 = 'a * ('b * ('c * 'd))
 
+  type ('a, 'b, 'c, 'd, 'e) tup5 = 'a * ('b * ('c * ('d * 'e)))
+
   type 'a s_list = 'a Script_list.t
 
   type deposit = unit
@@ -125,6 +127,16 @@ module CLST_types : sig
 
   val total_supply_update_event_type :
     (nat (* token_id *), nat (* new_total_supply *), int (* diff *)) tup3
+    ty_node
+    tzresult
+
+  val allowance_update_event_type :
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      nat (* new_allowance *),
+      int (* diff *) )
+    tup5
     ty_node
     tzresult
 end

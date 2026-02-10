@@ -18,6 +18,8 @@ module Helpers = struct
 
   type ('a, 'b, 'c, 'd) tup4 = 'a * ('b, 'c, 'd) tup3
 
+  type ('a, 'b, 'c, 'd, 'e) tup5 = 'a * ('b, 'c, 'd, 'e) tup4
+
   (* Node describing a type in its typed and untyped version, that serves as
      combinator to define native contract types. *)
   type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
@@ -81,6 +83,12 @@ module Helpers = struct
       (a, b, c, d) tup4 ty_node tzresult =
     let open Result_syntax in
     let* r = tup3_ty ty2 ty3 ty4 in
+    pair_ty ty1 r
+
+  let tup5_ty (type a b c d e) ty1 ty2 ty3 ty4 ty5 :
+      (a, b, c, d, e) tup5 ty_node tzresult =
+    let open Result_syntax in
+    let* r = tup4_ty ty2 ty3 ty4 ty5 in
     pair_ty ty1 r
 
   let or_ty (type l r) ({untyped = untyl; typed = Ty_ex_c tyl; _} : l ty_node)
@@ -180,6 +188,8 @@ module CLST_types = struct
   type ('a, 'b, 'c) tup3 = ('a, 'b, 'c) Helpers.tup3
 
   type ('a, 'b, 'c, 'd) tup4 = ('a, 'b, 'c, 'd) Helpers.tup4
+
+  type ('a, 'b, 'c, 'd, 'e) tup5 = ('a, 'b, 'c, 'd, 'e) Helpers.tup5
 
   type 'a s_list = 'a Script_list.t
 
@@ -366,6 +376,18 @@ module CLST_types = struct
         (add_name "diff" int_ty)
     in
     return @@ add_name "total_supply_update" x
+
+  let allowance_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup5_ty
+        (add_name "owner" address_ty)
+        (add_name "spender" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "new_allowance" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "allowance_update" x
 end
 
 type ('arg, 'storage) kind =
