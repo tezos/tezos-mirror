@@ -240,7 +240,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
   let* (), time =
     measure @@ fun () ->
     Log.info "Store slot in [dal_node2]." ;
-    let* dal_parameters = Dal.Parameters.from_client protocol client2 in
+    let* dal_parameters = Dal.Parameters.from_client client2 in
     let* commitment_hash, proof =
       measure_and_add_data_point ~tag:"locally_store_slot" @@ fun () ->
       store_slot_to_dal_node

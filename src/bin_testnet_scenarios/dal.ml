@@ -235,7 +235,7 @@ let scenario_without_rollup_node node dal_node client _network_name
   let num_accounts = List.length keys in
   let key_indices = range 0 (num_accounts - 1) in
   let dal_parameters =
-    Dal.Parameters.from_protocol_parameters Protocol.Alpha proto_parameters
+    Dal.Parameters.from_protocol_parameters proto_parameters
   in
   let cryptobox = dal_parameters.cryptobox in
   let number_of_slots = dal_parameters.number_of_slots in
@@ -337,7 +337,7 @@ let originate_rollup client rollup_node rollup_alias =
 let scenario_with_rollup_node node dal_node client network_name proto_parameters
     num_levels keys =
   let dal_parameters =
-    Dal.Parameters.from_protocol_parameters Protocol.Alpha proto_parameters
+    Dal.Parameters.from_protocol_parameters proto_parameters
   in
   let cryptobox = dal_parameters.cryptobox in
   let lag = dal_parameters.attestation_lag in
