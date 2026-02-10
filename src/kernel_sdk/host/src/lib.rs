@@ -18,6 +18,7 @@ pub mod debug;
 pub mod input;
 pub mod metadata;
 pub mod path;
+pub mod reveal;
 pub mod runtime;
 pub mod storage;
 

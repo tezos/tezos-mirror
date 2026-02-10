@@ -27,6 +27,7 @@ use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
     path::{Path, RefPath},
+    reveal::HostReveal,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
     storage::StorageV1,
 };
@@ -83,6 +84,45 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> H
     #[inline(always)]
     fn write_debug(&self, msg: &str) {
         self.host.borrow().write_debug(msg)
+    }
+}
+
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> HostReveal
+    for KernelHost<R, Host, Internal>
+{
+    #[inline(always)]
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.borrow().reveal_preimage(hash, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.borrow().reveal_metadata()
+    }
+
+    #[inline(always)]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.borrow().reveal_dal_page(
+            published_level,
+            slot_index,
+            page_index,
+            destination,
+        )
+    }
+
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.borrow().reveal_dal_parameters()
     }
 }
 
@@ -223,43 +263,8 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
     }
 
     #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.borrow().reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.host.borrow_mut().mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.borrow().reveal_metadata()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.borrow().reveal_dal_page(
-            published_level,
-            slot_index,
-            page_index,
-            destination,
-        )
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.borrow().reveal_dal_parameters()
     }
 
     #[inline(always)]

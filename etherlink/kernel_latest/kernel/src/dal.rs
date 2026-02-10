@@ -215,7 +215,7 @@ pub mod tests {
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::runtime::Runtime;
+    use tezos_smart_rollup_host::reveal::HostReveal;
 
     use crate::{
         block::GENESIS_PARENT_HASH,

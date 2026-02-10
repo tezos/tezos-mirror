@@ -37,6 +37,9 @@ pub mod host {
     pub use tezos_smart_rollup_host::debug::HostDebug;
 
     #[doc(inline)]
+    pub use tezos_smart_rollup_host::reveal::HostReveal;
+
+    #[doc(inline)]
     pub use tezos_smart_rollup_host::storage::StorageV1;
 }
 

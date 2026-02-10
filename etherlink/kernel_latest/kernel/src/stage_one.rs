@@ -249,7 +249,7 @@ mod tests {
         },
         types::PublicKeyHash,
     };
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
+    use tezos_smart_rollup_host::reveal::HostReveal;
     use tezos_smart_rollup_mock::TransferMetadata;
     // SdkRuntime is not used directly but necessary to add the Runtime trait in
     // context for typechecking. Feel free to remove it and look at rustc
