@@ -289,8 +289,8 @@ let scenario_on_teztnet =
     main_scenario ~airdropper_alias client dal_node l1_node
 
 (** This function allows to injects DAL slots in the given network. *)
-let slots_injector_scenario protocol ?publisher_sk ~airdropper_alias client
-    dal_node l1_node ~slot_index =
+let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
+    l1_node ~slot_index =
   let open Runnable.Syntax in
   let alias = "publisher" in
   let* () =
@@ -324,7 +324,7 @@ let slots_injector_scenario protocol ?publisher_sk ~airdropper_alias client
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
   in
   let dal_parameters =
-    Dal.Parameters.from_protocol_parameters protocol proto_parameters
+    Dal.Parameters.from_protocol_parameters proto_parameters
   in
   let slot_size = dal_parameters.cryptobox.slot_size in
   (* Endless loop that injects slots *)
@@ -434,15 +434,10 @@ let slots_injector_test ~network =
     Cli.get_string_opt "dal-bootstrap-peers"
     |> Option.map (String.split_on_char ',')
   in
-  let protocol =
-    match String.lowercase_ascii network with
-    | "weeklynet" | "dailynet" -> Protocol.Alpha
-    | _ -> Test.fail "unknown network"
-  in
   scenario_on_teztnet
     ?dal_bootstrap_peers
     ~network
-    ~main_scenario:(slots_injector_scenario protocol ~slot_index ?publisher_sk)
+    ~main_scenario:(slots_injector_scenario ~slot_index ?publisher_sk)
     ~operator_profiles:[slot_index]
     ()
 
