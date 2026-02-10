@@ -103,6 +103,47 @@ let account_str_rpc sequencer account key =
 let account_rpc sequencer account key =
   account_str_rpc sequencer account.Account.public_key_hash key
 
+(** Durable storage path where Michelson originated contracts are indexed in
+    Tezos X. Each subkey is the hex-encoded [Contract_repr.t] of the
+    Michelson contract. *)
+let tezosx_michelson_contracts_index = "/evm/world_state/contracts/index"
+
+(** [read_michelson_contract_storage sc_rollup_node contract_hex] reads the
+    storage of an originated Michelson contract from the durable storage,
+    given its hex-encoded [Contract_repr.t] key. *)
+let read_michelson_contract_storage sc_rollup_node contract_hex =
+  let path =
+    sf "%s/%s/data/storage" tezosx_michelson_contracts_index contract_hex
+  in
+  Sc_rollup_node.RPC.call sc_rollup_node
+  @@ Sc_rollup_rpc.get_global_block_durable_state_value
+       ~pvm_kind:"wasm_2_0_0"
+       ~operation:Sc_rollup_rpc.Value
+       ~key:path
+       ()
+
+(** [decode_michelson_contract_address hex] decodes a hex-encoded
+    [Contract_repr.t] into a b58check KT1 address string. *)
+let decode_michelson_contract_address hex =
+  let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+  Hex.to_bytes (`Hex hex)
+  |> Data_encoding.Binary.of_bytes_exn C.encoding
+  |> C.to_b58check
+
+(** [decode_micheline_storage hex_str] decodes a hex string from the durable
+    storage into a Micheline [JSON.u] value. Returns [None] if decoding
+    fails. *)
+let decode_micheline_storage hex_str =
+  let module S = Tezos_protocol_alpha.Protocol.Script_repr in
+  Data_encoding.Binary.of_bytes_opt
+    S.expr_encoding
+    (Hex.to_bytes (`Hex hex_str))
+  |> Option.map (fun e ->
+         Data_encoding.Json.(
+           construct S.expr_encoding e
+           |> to_string
+           |> JSON.parse ~origin:"decode_micheline_storage"))
+
 (** [send_tezos_op_to_delayed_inbox_and_wait] sends a Tezos operation via the
     delayed inbox and waits until it is included and the delayed inbox is
     empty. *)
