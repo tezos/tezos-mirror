@@ -70,4 +70,4 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ...................................................... -ꜩ10000
         Frozen_bonds([PUBLIC_KEY_HASH],[SMART_ROLLUP_HASH]) ... +ꜩ10000
 
-smart_rollup_refute, 231, 5150.073000
+smart_rollup_refute, 231, 5158.205000

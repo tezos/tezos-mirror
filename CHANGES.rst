@@ -83,6 +83,10 @@ Packaging
 Smart Rollup node
 -----------------
 
+- Delayed the start of a refutation game by one commitment period (approximately
+  15 minutes) to prevent some edge cases in dispute resolution. (MR
+  :gl:`!20674`)
+
 - Added ``max_batch_length`` configuration option in the injector
   settings to limit the maximum number of operations included in a
   single L1 batch. This allows operators to control batch length

@@ -1678,6 +1678,12 @@ module Manager = struct
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
     | Tz5_account_disabled
+    | Sc_rollup_refutation_game_start_too_early of {
+        current_level : Raw_level.t;
+        earliest_start_level : Raw_level.t;
+        conflict_inbox_level : Raw_level.t;
+        commitment_period_in_blocks : int;
+      }
 
   let () =
     register_error_kind
@@ -1953,6 +1959,66 @@ module Manager = struct
       Data_encoding.unit
       (function Tz5_account_disabled -> Some () | _ -> None)
       (fun () -> Tz5_account_disabled)
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"validate.operation.sc_rollup_refutation_game_start_too_early"
+      ~title:"Refutation game starts too early"
+      ~description:
+        "The refutation game cannot be started yet. The protocol requires a \
+         delay of one commitment period to ensure sufficient time has passed \
+         since the commitment being challenged was published."
+      ~pp:(fun
+          ppf
+          ( current_level,
+            earliest_start_level,
+            conflict_inbox_level,
+            commitment_period_in_blocks )
+        ->
+        Format.fprintf
+          ppf
+          "Cannot start refutation game at level %a. Earliest start level is \
+           %a (= conflict inbox level %a + commitment period %d)."
+          Raw_level.pp
+          current_level
+          Raw_level.pp
+          earliest_start_level
+          Raw_level.pp
+          conflict_inbox_level
+          commitment_period_in_blocks)
+      Data_encoding.(
+        obj4
+          (req "current_level" Raw_level.encoding)
+          (req "earliest_start_level" Raw_level.encoding)
+          (req "conflict_inbox_level" Raw_level.encoding)
+          (req "commitment_period_in_blocks" int31))
+      (function
+        | Sc_rollup_refutation_game_start_too_early
+            {
+              current_level;
+              earliest_start_level;
+              conflict_inbox_level;
+              commitment_period_in_blocks;
+            } ->
+            Some
+              ( current_level,
+                earliest_start_level,
+                conflict_inbox_level,
+                commitment_period_in_blocks )
+        | _ -> None)
+      (fun ( current_level,
+             earliest_start_level,
+             conflict_inbox_level,
+             commitment_period_in_blocks )
+         ->
+        Sc_rollup_refutation_game_start_too_early
+          {
+            current_level;
+            earliest_start_level;
+            conflict_inbox_level;
+            commitment_period_in_blocks;
+          })
 end
 
 type error += Failing_noop_error

@@ -4658,6 +4658,12 @@ let test_refutation_reward_and_punishment ~kind =
   let module M = Operation.Manager in
   (* [operator1] starts a dispute, but will never play. *)
   let* () =
+    let* () =
+      (* Bake one commitment period before starting the refutation game. *)
+      let* constants = get_sc_rollup_constants client in
+      let commitment_period_in_blocks = constants.commitment_period_in_blocks in
+      Client.bake_for_and_wait ~count:(commitment_period_in_blocks - 1) client
+    in
     start_refute
       client
       ~source:operator1

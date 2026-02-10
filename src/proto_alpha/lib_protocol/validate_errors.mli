@@ -284,6 +284,12 @@ module Manager : sig
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
     | Tz5_account_disabled
+    | Sc_rollup_refutation_game_start_too_early of {
+        current_level : Raw_level.t;
+        earliest_start_level : Raw_level.t;
+        conflict_inbox_level : Raw_level.t;
+        commitment_period_in_blocks : int;
+      }
 end
 
 type error += Failing_noop_error

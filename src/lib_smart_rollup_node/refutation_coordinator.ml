@@ -85,7 +85,21 @@ let on_process Layer1.{level; _} state =
           let opponents = Player.current_games () in
           (* Conflicts for which we need to start new refutation players.
              Some of these might be ongoing. *)
-          let new_conflicts = untracked_conflicts opponents conflicts in
+          let commitment_period_in_blocks =
+            (Reference.get state.node_ctxt.Node_context.current_protocol)
+              .constants
+              .sc_rollup
+              .commitment_period_in_blocks
+          in
+          let* conflicts_ready_to_start =
+            Plugin.Refutation_game_helpers.filter_conflicts_ready_to_start
+              ~current_level:level
+              ~commitment_period_in_blocks
+              conflicts
+          in
+          let new_conflicts =
+            untracked_conflicts opponents conflicts_ready_to_start
+          in
           (* L1 ongoing games *)
           let* ongoing_games =
             Plugin.Refutation_game_helpers.get_ongoing_games

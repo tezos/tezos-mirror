@@ -3207,9 +3207,40 @@ module Manager = struct
                  {kind = Consensus_pk; source; public_key})
           else return_unit
 
+  let validate_sc_rollup_refute ctxt source rollup opponent refutation =
+    let open Lwt_result_syntax in
+    match refutation with
+    | Sc_rollup.Game.Move _ -> return_unit
+    | Start {player_commitment_hash; opponent_commitment_hash} ->
+        let* {inbox_level; _}, _ctxt =
+          Sc_rollup.Refutation_storage.check_conflict_point
+            ctxt
+            rollup
+            ~refuter:source
+            ~defender:opponent
+            ~refuter_commitment_hash:player_commitment_hash
+            ~defender_commitment_hash:opponent_commitment_hash
+        in
+        let current_level = (Level.current ctxt).level in
+        let commitment_period_in_blocks =
+          Constants.sc_rollup_commitment_period_in_blocks ctxt
+        in
+        let earliest_start_level =
+          Raw_level.add inbox_level commitment_period_in_blocks
+        in
+        fail_unless
+          Raw_level.(current_level >= earliest_start_level)
+          (Validate_errors.Manager.Sc_rollup_refutation_game_start_too_early
+             {
+               current_level;
+               earliest_start_level;
+               conflict_inbox_level = inbox_level;
+               commitment_period_in_blocks;
+             })
+
   let check_kind_specific_content (type kind)
       (contents : kind Kind.manager contents) remaining_gas vi =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let (Manager_operation
            {
              source;
@@ -3223,51 +3254,58 @@ module Manager = struct
     in
     match operation with
     | Reveal {public_key; proof} ->
-        let* () = Contract.check_public_key public_key source in
-        check_bls_proof_for_manager_pk remaining_gas source public_key proof
+        let*? () = Contract.check_public_key public_key source in
+        let*? () =
+          check_bls_proof_for_manager_pk remaining_gas source public_key proof
+        in
+        return_unit
     | Transaction {parameters; destination; _} ->
-        let* () = check_tz5_account_enabled vi.ctxt destination in
-        let* (_ : Gas.Arith.fp) =
+        let*? () = check_tz5_account_enabled vi.ctxt destination in
+        let*? (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas parameters
         in
         return_unit
     | Origination {script; _} ->
-        let* remaining_gas = consume_decoding_gas remaining_gas script.code in
-        let* (_ : Gas.Arith.fp) =
+        let*? remaining_gas = consume_decoding_gas remaining_gas script.code in
+        let*? (_ : Gas.Arith.fp) =
           consume_decoding_gas remaining_gas script.storage
         in
         return_unit
     | Register_global_constant {value} ->
-        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
+        let*? (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
         return_unit
     | Delegation (Some pkh) ->
-        let* () = Delegate.check_not_tz5 pkh in
+        let*? () = Delegate.check_not_tz5 pkh in
         if Constants.allow_tz4_delegate_enable vi.ctxt then return_unit
-        else Delegate.check_not_tz4 pkh
+        else Delegate.check_not_tz4 pkh |> Lwt.return
     | Update_consensus_key {public_key; proof; kind} ->
         check_update_consensus_key vi remaining_gas source public_key proof kind
+        |> Lwt.return
     | Delegation None | Set_deposits_limit _ | Increase_paid_storage _ ->
         return_unit
     | Transfer_ticket {contents; ty; destination; _} ->
-        let* () = check_tz5_account_enabled vi.ctxt destination in
-        let* remaining_gas = consume_decoding_gas remaining_gas contents in
-        let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
+        let*? () = check_tz5_account_enabled vi.ctxt destination in
+        let*? remaining_gas = consume_decoding_gas remaining_gas contents in
+        let*? (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
         return_unit
-    | Sc_rollup_originate {kind; _} -> assert_pvm_kind_enabled vi kind
-    | Sc_rollup_add_messages {messages; _} -> assert_not_zero_messages messages
-    | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_refute _
-    | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
-    | Sc_rollup_recover_bond _ ->
+    | Sc_rollup_originate {kind; _} ->
+        assert_pvm_kind_enabled vi kind |> Lwt.return
+    | Sc_rollup_add_messages {messages; _} ->
+        assert_not_zero_messages messages |> Lwt.return
+    | Sc_rollup_cement _ | Sc_rollup_publish _ | Sc_rollup_timeout _
+    | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
            Should we successfully precheck Sc_rollup_recover_bond and any
            (simple) Sc rollup operation, or should we add some some checks to make
            the operations Branch_delayed if they cannot be successfully
            prechecked? *)
         return_unit
+    | Sc_rollup_refute {rollup; opponent; refutation} ->
+        validate_sc_rollup_refute vi.ctxt source rollup opponent refutation
     | Dal_publish_commitment slot_header ->
-        Dal_apply.validate_publish_commitment vi.ctxt slot_header
+        Dal_apply.validate_publish_commitment vi.ctxt slot_header |> Lwt.return
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
-        assert_zk_rollup_feature_enabled vi
+        assert_zk_rollup_feature_enabled vi |> Lwt.return
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check
@@ -3314,7 +3352,7 @@ module Manager = struct
         batch_state.is_allocated
         (Contract_storage.Empty_implicit_contract source)
     in
-    let*? () = check_kind_specific_content contents remaining_gas vi in
+    let* () = check_kind_specific_content contents remaining_gas vi in
     (* Gas should no longer be consumed below this point, because it
        would not take into account any gas consumed by
        {!check_kind_specific_content}. If you really need to consume gas here, then you

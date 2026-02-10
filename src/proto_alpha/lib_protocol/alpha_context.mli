@@ -4569,6 +4569,15 @@ module Sc_rollup : sig
       Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
 
+    val check_conflict_point :
+      context ->
+      t ->
+      refuter:Staker.t ->
+      refuter_commitment_hash:Commitment.Hash.t ->
+      defender:Staker.t ->
+      defender_commitment_hash:Commitment.Hash.t ->
+      (Commitment.t * context) tzresult Lwt.t
+
     module Internal_for_tests : sig
       val get_conflict_point :
         context ->
