@@ -226,6 +226,35 @@ let originate_michelson_contract_via_delayed_inbox ~sc_rollup_address
   Log.info "Originated contract: %s" kt1_address ;
   return (contract_hex, kt1_address)
 
+(** [call_michelson_contract_via_delayed_inbox] calls a Michelson contract
+    via the delayed inbox. Converts the argument from Michelson notation to
+    JSON, forges and sends the call operation. *)
+let call_michelson_contract_via_delayed_inbox ~sc_rollup_address ~sc_rollup_node
+    ~client ~l1_contracts ~sequencer ~source ~counter ~dest ~arg_data
+    ?(entrypoint = "default") ?(amount = 0) () =
+  let* arg = Client.convert_data_to_json ~data:arg_data client in
+  let* call_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter
+            ~gas_limit:10000
+            ~storage_limit:1000
+            ~source
+            (call ~dest ~arg ~entrypoint ~amount ());
+        ])
+      client
+  in
+  send_tezos_op_to_delayed_inbox_and_wait
+    ~sc_rollup_address
+    ~sc_rollup_node
+    ~client
+    ~l1_contracts
+    ~sequencer
+    call_op
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
