@@ -82,6 +82,10 @@ docker buildx build --push \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --build-arg NPM_REGISTRY_DOMAIN="${NPM_REGISTRY_DOMAIN:-}" \
   --build-arg NPM_REGISTRY="${NPM_REGISTRY:-}" \
+  --build-arg DOCKER_VERSION="${DOCKER_VERSION:-}" \
+  --build-arg GCLOUD_VERSION="${GCLOUD_VERSION:-}" \
+  --build-arg HADOLINT_VERSION="${HADOLINT_VERSION:-}" \
+  --build-arg REGCTL_VERSION="${REGCTL_VERSION:-}" \
   --tag "${gcp}" \
   --tag "${gcp_generic}" \
   $(if [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then echo "--tag=${protected_gcp}"; fi) \
