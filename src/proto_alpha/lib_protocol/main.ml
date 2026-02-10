@@ -120,22 +120,38 @@ let can_contain_preattestations mode =
       in
       return (Option.is_some locked_round)
 
-let delegate_to_shard_count ctxt ~attested_level =
+let delegate_to_shard_count ctxt ~attested_levels =
   let open Lwt_result_syntax in
   let open Alpha_context in
+  let lags = Constants.dal_attestation_lags ctxt in
+  (* We are using a set here to de-duplicate the committee levels across
+     different attested levels and attestation lags. Indeed, repetition may
+     occur; for instance, if [attested_level] contains levels 10 and 11, and
+     [attestation_lags = [2;3;5]], then committee level 12 can be obtained as
+     both [10-2 + 5-1] and [11-3 + 5-1]. *)
   let committee_levels =
-    List.filter_map
-      (fun lag ->
-        let level_opt = Dal.committee_level_of ctxt ~attested_level ~lag in
-        Option.map (Level.from_raw ctxt) level_opt)
-      (Constants.dal_attestation_lags ctxt)
+    List.fold_left
+      (fun acc attested_level ->
+        let attested_level = attested_level.Level.level in
+        let new_levels =
+          List.filter_map
+            (fun lag ->
+              let raw_level_opt =
+                Dal.committee_level_of ctxt ~attested_level ~lag
+              in
+              Option.map (Level.from_raw ctxt) raw_level_opt)
+            lags
+        in
+        Level.Set.union acc (Level.Set.of_list new_levels))
+      Level.Set.empty
+      attested_levels
   in
-  List.fold_left_es
-    (fun (ctxt, dal_map) committee_level ->
+  Level.Set.fold_es
+    (fun committee_level (ctxt, dal_map) ->
       let* ctxt, counts = Baking.delegate_to_shard_count ctxt committee_level in
       return (ctxt, Raw_level.Map.add committee_level.level counts dal_map))
-    (ctxt, Raw_level.Map.empty)
     committee_levels
+    (ctxt, Raw_level.Map.empty)
 
 (** Initialize the consensus rights by first slot for modes that are
     about the validation/application of a block: application, partial
@@ -160,7 +176,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
     else return (ctxt, None)
   in
   let* ctxt, delegate_to_shard_count =
-    delegate_to_shard_count ctxt ~attested_level:current_level.level
+    delegate_to_shard_count ctxt ~attested_levels:[current_level]
   in
   let ctxt =
     Consensus.initialize_consensus_operation
@@ -201,9 +217,10 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
       (ctxt, Level.Map.empty)
       allowed_levels
   in
-  let current_level = Level.current ctxt in
   let* ctxt, delegate_to_shard_count =
-    delegate_to_shard_count ctxt ~attested_level:current_level.level
+    delegate_to_shard_count
+      ctxt
+      ~attested_levels:(List.map (Level.succ ctxt) allowed_levels)
   in
   let ctxt =
     (* Store the resulting map in the context as [allowed_consensus]. *)

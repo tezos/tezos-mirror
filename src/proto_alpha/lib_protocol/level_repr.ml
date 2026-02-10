@@ -39,6 +39,7 @@ end
 
 include Compare.Make (Ordered)
 module Map = Map.Make (Ordered)
+module Set = Set.Make (Ordered)
 
 type level = t
 

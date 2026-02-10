@@ -34,27 +34,65 @@ open Dal_errors
 let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
   consensus_key.delegate
 
-let validate_attestations ctxt level slot consensus_key attestations =
-  let open Lwt_result_syntax in
-  let*? () = Dal.assert_feature_enabled ctxt in
+let validate_attestations ctxt ~attestation_level consensus_key attestations =
+  let open Result_syntax in
+  let* () = Dal.assert_feature_enabled ctxt in
   let number_of_slots = Constants.dal_number_of_slots ctxt in
   let number_of_lags = Constants.dal_number_of_lags ctxt in
   let maximum_size =
     Dal.Attestations.expected_max_size_in_bits ~number_of_slots ~number_of_lags
   in
   let size = Dal.Attestations.occupied_size_in_bits attestations in
-  let*? () =
+  let* () =
     error_unless
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
-  let number_of_shards = Constants.dal_number_of_shards ctxt in
-  (* TODO-DL: check for each lag index *)
-  fail_when
-    (Compare.Int.(Slot.to_int slot >= number_of_shards)
-    && not (Dal.Attestations.is_empty attestations))
-    (let attester = pkh_of_consensus_key consensus_key in
-     Dal_data_availibility_attester_not_in_committee {attester; level; slot})
+  let attested_level = Raw_level.succ attestation_level in
+  let attestation_lags = Constants.dal_attestation_lags ctxt in
+  let delegate_to_shard_count = Consensus.delegate_to_shard_count ctxt in
+  List.iteri_e
+    (fun lag_index lag ->
+      let committee_level_opt =
+        Dal.committee_level_of ctxt ~attested_level ~lag
+      in
+      match committee_level_opt with
+      | None ->
+          (* reachable only when [attested_level < lag]; so cannot happen on
+             Mainnet *)
+          return_unit
+      | Some committee_level -> (
+          match Raw_level.Map.find committee_level delegate_to_shard_count with
+          | None ->
+              (* by construction of [delegate_to_shard_count] should contain
+                 all committee levels *)
+              assert false
+          | Some delegate_map ->
+              let delegate = pkh_of_consensus_key consensus_key in
+              let not_in_committee =
+                match
+                  Signature.Public_key_hash.Map.find delegate delegate_map
+                with
+                | None -> true
+                | Some n ->
+                    (* otherwise, we should be in [None] case *)
+                    assert (Compare.Int.(n > 0)) ;
+                    false
+              in
+              error_when
+                (not_in_committee
+                && not
+                     (Dal.Attestations.is_empty_at_lag_index
+                        attestations
+                        ~lag_index))
+                (Dal_data_availibility_attester_not_in_committee
+                   {
+                     attester = delegate;
+                     committee_level;
+                     attested_level;
+                     lag_index;
+                   })))
+    attestation_lags
 
 let apply_attestations ctxt ~delegate ~attested_level attestations ~tb_slot
     ~committee_level_to_shard_count =

@@ -1316,6 +1316,8 @@ module Level : sig
   val may_compute_randao : context -> bool
 
   module Map : Map.S with type key = t
+
+  module Set : Set.S with type elt = t
 end
 
 (** This module re-exports definitions from {!Fitness_repr}. *)
@@ -2984,6 +2986,8 @@ module Dal : sig
 
     val is_empty : t -> bool
 
+    val is_empty_at_lag_index : t -> lag_index:int -> bool
+
     val commit :
       t ->
       number_of_slots:int ->
@@ -3353,8 +3357,9 @@ module Dal_errors : sig
       }
     | Dal_data_availibility_attester_not_in_committee of {
         attester : Signature.Public_key_hash.t;
-        level : Raw_level.t;
-        slot : Slot.t;
+        committee_level : Raw_level.t;
+        attested_level : Raw_level.t;
+        lag_index : int;
       }
     | Dal_cryptobox_error of {explanation : string}
 end

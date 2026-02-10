@@ -24,6 +24,9 @@ let bitset_mem bitset idx =
 let bitset_add bitset idx =
   match Bitset.add bitset idx with Ok b -> b | Error _ -> bitset
 
+(* Check if the attestation at [lag_index] is empty *)
+let is_empty_at_lag_index t ~lag_index = not @@ bitset_mem t lag_index
+
 (* Helper: compute the data bit position for a slot at a given lag_index.
    Returns None if the attestation at lag_index is empty. *)
 let compute_data_bit_position t ~number_of_slots ~number_of_lags ~lag_index
