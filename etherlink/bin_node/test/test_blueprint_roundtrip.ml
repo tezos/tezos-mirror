@@ -147,6 +147,34 @@ let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
       ~error_msg:"Wrong decoded of delayed transactions: got %L instead of %R") ;
   unit
 
+(* Bundles a tez block version with a set of utility and check functions *)
+module type TEZOS_BLOCK_TOOL = sig
+  type t
+
+  val name : string
+
+  val encode_block_for_store : t -> (string, string) result
+
+  val check_match : expected:t -> L2_types.Tezos_block.t -> unit
+end
+
+let test_tez_block_roundtrip (type block)
+    (module Block_tool : TEZOS_BLOCK_TOOL with type t = block) ~title
+    (block : block) =
+  register
+    ~title:(sf "%s producer decoder roundtrip (%s)" Block_tool.name title)
+  @@ fun () ->
+  let encoding_result =
+    expect_ok "could not encode the tez block"
+    @@ Block_tool.encode_block_for_store block
+  in
+  let decoding_result =
+    expect_ok "could not decode the tez block"
+    @@ L2_types.Tezos_block.decode_block_for_store encoding_result
+  in
+  Block_tool.check_match ~expected:block decoding_result ;
+  unit
+
 let test_tez_block_roundtrip ~title ~level ~timestamp ~parent_hash ~operations
     () =
   register ~title:(sf "Tez block producer decoder roundtrip (%s)" title)
