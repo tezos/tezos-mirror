@@ -143,6 +143,25 @@ let check_balance_updates full_metadata expected_balance_updates =
     expected_balance_updates
     balance_updates
 
+let check_expected_parameters ~loc expected parameters =
+  let open Lwt_result_syntax in
+  let* () =
+    Assert.equal_int32
+      ~loc
+      expected
+        .Clst_delegates_parameters_repr
+         .edge_of_clst_staking_over_baking_millionth
+      parameters
+        .Clst_delegates_parameters_repr
+         .edge_of_clst_staking_over_baking_millionth
+  in
+  Assert.equal_int32
+    ~loc
+    expected.ratio_of_clst_staking_over_direct_staking_billionth
+    parameters
+      .Clst_delegates_parameters_repr
+       .ratio_of_clst_staking_over_direct_staking_billionth
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -1117,3 +1136,123 @@ let () =
         ~loc:__LOC__
         ~str:"FA2.1 lambda_export is not implemented"
         trace
+
+let register_delegate_and_bake
+    ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
+    ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l) b
+    delegate =
+  let open Lwt_result_wrap_syntax in
+  let*?@ parameters =
+    Clst_delegates_parameters_repr.make
+      ~edge_of_clst_staking_over_baking_millionth
+      ~ratio_of_clst_staking_over_direct_staking_billionth
+  in
+  let* register_tx =
+    Op.clst_register_delegate
+      (Context.B b)
+      delegate
+      ~edge_of_clst_staking_over_baking_millionth:
+        (Z.of_int32 parameters.edge_of_clst_staking_over_baking_millionth)
+      ~ratio_of_clst_staking_over_direct_staking_billionth:
+        (Z.of_int32
+           parameters.ratio_of_clst_staking_over_direct_staking_billionth)
+  in
+  let* b = Block.bake b ~operation:register_tx in
+  return (b, parameters)
+
+let check_pending_parameters_and_return_next_activation_cycle ~loc b
+    delegate_pkh expected_parameters_list =
+  let open Lwt_result_syntax in
+  let* pending_parameters_list =
+    Delegate_services.pending_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  let rec check_and_return_earliest_cycle expected_parameters_list
+      pending_parameters_list first_cycle =
+    match (pending_parameters_list, expected_parameters_list) with
+    | [], [] -> return first_cycle
+    | [], _ :: _ -> Test.fail ~loc:__LOC__ "Expected pending CLST parameters"
+    | ( (activation_cycle, pending_parameters) :: pending_parameters_list',
+        expected_parameters :: expected_parameters_list' ) ->
+        let* () =
+          check_expected_parameters ~loc expected_parameters pending_parameters
+        in
+        let first_cycle =
+          match first_cycle with
+          | None -> Some activation_cycle
+          | Some _ -> first_cycle
+        in
+        check_and_return_earliest_cycle
+          expected_parameters_list'
+          pending_parameters_list'
+          first_cycle
+    | _ :: _, [] ->
+        Test.fail
+          ~loc:__LOC__
+          "There shouldn't be more than one pending parameter"
+  in
+  check_and_return_earliest_cycle
+    expected_parameters_list
+    pending_parameters_list
+    None
+
+let () =
+  register_test ~title:"Test baker registration" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh =
+    match delegate with
+    | Contract.Implicit pkh -> pkh
+    | Contract.Originated _ -> assert false
+  in
+  let* registered =
+    Delegate_services.clst_registered Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (not registered) in
+  let* b, parameters = register_delegate_and_bake b delegate in
+
+  (* Check that the baker is considered registered. *)
+  let* registered =
+    Delegate_services.clst_registered Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ registered in
+
+  (* Check that the pending parameters are the only parameters registered, and
+     bake until the cycle where these parameters will be activated. *)
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+
+  (* Now, check that the parameters have been activated. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  match active_parameters with
+  | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
+  | Some active_parameters ->
+      check_expected_parameters ~loc:__LOC__ parameters active_parameters
