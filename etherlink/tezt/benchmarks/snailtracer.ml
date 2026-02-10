@@ -15,8 +15,6 @@ open Benchmark_utils
 open Floodgate_lib
 
 type env = {
-  container :
-    L2_types.evm_chain_family Evm_node_lib_dev.Services_backend_sig.tx_container;
   sequencer : Evm_node.t;
   rpc_node : Evm_node.t;
   infos : Network_info.t;
@@ -184,10 +182,9 @@ let ray_trace_scanlines ({width; height; _} as env) sender =
     speedup ;
   unit
 
-let call_one {container; infos; rpc_node; gas_limit; contract; spp; _} sender =
+let call_one {infos; rpc_node; gas_limit; contract; spp; _} sender =
   let* _ =
     call
-      ~container
       infos
       rpc_node
       contract
@@ -244,13 +241,6 @@ let test_snailtracer () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
-  let start_container, container =
-    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-  in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let max_size = 999_999 in
   let tx_per_addr_limit = Int64.of_int 999_999 in
   let max_transaction_batch_length = Some 300 in
@@ -259,7 +249,7 @@ let test_snailtracer () =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
   let*? () =
-    start_container
+    Evm_node_lib_dev.Tx_queue.start
       ~config
       ~keep_alive:true
       ~timeout:parameters.timeout
@@ -274,7 +264,7 @@ let test_snailtracer () =
       ()
   in
   let tx_queue =
-    Tx_container.tx_queue_beacon
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
       ~evm_node_endpoint:(Rpc endpoint)
       ~tick_interval:0.5
   in
@@ -289,7 +279,6 @@ let test_snailtracer () =
   Log.info "Will use gas limit %a" Z.pp_print gas_limit ;
   let env =
     {
-      container;
       sequencer;
       rpc_node;
       infos;
@@ -313,7 +302,7 @@ let test_snailtracer () =
     in
     Lwt.cancel follower ;
     Lwt.cancel tx_queue ;
-    let*? () = Tx_container.shutdown () in
+    let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
     let* () = Evm_node.terminate sequencer in
     stop_profile ()
   in
@@ -358,13 +347,6 @@ let test_full_image_raytracing () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
-  let start_container, container =
-    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-  in
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
-  in
   let max_size = 999_999 in
   let tx_per_addr_limit = Int64.of_int 999_999 in
   let max_transaction_batch_length = Some 300 in
@@ -373,7 +355,7 @@ let test_full_image_raytracing () =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
   let*? () =
-    start_container
+    Evm_node_lib_dev.Tx_queue.start
       ~config
       ~keep_alive:true
       ~timeout:parameters.timeout
@@ -388,7 +370,7 @@ let test_full_image_raytracing () =
       ()
   in
   let tx_queue =
-    Tx_container.tx_queue_beacon
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
       ~evm_node_endpoint:(Rpc endpoint)
       ~tick_interval:0.5
   in
@@ -400,10 +382,9 @@ let test_full_image_raytracing () =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  let*? () = Tx_container.shutdown () in
+  let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
   let env =
     {
-      container;
       sequencer;
       rpc_node;
       infos;
