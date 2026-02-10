@@ -4707,6 +4707,9 @@ module Clst : sig
       Clst_delegates_parameters_repr.t ->
       context tzresult Lwt.t
 
+    val unregister :
+      context -> Signature.Public_key_hash.t -> context tzresult Lwt.t
+
     val activate_parameters : context -> new_cycle:Cycle.t -> context Lwt.t
   end
 

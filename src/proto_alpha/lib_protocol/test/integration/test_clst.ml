@@ -1338,10 +1338,10 @@ let () =
   let* b, parameters = register_delegate_and_bake b delegate in
 
   (* Check that the baker is considered registered. *)
-  let* registered =
-    Delegate_services.clst_registered Block.rpc_ctxt b delegate_pkh
+  let* eventually_registered =
+    Delegate_services.clst_eventually_registered Block.rpc_ctxt b delegate_pkh
   in
-  let* () = Assert.is_true ~loc:__LOC__ registered in
+  let* () = Assert.is_true ~loc:__LOC__ eventually_registered in
 
   (* Check that the pending parameters are the only parameters registered, and
      bake until the cycle where these parameters will be activated. *)

@@ -33,6 +33,13 @@ val register_pending_parameters :
   Clst_delegates_parameters_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+(** [unregister ctxt delegate] unregisters [delegate] after
+    {!Constant_storage.consensus_rights_delay} cycles. The delegate will not
+    receive baking rights from CLST starting from the cycle the unregistration
+    takes effects. *)
+val unregister :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+
 (** [activate_parameters ctxt ~new_cycle] activates the clst pending delegate
     parameters at the beginning of cycle [new_cycle]. This function iterates
     over all delegates registered with the CLST. *)

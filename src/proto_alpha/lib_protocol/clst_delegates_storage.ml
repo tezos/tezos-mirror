@@ -43,6 +43,8 @@ let add_update ctxt delegate t =
 let register_pending_parameters ctxt delegate t =
   add_update ctxt delegate (Update t)
 
+let unregister ctxt delegate = add_update ctxt delegate Unregister
+
 let activate_parameters ctxt ~new_cycle =
   let open Lwt_syntax in
   let* ctxt =
