@@ -13,8 +13,6 @@ open Floodgate_lib
 open Evm_node_lib_dev_encoding
 
 type env = {
-  container :
-    L2_types.evm_chain_family Evm_node_lib_dev.Services_backend_sig.tx_container;
   sequencer : Evm_node.t;
   rpc_node : Evm_node.t;
   infos : Network_info.t;
@@ -23,11 +21,9 @@ type env = {
   nb_contracts : int;
 }
 
-let deposit_one {container; infos; gas_limit; rpc_node; _} ?nonce value account
-    contract =
+let deposit_one {infos; gas_limit; rpc_node; _} ?nonce value account contract =
   let* _ =
     call
-      ~container
       infos
       rpc_node
       contract
@@ -136,11 +132,10 @@ let transfer_gas_limit {accounts; infos; rpc_node; _} contract =
   in
   return gas_limit
 
-let account_step {container; infos; rpc_node; gas_limit; _} contract ~nonce
+let account_step {infos; rpc_node; gas_limit; _} contract ~nonce
     (sender : Account.t) value (dest : Account.t) =
   let* _ =
     call
-      ~container
       infos
       rpc_node
       contract
@@ -207,12 +202,8 @@ let test_erc20_capacity () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100.
   in
-  let start_container, container =
-    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-  in
   let env =
     {
-      container;
       infos;
       sequencer;
       rpc_node = sequencer;
@@ -220,11 +211,6 @@ let test_erc20_capacity () =
       accounts;
       nb_contracts;
     }
-  in
-
-  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
-         (module Tx_container)) =
-    container
   in
 
   let max_size = 999_999 in
@@ -235,7 +221,7 @@ let test_erc20_capacity () =
     {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
   in
   let*? () =
-    start_container
+    Evm_node_lib_dev.Tx_queue.start
       ~config
       ~keep_alive:true
       ~timeout:parameters.timeout
@@ -250,7 +236,7 @@ let test_erc20_capacity () =
       ()
   in
   let tx_queue =
-    Tx_container.tx_queue_beacon
+    Evm_node_lib_dev.Tx_queue.tx_queue_beacon
       ~evm_node_endpoint:(Rpc endpoint)
       ~tick_interval:0.1
   in
@@ -283,7 +269,7 @@ let test_erc20_capacity () =
     in
     Lwt.cancel follower ;
     Lwt.cancel tx_queue ;
-    let*? () = Tx_container.shutdown () in
+    let*? () = Evm_node_lib_dev.Tx_queue.shutdown () in
     let* () = Evm_node.terminate sequencer in
     stop_profile ()
   in
