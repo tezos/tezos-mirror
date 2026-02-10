@@ -247,6 +247,16 @@ let pending_staking_parameters_encoding :
     (req "cycle" Cycle.encoding)
     (req "parameters" Staking_parameters_repr.encoding)
 
+type pending_clst_staking_parameters =
+  Cycle.t * Clst_delegates_parameters_repr.t
+
+let pending_clst_staking_parameters_encoding :
+    pending_clst_staking_parameters Data_encoding.t =
+  let open Data_encoding in
+  obj2
+    (req "cycle" Cycle.encoding)
+    (req "parameters" Clst_delegates_parameters_repr.encoding)
+
 let min_delegated_in_current_cycle_encoding =
   let open Data_encoding in
   conv
@@ -1012,6 +1022,31 @@ module S = struct
       ~output:(list pending_staking_parameters_encoding)
       RPC_path.(path / "pending_staking_parameters")
 
+  let clst_registered =
+    RPC_service.get_service
+      ~description:
+        "Returns true if the delegate is registered with CLST. Otherwise, \
+         returns false."
+      ~query:RPC_query.empty
+      ~output:bool
+      RPC_path.(path / "clst_registered")
+
+  let active_clst_staking_parameters =
+    RPC_service.get_service
+      ~description:
+        "Returns the currently active delegate's parameters for CLST."
+      ~query:RPC_query.empty
+      ~output:(option Clst_delegates_parameters_repr.encoding)
+      RPC_path.(path / "active_clst_parameters")
+
+  let pending_clst_staking_parameters =
+    RPC_service.get_service
+      ~description:
+        "Returns the currently pending delegate's parameters for CLST."
+      ~query:RPC_query.empty
+      ~output:(list pending_clst_staking_parameters_encoding)
+      RPC_path.(path / "pending_clst_parameters")
+
   let pending_denunciations =
     RPC_service.get_service
       ~description:"Returns the pending denunciations for the given delegate."
@@ -1522,6 +1557,16 @@ let register () =
       Delegate.Staking_parameters.of_delegate ctxt pkh) ;
   register1 ~chunked:false S.pending_staking_parameters (fun ctxt pkh () () ->
       Delegate.Staking_parameters.pending_updates ctxt pkh) ;
+  register1 ~chunked:false S.clst_registered (fun ctxt pkh () () ->
+      Clst_contract_storage.is_delegate_registered ctxt pkh) ;
+  register1
+    ~chunked:false
+    S.active_clst_staking_parameters
+    (fun ctxt pkh () () -> Clst.Delegates.get_delegate_parameters ctxt pkh) ;
+  register1
+    ~chunked:false
+    S.pending_clst_staking_parameters
+    (fun ctxt pkh () () -> Clst.Delegates.get_pending_parameters ctxt pkh) ;
   register1 ~chunked:false S.pending_denunciations (fun ctxt pkh () () ->
       Delegate.For_RPC.pending_denunciations ctxt pkh) ;
   register1
@@ -1620,6 +1665,15 @@ let active_staking_parameters ctxt block pkh =
 
 let pending_staking_parameters ctxt block pkh =
   RPC_context.make_call1 S.pending_staking_parameters ctxt block pkh () ()
+
+let active_clst_staking_parameters ctxt block pkh =
+  RPC_context.make_call1 S.active_clst_staking_parameters ctxt block pkh () ()
+
+let clst_registered ctxt block pkh =
+  RPC_context.make_call1 S.clst_registered ctxt block pkh () ()
+
+let pending_clst_staking_parameters ctxt block pkh =
+  RPC_context.make_call1 S.pending_clst_staking_parameters ctxt block pkh () ()
 
 let pending_denunciations ctxt block pkh =
   RPC_context.make_call1 S.pending_denunciations ctxt block pkh () ()
