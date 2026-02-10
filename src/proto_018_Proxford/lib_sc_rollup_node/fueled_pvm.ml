@@ -418,7 +418,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
     (feed_messages [@tailcall]) (state, fuel) message_counter_offset messages
 
   let eval_block_inbox ~fuel (node_ctxt : _ Node_context.t) (inbox, messages)
-      (state : Context.pvmstate) : fuel eval_result tzresult Lwt.t =
+      (state : _ Context.pvmstate) : fuel eval_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let module PVM = (val Pvm.of_kind node_ctxt.kind) in
     let module PVM_mut_state = PVM.Mutable_state in

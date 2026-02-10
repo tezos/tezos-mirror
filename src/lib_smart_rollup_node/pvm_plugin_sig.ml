@@ -79,7 +79,7 @@ module type FUELED_PVM = sig
     fuel:fuel ->
     _ Node_context.t ->
     Inbox.t * string list ->
-    Context.pvmstate ->
+    Access_mode.rw Context.pvmstate ->
     fuel eval_result tzresult Lwt.t
 
   (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
@@ -95,45 +95,48 @@ module type FUELED_PVM = sig
   val eval_messages :
     ?reveal_map:string Utils.Reveal_hash_map.t ->
     _ Node_context.t ->
-    (fuel, Context.pvmstate) eval_state ->
+    (fuel, Access_mode.rw Context.pvmstate) eval_state ->
     fuel eval_result tzresult Lwt.t
 end
 
 module type S = sig
   val context : Kind.t -> (module Context_sigs.S)
 
-  val get_tick : Kind.t -> Context.pvmstate -> Z.t Lwt.t
+  val get_tick : Kind.t -> _ Context.pvmstate -> Z.t Lwt.t
 
-  val state_hash : Kind.t -> Context.pvmstate -> State_hash.t Lwt.t
+  val state_hash : Kind.t -> _ Context.pvmstate -> State_hash.t Lwt.t
 
-  val set_initial_state : Kind.t -> empty:Context.pvmstate -> unit Lwt.t
+  val set_initial_state :
+    Kind.t -> empty:Access_mode.rw Context.pvmstate -> unit Lwt.t
 
   val parse_boot_sector : Kind.t -> string -> string option
 
-  val install_boot_sector : Kind.t -> Context.pvmstate -> string -> unit Lwt.t
+  val install_boot_sector :
+    Kind.t -> Access_mode.rw Context.pvmstate -> string -> unit Lwt.t
 
-  val get_status : _ Node_context.t -> Context.pvmstate -> string tzresult Lwt.t
+  val get_status :
+    _ Node_context.t -> _ Context.pvmstate -> string tzresult Lwt.t
 
   val find_whitelist_update_output_index :
     _ Node_context.t ->
-    Context.pvmstate ->
+    _ Context.pvmstate ->
     outbox_level:int32 ->
     int option Lwt.t
 
   val get_outbox_messages :
     _ Node_context.t ->
-    Context.pvmstate ->
+    _ Context.pvmstate ->
     outbox_level:int32 ->
     (int * Outbox_message.summary) list Lwt.t
 
   val produce_serialized_output_proof :
     _ Node_context.rw_context ->
-    Context.pvmstate ->
+    _ Context.pvmstate ->
     outbox_level:int32 ->
     message_index:int ->
     string tzresult Lwt.t
 
-  val get_current_level : Kind.t -> Context.pvmstate -> int32 option Lwt.t
+  val get_current_level : Kind.t -> _ Context.pvmstate -> int32 option Lwt.t
 
   val start_of_level_serialized : string
 
@@ -147,7 +150,7 @@ module type S = sig
   module Unsafe : sig
     val apply_patch :
       Kind.t ->
-      Context.pvmstate ->
+      Access_mode.rw Context.pvmstate ->
       Pvm_patches.unsafe_patch ->
       unit tzresult Lwt.t
   end

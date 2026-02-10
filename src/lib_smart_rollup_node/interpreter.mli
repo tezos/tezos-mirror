@@ -38,43 +38,64 @@
 val process_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
-  'a Context.t ->
+  < index : _ ; state : Access_mode.rw > Context.t ->
   predecessor:Layer1.head ->
   Layer1.head ->
   Octez_smart_rollup.Inbox.t * string list ->
   (int * int64 * Z.t) tzresult Lwt.t
 
-type patched = Patched
+(** {2 Genesis state}
 
-type unpatched = Unpatched
+    The genesis state can be retrieved in different variants depending on
+    whether unsafe patches should be applied. The permission parameter
+    tracks the access mode of the underlying PVM state. *)
 
-type both = Both
+(** Tag for a genesis state with patches applied. *)
+type 'a patched = Patched constraint 'a = [< `Read | `Write > `Read]
 
+(** Tag for a genesis state without patches (the original boot sector). *)
+type 'a unpatched = Unpatched constraint 'a = [< `Read | `Write > `Read]
+
+(** Tag for requesting both the patched and unpatched genesis states. *)
+type ('a, 'b) both =
+  | Both
+  constraint 'a = [< `Read | `Write > `Read]
+  constraint 'b = [< `Read | `Write > `Read]
+
+(** A genesis PVM state, parameterized by the requested variant. *)
 type _ genesis_state =
-  | Patched : Context.pvmstate -> patched genesis_state
-  | Unpatched : Context.pvmstate -> unpatched genesis_state
+  | Patched : 'perm Context.pvmstate -> 'perm patched genesis_state
+      (** The PVM state after applying unsafe patches. *)
+  | Unpatched : 'perm Context.pvmstate -> 'perm unpatched genesis_state
+      (** The original PVM state from the boot sector. *)
   | Both : {
-      patched : Context.pvmstate;
-      original : Context.pvmstate;
+      patched : 'perm_patched Context.pvmstate;
+      original : 'perm_orig Context.pvmstate;
     }
-      -> both genesis_state
+      -> ('perm_orig, 'perm_patched) both genesis_state
+      (** Both variants at once, each with independently tracked permissions. *)
 
+(** Selects which genesis state variant to compute and with what access
+    permissions. *)
 type _ genesis_state_mode =
-  | Patched : patched genesis_state_mode
-  | Unpatched : unpatched genesis_state_mode
-  | Both : both genesis_state_mode
+  | Patched : 'a Access_mode.t -> 'a patched genesis_state_mode
+      (** Request only the patched state. *)
+  | Unpatched : 'a Access_mode.t -> 'a unpatched genesis_state_mode
+      (** Request only the unpatched state. *)
+  | Both :
+      'a Access_mode.t * 'b Access_mode.t
+      -> ('a, 'b) both genesis_state_mode
+      (** Request both states with potentially different access permissions. *)
 
-(** [genesis_state plugin ?genesis_block node_ctxt] returns a pair [s1, s2]
-    where [s1] is the PVM state at the genesis block and [s2] is the genesis
-    state without any patches applied. [s2] is meant to be used to compute the
-    genesis commitment. If there are no unsafe patches for the rollup [s2] is
-    the same as [s1]. *)
+(** [genesis_state mode plugin ?genesis_block ?empty node_ctxt] the PVM state
+    at the genesis block with and/or without patches applied depending on
+    [mode]. *)
 val genesis_state :
   'm genesis_state_mode ->
   (module Protocol_plugin_sig.PARTIAL) ->
   ?genesis_block:Block_hash.t ->
+  ?empty:Access_mode.rw Context.pvmstate ->
   _ Node_context.t ->
-  Context.pvmstate ->
   'm genesis_state tzresult Lwt.t
 
 (** [state_of_tick plugin node_ctxt cache ?start_state ~tick level] returns [Some
@@ -86,11 +107,18 @@ val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
   _ Node_context.t ->
   Pvm_plugin_sig.state_cache ->
-  ?start_state:(Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state ->
+  ?start_state:
+    ( Fuel.Accounted.t,
+      Access_mode.rw Context.pvmstate )
+    Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->
-  (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state option tzresult
+  (Fuel.Accounted.t, Access_mode.rw Context.pvmstate) Pvm_plugin_sig.eval_state
+  option
+  tzresult
   Lwt.t
+
+(** {2 State retrieval} *)
 
 (** [state_of_head plugin node_ctxt ctxt head] returns the state corresponding
     to the block [head], or the state at rollup genesis if the block is before
@@ -98,6 +126,6 @@ val state_of_tick :
 val state_of_head :
   (module Protocol_plugin_sig.PARTIAL) ->
   < context : 'a ; store : _ > Node_context.t ->
-  'a Context.t ->
+  < index : 'a ; state : 'b > Context.t ->
   Layer1.head ->
-  Context.pvmstate tzresult Lwt.t
+  'b Context.pvmstate tzresult Lwt.t

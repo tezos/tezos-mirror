@@ -83,7 +83,10 @@ let inject_next_move node_ctxt ~refutation ~opponent =
 type pvm_intermediate_state =
   | Hash of State_hash.t
   | Evaluated of {
-      head : (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state;
+      head :
+        ( Fuel.Accounted.t,
+          Access_mode.rw Context.pvmstate )
+        Pvm_plugin_sig.eval_state;
           (** The working head which we are currently updating to go forwards
               during dissection traversal. *)
       snapshot :

@@ -229,11 +229,7 @@ let compute_pvm_state_for_genenis cctxt dest (store : _ Store.t) context
       ~data_dir:dest
       ~apply_unsafe_patches
   in
-  Interpreter.genesis_state
-    Both
-    plugin
-    node_context
-    (Context.PVMState.empty context)
+  Interpreter.genesis_state (Both (Read_write, Read_write)) plugin node_context
 
 let check_genesis_pvm_state_and_return cctxt dest store context header
     (module Plugin : Protocol_plugin_sig.PARTIAL) (metadata : Metadata.t)

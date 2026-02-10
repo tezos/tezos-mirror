@@ -219,7 +219,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val generate_proof :
     _ Node_context.rw_context ->
     Game.t ->
-    Context.pvmstate ->
+    Access_mode.rw Context.pvmstate ->
     string tzresult Lwt.t
 
   (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
@@ -233,7 +233,10 @@ module type REFUTATION_GAME_HELPERS = sig
     _ Node_context.t ->
     Pvm_plugin_sig.state_cache ->
     start_state:
-      (Fuel.Accounted.t, Context.pvmstate) Pvm_plugin_sig.eval_state option ->
+      ( Fuel.Accounted.t,
+        Access_mode.rw Context.pvmstate )
+      Pvm_plugin_sig.eval_state
+      option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->
     default_number_of_sections:int ->
