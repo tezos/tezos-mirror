@@ -10,6 +10,7 @@ use super::{Runtime, RuntimeError, ValueType};
 use crate::debug::HostDebug;
 #[cfg(feature = "alloc")]
 use crate::input::Message;
+use crate::reveal::HostReveal;
 use crate::storage::StorageV1;
 use crate::{dal_parameters::RollupDalParameters, metadata::RollupMetadata, path::Path};
 use alloc::rc::Rc;
@@ -73,6 +74,43 @@ impl<R> RefUnwindSafe for UnwindableRuntime<R> {}
 impl<R: HostDebug> HostDebug for UnwindableRuntime<R> {
     fn write_debug(&self, msg: &str) {
         self.runtime.read().unwrap().write_debug(msg)
+    }
+}
+
+impl<R: HostReveal> HostReveal for UnwindableRuntime<R> {
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.runtime.read().unwrap().reveal_metadata()
+    }
+
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.runtime
+            .read()
+            .unwrap()
+            .reveal_preimage(hash, destination)
+    }
+
+    #[cfg(feature = "alloc")]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.runtime.read().unwrap().reveal_dal_page(
+            published_level,
+            slot_index,
+            page_index,
+            destination,
+        )
+    }
+
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.runtime.read().unwrap().reveal_dal_parameters()
     }
 }
 
@@ -174,43 +212,8 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
         self.runtime.write().unwrap().read_input()
     }
 
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.runtime
-            .read()
-            .unwrap()
-            .reveal_preimage(hash, destination)
-    }
-
-    #[cfg(feature = "alloc")]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.runtime.read().unwrap().reveal_dal_page(
-            published_level,
-            slot_index,
-            page_index,
-            destination,
-        )
-    }
-
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.runtime.read().unwrap().reveal_dal_parameters()
-    }
-
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.runtime.write().unwrap().mark_for_reboot()
-    }
-
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.runtime.read().unwrap().reveal_metadata()
     }
 
     fn last_run_aborted(&self) -> Result<bool, RuntimeError> {

@@ -16,6 +16,7 @@ use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
     path::Path,
+    reveal::HostReveal,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
     storage::StorageV1,
 };
@@ -43,6 +44,39 @@ impl HostDebug for EvalHost {
         if let Err(e) = write!(*unboxed_buffer, "{data}") {
             eprint!("Error due to: {e}")
         }
+    }
+}
+
+impl HostReveal for EvalHost {
+    #[inline(always)]
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.reveal_preimage(hash, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.reveal_metadata()
+    }
+
+    #[inline(always)]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.reveal_dal_parameters()
     }
 }
 
@@ -145,40 +179,10 @@ impl SdkRuntime for EvalHost {
     fn read_input(&mut self) -> Result<Option<Message>, RuntimeError> {
         self.host.read_input()
     }
-    #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.reveal_preimage(hash, destination)
-    }
 
     #[inline(always)]
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
     }
 
     #[inline(always)]

@@ -44,6 +44,8 @@
   host's debug messaging capabilities if desired.
 - Split `store_` functions from `Runtime` to new `StorageV1` supertrait. Will allow kernels to restrict scope to just
   WASM-pvm flavour durable storage capabilities if desired.
+- Split `reveal_` functions from `Runtime` to new `HostReveal` supertrait. Will allow kernels to restrict scope to just
+  host's reveal capabilities if desired.
 
 ### Installer client/kernel
 

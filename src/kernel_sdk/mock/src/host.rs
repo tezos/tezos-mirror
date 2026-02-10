@@ -313,6 +313,7 @@ mod tests {
     use tezos_smart_rollup_host::{
         metadata::RollupMetadata,
         path::RefPath,
+        reveal::HostReveal,
         runtime::{Runtime, RuntimeError},
         storage::StorageV1,
     };

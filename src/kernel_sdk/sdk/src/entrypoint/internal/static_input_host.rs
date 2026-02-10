@@ -10,6 +10,7 @@
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
 use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
 
 use crate::core_unsafe::PREIMAGE_HASH_SIZE;
@@ -148,6 +149,39 @@ impl<Host: StorageV1> StorageV1 for StaticInputHost<'_, Host> {
     }
 }
 
+impl<R: HostReveal> HostReveal for StaticInputHost<'_, R> {
+    #[inline(always)]
+    fn reveal_preimage(
+        &self,
+        hash: &[u8; PREIMAGE_HASH_SIZE],
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host.reveal_preimage(hash, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_metadata(&self) -> RollupMetadata {
+        self.host.reveal_metadata()
+    }
+
+    #[inline(always)]
+    fn reveal_dal_page(
+        &self,
+        published_level: i32,
+        slot_index: u8,
+        page_index: i16,
+        destination: &mut [u8],
+    ) -> Result<usize, RuntimeError> {
+        self.host
+            .reveal_dal_page(published_level, slot_index, page_index, destination)
+    }
+
+    #[inline(always)]
+    fn reveal_dal_parameters(&self) -> RollupDalParameters {
+        self.host.reveal_dal_parameters()
+    }
+}
+
 impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
@@ -168,22 +202,8 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     }
 
     #[inline(always)]
-    fn reveal_preimage(
-        &self,
-        hash: &[u8; PREIMAGE_HASH_SIZE],
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host.reveal_preimage(hash, destination)
-    }
-
-    #[inline(always)]
     fn mark_for_reboot(&mut self) -> Result<(), RuntimeError> {
         self.host.mark_for_reboot()
-    }
-
-    #[inline(always)]
-    fn reveal_metadata(&self) -> RollupMetadata {
-        self.host.reveal_metadata()
     }
 
     #[inline(always)]
@@ -209,22 +229,5 @@ impl<R: Runtime> Runtime for StaticInputHost<'_, R> {
     #[inline(always)]
     fn runtime_version(&self) -> Result<String, RuntimeError> {
         self.host.runtime_version()
-    }
-
-    #[inline(always)]
-    fn reveal_dal_page(
-        &self,
-        published_level: i32,
-        slot_index: u8,
-        page_index: i16,
-        destination: &mut [u8],
-    ) -> Result<usize, RuntimeError> {
-        self.host
-            .reveal_dal_page(published_level, slot_index, page_index, destination)
-    }
-
-    #[inline(always)]
-    fn reveal_dal_parameters(&self) -> RollupDalParameters {
-        self.host.reveal_dal_parameters()
     }
 }
