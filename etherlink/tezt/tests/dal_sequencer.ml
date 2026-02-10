@@ -193,7 +193,7 @@ let test_more_than_one_slot_per_l1_level =
   let inbox_counter_p =
     count_blueprint_sent_on_inbox sequencer number_of_blueprints_sent_to_inbox
   in
-  let nb_transac = 5 in
+  let nb_transac = 8 in
   let sends =
     List.init nb_transac (fun i () ->
         build_transaction_with_large_data

@@ -1372,10 +1372,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           let ({
                  feature_enable;
                  incentives_enable;
-                 number_of_slots;
+                 number_of_slots = _;
                  attestation_lag = _;
                  attestation_threshold;
-                 cryptobox_parameters;
+                 cryptobox_parameters =
+                   {redundancy_factor; page_size; slot_size; number_of_shards};
                  minimal_participation_ratio;
                  rewards_ratio;
                  traps_fraction;
@@ -1387,11 +1388,17 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.feature_enable;
             incentives_enable;
             dynamic_lag_enable = false;
-            number_of_slots;
+            number_of_slots = 160;
             attestation_lag = 5;
             attestation_lags = [5];
             attestation_threshold;
-            cryptobox_parameters;
+            cryptobox_parameters =
+              {
+                redundancy_factor;
+                page_size;
+                slot_size = 3 * slot_size;
+                number_of_shards;
+              };
             minimal_participation_ratio;
             rewards_ratio;
             traps_fraction;

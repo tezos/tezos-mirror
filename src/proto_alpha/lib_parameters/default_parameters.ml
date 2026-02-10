@@ -144,7 +144,7 @@ let make_sc_rollup_parameter ~dal_activation_level
 let default_cryptobox_parameters =
   {
     Dal.Parameters.page_size = 3967;
-    slot_size = 126_944;
+    slot_size = 380_832;
     redundancy_factor = 8;
     number_of_shards = 512;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
@@ -158,7 +158,7 @@ let default_dal =
       feature_enable = true;
       incentives_enable = true;
       dynamic_lag_enable = false;
-      number_of_slots = 32;
+      number_of_slots = 160;
       attestation_lag = 5;
       attestation_lags = [5];
       attestation_threshold = 66;

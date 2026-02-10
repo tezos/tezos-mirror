@@ -681,9 +681,9 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
    writing tests. *)
 let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?additional_bootstrap_accounts ?attestation_lag
-    ?number_of_shards ?number_of_slots ?custom_constants ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable ?traps_fraction
-    ?dal_rewards_weight ?event_sections_levels ?node_arguments
+    ?number_of_shards ?number_of_slots ?slot_size ?custom_constants
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?traps_fraction ?dal_rewards_weight ?event_sections_levels ?node_arguments
     ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
     ?delay_increment_per_round ?blocks_per_cycle ?blocks_per_commitment variant
     scenario =
@@ -708,6 +708,7 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
         ?attestation_lag
         ?number_of_shards
         ?number_of_slots
+        ?slot_size
         ?incentives_enable
         ?traps_fraction
         ?dal_rewards_weight
@@ -5830,7 +5831,6 @@ module Skip_list_rpcs = struct
       number_of_slots
       slot_size ;
     let* starting_level = Client.level client in
-
     let rec publish ~max_level level commitments =
       (* Try to publish a slot at each level *)
       if level > max_level then return commitments
@@ -5875,12 +5875,16 @@ module Skip_list_rpcs = struct
     let* new_proto_params =
       Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
     in
-    let new_lag =
-      JSON.(
-        new_proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    let new_dal_params =
+      (* TODO: We use S023, since we do not parse the attestation_lags field. *)
+      Dal.Parameters.from_protocol_parameters S023 new_proto_params
     in
+    let new_lag = new_dal_params.attestation_lag in
     if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
+    let new_number_of_slots = new_dal_params.number_of_slots in
+    if new_number_of_slots <> number_of_slots then
+      Log.info "new number_of_slots = %d" new_number_of_slots ;
     let last_attested_level = last_confirmed_published_level + new_lag in
     (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
@@ -5906,7 +5910,6 @@ module Skip_list_rpcs = struct
 
     (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
-    let max_level = last_attested_level + 2 in
     let* () =
       let* current_level = Node.get_level node in
       let count = max_level - current_level in
@@ -5965,21 +5968,38 @@ module Skip_list_rpcs = struct
           match check_level with
           | None -> ()
           | Some level ->
+              let expected_published_level =
+                if level = 1 then (* the "level" of genesis *) 0
+                else if level > migration_level then level - new_lag
+                else level - lag
+              in
+              let current_number_of_slots =
+                if expected_published_level > migration_level then
+                  new_number_of_slots
+                else number_of_slots
+              in
               let expected_slot_index =
                 if level = 1 then
                   (* the "slot index" of genesis *)
                   0
-                else number_of_slots - 1
+                else current_number_of_slots - 1
+              in
+              let error_msg =
+                Format.sprintf "For level %d, " level
+                ^ "Unexpected slot index: got %L, expected %R"
               in
               Check.(
-                (cell_slot_index = expected_slot_index)
-                  int
-                  ~__LOC__
-                  ~error_msg:"Unexpected slot index: got %L, expected %R")
+                (cell_slot_index = expected_slot_index) int ~__LOC__ ~error_msg)
         in
         (if cell_index > 0 then
+           let accumulated_nb_of_slots =
+             if cell_level > migration_level then
+               (migration_level * number_of_slots)
+               + ((cell_level - migration_level - 1) * new_number_of_slots)
+             else (cell_level - 1) * number_of_slots
+           in
            let expected_cell_index =
-             ((cell_level - 1) * number_of_slots) + cell_slot_index
+             accumulated_nb_of_slots + cell_slot_index
            in
            Check.(
              (cell_index = expected_cell_index)
@@ -6252,13 +6272,6 @@ module Skip_list_rpcs = struct
       ~tags
       ~description
       ~operator_profiles:[slot_index] (* use the same parameters as Alpha *)
-      ~consensus_committee_size:512
-      ~attestation_lag:8
-      ~number_of_slots:32
-      ~number_of_shards:512
-      ~slot_size:126944
-      ~redundancy_factor:8
-      ~page_size:3967
       ()
 end
 
@@ -7382,7 +7395,13 @@ module Garbage_collection = struct
     (* Create & configure observer if needed *)
     let* observer_opt =
       if include_observer then
-        let observer = Dal_node.create ~name:"observer" ~node () in
+        (* We disable the amplification for this observer, since it is not the
+           purpose of the current test to test amplification, and if
+           amplification is triggered, it makes the DAL node very late compared
+           to the L1 node, making the test flaky. *)
+        let observer =
+          Dal_node.create ~disable_amplification:true ~name:"observer" ~node ()
+        in
         let* () =
           Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
         in
@@ -7579,8 +7598,6 @@ module Garbage_collection = struct
         attester
     in
 
-    (* We split the [bake_for] in two just in the hope this allows for the slot
-       to be attested (that is, to reduce flakiness). *)
     let wait_block_p =
       List.map
         (fun dal_node ->
@@ -7589,8 +7606,13 @@ module Garbage_collection = struct
             (published_level + dal_parameters.attestation_lag))
         [attester; dal_bootstrap; slot_producer]
     in
-    let* () = bake_for ~count:(dal_parameters.attestation_lag - 2) client in
-    let* () = bake_for ~count:3 client in
+    (* For the slot to be attested (that is, to reduce flakiness), we wait
+       between levels, giving the time for the attester DAL nodes to attest. *)
+    let* () =
+      repeat (dal_parameters.attestation_lag + 1) (fun () ->
+          let* () = bake_for client in
+          Lwt_unix.sleep 1.)
+    in
     let* () = Lwt.join wait_block_p in
     Log.info "Checking that the slot was attested" ;
     let* () =
@@ -8965,7 +8987,7 @@ let rollup_batches_and_publishes_optimal_dal_slots _protocol parameters dal_node
     in
     let* () = bake_for client in
     let* level = Client.level client in
-    let* _level = Sc_rollup_node.wait_for_level ~timeout:10. sc_node level in
+    let* _level = Sc_rollup_node.wait_for_level ~timeout:15. sc_node level in
     wait_inject_dal_slot_from_messages_first_level
   in
 
@@ -12273,6 +12295,7 @@ let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
     ~additional_bootstrap_accounts:1
+    ~slot_size:190_416
     "dal basic logic"
     test_slot_management_logic
     protocols ;
