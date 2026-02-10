@@ -417,6 +417,7 @@ module CLST_contract = struct
         execute_transfer (ctxt, step_constants) transfer storage
     | Approve approvals ->
         execute_approve (ctxt, step_constants) approvals storage
+    | Update_operators _ -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
