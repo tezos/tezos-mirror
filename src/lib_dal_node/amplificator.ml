@@ -355,7 +355,7 @@ let query_sender_job {query_pipe; process; _} =
                 process_input
                 Data_encoding.(Binary.to_bytes_exn int31 query_stop_tag))
         in
-        loop ()
+        return_unit
   in
   Lwt.catch loop (function exn ->
       (* Unknown exception *)
@@ -576,8 +576,21 @@ let start_amplificator node_ctxt =
 
 let restart amplificator =
   let open Lwt_result_syntax in
-  let () = stop_jobs amplificator in
+  (* Enqueue a stop message in the query pipe. The query_sender_job will
+     forward it to the child process and then exit (return Ok ()). *)
   let () = stop_process amplificator in
+  (* Wait for the query_sender_job to finish, ensuring the stop signal has
+     been delivered to the child process before we tear anything down. *)
+  let* () =
+    match amplificator.query_sender_job with
+    | Some job -> job
+    | None -> return_unit
+  in
+  (* Cancel the reply_receiver_job which is waiting on the old process output
+     stream. The child process is stopping so no more replies will come. *)
+  Option.iter Lwt.cancel amplificator.reply_receiver_job ;
+  amplificator.query_sender_job <- None ;
+  amplificator.reply_receiver_job <- None ;
   let () = reset_query_state amplificator in
   let* process = start_process amplificator.node_ctxt in
   amplificator.process <- process ;
