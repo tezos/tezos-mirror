@@ -146,16 +146,17 @@ xrefscheck:
 
 .PHONY: installcheck
 installcheck:
-	scripts/test_install_scripts.sh install-bin-noble
-	scripts/test_install_scripts.sh install-bin-jammy
+	scripts/test_install_scripts.sh install-bin-24.04
+	scripts/test_install_scripts.sh install-bin-22.04
 	scripts/test_install_scripts.sh install-bin-bookworm
 	scripts/test_install_scripts.sh install-bin-trixie
-	scripts/test_install_scripts.sh install-bin-rc-jammy
-	scripts/test_install_scripts.sh install-bin-rc-noble
+	scripts/test_install_scripts.sh install-bin-rc-24.04
+	scripts/test_install_scripts.sh install-bin-rc-22.04
 	scripts/test_install_scripts.sh install-bin-rc-bookworm
 	scripts/test_install_scripts.sh install-bin-rc-trixie
 	scripts/test_install_scripts.sh install-opam-scratch
-	scripts/test_install_scripts.sh install-opam-jammy
+	scripts/test_install_scripts.sh install-opam-24.04
+	scripts/test_install_scripts.sh install-opam-22.04
 	scripts/test_install_scripts.sh compile-release-sources-bullseye
 	scripts/test_install_scripts.sh compile-sources-bullseye
 	scripts/test_install_scripts.sh compile-sources-mantic

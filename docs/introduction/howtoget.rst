@@ -110,8 +110,10 @@ We support the following distribution/releases:
 
 - ``debian/trixie``
 - ``debian/bookworm``
-- ``ubuntu/noble``
-- ``ubuntu/jammy``
+- ``ubuntu/noble`` (Up to Octez version 24 included)
+- ``ubuntu/jammy`` (Up to Octez version 24 included)
+- ``ubuntu/22.04`` (Starting from Octez version 25)
+- ``ubuntu/24.04`` (Starting from Octez version 25)
 
 both on ``amd64`` and ``arm64`` architectures.
 
