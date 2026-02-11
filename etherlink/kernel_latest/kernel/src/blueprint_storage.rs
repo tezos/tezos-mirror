@@ -54,16 +54,16 @@ const EVM_CURRENT_BLOCK_HEADER: RefPath =
 /// which can be chunked, and blueprints constructed from
 /// inbox messages. Note that the latter are only to be
 /// used when the kernel isn't running with a sequencer.
-#[derive(PartialEq, Debug, Clone)]
-enum StoreBlueprint<Tx> {
+#[derive(PartialEq, Debug)]
+enum StoreBlueprint {
     SequencerChunk(Vec<u8>),
-    InboxBlueprint(Blueprint<Tx>),
+    InboxBlueprint(Blueprint<TezosXTransaction>),
 }
 
 const SEQUENCER_CHUNK_TAG: u8 = 0;
 const INBOX_BLUEPRINT_TAG: u8 = 1;
 
-impl<Tx: Encodable> Encodable for StoreBlueprint<Tx> {
+impl Encodable for StoreBlueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
         match &self {
@@ -79,7 +79,7 @@ impl<Tx: Encodable> Encodable for StoreBlueprint<Tx> {
     }
 }
 
-impl<Tx: Decodable> Decodable for StoreBlueprint<Tx> {
+impl Decodable for StoreBlueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -308,10 +308,7 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     store_blueprint_generation(host, &blueprint_path, current_generation)?;
     let blueprint_chunk_path =
         blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
-    // The `Transactions` type parameter of `StoreBlueprint` is not
-    // used in the `SequencerChunk` case so it is irrelevant here, we could pass
-    // any type implementing the `Encodable` trait.
-    let store_blueprint = StoreBlueprint::<Vec<u8>>::SequencerChunk(blueprint.chunk);
+    let store_blueprint = StoreBlueprint::SequencerChunk(blueprint.chunk);
     store_rlp(&store_blueprint, host, &blueprint_chunk_path).map_err(Error::from)
 }
 
@@ -349,9 +346,9 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Er
 }
 
 // Used to store a blueprint made out of forced delayed transactions.
-pub fn store_forced_blueprint<Host: Runtime, Tx: Encodable>(
+pub fn store_forced_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<Tx>,
+    blueprint: Blueprint<TezosXTransaction>,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
