@@ -1160,6 +1160,29 @@ let register_delegate_and_bake
   let* b = Block.bake b ~operation:register_tx in
   return (b, parameters)
 
+let update_delegate_and_bake
+    ?(edge_of_clst_staking_over_baking_millionth = 50_000l)
+    ?(ratio_of_clst_staking_over_direct_staking_billionth = 200_000_000l) b
+    delegate =
+  let open Lwt_result_wrap_syntax in
+  let*?@ parameters =
+    Clst_delegates_parameters_repr.make
+      ~edge_of_clst_staking_over_baking_millionth
+      ~ratio_of_clst_staking_over_direct_staking_billionth
+  in
+  let* register_tx =
+    Op.clst_update_delegate_parameters
+      (Context.B b)
+      delegate
+      ~edge_of_clst_staking_over_baking_millionth:
+        (Z.of_int32 parameters.edge_of_clst_staking_over_baking_millionth)
+      ~ratio_of_clst_staking_over_direct_staking_billionth:
+        (Z.of_int32
+           parameters.ratio_of_clst_staking_over_direct_staking_billionth)
+  in
+  let* b = Block.bake b ~operation:register_tx in
+  return (b, parameters)
+
 let check_pending_parameters_and_return_next_activation_cycle ~loc b
     delegate_pkh expected_parameters_list =
   let open Lwt_result_syntax in
@@ -1291,3 +1314,102 @@ let () =
   | Ok _ ->
       Test.fail ~__LOC__ "A non delegate account shouldn't be able to register"
   | Error e -> Error_helpers.expect_clst_contract_is_not_delegate ~loc:__LOC__ e
+
+let () =
+  register_test ~title:"Test baker parameters update" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh =
+    match delegate with
+    | Contract.Implicit pkh -> pkh
+    | Contract.Originated _ -> assert false
+  in
+  let* b, parameters = register_delegate_and_bake b delegate in
+
+  (* Check that the pending parameters are the only parameters registered, and
+     bake until the cycle where these parameters will be activated. *)
+  let* first_params_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [parameters]
+  in
+  let first_params_activation_cycle_minus_one =
+    Option.value_f
+      ~default:(fun _ -> assert false)
+      (Option.bind first_params_activation_cycle Cycle.pred)
+  in
+  let* b = Block.bake_until_cycle first_params_activation_cycle_minus_one b in
+
+  (* Now let's register with new parameters, before the previous one are activated *)
+  let* b, next_parameters =
+    update_delegate_and_bake
+      ~edge_of_clst_staking_over_baking_millionth:0l
+      b
+      delegate
+  in
+  let* first_params_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [parameters; next_parameters]
+  in
+  let first_params_activation_cycle =
+    Option.value_f
+      ~default:(fun _ -> assert false)
+      first_params_activation_cycle
+  in
+  let* b = Block.bake_until_cycle first_params_activation_cycle b in
+
+  (* Now, check that the parameters have been activated. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  let* () =
+    match active_parameters with
+    | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
+    | Some active_parameters ->
+        check_expected_parameters ~loc:__LOC__ parameters active_parameters
+  in
+
+  (* Check the new parameters are still pending. *)
+  let* next_params_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [next_parameters]
+  in
+  let next_params_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) next_params_activation_cycle
+  in
+  let* b = Block.bake_until_cycle next_params_activation_cycle b in
+
+  (* Finally, check that the second parameters have been activated. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  match active_parameters with
+  | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
+  | Some active_parameters ->
+      check_expected_parameters ~loc:__LOC__ next_parameters active_parameters
