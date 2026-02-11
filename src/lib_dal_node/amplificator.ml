@@ -42,8 +42,8 @@ type t = {
          received from the network. The duration of the delay is picked at
          random between [amplification_random_delay_min] and
          [amplification_random_delay_max]. *)
-  mutable query_sender_job : unit tzresult Lwt.t;
-  mutable reply_receiver_job : unit tzresult Lwt.t;
+  mutable query_sender_job : unit tzresult Lwt.t option;
+  mutable reply_receiver_job : unit tzresult Lwt.t option;
 }
 
 type error +=
@@ -527,13 +527,14 @@ let start_jobs amplificator =
         Lwt_result_syntax.fail
           (Amplification_reply_receiver_job "Error in reply receiver job" :: e)
   in
-  amplificator.query_sender_job <- amplificator_query_sender_job ;
-  amplificator.reply_receiver_job <- amplificator_reply_receiver_job
+  amplificator.query_sender_job <- Some amplificator_query_sender_job ;
+  amplificator.reply_receiver_job <- Some amplificator_reply_receiver_job
 
 let stop_jobs amplificator =
-  let () = Lwt.cancel amplificator.query_sender_job in
-  let () = Lwt.cancel amplificator.reply_receiver_job in
-  ()
+  Option.iter Lwt.cancel amplificator.query_sender_job ;
+  Option.iter Lwt.cancel amplificator.reply_receiver_job ;
+  amplificator.query_sender_job <- None ;
+  amplificator.reply_receiver_job <- None
 
 let stop_process amplificator =
   let query_id = amplificator.query_id in
@@ -556,7 +557,6 @@ let start_amplificator node_ctxt =
   let query_store = Query_store.create 23 in
   let queue_length = Query_store.length query_store in
   let () = Dal_metrics.update_amplification_queue_length queue_length in
-  let dummy_job = Lwt.return (Ok ()) in
   let amplificator : t =
     {
       node_ctxt;
@@ -566,8 +566,8 @@ let start_amplificator node_ctxt =
       query_id = 0;
       amplification_random_delay_min;
       amplification_random_delay_max;
-      query_sender_job = dummy_job;
-      reply_receiver_job = dummy_job;
+      query_sender_job = None;
+      reply_receiver_job = None;
     }
   in
   let*! () = write_welcome_handshake amplificator in
@@ -590,8 +590,7 @@ let make node_ctxt =
   let* amplificator = start_amplificator node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_code ->
-        let () = Lwt.cancel amplificator.query_sender_job in
-        let () = Lwt.cancel amplificator.reply_receiver_job in
+        stop_jobs amplificator ;
         Lwt.return_unit)
   in
   return amplificator
