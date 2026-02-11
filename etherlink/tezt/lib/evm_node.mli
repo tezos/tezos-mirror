@@ -111,6 +111,53 @@ type history_mode =
   | Rolling of int  (** Rolling with retention period in days. *)
   | Full of int  (** Full with retention period in days. *)
 
+(** Node configuration shared across modes.
+    Groups mode-agnostic parameters to simplify function signatures. *)
+type node_setup = {
+  path : string;
+  name : string;
+  runner : Runner.t option;
+  history_mode : history_mode option;
+  data_dir : string option;
+  config_file : string option;
+  rpc_addr : string option;
+  rpc_port : int;
+  restricted_rpcs : string option;
+  spawn_rpc : int option;
+  websockets : bool;
+  initial_kernel : string option;
+  preimages_dir : string option;
+  private_rpc_port : int option;
+  tx_queue_max_lifespan : int option;
+  tx_queue_max_size : int option;
+  tx_queue_tx_per_addr_limit : int option;
+}
+
+(** [make_setup ()] creates a [node_setup] with meaningful defaults:
+    path is set to the octez-evm-node binary, name is freshly generated,
+    data_dir is set to [Temp.dir name], rpc_port is allocated, and websockets
+    is set to false. All parameters can be overridden via optional arguments. *)
+val make_setup :
+  ?path:string ->
+  ?name:string ->
+  ?runner:Runner.t ->
+  ?history_mode:history_mode ->
+  ?data_dir:string ->
+  ?config_file:string ->
+  ?rpc_addr:string ->
+  ?rpc_port:int ->
+  ?restricted_rpcs:string ->
+  ?spawn_rpc:int ->
+  ?websockets:bool ->
+  ?initial_kernel:string ->
+  ?preimages_dir:string ->
+  ?private_rpc_port:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  unit ->
+  node_setup
+
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
 
@@ -130,10 +177,7 @@ val config_file : t -> string option
     kernel run by the node. *)
 val preimages_dir : t -> string
 
-(** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
-    ?spawn_rpc ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    rollup_node_endpoint] creates an EVM node server.
+(** [create ~mode ?node_setup ()] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
@@ -141,38 +185,9 @@ val preimages_dir : t -> string
 
     If [websockets] is true, activates the websocket server.
 
-    The server communicates with a rollup-node and sets its endpoint via
-    [rollup_node_endpoint].
-
-    [mode] defaults to [Proxy].
-
-    Common stateful mode configuration:
-    - [initial_kernel]: Path to the initial kernel
-    - [preimages_dir]: Path to preimages directory
-    - [private_rpc_port]: Port for private RPC server
-    - [tx_queue_*]: Transaction queue configuration
-*)
-val create :
-  ?path:string ->
-  ?name:string ->
-  ?runner:Runner.t ->
-  ?history:history_mode ->
-  ?data_dir:string ->
-  ?config_file:string ->
-  ?rpc_addr:string ->
-  ?rpc_port:int ->
-  ?restricted_rpcs:string ->
-  ?spawn_rpc:int ->
-  ?websockets:bool ->
-  ?initial_kernel:string ->
-  ?preimages_dir:string ->
-  ?private_rpc_port:int ->
-  ?tx_queue_max_lifespan:int ->
-  ?tx_queue_max_size:int ->
-  ?tx_queue_tx_per_addr_limit:int ->
-  mode:mode ->
-  unit ->
-  t
+    Common configuration is provided via [node_setup]. Use {!make_setup}
+    with optional arguments to construct it. *)
+val create : ?node_setup:node_setup -> mode:mode -> unit -> t
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
     EVM state. Fails if [node] is a proxy node. *)
@@ -360,32 +375,15 @@ val patch_config_websockets_if_enabled :
 (** Edit garbage collector parameters in the configuration file. *)
 val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
-(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    rollup_node_endpoint] creates an EVM node server with {!create},
+(** [init ?patch_config ~mode ?node_setup ?end_test_on_failure
+    ?extra_arguments ()] creates an EVM node server with {!create},
     init the config with {!spawn_init_config}, patch it with [patch_config],
     then runs it with {!run}. *)
 val init :
   ?patch_config:(JSON.t -> JSON.t) ->
-  ?name:string ->
-  ?runner:Runner.t ->
+  ?node_setup:node_setup ->
   mode:mode ->
   ?end_test_on_failure:bool ->
-  ?data_dir:string ->
-  ?config_file:string ->
-  ?rpc_addr:string ->
-  ?rpc_port:int ->
-  ?restricted_rpcs:string ->
-  ?history_mode:history_mode ->
-  ?spawn_rpc:int ->
-  ?websockets:bool ->
-  ?initial_kernel:string ->
-  ?preimages_dir:string ->
-  ?private_rpc_port:int ->
-  ?tx_queue_max_lifespan:int ->
-  ?tx_queue_max_size:int ->
-  ?tx_queue_tx_per_addr_limit:int ->
   ?extra_arguments:string list ->
   unit ->
   t Lwt.t

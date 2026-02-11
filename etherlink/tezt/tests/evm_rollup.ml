@@ -439,7 +439,11 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     | Setup_proxy ->
         let mode = Evm_node.Proxy (Sc_rollup_node.endpoint sc_rollup_node) in
         let* evm_node =
-          Evm_node.init ~patch_config ~mode ?restricted_rpcs ?websockets ()
+          Evm_node.init
+            ~patch_config
+            ~node_setup:(Evm_node.make_setup ?restricted_rpcs ?websockets ())
+            ~mode
+            ()
         in
         return
           ( (fun () ->
@@ -454,7 +458,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
           max_blueprints_ahead;
           genesis_timestamp;
         } ->
-        let private_rpc_port = Port.fresh () in
         let sequencer_config : Evm_node.sequencer_config =
           {
             time_between_blocks;
@@ -480,15 +483,17 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         let* sequencer =
           Evm_node.init
             ~patch_config
+            ~node_setup:
+              (Evm_node.make_setup
+                 ?restricted_rpcs
+                 ?websockets
+                 ~initial_kernel:output
+                 ~preimages_dir
+                 ?tx_queue_max_lifespan
+                 ?tx_queue_max_size
+                 ?tx_queue_tx_per_addr_limit
+                 ())
             ~mode:sequencer_mode
-            ?restricted_rpcs
-            ?websockets
-            ~initial_kernel:output
-            ~preimages_dir
-            ~private_rpc_port
-            ?tx_queue_max_lifespan
-            ?tx_queue_max_size
-            ?tx_queue_tx_per_addr_limit
             ()
         in
         let produce_block () = Rpc.produce_block sequencer in
@@ -496,7 +501,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         else
           let evm_node =
             Evm_node.create
-              ~data_dir:(Evm_node.data_dir sequencer)
+              ~node_setup:
+                (Evm_node.make_setup ~data_dir:(Evm_node.data_dir sequencer) ())
               ~mode:(Rpc Evm_node.(mode sequencer))
               ()
           in

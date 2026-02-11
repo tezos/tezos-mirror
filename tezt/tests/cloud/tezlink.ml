@@ -821,7 +821,6 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
       ~rpc_port
-      ()
       cloud
       agent
   in

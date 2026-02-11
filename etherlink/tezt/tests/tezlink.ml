@@ -1954,11 +1954,13 @@ let test_tezlink_sandbox () =
 
   let* sequencer =
     Evm_node.init
+      ~node_setup:
+        (Evm_node.make_setup
+           ~spawn_rpc:(Port.fresh ())
+           ~initial_kernel:output
+           ~preimages_dir
+           ())
       ~mode:sequencer_mode
-      ~spawn_rpc:(Port.fresh ())
-      ~initial_kernel:output
-      ~preimages_dir
-      ~private_rpc_port:(Port.fresh ())
       ()
   in
 

@@ -104,6 +104,26 @@ type mode =
   | Proxy of string
   | Rpc of mode
 
+type node_setup = {
+  path : string;
+  name : string;
+  runner : Runner.t option;
+  history_mode : history_mode option;
+  data_dir : string option;
+  config_file : string option;
+  rpc_addr : string option;
+  rpc_port : int;
+  restricted_rpcs : string option;
+  spawn_rpc : int option;
+  websockets : bool;
+  initial_kernel : string option;
+  preimages_dir : string option;
+  private_rpc_port : int option;
+  tx_queue_max_lifespan : int option;
+  tx_queue_max_size : int option;
+  tx_queue_tx_per_addr_limit : int option;
+}
+
 module Per_level_map = Map.Make (Int)
 
 let daemon_default_colors =
@@ -726,30 +746,55 @@ let wait_for_single_tx_execution_done ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"single_tx_execution_done.v0"
   @@ fun json -> Some (JSON.as_string json)
 
-let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner ?history
-    ?data_dir ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?spawn_rpc
-    ?(websockets = false) ?initial_kernel ?preimages_dir ?private_rpc_port
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ~mode
-    () =
+let make_setup ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
+    ?history_mode ?data_dir ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs
+    ?spawn_rpc ?(websockets = false) ?initial_kernel ?preimages_dir
+    ?(private_rpc_port = Port.fresh ()) ?tx_queue_max_lifespan
+    ?tx_queue_max_size ?tx_queue_tx_per_addr_limit () =
+  let rpc_port = Option.value ~default:(Port.fresh ()) rpc_port in
+  let name = Option.value ~default:(fresh_name ()) name in
+  {
+    path;
+    name;
+    runner;
+    history_mode;
+    data_dir;
+    config_file;
+    rpc_addr;
+    rpc_port;
+    restricted_rpcs;
+    spawn_rpc;
+    websockets;
+    initial_kernel;
+    preimages_dir;
+    private_rpc_port = Some private_rpc_port;
+    tx_queue_max_lifespan;
+    tx_queue_max_size;
+    tx_queue_tx_per_addr_limit;
+  }
+
+let create ?(node_setup = make_setup ()) ~mode () =
   let arguments, rpc_addr, rpc_port =
-    connection_arguments ?rpc_addr ?rpc_port ?runner ()
+    connection_arguments
+      ?rpc_addr:node_setup.rpc_addr
+      ~rpc_port:node_setup.rpc_port
+      ?runner:node_setup.runner
+      ()
   in
-  let new_name () =
+  let mode_prefix =
     match mode with
-    | Proxy _ -> "proxy_" ^ fresh_name ()
-    | Sequencer _ -> "sequencer_" ^ fresh_name ()
-    | Sandbox _ -> "sandbox_" ^ fresh_name ()
-    | Tezlink_sandbox _ -> "tezlink_sandbox_" ^ fresh_name ()
-    | Observer _ -> "observer_" ^ fresh_name ()
-    | Rpc _ -> "rpc_" ^ fresh_name ()
+    | Proxy _ -> "proxy_"
+    | Sequencer _ -> "sequencer_"
+    | Sandbox _ -> "sandbox_"
+    | Tezlink_sandbox _ -> "tezlink_sandbox_"
+    | Observer _ -> "observer_"
+    | Rpc _ -> "rpc_"
   in
-  let name = Option.value ~default:(new_name ()) name in
-  let data_dir =
-    match data_dir with None -> Temp.dir name | Some dir -> dir
-  in
+  let name = mode_prefix ^ node_setup.name in
+  let data_dir = Option.value ~default:(Temp.dir name) node_setup.data_dir in
   let evm_node =
     create
-      ~path
+      ~path:node_setup.path
       ~name
       {
         arguments;
@@ -761,21 +806,21 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner ?history
         last_finalized_level = 0;
         pending_blueprint_finalized = Per_level_map.empty;
         mode;
-        history;
+        history = node_setup.history_mode;
         data_dir;
-        config_file;
+        config_file = node_setup.config_file;
         rpc_addr;
         rpc_port;
-        websockets;
-        restricted_rpcs;
-        runner;
-        spawn_rpc;
-        initial_kernel;
-        preimages_dir;
-        private_rpc_port;
-        tx_queue_max_lifespan;
-        tx_queue_max_size;
-        tx_queue_tx_per_addr_limit;
+        websockets = node_setup.websockets;
+        restricted_rpcs = node_setup.restricted_rpcs;
+        runner = node_setup.runner;
+        spawn_rpc = node_setup.spawn_rpc;
+        initial_kernel = node_setup.initial_kernel;
+        preimages_dir = node_setup.preimages_dir;
+        private_rpc_port = node_setup.private_rpc_port;
+        tx_queue_max_lifespan = node_setup.tx_queue_max_lifespan;
+        tx_queue_max_size = node_setup.tx_queue_max_size;
+        tx_queue_tx_per_addr_limit = node_setup.tx_queue_tx_per_addr_limit;
       }
   in
   evm_node
@@ -935,7 +980,34 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
+(** [update_or_create_json ~origin key f json] is equivalent to
+    [JSON.update key f json] but [json] can be [Null] in which case an
+    object is created *)
+let update_or_create_json ~origin key f json =
+  JSON.update
+    key
+    (fun json ->
+      let json =
+        if JSON.is_null json then JSON.annotate ~origin (`O []) else json
+      in
+      f json)
+    json
+
 module Config_file = struct
+  let json_put ~name value_json json =
+    JSON.put
+      (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
+      json
+
+  let conditional_json_put ~name cond value_json json =
+    if cond then json_put ~name value_json json else json
+
+  let conditional_json_put_default ~name cond value_json ~default json =
+    json_put ~name (if cond then value_json else default) json
+
+  let optional_json_put ~name v f json =
+    match v with None -> json | Some v -> json_put ~name (f v) json
+
   let filename evm_node =
     match evm_node.persistent_state.config_file with
     | Some config_file -> config_file
@@ -967,6 +1039,18 @@ module Config_file = struct
     let* config = read node in
     let config = update config in
     write node config
+
+  let json_update_experimental_feature f config =
+    update_or_create_json
+      ~origin:"config_update"
+      "experimental_features"
+      f
+      config
+
+  let update_experimental_feature evm_node
+      (experimental_config_update : JSON.t -> JSON.t) =
+    update evm_node
+    @@ json_update_experimental_feature experimental_config_update
 end
 
 let spawn_init_config_minimal ?data_dir ?config_file
@@ -1127,46 +1211,13 @@ let endpoint = rpc_endpoint ?local:None
 
 type rpc_server = Resto | Dream
 
-let conditional_json_put ~name cond value_json json =
-  if cond then
-    JSON.put
-      (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
-      json
-  else json
-
-let conditional_json_put_default ~name cond value_json ~default json =
-  JSON.put
-    ( name,
-      JSON.annotate ~origin:"evm_node.config_patch"
-      @@ if cond then value_json else default )
-    json
-
-let optional_json_put ~name v f json =
-  match v with
-  | None -> json
-  | Some v ->
-      let value_json = f v in
-      JSON.put
-        (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
-        json
-
-(** [update_or_create_json ~origin key f json] is equivalent to
-    [JSON.update key f json] but [json] can be [Null] in which case an
-    object is created *)
-let update_or_create_json ~origin key f json =
-  JSON.update
-    key
-    (fun json ->
-      let json = if JSON.is_null json then JSON.parse ~origin "{}" else json in
-      f json)
-    json
-
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
     ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains
     ?preconfirmation_stream_enabled () =
-  JSON.update "experimental_features" @@ fun json ->
+  let open Config_file in
+  json_update_experimental_feature @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
     ~name:"drop_duplicate_on_injection"
@@ -1209,6 +1260,7 @@ let patch_config_websockets_if_enabled ?max_message_length
   JSON.update "websockets" @@ fun json ->
   if JSON.is_null json then json
   else
+    let open Config_file in
     optional_json_put
       max_message_length
       ~name:"max_message_length"
@@ -1225,53 +1277,29 @@ let patch_config_websockets_if_enabled ?max_message_length
 
 let patch_config_gc ?history_mode json =
   json
-  |> optional_json_put ~name:"history" history_mode (function
+  |> Config_file.optional_json_put ~name:"history" history_mode (function
        | Archive -> `String "archive"
        | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
        | Full retention -> `String (Format.sprintf "full:%d" retention))
 
-let init ?patch_config ?name ?runner ~mode ?end_test_on_failure ?data_dir
-    ?config_file ?rpc_addr ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc
-    ?websockets ?initial_kernel ?preimages_dir ?private_rpc_port
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ?extra_arguments () =
-  let evm_node =
-    create
-      ?name
-      ?runner
-      ~mode
-      ?history:history_mode
-      ?data_dir
-      ?config_file
-      ?rpc_addr
-      ?rpc_port
-      ?restricted_rpcs
-      ?spawn_rpc
-      ?websockets
-      ?initial_kernel
-      ?preimages_dir
-      ?private_rpc_port
-      ?tx_queue_max_lifespan
-      ?tx_queue_max_size
-      ?tx_queue_tx_per_addr_limit
-      ()
-  in
+let init ?patch_config ?node_setup ~mode ?end_test_on_failure ?extra_arguments
+    () =
+  let evm_node = create ?node_setup ~mode () in
   let* () = Process.check @@ spawn_init_config evm_node in
   let* () =
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
   in
-
   let* () =
-    if Option.is_some spawn_rpc then
-      Config_file.update evm_node
-      @@ update_or_create_json
-           ~origin:"init"
-           "experimental_features"
-           (optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
-                `O [("protected_port", `Float (float_of_int port))]))
-    else return ()
+    match evm_node.persistent_state.spawn_rpc with
+    | Some port ->
+        Config_file.(
+          update_experimental_feature evm_node
+          @@ json_put
+               ~name:"spawn_rpc"
+               (`O [("protected_port", `Float (float_of_int port))]))
+    | None -> return ()
   in
   let* () = run ?extra_arguments ?end_test_on_failure evm_node in
   return evm_node

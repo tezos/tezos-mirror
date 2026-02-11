@@ -134,7 +134,10 @@ let setup_evm_infra ~config ~operator ?runner ?preexisting_rollup
   let* current_level = Node.get_level node in
   let* _ = Sc_rollup_node.wait_for_level rollup_node current_level in
   let* evm_node =
-    Evm_node.init ~mode:(Proxy (Sc_rollup_node.endpoint rollup_node)) ?runner ()
+    Evm_node.init
+      ~node_setup:(Evm_node.make_setup ?runner ())
+      ~mode:(Proxy (Sc_rollup_node.endpoint rollup_node))
+      ()
   in
   Log.info "Node API is available at %s." (Evm_node.endpoint evm_node) ;
   return (rollup_address, rollup_node, evm_node)

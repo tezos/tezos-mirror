@@ -160,8 +160,11 @@ let prepare_and_run_sequencer rollup_node =
   (* Create an evm node and patch the sequencer key. *)
   let sequencer =
     Evm_node.create
-      ~preimages_dir:(Sc_rollup_node.data_dir rollup_node ^ "/wasm_2_0_0")
-      ~private_rpc_port:8546
+      ~node_setup:
+        (Evm_node.make_setup
+           ~preimages_dir:(Sc_rollup_node.data_dir rollup_node ^ "/wasm_2_0_0")
+           ~private_rpc_port:8546
+           ())
       ~mode:
         (Evm_node.Sequencer
            {

@@ -623,18 +623,18 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
             sequencer_keys;
       }
   in
-  Evm_node.init
-    ?history_mode
-    ?patch_config
-    ?websockets
-    ~mode:sequencer_mode
-    ~initial_kernel:output
-    ~preimages_dir
-    ~private_rpc_port:(Port.fresh ())
-    ?tx_queue_max_lifespan
-    ?tx_queue_max_size
-    ?tx_queue_tx_per_addr_limit
-    ()
+  let node_setup =
+    Evm_node.make_setup
+      ?history_mode
+      ?websockets
+      ~initial_kernel:output
+      ~preimages_dir
+      ?tx_queue_max_lifespan
+      ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit
+      ()
+  in
+  Evm_node.init ~node_setup ?patch_config ~mode:sequencer_mode ()
 
 (* Send the transaction but doesn't wait to be mined and does not
    produce a block after sending the transaction. *)

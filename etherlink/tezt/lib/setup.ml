@@ -179,14 +179,16 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
     }
 
 let run_new_rpc_endpoint evm_node =
-  let rpc_node =
-    Evm_node.create
+  let node_setup =
+    Evm_node.make_setup
       ~data_dir:(Evm_node.data_dir evm_node)
-      ~mode:(Rpc Evm_node.(mode evm_node))
-      ?config_file:Evm_node.(config_file evm_node)
+      ?config_file:(Evm_node.config_file evm_node)
       ?initial_kernel:(Evm_node.initial_kernel evm_node)
       ~preimages_dir:(Evm_node.preimages_dir evm_node)
       ()
+  in
+  let rpc_node =
+    Evm_node.create ~node_setup ~mode:(Rpc Evm_node.(mode evm_node)) ()
   in
   let* () = Evm_node.run rpc_node in
   return rpc_node
@@ -198,8 +200,6 @@ let observer_counter =
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     ?(fail_on_divergence = true) ~sc_rollup_node ?rpc_server ?websockets
     ?history_mode ?tx_queue ?l2_chain evm_node =
-  let preimages_dir = Evm_node.preimages_dir evm_node in
-  let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
   incr observer_counter ;
   let patch_config =
@@ -246,23 +246,27 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
         evm_node_endpoint = Evm_node.endpoint evm_node;
       }
   in
-  let* observer =
-    Evm_node.init
-      ~patch_config
-      ~mode:observer_mode
+  let node_setup =
+    Evm_node.make_setup
       ~config_file
-      ~end_test_on_failure:true
       ?history_mode
       ?websockets
-      ?initial_kernel
-      ~preimages_dir
-      ~private_rpc_port:(Port.fresh ())
+      ?initial_kernel:(Evm_node.initial_kernel evm_node)
+      ~preimages_dir:(Evm_node.preimages_dir evm_node)
       ?tx_queue_max_lifespan:
         (Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue)
       ?tx_queue_max_size:
         (Option.map (fun tx_queue -> tx_queue.max_size) tx_queue)
       ?tx_queue_tx_per_addr_limit:
         (Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue)
+      ()
+  in
+  let* observer =
+    Evm_node.init
+      ~patch_config
+      ~node_setup
+      ~mode:observer_mode
+      ~end_test_on_failure:true
       ()
   in
   let* () = Evm_node.wait_for_blueprint_applied observer 0
@@ -522,8 +526,9 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ()
 
 let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
-    ?next_wasm_runtime ?sequencer_rpc_port ?sequencer_private_rpc_port
-    ~mainnet_compat ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
+    ?next_wasm_runtime ?sequencer_rpc_port
+    ?(sequencer_private_rpc_port : int option) ~mainnet_compat
+    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
@@ -651,11 +656,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  let private_rpc_port =
-    match sequencer_private_rpc_port with
-    | Some p -> Some p
-    | None -> Some (Port.fresh ())
-  in
   let seq_patch_config =
     Evm_node.patch_config_with_experimental_feature
       ?l2_chains:(if enable_multichain then Some l2_chains else None)
@@ -720,23 +720,28 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
         sequencer_sunset_sec = Some sequencer_sunset_sec;
       }
   in
-  let* sequencer =
-    Evm_node.init
+  let sequencer_node_setup =
+    Evm_node.make_setup
       ?rpc_port:sequencer_rpc_port
-      ~patch_config:seq_patch_config
-      ~mode:sequencer_mode
       ?history_mode
       ?spawn_rpc
       ?websockets
       ~initial_kernel:output
       ~preimages_dir
-      ?private_rpc_port
+      ?private_rpc_port:sequencer_private_rpc_port
       ?tx_queue_max_lifespan:
         (Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue)
       ?tx_queue_max_size:
         (Option.map (fun tx_queue -> tx_queue.max_size) tx_queue)
       ?tx_queue_tx_per_addr_limit:
         (Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue)
+      ()
+  in
+  let* sequencer =
+    Evm_node.init
+      ~patch_config:seq_patch_config
+      ~node_setup:sequencer_node_setup
+      ~mode:sequencer_mode
       ()
   in
   let* observers =

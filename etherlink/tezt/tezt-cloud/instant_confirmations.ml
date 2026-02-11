@@ -63,20 +63,21 @@ module Evm_node_cloud = struct
             port
         | Some port -> port
       in
-      create
-        ?name
-        ~path
-        ?runner
-        ?data_dir
-        ~rpc_port
-        ~mode
-        ?websockets
-        ?initial_kernel
-        ?preimages_dir
-        ?private_rpc_port
-        ?tx_queue_tx_per_addr_limit
-        ()
-      |> Lwt.return
+      let node_setup =
+        make_setup
+          ~path
+          ?name
+          ?runner
+          ?data_dir
+          ~rpc_port
+          ?websockets
+          ?initial_kernel
+          ?preimages_dir
+          ?private_rpc_port
+          ?tx_queue_tx_per_addr_limit
+          ()
+      in
+      create ~node_setup ~mode () |> Lwt.return
 
     let init ?patch_config ?name ~mode ?websockets ?data_dir ?rpc_port ?wait
         ?extra_arguments ?copy_binary ?initial_kernel ?preimages_dir
