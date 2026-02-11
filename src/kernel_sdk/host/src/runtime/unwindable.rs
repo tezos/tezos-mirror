@@ -18,6 +18,7 @@ use alloc::rc::Rc;
 use core::panic::{RefUnwindSafe, UnwindSafe};
 use std::sync::RwLock;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
 
 extern crate alloc;
 extern crate std;
@@ -200,6 +201,13 @@ impl<R: StorageV1> StorageV1 for UnwindableRuntime<R> {
 
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.runtime.read().unwrap().store_value_size(path)
+    }
+
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError> {
+        self.runtime.read().unwrap().store_get_hash(path)
     }
 }
 

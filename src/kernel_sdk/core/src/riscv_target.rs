@@ -225,3 +225,13 @@ pub(super) unsafe fn store_copy(
 pub(super) unsafe fn store_value_size(_path: *const u8, _path_len: usize) -> i32 {
     unimplemented!()
 }
+
+#[inline]
+pub(super) unsafe fn __internal_store_get_hash(
+    _path: *const u8,
+    _path_len: usize,
+    _dst: *mut u8,
+    _max_size: usize,
+) -> i32 {
+    unimplemented!()
+}

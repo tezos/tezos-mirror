@@ -108,3 +108,12 @@ pub(super) unsafe fn reveal(
 ) -> i32 {
     unimplemented!()
 }
+
+pub(super) unsafe fn __internal_store_get_hash(
+    __path: *const u8,
+    __path_len: usize,
+    __destination_addr: *mut u8,
+    __max_bytes: usize,
+) -> i32 {
+    unimplemented!()
+}

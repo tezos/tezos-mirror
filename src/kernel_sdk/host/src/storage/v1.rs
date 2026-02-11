@@ -5,6 +5,7 @@
 //! Irmin-backed durable storage functionality, currently integrated in the WASM pvm.
 
 use tezos_smart_rollup_core::SmartRollupCore;
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
 
 use crate::path::Path;
 use crate::runtime::RuntimeError;
@@ -99,6 +100,12 @@ pub trait StorageV1 {
 
     /// Return the size of value stored at `path`
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError>;
+
+    /// Retrieve the root hash of the tree in durable storage at `path`
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError>;
 }
 
 impl<Host: SmartRollupCore> StorageV1 for Host {
@@ -373,6 +380,26 @@ impl<Host: SmartRollupCore> StorageV1 for Host {
             Err(e) => {
                 Err(RuntimeError::HostErr(e)).map_err(check_path_has_value(self, path))
             }
+        }
+    }
+
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError> {
+        let mut buffer = [0u8; STORE_HASH_SIZE];
+        let result = unsafe {
+            self.__internal_store_get_hash(
+                path.as_ptr(),
+                path.size(),
+                buffer.as_mut_ptr(),
+                STORE_HASH_SIZE,
+            )
+        };
+        match Error::wrap(result) {
+            Ok(i) if i == STORE_HASH_SIZE => Ok(buffer),
+            Ok(_) => Err(RuntimeError::DecodingError),
+            Err(e) => Err(RuntimeError::HostErr(e)),
         }
     }
 }

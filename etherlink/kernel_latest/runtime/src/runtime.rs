@@ -249,6 +249,15 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> StorageV1
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.host.borrow().store_value_size(path)
     }
+
+    #[instrument(skip(self))]
+    #[inline(always)]
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; tezos_smart_rollup_core::STORE_HASH_SIZE], RuntimeError> {
+        self.host.borrow().store_get_hash(path)
+    }
 }
 
 impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> WasmHost

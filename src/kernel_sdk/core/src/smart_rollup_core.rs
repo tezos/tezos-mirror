@@ -207,6 +207,23 @@ pub unsafe trait SmartRollupCore {
     /// - `path_len` must be the length of that slice.
     unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32;
 
+    /// Get the root hash of the durable storage (irmin) tree
+    /// at `path`. Returns the number of bytes written to `dst`.
+    ///
+    /// # Safety
+    /// - `path` must be a ptr to a correctly path-encoded slice of bytes.
+    /// - `path_len` must be the length of that slice.
+    /// - `destination_addr` must point to a mutable slice of bytes with
+    /// - `len >= max_size`
+    #[allow(non_snake_case)]
+    unsafe fn __internal_store_get_hash(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32;
+
     /// Loads the 24-byte metedata (20-byte address of the rollup followed by the 4-byte
     /// origination level) into memory.
     ///

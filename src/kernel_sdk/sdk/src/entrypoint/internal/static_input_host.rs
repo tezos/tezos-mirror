@@ -9,6 +9,7 @@
 //! To create the new [`Runtime`], an existing [`Runtime`] will need to be provided along
 //! the contents of an [`Inbox`] in a serialized format with [`serde_json`]
 
+use tezos_smart_rollup_core::STORE_HASH_SIZE;
 use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
@@ -147,6 +148,14 @@ impl<Host: StorageV1> StorageV1 for StaticInputHost<'_, Host> {
     #[inline(always)]
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.host.store_value_size(path)
+    }
+
+    #[inline(always)]
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; STORE_HASH_SIZE], RuntimeError> {
+        self.host.store_get_hash(path)
     }
 }
 

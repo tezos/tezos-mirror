@@ -73,4 +73,11 @@ extern "C" {
         destination_addr: *mut u8,
         max_bytes: usize,
     ) -> i32;
+
+    pub(super) fn __internal_store_get_hash(
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32;
 }
