@@ -814,6 +814,82 @@ let test_michelson_call_failwith =
         ~amount:1_234_567
         ())
 
+(** Test inter-contract calls via TRANSFER_TOKENS.
+
+    1. Originate [execution_order_storer.tz]: takes a string parameter and
+       appends it to its string storage.
+    2. Originate [execution_order_appender.tz]: calls the storer via
+       TRANSFER_TOKENS with a string stored in its own storage.
+    3. Call the appender and verify that the storer's storage was updated,
+       proving that the target KT1's code was actually executed. *)
+let test_michelson_inter_contract_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson inter-contract call via TRANSFER_TOKENS on tezos X"
+    ~tags:["call"; "michelson"; "internal"; "inter_contract"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate storer (string storage, initially empty) *)
+  let* storer_hex, storer_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "execution_order_storer"]
+      ~init_storage_data:{|""|}
+      protocol
+  in
+  (* Step 2: Originate appender with storage = Pair <storer_address> "Hello" *)
+  let* _appender_hex, appender_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~script_name:["mini_scenarios"; "execution_order_appender"]
+      ~init_storage_data:(sf {|Pair "%s" "Hello"|} storer_kt1)
+      protocol
+  in
+  (* Sanity check: storer's storage is still empty *)
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex:storer_hex
+      ~expected:(`O [("string", `String "")])
+      ()
+  in
+  (* Step 3: Call the appender — it will TRANSFER_TOKENS to the storer *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:3
+      ~dest:appender_kt1
+      ~arg_data:"Unit"
+      ()
+  in
+  (* Step 4: Verify the storer's storage was updated to "Hello" *)
+  check_michelson_storage_value
+    ~sc_rollup_node
+    ~contract_hex:storer_hex
+    ~expected:(`O [("string", `String "Hello")])
+    ()
+
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test
     ~title:"Test the tez_getTezosEthereumAddress RPC"
@@ -992,6 +1068,7 @@ let () =
   test_michelson_call_wrong_entrypoint [Alpha] ;
   test_michelson_origination_wrong_storage_type [Alpha] ;
   test_michelson_call_failwith [Alpha] ;
+  test_michelson_inter_contract_call [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
