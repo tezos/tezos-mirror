@@ -807,6 +807,29 @@ mod test {
         }
     }
 
+    /// Encode then decode: must be identity.
+    /// 2^55 fits in 7 big-endian bytes (d never reaches 7).
+    /// 2^58 needs 8 big-endian bytes, so d reaches 7 once.
+    /// 2^184 needs 24 big-endian bytes, so d reaches 7 three times.
+    /// Before the fix, the round-trip failed for 2^58 and 2^184
+    /// because the encoder silently dropped input bytes when d == 7.
+    #[test]
+    fn n_bignum_roundtrip() {
+        use num_bigint::BigUint;
+        let values: Vec<BigUint> = vec![
+            BigUint::from(1u8) << 55,  // 7 BE bytes, d never reaches 7
+            BigUint::from(1u8) << 58,  // 8 BE bytes, d=7 once
+            BigUint::from(1u8) << 184, // 24 BE bytes, d=7 three times
+        ];
+        for n in &values {
+            let mut encoded = Vec::new();
+            super::n_bignum(n, &mut encoded).unwrap();
+            let (rest, decoded) = crate::nom::n_bignum(&encoded).unwrap();
+            assert!(rest.is_empty());
+            assert_eq!(&decoded, n, "round-trip failed for {n}");
+        }
+    }
+
     fn hex_to_bigint(s: &str) -> num_bigint::BigInt {
         use num_traits::FromPrimitive;
         num_bigint::BigInt::from_u64(u64::from_str_radix(s, 16).unwrap()).unwrap()
