@@ -487,8 +487,8 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 /// Only used for test, as all errors are handled in the same way
 #[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
-pub enum BlueprintValidity<Tx> {
-    Valid(Blueprint<Tx>),
+pub enum BlueprintValidity {
+    Valid(Blueprint<TezosXTransaction>),
     InvalidParentHash,
     TimestampFromPast,
     TimestampFromFuture,
@@ -581,7 +581,7 @@ pub fn fetch_delayed_txs<Host: Runtime, ChainConfig: ChainConfigTrait>(
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(BlueprintValidity<TezosXTransaction>, usize)> {
+) -> anyhow::Result<(BlueprintValidity, usize)> {
     let (mut delayed_txs, total_size) =
         match ChainConfig::fetch_hashes_from_delayed_inbox(
             host,
@@ -633,7 +633,7 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     max_blueprint_lookahead_in_seconds: i64,
     parent_chain_header: &ChainConfig::ChainHeader,
     head_timestamp: Timestamp,
-) -> anyhow::Result<(BlueprintValidity<TezosXTransaction>, usize)> {
+) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
     match rlp::decode::<BlueprintWithDelayedHashes>(bytes) {
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
@@ -695,10 +695,10 @@ fn parse_and_validate_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     }
 }
 
-fn invalidate_blueprint<Host: Runtime, Tx: Debug>(
+fn invalidate_blueprint<Host: Runtime>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
-    error: &BlueprintValidity<Tx>,
+    error: &BlueprintValidity,
 ) -> Result<(), Error> {
     log!(
         host,
@@ -722,7 +722,7 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
-        invalidate_blueprint::<_, TezosXTransaction>(
+        invalidate_blueprint(
             host,
             blueprint_path,
             &BlueprintValidity::BlueprintTooLarge,
@@ -758,7 +758,7 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
             max_blueprint_lookahead_in_seconds,
             ..
         } => {
-            let validity: (BlueprintValidity<TezosXTransaction>, usize) =
+            let validity: (BlueprintValidity, usize) =
                 parse_and_validate_blueprint::<_, ChainConfig>(
                     host,
                     chunks.concat().as_slice(),
@@ -806,7 +806,7 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
             invalidate_blueprint(
                 host,
                 &blueprint_path,
-                &BlueprintValidity::<Vec<ChainConfig::Transaction>>::StaleBlueprint,
+                &BlueprintValidity::StaleBlueprint,
             )?;
             return Ok((None, 0));
         }
