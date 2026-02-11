@@ -5,7 +5,7 @@
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
 use alloy_sol_types::SolCall;
 use primitive_types::U256;
-use revm::context::result::ExecutionResult;
+use revm::context::result::{ExecutionResult, Output};
 use revm::state::Bytecode;
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy,
@@ -198,33 +198,115 @@ impl RuntimeInterface for EthereumRuntime {
 
     fn call<Host: Runtime>(
         &self,
-        _registry: &impl tezosx_interfaces::Registry,
+        registry: &impl tezosx_interfaces::Registry,
         host: &mut Host,
-        _from: &[u8],
+        from: &[u8],
         to: &[u8],
         amount: primitive_types::U256,
-        _data: &[u8],
-        _context: CrossRuntimeContext,
+        data: &[u8],
+        context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
-        if to.len() != 20 {
+        if from.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
-                "Invalid address length".to_string(),
+                "Invalid 'from' address length".to_string(),
             ));
         }
-        let mut addr = [0u8; 20];
-        addr.copy_from_slice(to);
-        let to = Address::from(addr);
-        // TODO: Implement a real EVM call here.
-        // For now it only implements a transfer of amount.
-        let amount = u256_to_alloy(&amount);
-        let mut to_account = StorageAccount::from_address(&to)?;
-        let mut to_info = to_account.info(host)?;
-        to_info.balance = to_info
-            .balance
-            .checked_add(amount)
-            .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        to_account.set_info(host, to_info)?;
-        Ok(CrossCallResult::Success(vec![]))
+        if to.len() != 20 {
+            return Err(TezosXRuntimeError::Custom(
+                "Invalid 'to' address length".to_string(),
+            ));
+        }
+
+        let caller = Address::from_slice(from);
+        let destination = Address::from_slice(to);
+
+        let evm_version = read_evm_version(host);
+        let block_constants = self.create_block_constants(host, &context);
+
+        // Set up gas data (zero gas price since this is a cross-runtime transaction)
+        // unlimited gas for now (ie current block gas limit, to make sure the transaction will
+        // fit and not be rejected)
+        // TODO: L2-869
+        let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
+
+        // TODO: L2-870 — pass the real amount to the EVM without debiting the
+        // caller. For now we credit the destination manually and pass zero
+        // value to the EVM.
+        let transfer_amount = u256_to_alloy(&amount);
+        if transfer_amount > AlloyU256::ZERO {
+            let mut to_account = StorageAccount::from_address(&destination)?;
+            let mut to_info = to_account.info(host)?;
+            to_info.balance =
+                to_info
+                    .balance
+                    .checked_add(transfer_amount)
+                    .ok_or_else(|| {
+                        TezosXRuntimeError::Custom("Balance overflow".to_string())
+                    })?;
+            to_account.set_info(host, to_info)?;
+        }
+        let value = AlloyU256::ZERO;
+        let call_data = Bytes::from(data.to_vec());
+
+        // Run the EVM transaction
+        let outcome = run_transaction(
+            host,
+            registry,
+            evm_version.into(),
+            &block_constants,
+            None, // no transaction hash for cross-runtime transactions
+            caller,
+            Some(destination),
+            call_data,
+            gas_data,
+            value,
+            revm::context::transaction::AccessList(vec![]),
+            None,  // no authorization list
+            None,  // no tracer
+            false, // not a simulation
+        )
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+        })?;
+
+        match outcome.result {
+            ExecutionResult::Success { output, .. } => match output {
+                Output::Call(bytes) => Ok(CrossCallResult::Success(bytes.to_vec())),
+                Output::Create(bytes, _) => Ok(CrossCallResult::Success(bytes.to_vec())),
+            },
+            ExecutionResult::Revert { output, .. } => {
+                // TODO: L2-870 — That revert should be part of run_transaction.
+                if transfer_amount > AlloyU256::ZERO {
+                    let mut to_account = StorageAccount::from_address(&destination)?;
+                    let mut to_info = to_account.info(host)?;
+                    to_info.balance = to_info
+                        .balance
+                        .checked_sub(transfer_amount)
+                        .ok_or_else(|| {
+                            TezosXRuntimeError::Custom("Balance underflow".to_string())
+                        })?;
+                    to_account.set_info(host, to_info)?;
+                }
+                Ok(CrossCallResult::Revert(output.to_vec()))
+            }
+            ExecutionResult::Halt { reason, .. } => {
+                // TODO: L2-870 — That revert should be part of run_transaction.
+                if transfer_amount > AlloyU256::ZERO {
+                    let mut to_account = StorageAccount::from_address(&destination)?;
+                    let mut to_info = to_account.info(host)?;
+                    to_info.balance = to_info
+                        .balance
+                        .checked_sub(transfer_amount)
+                        .ok_or_else(|| {
+                            TezosXRuntimeError::Custom("Balance underflow".to_string())
+                        })?;
+                    to_account.set_info(host, to_info)?;
+                }
+                Ok(CrossCallResult::Halt(
+                    format!("EVM call halted: {reason:?}").into_bytes(),
+                ))
+            }
+        }
     }
 
     fn address_from_string(
