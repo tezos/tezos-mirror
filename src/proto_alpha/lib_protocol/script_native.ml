@@ -412,6 +412,7 @@ module CLST_contract = struct
       (operations, storage, ctxt) ((owner, (operator, token_id)) : operator)
       action =
     let open Lwt_result_syntax in
+    let*? entrypoint_str = Entrypoint.of_string_lax "update_operators" in
     (* Restrict operator updates only to the owner of the token. *)
     let*? () =
       error_when
@@ -421,8 +422,8 @@ module CLST_contract = struct
     in
     (* Check token_id is the one defined by the contract. *)
     let*? () = check_token_id token_id in
-    let new_allowance =
-      match action with `Add -> Some None | `Remove -> None
+    let new_allowance, is_operator =
+      match action with `Add -> (Some None, true) | `Remove -> (None, false)
     in
     let* storage, ctxt =
       Clst_contract_storage.set_account_operator_allowance
@@ -432,22 +433,31 @@ module CLST_contract = struct
         ~spender:operator
         new_allowance
     in
-    return (operations, storage, ctxt)
+    let* op_operator_update_event, ctxt =
+      Clst_events.operator_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner
+        ~operator
+        ~token_id:Clst_contract_storage.token_id
+        ~is_operator
+    in
+    return (op_operator_update_event :: operations, storage, ctxt)
 
   let execute_update_operators (ctxt, (step_constants : step_constants))
       (value : update_operators) (storage : Clst_contract_storage.t) =
     let open Lwt_result_syntax in
-    let* operations, storage, ctxt =
+    let* rev_ops, storage, ctxt =
       List.fold_left_es
         (fun acc add_or_remove ->
           let action, op =
             match add_or_remove with L op -> (`Add, op) | R op -> (`Remove, op)
           in
           execute_update_operator step_constants acc op action)
-        (Script_list.empty, storage, ctxt)
+        ([], storage, ctxt)
         (Script_list.to_list value)
     in
-    return (operations, storage, [], ctxt)
+    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
