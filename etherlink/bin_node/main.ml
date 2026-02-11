@@ -1718,6 +1718,7 @@ let make_dev_messages ~kind ~smart_rollup_address data =
           Sequencer_blueprint.make_blueprint_chunks
             ~number:(Ethereum_types.quantity_of_z number)
             {
+              version = Sequencer_blueprint.Legacy;
               parent_hash = Ethereum_types.block_hash_of_string parent_hash;
               delayed_transactions = [];
               transactions;

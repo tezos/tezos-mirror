@@ -274,10 +274,12 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
+  let blueprint_version : Sequencer_blueprint.blueprint_version = Legacy in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:head_info.next_blueprint_number
       {
+        version = blueprint_version;
         parent_hash = head_info.current_block_hash;
         delayed_transactions = delayed_hashes;
         transactions;
@@ -637,10 +639,19 @@ let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
 let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
   let open Lwt_result_syntax in
   let delayed_transactions = [] in
+  (* The genesis blueprint contains no transaction so the version
+     field (which versions the format of the "transactions" field) is
+     irrelevant. *)
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:Ethereum_types.(Qty Z.zero)
-      {parent_hash; delayed_transactions; transactions = []; timestamp}
+      {
+        version = Legacy;
+        parent_hash;
+        delayed_transactions;
+        transactions = [];
+        timestamp;
+      }
   in
   let* genesis_chunks, genesis_payload, _ =
     Evm_context.apply_chunks

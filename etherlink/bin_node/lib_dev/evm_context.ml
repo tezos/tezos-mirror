@@ -1499,6 +1499,10 @@ module State = struct
       Sequencer_blueprint.make_blueprint_chunks
         ~number:flushed_level
         {
+          version = Legacy;
+          (* Flushed blueprints contain no transactions so the version
+             field (which versions the format of the "transactions"
+             field) is irrelevant. *)
           parent_hash;
           delayed_transactions = hashes;
           transactions = [];
