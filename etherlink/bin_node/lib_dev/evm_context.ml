@@ -1186,8 +1186,17 @@ module State = struct
             ~root:Durable_storage_path.tezosx_tezos_blocks_root
             evm_state
         in
-        return
-          (match tez_block with Some (Tez block) -> Some block | _ -> None)
+        match tez_block with
+        | Some (Tez block) -> return_some block
+        | _ ->
+            if
+              Storage_version.tezosx_tezos_blocks
+                ~storage_version:ctxt.session.storage_version
+            then
+              failwith
+                "Expected to find a Tezos block alongside the EVM block, but \
+                 none was found."
+            else return_none
       else return_none
     in
 
