@@ -40,8 +40,8 @@
   "cache_sampler_state_cycles": 5, "cache_stake_info_cycles": 5,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": true,
-      "dynamic_lag_enable": false, "number_of_slots": 16,
-      "attestation_lag": 5, "attestation_lags": [ 5 ],
+      "dynamic_lag_enable": true, "number_of_slots": 16,
+      "attestation_lag": 5, "attestation_lags": [ 1, 2, 3, 4, 5 ],
       "attestation_threshold": 66,
       "minimal_participation_ratio":
         { "numerator": "16", "denominator": "25" },
