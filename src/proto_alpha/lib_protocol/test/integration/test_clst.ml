@@ -2132,3 +2132,77 @@ let () =
   match active_parameters with
   | None -> return_unit
   | Some _ -> Test.fail ~loc:__LOC__ "Delegate shouldn't have parameters"
+
+let () =
+  register_test
+    ~title:"Test baker unregistration with pending parameters at the same cycle"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh =
+    match delegate with
+    | Contract.Implicit pkh -> pkh
+    | Contract.Originated _ -> assert false
+  in
+  let* b, _parameters = register_delegate_and_bake b delegate in
+
+  (* Check that the delegate will eventually be registered. *)
+  let* is_eventually_registered =
+    check_delegate_is_eventually_registered b delegate_pkh
+  in
+  let* () =
+    if not is_eventually_registered then
+      Test.fail ~loc:__LOC__ "Delegate is expected to be eventually registered"
+    else return_unit
+  in
+
+  (* Let's send an unregister operation, this shouldn't fail *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let* b = Block.bake ~operation:unregister_tx b in
+  let* unregister_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Unregister]
+  in
+  let unregister_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) unregister_activation_cycle
+  in
+  let* b = Block.bake_until_cycle unregister_activation_cycle b in
+
+  (* Check that the delegate will eventually be unregistered. *)
+  let* is_eventually_registered =
+    check_delegate_is_eventually_registered b delegate_pkh
+  in
+  let* () =
+    if is_eventually_registered then
+      Test.fail
+        ~loc:__LOC__
+        "Delegate is expected to be eventually unregistered"
+    else return_unit
+  in
+
+  (* Pending parameters shouln't have been registered, as they've been subsumed
+     by the unregistration at the same cycle. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  match active_parameters with
+  | None -> return_unit
+  | Some _ -> Test.fail ~loc:__LOC__ "Delegate shouldn't have parameters"
