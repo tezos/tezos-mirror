@@ -53,6 +53,74 @@ type upstream_image = Pipeline_dep of string | Upstream of string
    ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:trixie-$COMMIT_REF_SLUG )
 *)
 
+(* FIXME: remove changesets from [base_images.daily] which is a branch
+   pipeline cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
+module Files = struct
+  let build_script = ["scripts/ci/build-base-images.sh"]
+
+  (* Direct changesets of jobs, i.e. files directly used by the corresponding jobs.
+
+     The full changeset of a job should also contain the files indirectly used.
+     - Example: [image A] is built on top of [image B], then the
+     changeset of the image A build ([job A])job should contain the
+     files needed to build B.
+
+
+     Also, the full changeset of a job should contain the changeset of the jobs that depend on it.
+     - Example: [image A] is built on top of [image B] so [job A] depends on
+     [job B]. If [job A] is in the pipeline then [job B] should be too. So, the
+     full changeset of [job B] needs to include the changeset of [job A].
+     NB: This is enforced by Cacio, so this part will be simplified if the jobs are migrated.
+
+   *)
+
+  let rpm_base =
+    [
+      "images/base-images/Dockerfile.rpm";
+      (* scripts used in Dockerfile *)
+      "scripts/kiss-fetch.sh";
+      "images/scripts/configure_rpm_proxy.sh";
+      "images/scripts/install_datadog_static.sh";
+      "images/scripts/install-gcloud-dnf.sh";
+    ]
+    @ build_script
+
+  let debian_base =
+    [
+      "images/base-images/Dockerfile.debian";
+      (* scripts in Dockerfile *)
+      "scripts/kiss-fetch.sh";
+      "images/scripts/install_datadog_static.sh";
+      "images/scripts/install-gcloud-apt.sh";
+    ]
+    @ build_script
+
+  let debian_homebrew =
+    [
+      "images/base-images/Dockerfile.debian-homebrew";
+      (* script used in Dockerfile *)
+      "scripts/packaging/homebrew_install.sh";
+    ]
+    @ build_script
+
+  let debian_rust_build =
+    [
+      "images/base-images/Dockerfile.rust";
+      (* script used in Dockerfile *)
+      "images/scripts/install_sccache_static.sh";
+    ]
+    @ build_script
+
+  let debian_rust_merge =
+    [
+      "images/base-images/Dockerfile.rust";
+      (* script used in Dockerfile *)
+      "images/scripts/install_sccache_static.sh";
+      (* job script *)
+      "scripts/ci/docker-merge-base-images.sh";
+    ]
+end
+
 let jobs =
   (* This function can build docker images both in an emulated environment using
      qemu or natively. The advantage of choosing emulated vs native depends on
@@ -132,19 +200,11 @@ let jobs =
   in
   let job_debian_based_images =
     let changes =
+      (* we need the [debian] base job if we have [debian-homebrew] or
+         [debian-rust] jobs *)
       Changeset.make
-        [
-          "images/base-images/Dockerfile.debian";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-apt.sh";
-          "images/base-images/Dockerfile.debian-homebrew";
-          "scripts/packaging/homebrew_install.sh";
-          "images/base-images/Dockerfile.rust";
-          "images/scripts/install_sccache_static.sh";
-          "scripts/ci/build-base-images.sh";
-          "scripts/ci/docker-merge-base-images.sh";
-        ]
+        (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
+       @ Files.debian_rust_merge)
     in
     make_job_base_images
       ~__POS__
@@ -155,126 +215,82 @@ let jobs =
       "images/base-images/Dockerfile.debian"
   in
   let job_ubuntu_based_images =
-    let changes =
-      Changeset.make
-        [
-          "images/base-images/Dockerfile.debian";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-apt.sh";
-          "scripts/ci/build-base-images.sh";
-        ]
-    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.ubuntu"
       ~image_name:"ubuntu"
       ~matrix:ubuntu_matrix
-      ~changes
+      ~changes:(Changeset.make Files.debian_base)
       "images/base-images/Dockerfile.debian"
   in
   let job_fedora_based_images =
-    let changes =
-      Changeset.make
-        [
-          "images/base-images/Dockerfile.rpm";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/configure_rpm_proxy.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-dnf.sh";
-          "scripts/ci/build-base-images.sh";
-        ]
-    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.fedora"
       ~image_name:"fedora"
       ~matrix:fedora_matrix
-      ~changes
+      ~changes:(Changeset.make Files.rpm_base)
       "images/base-images/Dockerfile.rpm"
   in
   let job_rockylinux_based_images =
-    let changes =
-      Changeset.make
-        [
-          "images/base-images/Dockerfile.rpm";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/configure_rpm_proxy.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-dnf.sh";
-          "scripts/ci/build-base-images.sh";
-        ]
-    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.rockylinux"
       ~image_name:"rockylinux"
       ~base_name:(Upstream "rockylinux/rockylinux")
       ~matrix:rockylinux_matrix
-      ~changes
+      ~changes:(Changeset.make Files.rpm_base)
       "images/base-images/Dockerfile.rpm"
   in
-  let job_rust_based_images, job_rust_based_images_merge =
-    (* the changeset here and an under approximation. When adding
-         these pipelines to the merge trains, these should be refactored.
-      FIXME: remove changesets from [base_images.daily] which is a
-             branch pipeline cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
-    let changes =
-      Changeset.make
+  let job_rust_based_images =
+    make_job_base_images
+      ~__POS__
+      ~name:"oc.base-images.rust"
+      ~image_name:"debian-rust"
+      ~base_name:(Pipeline_dep "debian")
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~dependencies:(Dependent [Job job_debian_based_images])
+      ~compilation:Native
+      ~changes:
+        (Changeset.make
+           (Files.debian_rust_build
+          (* Adding the changeset of debian job as we want to test the
+             build of [debian-rust] if [debian] is rebuild. *)
+          @ Files.debian_base
+           (* If we run [debian-rust] merge job, we need [debian-rust] build job *)
+           @ Files.debian_rust_merge))
+      "images/base-images/Dockerfile.rust"
+  in
+  let job_rust_based_images_merge =
+    job_docker_authenticated
+      ~__POS__
+      ~name:"oc.base-images.rust.merge"
+      ~stage:Stages.images
+      ~dependencies:(Dependent [Job job_rust_based_images])
+      ~rules:
         [
-          "images/base-images/Dockerfile.debian";
-          "images/base-images/Dockerfile.rust";
-          "images/scripts/install_sccache_static.sh";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-apt.sh";
-          "scripts/ci/docker-merge-base-images.sh";
-          "scripts/ci/build-base-images.sh";
+          job_rule
+            ~changes:
+              (Changeset.encode
+                 (Changeset.make
+                    (Files.debian_rust_merge
+                   (* Adding changesets of [debian] and
+                        [debian-rust] build jobs as if we rebuild one
+                        of these images, we want to test the
+                        [debian-rust] merge job *)
+                   @ Files.debian_rust_build
+                    @ Files.debian_base)))
+            ~when_:On_success
+            ();
         ]
-    in
-
-    let images =
-      make_job_base_images
-        ~__POS__
-        ~name:"oc.base-images.rust"
-        ~image_name:"debian-rust"
-        ~base_name:(Pipeline_dep "debian")
-        ~matrix:[("RELEASE", ["trixie"])]
-        ~dependencies:(Dependent [Job job_debian_based_images])
-        ~compilation:Native
-        ~changes
-        "images/base-images/Dockerfile.rust"
-    in
-    let merge =
-      job_docker_authenticated
-        ~__POS__
-        ~name:"oc.base-images.rust.merge"
-        ~stage:Stages.images
-        ~dependencies:(Dependent [Job images])
-        ~rules:
-          [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
-        ~variables:
-          [
-            ("RELEASE", "trixie");
-            ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
-          ]
-        ["scripts/ci/docker-merge-base-images.sh"]
-    in
-    (images, merge)
+      ~variables:
+        [
+          ("RELEASE", "trixie");
+          ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+        ]
+      ["scripts/ci/docker-merge-base-images.sh"]
   in
   let job_debian_homebrew_base_images =
-    let changes =
-      Changeset.make
-        [
-          "images/base-images/Dockerfile.debian";
-          "images/base-images/Dockerfile.debian-homebrew";
-          "scripts/packaging/homebrew_install.sh";
-          "scripts/kiss-fetch.sh";
-          "images/scripts/install_datadog_static.sh";
-          "images/scripts/install-gcloud-apt.sh";
-          "scripts/ci/build-base-images.sh";
-        ]
-    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian-homebrew"
@@ -283,7 +299,9 @@ let jobs =
       ~dependencies:(Dependent [Job job_debian_based_images])
       ~matrix:[("RELEASE", ["trixie"])]
       ~compilation:Amd64_only
-      ~changes
+        (* Adding the changeset of [debian] job as we want to test the
+         build of [debian-homebrew] if [debian] is rebuild. *)
+      ~changes:(Changeset.make (Files.debian_homebrew @ Files.debian_base))
       "images/base-images/Dockerfile.debian-homebrew"
   in
   [
