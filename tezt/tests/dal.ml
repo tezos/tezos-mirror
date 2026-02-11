@@ -5897,7 +5897,6 @@ module Skip_list_rpcs = struct
       Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
     in
     let new_dal_params =
-      (* TODO: We use S023, since we do not parse the attestation_lags field. *)
       Dal.Parameters.from_protocol_parameters new_proto_params
     in
     let new_lag = new_dal_params.attestation_lag in
