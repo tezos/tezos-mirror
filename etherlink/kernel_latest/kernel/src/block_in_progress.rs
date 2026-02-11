@@ -8,8 +8,7 @@
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{
-    TezosXTransaction, TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-    TEZOS_BLOCKS_PATH,
+    TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -331,7 +330,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     }
 
     pub fn from_blueprint(
-        blueprint: crate::blueprint::Blueprint<TezosXTransaction>,
+        blueprint: crate::blueprint::Blueprint,
         number: U256,
         ethereum_parent_hash: H256,
         tezos_parent_hash: H256,

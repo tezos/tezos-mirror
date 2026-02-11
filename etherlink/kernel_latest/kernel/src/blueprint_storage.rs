@@ -57,7 +57,7 @@ const EVM_CURRENT_BLOCK_HEADER: RefPath =
 #[derive(PartialEq, Debug)]
 enum StoreBlueprint {
     SequencerChunk(Vec<u8>),
-    InboxBlueprint(Blueprint<TezosXTransaction>),
+    InboxBlueprint(Blueprint),
 }
 
 const SEQUENCER_CHUNK_TAG: u8 = 0;
@@ -314,7 +314,7 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
 
 pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<TezosXTransaction>,
+    blueprint: Blueprint,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
@@ -328,7 +328,7 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime>(
 
 pub fn store_inbox_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<TezosXTransaction>,
+    blueprint: Blueprint,
 ) -> anyhow::Result<()> {
     let number = read_next_blueprint_number(host)?;
     Ok(store_inbox_blueprint_by_number(host, blueprint, number)?)
@@ -348,7 +348,7 @@ pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Er
 // Used to store a blueprint made out of forced delayed transactions.
 pub fn store_forced_blueprint<Host: Runtime>(
     host: &mut Host,
-    blueprint: Blueprint<TezosXTransaction>,
+    blueprint: Blueprint,
     number: U256,
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
@@ -488,7 +488,7 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 #[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
 pub enum BlueprintValidity {
-    Valid(Blueprint<TezosXTransaction>),
+    Valid(Blueprint),
     InvalidParentHash,
     TimestampFromPast,
     TimestampFromFuture,
@@ -718,7 +718,7 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     config: &mut Configuration,
     previous_chain_header: &ChainConfig::ChainHeader,
     previous_timestamp: Timestamp,
-) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let mut chunks = vec![];
     let mut size = 0;
     if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
@@ -793,7 +793,7 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     number: U256,
     previous_timestamp: Timestamp,
     previous_chain_header: &ChainConfig::ChainHeader,
-) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let blueprint_path = blueprint_path(number)?;
     let exists = blueprint_exists(host, &blueprint_path)?;
     if exists {
@@ -842,7 +842,7 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<(Option<Blueprint<TezosXTransaction>>, usize)> {
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let (number, previous_timestamp, block_header) =
         match read_current_block_header::<_, EVMBlockHeader>(host) {
             Ok(BlockHeader {

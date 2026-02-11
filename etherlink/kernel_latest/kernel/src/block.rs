@@ -13,9 +13,7 @@ use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
     store_current_block_header, BlockHeader, ChainHeader,
 };
-use crate::chains::{
-    ChainConfigTrait, ChainHeaderTrait, EvmLimits, TezosXTransaction, TransactionTrait,
-};
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, EvmLimits, TransactionTrait};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -190,7 +188,7 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
-    blueprint: Blueprint<TezosXTransaction>,
+    blueprint: Blueprint,
 ) -> BlockInProgress<ChainConfig::Transaction> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
@@ -524,7 +522,7 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezosXTransaction,
         TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -724,7 +722,7 @@ mod tests {
         )
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<TezosXTransaction> {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
             transactions: transactions
                 .into_iter()
@@ -734,10 +732,7 @@ mod tests {
         }
     }
 
-    fn tezlink_blueprint(
-        operations: Vec<Operation>,
-        timestamp: Timestamp,
-    ) -> Blueprint<TezosXTransaction> {
+    fn tezlink_blueprint(operations: Vec<Operation>, timestamp: Timestamp) -> Blueprint {
         let operations = operations
             .into_iter()
             .map(|op| {
@@ -918,7 +913,7 @@ mod tests {
 
     fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
-        blueprints: Vec<Blueprint<TezosXTransaction>>,
+        blueprints: Vec<Blueprint>,
     ) {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
@@ -1938,7 +1933,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint<TezosXTransaction> {
+    fn almost_empty_blueprint() -> Blueprint {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid
