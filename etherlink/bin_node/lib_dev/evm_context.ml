@@ -28,6 +28,7 @@ type head = {
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
+  storage_version : int;
 }
 
 type parameters = {
@@ -286,6 +287,7 @@ module State = struct
           Option.map
             (fun pending_upgrade -> pending_upgrade.Evm_store.sequencer_upgrade)
             session.pending_sequencer_upgrade;
+        storage_version = session.storage_version;
       }
 
     let run ctxt (k : t -> Sqlite.conn -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t
