@@ -77,15 +77,22 @@ let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_mock.version
 
-let make_contract_info contract_balance counter_z contract_script =
+let make_contract_info contract_balance counter_opt contract_script =
   let open Lwt_result_syntax in
   let open Imported_protocol_plugin.Contract_services in
-  let*? counter = Protocol_types.Counter.of_z counter_z in
+  let*? counter =
+    let open Result_syntax in
+    match counter_opt with
+    | None -> return_none
+    | Some counter_z ->
+        let* counter = Protocol_types.Counter.of_z counter_z in
+        return_some counter
+  in
   return
     {
       balance = contract_balance;
       delegate = None;
-      counter = Some counter;
+      counter;
       script = contract_script;
       revealed = None;
     }
@@ -278,6 +285,17 @@ let opt_register ~service ~impl dir =
 let opt_register_with_conversion ~service ~impl ~convert_output dir =
   opt_register ~service ~impl:(wrap (Option.map_e convert_output) impl) dir
 
+(* On not-yet-allocated implicit accounts, L1 returns the current
+   global counter instead of [None]. We don't have a global counter so
+   we return 0 in this case instead. See also
+   https://gitlab.com/tezos/tezos/-/issues/7960. *)
+let get_counter (module Backend : Tezlink_backend_sig.S) chain block contract =
+  let open Lwt_result_syntax in
+  let* counter_opt = Backend.counter chain block contract in
+  match (counter_opt, contract) with
+  | None, Implicit _ -> return_some Z.zero
+  | counter_opt, _ -> return counter_opt
+
 (** Builds the static part of the directory registering services under `/chains/<main>/blocks/<head>/...`.
     This part is based on the current protocol supported by Tezlink, which means that if we request the counter
     of a tz1 on an old block the encoding used will be the one of the current live protocol. *)
@@ -299,7 +317,7 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* balance = Backend.balance chain block contract in
-         let* counter = Backend.counter chain block contract in
+         let* counter = get_counter (module Backend) chain block contract in
          let* script = Backend.get_script chain block contract in
          make_contract_info balance counter script)
   |> opt_register
@@ -355,12 +373,12 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          Backend.manager_key chain block contract)
-  |> register_with_conversion
+  |> opt_register_with_conversion
        ~service:Tezos_services.counter
        ~impl:(fun ((((), chain), block), contract) () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         Backend.counter chain block contract)
+         get_counter (module Backend) chain block contract)
        ~convert_output:Protocol_types.Counter.of_z
   |> register
        ~service:Tezos_services.constants

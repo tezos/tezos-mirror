@@ -11,7 +11,7 @@
     of a contract in that context (i.e. the last block). *)
 type michelson_validation_config = {
   get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
-  get_counter : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
+  get_counter : Tezos_types.Contract.t -> Z.t option tzresult Lwt.t;
 }
 
 type evm_validation_config = {
@@ -38,10 +38,7 @@ type validation_state = {
 
 let dummy_michelson_config =
   let open Lwt_result_syntax in
-  {
-    get_balance = (fun _ -> return Z.zero);
-    get_counter = (fun _ -> return Z.zero);
-  }
+  {get_balance = (fun _ -> return Z.zero); get_counter = (fun _ -> return_none)}
 
 let dummy_evm_config =
   let open Lwt_result_syntax in

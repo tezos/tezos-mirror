@@ -404,6 +404,7 @@ let validate_first_counter ~read ~source ~first_counter =
     Tezlink_durable_storage.counter read
     @@ Tezos_types.Contract.of_implicit source
   in
+  let counter = Option.value ~default:Z.zero counter in
   let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
   if Z.gt first_counter counter then
     (* we allow the first counter to be in the future *) return (Ok ())
@@ -574,7 +575,14 @@ let get_ read cache source =
 let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
   let* counter =
-    get_ state.michelson_config.get_counter state.addr_nonce operation.source
+    get_
+      (fun c ->
+        let* counter_opt = state.michelson_config.get_counter c in
+        (* FIXME: #7960
+           This default should be the global counter *)
+        return (Option.value ~default:Z.one counter_opt))
+      state.addr_nonce
+      operation.source
   in
   let** new_counter =
     if not Z.(equal (succ counter) operation.first_counter) then
