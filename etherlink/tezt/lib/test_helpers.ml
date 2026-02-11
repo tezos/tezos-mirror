@@ -715,10 +715,10 @@ let check_operations ~client ~block ~expected =
   Check.((hashes = expected) (list string) ~error_msg:"Expected %R Actual %L") ;
   unit
 
-let produce_block_and_wait_for ~sequencer n =
+let produce_block_and_wait_for ?timestamp ~sequencer n =
   let open Rpc.Syntax in
   let* () =
-    let*@ _ = produce_block sequencer in
+    let*@ _ = produce_block ?timestamp sequencer in
     unit
   and* () = Evm_node.wait_for_blueprint_applied sequencer n in
   return ()

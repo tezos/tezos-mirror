@@ -32,7 +32,25 @@ let check_kernel_version ~evm_node ~equal expected =
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ?genesis_timestamp ?(time_between_blocks = Evm_node.Nothing)
     ?additional_uses ?max_blueprints_catchup ?max_blueprints_lag
-    ?catchup_cooldown ?(kernels = [Kernel.Latest]) scenario protocols =
+    ?catchup_cooldown ?(kernels = [Kernel.Latest])
+    ?(wait_for_valid_block = true) scenario protocols =
+  (* Most of the RPCs tezt tests are RPC that are enable on a real Tezos protocol.
+       Now that block 0 and 1 are set on protocol Zero and Genesis, we produce two
+       blocks to skip the two first blocks. *)
+  let scenario setup protocol =
+    let* () =
+      if wait_for_valid_block then
+        match time_between_blocks with
+        | Evm_node.Nothing ->
+            (* Blocks are not produced automatically *)
+            let* () = produce_block_and_wait_for ~sequencer:setup.sequencer 1 in
+            produce_block_and_wait_for ~sequencer:setup.sequencer 2
+        | Time_between_blocks _ ->
+            Evm_node.wait_for_blueprint_applied setup.sequencer 2
+      else return ()
+    in
+    scenario setup protocol
+  in
   register_all
     ~__FILE__
     ~kernels
@@ -59,9 +77,8 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     protocols
 
 let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
-    ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.tezlink_all)
-    ?(upgrade_to = Kernel.upgrade_to) ?(additional_uses = []) scenario protocols
-    =
+    ?(kernels = Kernel.tezlink_all) ?(upgrade_to = Kernel.upgrade_to)
+    ?(additional_uses = []) scenario protocols =
   List.iter
     (fun from ->
       let from_tag, _ = Kernel.to_uses_and_tags from in
@@ -70,10 +87,15 @@ let register_tezlink_upgrade_test ~title ~tags ~genesis_timestamp
       register_tezlink_test
         ~kernels:[from]
         ~genesis_timestamp
-        ~time_between_blocks
+        ~time_between_blocks:Nothing
         ~tags:("upgrade_scenario" :: to_tag :: tags)
         ~title:Format.(sprintf "%s (%s -> %s)" title from_tag to_tag)
         ~additional_uses:(to_use :: additional_uses)
+          (* No need to wait in an upgrade scenario. *)
+          (* If this boolean is set to true, upgrade test 
+             will fail because blueprint are produced at
+             an unexpected timestamp. *)
+        ~wait_for_valid_block:false
         (scenario from to_)
         protocols)
     kernels
@@ -114,6 +136,8 @@ let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
       ~time_between_blocks
       protocol
   in
+  (* Produce block to skip block 1 *)
+  let* () = produce_block_and_wait_for ~sequencer:setup.sequencer 1 in
   scenario setup protocol
 
 (** Helper to parse RPC response. Returns [Some json] if 200, [None] if 404,
@@ -155,7 +179,7 @@ let test_observer_starts =
     ~title:"Test Tezlink observer does not crash at startup"
     ~tags:["observer"]
   @@ fun {sequencer; observer; _} _protocol ->
-  let observer_promise = Evm_node.wait_for_blueprint_applied observer 1 in
+  let observer_promise = Evm_node.wait_for_blueprint_applied observer 3 in
   let* () =
     let*@ _ = Rpc.produce_block sequencer in
     unit
@@ -218,26 +242,26 @@ let test_tezlink_current_level =
 
   (* checks *)
   let* res = rpc_current_level "head" in
-  let* () = check_current_level res 0 in
+  let* () = check_current_level res 2 in
   (* test with offset *)
   let* res = rpc_current_level "head" ~offset:1 in
-  let* () = check_current_level res 1 in
+  let* () = check_current_level res 3 in
   (* test with offset larger than a cycle *)
   let* res = rpc_current_level "head" ~offset:40000 in
-  let* () = check_current_level res 40000 in
-  (* Bake 5 blocks and test that "head" is now at level 5. *)
+  let* () = check_current_level res 40002 in
+  (* Bake 5 blocks and test that "head" is now at level 7. *)
   let* () =
     repeat 5 (fun () ->
         let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* res = rpc_current_level "head" in
-  let* () = check_current_level res 5 in
+  let* () = check_current_level res 7 in
   (* Check with block parameter *)
   let* res = rpc_current_level "head~2" in
-  let* () = check_current_level res 3 in
+  let* () = check_current_level res 5 in
   let* res = rpc_current_level "head~2" ~offset:1 in
-  let* () = check_current_level res 4 in
+  let* () = check_current_level res 6 in
   (* test negative offset *)
   let* res = rpc_current_level "head" ~offset:(-1) in
   Check.(
@@ -247,8 +271,8 @@ let test_tezlink_current_level =
       string
       ~error_msg:"Should have failed: expected %R but got %L") ;
   (* test numeric block parameter *)
-  let* res = rpc_current_level "3" ~offset:1 in
-  let* () = check_current_level res 4 in
+  let* res = rpc_current_level "5" ~offset:1 in
+  let* () = check_current_level res 6 in
   let* res = rpc_current_level "genesis" in
   let* () = check_current_level res 0 in
   unit
@@ -812,14 +836,14 @@ let test_tezlink_header =
         {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
 
-  let*@ n = Rpc.produce_block sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
   let current_timestamp =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
   in
-  let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* () =
+    produce_block_and_wait_for ~timestamp:current_timestamp ~sequencer 4
+  in
   let* block_1 =
     Client.RPC.call ~hooks ~endpoint client
     @@ RPC.get_chain_block_header ~block:"head~1" ()
@@ -861,15 +885,15 @@ let test_tezlink_block_metadata =
     unit
   in
   let* () = check_current_block_metadata () in
-  let*@ _n = Rpc.produce_block sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
   let current_timestamp =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
   in
   let* () = check_current_block_metadata () in
-  let*@ _n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer 2 in
+  let* () =
+    produce_block_and_wait_for ~timestamp:current_timestamp ~sequencer 4
+  in
   check_current_block_metadata ()
 
 let test_tezlink_block_info =
@@ -889,14 +913,14 @@ let test_tezlink_block_info =
         {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
 
-  let*@ n = Rpc.produce_block sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
   let current_timestamp =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
   in
-  let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* () =
+    produce_block_and_wait_for ~timestamp:current_timestamp ~sequencer 4
+  in
   let* block_1 =
     Client.RPC.call ~hooks ~endpoint client
     @@ RPC.get_chain_block ~block:"head~1" ()
@@ -927,8 +951,9 @@ let test_tezlink_bootstrapped =
     Tezos_base.Time.(
       System.now () |> System.to_protocol |> Protocol.to_notation)
   in
-  let*@ n = Rpc.produce_block ~timestamp:current_timestamp sequencer in
-  let* () = Evm_node.wait_for_blueprint_applied sequencer n in
+  let* () =
+    produce_block_and_wait_for ~timestamp:current_timestamp ~sequencer 3
+  in
   let* block =
     Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block_header ()
   in
@@ -1284,7 +1309,7 @@ let test_tezlink_observer_transfer =
   let*@ nb_txs = produce_block sequencer in
   Check.((nb_txs = 1) int)
     ~error_msg:"Expected %R transaction in the block, got %L" ;
-  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* () = Evm_node.wait_for_blueprint_applied observer 3 in
   let* balance1 =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
   in
@@ -1319,10 +1344,10 @@ let test_tezlink_transfer_and_wait =
   (* The branch of the operation injected by the client is the
      grand-parent of the current block. Looking for operation hashes
      relies on the operation_hashes RPC which is not implemented for
-     the genesis block. For this reason, we wait for block level 3
+     the genesis block. For this reason, we wait for block level 5
      before building the operation to ensure that the operation's
      branch is not genesis. *)
-  let* () = Evm_node.wait_for_blueprint_applied sequencer 3 in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 5 in
   let* () =
     Client.transfer
       ~wait:"2"
@@ -1387,12 +1412,12 @@ let test_tezlink_reveal =
   unit
 
 let test_tezlink_bootstrap_block_info =
-  (* This test just makes sure the block info call on block 2 does not fail
-     catastrophically. We check block 2 in particular because at this level
+  (* This test just makes sure the block info call on block 4 does not fail
+     catastrophically. We check block 4 in particular because at this level
      we mock information to index bootstrap accounts. *)
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
-    ~title:"Test of tezlink block info on block 2"
+    ~title:"Test of tezlink block info on block 4"
     ~tags:["bootstrap"; "block_info"]
     ~bootstrap_contracts:[contract]
     ~bootstrap_accounts:[Constant.bootstrap1]
@@ -1405,14 +1430,14 @@ let test_tezlink_bootstrap_block_info =
   let*@ _ = produce_block sequencer in
   let*@ _ = produce_block sequencer in
   let* info =
-    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block ~block:"2" ()
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block ~block:"4" ()
   in
   Check.(
-    JSON.(info |-> "header" |-> "level" |> as_int = 2)
+    JSON.(info |-> "header" |-> "level" |> as_int = 4)
       int
       ~error_msg:
         "Expect %R but got %L: we should have been able to get block info for \
-         level 2") ;
+         level 4") ;
   unit
 
 let test_tezlink_execution =
@@ -1963,6 +1988,10 @@ let test_tezlink_sandbox () =
       ~mode:sequencer_mode
       ()
   in
+
+  (* Skip blocks 0 and 1 so that the transfer happens in the block 2 *)
+  let* () = produce_block_and_wait_for ~sequencer 0 in
+  let* () = produce_block_and_wait_for ~sequencer 1 in
 
   let endpoint =
     Client.(
@@ -2897,8 +2926,8 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
   in
 
   (* make sure there are no transactions in the queue *)
-  let* () = produce_block_and_wait_for ~sequencer 1 in
-  let* () = produce_block_and_wait_for ~sequencer 2 in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
 
   (* **** hardcoded cost values, from protocol **** *)
   (* base cost for manager operations*)
@@ -2962,11 +2991,11 @@ let test_tezlink_prevalidation_gas_limit_lower_bound =
             (transfer ());
         ]
   in
-  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
     check_operations
       ~client:client_tezlink
-      ~block:"3"
+      ~block:"5"
       ~expected:[op_just_enough_hash]
   in
   let* _ =
@@ -3042,8 +3071,8 @@ let test_tezlink_validation_gas_limit =
   let hard_gas_limit_per_block = 1_386_666 in
 
   (* make sure there are no transactions in the queue *)
-  let* () = produce_block_and_wait_for ~sequencer 1 in
-  let* () = produce_block_and_wait_for ~sequencer 2 in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
 
   let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
 
@@ -3064,9 +3093,9 @@ let test_tezlink_validation_gas_limit =
       ~gas_limit:almost_half_block
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2]
+    check_operations ~client:client_tezlink ~block:"5" ~expected:[op1; op2]
   in
 
   (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
@@ -3086,13 +3115,13 @@ let test_tezlink_validation_gas_limit =
       ~gas_limit:(almost_half_block + 100)
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 4 in
-  let* () = produce_block_and_wait_for ~sequencer 5 in
+  let* () = produce_block_and_wait_for ~sequencer 6 in
+  let* () = produce_block_and_wait_for ~sequencer 7 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"4" ~expected:[op3]
+    check_operations ~client:client_tezlink ~block:"6" ~expected:[op3]
   in
   let* () =
-    check_operations ~client:client_tezlink ~block:"5" ~expected:[op4]
+    check_operations ~client:client_tezlink ~block:"7" ~expected:[op4]
   in
   unit
 
@@ -3141,9 +3170,9 @@ let test_tezlink_validation_counter =
       ~dest:Constant.bootstrap1
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2; op3]
+    check_operations ~client:client_tezlink ~block:"5" ~expected:[op1; op2; op3]
   in
   unit
 
@@ -3163,8 +3192,8 @@ let test_tezlink_validation_balance =
   let new_account = Constant.bootstrap3 in
 
   (* make sure there are no transactions in the queue *)
-  let* () = produce_block_and_wait_for ~sequencer 1 in
   let* () = produce_block_and_wait_for ~sequencer 2 in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
 
   (* setup *)
   let amount = 100_000_000 in
@@ -3177,7 +3206,7 @@ let test_tezlink_validation_balance =
       ~gas_limit:5000
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
   let* reveal =
     Operation.Manager.(
       operation [make ~fee:1000 ~source:new_account (reveal new_account ())])
@@ -3186,9 +3215,9 @@ let test_tezlink_validation_balance =
   let* (`OpHash op_reveal) =
     Operation.inject ~dont_wait:true reveal client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () = produce_block_and_wait_for ~sequencer 6 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"4" ~expected:[op_reveal]
+    check_operations ~client:client_tezlink ~block:"6" ~expected:[op_reveal]
   in
 
   (* sanity check *)
@@ -3212,10 +3241,10 @@ let test_tezlink_validation_balance =
       ~amount:(amount + 10)
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 5 in
+  let* () = produce_block_and_wait_for ~sequencer 7 in
   (* big transfer should go in but fail *)
   let* () =
-    check_operations ~client:client_tezlink ~block:"5" ~expected:[big_transfer]
+    check_operations ~client:client_tezlink ~block:"7" ~expected:[big_transfer]
   in
   let* receipt =
     Client.get_receipt_for ~operation:big_transfer client_tezlink
@@ -3248,12 +3277,12 @@ let test_tezlink_validation_balance =
       ~fee:half_amount
       client_tezlink
   in
-  let* () = produce_block_and_wait_for ~sequencer 6 in
+  let* () = produce_block_and_wait_for ~sequencer 8 in
   let* () =
-    check_operations ~client:client_tezlink ~block:"6" ~expected:[big_but_in]
+    check_operations ~client:client_tezlink ~block:"8" ~expected:[big_but_in]
   in
-  let* () = produce_block_and_wait_for ~sequencer 7 in
-  let* () = check_operations ~client:client_tezlink ~block:"7" ~expected:[] in
+  let* () = produce_block_and_wait_for ~sequencer 9 in
+  let* () = check_operations ~client:client_tezlink ~block:"9" ~expected:[] in
   unit
 
 let test_tezlink_gas_vs_l1 =
@@ -3741,10 +3770,10 @@ let test_tezlink_upgrade_kernel_auto_sync =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
+  let timestamp = "2020-01-01T00:00:05Z" in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_tezlink_upgrade_test
     ~genesis_timestamp
-    ~time_between_blocks:Nothing
     ~tags:["sequencer"; "upgrade"; "auto"; "sync"]
     ~title:
       "Tezlink rollup-node kernel upgrade is applied to the sequencer state."
@@ -3793,7 +3822,7 @@ let test_tezlink_upgrade_kernel_auto_sync =
      the kernel is upgraded. *)
   let* _ =
     repeat 2 (fun () ->
-        let*@ _ = produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer in
+        let*@ _ = produce_block ~timestamp sequencer in
         unit)
   in
   let* () =

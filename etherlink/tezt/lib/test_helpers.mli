@@ -348,9 +348,11 @@ val deposit :
 val check_operations :
   client:Client.t -> block:string -> expected:string list -> unit Lwt.t
 
-(** [produce_block_and_wait_for ~sequencer n] Produces a block and wait for
+(** [produce_block_and_wait_for ?timestamp ~sequencer n]
+    Produces a block at [timestamp] and wait for
     blueprint [n] to be applied. *)
-val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
+val produce_block_and_wait_for :
+  ?timestamp:string -> sequencer:Evm_node.t -> int -> unit Lwt.t
 
 val register_sandbox :
   __FILE__:string ->
