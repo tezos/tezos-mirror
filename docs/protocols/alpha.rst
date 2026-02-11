@@ -54,6 +54,8 @@ Data Availability Layer
   ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`)
 - Increase number of slots to 160. (MR :gl:`!20457`)
 - Increase slot size to 380_832 bytes. (MR :gl:`!20457`)
+- Introduced a new optional field ``lag_index`` to DAL entrapment evidence
+  operations. (MR :gl:`!20360`)
 
 Adaptive Issuance
 -----------------
