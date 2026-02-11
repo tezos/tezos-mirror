@@ -6,10 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezlink_imports
-
 (* Provides mock values necessary for constructing L1 types that contain fields
     that are either irrelevant to the L2 or are not yet supported. *)
+
+include Tezlink_imports
+
 let proto_level = 1
 
 let validation_passes = 4
@@ -44,6 +45,12 @@ let baker_initial_deposit = Alpha_context.Tez.of_mutez_exn baker_initial_balance
 
 let faucet_public_key_hash = Signature.V2.Public_key_hash.zero
 
+type account = {
+  pkh : Alpha_context.public_key_hash;
+  pk : Alpha_context.public_key;
+  balance : int64;
+}
+
 let baker_account =
   let public_key_internal =
     let pk_opt =
@@ -52,20 +59,17 @@ let baker_account =
     in
     match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
   in
-  let public_key : Imported_protocol.Alpha_context.public_key =
-    Ed25519 public_key_internal
-  in
-  let public_key_hash : Imported_protocol.Alpha_context.public_key_hash =
+  let public_key : Alpha_context.public_key = Ed25519 public_key_internal in
+  let public_key_hash : Alpha_context.public_key_hash =
     Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
   in
-  Imported_protocol_parameters.Default_parameters.make_bootstrap_account
-    ( public_key_hash,
-      public_key,
-      (* This amount was arbitrarly chosen according to bootstrap account
+  {
+    pkh = public_key_hash;
+    pk = public_key;
+    (* This amount was arbitrarly chosen according to bootstrap account
          in L1 sandbox *)
-      baker_initial_deposit,
-      None,
-      None )
+    balance = baker_initial_balance;
+  }
 
 let contents : Alpha_context.Block_header.contents =
   {
@@ -318,17 +322,12 @@ let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
   [debited_rewards; credited_rewards]
 
 let storage_cycle () =
-  let public_key =
-    match baker_account.public_key with
-    | None -> (* Unreachable *) assert false
-    | Some public_key -> public_key
-  in
   let consensus_pk =
     Imported_protocol.Raw_context.
       {
-        delegate = baker_account.public_key_hash;
-        consensus_pk = public_key;
-        consensus_pkh = baker_account.public_key_hash;
+        delegate = baker_account.pkh;
+        consensus_pk = baker_account.pk;
+        consensus_pkh = baker_account.pkh;
         companion_pk = None;
         companion_pkh = None;
       }

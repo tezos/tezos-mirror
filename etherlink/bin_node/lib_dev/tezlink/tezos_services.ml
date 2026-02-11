@@ -81,17 +81,36 @@ module Protocol_types = struct
   end
 end
 
-module type BLOCK_SERVICES = sig
-  include Tezos_shell_services.Block_services.S
+module type Tezlink_protocol = sig
+  include Tezos_shell_services.Block_services.PROTO
 
-  val deserialize_operations :
-    chain_id:Chain_id.t -> bytes -> operation list tzresult
+  val mock_block_header_data : chain_id:Chain_id.t -> block_header_data tzresult
+
+  val mock_block_header_metadata :
+    Tezos_types.level -> block_header_metadata tzresult
+end
+
+module type Tezlink_block_service = sig
+  module Tezlink_proto : Tezlink_protocol
+
+  module Tezlink_next_proto : Tezlink_protocol
+
+  include module type of
+      Tezos_shell_services.Block_services.Make
+        (Tezlink_proto)
+        (Tezlink_next_proto)
 
   val mock_block_header_data :
     chain_id:Chain_id.t -> Proto.block_header_data tzresult
 
   val mock_block_header_metadata :
     Tezos_types.level -> Proto.block_header_metadata tzresult
+
+  val deserialize_operations :
+    chain_id:Chain_id.t -> bytes -> operation list tzresult
+
+  val deserialize_operations_header :
+    bytes -> (Operation_hash.t * Operation.shell_header * bytes) list tzresult
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -117,6 +136,107 @@ module Imported_protocol = struct
 
   let mock_protocol_data : Block_header_repr.protocol_data =
     {contents; signature}
+
+  let mock_block_header_data ~chain_id:_ : block_header_data tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_data"
+      ~dst:block_header_data_encoding
+      ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
+      mock_protocol_data
+
+  let voting_period ~cycles_per_voting_period ~position ~level_info =
+    let open Tezos_types in
+    (* There's a certain amount of cycle in each period, to get the index
+       of the current, we just divide the current number of cycle by the
+       number of cycle for a period (floor div) *)
+    let index = Int32.div level_info.cycle cycles_per_voting_period in
+    (* The start_position can be determined based on the current position
+       given in parameter. *)
+    let start_position = Int32.(sub (sub level_info.level 1l) position) in
+    Voting_period.
+      {index; kind = Alpha_context.Voting_period.Proposal; start_position}
+
+  let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
+      =
+    let open Tezos_types in
+    let open Result_syntax in
+    (* The number of cycles in the current period is the remainder of the
+       Euclidean division between the current cycle index the number of
+       cycles in a voting period. *)
+    let number_of_cycle_in_period =
+      Int32.rem level_info.cycle cycles_per_voting_period
+    in
+    (* During a voting period, the position parameter is the number of block
+       produced since the beginning of the period. We can deduce it based on
+       the number of cycles in the current period. *)
+    let position =
+      Int32.(
+        add
+          (mul number_of_cycle_in_period block_per_cycle)
+          level_info.cycle_position)
+    in
+    let* voting_period =
+      Voting_period.convert
+        (voting_period ~cycles_per_voting_period ~position ~level_info)
+    in
+    (* The number of block remaining is deducted from the current position
+       and the number of cycles needed to complete a period. *)
+    let remaining =
+      Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
+    in
+    let voting_period_info =
+      Imported_protocol.Alpha_context.Voting_period.
+        {voting_period; position; remaining}
+    in
+    return voting_period_info
+
+  let mock_block_header_metadata level_info =
+    let open Imported_protocol.Apply_results in
+    let open Result_syntax in
+    let proposer =
+      Imported_protocol.Alpha_context.Consensus_key.
+        {
+          delegate = Tezlink_mock.baker_account.pkh;
+          consensus_pkh = Tezlink_mock.baker_account.pkh;
+        }
+    in
+    let balance_updates =
+      let amount = Alpha_context.Tez.of_mutez_exn 0L in
+      Tezlink_mock.balance_udpdate_rewards
+        ~baker:Tezlink_mock.baker_account.pkh
+        ~amount
+    in
+
+    let constant = Tezlink_constants.all_constants.parametric in
+    let* voting_period_info =
+      voting_period_info
+        ~block_per_cycle:constant.blocks_per_cycle
+        ~cycles_per_voting_period:constant.cycles_per_voting_period
+        ~level_info
+    in
+    let* level_info = Protocol_types.Level.convert level_info in
+    return
+      {
+        proposer;
+        baker = proposer;
+        level_info;
+        voting_period_info;
+        nonce_hash = None;
+        consumed_gas = Alpha_context.Gas.Arith.zero;
+        deactivated = [];
+        balance_updates;
+        liquidity_baking_toggle_ema =
+          Imported_protocol.Alpha_context.Per_block_votes
+          .Liquidity_baking_toggle_EMA
+          .zero;
+        adaptive_issuance_vote_ema =
+          Imported_protocol.Alpha_context.Per_block_votes
+          .Adaptive_issuance_launch_EMA
+          .zero;
+        adaptive_issuance_launch_cycle = None;
+        implicit_operations_results = [];
+        dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
+      }
 end
 
 type error +=
@@ -163,10 +283,22 @@ let () =
     (fun error -> Deserialize_operations_header error)
 
 module Make_block_service
-    (Proto : Tezos_shell_services.Block_services.PROTO)
-    (Next_proto : Tezos_shell_services.Block_services.PROTO) =
-struct
-  include Tezos_shell_services.Block_services.Make (Proto) (Next_proto)
+    (Proto : Tezlink_protocol)
+    (Next_proto : Tezlink_protocol) :
+  Tezlink_block_service
+    with module Tezlink_proto = Proto
+     and module Tezlink_next_proto = Next_proto = struct
+  module Tezlink_proto = Proto
+  module Tezlink_next_proto = Next_proto
+
+  let mock_block_header_data ~chain_id = Proto.mock_block_header_data ~chain_id
+
+  let mock_block_header_metadata level = Proto.mock_block_header_metadata level
+
+  include
+    Tezos_shell_services.Block_services.Make
+      (Tezlink_proto)
+      (Tezlink_next_proto)
 
   let deserialize_operations_header bytes =
     let open Result_syntax in
@@ -224,108 +356,7 @@ end
 module Current_block_services = struct
   include Make_block_service (Imported_protocol) (Imported_protocol)
 
-  let voting_period ~cycles_per_voting_period ~position ~level_info =
-    let open Tezos_types in
-    (* There's a certain amount of cycle in each period, to get the index
-       of the current, we just divide the current number of cycle by the
-       number of cycle for a period (floor div) *)
-    let index = Int32.div level_info.cycle cycles_per_voting_period in
-    (* The start_position can be determined based on the current position
-       given in parameter. *)
-    let start_position = Int32.(sub (sub level_info.level 1l) position) in
-    Voting_period.
-      {index; kind = Alpha_context.Voting_period.Proposal; start_position}
-
-  let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
-      =
-    let open Tezos_types in
-    let open Result_syntax in
-    (* The number of cycles in the current period is the remainder of the
-       Euclidean division between the current cycle index the number of
-       cycles in a voting period. *)
-    let number_of_cycle_in_period =
-      Int32.rem level_info.cycle cycles_per_voting_period
-    in
-    (* During a voting period, the position parameter is the number of block
-       produced since the beginning of the period. We can deduce it based on
-       the number of cycles in the current period. *)
-    let position =
-      Int32.(
-        add
-          (mul number_of_cycle_in_period block_per_cycle)
-          level_info.cycle_position)
-    in
-    let* voting_period =
-      Voting_period.convert
-        (voting_period ~cycles_per_voting_period ~position ~level_info)
-    in
-    (* The number of block remaining is deducted from the current position
-       and the number of cycles needed to complete a period. *)
-    let remaining =
-      Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
-    in
-    let voting_period_info =
-      Imported_protocol.Alpha_context.Voting_period.
-        {voting_period; position; remaining}
-    in
-    return voting_period_info
-
-  let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_data"
-      ~dst:Proto.block_header_data_encoding
-      ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
-      Imported_protocol.mock_protocol_data
-
-  let mock_block_header_metadata level_info =
-    let open Imported_protocol.Apply_results in
-    let open Result_syntax in
-    let proposer =
-      Imported_protocol.Alpha_context.Consensus_key.
-        {
-          delegate = Tezlink_mock.baker_account.public_key_hash;
-          consensus_pkh = Tezlink_mock.baker_account.public_key_hash;
-        }
-    in
-    let balance_updates =
-      let amount = Alpha_context.Tez.of_mutez_exn 0L in
-      Tezlink_mock.balance_udpdate_rewards
-        ~baker:Tezlink_mock.baker_account.public_key_hash
-        ~amount
-    in
-
-    let constant = Tezlink_constants.all_constants.parametric in
-    let* voting_period_info =
-      voting_period_info
-        ~block_per_cycle:constant.blocks_per_cycle
-        ~cycles_per_voting_period:constant.cycles_per_voting_period
-        ~level_info
-    in
-    let* level_info = Protocol_types.Level.convert level_info in
-    return
-      {
-        proposer;
-        baker = proposer;
-        level_info;
-        voting_period_info;
-        nonce_hash = None;
-        consumed_gas = Alpha_context.Gas.Arith.zero;
-        deactivated = [];
-        balance_updates;
-        liquidity_baking_toggle_ema =
-          Imported_protocol.Alpha_context.Per_block_votes
-          .Liquidity_baking_toggle_EMA
-          .zero;
-        adaptive_issuance_vote_ema =
-          Imported_protocol.Alpha_context.Per_block_votes
-          .Adaptive_issuance_launch_EMA
-          .zero;
-        adaptive_issuance_launch_cycle = None;
-        implicit_operations_results = [];
-        dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
-      }
-
-  let transfer_receipt account balance : operation_receipt =
+  let transfer_receipt account balance : Imported_protocol.operation_receipt =
     let open Alpha_context.Receipt in
     let open Imported_protocol.Apply_results in
     let contract = Tezos_types.Contract.of_implicit account in
@@ -364,7 +395,7 @@ module Current_block_services = struct
         (Manager_operation_result
            {balance_updates = []; operation_result; internal_operation_results})
     in
-    Receipt (Operation_metadata {contents})
+    Operation_metadata {contents}
 
   let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
     Tezos_types.convert_using_serialization
@@ -373,8 +404,8 @@ module Current_block_services = struct
       ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
       Z.zero
 
-  let create_transfer ~chain_id (account : Alpha_context.public_key_hash)
-      (balance : Alpha_context.Tez.t) : operation tzresult =
+  let create_transfer (account : Alpha_context.public_key_hash)
+      (balance : Alpha_context.Tez.t) =
     let open Result_syntax in
     let open Imported_protocol.Alpha_context in
     let operation =
@@ -400,51 +431,61 @@ module Current_block_services = struct
            })
     in
     let signature = None in
-    let protocol_data = Operation_data {contents; signature} in
-    let shell : Tezos_base.Operation.shell_header =
-      {branch = Tezos_crypto.Hashed.Block_hash.zero}
-    in
     let receipt = transfer_receipt account balance in
-    let hash = Operation_hash.zero in
-    return {chain_id; hash; receipt; shell; protocol_data}
+    return (receipt, Operation_data {contents; signature})
 
-  let activate_bootstraps_with_transfers ~chain_id
+  let activate_bootstraps_with_transfers
       (module Backend : Tezlink_backend_sig.S) =
     let open Lwt_result_syntax in
     let* bootstrap_accounts = Backend.bootstrap_accounts () in
     let*? ops =
       List.map_e
-        (fun (account, balance) -> create_transfer ~chain_id account balance)
+        (fun (account, balance) -> create_transfer account balance)
         bootstrap_accounts
     in
     return ops
 end
 
-module Zero_block_services = struct
-  include Make_block_service (Zero_protocol) (Genesis_protocol)
+module Zero_protocol = struct
+  include Zero_protocol
 
-  let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
+  let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
-      ~name:"block_header_data"
-      ~dst:Proto.block_header_data_encoding
+      ~name:"block_header_metadata"
+      ~dst:block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
 
-  let mock_block_header_metadata _ : Proto.block_header_metadata tzresult =
+  let mock_block_header_data ~chain_id:_ : block_header_data tzresult =
     Tezos_types.convert_using_serialization
-      ~name:"block_header_metadata"
-      ~dst:Proto.block_header_metadata_encoding
+      ~name:"block_header_data"
+      ~dst:block_header_data_encoding
       ~src:Data_encoding.empty
       ()
 end
 
-module Genesis_block_services = struct
-  include Make_block_service (Genesis_protocol) (Imported_protocol)
+module Genesis_protocol = struct
+  include Tezos_protocol_000_Ps9mPmXa.Protocol
 
-  let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
+  let mock_block_header_metadata _ : block_header_metadata tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_metadata"
+      ~dst:block_header_metadata_encoding
+      ~src:Data_encoding.empty
+      ()
+
+  let mock_block_header_data ~chain_id : block_header_data tzresult =
+    let bootstrap_account =
+      Imported_protocol_parameters.Default_parameters.make_bootstrap_account
+        ( baker_account.pkh,
+          baker_account.pk,
+          Alpha_context.Tez.of_mutez_exn baker_account.balance,
+          None,
+          None )
+    in
     let parameter =
       Imported_protocol_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts:[Tezlink_mock.baker_account]
+        ~bootstrap_accounts:[bootstrap_account]
         Tezlink_constants.all_constants.parametric
     in
     let parameter_format_json =
@@ -456,25 +497,22 @@ module Genesis_block_services = struct
       Data_encoding.Binary.to_bytes_exn Data_encoding.json parameter_format_json
     in
     Result_syntax.return
-      Genesis_protocol.
-        {
-          command =
-            Genesis_protocol.Data.Command.Activate
-              {
-                protocol = Imported_protocol.hash;
-                fitness = [];
-                protocol_parameters;
-              };
-          signature = Signature.V0.zero;
-        }
-
-  let mock_block_header_metadata _ : Proto.block_header_metadata tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"block_header_metadata"
-      ~dst:Proto.block_header_metadata_encoding
-      ~src:Data_encoding.empty
-      ()
+      {
+        command =
+          Data.Command.Activate
+            {
+              protocol = Imported_protocol.hash;
+              fitness = [];
+              protocol_parameters;
+            };
+        signature = Signature.V0.zero;
+      }
 end
+
+module Zero_block_services =
+  Make_block_service (Zero_protocol) (Genesis_protocol)
+module Genesis_block_services =
+  Make_block_service (Genesis_protocol) (Imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -499,11 +537,11 @@ type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
 
-type tezlink_rpc_context = {block : block; chain : chain}
+type tezlink_rpc_context = (unit * chain) * block
 
 (** Builds a [tezlink_rpc_context] from paths parameters. *)
 let make_env (chain : chain) (block : block) : tezlink_rpc_context Lwt.t =
-  Lwt.return {block; chain}
+  Lwt.return (((), chain), block)
 
 module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
@@ -588,16 +626,6 @@ let version :
       Tezos_version.Octez_node_version.t )
     Tezos_rpc.Service.t =
   Tezos_shell_services.Version_services.S.version
-
-let protocols :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Tezlink_protocols.protocols )
-    Tezos_rpc.Service.t =
-  import_service Tezos_shell_services.Shell_services.Blocks.S.protocols
 
 (* Queries will be ignored for now. *)
 let contract_info :
@@ -684,66 +712,9 @@ let constants :
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.Constants_services.S.all
 
-let hash :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Block_hash.t )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.hash
-
 let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Chain_services.S.chain_id
-
-let operation_hashes :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Operation_hash.t list list )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.Operation_hashes.operation_hashes
-
-let operation_hashes_in_pass :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context * int,
-      unit,
-      unit,
-      Operation_hash.t list )
-    Tezos_rpc.Service.t =
-  import_service_with_arg
-    Current_block_services.S.Operation_hashes.operation_hashes_in_pass
-
-let operation :
-    ( [`GET],
-      tezlink_rpc_context,
-      (tezlink_rpc_context * int) * int,
-      < force_metadata : bool
-      ; metadata : [`Always | `Never] option
-      ; version : Tezos_shell_services.Block_services.version >,
-      unit,
-      Tezos_shell_services.Block_services.version
-      * Current_block_services.operation )
-    Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
-
-let operations :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      < force_metadata : bool
-      ; metadata : [`Always | `Never] option
-      ; version : Tezlink_protocols.Shell_impl.version >,
-      unit,
-      Tezos_shell_services.Block_services.version
-      * Current_block_services.operation list list )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.Operations.operations
 
 let bootstrapped :
     ( [`GET],
