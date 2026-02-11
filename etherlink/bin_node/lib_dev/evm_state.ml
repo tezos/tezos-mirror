@@ -223,6 +223,8 @@ let read state key =
 
 let storage_version state = Durable_storage.storage_version (read state)
 
+let tezosx_runtimes state = Durable_storage.list_runtimes (read state)
+
 let kernel_version evm_state =
   let open Lwt_syntax in
   let+ version = inspect evm_state Durable_storage_path.kernel_version in

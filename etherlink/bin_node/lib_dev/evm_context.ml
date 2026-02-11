@@ -29,6 +29,7 @@ type head = {
   pending_upgrade : Evm_events.Upgrade.t option;
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
   storage_version : int;
+  tezosx_runtimes : Tezosx.runtime list;
 }
 
 type parameters = {
@@ -76,6 +77,7 @@ type session_state = {
             observer when IC is not enabled)
           - [Awaiting_next_block_info]: IC enabled, waiting for valid block info
           - [Executing]: Actively executing transactions for IC *)
+  mutable tezosx_runtimes : Tezosx.runtime list;
 }
 
 type t = {
@@ -231,6 +233,7 @@ module State = struct
           last_split_block;
           post_transaction_run_hook;
           future_block_info;
+          tezosx_runtimes;
         } =
       {
         context;
@@ -244,6 +247,7 @@ module State = struct
         last_split_block;
         post_transaction_run_hook;
         future_block_info;
+        tezosx_runtimes;
       }
 
     (* [apply session session'] modifies [session] in-place to match the content of [session']. *)
@@ -260,6 +264,7 @@ module State = struct
           last_split_block;
           post_transaction_run_hook;
           future_block_info;
+          tezosx_runtimes;
         } =
       session.context <- context ;
       session.storage_version <- storage_version ;
@@ -271,7 +276,8 @@ module State = struct
       session.evm_state <- evm_state ;
       session.last_split_block <- last_split_block ;
       session.post_transaction_run_hook <- post_transaction_run_hook ;
-      session.future_block_info <- future_block_info
+      session.future_block_info <- future_block_info ;
+      session.tezosx_runtimes <- tezosx_runtimes
 
     let session_to_head_info session =
       {
@@ -288,6 +294,7 @@ module State = struct
             (fun pending_upgrade -> pending_upgrade.Evm_store.sequencer_upgrade)
             session.pending_sequencer_upgrade;
         storage_version = session.storage_version;
+        tezosx_runtimes = session.tezosx_runtimes;
       }
 
     let run ctxt (k : t -> Sqlite.conn -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t
@@ -590,6 +597,7 @@ module State = struct
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
     let* storage_version = Evm_state.storage_version evm_state in
+    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
       let (Ex_tx_container tx_container) = ctxt.tx_container in
@@ -615,6 +623,7 @@ module State = struct
       Evm_state.current_block_hash ~chain_family evm_state
     in
     ctxt.session.storage_version <- storage_version ;
+    ctxt.session.tezosx_runtimes <- tezosx_runtimes ;
     ctxt.session.next_blueprint_number <- next_blueprint_number ;
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.current_block_hash <- current_block_hash ;
@@ -1447,6 +1456,7 @@ module State = struct
     let* () =
       if applied_kernel_upgrade then (
         let* storage_version = Evm_state.storage_version evm_state in
+        let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
         ctxt.session.pending_upgrade <- None ;
         Result.iter
           (* Etherlink kernel always set a storage version, the error case
@@ -1454,6 +1464,10 @@ module State = struct
           (fun storage_version ->
             ctxt.session.storage_version <- storage_version)
           storage_version ;
+        Result.iter
+          (fun tezosx_runtimes ->
+            ctxt.session.tezosx_runtimes <- tezosx_runtimes)
+          tezosx_runtimes ;
         return_unit)
       else return_unit
     in
@@ -2104,6 +2118,8 @@ module State = struct
 
     let* storage_version = Evm_state.storage_version evm_state in
 
+    let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
+
     let* last_split_block =
       match history_mode with
       | Rolling _ | Full _ -> Evm_store.Irmin_chunks.latest conn
@@ -2136,6 +2152,7 @@ module State = struct
             last_split_block;
             post_transaction_run_hook = None;
             future_block_info;
+            tezosx_runtimes;
           };
         store;
         signer;
