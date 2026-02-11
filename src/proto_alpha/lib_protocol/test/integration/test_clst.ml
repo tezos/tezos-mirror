@@ -2206,3 +2206,30 @@ let () =
   match active_parameters with
   | None -> return_unit
   | Some _ -> Test.fail ~loc:__LOC__ "Delegate shouldn't have parameters"
+
+let () =
+  register_test ~title:"Test baker unregistration when not registered"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  (* Let's send an unregister operation, which is expected to fail *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let*! b = Block.bake ~operation:unregister_tx b in
+  match b with
+  | Ok _ ->
+      Test.fail
+        ~loc:__LOC__
+        "Operation is invalid, a non registered delegate cannot unregister"
+  | Error e -> Error_helpers.expect_clst_unregistered_delegate ~loc:__LOC__ e

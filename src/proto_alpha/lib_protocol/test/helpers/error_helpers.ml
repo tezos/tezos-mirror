@@ -308,7 +308,18 @@ let expect_clst_contract_is_not_delegate ~loc errs =
 
 let expect_negative_ticket_balance ~loc errs =
   Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
     | [Ticket_storage.Negative_ticket_balance _] -> true
+    | _ -> false)
+
+let expect_clst_unregistered_delegate ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter_errors.Runtime_contract_error _
+      :: Script_native.CLST_contract.Delegate_is_not_registered _ :: _ ->
+        true
     | _ -> false)
 
 let expect_tz5_account_disabled ~loc errs =
