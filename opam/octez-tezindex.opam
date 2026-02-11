@@ -1,0 +1,59 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "octez-rust-deps"
+  "bls12-381"
+  "octez-libs"
+  "octez-shell-libs"
+  "caqti-driver-postgresql" { >= "2.0.1" }
+  "caqti-driver-sqlite3" { >= "2.0.1" & < "2.2.0" }
+  "caqti-lwt" { >= "2.0.1" }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
+  "octez-rpc-process"
+  "safepass"
+  "lwt" { >= "5.7.0" & < "5.9.0" }
+  "x509" { >= "1.0.0" }
+]
+depopts: [
+  "octez-protocol-001-PtCJ7pwo-libs"
+  "octez-protocol-002-PsYLVpVv-libs"
+  "octez-protocol-003-PsddFKi3-libs"
+  "octez-protocol-004-Pt24m4xi-libs"
+  "octez-protocol-005-PsBabyM1-libs"
+  "octez-protocol-006-PsCARTHA-libs"
+  "octez-protocol-007-PsDELPH1-libs"
+  "octez-protocol-008-PtEdo2Zk-libs"
+  "octez-protocol-009-PsFLoren-libs"
+  "octez-protocol-010-PtGRANAD-libs"
+  "octez-protocol-011-PtHangz2-libs"
+  "octez-protocol-012-Psithaca-libs"
+  "octez-protocol-013-PtJakart-libs"
+  "octez-protocol-014-PtKathma-libs"
+  "octez-protocol-015-PtLimaPt-libs"
+  "octez-protocol-016-PtMumbai-libs"
+  "octez-protocol-017-PtNairob-libs"
+  "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisB-libs"
+  "octez-protocol-020-PsParisC-libs"
+  "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-022-PsRiotum-libs"
+  "octez-protocol-023-PtSeouLo-libs"
+  "octez-protocol-024-PtTALLiN-libs"
+  "octez-protocol-alpha-libs"
+]
+build: [
+  ["rm" "-rf" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+available: os-family != "windows"
+synopsis: "Tezos: tezindex, a delegate operations monitor"

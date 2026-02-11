@@ -56,6 +56,18 @@
    (system
     "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev -cclib -lcrypto -cclib -lssl -cclib -lpgport -cclib -lpgcommon)' || echo '()'"))))
 
+; This file is included in the link_flags stanza of tezindex server binary when
+; we want a static build.
+
+(rule
+ (target static-link-flags-tezindex.sexp)
+ (action
+  (with-stdout-to
+   %{target}
+   (system
+    "[ '%{profile}' = 'static' ] && echo '(-ccopt -static -cclib -lusb-1.0 -cclib -ludev -cclib -lcrypto -cclib -lssl -cclib -lpgport -cclib -lpgcommon)' || echo '()'"))))
+
+
 ; This file is uncluded in the link_flags stanza for the EVM node, to
 ; accomodate with how Alpine Linux handles threads stacks.
 

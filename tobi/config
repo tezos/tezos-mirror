@@ -144,6 +144,7 @@ octez-smart-rollup-wasm-debugger-plugin: src/bin_wasm_debugger/plugin
 octez-snoop: src/bin_snoop
 octez-store-tests: src/lib_store/unix/test
 octez-testnet-scenarios: src/bin_testnet_scenarios
+octez-tezindex: tezindex/bin_tezindex
 octez-teztale: teztale/bin_teztale_archiver, teztale/bin_teztale_server, teztale/bin_teztale_snitch
 octez-version: src/lib_version/exe, src/lib_version/print, src/lib_version/value/
 octogram: src/bin_octogram, src/lib_octogram
