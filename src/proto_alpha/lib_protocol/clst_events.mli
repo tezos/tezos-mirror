@@ -64,3 +64,17 @@ val allowance_update_event :
   new_allowance:CLST_types.nat ->
   diff:CLST_types.int ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** [operator_update_event] returns an internal event operation of type
+    (pair %operator_update
+      (address %owner)
+      (pair (address %operator) (pair (nat %token_id) (bool %is_operator))))
+    with tag [entrypoint]. *)
+val operator_update_event :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  owner:address ->
+  operator:address ->
+  token_id:CLST_types.nat ->
+  is_operator:bool ->
+  (Script_typed_ir.operation * context) tzresult Lwt.t

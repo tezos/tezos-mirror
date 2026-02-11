@@ -155,6 +155,15 @@ module CLST_types : sig
     tup5
     ty_node
     tzresult
+
+  val operator_update_event_type :
+    ( address (* owner *),
+      address (* operator *),
+      nat (* token_id *),
+      bool (* is_operator *) )
+    tup4
+    ty_node
+    tzresult
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)

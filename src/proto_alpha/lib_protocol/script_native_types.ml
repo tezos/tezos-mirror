@@ -430,6 +430,17 @@ module CLST_types = struct
         (add_name "diff" int_ty)
     in
     return @@ add_name "allowance_update" x
+
+  let operator_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "owner" address_ty)
+        (add_name "operator" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "is_operator" bool_ty)
+    in
+    return @@ add_name "operator_update" x
 end
 
 type ('arg, 'storage) kind =
