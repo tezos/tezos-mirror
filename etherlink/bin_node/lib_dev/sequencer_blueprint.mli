@@ -79,7 +79,9 @@ val maximum_usable_space_in_blueprint : int -> int
    hold at once. *)
 val maximum_chunks_per_l1_level : int
 
-type blueprint_version = Legacy
+type blueprint_version = Legacy | V1
+
+val evm_runtime_id : string
 
 type kernel_blueprint = {
   version : blueprint_version;

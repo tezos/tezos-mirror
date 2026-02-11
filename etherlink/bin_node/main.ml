@@ -1099,6 +1099,7 @@ let blueprint_version_arg =
     ~placeholder:"0"
   @@ Tezos_clic.parameter (fun () -> function
        | "0" -> return Legacy
+       | "1" -> return V1
        | s -> failwith "Invalid blueprint version %S" s)
 
 let common_config_args =

@@ -98,11 +98,15 @@ let maximum_usable_space_in_blueprint chunks_count =
 
 let maximum_chunks_per_l1_level = 512 * 1024 / 4096
 
-type blueprint_version = Legacy
+type blueprint_version = Legacy | V1
+
+let evm_runtime_id = "\001"
 
 let encode_transaction ~version raw =
   let open Rlp in
-  match version with Legacy -> Value (Bytes.of_string raw)
+  match version with
+  | Legacy -> Value (Bytes.of_string raw)
+  | V1 -> Value (Bytes.of_string (evm_runtime_id ^ raw))
 
 type kernel_blueprint = {
   version : blueprint_version;
@@ -132,7 +136,11 @@ let kernel_blueprint_to_rlp
   let unversioned_blueprint =
     [parent_hash; delayed_transactions; messages; timestamp]
   in
-  match version with Legacy -> List unversioned_blueprint
+  match version with
+  | Legacy -> List unversioned_blueprint
+  | V1 ->
+      let version_char = Char.chr 1 in
+      List (Value (Bytes.make 1 version_char) :: unversioned_blueprint)
 
 let kernel_blueprint_parent_hash_of_rlp s =
   match Rlp.decode s with
