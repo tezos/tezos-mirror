@@ -1310,6 +1310,14 @@ let check_pending_parameters_and_return_next_activation_cycle ~loc b
     pending_parameters_list
     None
 
+let check_delegate_is_eventually_registered ctxt pkh =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = Block.get_alpha_ctxt ctxt in
+  let*@ registered =
+    Clst_contract_storage.is_delegate_eventually_registered ctxt pkh
+  in
+  return registered
+
 let () =
   register_test ~title:"Test baker registration" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -1339,7 +1347,7 @@ let () =
 
   (* Check that the baker is considered registered. *)
   let* eventually_registered =
-    Delegate_services.clst_eventually_registered Block.rpc_ctxt b delegate_pkh
+    check_delegate_is_eventually_registered b delegate_pkh
   in
   let* () = Assert.is_true ~loc:__LOC__ eventually_registered in
 
@@ -2022,3 +2030,105 @@ let () =
         Error_helpers.expect_negative_ticket_balance ~loc:__LOC__ trace
   in
   return_unit
+
+let () =
+  register_test ~title:"Test baker unregistration with active parameters"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let delegate_pkh =
+    match delegate with
+    | Contract.Implicit pkh -> pkh
+    | Contract.Originated _ -> assert false
+  in
+  let* registered =
+    Delegate_services.clst_registered Block.rpc_ctxt b delegate_pkh
+  in
+  let* () = Assert.is_true ~loc:__LOC__ (not registered) in
+  let* b, parameters = register_delegate_and_bake b delegate in
+
+  (* Check that the pending parameters are the only parameters registered, and
+     bake until the cycle where these parameters will be activated. *)
+  let* activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Update parameters]
+  in
+  let activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) activation_cycle
+  in
+  let* b = Block.bake_until_cycle activation_cycle b in
+
+  (* Parameters should have been activated. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  let* () =
+    match active_parameters with
+    | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
+    | Some _ -> return_unit
+  in
+
+  (* Let's send an unregister operation *)
+  let* unregister_tx = Op.clst_unregister_delegate (Context.B b) delegate in
+  let* b = Block.bake ~operation:unregister_tx b in
+  let* unregister_activation_cycle =
+    check_pending_parameters_and_return_next_activation_cycle
+      ~loc:__LOC__
+      b
+      delegate_pkh
+      [Clst_delegates_parameters_repr.Unregister]
+  in
+  let unregister_activation_cycle =
+    Option.value_f ~default:(fun _ -> assert false) unregister_activation_cycle
+  in
+
+  (* Check that the delegate will eventually unregister. *)
+  let* is_eventually_registered =
+    check_delegate_is_eventually_registered b delegate_pkh
+  in
+  let* () =
+    if is_eventually_registered then
+      Test.fail
+        ~loc:__LOC__
+        "Delegate is expected to be eventually unregistered ????"
+    else return_unit
+  in
+  let* b = Block.bake_until_cycle unregister_activation_cycle b in
+
+  (* Check that the delegate is unregistered. *)
+  let* is_registered =
+    Delegate_services.clst_registered Block.rpc_ctxt b delegate_pkh
+  in
+  let* () =
+    if is_registered then
+      Test.fail ~loc:__LOC__ "Delegate is expected to be unregistered"
+    else return_unit
+  in
+  (* Parameters should be unregistered by now, so it doesn't have parameters anymore. *)
+  let* active_parameters =
+    Delegate_services.active_clst_staking_parameters
+      Block.rpc_ctxt
+      b
+      delegate_pkh
+  in
+  match active_parameters with
+  | None -> return_unit
+  | Some _ -> Test.fail ~loc:__LOC__ "Delegate shouldn't have parameters"

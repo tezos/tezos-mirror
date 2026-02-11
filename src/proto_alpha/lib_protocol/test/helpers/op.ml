@@ -1980,3 +1980,20 @@ let clst_update_delegate_parameters ?force_reveal ?counter ?fee ?gas_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let clst_unregister_delegate ?force_reveal ?counter ?fee ?gas_limit
+    ?storage_limit (ctxt : Context.t) (src : Contract.t) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "unregister_delegate")
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
