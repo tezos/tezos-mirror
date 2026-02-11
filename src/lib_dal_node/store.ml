@@ -366,7 +366,8 @@ module Shards_disk = struct
     in
     return_unit
 
-  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot =
+  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot
+      ~lru_size =
     let open Lwt_result_syntax in
     if min_shards_to_reconstruct_slot <= 0 then
       tzfail
@@ -374,9 +375,7 @@ module Shards_disk = struct
            {given = min_shards_to_reconstruct_slot})
     else
       let root_dir = Filename.concat node_store_dir shard_store_dir in
-      let* shards_store =
-        KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
-      in
+      let* shards_store = KVS.init ~lru_size ~root_dir in
       return {shards_store; min_shards_to_reconstruct_slot}
 end
 
@@ -484,7 +483,8 @@ module Shards = struct
 
   type t = {disk : Disk.t option; cache : Cache.t}
 
-  let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
+  let init ~profile_ctxt ~proto_parameters ~lru_size node_store_dir
+      shard_store_dir =
     let open Lwt_result_syntax in
     let* disk =
       if Profile_manager.is_attester_only_profile profile_ctxt then return_none
@@ -500,6 +500,7 @@ module Shards = struct
             node_store_dir
             shard_store_dir
             ~min_shards_to_reconstruct_slot
+            ~lru_size
         in
         return_some store
     in
@@ -612,9 +613,9 @@ module Slots = struct
     let layout = make_file_layout cryptobox in
     slots_layouts := SlotsLayouts.add level layout !slots_layouts
 
-  let init node_store_dir slot_store_dir =
+  let init node_store_dir slot_store_dir ~lru_size =
     let root_dir = Filename.concat node_store_dir slot_store_dir in
-    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+    KVS.init ~lru_size ~root_dir
 
   let add_slot t slot (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
@@ -680,6 +681,8 @@ module Slot_id_cache = struct
     fun t Types.Slot_id.{slot_level; slot_index} ->
       Levels.find_opt t slot_level
       |> Option.filter_map (Fun.flip get_opt slot_index)
+
+  let fold = Levels.fold
 end
 
 module Traps = struct
@@ -931,17 +934,17 @@ end
 
 (** Store context *)
 type t = {
-  statuses_cache : Statuses_cache.t;
+  mutable statuses_cache : Statuses_cache.t;
   shards : Shards.t;
   slots : Slots.t;
-  traps : Traps.t;
+  mutable traps : Traps.t;
   not_yet_published_cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* Cache of not-yet-published slots, shards, and shard proofs. The length
          of the array is the number of shards per slot *)
   chain_id : Chain_id.rw Chain_id.t;
-  finalized_commitments : Slot_id_cache.t;
+  mutable finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.rw Last_processed_level.t;
   first_seen_level : First_seen_level.rw First_seen_level.t;
   skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
@@ -963,6 +966,54 @@ let shards {shards; _} = shards
 let skip_list_cells t = t.skip_list_cells_store
 
 let statuses_cache {statuses_cache; _} = statuses_cache
+
+let resize_caches t proto_parameters =
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
+  in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let new_statuses_cache =
+    let size =
+      Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Statuses_cache.init size in
+    Slot_map.fold
+      (fun slot_id status () -> Statuses_cache.add_status cache status slot_id)
+      t.statuses_cache
+      () ;
+    cache
+  in
+  let new_finalized_commitments =
+    let capacity =
+      Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+    in
+    let cache = Slot_id_cache.create ~capacity in
+    Slot_id_cache.fold
+      (fun level table () -> Slot_id_cache.Levels.replace cache level table)
+      t.finalized_commitments
+      () ;
+    cache
+  in
+  let new_traps =
+    let capacity =
+      Constants.traps_cache_size
+        ~number_of_slots
+        ~number_of_shards
+        ~attestation_lag
+        ~traps_fraction
+    in
+    let cache = Traps.create ~capacity in
+    Traps.Level_map.fold
+      (fun level slots () -> Traps.Level_map.replace cache level slots)
+      t.traps
+      () ;
+    cache
+  in
+  t.statuses_cache <- new_statuses_cache ;
+  t.finalized_commitments <- new_finalized_commitments ;
+  t.traps <- new_traps
 
 let slots {slots; _} = slots
 
@@ -1092,13 +1143,43 @@ let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let* () = check_version_and_may_upgrade base_dir in
-  let statuses_cache = Statuses_cache.init Constants.statuses_cache_size in
-  let* shards =
-    Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  let number_of_shards =
+    proto_parameters.cryptobox_parameters.number_of_shards
   in
-  let* slots = Slots.init base_dir Stores_dirs.slot in
+  let attestation_lag = proto_parameters.attestation_lag in
+  let traps_fraction = proto_parameters.traps_fraction in
+  let statuses_cache_size =
+    Constants.statuses_cache_size ~number_of_slots ~attestation_lag
+  in
+  let shards_store_lru_size =
+    Constants.shards_store_lru_size ~number_of_slots
+  in
+  let slots_store_lru_size = Constants.slots_store_lru_size in
+  let traps_cache_size =
+    Constants.traps_cache_size
+      ~number_of_slots
+      ~number_of_shards
+      ~attestation_lag
+      ~traps_fraction
+  in
+  let slot_id_cache_size =
+    Constants.slot_id_cache_size ~number_of_slots ~attestation_lag
+  in
+  let statuses_cache = Statuses_cache.init statuses_cache_size in
+  let* shards =
+    Shards.init
+      ~profile_ctxt
+      ~proto_parameters
+      ~lru_size:shards_store_lru_size
+      base_dir
+      Stores_dirs.shard
+  in
+  let* slots =
+    Slots.init base_dir Stores_dirs.slot ~lru_size:slots_store_lru_size
+  in
   let* () = Version.(write_version_file ~base_dir ~version:current_version) in
-  let traps = Traps.create ~capacity:Constants.traps_cache_size in
+  let traps = Traps.create ~capacity:traps_cache_size in
   let* chain_id = Chain_id.init ~root_dir:base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
@@ -1112,8 +1193,7 @@ let init config profile_ctxt proto_parameters =
       statuses_cache;
       not_yet_published_cache =
         Commitment_indexed_cache.create Constants.not_yet_published_cache_size;
-      finalized_commitments =
-        Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      finalized_commitments = Slot_id_cache.create ~capacity:slot_id_cache_size;
       chain_id;
       last_processed_level;
       first_seen_level;

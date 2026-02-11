@@ -229,6 +229,19 @@ val skip_list_cells : t -> Dal_store_sqlite3.Skip_list_cells.t
     [t]. *)
 val statuses_cache : t -> Statuses_cache.t
 
+(** [resize_caches t proto_parameters] resizes in-memory caches whose capacity
+    depends on DAL protocol parameters. Existing entries are preserved when
+    the capacity increases.
+
+    This function replaces the cache objects in [t] (it does not resize them
+    in place). Callers that captured a reference to a cache field before the
+    resize (e.g. via {!traps} or {!statuses_cache}) will keep using the old,
+    stale cache. This is safe as long as [resize_caches] is called before any
+    concurrent cache readers/writers in the same block-processing cycle — which
+    is the case today since it runs at the beginning of
+    {!Node_context.may_add_plugin_and_cryptobox}. *)
+val resize_caches : t -> Types.proto_parameters -> unit
+
 (** [slots t] returns the slots store associated with the store
     [t]. *)
 val slots : t -> Slots.t
