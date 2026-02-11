@@ -615,6 +615,54 @@ let test_michelson_call_nonexistent_contract =
         ~amount:transfer_amount
         ())
 
+(** Call an existing Michelson contract with a non-existing entrypoint via
+    the delayed inbox. The operation should fail: only fees are consumed. *)
+let test_michelson_call_wrong_entrypoint =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson call to wrong entrypoint on tezos X"
+    ~tags:["call"; "michelson"; "entrypoint"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sequencer in
+  (* Originate store_input.tz (only has "default" entrypoint) *)
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "store_input"]
+      ~init_storage_data:{|""|}
+      protocol
+  in
+  (* Call with a non-existing entrypoint: only fees should be consumed *)
+  with_check_source_delta_balance
+    ~source
+    ~tez_client
+    ~expected_consumed:1000
+    (fun () ->
+      call_michelson_contract_via_delayed_inbox
+        ~sc_rollup_address
+        ~sc_rollup_node
+        ~client
+        ~l1_contracts
+        ~sequencer
+        ~source
+        ~counter:2
+        ~dest:kt1_address
+        ~arg_data:{|"hello"|}
+        ~entrypoint:"nonexistent"
+        ~amount:1_234_567
+        ())
+
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test
     ~title:"Test the tez_getTezosEthereumAddress RPC"
@@ -789,6 +837,7 @@ let () =
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_call_nonexistent_contract [Alpha] ;
+  test_michelson_call_wrong_entrypoint [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
