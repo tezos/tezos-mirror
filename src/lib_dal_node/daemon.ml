@@ -51,7 +51,7 @@ let[@warning "-32"] may_start_profiler data_dir =
   | None -> ()
 
 (* Monitor and process finalized heads. *)
-let on_new_finalized_head ctxt cctxt crawler =
+let on_new_finalized_head ctxt cctxt crawler amplificator =
   let open Lwt_result_syntax in
   let stream = Crawler.finalized_heads_stream crawler in
   let rec loop () =
@@ -74,6 +74,7 @@ let on_new_finalized_head ctxt cctxt crawler =
              finalized_block_hash
              finalized_shell_header
              ~launch_time
+             ?amplificator
            [@profiler.record_s
              {verbosity = Notice; profiler_module = Profiler}
                "new_finalized_head"])
@@ -857,6 +858,9 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   () [@profiler.overwrite may_start_profiler data_dir] ;
   let* _ =
     Lwt.pick
-      [Lwt.bind gs return; daemonize [on_new_finalized_head ctxt cctxt crawler]]
+      [
+        Lwt.bind gs return;
+        daemonize [on_new_finalized_head ctxt cctxt crawler amplificator];
+      ]
   in
   return_unit

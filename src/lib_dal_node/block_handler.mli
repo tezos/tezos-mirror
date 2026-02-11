@@ -32,8 +32,8 @@
 
 *)
 
-(** [new_finalized_head ctxt cctxt l1_crawler cryptobox block_hash shell_header
-    ~launch_time] processes a new finalized L1 block. It performs cleanup of old
+(** [new_finalized_head ctxt cctxt l1_crawler cryptobox block_hash ~launch_time
+    ?amplificator shell_header] processes a new finalized L1 block. It performs cleanup of old
     DAL data, updates the committee cache, re-registers the gossipsub message
     validation hook, and triggers block-level processing (e.g. slot header
     storage, shard publishing to Gossipsub, attestation analysis). This function
@@ -43,8 +43,9 @@ val new_finalized_head :
   Rpc_context.t ->
   Crawler.t ->
   Block_hash.t ->
-  Block_header.shell_header ->
   launch_time:float ->
+  ?amplificator:Amplificator.t ->
+  Block_header.shell_header ->
   (unit, tztrace) result Lwt.t
 
 (** [fetch_and_store_skip_list_cells ctxt cctxt proto_parameters ~attested_level plugin]
