@@ -18,6 +18,7 @@ pub struct CrossRuntimeContext {
     pub block_number: U256,
 }
 
+#[derive(Debug)]
 pub enum CrossCallResult {
     /// execution completed normally, return data is the output
     Success(Vec<u8>),

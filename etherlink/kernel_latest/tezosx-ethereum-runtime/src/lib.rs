@@ -338,7 +338,178 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::Keccak256;
+    use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
+    use primitive_types::U256;
+    use revm::primitives::Address;
+    use revm::state::{AccountInfo, Bytecode};
+    use revm_etherlink::{
+        helpers::storage::bytes_hash,
+        storage::{code::CodeStorage, world_state_handler::StorageAccount},
+    };
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{
+        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
+        TezosXRuntimeError,
+    };
+
+    use crate::EthereumRuntime;
+
+    /// Minimal Registry stub for testing EthereumRuntime in isolation.
+    struct StubRegistry;
+
+    impl Registry for StubRegistry {
+        fn bridge<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _destination_runtime: RuntimeId,
+            _destination_address: &[u8],
+            _source_address: &[u8],
+            _amount: U256,
+            _data: &[u8],
+            _context: CrossRuntimeContext,
+        ) -> Result<CrossCallResult, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+
+        fn generate_alias<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _native_address: &[u8],
+            _runtime_id: RuntimeId,
+            _context: CrossRuntimeContext,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+
+        fn address_from_string(
+            &self,
+            _address_str: &str,
+            _runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+    }
+
+    /// Adapted from `test_simple_transfer` in `revm/src/lib.rs`.
+    #[test]
+    fn test_call_simple_transfer() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let caller = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+        let value = U256::from(5);
+
+        // Set up caller with sufficient balance
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::from(1000),
+                    nonce: 0,
+                    code_hash: Default::default(),
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        let context = CrossRuntimeContext {
+            gas_limit: u64::MAX,
+            timestamp: U256::from(1),
+            block_number: U256::from(1),
+        };
+
+        let result = runtime.call(
+            &registry,
+            &mut host,
+            &caller.0 .0,
+            &destination.0 .0,
+            value,
+            &[],
+            context,
+        );
+        assert!(result.is_ok(), "EVM call should succeed: {result:?}");
+
+        // Verify destination received the transfer
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+        let info = destination_account.info(&mut host).unwrap();
+        assert_eq!(info.balance, revm::primitives::U256::from(5));
+    }
+
+    /// Adapted from `test_contract_call_sload_sstore` in `revm/src/lib.rs`.
+    #[test]
+    fn test_call_executes_contract_bytecode() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let caller = Address::from_slice(&[0x11; 20]);
+        let contract = Address::from_slice(&[0x22; 20]);
+
+        // Set up caller with balance
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::from(1000),
+                    nonce: 0,
+                    code_hash: Default::default(),
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        // Deploy a tiny contract:
+        //   PUSH1 0x42   (value to store)
+        //   PUSH1 0x01   (storage slot)
+        //   SSTORE       (store 0x42 at slot 1)
+        //   PUSH1 0x01
+        //   SLOAD        (load from slot 1)
+        let bytecode_raw = Bytes::from_hex("6042600155600154").unwrap();
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
+        contract_account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::ZERO,
+                    nonce: 0,
+                    code_hash,
+                    account_id: None,
+                    code: Some(Bytecode::new_raw(bytecode_raw.clone())),
+                },
+            )
+            .unwrap();
+        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+
+        let context = CrossRuntimeContext {
+            gas_limit: u64::MAX,
+            timestamp: U256::from(1),
+            block_number: U256::from(1),
+        };
+
+        let result = runtime.call(
+            &registry,
+            &mut host,
+            &caller.0 .0,
+            &contract.0 .0,
+            U256::zero(),
+            &[],
+            context,
+        );
+        assert!(result.is_ok(), "EVM call should succeed: {result:?}");
+
+        // Verify the contract wrote 0x42 to storage slot 1
+        let slot_value = contract_account
+            .get_storage(&host, &revm::primitives::U256::from(1))
+            .unwrap();
+        assert_eq!(slot_value, revm::primitives::U256::from(0x42));
+    }
 
     /// Test that alias addresses are computed deterministically from native addresses.
     #[test]
