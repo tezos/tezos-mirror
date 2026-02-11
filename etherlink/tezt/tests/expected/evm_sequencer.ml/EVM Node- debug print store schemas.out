@@ -38,7 +38,7 @@ CREATE TABLE blocks (
   level serial PRIMARY KEY,
   hash VARCHAR(32) NOT NULL,
   block BLOB NOT NULL
-);
+, tez_block BLOB);
 
 CREATE TABLE transactions (
   block_hash VARCHAR(32) NOT NULL,

@@ -437,7 +437,7 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 22
+    let version = 23
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -923,8 +923,10 @@ DO UPDATE SET value = excluded.value
     let table = "blocks" (* For opentelemetry *)
 
     let insert =
-      (t3 level block_hash block ->. unit) ~name:__FUNCTION__ ~table
-      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+      (t4 level block_hash block (option tezos_block) ->. unit)
+        ~name:__FUNCTION__
+        ~table
+      @@ {eos|INSERT INTO blocks (level, hash, block, tez_block) VALUES (?, ?, ?, ?)|eos}
 
     let tez_insert =
       (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
@@ -937,6 +939,10 @@ DO UPDATE SET value = excluded.value
     let tez_select_with_level =
       (level ->? tezos_block) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
+    let tezosx_select_tez_block_with_level =
+      (level ->? tezos_block) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT tez_block FROM blocks WHERE level = ?|eos}
 
     let select_with_hash =
       (block_hash ->? block) ~name:__FUNCTION__ ~table
@@ -1814,10 +1820,10 @@ module Irmin_chunks = struct
 end
 
 module Blocks = struct
-  let store store
+  let store ?tez_block store
       (block : Ethereum_types.legacy_transaction_object Ethereum_types.block) =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
+    Db.exec conn Q.Blocks.insert (block.number, block.hash, block, tez_block)
 
   let tez_store store (block : L2_types.Tezos_block.t) =
     with_connection store @@ fun conn ->
@@ -1825,6 +1831,14 @@ module Blocks = struct
       conn
       Q.Blocks.tez_insert
       (Qty (Z.of_int32 block.level), block.hash, block)
+
+  let tezosx_find_tez_block_with_level store level =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.tezosx_select_tez_block_with_level level
+    in
+    return block_opt
 
   let block_with_objects store block =
     let open Lwt_result_syntax in

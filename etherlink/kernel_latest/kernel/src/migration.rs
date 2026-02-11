@@ -769,6 +769,11 @@ fn migrate_to<Host: Runtime>(
             // have a version field
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V49 => {
+            // Starting version 49, the kernel produce blocks for Michelson Runtime
+            // when TezosX feature is activated.
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

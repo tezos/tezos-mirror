@@ -791,6 +791,31 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             block_param_to_block_number ~chain_family:L2_types.Michelson
         end)
         (Tezlink_block_storage)
+
+    module Tezosx_block_storage : Tezlink_block_storage_sig.S = struct
+      let nth_block level =
+        let open Lwt_result_syntax in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* block_opt =
+          Evm_store.Blocks.tezosx_find_tez_block_with_level conn (Qty level)
+        in
+        match block_opt with
+        | None -> failwith "TezosX Tezos block %a not found" Z.pp_print level
+        | Some block -> return block
+
+      let nth_block_hash = nth_block_hash
+    end
+
+    (* Overwrites Tezos using the store instead of the durable_storage *)
+    module Tezos =
+      Tezos_backend.Make
+        (struct
+          include Backend.SimulatorBackend
+
+          let block_param_to_block_number =
+            block_param_to_block_number ~chain_family:L2_types.Michelson
+        end)
+        (Tezosx_block_storage)
   end)
 
 let next_blueprint_number ctxt =

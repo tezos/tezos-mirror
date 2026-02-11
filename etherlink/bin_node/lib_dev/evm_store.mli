@@ -167,6 +167,7 @@ end
 
 module Blocks : sig
   val store :
+    ?tez_block:L2_types.Tezos_block.t ->
     conn ->
     Ethereum_types.legacy_transaction_object Ethereum_types.block ->
     unit tzresult Lwt.t
@@ -216,6 +217,13 @@ module Blocks : sig
     Ethereum_types.quantity option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [tezosx_find_tez_block_with_level conn level] returns the Tezos block
+      produced by the TezosX runtime at the given level, if present. *)
+  val tezosx_find_tez_block_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    L2_types.Tezos_block.t option tzresult Lwt.t
 end
 
 module Block_storage_mode : sig

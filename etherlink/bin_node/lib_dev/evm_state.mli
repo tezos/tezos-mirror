@@ -93,6 +93,15 @@ val current_block_hash :
   t ->
   Ethereum_types.block_hash tzresult Lwt.t
 
+(** [retrieve_block_at_root ~chain_family ~root evm_state] reads the current
+    block from durable storage at the given [root] path, decoding it using
+    [chain_family]. *)
+val retrieve_block_at_root :
+  chain_family:_ L2_types.chain_family ->
+  root:Durable_storage_path.path ->
+  t ->
+  Ethereum_types.legacy_transaction_object L2_types.block option tzresult Lwt.t
+
 type apply_result =
   | Apply_success of {
       evm_state : t;

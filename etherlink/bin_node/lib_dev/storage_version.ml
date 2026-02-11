@@ -27,3 +27,5 @@ let legacy_storage_compatible ~storage_version = storage_version < 41
 
 let sub_block_latency_entrypoints_disabled ~storage_version =
   storage_version < 42
+
+let tezosx_tezos_blocks ~storage_version = storage_version >= 49

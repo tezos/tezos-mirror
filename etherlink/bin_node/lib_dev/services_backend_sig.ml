@@ -140,7 +140,16 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
   module SimulatorBackend = Backend.SimulatorBackend
-  module Tezos = Tezos_backend.Make (Backend.SimulatorBackend)
+
+  module Tezos =
+    Tezos_backend.Make
+      (struct
+        include Backend.SimulatorBackend
+
+        let block_param_to_block_number =
+          Backend.block_param_to_block_number ~chain_family:L2_types.Michelson
+      end)
+      (Tezlink_block_storage)
 
   module Tezlink =
     Tezlink_services_impl.Make
