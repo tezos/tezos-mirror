@@ -10,7 +10,7 @@ use thiserror::Error;
 /// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
 pub struct CrossRuntimeContext {
-    /// Gas limit
+    /// block gas limit
     pub gas_limit: u64,
     /// Timestamp for the block
     pub timestamp: U256,

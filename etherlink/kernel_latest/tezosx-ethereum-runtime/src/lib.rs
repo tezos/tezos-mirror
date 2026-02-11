@@ -43,6 +43,29 @@ impl EthereumRuntime {
     pub fn new(chain_id: primitive_types::U256) -> Self {
         Self { chain_id }
     }
+
+    fn create_block_constants<Host: Runtime>(
+        &self,
+        host: &Host,
+        context: &CrossRuntimeContext,
+    ) -> BlockConstants {
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+
+        BlockConstants {
+            number: context.block_number,
+            coinbase,
+            timestamp: context.timestamp,
+            gas_limit: context.gas_limit,
+            block_fees: BlockFees::new(
+                primitive_types::U256::zero(),
+                primitive_types::U256::zero(),
+                primitive_types::U256::zero(),
+            ),
+            chain_id: self.chain_id,
+            tezos_experimental_features: true,
+            prevrandao: None,
+        }
+    }
 }
 
 /// Read the sequencer pool address (coinbase) from storage.
@@ -127,22 +150,7 @@ impl RuntimeInterface for EthereumRuntime {
 
         // Set up block constants for EVM execution
         let evm_version = read_evm_version(host);
-        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-
-        let block_constants = BlockConstants {
-            number: context.block_number,
-            coinbase,
-            timestamp: context.timestamp,
-            gas_limit: context.gas_limit,
-            block_fees: BlockFees::new(
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-            ),
-            chain_id: self.chain_id,
-            tezos_experimental_features: true,
-            prevrandao: None,
-        };
+        let block_constants = self.create_block_constants(host, &context);
 
         // Set up gas data (zero gas price since this is an internal transaction)
         let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
