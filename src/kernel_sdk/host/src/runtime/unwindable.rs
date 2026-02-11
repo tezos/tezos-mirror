@@ -12,6 +12,7 @@ use crate::debug::HostDebug;
 use crate::input::Message;
 use crate::reveal::HostReveal;
 use crate::storage::StorageV1;
+use crate::wasm::WasmHost;
 use crate::{dal_parameters::RollupDalParameters, metadata::RollupMetadata, path::Path};
 use alloc::rc::Rc;
 use core::panic::{RefUnwindSafe, UnwindSafe};
@@ -202,7 +203,7 @@ impl<R: StorageV1> StorageV1 for UnwindableRuntime<R> {
     }
 }
 
-impl<R: Runtime> Runtime for UnwindableRuntime<R> {
+impl<R: WasmHost> WasmHost for UnwindableRuntime<R> {
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.runtime.write().unwrap().write_output(from)
     }
@@ -237,3 +238,5 @@ impl<R: Runtime> Runtime for UnwindableRuntime<R> {
         self.runtime.read().unwrap().runtime_version()
     }
 }
+
+impl<R: Runtime> Runtime for UnwindableRuntime<R> {}

@@ -14,6 +14,7 @@ use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::reveal::HostReveal;
 use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use tezos_smart_rollup_host::{
     input::Message,
     metadata::RollupMetadata,
@@ -201,7 +202,7 @@ impl<Host: StorageV1> StorageV1 for SafeStorage<&mut Host> {
     }
 }
 
-impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
+impl<Host: WasmHost> WasmHost for SafeStorage<&mut Host> {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
@@ -242,6 +243,8 @@ impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {
         self.host.runtime_version()
     }
 }
+
+impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {}
 
 impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
     fn verbosity(&self) -> tezos_evm_logging::Level {

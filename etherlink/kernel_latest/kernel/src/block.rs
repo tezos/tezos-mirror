@@ -566,8 +566,8 @@ mod tests {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
     }
 
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_smart_rollup_host::storage::StorageV1;
+    use tezos_smart_rollup_host::wasm::WasmHost;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::ManagerOperationContent;

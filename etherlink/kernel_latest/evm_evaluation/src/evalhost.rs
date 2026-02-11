@@ -19,6 +19,7 @@ use tezos_smart_rollup_host::{
     reveal::HostReveal,
     runtime::{Runtime as SdkRuntime, RuntimeError, ValueType},
     storage::StorageV1,
+    wasm::WasmHost,
 };
 
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -169,7 +170,7 @@ impl StorageV1 for EvalHost {
     }
 }
 
-impl SdkRuntime for EvalHost {
+impl WasmHost for EvalHost {
     #[inline(always)]
     fn write_output(&mut self, from: &[u8]) -> Result<(), RuntimeError> {
         self.host.write_output(from)
@@ -210,6 +211,8 @@ impl SdkRuntime for EvalHost {
         self.host.runtime_version()
     }
 }
+
+impl SdkRuntime for EvalHost {}
 
 impl InternalRuntime for EvalHost {
     fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(

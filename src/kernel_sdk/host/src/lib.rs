@@ -21,6 +21,7 @@ pub mod path;
 pub mod reveal;
 pub mod runtime;
 pub mod storage;
+pub mod wasm;
 
 /// The size of a DAL parameters in bytes: 4 * size(i64) = 32 bytes.
 pub use crate::dal_parameters::DAL_PARAMETERS_SIZE;

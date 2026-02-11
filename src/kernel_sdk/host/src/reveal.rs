@@ -12,7 +12,7 @@ use crate::{
     Error, DAL_PARAMETERS_SIZE, METADATA_SIZE,
 };
 
-/// Core capability required to expose the SDK's debug functionality for a given host.
+/// Core capability required to expose the SDK's reveal functionality for a given host.
 pub trait HostReveal {
     /// Returns [RollupMetadata]
     fn reveal_metadata(&self) -> RollupMetadata;
