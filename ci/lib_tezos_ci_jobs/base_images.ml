@@ -131,7 +131,21 @@ let jobs =
       [script]
   in
   let job_debian_based_images =
-    let changes = Changeset.make ["images/base-images/Dockerfile.debian"] in
+    let changes =
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.debian";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-apt.sh";
+          "images/base-images/Dockerfile.debian-homebrew";
+          "scripts/packaging/homebrew_install.sh";
+          "images/base-images/Dockerfile.rust";
+          "images/scripts/install_sccache_static.sh";
+          "scripts/ci/build-base-images.sh";
+          "scripts/ci/docker-merge-base-images.sh";
+        ]
+    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian"
@@ -141,7 +155,16 @@ let jobs =
       "images/base-images/Dockerfile.debian"
   in
   let job_ubuntu_based_images =
-    let changes = Changeset.make ["images/base-images/Dockerfile.debian"] in
+    let changes =
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.debian";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-apt.sh";
+          "scripts/ci/build-base-images.sh";
+        ]
+    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.ubuntu"
@@ -151,7 +174,17 @@ let jobs =
       "images/base-images/Dockerfile.debian"
   in
   let job_fedora_based_images =
-    let changes = Changeset.make ["images/base-images/Dockerfile.rpm"] in
+    let changes =
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.rpm";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/configure_rpm_proxy.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-dnf.sh";
+          "scripts/ci/build-base-images.sh";
+        ]
+    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.fedora"
@@ -161,7 +194,17 @@ let jobs =
       "images/base-images/Dockerfile.rpm"
   in
   let job_rockylinux_based_images =
-    let changes = Changeset.make ["images/base-images/Dockerfile.rpm"] in
+    let changes =
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.rpm";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/configure_rpm_proxy.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-dnf.sh";
+          "scripts/ci/build-base-images.sh";
+        ]
+    in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.rockylinux"
@@ -172,19 +215,25 @@ let jobs =
       "images/base-images/Dockerfile.rpm"
   in
   let job_rust_based_images, job_rust_based_images_merge =
-    let images =
-      (* the changeset here and an under approximation. When adding
+    (* the changeset here and an under approximation. When adding
          these pipelines to the merge trains, these should be refactored.
-       
-FIXME: remove changesets from [base_images.daily] which is a branch pipeline
-cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
-      let changes =
-        Changeset.make
-          [
-            "images/base-images/Dockerfile.debian";
-            "images/base-images/Dockerfile.rust";
-          ]
-      in
+      FIXME: remove changesets from [base_images.daily] which is a
+             branch pipeline cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
+    let changes =
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.debian";
+          "images/base-images/Dockerfile.rust";
+          "images/scripts/install_sccache_static.sh";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-apt.sh";
+          "scripts/ci/docker-merge-base-images.sh";
+          "scripts/ci/build-base-images.sh";
+        ]
+    in
+
+    let images =
       make_job_base_images
         ~__POS__
         ~name:"oc.base-images.rust"
@@ -202,6 +251,8 @@ cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
         ~name:"oc.base-images.rust.merge"
         ~stage:Stages.images
         ~dependencies:(Dependent [Job images])
+        ~rules:
+          [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
         ~variables:
           [
             ("RELEASE", "trixie");
@@ -217,6 +268,11 @@ cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
         [
           "images/base-images/Dockerfile.debian";
           "images/base-images/Dockerfile.debian-homebrew";
+          "scripts/packaging/homebrew_install.sh";
+          "scripts/kiss-fetch.sh";
+          "images/scripts/install_datadog_static.sh";
+          "images/scripts/install-gcloud-apt.sh";
+          "scripts/ci/build-base-images.sh";
         ]
     in
     make_job_base_images
