@@ -48,7 +48,60 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 end
 
 module Loops = struct
-  let balance_update_loop cctx =
+  let with_cache _mutex request mem add (module Db : Caqti_lwt.CONNECTION) list
+      =
+    let open Lwt_result.Syntax in
+    (* Note: even if data is already in cache,
+     we add it again at the end in order to mark it as recent. *)
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+      (fun x ->
+        let+ () =
+          if mem x then
+            Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax
+            .return_unit
+          else Db.exec request x
+        in
+        add x)
+      list
+
+  let without_cache mutex request =
+    (* We don't use the cache feature here,
+     but we want to reuse the mutex and transactions handling from above.
+     Typically used by functions when you need to process multiple requests
+     before marking the key as done in an external cache,
+     or when it is relevant to use a cache the whole list as single item.
+     (e.g. use the level as cache key instead of one key for each list element) *)
+    with_cache mutex request (fun _ -> false) (fun _ -> ())
+
+  let maybe_add_balance_updates logger pool level
+      (balance_updates : Data.Balance_update.balance_update list) =
+    let rows =
+      List.map
+        (fun (balance_update : Data.Balance_update.balance_update) ->
+          ( level,
+            balance_update.address,
+            Data.Balance_update.category_to_string balance_update.category,
+            Data.Balance_update.result_to_string balance_update.result,
+            balance_update.value ))
+        balance_updates
+    in
+    let out =
+      Caqti_lwt_unix.Pool.use
+        (fun (module Db : Caqti_lwt.CONNECTION) ->
+          without_cache
+            Sql_requests.Mutex.balance_updates
+            Sql_requests.insert_block_balance_update
+            (module Db)
+            rows)
+        pool
+    in
+    Lwt.bind out (function
+      | Ok () -> Lwt.return_unit
+      | Error e ->
+          Log.error logger (fun () -> Caqti_error.show e) ;
+          Lwt.return_unit)
+
+  let balance_update_loop cctx pool =
     let logger = Log.logger () in
     let*! head_stream = Shell_services.Monitor.heads cctx cctx#chain in
     match head_stream with
@@ -103,12 +156,15 @@ module Loops = struct
               let*! res = balance_updates_recorder cctx block_level in
               match res with
               | Error _ -> assert false
-              | Ok (_level, _block_hash, _time, _balance_updates) ->
+              | Ok (level, _block_hash, _time, balance_updates) ->
+                  let*! _ =
+                    maybe_add_balance_updates logger pool level balance_updates
+                  in
                   Lwt.return acc')
             head_stream
             None
         in
         Lwt.return_unit
 
-  let blocks_loop cctx = Lwt.join [balance_update_loop cctx]
+  let blocks_loop cctx pool = Lwt.join [balance_update_loop cctx pool]
 end

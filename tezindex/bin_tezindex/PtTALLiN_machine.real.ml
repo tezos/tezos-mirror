@@ -192,7 +192,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     Format.eprintf
       "%a@."
-      (Format.pp_print_list Data.Balance_update.pp_balance_update)
+      (Format.pp_print_list
+         ~pp_sep:Format.pp_print_newline
+         Data.Balance_update.pp_balance_update)
       balance_updates ;
     return
       (header.shell.level, header.hash, header.shell.timestamp, balance_updates)

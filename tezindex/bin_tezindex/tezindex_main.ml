@@ -14,12 +14,16 @@ let _print_error logger e =
   in
   Lwt.return_unit
 
-let run cctxt _config =
+let run cctxt config =
   let logger = Log.logger () in
+  let*! pool = Db.init_pool logger config in
+  let pool = match pool with Error _ -> assert false | Ok pool -> pool in
   let* () = Client_confirmations.wait_for_bootstrapped cctxt in
   let () = Log.info logger (fun () -> "Node bootstrapped") in
   let main =
-    let*! () = Lwt.join [General_archiver.Loops.balance_update_loop cctxt] in
+    let*! () =
+      Lwt.join [General_archiver.Loops.balance_update_loop cctxt pool]
+    in
     Lwt.return_unit
   in
   let*! out = Lwt.join [main] in

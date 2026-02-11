@@ -123,26 +123,42 @@ module Balance_update = struct
 
   let balance_updates_encoding = Data_encoding.list balance_update_encoding
 
-  let pp_category fmt category =
-    Format.fprintf
-      fmt
-      (match category with
-      | Block_fees -> "Block_fees"
-      | Baking_rewards -> "Baking_rewards"
-      | Baking_bonuses -> "Baking_bonuses"
-      | Attestation_rewards -> "Attestation_rewards"
-      | Dal_attestation_rewards -> "Dal_attestation_rewards")
+  let category_to_string = function
+    | Block_fees -> "Block_fees"
+    | Baking_rewards -> "Baking_rewards"
+    | Baking_bonuses -> "Baking_bonuses"
+    | Attestation_rewards -> "Attestation_rewards"
+    | Dal_attestation_rewards -> "Dal_attestation_rewards"
 
-  let pp_result fmt result =
-    Format.fprintf
-      fmt
-      (match result with
-      | Lost -> "Lost"
-      | Contract -> "Contract"
-      | Delegate -> "Delegate"
-      | Baker_own_stake -> "Baker_own_stake"
-      | Baker_edge -> "Baker_edge"
-      | Staker -> "Staker")
+  let category_of_string = function
+    | "Block_fees" -> Some Block_fees
+    | "Baking_rewards" -> Some Baking_rewards
+    | "Baking_bonuses" -> Some Baking_bonuses
+    | "Attestation_rewards" -> Some Attestation_rewards
+    | "Dal_attestation_rewards" -> Some Dal_attestation_rewards
+    | _ -> None
+
+  let pp_category fmt category =
+    Format.fprintf fmt "%s" (category_to_string category)
+
+  let result_to_string = function
+    | Lost -> "Lost"
+    | Contract -> "Contract"
+    | Delegate -> "Delegate"
+    | Baker_own_stake -> "Baker_own_stake"
+    | Baker_edge -> "Baker_edge"
+    | Staker -> "Staker"
+
+  let result_of_string = function
+    | "Lost" -> Some Lost
+    | "Contract" -> Some Contract
+    | "Delegate" -> Some Delegate
+    | "Baker_own_stake" -> Some Baker_own_stake
+    | "Baker_edge" -> Some Baker_edge
+    | "Staker" -> Some Staker
+    | _ -> None
+
+  let pp_result fmt result = Format.fprintf fmt "%s" (result_to_string result)
 
   let pp_balance_update fmt {address; category; result; value} =
     Format.fprintf
