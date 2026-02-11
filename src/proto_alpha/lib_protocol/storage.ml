@@ -1583,6 +1583,15 @@ module Clst = struct
 
         let encoding = Unstake_request.requests_encoding
       end)
+
+  module Registered_delegates =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["registered_delegates"]
+         end))
+         (Make_index (Contract_repr.Index))
+      (Clst_delegates_parameters_repr)
 end
 
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
