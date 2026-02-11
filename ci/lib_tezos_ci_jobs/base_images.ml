@@ -58,6 +58,22 @@ type upstream_image = Pipeline_dep of string | Upstream of string
 module Files = struct
   let build_script = ["scripts/ci/build-base-images.sh"]
 
+  (* Direct changesets of jobs, i.e. files directly used by the corresponding jobs.
+
+     The full changeset of a job should also contain the files indirectly used.
+     - Example: [image A] is built on top of [image B], then the
+     changeset of the image A build ([job A])job should contain the
+     files needed to build B.
+
+
+     Also, the full changeset of a job should contain the changeset of the jobs that depend on it.
+     - Example: [image A] is built on top of [image B] so [job A] depends on
+     [job B]. If [job A] is in the pipeline then [job B] should be too. So, the
+     full changeset of [job B] needs to include the changeset of [job A].
+     NB: This is enforced by Cacio, so this part will be simplified if the jobs are migrated.
+
+   *)
+
   let rpm_base =
     [
       "images/base-images/Dockerfile.rpm";
