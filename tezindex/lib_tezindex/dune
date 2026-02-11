@@ -16,6 +16,7 @@
   octez-libs.rpc-http-client-unix
   octez-libs.rpc-http
   octez-libs.rpc-http-server
+  octez-rpc-process
   safepass
   lwt.unix)
  (flags
@@ -26,4 +27,5 @@
   -open Tezos_client_base_unix
   -open Tezos_rpc_http_client_unix
   -open Tezos_rpc_http
-  -open Tezos_rpc_http_server))
+  -open Tezos_rpc_http_server
+  -open Octez_rpc_process))

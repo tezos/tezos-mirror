@@ -40,6 +40,7 @@ let tezindex_library =
         octez_rpc_http_client_unix |> open_;
         octez_rpc_http |> open_;
         octez_rpc_http_server |> open_;
+        octez_rpc_process |> open_;
         safepass;
         lwt_unix;
       ]

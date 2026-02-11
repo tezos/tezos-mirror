@@ -114,8 +114,9 @@ let pp_config logger config =
 
 let get_config basedir rpc_listen_addr external__rpc_listen_addr db_name
     watched_addresses : config =
+  let _external_rpc_listen_addr = external__rpc_listen_addr in
   let rpc_addr =
-    match (rpc_listen_addr, external__rpc_listen_addr) with _ -> None
+    Option.map (fun addr -> Uri.of_string ("//" ^ addr)) rpc_listen_addr
   in
   let watched_addresses =
     match watched_addresses with
