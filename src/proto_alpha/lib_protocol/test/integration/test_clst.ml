@@ -1256,3 +1256,38 @@ let () =
   | None -> Test.fail ~loc:__LOC__ "Delegate has no active parameters"
   | Some active_parameters ->
       check_expected_parameters ~loc:__LOC__ parameters active_parameters
+
+let () =
+  register_test ~title:"Test non delegate cannot register" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  (* Ensures that neither storage cost nor issuance will modify the balance,
+     making it easier to check. *)
+  let* b, delegate =
+    Context.init1
+      ~consensus_threshold_size:0
+      ~cost_per_byte:Tez.zero
+      ~issuance_weights:
+        {
+          Default_parameters.constants_test.issuance_weights with
+          base_total_issued_per_minute = Tez.zero;
+        }
+      ()
+  in
+  let account = Account.new_account () in
+  let pk = account.Account.pk in
+  let account = Contract.Implicit account.Account.pkh in
+  let* funding =
+    Op.transaction
+      (Context.B b)
+      delegate
+      account
+      (Tez.of_mutez_exn 1_000_000_000L)
+  in
+  let* b = Block.bake ~operation:funding b in
+  let* reveal = Op.revelation (Context.B b) pk in
+  let* b = Block.bake ~operation:reveal b in
+  let*! b_and_parameters = register_delegate_and_bake b account in
+  match b_and_parameters with
+  | Ok _ ->
+      Test.fail ~__LOC__ "A non delegate account shouldn't be able to register"
+  | Error e -> Error_helpers.expect_clst_contract_is_not_delegate ~loc:__LOC__ e
