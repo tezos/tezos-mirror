@@ -55,26 +55,6 @@ let test_normalize_unparsing_mode =
   in
   unit
 
-let test_normalize_legacy_flag =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~title:"Test normalize with legacy flag"
-    ~tags:[team; "client"; "normalize"]
-    ~uses_node:false
-  @@ fun protocol ->
-  let* client = Client.init_mockup ~protocol () in
-  let data = "{Elt %a 0 1}" in
-  let typ = "map nat nat" in
-  let* () =
-    let* _ = Client.normalize_data client ~legacy:true ~hooks ~data ~typ in
-    unit
-  in
-  let* () =
-    Client.spawn_normalize_data client ~legacy:false ~hooks ~data ~typ
-    |> Process.check_error ~msg:(rex "unexpected annotation.")
-  in
-  unit
-
 let test_normalize_stack =
   Protocol.register_regression_test
     ~__FILE__
@@ -175,7 +155,6 @@ let test_normalize_type =
 
 let register ~protocols =
   test_normalize_unparsing_mode protocols ;
-  test_normalize_legacy_flag protocols ;
   test_normalize_stack protocols ;
   test_normalize_script protocols ;
   test_normalize_type protocols

@@ -354,7 +354,8 @@ module Scripts = struct
     let normalize_data =
       RPC_service.post_service
         ~description:
-          "Normalizes some data expression using the requested unparsing mode"
+          "Normalizes some data expression using the requested unparsing mode, \
+           input data does not need to be well-typed."
         ~input:
           (obj6
              (req "data" Script.expr_encoding)
@@ -370,7 +371,8 @@ module Scripts = struct
     let normalize_stack =
       RPC_service.post_service
         ~description:
-          "Normalize a Michelson stack using the requested unparsing mode"
+          "Normalize a Michelson stack using the requested unparsing mode, \
+           input stack does not need to be well-typed."
         ~query:RPC_query.empty
         ~input:normalize_stack_input_encoding
         ~output:normalize_stack_output_encoding
@@ -701,7 +703,353 @@ module Scripts = struct
       | Chest_key_t -> return (T_chest_key, [], [])
   end
 
+  module Normalize_data = struct
+    (** This module defines a normalizing function for Michelson data,
+        which is compatible with the normalization strategy of the
+        protocol: parsing then unparsing.
+
+        The key differences are that:
+
+        - This implementation does not fail on ill-typed data and in
+          particular does not require a context containing all the big
+          maps and contracts referenced in the data to normalize.
+
+        - There is no gas accounting for the normalization. *)
+
+    (* "timestamp" is the only Michelson type using Micheline.Int for
+       its optimized representation; all other atomic types with a
+       particular optimized representation use Micheline.Bytes. *)
+
+    let normalize_timestamp
+        ~(unparsing_mode : Script_ir_unparser.unparsing_mode) e =
+      match (e, unparsing_mode) with
+      | Micheline.Int (loc, v), Readable -> (
+          match Script_timestamp.to_notation (Script_timestamp.of_zint v) with
+          | None -> e
+          | Some s -> String (loc, s))
+      | String (loc, s), (Optimized | Optimized_legacy) -> (
+          match Script_timestamp.of_string s with
+          | None -> e
+          | Some t -> Int (loc, Script_timestamp.to_zint t))
+      | String (loc, s), Readable -> (
+          (* Script_timestamp.of_strings allows more than one
+             representations; we roundtrip through int to ensure we
+               get the canonical representation. *)
+          match Script_timestamp.of_string s with
+          | None -> e
+          | Some t -> (
+              match Script_timestamp.to_notation t with
+              | None -> e
+              | Some s -> String (loc, s)))
+      | _, _ -> e
+
+    module type BASE58_ENCODABLE = sig
+      type t
+
+      val to_b58check : t -> string
+
+      val of_b58check_opt : string -> t option
+
+      val encoding : t Data_encoding.t
+    end
+
+    module Normalize_base58 (M : BASE58_ENCODABLE) = struct
+      let normalize ~(unparsing_mode : Script_ir_unparser.unparsing_mode) e =
+        match (e, unparsing_mode) with
+        | Micheline.Bytes (loc, bytes), Readable -> (
+            match Data_encoding.Binary.of_bytes_opt M.encoding bytes with
+            | None -> e
+            | Some k -> String (loc, M.to_b58check k))
+        | String (loc, s), (Optimized | Optimized_legacy) -> (
+            match M.of_b58check_opt s with
+            | None -> e
+            | Some k ->
+                Bytes (loc, Data_encoding.Binary.to_bytes_exn M.encoding k))
+        | _, _ -> e
+    end
+
+    module Normalize_key = Normalize_base58 (Signature.Public_key)
+    module Normalize_key_hash = Normalize_base58 (Signature.Public_key_hash)
+    module Normalize_signature = Normalize_base58 (Signature)
+    module Normalize_chain_id =
+      Normalize_base58 (Script_typed_ir.Script_chain_id)
+
+    module Normalize_address = Normalize_base58 (struct
+      type t = Destination.t * Entrypoint.t
+
+      let to_b58check (destination, entrypoint) =
+        Destination.to_b58check destination
+        ^ Entrypoint.to_address_suffix entrypoint
+
+      let of_b58check_opt s =
+        let addr_entrypoint_opt =
+          match String.index_opt s '%' with
+          | None -> Some (s, Entrypoint.default)
+          | Some pos -> (
+              let len = String.length s - pos - 1 in
+              let name = String.sub s (pos + 1) len in
+              match Entrypoint.of_string_strict ~loc:0 name with
+              | Error _ -> None
+              | Ok entrypoint -> Some (String.sub s 0 pos, entrypoint))
+        in
+        match addr_entrypoint_opt with
+        | None -> None
+        | Some (addr, entrypoint) -> (
+            match Destination.of_b58check addr with
+            | Error _ -> None
+            | Ok destination -> Some (destination, entrypoint))
+
+      let encoding =
+        Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
+    end)
+
+    let normalize_or ~normalize_l ~normalize_r ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Left, [v], annot) ->
+          let v = normalize_l ctxt v in
+          Prim (loc, D_Left, [v], annot)
+      | Prim (loc, D_Right, [v], annot) ->
+          let v = normalize_r ctxt v in
+          Prim (loc, D_Right, [v], annot)
+      | e -> e
+
+    let normalize_option ~normalize_data ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Some, [v], annot) ->
+          let v = normalize_data ctxt v in
+          Prim (loc, D_Some, [v], annot)
+      | e -> e
+
+    let normalize_ticket ~normalize_data ~unparsing_mode ctxt =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      function
+      | Prim (loc, D_Ticket, [ticketer; _; contents; amount], [])
+      | Prim (loc, D_Pair, [ticketer; contents; amount], [])
+      | Prim
+          (loc, D_Pair, [ticketer; Prim (_, D_Pair, [contents; amount], [])], [])
+      | Seq (loc, [ticketer; contents; amount]) -> (
+          let ticketer = Normalize_address.normalize ~unparsing_mode ticketer in
+          let contents = normalize_data ctxt contents in
+          match unparsing_mode with
+          | Readable -> Prim (loc, D_Pair, [ticketer; contents; amount], [])
+          | Optimized | Optimized_legacy ->
+              Prim
+                ( loc,
+                  D_Pair,
+                  [ticketer; Prim (loc, D_Pair, [contents; amount], [])],
+                  [] ))
+      | e -> e
+
+    let normalize_pair (type a ac) ~(rty : (a, ac) Script_typed_ir.ty)
+        ~normalize_l ~normalize_r
+        ~(unparsing_mode : Script_ir_unparser.unparsing_mode) ctxt e =
+      let open Michelson_v1_primitives in
+      let open Micheline in
+      let open Script_typed_ir in
+      let decomposed =
+        match e with
+        | Prim (loc, D_Pair, [l; r], []) | Seq (loc, [l; r]) -> Some (loc, l, r)
+        | Prim (loc, D_Pair, l :: r, []) ->
+            Some (loc, l, Prim (loc, D_Pair, r, []))
+        | Seq (loc, l :: r) -> Some (loc, l, Seq (loc, r))
+        | _ -> None
+      in
+      match decomposed with
+      | None -> e
+      | Some (loc, l, r) -> (
+          let l = normalize_l ctxt l in
+          let r = normalize_r ctxt r in
+          match (l, r, unparsing_mode, rty) with
+          | a, Prim (_, D_Pair, b, []), Readable, Pair_t _ ->
+              (* In Readable mode, always use n-ary Pair, except if
+                 the right part is not a pair (for instance if it is a
+                 ticket). *)
+              Prim (loc, D_Pair, a :: b, [])
+          | ( a,
+              Seq (_, b),
+              Optimized,
+              Pair_t (_, Pair_t (_, Pair_t _, _, _), _, _) ) ->
+              (* In Optimized mode, if the right part normalizes to a
+                 Seq and its type is an n-ary pair for n >= 4, keep
+                 using a Seq. *)
+              Seq (loc, a :: b)
+          | ( a,
+              Prim (_, D_Pair, [b; Prim (_, D_Pair, [c; d], [])], []),
+              Optimized,
+              Pair_t (_, Pair_t _, _, _) ) ->
+              (* In Optimized mode, switch from nested binary pairs to Seq
+                 when we reach length 4. *)
+              Seq (loc, [a; b; c; d])
+          | a, Prim (_, D_Pair, [b; c], []), Optimized, Pair_t _ ->
+              (* In Optimized mode, use nested pairs for length 3. *)
+              Prim (loc, D_Pair, [a; Prim (loc, D_Pair, [b; c], [])], [])
+          | a, b, _, _ ->
+              (* In all other cases, use a binary pair. This covers the
+                 following cases:
+                 - in any mode, keep annotations on the Pair constructor,
+                 - in any mode, use Pair instead of Seq for length 2,
+                 - in Optimized_legacy mode, always use nested binary pairs. *)
+              Prim (loc, D_Pair, [a; b], []))
+
+    let normalize_seq ~normalize_data ctxt =
+      let open Micheline in
+      function
+      | Seq (loc, l) ->
+          let l =
+            List.fold_left
+              (fun acc v ->
+                let v = normalize_data ctxt v in
+                v :: acc)
+              []
+              l
+          in
+          Seq (loc, List.rev l)
+      | e -> e
+
+    let normalize_map ~normalize_key ~normalize_val ctxt e =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      let normalize_data ctxt = function
+        | Prim (loc, D_Elt, [key; value], annot) ->
+            let key = normalize_key ctxt key in
+            let value = normalize_val ctxt value in
+            Prim (loc, D_Elt, [key; value], annot)
+        | e -> e
+      in
+      normalize_seq ~normalize_data ctxt e
+
+    let normalize_big_map ~normalize_key ~normalize_val ctxt =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      function
+      | Seq _ as m -> normalize_map ~normalize_key ~normalize_val ctxt m
+      | Prim (loc, D_Pair, [id; diffs], annot) ->
+          let diffs =
+            normalize_map
+              ~normalize_key
+              ~normalize_val:(normalize_option ~normalize_data:normalize_val)
+              ctxt
+              diffs
+          in
+          Prim (loc, D_Pair, [id; diffs], annot)
+      | e -> e
+
+    let rec normalize_code ~unparsing_mode ctxt =
+      let open Micheline in
+      let open Michelson_v1_primitives in
+      function
+      | Prim (loc, I_PUSH, [ty; data], annot) as e -> (
+          let ctxt = Alpha_context.Gas.set_unlimited ctxt in
+          match Script_ir_translator.parse_packable_ty ctxt ~legacy:true ty with
+          | Error _ -> e
+          | Ok (Ex_ty tyd, _ctxt) ->
+              let data = normalize_data ~unparsing_mode tyd ctxt data in
+              Prim (loc, I_PUSH, [ty; data], annot))
+      | Seq (loc, items) ->
+          let items =
+            List.fold_left
+              (fun acc item ->
+                let item = normalize_code ~unparsing_mode ctxt item in
+                item :: acc)
+              []
+              items
+          in
+          Seq (loc, List.rev items)
+      | Prim (loc, prim, items, annot) ->
+          let items =
+            List.fold_left
+              (fun acc item ->
+                let item = normalize_code ~unparsing_mode ctxt item in
+                item :: acc)
+              []
+              items
+          in
+          Prim (loc, prim, List.rev items, annot)
+      | (Int _ | String _ | Bytes _) as e -> e
+
+    and normalize_data : type a ac.
+        unparsing_mode:Script_ir_unparser.unparsing_mode ->
+        (a, ac) Script_typed_ir.ty ->
+        context ->
+        Script.node ->
+        Script.node =
+     fun ~unparsing_mode ty ctxt e ->
+      let open Script_typed_ir in
+      match ty with
+      | Unit_t | Int_t | Nat_t | String_t | Bytes_t | Bool_t | Mutez_t
+      | Operation_t | Never_t | Sapling_transaction_t _
+      | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Bls12_381_g1_t
+      | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t | Chest_t ->
+          e
+      | Timestamp_t -> normalize_timestamp ~unparsing_mode e
+      | Address_t -> Normalize_address.normalize ~unparsing_mode e
+      | Contract_t _ ->
+          (* Contract_t uses exactly the same syntax as Address_t *)
+          Normalize_address.normalize ~unparsing_mode e
+      | Signature_t -> Normalize_signature.normalize ~unparsing_mode e
+      | Key_t -> Normalize_key.normalize ~unparsing_mode e
+      | Key_hash_t -> Normalize_key_hash.normalize ~unparsing_mode e
+      | Chain_id_t -> Normalize_chain_id.normalize ~unparsing_mode e
+      | Pair_t (a, b, _, _) ->
+          let normalize_l = normalize_data ~unparsing_mode a in
+          let normalize_r = normalize_data ~unparsing_mode b in
+          normalize_pair ~rty:b ~normalize_l ~normalize_r ~unparsing_mode ctxt e
+      | Or_t (a, b, _, _) ->
+          let normalize_l = normalize_data ~unparsing_mode a in
+          let normalize_r = normalize_data ~unparsing_mode b in
+          normalize_or ~normalize_l ~normalize_r ctxt e
+      | Option_t (a, _, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_option ~normalize_data ctxt e
+      | List_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_seq ~normalize_data ctxt e
+      | Set_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_seq ~normalize_data ctxt e
+      | Map_t (a, b, _) ->
+          let normalize_key = normalize_data ~unparsing_mode a in
+          let normalize_val = normalize_data ~unparsing_mode b in
+          normalize_map ~normalize_key ~normalize_val ctxt e
+      | Big_map_t (a, b, _) ->
+          let normalize_key = normalize_data ~unparsing_mode a in
+          let normalize_val = normalize_data ~unparsing_mode b in
+          normalize_big_map ~normalize_key ~normalize_val ctxt e
+      | Ticket_t (a, _) ->
+          let normalize_data = normalize_data ~unparsing_mode a in
+          normalize_ticket ~normalize_data ~unparsing_mode ctxt e
+      | Lambda_t _ -> normalize_code ~unparsing_mode ctxt e
+  end
+
   module Normalize_stack = struct
+    let normalize_stack ctxt ~unparsing_mode ~legacy stack =
+      let open Result_syntax in
+      List.map_e
+        (fun (ty_node, data_node) ->
+          let* Ex_ty ty, ctxt =
+            Script_ir_translator.parse_ty
+              ctxt
+              ~legacy
+              ~allow_lazy_storage:true
+              ~allow_operation:true
+              ~allow_contract:true
+              ~allow_ticket:true
+              ty_node
+          in
+          let* ty_node, ctxt = Script_ir_unparser.unparse_ty ~loc:() ctxt ty in
+          let normalized =
+            Normalize_data.normalize_data ~unparsing_mode ty ctxt data_node
+          in
+          return
+            ( Micheline.strip_locations ty_node,
+              Micheline.strip_locations normalized ))
+        stack
+
     type ex_stack =
       | Ex_stack : ('a, 's) Script_typed_ir.stack_ty * 'a * 's -> ex_stack
 
@@ -1676,7 +2024,6 @@ module Scripts = struct
         ()
         (expr, typ, unparsing_mode, legacy, other_contracts, extra_big_maps)
       ->
-        let open Script_ir_translator in
         let other_contracts = Option.value ~default:[] other_contracts in
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
@@ -1685,19 +2032,15 @@ module Scripts = struct
         let*? Ex_ty typ, ctxt =
           Script_ir_translator.parse_any_ty ctxt ~legacy (Micheline.root typ)
         in
-        let* data, ctxt =
-          parse_data
-            ctxt
-            ~elab_conf:(elab_conf ~legacy ())
-            ~allow_forged_tickets:true
-            ~allow_forged_lazy_storage_id:true
-            typ
-            (Micheline.root expr)
+        let normalized =
+          Micheline.strip_locations
+          @@ Normalize_data.normalize_data
+               ~unparsing_mode
+               typ
+               ctxt
+               (Micheline.root expr)
         in
-        let+ normalized, _ctxt =
-          Script_ir_translator.unparse_data ctxt unparsing_mode typ data
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_stack
@@ -1714,13 +2057,10 @@ module Scripts = struct
         let* ctxt = originate_dummy_contracts ctxt other_contracts in
         let extra_big_maps = Option.value ~default:[] extra_big_maps in
         let* ctxt = initialize_big_maps ctxt extra_big_maps in
-        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
-          Normalize_stack.parse_stack ctxt ~legacy nodes
+        let*? normalized =
+          Normalize_stack.normalize_stack ctxt ~unparsing_mode ~legacy nodes
         in
-        let+ normalized, _ctxt =
-          Normalize_stack.unparse_stack ctxt unparsing_mode st_ty x st
-        in
-        normalized) ;
+        return normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_script
