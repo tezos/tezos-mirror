@@ -663,6 +663,74 @@ let test_michelson_call_wrong_entrypoint =
         ~amount:1_234_567
         ())
 
+(** Originate a Michelson contract with wrongly-typed initial storage via
+    the delayed inbox. The origination should fail: only fees are consumed,
+    not the initial balance. *)
+let test_michelson_origination_wrong_storage_type =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson origination with wrong storage type on tezos X"
+    ~tags:["origination"; "michelson"; "type_error"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sequencer in
+  (* We don't use [originate_michelson_contract_via_delayed_inbox] here
+     because it expects the origination to succeed. *)
+  let* contracts_before =
+    Delayed_inbox.subkeys
+      tezosx_michelson_contracts_index
+      (Sc_rollup_node sc_rollup_node)
+  in
+  let* () =
+    with_check_source_delta_balance
+      ~source
+      ~tez_client
+      ~expected_consumed:1000
+      (fun () ->
+        let script_path =
+          Michelson_script.(find ["opcodes"; "store_input"] protocol |> path)
+        in
+        let* code = Client.convert_script_to_json ~script:script_path client in
+        (* store_input.tz expects storage string, but we pass an int *)
+        let* init_storage = Client.convert_data_to_json ~data:"42" client in
+        let* origination_op =
+          Operation.Manager.(
+            operation
+              [
+                make
+                  ~fee:1000
+                  ~counter:1
+                  ~gas_limit:10000
+                  ~storage_limit:1000
+                  ~source
+                  (origination ~code ~init_storage ~init_balance:1_234_567 ());
+              ])
+            client
+        in
+        send_tezos_op_to_delayed_inbox_and_wait
+          ~sc_rollup_address
+          ~sc_rollup_node
+          ~client
+          ~l1_contracts
+          ~sequencer
+          origination_op)
+  in
+  (* No new contract should have been created *)
+  let* contracts_after =
+    Delayed_inbox.subkeys
+      tezosx_michelson_contracts_index
+      (Sc_rollup_node sc_rollup_node)
+  in
+  Check.(
+    (List.length contracts_after = List.length contracts_before)
+      int
+      ~error_msg:"Expected no new contracts but got %L (was %R)") ;
+  unit
+
 (** Call a Michelson contract that always fails (FAILWITH) via the delayed
     inbox. The operation should fail: only fees are consumed. *)
 let test_michelson_call_failwith =
@@ -885,6 +953,7 @@ let () =
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_call_nonexistent_contract [Alpha] ;
   test_michelson_call_wrong_entrypoint [Alpha] ;
+  test_michelson_origination_wrong_storage_type [Alpha] ;
   test_michelson_call_failwith [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
