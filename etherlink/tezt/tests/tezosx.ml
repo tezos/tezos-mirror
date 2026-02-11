@@ -579,6 +579,42 @@ let test_michelson_origination_and_call =
     ~expected:(`O [("string", `String expected_storage)])
     ()
 
+(** Call a non-existing KT1 address via the delayed inbox. The operation
+    should be included but fail: only fees are consumed, the transferred
+    amount is not deducted from the sender's balance. *)
+let test_michelson_call_nonexistent_contract =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson call to non-existing contract on tezos X"
+    ~tags:["call"; "michelson"; "nonexistent"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sequencer in
+  let fake_kt1 = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
+  let transfer_amount = 1_234_567 in
+  (* Only the fee (1000 mutez) should be consumed, not the transfer amount *)
+  with_check_source_delta_balance
+    ~source
+    ~tez_client
+    ~expected_consumed:1000
+    (fun () ->
+      call_michelson_contract_via_delayed_inbox
+        ~sc_rollup_address
+        ~sc_rollup_node
+        ~client
+        ~l1_contracts
+        ~sequencer
+        ~source
+        ~counter:1
+        ~dest:fake_kt1
+        ~arg_data:{|Unit|}
+        ~amount:transfer_amount
+        ())
+
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test
     ~title:"Test the tez_getTezosEthereumAddress RPC"
@@ -752,6 +788,7 @@ let () =
   test_transfer [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
+  test_michelson_call_nonexistent_contract [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
