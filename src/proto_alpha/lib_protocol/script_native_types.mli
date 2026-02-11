@@ -97,6 +97,11 @@ module CLST_types : sig
       nat (* allowance *) )
     view_type
 
+  type is_operator_view =
+    ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
+      bool (* is_operator *) )
+    view_type
+
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
@@ -115,6 +120,8 @@ module CLST_types : sig
   val is_token_view_ty : is_token_view
 
   val get_allowance_view_ty : get_allowance_view tzresult
+
+  val is_operator_view_ty : is_operator_view tzresult
 
   val transfer_event_type :
     ( address (* from_ *),
