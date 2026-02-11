@@ -277,6 +277,33 @@ let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
           ~error_msg:"Expected storage %R but got %L") ;
       unit
 
+(** [with_check_source_delta_balance ~source ~tez_client ~expected_consumed action]
+    reads the balance of [source] before and after running [action ()], then
+    checks that exactly [expected_consumed] mutez were consumed. The balance
+    check always runs, even if [action] fails. Returns the result of
+    [action]. *)
+let with_check_source_delta_balance ~source ~tez_client ~expected_consumed
+    action =
+  let* balance_before =
+    Client.get_balance_for ~account:source.Account.public_key_hash tez_client
+  in
+  Lwt.finalize action (fun () ->
+      let* balance_after =
+        Client.get_balance_for
+          ~account:source.Account.public_key_hash
+          tez_client
+      in
+      let consumed = Tez.to_mutez balance_before - Tez.to_mutez balance_after in
+      Log.info
+        "Balance consumed: %d mutez (expected %d)"
+        consumed
+        expected_consumed ;
+      Check.(
+        (consumed = expected_consumed)
+          int
+          ~error_msg:"Expected %R mutez consumed but got %L") ;
+      Lwt.return_unit)
+
 let test_bootstrap_kernel_config () =
   let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
