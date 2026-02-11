@@ -1329,6 +1329,11 @@ let aggregated_operations_retrival_from_block_content ~abaab =
   in
   unit
 
+let with_timeout ~timeout ~on_timeout f =
+  Lwt.catch
+    (fun () -> Lwt_unix.with_timeout timeout f)
+    (function Lwt_unix.Timeout -> on_timeout () | e -> Lwt.reraise e)
+
 let unable_to_reach_node_mempool =
   Protocol.register_test
     ~__FILE__
@@ -1349,23 +1354,15 @@ let unable_to_reach_node_mempool =
   log_step 2 "Run a baker" ;
   let* baker = Agnostic_baker.init node client in
   log_step 3 "Wait for baker termination" ;
-  let* outcome =
-    Lwt.choose
-      [
-        (let* () = Agnostic_baker.wait_for_termination baker in
-         return `Terminated);
-        (* Saves some CI time by failing after 2 minutes if the baker fails to
-           shut down as expected.*)
-        (let* () = Lwt_unix.sleep 120. in
-         return `Timeout);
-      ]
-  in
-  match outcome with
-  | `Terminated -> unit
-  | `Timeout ->
+  (* Saves some CI time by failing after 2 minutes if the baker fails to
+     shutdown as expected.*)
+  with_timeout
+    ~timeout:120.
+    ~on_timeout:(fun () ->
       Test.fail
         "The baker failed to shut down after being unable to reach the node \
-         mempool for 2 minutes"
+         mempool for 2 minutes.")
+    (fun () -> Agnostic_baker.wait_for_termination baker)
 
 let stream_is_refreshed_on_timeout =
   Protocol.register_test
@@ -1766,6 +1763,36 @@ let test_reproposal_at_abaab_activation_level =
   assert (String.equal (JSON.as_string ratio) "66.66%") ;
   unit
 
+let baker_shutdown_on_node_shutdown =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shutdown on node shutdown"
+    ~tags:[team; "baker"; "shutdown"]
+    ~supports:Protocol.(From_protocol 025)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~timestamp:Now ()
+  in
+  Log.info "Wait for level 1" ;
+  let* _ = Node.wait_for_level node 1 in
+  Log.info "Starts an agnostic baker" ;
+  let* baker = Agnostic_baker.init ~delegates:[] node client in
+  Log.info "Wait 5 levels" ;
+  let* _ = Node.wait_for_level node 5 in
+  Log.info "Kill the node and wait for baker termination" ;
+  let* () = Node.kill node in
+  let timeout = (* arbitrary value *) 1. in
+  with_timeout
+    ~timeout
+    ~on_timeout:(fun () ->
+      Test.fail
+        "The baker failed to shutdown after being disconnected from the node \
+         for over %f seconds."
+        timeout)
+    (fun () -> Agnostic_baker.wait_for_termination baker)
+
 let register_with_abaab ~abaab ~protocols =
   baker_check_consensus_branch ~abaab protocols ;
   force_apply_from_round ~abaab protocols ;
@@ -1790,4 +1817,5 @@ let register ~protocols =
   stream_is_refreshed_on_timeout protocols ;
   test_reproposal_at_abaab_activation_level protocols ;
   register_with_abaab ~abaab:false ~protocols ;
-  register_with_abaab ~abaab:true ~protocols
+  register_with_abaab ~abaab:true ~protocols ;
+  baker_shutdown_on_node_shutdown protocols
