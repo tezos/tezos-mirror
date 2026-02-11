@@ -317,6 +317,13 @@ let () =
     () ;
 
   test_blueprint_roundtrip
+    ~title:"empty V1 blueprint"
+    ~delayed_transactions:[]
+    ~transactions:[]
+    ~version:V1
+    () ;
+
+  test_blueprint_roundtrip
     ~title:"only transactions, legacy"
     ~delayed_transactions:[]
     ~transactions:["txntxntxn"; "txntxntxntxn"]
@@ -339,6 +346,13 @@ let () =
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
     ~transactions:["txntxntxn"; "txntxntxntxn"]
     ~version:Legacy
+    () ;
+
+  test_blueprint_roundtrip
+    ~title:"both delayed and regular transactions, V1"
+    ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
+    ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~version:V1
     () ;
 
   test_blueprint_roundtrip
