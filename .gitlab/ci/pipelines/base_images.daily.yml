@@ -3,7 +3,7 @@
 
 stages:
 - start
-- images
+- build
 
 datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
@@ -29,7 +29,7 @@ datadog_pipeline_trace:
 
 oc.base-images.debian:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -76,7 +76,7 @@ oc.base-images.debian:
 
 oc.base-images.ubuntu:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -118,7 +118,7 @@ oc.base-images.ubuntu:
 
 oc.base-images.fedora:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -161,7 +161,7 @@ oc.base-images.fedora:
 
 oc.base-images.rockylinux:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -203,7 +203,7 @@ oc.base-images.rockylinux:
 
 oc.base-images.rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - $TAGS
   rules:
@@ -251,7 +251,7 @@ oc.base-images.rust:
 
 oc.base-images.rust.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp
   rules:
@@ -289,7 +289,7 @@ oc.base-images.rust.merge:
 
 oc.base-images.debian-homebrew:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:

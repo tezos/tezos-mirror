@@ -186,7 +186,7 @@ let jobs =
     job_docker_authenticated
       ~__POS__
       ~name
-      ~stage:Stages.images
+      ~stage:Stages.build
       ~variables
       ~rules:
         [
@@ -265,7 +265,7 @@ let jobs =
     job_docker_authenticated
       ~__POS__
       ~name:"oc.base-images.rust.merge"
-      ~stage:Stages.images
+      ~stage:Stages.build
       ~dependencies:(Dependent [Job job_rust_based_images])
       ~rules:
         [
