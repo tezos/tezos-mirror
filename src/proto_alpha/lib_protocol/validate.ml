@@ -2497,6 +2497,10 @@ module Anonymous = struct
                    {delegate; level = raw_level; slot_index; lag_index_opt})
           | Some level -> return level
         in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+           Trap denunciation cross dynamic lag activation.
+           Should be removed after protocol U. *)
+        let attestation_with_dynamic_lag = dal_params.dynamic_lag_enable in
         let* dal_params =
           Dal.Past_parameters.parameters vi.ctxt published_level
         in
@@ -2514,29 +2518,8 @@ module Anonymous = struct
         let number_of_lags = List.length dal_params.attestation_lags in
         let*? () = check_lag_index_is_in_range ~number_of_lags lag_index_opt in
         let* () =
-          let* protocol_activation_level =
-            Protocol_activation_level.get vi.ctxt
-          in
           let* is_attested =
-            if Raw_level.(raw_level <= protocol_activation_level) then
-              let* () =
-                match lag_index_opt with
-                | None -> return_unit
-                | Some _ ->
-                    tzfail
-                      (Invalid_accusation_unexpected_lag_index
-                         {
-                           tb_slot = consensus_slot;
-                           level = raw_level;
-                           slot_index;
-                           lag_index_opt;
-                         })
-              in
-              let attestation =
-                Dal.Attestation.of_attestations dal_content.attestations
-              in
-              return @@ Dal.Attestation.is_attested attestation slot_index
-            else
+            if attestation_with_dynamic_lag then
               match lag_index_opt with
               | None ->
                   tzfail
@@ -2555,6 +2538,24 @@ module Anonymous = struct
                        ~number_of_lags
                        ~lag_index
                        slot_index
+            else
+              let* () =
+                match lag_index_opt with
+                | None -> return_unit
+                | Some _ ->
+                    tzfail
+                      (Invalid_accusation_unexpected_lag_index
+                         {
+                           tb_slot = consensus_slot;
+                           level = raw_level;
+                           slot_index;
+                           lag_index_opt;
+                         })
+              in
+              let attestation =
+                Dal.Attestation.of_attestations dal_content.attestations
+              in
+              return @@ Dal.Attestation.is_attested attestation slot_index
           in
           fail_unless
             is_attested
