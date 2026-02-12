@@ -91,6 +91,8 @@ type mockup_sync_mode = Asynchronous | Synchronous
 (** The mode argument of the client's 'normalize data' command *)
 type normalize_mode = Readable | Optimized | Optimized_legacy
 
+val normalize_mode_to_string : normalize_mode -> string
+
 (** Tezos client states. *)
 type t
 
