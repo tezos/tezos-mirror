@@ -1199,8 +1199,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
       tags =
         (["snapshot"; history_mode_str]
         @ (if compact then ["compact"] else [])
-        @ (if unsafe_pvm_patches then ["unsafe_pvm_patches"] else [])
-        @ if kind == "riscv" then ["riscv"; Tag.ci_disabled] else []);
+        @ if unsafe_pvm_patches then ["unsafe_pvm_patches"] else []);
       variant = None;
       description =
         sf
@@ -1250,7 +1249,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
-  let create_observer_node () =
+  let create_observer_node dir =
     let new_rollup_node =
       Sc_rollup_node.create
         Observer
@@ -1259,13 +1258,16 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
         ~base_dir:(Client.base_dir client)
     in
     let* () = maybe_add_unsafe_pvm_patches_in_config new_rollup_node in
-    let* () = maybe_setup_preimages_dir new_rollup_node kind preimages_dir in
+    let* () = maybe_setup_preimages_dir new_rollup_node kind dir in
     Lwt.return new_rollup_node
   in
-  let* rollup_node_2 = create_observer_node () in
-  let* rollup_node_3 = create_observer_node () in
-  let* rollup_node_4 = create_observer_node () in
-  let* rollup_node_5 = create_observer_node () in
+  (* rollup_node_5 needs the preimages dir for the Archive test, the
+     others are better without preimages as this will test that
+     imported snapshots includes the preimage as well *)
+  let* rollup_node_2 = create_observer_node None in
+  let* rollup_node_3 = create_observer_node None in
+  let* rollup_node_4 = create_observer_node None in
+  let* rollup_node_5 = create_observer_node preimages_dir in
   let* () =
     Sc_rollup_node.run
       rollup_node_2
