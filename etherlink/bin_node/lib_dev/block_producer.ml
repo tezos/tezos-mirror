@@ -105,12 +105,6 @@ end
 
 type force = True | False | With_timestamp of Time.Protocol.t
 
-type preconfirmed_transactions_result = {
-  accepted : Ethereum_types.hash list;
-  refused : Ethereum_types.hash list;
-  dropped : Ethereum_types.hash list;
-}
-
 module Request = struct
   type ('a, 'b) t =
     | Produce_genesis :
@@ -124,7 +118,7 @@ module Request = struct
     | Propose_next_block_timestamp : Time.Protocol.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
-        -> (preconfirmed_transactions_result, tztrace) t
+        -> (Tx_queue_types.preconfirmed_transactions_result, tztrace) t
     | Lock_block_production : (unit, tztrace) t
     | Unlock_block_production : (unit, tztrace) t
 
@@ -874,6 +868,7 @@ let preconfirm_transactions
     (preconfirmation_state : Types.preconfirmation_state)
     ~maximum_number_of_chunks ~transactions =
   let open Lwt_result_syntax in
+  let open Tx_queue_types in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       maximum_number_of_chunks

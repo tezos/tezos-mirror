@@ -21,6 +21,18 @@ val payload_method : payload_t -> string
 
 val tag_payload : transaction_object_t -> Ethereum_types.hex -> payload_t
 
+type preconfirmed_transactions_result = {
+  accepted : Ethereum_types.hash list;
+      (** Transactions that were validated by the
+          preconfirm_transactions request. *)
+  refused : Ethereum_types.hash list;
+      (** Transactions that were invalidated by the preconfirm_transactions request. *)
+  dropped : Ethereum_types.hash list;
+      (** Transactions that were dropped by the
+          preconfirm_transactions request when there is already too
+          many transaction. *)
+}
+
 module L2_transaction : sig
   type t = transaction_object_t
 

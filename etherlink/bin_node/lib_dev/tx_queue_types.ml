@@ -24,6 +24,12 @@ let tag_payload tx_object payload =
   | Evm _ -> Evm_payload payload
   | Michelson _ -> Michelson_payload payload
 
+type preconfirmed_transactions_result = {
+  accepted : Ethereum_types.hash list;
+  refused : Ethereum_types.hash list;
+  dropped : Ethereum_types.hash list;
+}
+
 type tezlink_batch_nonces = {first : Z.t; length : int}
 
 type shared_nonce =

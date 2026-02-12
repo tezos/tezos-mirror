@@ -21,18 +21,6 @@ type force =
   | With_timestamp of Time.Protocol.t
       (** Force the creation of a block with the provided timestamp *)
 
-type preconfirmed_transactions_result = {
-  accepted : Ethereum_types.hash list;
-      (** Transactions that were validated by the
-          preconfirm_transactions request. *)
-  refused : Ethereum_types.hash list;
-      (** Transactions that were invalidated by the preconfirm_transactions request. *)
-  dropped : Ethereum_types.hash list;
-      (** Transactions that were dropped by the
-          preconfirm_transactions request when there is already too
-          many transaction. *)
-}
-
 (** [start parameters] starts the events follower. *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -61,7 +49,7 @@ type error += IC_disabled
     confirmation is not enabled. *)
 val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->
-  preconfirmed_transactions_result tzresult Lwt.t
+  Tx_queue_types.preconfirmed_transactions_result tzresult Lwt.t
 
 (** [lock_block_production ()] locks block production. While locked, produce_block
     will not produce blocks and preconfirmations will be refused. *)
