@@ -308,7 +308,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm-v24-backport-20662-daefb630
   stage: test
   tags:
   - gcp
@@ -327,7 +327,7 @@ documentation.install_python_bookworm:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_jammy:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-v24-backport-20662-daefb630
   stage: test
   tags:
   - gcp
@@ -346,7 +346,7 @@ documentation.install_python_jammy:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-6253f76a
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-v24-backport-20662-daefb630
   stage: test
   tags:
   - gcp
