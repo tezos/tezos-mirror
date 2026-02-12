@@ -263,18 +263,22 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
         destination: &str,
         amount: U256,
     ) -> Result<(), CustomPrecompileError> {
+        let context = CrossRuntimeContext {
+            gas_limit: self.block.gas_limit,
+            timestamp: self.block.timestamp,
+            block_number: self.block.number,
+        };
         let alias = match get_alias(self.host, &source, RuntimeId::Tezos)? {
             Some(alias) => alias,
             None => {
-                // Create context for alias generation using current block constants
-                let context = CrossRuntimeContext {
-                    gas_limit: self.block.gas_limit,
-                    timestamp: self.block.timestamp,
-                    block_number: self.block.number,
-                };
                 let alias = self
                     .registry
-                    .generate_alias(self.host, &source.0 .0, RuntimeId::Tezos, context)
+                    .generate_alias(
+                        self.host,
+                        &source.0 .0,
+                        RuntimeId::Tezos,
+                        context.clone(),
+                    )
                     .map_err(|e| {
                         CustomPrecompileError::Revert(format!(
                             "Failed to generate alias for source address: {e:?}"
@@ -307,6 +311,7 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                     })?,
                 ),
                 &[],
+                context,
             )
             .map_err(|e| {
                 CustomPrecompileError::Revert(format!(

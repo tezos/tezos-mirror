@@ -554,6 +554,7 @@ mod test {
                 source_address: &[u8],
                 amount: primitive_types::U256,
                 data: &[u8],
+                context: CrossRuntimeContext,
             ) -> Result<CrossCallResult, TezosXRuntimeError> {
                 match destination_runtime {
                     RuntimeId::Tezos => self.mock_tezos.call(
@@ -563,6 +564,7 @@ mod test {
                         destination_address,
                         amount,
                         data,
+                        context,
                     ),
                     RuntimeId::Ethereum => {
                         Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
@@ -668,6 +670,7 @@ mod test {
                 to: &[u8],
                 amount: primitive_types::U256,
                 _data: &[u8],
+                _context: CrossRuntimeContext,
             ) -> Result<CrossCallResult, TezosXRuntimeError> {
                 // Store the balance for the destination address
                 let address_hex = hex::encode(to);

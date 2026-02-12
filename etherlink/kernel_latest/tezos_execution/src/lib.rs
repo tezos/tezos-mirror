@@ -1154,7 +1154,9 @@ pub(crate) mod test_utils {
     use primitive_types::U256;
     use std::cell::RefCell;
     use tezos_evm_runtime::runtime::Runtime;
-    use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError};
+    use tezosx_interfaces::{
+        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+    };
 
     /// Mock Registry for testing gateway operations.
     /// Tracks all calls to bridge and generate_alias for verification.
@@ -1183,6 +1185,7 @@ pub(crate) mod test_utils {
             source_address: &[u8],
             amount: U256,
             _data: &[u8],
+            _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError> {
             self.bridge_calls.borrow_mut().push((
                 destination_runtime,
@@ -1285,6 +1288,7 @@ mod tests {
             _source_address: &[u8],
             _amount: primitive_types::U256,
             _data: &[u8],
+            _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError> {
             Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
         }

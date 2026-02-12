@@ -98,24 +98,27 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
     let source = ctx.sender();
     let amount = ctx.amount();
     let block_number = ctx.level();
+
     let timestamp = ctx.now();
     let host = ctx.host();
 
     if amount < 0 {
         return Err(TransferError::GatewayError("Negative amount".into()));
     }
+
+    let context = CrossRuntimeContext {
+        gas_limit: u64::MAX, // TODO: L2-869 this should have a proper bound
+        timestamp: bigint_to_u256(&timestamp)?,
+        block_number: biguint_to_u256(block_number)?,
+    };
+
     // the sender has been debited before the execution of the contract
     let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
         Some(alias) => alias,
         None => {
             let source_bytes = source.to_bytes_vec();
-            let context = CrossRuntimeContext {
-                gas_limit: u64::MAX,
-                timestamp: bigint_to_u256(&timestamp)?,
-                block_number: biguint_to_u256(block_number)?,
-            };
             let alias = registry
-                .generate_alias(host, &source_bytes, RuntimeId::Ethereum, context)
+                .generate_alias(host, &source_bytes, RuntimeId::Ethereum, context.clone())
                 .map_err(|e| TransferError::GatewayError(e.to_string()))?;
             store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
             alias
@@ -132,6 +135,7 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
             &alias,
             U256::from(amount as u64),
             &[0u8; 0],
+            context,
         )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
     match result {

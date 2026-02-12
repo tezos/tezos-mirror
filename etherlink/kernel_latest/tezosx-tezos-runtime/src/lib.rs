@@ -52,6 +52,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         to: &[u8],
         amount: U256,
         _data: &[u8],
+        _context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         let to = Contract::nom_read_exact(to).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(

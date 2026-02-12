@@ -32,6 +32,7 @@ impl Registry for RegistryImpl {
         source_address: &[u8],
         amount: U256,
         data: &[u8],
+        context: tezosx_interfaces::CrossRuntimeContext,
     ) -> Result<CrossCallResult, tezosx_interfaces::TezosXRuntimeError> {
         match destination_runtime {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.call(
@@ -41,6 +42,7 @@ impl Registry for RegistryImpl {
                 destination_address,
                 amount,
                 data,
+                context,
             ),
             tezosx_interfaces::RuntimeId::Ethereum => self.ethereum.call(
                 self,
@@ -49,6 +51,7 @@ impl Registry for RegistryImpl {
                 destination_address,
                 amount,
                 data,
+                context,
             ),
         }
     }

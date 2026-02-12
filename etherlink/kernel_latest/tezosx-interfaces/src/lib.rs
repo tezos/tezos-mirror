@@ -43,6 +43,7 @@ pub enum TezosXRuntimeError {
     Custom(String),
 }
 pub trait Registry {
+    #[allow(clippy::too_many_arguments)]
     fn bridge<Host: Runtime>(
         &self,
         host: &mut Host,
@@ -51,6 +52,7 @@ pub trait Registry {
         source_address: &[u8],
         amount: U256,
         data: &[u8],
+        context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError>;
 
     fn generate_alias<Host: Runtime>(
@@ -81,12 +83,11 @@ pub trait RuntimeInterface {
         context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
-    // This is a just a placeholder for now to show how the
-    //interface would look like.
-    // TODO: Probably need to pass and return more data to
-    // initialize a real operation when we will implement this.
-    // Amounts should have been subtracted from the sender
-    // before calling this function.
+    /// Execute a call in this runtime.
+    ///
+    /// Amounts should have been subtracted from the sender
+    /// before calling this function.
+    #[allow(clippy::too_many_arguments)]
     fn call<Host: Runtime>(
         &self,
         registry: &impl Registry,
@@ -95,6 +96,7 @@ pub trait RuntimeInterface {
         to: &[u8],
         amount: U256,
         data: &[u8],
+        context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError>;
 
     fn address_from_string(

@@ -196,6 +196,7 @@ impl RuntimeInterface for EthereumRuntime {
         to: &[u8],
         amount: primitive_types::U256,
         _data: &[u8],
+        _context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         if to.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
