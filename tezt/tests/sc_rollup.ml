@@ -172,6 +172,16 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
   in
   scenario protocol sc_rollup tezos_node tezos_client
 
+let maybe_setup_preimages_dir rollup_node kind preimages_dir =
+  match preimages_dir with
+  | None -> Lwt.return ()
+  | Some src_dir ->
+      let data_dir = Sc_rollup_node.data_dir rollup_node in
+      let dest_dir = Filename.concat data_dir kind in
+      (* Copying used here instead of softlink to avoid tampering of artefact
+         when debugging from the temp test directory *)
+      Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
+
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
@@ -233,16 +243,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
         if name = "kernel_debug.v0" then
           Regression.capture
             (Tezos_regression.replace_variables (JSON.as_string value))) ;
-  let* () =
-    match preimages_dir with
-    | None -> Lwt.return_unit
-    | Some src_dir ->
-        let data_dir = Sc_rollup_node.data_dir rollup_node in
-        let dest_dir = Filename.concat data_dir kind in
-        (* Copying used here instead of softlink to avoid tampering of artefact
-           when debugging from the temp test directory *)
-        Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
-  in
+  let* () = maybe_setup_preimages_dir rollup_node kind preimages_dir in
   let* () =
     if Sc_rollup_node.monitors_finalized rollup_node then
       (* For rollup nodes that only monitor finalized blocks we start by baking
@@ -1185,7 +1186,7 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
    - we ensure they are all synchronized
    - we also try to import invalid snapshots to make sure they are rejected. *)
 let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
-    ~commitment_period ~history_mode ~compact =
+    ~commitment_period ~history_mode ~compact ?preimages_dir =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
 
   let whitelist =
@@ -1210,6 +1211,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
     ~kind
     ~challenge_window
     ~commitment_period
+    ?preimages_dir
   @@ fun _protocol sc_rollup_node sc_rollup node client ->
   (* Originate another rollup for sanity checks *)
   let* other_rollup = originate_sc_rollup ~alias:"other_rollup" ~kind client in
@@ -1247,22 +1249,25 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   in
   (* We run the other nodes in mode observer because we only care if they can
      catch up. *)
-  let rollup_node_2 =
-    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
+  let create_observer_node dir =
+    let new_rollup_node =
+      Sc_rollup_node.create
+        Observer
+        node
+        ~kind
+        ~base_dir:(Client.base_dir client)
+    in
+    let* () = maybe_add_unsafe_pvm_patches_in_config new_rollup_node in
+    let* () = maybe_setup_preimages_dir new_rollup_node kind dir in
+    Lwt.return new_rollup_node
   in
-  let rollup_node_3 =
-    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
-  in
-  let rollup_node_4 =
-    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
-  in
-  let rollup_node_5 =
-    Sc_rollup_node.create Observer node ~kind ~base_dir:(Client.base_dir client)
-  in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_2 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_3 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_4 in
-  let* () = maybe_add_unsafe_pvm_patches_in_config rollup_node_5 in
+  (* rollup_node_5 needs the preimages dir for the Archive test, the
+     others are better without preimages as this will test that
+     imported snapshots includes the preimage as well *)
+  let* rollup_node_2 = create_observer_node None in
+  let* rollup_node_3 = create_observer_node None in
+  let* rollup_node_4 = create_observer_node None in
+  let* rollup_node_5 = create_observer_node preimages_dir in
   let* () =
     Sc_rollup_node.run
       rollup_node_2
@@ -1290,12 +1295,18 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
         let* (_ : int) = Sc_rollup_node.wait_sync rollup_node_5 ~timeout:3. in
         Sc_rollup_node.terminate rollup_node_5
   in
+  (* Keep L1 node and operator rollup node in sync when progressing. *)
+  let rollup_sync_hook _ =
+    let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
+    unit
+  in
+  let bake_sync n = bake_levels n client ~hook:rollup_sync_hook in
   let rollup_node_processing =
-    let* () = bake_levels stop_rollup_node_2_levels client in
+    let* () = bake_sync stop_rollup_node_2_levels in
     Log.info "Stopping rollup node 2 and 4 before snapshot is made." ;
     let* () = Sc_rollup_node.terminate rollup_node_2 in
     let* () = Sc_rollup_node.terminate rollup_node_4 in
-    let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
+    let* () = bake_sync (total_blocks - stop_rollup_node_2_levels) in
     let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
     unit
   in
@@ -1376,7 +1387,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   Log.info "Bake until next commitment." ;
   let* () =
     let event_name = "smart_rollup_node_new_commitment.v0" in
-    bake_until_event client ~event_name
+    bake_until_event ~timeout:60. client ~event_name ~hook:rollup_sync_hook
     @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
@@ -7660,7 +7671,31 @@ let register_riscv ~protocols =
     ~boot_sector
     ~internal:false
     ~kernel_debug_log:true
+    ~preimages_dir ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Full
+    ~compact:false
     ~preimages_dir
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Full
+    ~compact:true
+    ~preimages_dir
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:10
+    ~commitment_period:10
+    ~history_mode:Archive
+    ~compact:false
+    ~preimages_dir
+    protocols
 
 let register_riscv_kernel ~protocols ~kernel =
   let kind = "riscv" in
