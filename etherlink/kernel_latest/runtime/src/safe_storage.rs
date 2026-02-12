@@ -6,7 +6,6 @@
 // SPDX-License-Identifier: MIT
 
 use crate::extensions::WithGas;
-use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
 use crate::runtime::{IsEvmNode, Runtime};
 use tezos_evm_logging::Verbosity;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
@@ -35,31 +34,6 @@ pub struct SafeStorage<Runtime> {
     pub host: Runtime,
     /// Invariant: paths must not overlap (no path is a prefix of another)
     pub world_states: Vec<OwnedPath>,
-}
-
-impl<Host: Runtime> InternalRuntime for SafeStorage<&mut Host> {
-    fn __internal_store_get_hash<T: Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.__internal_store_get_hash(path)
-    }
-}
-
-impl<Host: Runtime> ExtendedRuntime for SafeStorage<&mut Host> {
-    #[inline(always)]
-    fn store_get_hash<P: Path>(&mut self, path: &P) -> Result<Vec<u8>, RuntimeError> {
-        let path = safe_path(path)?;
-        self.__internal_store_get_hash(&path)
-    }
-
-    #[inline(always)]
-    fn internal_store_read_all<T: Path>(
-        &self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read_all(path)
-    }
 }
 
 impl<Host: HostDebug> HostDebug for SafeStorage<&mut Host> {

@@ -30,7 +30,6 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
@@ -351,18 +350,14 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 // internal runtime. Use `kernel` instead.
 #[entrypoint::main]
 pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
-    kernel(
-        host,
-        tezos_evm_runtime::internal_runtime::WasmInternalHost(),
-    )
+    kernel(host)
 }
 
-pub fn kernel<Host, I>(host: &mut Host, internal: I)
+pub fn kernel<Host>(host: &mut Host)
 where
     Host: tezos_smart_rollup_host::runtime::Runtime,
-    I: InternalRuntime,
 {
-    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
+    let mut host: KernelHost<Host, &mut Host> = KernelHost::init(host);
 
     let reboot_counter = host
         .host

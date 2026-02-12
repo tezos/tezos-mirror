@@ -426,8 +426,8 @@ impl BlockInProgress {
         path: &RefPath,
     ) -> Result<Vec<u8>, anyhow::Error> {
         match host.store_get_hash(path) {
-            Ok(hash) => Ok(hash),
-            _ => Ok("00000000000000000000000000000000".into()),
+            Ok(hash) => Ok(hash.into()),
+            _ => Ok([b'0'; tezos_smart_rollup_core::STORE_HASH_SIZE].into()),
         }
     }
 

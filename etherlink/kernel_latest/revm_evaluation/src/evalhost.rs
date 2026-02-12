@@ -7,7 +7,6 @@ use std::{cell::RefCell, io::Write};
 use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
     extensions::WithGas,
-    internal_runtime::{ExtendedRuntime, InternalRuntime},
     runtime::{IsEvmNode, MockKernelHost},
 };
 use tezos_smart_rollup_host::{
@@ -221,31 +220,6 @@ impl WasmHost for EvalHost {
 }
 
 impl SdkRuntime for EvalHost {}
-
-impl InternalRuntime for EvalHost {
-    fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
-        self.host.__internal_store_get_hash(path)
-    }
-}
-
-impl ExtendedRuntime for EvalHost {
-    fn store_get_hash<T: tezos_smart_rollup_host::path::Path>(
-        &mut self,
-        path: &T,
-    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
-        self.host.store_get_hash(path).map(|hash| hash.to_vec())
-    }
-
-    fn internal_store_read_all<T: Path>(
-        &self,
-        path: &T,
-    ) -> Result<Vec<u8>, RuntimeError> {
-        self.host.store_read_all(path)
-    }
-}
 
 impl Verbosity for EvalHost {
     fn verbosity(&self) -> tezos_evm_logging::Level {

@@ -234,7 +234,7 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
     }
 
     fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-        let bytes = self.host.internal_store_read_all(&SEQUENCER_KEY_PATH)?;
+        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
         PublicKey::from_b58check(std::str::from_utf8(&bytes).map_err(|e| {
             CustomPrecompileError::Revert(format!(
                 "Invalid sequencer key UTF-8 encoding: {e}"
@@ -248,10 +248,7 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
     }
 
     fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
-        match self
-            .host
-            .internal_store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
-        {
+        match self.host.store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH) {
             Ok(_) => Ok(true),
             Err(RuntimeError::PathNotFound) => Ok(false),
             Err(e) => Err(CustomPrecompileError::from(e)),
