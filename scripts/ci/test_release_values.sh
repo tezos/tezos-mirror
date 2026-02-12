@@ -12,7 +12,8 @@ tests=(
   "true octez-v1.1-rc1 xxx nomadic TestReleaseCandidate 1.1-rc1"
   "true lalalalal xxx tezos SoftRelease"
   "false lalalalal xxx tezos TestBranch"
-  "false  octez-v1.1 xxx tezos TestBranch 1.1"
+  "false octez-v1.1 xxx tezos TestBranch 1.1"
+  "true none xxx tezos TestProtectedBranch"
   "true lalalalal master tezos Master"
   # Add more test cases here as needed
 )
@@ -23,6 +24,10 @@ for test in "${tests[@]}"; do
   IFS=' ' read -r CI_COMMIT_REF_PROTECTED CI_COMMIT_TAG CI_COMMIT_REF_NAME CI_PROJECT_NAMESPACE expected_release expected_version <<< "$test"
 
   export CI_COMMIT_REF_PROTECTED CI_COMMIT_TAG CI_COMMIT_REF_NAME
+
+  if [ "$CI_COMMIT_TAG" = "none" ]; then
+    export CI_COMMIT_TAG=""
+  fi
 
   . scripts/ci/octez-packages-version.sh
 

@@ -107,7 +107,7 @@ SoftRelease)
   DEBVERSION="1:$TIMESTAMP+${CI_COMMIT_TAG:-}"
   DEBCHANGELOG="Packages for tag ${CI_COMMIT_TAG:-}"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   DEBVERSION="1:$TIMESTAMP+$CI_COMMIT_SHORT_SHA"
   DEBCHANGELOG="Test package commit ${CI_COMMIT_REF_NAME:-}"
   ;;
