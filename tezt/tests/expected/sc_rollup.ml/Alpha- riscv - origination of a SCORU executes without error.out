@@ -1,5 +1,5 @@
 
-./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type string with kernel kernel:src/riscv/assets/riscv-dummy.elf:c0047e2a561e90aa2e1ae691c9e12798d4c44cccf991f1505a7da59b74f37e83 --burn-cap 9999999
+./octez-client --wait none originate smart rollup rollup from bootstrap1 of kind riscv of type string with kernel kernel:src/riscv/assets/riscv-dummy.elf:a81457e55ed4573879e7a246526d885b084c8b09edaec5c0c063e6cb7859fcea --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1933.839 units (will add 100 for safety)
 Estimated storage: 6552 bytes added (will add 20 for safety)
@@ -22,7 +22,7 @@ This sequence of operations was run:
     Smart rollup origination:
       Kind: riscv
       Parameter type: string
-      Kernel Blake2B hash: '960f98f44a4beb8c1cbc661bbed4eb66cab506ea6685e33be37e97ad4e02564b'
+      Kernel Blake2B hash: 'fc55650a30f5d14fe976bad0a3fe9b22b2a138340850b56e39df8f5629541bb7'
       This smart rollup origination was successfully applied
       Consumed gas: 1933.806
       Storage size: 6552 bytes
