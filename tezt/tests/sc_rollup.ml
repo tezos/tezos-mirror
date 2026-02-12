@@ -1293,12 +1293,18 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
         let* (_ : int) = Sc_rollup_node.wait_sync rollup_node_5 ~timeout:3. in
         Sc_rollup_node.terminate rollup_node_5
   in
+  (* Keep L1 node and operator rollup node in sync when progressing. *)
+  let rollup_sync_hook _ =
+    let* _ = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
+    unit
+  in
+  let bake_sync n = bake_levels n client ~hook:rollup_sync_hook in
   let rollup_node_processing =
-    let* () = bake_levels stop_rollup_node_2_levels client in
+    let* () = bake_sync stop_rollup_node_2_levels in
     Log.info "Stopping rollup node 2 and 4 before snapshot is made." ;
     let* () = Sc_rollup_node.terminate rollup_node_2 in
     let* () = Sc_rollup_node.terminate rollup_node_4 in
-    let* () = bake_levels (total_blocks - stop_rollup_node_2_levels) client in
+    let* () = bake_sync (total_blocks - stop_rollup_node_2_levels) in
     let* (_ : int) = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:3. in
     unit
   in
@@ -1379,7 +1385,7 @@ let test_snapshots ?(unsafe_pvm_patches = false) ~kind ~challenge_window
   Log.info "Bake until next commitment." ;
   let* () =
     let event_name = "smart_rollup_node_new_commitment.v0" in
-    bake_until_event client ~event_name
+    bake_until_event ~timeout:60. client ~event_name ~hook:rollup_sync_hook
     @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
