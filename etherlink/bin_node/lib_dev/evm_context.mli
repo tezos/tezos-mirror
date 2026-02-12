@@ -49,7 +49,6 @@ val start :
   store_perm:Sqlite.perm ->
   ?signer:Signer.map ->
   ?snapshot_source:snapshot_source ->
-  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -62,7 +61,6 @@ val init_from_rollup_node :
   configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
   rollup_node_data_dir:string ->
-  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   unit tzresult Lwt.t
 

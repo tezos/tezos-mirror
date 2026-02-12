@@ -242,20 +242,13 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~l2_chains:configuration.experimental_features.l2_chains
   in
 
-  let* tx_container =
-    let start, tx_container = Tx_queue.tx_container ~chain_family in
-    let* () =
-      start
-        ~config:configuration.tx_queue
-        ~keep_alive
-        ~timeout:rpc_timeout
-        ~start_injector_worker:false
-        ()
-    in
-    return tx_container
-  in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
+  let* () =
+    Tx_queue.start
+      ~config:configuration.tx_queue
+      ~keep_alive
+      ~timeout:rpc_timeout
+      ~start_injector_worker:false
+      ()
   in
 
   let* signer =
@@ -269,7 +262,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~store_perm:Read_write
       ~signer
       ?snapshot_source
-      ~tx_container
       ()
   in
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
@@ -458,7 +450,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       {
         signer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
-        tx_container = Ex_tx_container tx_container;
         sequencer_sunset_sec = sequencer_config.sunset_sec;
         preconfirmation_stream_enabled =
           configuration.experimental_features.preconfirmation_stream_enabled;
@@ -503,7 +494,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
 
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~mode:(Sequencer tx_container)
+      ~mode:Sequencer
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(
@@ -517,7 +508,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~mode:(Sequencer tx_container)
+      ~mode:Sequencer
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)

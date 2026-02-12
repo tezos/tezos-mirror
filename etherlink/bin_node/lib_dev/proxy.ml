@@ -136,7 +136,6 @@ let main
       let* enable_multichain = Rollup_node_rpc.is_multichain_enabled () in
       Rollup_node_rpc.single_chain_id_and_family ~config ~enable_multichain
   in
-  let _start_tx_queue, tx_container = Tx_queue.tx_container ~chain_family in
   let* () =
     Tx_queue.start
       ~config:config.tx_queue
@@ -178,7 +177,7 @@ let main
 
   let* server_finalizer =
     Rpc_server.start_public_server
-      ~mode:(Proxy tx_container)
+      ~mode:Proxy
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
       ~tick:(fun () -> Lwt_result_syntax.return_unit)

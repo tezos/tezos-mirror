@@ -2039,14 +2039,10 @@ let init_from_rollup_node_command =
       in
       let* configuration = Cli.create_or_read_config ~data_dir config_file in
       let*! () = init_logs ~daily_logs:false configuration in
-      let _start_tx_queue, tx_container =
-        Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-      in
       Evm_node_lib_dev.Evm_context.init_from_rollup_node
         ~configuration
         ~omit_delayed_tx_events
         ~rollup_node_data_dir
-        ~tx_container
         ())
 
 let dump_to_rlp_command =
@@ -2395,15 +2391,8 @@ let patch_kernel_command =
          to interact with an upstream EVM node. *)
       let configuration = {configuration with observer = None} in
       if force then
-        let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-        in
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~store_perm:Read_write
-            ~tx_container
-            ()
+          Evm_context.start ~configuration ~store_perm:Read_write ()
         in
         Evm_context.patch_kernel ?block_number (On_disk kernel_path)
       else
@@ -3910,15 +3899,8 @@ let patch_state_command =
         (* We remove the [observer] configuration. This [patch] should not need
            to interact with an upstream EVM node. *)
         let configuration = {configuration with observer = None} in
-        let _start_tx_queue, tx_container =
-          Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
-        in
         let* _status =
-          Evm_context.start
-            ~configuration
-            ~store_perm:Read_write
-            ~tx_container
-            ()
+          Evm_context.start ~configuration ~store_perm:Read_write ()
         in
         Evm_context.patch_state ?block_number ~key ~value ()
       else

@@ -39,7 +39,6 @@ type parameters = {
   store_perm : Sqlite.perm;
   signer : Signer.map option;
   snapshot_source : snapshot_source option;
-  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 type future_block_info = {
@@ -87,7 +86,6 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   signer : Signer.map option;
-  tx_container : Services_backend_sig.ex_tx_container;
   execution_pool : Lwt_domain.pool;
 }
 
@@ -599,13 +597,7 @@ module State = struct
     let* storage_version = Evm_state.storage_version evm_state in
     let* tezosx_runtimes = Evm_state.tezosx_runtimes evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
-    let* () =
-      let (Ex_tx_container tx_container) = ctxt.tx_container in
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
-      in
-      Tx_container.clear ()
-    in
+    let* () = Tx_queue.clear () in
     (* Clear the store. *)
     let* () = Evm_store.reset_after conn ~l2_level in
     let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending conn in
@@ -1982,8 +1974,7 @@ module State = struct
   let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-      ~store_perm ?signer ?snapshot_source
-      ~(tx_container : _ Services_backend_sig.tx_container) () =
+      ~store_perm ?signer ?snapshot_source () =
     let open Lwt_result_syntax in
     let pool =
       (* All interactions of the Evm_context worker with the kernel are purely
@@ -2158,7 +2149,6 @@ module State = struct
           };
         store;
         signer;
-        tx_container = Ex_tx_container tx_container;
         execution_pool = pool;
       }
     in
@@ -2433,7 +2423,6 @@ module Handlers = struct
         store_perm;
         signer;
         snapshot_source;
-        tx_container = Ex_tx_container tx_container;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -2444,7 +2433,6 @@ module Handlers = struct
         ~store_perm
         ?signer
         ?snapshot_source
-        ~tx_container
         ()
     in
     Lwt.wakeup execution_config_waker
@@ -2716,8 +2704,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-    ~store_perm ?signer ?snapshot_source
-    ~(tx_container : _ Services_backend_sig.tx_container) () =
+    ~store_perm ?signer ?snapshot_source () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
@@ -2731,7 +2718,6 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         store_perm;
         signer;
         snapshot_source;
-        tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
   in
@@ -2900,7 +2886,7 @@ let apply_evm_events' ?finalized_level events =
   worker_wait_for_request (Apply_evm_events {finalized_level; events})
 
 let init_from_rollup_node ~(configuration : Configuration.t)
-    ~omit_delayed_tx_events ~rollup_node_data_dir ~tx_container () =
+    ~omit_delayed_tx_events ~rollup_node_data_dir () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* irmin_context, evm_state, finalized_level =
@@ -2926,12 +2912,7 @@ let init_from_rollup_node ~(configuration : Configuration.t)
     rollup_node_metadata ~rollup_node_data_dir
   in
   let* _loaded =
-    start
-      ~configuration
-      ~smart_rollup_address
-      ~store_perm:Read_write
-      ~tx_container
-      ()
+    start ~configuration ~smart_rollup_address ~store_perm:Read_write ()
   in
   worker_wait_for_request
     (Apply_evm_events

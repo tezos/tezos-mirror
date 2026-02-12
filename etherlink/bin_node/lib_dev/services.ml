@@ -153,7 +153,7 @@ let configuration_handler config =
 
 let health_check_handler config mode db_liveness_check query =
   match mode with
-  | Mode.Sequencer _ | Observer _ | Proxy _ ->
+  | Mode.Sequencer | Observer | Proxy ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -188,9 +188,9 @@ let health_check_handler config mode db_liveness_check query =
 let evm_mode_handler config evm_mode =
   let open Lwt_result_syntax in
   match evm_mode with
-  | Mode.Sequencer _ -> return "sequencer"
-  | Observer _ -> return "observer"
-  | Proxy _ -> return "proxy"
+  | Mode.Sequencer -> return "sequencer"
+  | Observer -> return "observer"
+  | Proxy -> return "proxy"
   | Rpc {evm_node_endpoint; _} ->
       let+ evm_node_mode =
         Rollup_services.call_service
@@ -818,7 +818,7 @@ let inject_rpc_call (config : Configuration.t) request method_
 let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful =
   match mode with
   | Mode.Rpc rpc -> on_rpc rpc
-  | Proxy _ | Sequencer _ | Observer _ -> on_stateful ()
+  | Proxy | Sequencer | Observer -> on_stateful ()
 
 let wait_confirmation_callback wait_confirmation_wakener =
  fun status ->
