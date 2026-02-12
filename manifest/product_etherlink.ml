@@ -318,6 +318,19 @@ let evm_node_lib_dev_tezlink =
     | Some target -> target
     | None -> (* unreachable *) assert false
   in
+  let tezlink_target_proto_024 =
+    List.find (fun proto -> Protocol.short_hash proto = "PtTALLiN") Protocol.all
+  in
+  let tezlink_protocol_plugin_024 =
+    match Protocol.plugin tezlink_target_proto_024 with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
+  let tezlink_protocol_parameters_024 =
+    match Protocol.parameters tezlink_target_proto_024 with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
   let tezlink_genesis_proto =
     List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
   in
@@ -336,12 +349,15 @@ let evm_node_lib_dev_tezlink =
         evm_node_lib_dev_encoding |> open_;
         tezlink_protocol_plugin;
         tezlink_protocol_parameters;
+        tezlink_protocol_plugin_024;
+        tezlink_protocol_parameters_024;
         tezlink_genesis_protocol_plugin;
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
         octez_version;
         octez_micheline;
         Protocol.test_helpers_exn tezlink_target_proto;
+        Protocol.test_helpers_exn tezlink_target_proto_024;
         lwt_watcher;
       ]
 

@@ -234,6 +234,100 @@ module Tezlink_SeouLo_protocol = struct
       }
 end
 
+(** We add to Imported_protocol_024 the mocked protocol data used in headers *)
+module Tezlink_TALLiN_protocol = struct
+  include Tezos_protocol_024_PtTALLiN.Protocol
+
+  let contents : Block_header_repr.contents =
+    {
+      payload_hash = Block_payload_hash.zero;
+      payload_round = Round_repr.zero;
+      seed_nonce_hash = None;
+      proof_of_work_nonce =
+        Bytes.make Constants_repr.proof_of_work_nonce_size '\000';
+      per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
+    }
+
+  let signature : Alpha_context.signature =
+    Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
+
+  let mock_protocol_data : Block_header_repr.protocol_data =
+    {contents; signature}
+
+  let mock_block_header_data ~chain_id:_ : block_header_data tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_data"
+      ~dst:block_header_data_encoding
+      ~src:Block_header_repr.protocol_data_encoding
+      mock_protocol_data
+
+  let mock_block_header_metadata level_info =
+    let open Apply_results in
+    let open Result_syntax in
+    let proposer =
+      Alpha_context.Consensus_key.
+        {
+          delegate = Tezlink_mock.baker_account.pkh;
+          consensus_pkh = Tezlink_mock.baker_account.pkh;
+        }
+    in
+    let* balance_updates =
+      let amount = Tezlink_SeouLo_protocol.Alpha_context.Tez.of_mutez_exn 0L in
+      let seoul_balance_update =
+        Tezlink_mock.balance_udpdate_rewards
+          ~baker:Tezlink_mock.baker_account.pkh
+          ~amount
+      in
+      Tezos_types.convert_using_serialization
+        ~name:"Tallinn balance updates"
+        ~src:
+          Tezlink_SeouLo_protocol.Alpha_context.Receipt.balance_updates_encoding
+        ~dst:Alpha_context.Receipt.balance_updates_encoding
+        seoul_balance_update
+    in
+
+    let constant = Tezlink_constants.all_constants.parametric in
+    let* voting_period_info =
+      let* seoul_period_info =
+        Tezlink_SeouLo_protocol.voting_period_info
+          ~block_per_cycle:constant.blocks_per_cycle
+          ~cycles_per_voting_period:constant.cycles_per_voting_period
+          ~level_info
+      in
+      Tezos_types.convert_using_serialization
+        ~name:"Tallinn period info"
+        ~src:Tezlink_SeouLo_protocol.Alpha_context.Voting_period.info_encoding
+        ~dst:Alpha_context.Voting_period.info_encoding
+        seoul_period_info
+    in
+    let* level_info =
+      let* level_info = Protocol_types.Level.convert level_info in
+      Tezos_types.convert_using_serialization
+        ~name:"Tallinn level info"
+        ~src:Tezlink_SeouLo_protocol.Alpha_context.Level.encoding
+        ~dst:Alpha_context.Level.encoding
+        level_info
+    in
+    return
+      {
+        proposer;
+        baker = proposer;
+        level_info;
+        voting_period_info;
+        nonce_hash = None;
+        consumed_gas = Alpha_context.Gas.Arith.zero;
+        deactivated = [];
+        balance_updates;
+        liquidity_baking_toggle_ema =
+          Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
+        implicit_operations_results = [];
+        dal_attestation = Alpha_context.Dal.Attestation.empty;
+        abaab_activation_level = None;
+        attestations = None;
+        preattestations = None;
+      }
+end
+
 type error +=
   | Deserialize_operation of string * string * string
   | Deserialize_operations_header of string
