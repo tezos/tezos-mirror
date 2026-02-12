@@ -21,15 +21,10 @@ open Ethereum_types
     into a forced blueprint. The sequencer has performed a reorganization and
     starts submitting blocks from the new branch.
 *)
-let on_new_blueprint (type f)
-    (tx_container : f Services_backend_sig.tx_container) evm_node_endpoint
-    next_blueprint_number
+let on_new_blueprint evm_node_endpoint next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) ~expected_block_hash =
   let open Lwt_result_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
@@ -67,7 +62,7 @@ let on_new_blueprint (type f)
                blueprint.")
     | Ok confirmed_txs ->
         let* () =
-          Tx_container.confirm_transactions
+          Tx_queue.confirm_transactions
             ~clear_pending_queue_after:false
             ~confirmed_txs
         in
@@ -134,14 +129,9 @@ let on_inclusion (txn : Broadcast.transaction) hash =
     opt_receipt ;
   return_unit
 
-let install_finalizer_observer ~rollup_node_tracking
-    ~(tx_container : _ Services_backend_sig.tx_container)
-    finalizer_public_server finalizer_private_server finalizer_rpc_process
-    telemetry_cleanup =
+let install_finalizer_observer ~rollup_node_tracking finalizer_public_server
+    finalizer_private_server finalizer_rpc_process telemetry_cleanup =
   let open Lwt_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
@@ -150,7 +140,7 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_container.shutdown () in
+  let* () = Tx_queue.shutdown () in
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
@@ -275,12 +265,9 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Metrics.init
     ~mode:"observer"
-    ~tx_pool_size_info:Tx_container.size_info
+    ~tx_pool_size_info:Tx_queue.size_info
     ~smart_rollup_address
     () ;
 
@@ -293,7 +280,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let tick () =
-    Tx_container.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
+    Tx_queue.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
@@ -370,7 +357,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       finalizer_private_server
       finalizer_rpc_process
       telemetry_cleanup
-      ~tx_container
   in
 
   let*! next_blueprint_number = Evm_context.next_blueprint_number () in
@@ -387,7 +373,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
           ~chain_family
           Evm_context.next_blueprint_number) ;
     Misc.background_task ~name:"tx_queue_beacon" (fun () ->
-        Tx_container.tx_queue_beacon
+        Tx_queue.tx_queue_beacon
           ~evm_node_endpoint:(Rpc evm_node_endpoint)
           ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)) ;
     Blueprints_follower.start
@@ -398,12 +384,12 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~next_blueprint_number
       ~instant_confirmations:
         config.experimental_features.preconfirmation_stream_enabled
-      ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
+      ~on_new_blueprint:(on_new_blueprint evm_node_endpoint)
       ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
       ~on_next_block_info
       ~on_inclusion
       ~on_dropped:(fun hash reason ->
         Broadcast.notify_transaction_result {hash; result = Error reason} ;
-        let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
+        let* () = Tx_queue.dropped_transaction ~dropped_tx:hash ~reason in
         return_unit)
       ())
