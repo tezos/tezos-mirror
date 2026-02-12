@@ -3,7 +3,7 @@
 
 stages:
 - start
-- images
+- build
 
 datadog_pipeline_trace:
   image: datadog/ci:v4.1.0
@@ -27,9 +27,9 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.base-images.debian:
+images.debian:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -74,9 +74,9 @@ oc.base-images.debian:
       - bookworm
       - trixie
 
-oc.base-images.ubuntu:
+images.ubuntu:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -116,9 +116,9 @@ oc.base-images.ubuntu:
       - "24.04"
       - "25.10"
 
-oc.base-images.fedora:
+images.fedora:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -159,9 +159,9 @@ oc.base-images.fedora:
       - "41"
       - "42"
 
-oc.base-images.rockylinux:
+images.rockylinux:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -201,9 +201,9 @@ oc.base-images.rockylinux:
       - "9"
       - "10"
 
-oc.base-images.rust:
+images.rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - $TAGS
   rules:
@@ -220,7 +220,7 @@ oc.base-images.rust:
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
-  - oc.base-images.debian
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -249,9 +249,9 @@ oc.base-images.rust:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.base-images.rust.merge:
+images.rust.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp
   rules:
@@ -266,7 +266,7 @@ oc.base-images.rust.merge:
     - scripts/kiss-fetch.sh
     when: on_success
   needs:
-  - oc.base-images.rust
+  - images.rust
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -287,9 +287,9 @@ oc.base-images.rust.merge:
     RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
-oc.base-images.debian-homebrew:
+images.debian-homebrew:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
+  stage: build
   tags:
   - gcp_very_high_cpu
   rules:
@@ -305,7 +305,7 @@ oc.base-images.debian-homebrew:
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
-  - oc.base-images.debian
+  - images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
