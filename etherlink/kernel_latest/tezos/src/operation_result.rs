@@ -217,7 +217,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -231,6 +231,11 @@ pub enum ApplyOperationError {
     UnSupportedSetDelegate(String),
     #[error("Internal operation nonce overflow due to {0}")]
     InternalOperationNonceOverflow(String),
+    // This error variant is used to encapsulate errors that were generated in the past and encoded as bson.
+    // It should not be used for new errors, which should be added as new variants to this enum.
+    // This is a temporary solution while waiting for better error support.
+    #[error("")]
+    PastError(Vec<u8>),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -287,17 +292,34 @@ fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
 // TODO https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
 impl BinWriter for ApplyOperationError {
     fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
-            let str_error = format!("{error:?}");
-            let encoded_str_error = str_error.as_bytes();
-            let bson = elements_to_bson(&[
-                (b"kind", b"permanent"),
-                (b"id", b"tezlink_error"),
-                (b"error_message", encoded_str_error),
-            ]);
-            tezos_enc::bytes(bson, out)?;
+        tezos_enc::dynamic(|error: &ApplyOperationError, out: &mut Vec<u8>| {
+            match *error {
+                ApplyOperationError::PastError(ref bytes) => {
+                    tezos_enc::bytes(bytes, out)?
+                }
+                _ => {
+                    let str_error = format!("{error:?}");
+                    let encoded_str_error = str_error.as_bytes();
+                    let bson = elements_to_bson(&[
+                        (b"kind", b"permanent"),
+                        (b"id", b"tezlink_error"),
+                        (b"error_message", encoded_str_error),
+                    ]);
+                    tezos_enc::bytes(bson, out)?;
+                }
+            }
             Ok(())
         })(self, output)
+    }
+}
+
+// As we're encoding the OperationError with a single String, the NomReader function is broken.
+// For now, we decode them as a PastError with the raw bytes.
+impl NomReader<'_> for ApplyOperationError {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        tezos_nom::dynamic(|bytes| {
+            Ok((&[], ApplyOperationError::PastError(bytes.to_vec())))
+        })(input)
     }
 }
 
@@ -1200,5 +1222,51 @@ mod tests {
             "backtracked",
         );
         assert_eq!(output, operation_and_receipt_bytes);
+    }
+
+    #[test]
+    fn test_enc_dec_roundtrip_operation_error() {
+        let operation_error =
+            ApplyOperationError::Transfer(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap(),
+                balance: 10_u64.into(),
+                amount: 21_u64.into(),
+            }));
+        let mut output = vec![];
+        operation_error
+            .bin_write(&mut output)
+            .expect("Operation error should be encodable");
+        let outputcpy = output.clone();
+        let (remaining, read_result) = ApplyOperationError::nom_read(&outputcpy)
+            .expect("Operation error should be decodable");
+
+        // Should be a PastError
+        assert!(matches!(read_result, ApplyOperationError::PastError(_)));
+        assert_eq!(
+            remaining.len(),
+            0,
+            "There should be no remaining bytes after decoding"
+        );
+
+        // Encode the PastError back to bytes and decode it again to check if it's the same
+        let mut past_error_bytes = vec![];
+        read_result
+            .bin_write(&mut past_error_bytes)
+            .expect("Past error should be encodable");
+        let past_error_bytes_copy = past_error_bytes.clone();
+        let (remaining, past_error_read_result) =
+            ApplyOperationError::nom_read(&past_error_bytes_copy)
+                .expect("Past error should be decodable");
+
+        assert_eq!(
+            read_result, past_error_read_result,
+            "Past error should be the same after encoding and decoding"
+        );
+        assert_eq!(
+            remaining.len(),
+            0,
+            "There should be no remaining bytes after decoding the past error"
+        );
     }
 }
