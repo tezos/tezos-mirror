@@ -815,18 +815,10 @@ let inject_rpc_call (config : Configuration.t) request method_
   | Ok output -> rpc_ok output
   | Error reason -> rpc_error (Rpc_errors.internal_error reason)
 
-let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful_evm
-    ~on_stateful_michelson =
+let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful =
   match mode with
   | Mode.Rpc rpc -> on_rpc rpc
-  | Proxy (Evm_tx_container tx_container)
-  | Sequencer (Evm_tx_container tx_container)
-  | Observer (Evm_tx_container tx_container) ->
-      on_stateful_evm tx_container
-  | Proxy (Michelson_tx_container tx_container)
-  | Sequencer (Michelson_tx_container tx_container)
-  | Observer (Michelson_tx_container tx_container) ->
-      on_stateful_michelson tx_container
+  | Proxy _ | Sequencer _ | Observer _ -> on_stateful ()
 
 let wait_confirmation_callback wait_confirmation_wakener =
  fun status ->
@@ -915,17 +907,21 @@ let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
         process_based_on_mode
           mode
           ~on_rpc:(on_rpc raw_tx transaction_object)
-          ~on_stateful_evm:(fun (module Tx_container) ->
+          ~on_stateful:(fun () ->
             let* tx_hash =
               match wait_confirmation_wakener with
-              | None -> Tx_container.add ~next_nonce transaction_object ~raw_tx
+              | None ->
+                  Tx_queue.add
+                    ~next_nonce
+                    (Tx_queue_types.Evm transaction_object)
+                    ~raw_tx
               | Some wait_confirmation_wakener ->
                   let callback =
                     wait_confirmation_callback wait_confirmation_wakener
                   in
-                  Tx_container.add
+                  Tx_queue.add
                     ~next_nonce
-                    transaction_object
+                    (Tx_queue_types.Evm transaction_object)
                     ~raw_tx
                     ~callback
             in
@@ -933,9 +929,6 @@ let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
             | Ok tx_hash -> rpc_ok tx_hash
             | Error reason ->
                 rpc_error (Rpc_errors.transaction_rejected reason None))
-          ~on_stateful_michelson:(fun _ ->
-            failwith
-              "Unsupported JSONRPC method in Tezlink: eth_sendRawTransaction")
   in
   f
 
@@ -975,20 +968,21 @@ let send_raw_tezlink_operation (type f) (config : Configuration.t)
         process_based_on_mode
           mode
           ~on_rpc:(on_rpc raw_tx transaction_object)
-          ~on_stateful_evm:(fun _ ->
-            failwith
-              "Unsupported JSONRPC method in Etherlink: tez_sendRawTransaction")
-          ~on_stateful_michelson:(fun (module Tx_container) ->
+          ~on_stateful:(fun () ->
             let* tx_hash =
               match wait_confirmation_wakener with
-              | None -> Tx_container.add ~next_nonce transaction_object ~raw_tx
+              | None ->
+                  Tx_queue.add
+                    ~next_nonce
+                    (Tx_queue_types.Michelson transaction_object)
+                    ~raw_tx
               | Some wait_confirmation_wakener ->
                   let callback =
                     wait_confirmation_callback wait_confirmation_wakener
                   in
-                  Tx_container.add
+                  Tx_queue.add
                     ~next_nonce
-                    transaction_object
+                    (Tx_queue_types.Michelson transaction_object)
                     ~raw_tx
                     ~callback
             in
@@ -1184,18 +1178,18 @@ let dispatch_request (type f) ~websocket
                   process_based_on_mode
                     mode
                     ~on_rpc:(inject_rpc_call config request module_)
-                    ~on_stateful_michelson:(fun _ ->
-                      failwith
-                        "Unsupported JSONRPC method in Tezlink: \
-                         getTransactionCount")
-                    ~on_stateful_evm:(fun (module Tx_container) ->
+                    ~on_stateful:(fun () ->
                       let* next_nonce =
                         Backend_rpc.Etherlink.nonce address block_param
                       in
                       let next_nonce =
                         Option.value ~default:Qty.zero next_nonce
                       in
-                      let* nonce = Tx_container.nonce ~next_nonce address in
+                      let (Ethereum_types.Address (Ethereum_types.Hex address))
+                          =
+                        address
+                      in
+                      let* nonce = Tx_queue.nonce ~next_nonce address in
                       rpc_ok nonce)
               | _ ->
                   let* nonce =
@@ -1302,14 +1296,16 @@ let dispatch_request (type f) ~websocket
               process_based_on_mode
                 mode
                 ~on_rpc:(inject_rpc_call config request module_)
-                ~on_stateful_michelson:(fun _ ->
-                  failwith
-                    "Unsupported JSONRPC method in Tezlink: \
-                     GetTransactionByHash")
-                ~on_stateful_evm:(fun (module Tx_container) ->
-                  let* transaction_object = Tx_container.find tx_hash in
+                ~on_stateful:(fun () ->
+                  let* transaction_object = Tx_queue.find tx_hash in
                   match transaction_object with
-                  | Some transaction_object -> rpc_ok (Some transaction_object)
+                  | Some (Tx_queue_types.Evm transaction_object) ->
+                      rpc_ok (Some transaction_object)
+                  | Some (Tx_queue_types.Michelson _) ->
+                      rpc_error
+                        (Rpc_errors.internal_error
+                           "Unsupported JSONRPC method in Tezlink: \
+                            GetTransactionByHash")
                   | None ->
                       let* transaction_object =
                         Backend_rpc.Etherlink_block_storage.transaction_object
@@ -1564,11 +1560,8 @@ let dispatch_request (type f) ~websocket
               process_based_on_mode
                 mode
                 ~on_rpc:(inject_rpc_call config request module_)
-                ~on_stateful_michelson:(fun _ ->
-                  failwith
-                    "Unsupported JSONRPC method in Tezlink: txpoolContent")
-                ~on_stateful_evm:(fun (module Tx_container) ->
-                  let* txpool_content = Tx_container.content () in
+                ~on_stateful:(fun () ->
+                  let* txpool_content = Tx_queue.content () in
                   rpc_ok txpool_content)
             in
             build ~f module_ parameters
@@ -1821,7 +1814,7 @@ let dispatch_private_request (type f) ~websocket
             add_attrs (fun () -> Telemetry.Attributes.[Transaction.hash hash])) ;
           process_based_on_mode
             mode
-            ~on_stateful_evm:(fun (module Tx_container) ->
+            ~on_stateful:(fun () ->
               let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
               let callback = function
                 | `Missing ->
@@ -1843,7 +1836,7 @@ let dispatch_private_request (type f) ~websocket
                 | (`Dropped | `Confirmed) as status ->
                     wait_confirmation_callback wait_confirmation_wakener status
               in
-              let* () = Tx_container.add_pending_callback hash ~callback in
+              let* () = Tx_queue.add_pending_callback hash ~callback in
               let wait_on_confirmation () =
                 let* wait_confirmation in
                 match wait_confirmation with
@@ -1853,11 +1846,6 @@ let dispatch_private_request (type f) ~websocket
                       (Rpc_errors.transaction_rejected reason (Some hash))
               in
               return (wait_on_confirmation ()))
-            ~on_stateful_michelson:(fun _ ->
-              return
-              @@ failwith
-                   "Unsupported JSONRPC method in Tezlink: \
-                    Wait_transaction_confirmation")
             ~on_rpc:(fun _ ->
               return
               @@ failwith
@@ -1895,7 +1883,7 @@ let dispatch_private_request (type f) ~websocket
           let transaction = Ethereum_types.hex_encode_string raw_txn in
           process_based_on_mode
             mode
-            ~on_stateful_evm:(fun (module Tx_container) ->
+            ~on_stateful:(fun () ->
               if wait_confirmation then
                 let wait_confirmation, wait_confirmation_wakener =
                   Lwt.wait ()
@@ -1904,9 +1892,9 @@ let dispatch_private_request (type f) ~websocket
                   wait_confirmation_callback wait_confirmation_wakener
                 in
                 let* tx_hash_res =
-                  Tx_container.add
+                  Tx_queue.add
                     ~next_nonce
-                    transaction_object
+                    (Tx_queue_types.Evm transaction_object)
                     ~raw_tx:transaction
                     ~callback
                 in
@@ -1926,9 +1914,9 @@ let dispatch_private_request (type f) ~websocket
                 | Ok hash -> wait_on_confirmation hash
               else
                 let* tx_hash_res =
-                  Tx_container.add
+                  Tx_queue.add
                     ~next_nonce
-                    transaction_object
+                    (Tx_queue_types.Evm transaction_object)
                     ~raw_tx:transaction
                 in
                 return
@@ -1940,10 +1928,6 @@ let dispatch_private_request (type f) ~websocket
             ~on_rpc:(fun _ ->
               return
               @@ failwith "Unsupported JSONRPC method in Rpc: injectTransaction")
-            ~on_stateful_michelson:(fun _ ->
-              return
-              @@ failwith
-                   "Unsupported JSONRPC method in Tezlink: injectTransaction")
         in
         build_with_input_and_lazy_output ~f module_ parameters
     | Method (Inject_tezlink_operation.Method, module_) ->
@@ -1958,28 +1942,16 @@ let dispatch_private_request (type f) ~websocket
                 Telemetry.Attributes.
                   [Transaction.hash (Tezos_types.Operation.hash_operation op)])) ;
           let* hash =
-            let* (module Tx_container) =
-              match mode with
-              | Observer (Michelson_tx_container m)
-              | Sequencer (Michelson_tx_container m) ->
-                  return m
-              | Observer (Evm_tx_container _m) | Sequencer (Evm_tx_container _m)
-                ->
-                  failwith
-                    "Unsupported JSONRPC method in Etherlink: \
-                     injectTezlinkOperation"
-              | Proxy _ ->
-                  failwith
-                    "Unsupported JSONRPC method in proxy: \
-                     injectTezlinkOperation"
-              | Rpc _ ->
-                  failwith
-                    "Unsupported JSONRPC method in Rpc: injectTezlinkOperation"
-            in
-            Tx_container.add
-              ~next_nonce:(Ethereum_types.Qty op.first_counter)
-              op
-              ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
+            process_based_on_mode
+              mode
+              ~on_rpc:(fun _ ->
+                failwith
+                  "Unsupported JSONRPC method in Rpc: injectTezlinkOperation")
+              ~on_stateful:(fun () ->
+                Tx_queue.add
+                  ~next_nonce:(Ethereum_types.Qty op.first_counter)
+                  (Tx_queue_types.Michelson op)
+                  ~raw_tx:(Ethereum_types.hex_of_bytes raw_op))
           in
           match hash with
           | Ok hash -> rpc_ok hash
