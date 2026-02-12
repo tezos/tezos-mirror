@@ -67,7 +67,14 @@ module CLST_types : sig
 
   type update_operators = operator_delta s_list
 
-  type fa21_entrypoints = ((transfer, approve) or_, update_operators) or_
+  type balance_request = address (* owner *) * nat (* token_id *)
+
+  type balance_of =
+    balance_request s_list
+    * (balance_request * nat (* balance*)) s_list typed_contract
+
+  type fa21_entrypoints =
+    ((transfer, approve) or_, (update_operators, balance_of) or_) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -111,6 +118,7 @@ module CLST_types : sig
     | Transfer of transfer
     | Approve of approve
     | Update_operators of update_operators
+    | Balance_of of balance_of
 
   val entrypoint_from_arg : arg -> entrypoint
 

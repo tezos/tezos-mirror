@@ -110,6 +110,12 @@ module Helpers = struct
     let+ typed = Script_typed_ir.option_t loc ty in
     {untyped = prim Script.T_option [untyped]; typed = Ty_ex_c typed}
 
+  let contract_ty (type t) ({untyped; typed = Ty_ex_c ty; _} : t ty_node) :
+      t typed_contract ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.contract_t loc ty in
+    {untyped = prim Script.T_contract [untyped]; typed = Ty_ex_c typed}
+
   (** Entrypoints combinator *)
 
   (* The combinators will build the `or-tree` with the correct entrypoints representation. *)
@@ -232,7 +238,14 @@ module CLST_types = struct
 
   type update_operators = operator_delta s_list
 
-  type fa21_entrypoints = ((transfer, approve) or_, update_operators) or_
+  type balance_request = address (* owner *) * nat (* token_id *)
+
+  type balance_of =
+    balance_request s_list
+    * (balance_request * nat (* balance*)) s_list typed_contract
+
+  type fa21_entrypoints =
+    ((transfer, approve) or_, (update_operators, balance_of) or_) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -253,6 +266,7 @@ module CLST_types = struct
     | Transfer of transfer
     | Approve of approve
     | Update_operators of update_operators
+    | Balance_of of balance_of
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L p)) -> Deposit p
@@ -260,7 +274,8 @@ module CLST_types = struct
     | L (R p) -> Finalize p
     | R (L (L p)) -> Transfer p
     | R (L (R p)) -> Approve p
-    | R (R p) -> Update_operators p
+    | R (R (L p)) -> Update_operators p
+    | R (R (R p)) -> Balance_of p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L p))
@@ -268,7 +283,8 @@ module CLST_types = struct
     | Finalize p -> L (R p)
     | Transfer p -> R (L (L p))
     | Approve p -> R (L (R p))
-    | Update_operators p -> R (R p)
+    | Update_operators p -> R (R (L p))
+    | Balance_of p -> R (R (R p))
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -326,6 +342,27 @@ module CLST_types = struct
     let* update_operators_type = list_ty operator_delta_type in
     make_entrypoint_leaf "update_operators" update_operators_type
 
+  let balance_of_type :
+      (balance_of ty_node * balance_of entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* balance_request_type =
+      pair_ty (add_name "owner" address_ty) (add_name "token_id" nat_ty)
+    in
+    let* balance_response_type =
+      pair_ty
+        (add_name "request" balance_request_type)
+        (add_name "balance" nat_ty)
+    in
+    let* balance_requests_type = list_ty balance_request_type in
+    let* balance_responses_type = list_ty balance_response_type in
+    let* callback_type = contract_ty balance_responses_type in
+    let* balance_of_type =
+      pair_ty
+        (add_name "requests" balance_requests_type)
+        (add_name "callback" callback_type)
+    in
+    make_entrypoint_leaf "balance_of" balance_of_type
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
@@ -334,6 +371,7 @@ module CLST_types = struct
     let* transfer_type in
     let* approve_type in
     let* update_operators_type in
+    let* balance_of_type in
     let* clst_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
@@ -343,8 +381,11 @@ module CLST_types = struct
     let* fa21_entrypoints_type_l =
       make_entrypoint_node transfer_type approve_type
     in
+    let* fa21_entrypoints_type_r =
+      make_entrypoint_node update_operators_type balance_of_type
+    in
     let* fa21_entrypoints_type =
-      make_entrypoint_node fa21_entrypoints_type_l update_operators_type
+      make_entrypoint_node fa21_entrypoints_type_l fa21_entrypoints_type_r
     in
     let* arg_type =
       make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type

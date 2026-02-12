@@ -502,6 +502,7 @@ module CLST_contract = struct
         execute_approve (ctxt, step_constants) approvals storage
     | Update_operators operators ->
         execute_update_operators (ctxt, step_constants) operators storage
+    | Balance_of _ -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
