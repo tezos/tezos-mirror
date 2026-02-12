@@ -125,9 +125,6 @@ oc.base-images.ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
-      - plucky
       - "22.04"
       - "24.04"
       - "25.10"

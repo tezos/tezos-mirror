@@ -95,8 +95,8 @@ oc.docker-systemd_tests_ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -169,8 +169,8 @@ oc.docker-systemd-merge-manifest.ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
 
@@ -385,8 +385,8 @@ oc.docker-build-ubuntu-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -422,8 +422,8 @@ oc.docker-build-merge-manifest.ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
 
@@ -466,14 +466,14 @@ oc.build-ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -492,7 +492,7 @@ apt_repo_ubuntu:
   - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -618,7 +618,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
     RELEASE: bookworm
 
 oc.lintian_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
   stage: publishing_tests
   tags:
   - gcp
@@ -637,14 +637,14 @@ oc.lintian_ubuntu:
   - apt-get install lintian parallel -y
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble
+  - ./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_ubunty_jammy:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-03271731
+oc.install_bin_ubuntu_22_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-03271731
   stage: publishing_tests
   tags:
   - gcp
@@ -658,15 +658,15 @@ oc.install_bin_ubunty_jammy:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu jammy
+  - ./docs/introduction/install-bin-deb.sh ubuntu 22.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     PREFIX: ""
 
-oc.install_bin_ubunty_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
+oc.install_bin_ubuntu_24_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
   stage: publishing_tests
   tags:
   - gcp
@@ -680,14 +680,14 @@ oc.install_bin_ubunty_noble:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/install-bin-deb.sh ubuntu noble
+  - ./docs/introduction/install-bin-deb.sh ubuntu 24.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     PREFIX: ""
 
-oc.install_bin_ubuntu_noble_systemd:
+oc.install_bin_ubuntu_24_04_systemd:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -717,9 +717,9 @@ oc.install_bin_ubuntu_noble_systemd:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: ubuntu
-    RELEASE: noble
+    RELEASE: "24.04"
 
-oc.upgrade_bin_ubuntu_jammy_systemd_test:
+oc.upgrade_bin_ubuntu_22_04_systemd_test:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -749,9 +749,9 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: ubuntu
-    RELEASE: jammy
+    RELEASE: "22.04"
 
-oc.upgrade_bin_ubuntu_noble_systemd_test:
+oc.upgrade_bin_ubuntu_24_04_systemd_test:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
@@ -781,4 +781,4 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/systemd-tests-$DISTRIBUTION
     PREFIX: ""
     DISTRIBUTION: ubuntu
-    RELEASE: noble
+    RELEASE: "24.04"

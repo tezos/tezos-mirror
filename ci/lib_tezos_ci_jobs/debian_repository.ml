@@ -65,11 +65,11 @@ let debian_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
     Set [arm64] to false to exclude from the matrix arm64 architecture.
     *)
 let ubuntu_package_release_matrix ?(ramfs = false) ?(arm64 = true) = function
-  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Partial -> [[("RELEASE", ["22.04"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
-          ("RELEASE", ["noble"; "jammy"]);
+          ("RELEASE", ["22.04"; "24.04"]);
           ("TAGS", tag_amd64 ~ramfs :: (if arm64 then [tag_arm64] else []));
         ];
       ]
@@ -260,8 +260,8 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.Base_images.ubuntu_noble
-      ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
+      ~image:Images.Base_images.ubuntu_24_04
+      ["./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04"]
   in
   (* These test the installability of the old packages *)
   let job_install_bin ~__POS__ ~name ~dependencies ~image ?(variables = [])
@@ -317,25 +317,25 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~__POS__
         ~name:"oc.lintian_ubuntu"
         ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
-        ~image:Images.Base_images.ubuntu_noble
-        ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
+        ~image:Images.Base_images.ubuntu_24_04
+        ["./scripts/ci/lintian_debian_packages.sh ubuntu 22.04 24.04"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_ubunty_jammy"
+        ~name:"oc.install_bin_ubuntu_22_04"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.Base_images.ubuntu_jammy
-        ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
+        ~image:Images.Base_images.ubuntu_22_04
+        ["./docs/introduction/install-bin-deb.sh ubuntu 22.04"];
       job_install_bin
         ~__POS__
-        ~name:"oc.install_bin_ubunty_noble"
+        ~name:"oc.install_bin_ubuntu_24_04"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.Base_images.ubuntu_noble
-        ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
+        ~image:Images.Base_images.ubuntu_24_04
+        ["./docs/introduction/install-bin-deb.sh ubuntu 24.04"];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.install_bin_ubuntu_noble_systemd"
+        ~name:"oc.install_bin_ubuntu_24_04_systemd"
         ~dependencies:
           (Dependent
              [
@@ -345,7 +345,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~variables:
           (Common.Packaging.make_variables
              ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
+             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "24.04")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/install-bin-deb.sh \
@@ -353,7 +353,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_jammy_systemd_test"
+        ~name:"oc.upgrade_bin_ubuntu_22_04_systemd_test"
         ~dependencies:
           (Dependent
              [
@@ -363,7 +363,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~variables:
           (Common.Packaging.make_variables
              ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "jammy")])
+             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "22.04")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
@@ -371,7 +371,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
+        ~name:"oc.upgrade_bin_ubuntu_24_04_systemd_test"
         ~dependencies:
           (Dependent
              [
@@ -381,7 +381,7 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ~variables:
           (Common.Packaging.make_variables
              ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
+             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "24.04")])
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \

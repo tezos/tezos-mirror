@@ -398,8 +398,8 @@ documentation.install_python_bookworm:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation.install_python_jammy:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy-master-03271731
+documentation.install_python_24_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:22.04-master-03271731
   stage: test
   tags:
   - gcp
@@ -417,8 +417,8 @@ documentation.install_python_jammy:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation.install_python_noble:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
+documentation.install_python_22_04:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
   stage: test
   tags:
   - gcp

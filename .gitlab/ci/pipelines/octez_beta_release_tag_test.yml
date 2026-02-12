@@ -556,8 +556,8 @@ oc.docker-build-ubuntu-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -592,8 +592,8 @@ oc.docker-build-merge-manifest.ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu
 
@@ -635,14 +635,14 @@ oc.build-ubuntu:
   parallel:
     matrix:
     - RELEASE:
-      - noble
-      - jammy
+      - "22.04"
+      - "24.04"
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:24.04-master-03271731
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -660,7 +660,7 @@ apt_repo_ubuntu:
   - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
+  - ./scripts/ci/create_debian_repo.sh ubuntu 22.04 24.04
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

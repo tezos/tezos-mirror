@@ -65,8 +65,8 @@ let job_install_python =
   let os_distribution_name, image =
     let open Tezos_ci in
     match os_distribution with
-    | `ubuntu_noble -> ("noble", Images.Base_images.ubuntu_noble)
-    | `ubuntu_jammy -> ("jammy", Images.Base_images.ubuntu_jammy)
+    | `ubuntu_22_04 -> ("22_04", Images.Base_images.ubuntu_24_04)
+    | `ubuntu_24_04 -> ("24_04", Images.Base_images.ubuntu_22_04)
     | `debian_bookworm -> ("bookworm", Images.Base_images.debian_bookworm)
   in
   let project, branch =
@@ -264,8 +264,8 @@ let register () =
       ]
     [
       (Auto, job_rst_check);
-      (Auto, job_install_python `ubuntu_noble `master);
-      (Auto, job_install_python `ubuntu_jammy `master);
+      (Auto, job_install_python `ubuntu_22_04 `master);
+      (Auto, job_install_python `ubuntu_24_04 `master);
       (Auto, job_install_python `debian_bookworm `master);
       (Auto, job_build_all `lite);
       (Auto, job_linkcheck `lite);

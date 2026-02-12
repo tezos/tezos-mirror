@@ -71,11 +71,5 @@ else
   gitlab_octez_source_package_name="octez-source-${suffix}"
 fi
 
-gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm"
-gitlab_octez_ubuntu_noble_package_name="octez-ubuntu-noble"
-gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy"
-gitlab_octez_fedora_package_name="octez-fedora"
-gitlab_octez_rockylinux_package_name="octez-rockylinux"
-
 # X.Y or X.Y-rcZ
 gitlab_package_version="${suffix}"
