@@ -513,32 +513,37 @@ let build_block_static_directory ~l2_chain_id
          let*? block = check_block block in
          Backend.big_map_raw_info chain block id)
 
-let retrieve_level (module Backend : Tezlink_backend_sig.S) chain block =
+let retrieve_block (module Backend : Tezlink_backend_sig.S) chain block =
   let open Lwt_result_syntax in
   let*? chain = check_chain chain in
   let*? block = check_block block in
-  let* tezlink_level = Backend.current_level chain block ~offset:0l in
-  return tezlink_level.level
+  Backend.block chain block
 
-let protocol_for_block_or_level level_result :
+let tezlink_protocol_of_protocol = function
+  | L2_types.Tezos_block.Protocol.S023 ->
+      (module Tezos_services.Imported_protocol : Tezlink_protocol)
+
+let protocol_for_block_or_level block_result :
     (module Tezlink_protocol) * (module Tezlink_protocol) =
   let imported =
     ( (module Tezos_services.Imported_protocol : Tezlink_protocol),
       (module Tezos_services.Imported_protocol : Tezlink_protocol) )
   in
-  match level_result with
-  | Ok level -> (
-      match level with
+  match block_result with
+  | Ok (block : L2_types.Tezos_block.t) -> (
+      match block.level with
       | 0l ->
           ( (module Zero_protocol : Tezlink_protocol),
             (module Genesis_protocol : Tezlink_protocol) )
       | 1l ->
           ( (module Genesis_protocol : Tezlink_protocol),
-            (module Tezos_services.Imported_protocol : Tezlink_protocol) )
-      | _ -> imported)
+            tezlink_protocol_of_protocol block.next_protocol )
+      | _ ->
+          ( tezlink_protocol_of_protocol block.protocol,
+            tezlink_protocol_of_protocol block.next_protocol ))
   | _ ->
       (* TezosX PoC also uses the same backend as Tezlink for now. So when
-        requesting the current_level, it fails as blocks are not stored at the same path.
+        requesting the block, it fails as blocks are not stored at the same path.
         Until TezosX Poc has its own backend, we should return imported to prevent the failure.*)
       imported
 
@@ -553,10 +558,14 @@ let protocol_for_block_or_level level_result :
 let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) (chain : chain) (block : block) =
   let open Lwt_result_syntax in
-  let*! tezlink_level = retrieve_level (module Backend) chain block in
+  let*! tezlink_block = retrieve_block (module Backend) chain block in
   let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
       =
-    protocol_for_block_or_level tezlink_level
+    match block with
+    | `Head 0 ->
+        ( (module Tezos_services.Imported_protocol : Tezlink_protocol),
+          (module Tezos_services.Imported_protocol : Tezlink_protocol) )
+    | _ -> protocol_for_block_or_level tezlink_block
   in
   let module Block_header = Make_block_header (Proto) (Next_proto) in
   let module S = Block_header.Block_services.S in
