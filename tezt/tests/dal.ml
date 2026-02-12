@@ -5363,7 +5363,7 @@ let dal_slots_retrievability =
   in
 
   (* Main test body *)
-  fun _protocol
+  fun protocol
       dal_parameters
       ~(store_kind : [`Slots | `Shards])
       _cryptobox
@@ -5468,7 +5468,29 @@ let dal_slots_retrievability =
              invalid_dal_fetcher_bad_uri_trusted;
            ]
     in
-    let* () = bake_for ~count:(attestation_lag + 3) client in
+    let* () = bake_for ~count:attestation_lag client in
+
+    (* Now we make sure that slots are DAL attested. *)
+    let some_baker, rest_pkhs =
+      let some_baker = Account.Bootstrap.keys.(0) in
+      let all_pkhs =
+        Account.Bootstrap.keys |> Array.to_list
+        |> List.map (fun account -> account.Account.public_key_hash)
+      in
+      (some_baker, List.tl all_pkhs)
+    in
+    let* _ =
+      inject_dal_attestations
+        ~protocol
+          (* Since the attestation threshold of the test is set to 0%,
+             having only one signer is sufficient. *)
+        ~signers:[some_baker]
+        (Slots [1; 2; 3])
+        client
+        dal_parameters
+    in
+
+    let* () = bake_for ~count:3 ~delegates:(`For rest_pkhs) client in
     let* () = wait_for_dal_nodes in
 
     (* C. RETRIEVAL & VALIDATION *)
