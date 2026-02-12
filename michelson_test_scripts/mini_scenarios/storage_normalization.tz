@@ -1,0 +1,10 @@
+# Michelson data can be displayed using three different unparsing
+# modes: Readable, Optimized, and Optimized_legacy. The storage of
+# this contract has a type meant to show the differences between these
+# three: It uses the address type because it is displayed differently
+# in Readable mode than the two other modes. It uses comb pairs of
+# length 4 because they are displayed differently in Optimized and
+# Optimized_legacy modes.
+storage (pair address unit unit unit);
+parameter unit;
+code { CDR; NIL operation; PAIR }
