@@ -566,7 +566,7 @@ module Request = struct
       (function
         | Services_backend_sig.Rpc uri -> Uri.to_string uri
         | Websocket _ -> "[websocket]"
-        | Block_producer -> "[block_producer]")
+        | Block_producer _ -> "[block_producer]")
       (fun _ -> assert false)
       string
 
@@ -876,12 +876,9 @@ module Handlers = struct
                   batch
               in
               check_missed_transactions ~self ~hashes ~responses)
-      | Block_producer -> (
+      | Block_producer preconfirm_transactions -> (
           let* hashes, transactions =
             build_sequencer_batch ~state transactions
-          in
-          let*! hashes_and_status =
-            Block_producer.preconfirm_transactions ~transactions
           in
           let inject_status status =
             List.iter_p (fun txn_hash ->
@@ -893,6 +890,7 @@ module Handlers = struct
                 in
                 return_unit)
           in
+          let*! hashes_and_status = preconfirm_transactions ~transactions in
           match hashes_and_status with
           | Ok {accepted; refused; dropped} ->
               let*! () =
@@ -904,10 +902,9 @@ module Handlers = struct
                   ]
               in
               return_unit
-          | Error [Block_producer.IC_disabled] ->
-              (* This case should not happens, it means the
-                     block_producer worker has ic deactivated and so
-                     we should not call it. *)
+          | Error [Services_backend_sig.IC_disabled] ->
+              (* This case should not happen: if instant confirmations are
+                   disabled, we should not route through this endpoint. *)
               let*! () = inject_status `Refused hashes in
               return_unit
           | Error err -> fail err)

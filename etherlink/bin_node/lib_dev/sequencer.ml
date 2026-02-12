@@ -499,10 +499,14 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         () ;
       return_unit
   in
+  let block_producer_endpoint =
+    Services_backend_sig.Block_producer Block_producer.preconfirm_transactions
+  in
 
   let tick () =
     when_ configuration.experimental_features.preconfirmation_stream_enabled
-    @@ fun () -> Tx_container.tx_queue_tick ~evm_node_endpoint:Block_producer
+    @@ fun () ->
+    Tx_container.tx_queue_tick ~evm_node_endpoint:block_producer_endpoint
   in
 
   let* finalizer_public_server =
@@ -561,7 +565,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       when_ configuration.experimental_features.preconfirmation_stream_enabled
       @@ fun () ->
       Tx_container.tx_queue_beacon
-        ~evm_node_endpoint:Block_producer
+        ~evm_node_endpoint:block_producer_endpoint
         ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)) ;
   loop_sequencer
     enable_multichain

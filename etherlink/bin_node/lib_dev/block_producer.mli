@@ -41,12 +41,11 @@ val produce_genesis :
 val produce_block :
   force:force -> [`Block_produced of int | `No_block] tzresult Lwt.t
 
-type error += IC_disabled
-
 (** [preconfirm_transactions ~transactions] validates each transaction
     in [transactions] and streams every successfully validated one to
-    the preconfirmation pipeline. Fails with [IC_disabled] if instant
-    confirmation is not enabled. *)
+    the preconfirmation pipeline. Fails with
+    [Services_backend_sig.IC_disabled] if instant confirmation is not
+    enabled. *)
 val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->
   Tx_queue_types.preconfirmed_transactions_result tzresult Lwt.t
