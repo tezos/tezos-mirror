@@ -17,6 +17,7 @@ use arbitrary_int::u31;
 use move_semantics::ImmutableState;
 use move_semantics::MutableState;
 use ocaml::ToValue;
+use octez_riscv::machine_state::page_cache::EmptyPageCache;
 use octez_riscv::pvm::InputRequest as PvmInputRequest;
 use octez_riscv::pvm::PvmInput;
 use octez_riscv::pvm::PvmStatus;
@@ -268,7 +269,7 @@ pub fn octez_riscv_to_imm(state: SafePointer<MutState>) -> SafePointer<State> {
 #[ocaml::func]
 #[ocaml::sig("bytes -> id")]
 pub fn octez_riscv_id_unsafe_of_raw_bytes(bytes: &[u8]) -> SafePointer<Id> {
-    let digest: [u8; hash::DIGEST_SIZE] = bytes.try_into().expect("Invalid hash length");
+    let digest: [u8; hash::Hash::DIGEST_SIZE] = bytes.try_into().expect("Invalid hash length");
     let hash = hash::Hash::from(digest);
     Id(hash).into()
 }
@@ -567,7 +568,7 @@ struct Proof {
     final_state_hash: hash::Hash,
     serialised_proof: Box<[u8]>,
     /// When deserialising a proof in the protocol, a verifier backend and its [`MerkleProof`] are needed for the rest of the API.
-    verifier: OnceLock<(NodePvm<Verify>, MerkleProof)>,
+    verifier: OnceLock<(NodePvm<Verify, EmptyPageCache>, MerkleProof)>,
 }
 
 impl From<PvmProof> for Proof {
@@ -584,7 +585,9 @@ impl Proof {
     /// Obtain the [`NodePvm`] and [`MerkleProof`] for this proof.
     ///
     /// Create them from the raw proof bytes if they do not exist yet.
-    fn get_or_create_verifier(&self) -> Result<&(NodePvm<Verify>, MerkleProof), String> {
+    fn get_or_create_verifier(
+        &self,
+    ) -> Result<&(NodePvm<Verify, EmptyPageCache>, MerkleProof), String> {
         match self.verifier.get() {
             Some(node_pvm_and_merkle_tree) => Ok(node_pvm_and_merkle_tree),
             None => {
@@ -619,7 +622,9 @@ pub fn octez_riscv_proof_start_state(proof: SafePointer<Proof>) -> OcamlFallible
         }
     };
 
-    Ok(<[u8; hash::DIGEST_SIZE]>::from(merkle_proof.root_hash()))
+    Ok(<[u8; hash::Hash::DIGEST_SIZE]>::from(
+        merkle_proof.root_hash(),
+    ))
 }
 
 #[ocaml::func]
@@ -671,7 +676,7 @@ pub unsafe fn octez_riscv_serialise_proof(proof: SafePointer<Proof>) -> BytesWra
 pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<SafePointer<Proof>, String> {
     let iter = bytes.iter().copied();
 
-    let (proof, node_pvm): (PvmProof, NodePvm<Verify>) =
+    let (proof, node_pvm): (PvmProof, NodePvm<Verify, EmptyPageCache>) =
         deserialise_proof(iter).map_err(|e| e.to_string())?;
     let final_state_hash = proof.final_state_hash();
     let merkle_tree = proof.into_tree();
