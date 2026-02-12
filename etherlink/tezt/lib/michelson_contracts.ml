@@ -80,3 +80,15 @@ let emit_events_contract () =
           find ["mini_scenarios"; "emit_events"] tezlink_protocol |> path);
       initial_storage = "Unit";
     }
+
+let storage_normalization () =
+  Evm_node.
+    {
+      address = "KT1KxwEU2qHgG7icmAyDj2u3vh8Z5UXuE7Tp";
+      path =
+        Michelson_script.(
+          find ["mini_scenarios"; "storage_normalization"] tezlink_protocol
+          |> path);
+      initial_storage =
+        sf "Pair %S Unit Unit Unit" Constant.bootstrap1.public_key_hash;
+    }

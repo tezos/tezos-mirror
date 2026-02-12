@@ -1218,6 +1218,54 @@ let test_tezlink_script_rpc =
 
   unit
 
+(* This test was copied and adapted from tezt/tests/contract_storage_normalization.ml *)
+
+let test_contract_storage_normalization =
+  let contract = Michelson_contracts.storage_normalization () in
+  register_tezlink_test
+    ~title:"Test of the storage rpc with normalization"
+    ~tags:["rpc"; "storage"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_contracts:[contract]
+  @@ fun {sequencer; client; _} _protocol ->
+  let foreign_endpoint =
+    {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"}
+  in
+  let endpoint = Client.(Foreign_endpoint foreign_endpoint) in
+  let address_readable = sf "%S" Constant.bootstrap1.public_key_hash in
+  let* address_optimized =
+    Client.normalize_data
+      ~mode:Optimized
+      ~data:address_readable
+      ~typ:"address"
+      client
+  in
+  let address_optimized = String.trim address_optimized in
+  Lwt_list.iter_s
+    (fun (unparsing_mode, expected) ->
+      let* storage =
+        Client.contract_storage
+          ~endpoint
+          ~unparsing_mode
+          contract.address
+          client
+      in
+      Log.info
+        "Checking contract storage using unparsing mode %s"
+        (Client.normalize_mode_to_string unparsing_mode) ;
+      Check.(
+        (String.trim storage = expected)
+          string
+          ~__LOC__
+          ~error_msg:"expected storage %R, got %L") ;
+      unit)
+    [
+      (Readable, sf "Pair %s Unit Unit Unit" address_readable);
+      (Optimized, sf "{ %s ; Unit ; Unit ; Unit }" address_optimized);
+      ( Optimized_legacy,
+        sf "Pair %s (Pair Unit (Pair Unit Unit))" address_optimized );
+    ]
+
 let test_contract_counter =
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
@@ -3905,6 +3953,7 @@ let () =
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
   test_tezlink_script_rpc [Alpha] ;
+  test_contract_storage_normalization [Alpha] ;
   test_contract_counter [Alpha] ;
   test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
