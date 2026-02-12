@@ -214,6 +214,8 @@ impl InputHandler for SequencerInput {
             }) => {
                 log!(host, Debug, "Importing {} DAL signals", &signals.0.len());
                 let params = host.reveal_dal_parameters();
+                let slot_size = params.slot_size;
+                let page_size = params.page_size;
                 let next_blueprint_number: U256 =
                     crate::blueprint_storage::read_next_blueprint_number(host)?;
                 for signal in signals.0.iter() {
@@ -230,7 +232,8 @@ impl InputHandler for SequencerInput {
                         if let Some(unsigned_seq_blueprints) =
                             fetch_and_parse_sequencer_blueprint_from_dal(
                                 host,
-                                &params,
+                                slot_size,
+                                page_size,
                                 &next_blueprint_number,
                                 *slot_index,
                                 published_level,
@@ -372,6 +375,75 @@ fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
     }
 }
 
+/// Import DAL slots based on protocol attestation information.
+/// This is called when processing DalAttestedSlots internal messages.
+fn import_dal_attested_slots<Host: Runtime>(
+    host: &mut Host,
+    published_level: i32,
+    slot_size: u64,
+    page_size: u64,
+    slot_indices: &[u8],
+) -> anyhow::Result<()> {
+    // Skip if there are no attested slots
+    if slot_indices.is_empty() {
+        return Ok(());
+    }
+
+    let next_blueprint_number: U256 =
+        crate::blueprint_storage::read_next_blueprint_number(host)?;
+
+    log!(
+        host,
+        Debug,
+        "Importing {} DAL attested slots for published level {}",
+        slot_indices.len(),
+        published_level
+    );
+
+    for slot_index in slot_indices {
+        log!(
+            host,
+            Debug,
+            "Importing DAL slot {} at published level {}",
+            slot_index,
+            published_level
+        );
+
+        if let Some(unsigned_seq_blueprints) =
+            fetch_and_parse_sequencer_blueprint_from_dal(
+                host,
+                slot_size,
+                page_size,
+                &next_blueprint_number,
+                *slot_index,
+                published_level as u32,
+            )
+        {
+            log!(
+                host,
+                Debug,
+                "DAL slot {} successfully parsed as {} unsigned blueprint chunks",
+                slot_index,
+                unsigned_seq_blueprints.len()
+            );
+            for chunk in unsigned_seq_blueprints {
+                if let Err(e) = handle_blueprint_chunk(host, chunk) {
+                    log!(
+                        host,
+                        Error,
+                        "Failed to handle blueprint chunk from slot {}: {:?}",
+                        slot_index,
+                        e
+                    );
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
@@ -397,6 +469,20 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             Mode::handle_fa_deposit(host, fa_deposit, chain_id, inbox_content)?
         }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
+        Input::DalAttestedSlots {
+            published_level,
+            slot_size,
+            page_size,
+            slot_indices,
+        } => {
+            import_dal_attested_slots(
+                host,
+                published_level,
+                slot_size,
+                page_size,
+                &slot_indices,
+            )?;
+        }
     }
     Ok(())
 }
@@ -547,6 +633,10 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     let next_blueprint_number: U256 =
         crate::blueprint_storage::read_next_blueprint_number(host)?;
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
+    let legacy_dal_signals_disabled =
+        crate::storage::is_legacy_dal_signals_disabled(host).unwrap_or(false);
+    let dal_publishers_whitelist =
+        crate::storage::read_dal_publishers_whitelist(host).unwrap_or_default();
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
@@ -556,6 +646,8 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
         buffer_transaction_chunks: None,
         next_blueprint_number,
         experimental_features,
+        legacy_dal_signals_disabled,
+        dal_publishers_whitelist,
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

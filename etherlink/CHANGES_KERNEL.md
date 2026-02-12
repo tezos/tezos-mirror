@@ -6,6 +6,18 @@ Its storage version is 48.
 
 ### Features
 
+- Add support for `DalAttestedSlots` internal inbox message introduced in
+  protocol U. The kernel now processes DAL slot attestations directly from the
+  Layer 1 protocol, and does not need to rely on external import signals.  Only
+  DAL slots published by whitelisted public key hashes (representing batching
+  operators) are accepted and processed by the kernel. The whitelist is stored
+  in durable storage at `/evm/dal_publishers_whitelist` as an RLP-encoded list
+  of binary public key hashes. An empty whitelist operates in strict mode: all
+  DAL slots are rejected. (!20143)
+- Add ability to disable legacy DAL slot import signals via the
+  `disable_legacy_dal_signals` feature flag. When enabled, the kernel ignores
+  external `DalSlotImportSignal` messages and relies exclusively on
+  `DalAttestedSlots` internal messages for DAL data import. (!20143)
 - Update the Layer 1 governance contracts to take into account protocol T L1
   block time that is reduced from 8s to 6s. (!20574)
     - [`KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH`](https://better-call.dev/mainnet/KT1NM6cpM5BPTmYPszjv6LRDAMRZXPET9DmH) for the slow upgrade governance

@@ -732,6 +732,8 @@ val make_kernel_installer_config :
   ?enable_revm:bool ->
   ?enable_dal:bool ->
   ?dal_slots:int list ->
+  ?dal_publishers_whitelist:string list ->
+  ?disable_legacy_dal_signals:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?enable_multichain:bool ->

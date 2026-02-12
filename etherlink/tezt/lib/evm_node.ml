@@ -1620,7 +1620,8 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
-    ?(enable_dal = false) ?dal_slots ?(enable_fast_withdrawal = false)
+    ?(enable_dal = false) ?dal_slots ?dal_publishers_whitelist
+    ?(disable_legacy_dal_signals = false) ?(enable_fast_withdrawal = false)
     ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
     ?evm_version ?(with_runtimes = []) ~output () =
   let set_account_code =
@@ -1704,6 +1705,13 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
         dal_slots
+    @ Cli_arg.optional_arg
+        "dal-publishers-whitelist"
+        (fun l -> String.concat "," l)
+        dal_publishers_whitelist
+    @ Cli_arg.optional_switch
+        "disable-legacy-dal-signals"
+        disable_legacy_dal_signals
     @ Cli_arg.optional_arg
         "eth-bootstrap-balance"
         Wei.to_string

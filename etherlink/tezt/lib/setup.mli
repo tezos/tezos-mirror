@@ -122,6 +122,7 @@ val register_test :
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  ?dal_publishers_whitelist:string list ->
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
@@ -177,6 +178,7 @@ val register_multichain_test :
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  ?dal_publishers_whitelist:string list ->
   enable_multichain:bool ->
   l2_setups:Evm_node.l2_setup list option ->
   ?rpc_server:Evm_node.rpc_server ->
@@ -231,6 +233,7 @@ val register_test_for_kernels :
   ?additional_uses:Tezt_wrapper.Uses.t list ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
+  ?dal_publishers_whitelist:string list ->
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->

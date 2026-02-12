@@ -7,7 +7,6 @@ use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use primitive_types::U256;
 use rlp::{DecoderError, PayloadInfo};
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
 
 use tezos_evm_runtime::runtime::Runtime;
 
@@ -26,7 +25,8 @@ enum ParsedInput {
 // Import all the pages of a DAL slot and concatenate them.
 fn import_dal_slot<Host: Runtime>(
     host: &mut Host,
-    params: &RollupDalParameters,
+    slot_size: u64,
+    page_size: u64,
     published_level: u32,
     slot_index: u8,
 ) -> Option<Vec<u8>> {
@@ -36,10 +36,10 @@ fn import_dal_slot<Host: Runtime>(
     if published_level > i32::MAX as u32 {
         return None;
     }
-    let page_size = params.page_size as usize;
-    let slot_size = params.slot_size as usize;
-    let mut slot: Vec<u8> = vec![0u8; slot_size];
-    let number_of_pages = (params.slot_size / params.page_size) as i16;
+    let page_size_usize = page_size as usize;
+    let slot_size_usize = slot_size as usize;
+    let mut slot: Vec<u8> = vec![0u8; slot_size_usize];
+    let number_of_pages = (slot_size / page_size) as i16;
     let mut page_start = 0usize;
     for page_index in 0..number_of_pages {
         let imported_page_len = host
@@ -47,10 +47,10 @@ fn import_dal_slot<Host: Runtime>(
                 published_level as i32,
                 slot_index,
                 page_index,
-                &mut slot[page_start..page_start + page_size],
+                &mut slot[page_start..page_start + page_size_usize],
             )
             .unwrap_or(0);
-        if imported_page_len == page_size {
+        if imported_page_len == page_size_usize {
             page_start += imported_page_len
         } else {
             return None;
@@ -168,12 +168,15 @@ fn parse_slot<Host: Runtime>(
 
 pub fn fetch_and_parse_sequencer_blueprint_from_dal<Host: Runtime>(
     host: &mut Host,
-    params: &RollupDalParameters,
+    slot_size: u64,
+    page_size: u64,
     next_blueprint_number: &U256,
     slot_index: u8,
     published_level: u32,
 ) -> Option<Vec<UnsignedSequencerBlueprint>> {
-    if let Some(slot) = import_dal_slot(host, params, published_level, slot_index) {
+    if let Some(slot) =
+        import_dal_slot(host, slot_size, page_size, published_level, slot_index)
+    {
         log!(
             host,
             Debug,
@@ -367,7 +370,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -407,7 +411,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -473,7 +478,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -551,7 +557,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -565,7 +572,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &0.into(),
             0,
             published_level,
@@ -599,7 +607,8 @@ pub mod tests {
 
         let chunks_from_slot = fetch_and_parse_sequencer_blueprint_from_dal(
             &mut host,
-            &dal_parameters,
+            dal_parameters.slot_size,
+            dal_parameters.page_size,
             &next_blueprint_number,
             0,
             published_level,

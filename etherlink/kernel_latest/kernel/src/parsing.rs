@@ -138,6 +138,13 @@ pub enum Input<Mode> {
     RemoveSequencer,
     Info(LevelWithInfo),
     ForceKernelUpgrade,
+    /// DAL attested slots from the protocol - contains published_level, slot parameters, and list of attested slot indices.
+    DalAttestedSlots {
+        published_level: i32,
+        slot_size: u64,
+        page_size: u64,
+        slot_indices: Vec<u8>,
+    },
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -170,7 +177,8 @@ pub type RollupType = MichelsonOr<
 pub trait Parsable {
     type Context;
 
-    fn parse_external(
+    fn parse_external<Host: Runtime>(
+        host: &mut Host,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -189,6 +197,13 @@ pub trait Parsable {
     fn on_deposit(context: &mut Self::Context);
 
     fn on_fa_deposit(context: &mut Self::Context);
+
+    /// Get the whitelist of authorized DAL publishers from the context.
+    /// Returns an empty slice if no whitelist is configured or in proxy mode.
+    /// NOTE: Empty whitelist means reject all publishers (therefore all slots).
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash];
 }
 
 impl ProxyInput {
@@ -267,7 +282,12 @@ impl ProxyInput {
 impl Parsable for ProxyInput {
     type Context = ();
 
-    fn parse_external(tag: &u8, input: &[u8], _: &mut ()) -> InputResult<Self> {
+    fn parse_external<Host: Runtime>(
+        _host: &mut Host,
+        tag: &u8,
+        input: &[u8],
+        _: &mut (),
+    ) -> InputResult<Self> {
         // External transactions are only allowed in proxy mode
         match *tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(input),
@@ -288,6 +308,13 @@ impl Parsable for ProxyInput {
     fn on_deposit(_: &mut Self::Context) {}
 
     fn on_fa_deposit(_: &mut Self::Context) {}
+
+    fn dal_publishers_whitelist(
+        _context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        // Proxy mode doesn't have a whitelist - return empty slice (rejects all publishers)
+        &[]
+    }
 }
 
 pub struct BufferTransactionChunks {
@@ -308,6 +335,13 @@ pub struct SequencerParsingContext {
     // before this is useless.
     pub next_blueprint_number: U256,
     pub experimental_features: ExperimentalFeatures,
+    // When true, legacy DAL slot import signals are disabled.
+    // The kernel will rely on DalAttestedSlots internal messages instead.
+    pub legacy_dal_signals_disabled: bool,
+    // Whitelist of authorized DAL publishers (public key hashes).
+    // Only slots published by these keys will be accepted from DalAttestedSlots messages.
+    pub dal_publishers_whitelist:
+        Vec<tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash>,
 }
 
 fn check_unsigned_blueprint_chunk(
@@ -396,7 +430,8 @@ impl SequencerInput {
         InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(res)))
     }
 
-    pub fn parse_dal_slot_import_signal(
+    pub fn parse_dal_slot_import_signal<Host: Runtime>(
+        host: &mut Host,
         bytes: &[u8],
         context: &mut SequencerParsingContext,
     ) -> InputResult<Self> {
@@ -408,6 +443,18 @@ impl SequencerInput {
         context.allocated_ticks = context
             .allocated_ticks
             .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
+
+        // If legacy DAL signals are disabled, ignore this message.
+        // The kernel would then rely entirely on DalAttestedSlots internal
+        // messages from the protocol.
+        if context.legacy_dal_signals_disabled {
+            log!(
+                host,
+                Error,
+                "Legacy DAL slot import signal ignored (disable_legacy_dal_signals is enabled)"
+            );
+            return InputResult::Unparsable;
+        }
 
         let Some(dal) = &context.dal_configuration else {
             return InputResult::Unparsable;
@@ -593,7 +640,8 @@ mod delayed_chunked_transaction {
 impl Parsable for SequencerInput {
     type Context = SequencerParsingContext;
 
-    fn parse_external(
+    fn parse_external<Host: Runtime>(
+        host: &mut Host,
         tag: &u8,
         input: &[u8],
         context: &mut Self::Context,
@@ -604,7 +652,7 @@ impl Parsable for SequencerInput {
                 Self::parse_sequencer_blueprint_input(input, context)
             }
             DAL_SLOT_IMPORT_SIGNAL_TAG => {
-                Self::parse_dal_slot_import_signal(input, context)
+                Self::parse_dal_slot_import_signal(host, input, context)
             }
             _ => InputResult::Unparsable,
         }
@@ -693,6 +741,12 @@ impl Parsable for SequencerInput {
             .allocated_ticks
             .saturating_sub(TICKS_PER_FA_DEPOSIT_PARSING);
     }
+
+    fn dal_publishers_whitelist(
+        context: &Self::Context,
+    ) -> &[tezos_smart_rollup_encoding::public_key_hash::PublicKeyHash] {
+        &context.dal_publishers_whitelist
+    }
 }
 
 impl<Mode: Parsable> InputResult<Mode> {
@@ -715,7 +769,8 @@ impl<Mode: Parsable> InputResult<Mode> {
     ///
     // External message structure :
     // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
-    pub fn parse_external(
+    pub fn parse_external<Host: Runtime>(
+        host: &mut Host,
         input: &[u8],
         smart_rollup_address: &[u8],
         context: &mut Mode::Context,
@@ -734,7 +789,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
-            _ => Mode::parse_external(transaction_tag, remaining, context),
+            _ => Mode::parse_external(host, transaction_tag, remaining, context),
         }
     }
 
@@ -915,6 +970,73 @@ impl<Mode: Parsable> InputResult<Mode> {
                 enable_fa_deposits,
             ),
             InternalInboxMessage::EndOfLevel => InputResult::NoInput,
+            InternalInboxMessage::DalAttestedSlots(dal_attested) => {
+                // Extract slot indices only from whitelisted publishers.
+                // Each PublisherSlots contains a Zarith bitset where bit i is
+                // set if slot index i is attested.
+                let whitelist = Mode::dal_publishers_whitelist(context);
+
+                // Count total published slots before filtering
+                let total_published_slots: usize = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .count()
+                    })
+                    .sum();
+
+                let mut rejected_publishers = Vec::new();
+                let slot_indices: Vec<u8> = dal_attested
+                    .slots_by_publisher
+                    .iter()
+                    .filter(|publisher_slots| {
+                        let is_whitelisted =
+                            whitelist.contains(&publisher_slots.publisher);
+                        if !is_whitelisted {
+                            rejected_publishers
+                                .push(publisher_slots.publisher.to_b58check());
+                        }
+                        is_whitelisted
+                    })
+                    .flat_map(|publisher_slots| {
+                        (0..dal_attested.number_of_slots)
+                            .filter(|&i| publisher_slots.slots_bitset.0.bit(i as u64))
+                            .map(|i| i as u8)
+                    })
+                    .collect();
+
+                // Log summary
+                if rejected_publishers.is_empty() {
+                    log!(
+                        host,
+                        Debug,
+                        "For published level {}, accepted {}/{} DAL slots from {} publishers",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        dal_attested.slots_by_publisher.len()
+                    );
+                } else {
+                    log!(
+                        host,
+                        Debug,
+                        "For published level {}, accepted {}/{} DAL slots; not whitelisted: {}",
+                        dal_attested.published_level,
+                        slot_indices.len(),
+                        total_published_slots,
+                        rejected_publishers.join(", ")
+                    );
+                }
+
+                InputResult::Input(Input::DalAttestedSlots {
+                    published_level: dal_attested.published_level,
+                    slot_size: dal_attested.slot_size as u64,
+                    page_size: dal_attested.page_size as u64,
+                    slot_indices,
+                })
+            }
             _ => InputResult::Unparsable,
         }
     }
@@ -936,7 +1058,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
-                    Self::parse_external(message, &smart_rollup_address, context)
+                    Self::parse_external(host, message, &smart_rollup_address, context)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
                     host,
