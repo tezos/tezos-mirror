@@ -87,11 +87,17 @@ module Chain_family : sig
 end
 
 module Tezos_block : sig
+  module Protocol : sig
+    type t = S023
+  end
+
   type t = {
     hash : Ethereum_types.block_hash;
     level : int32;
     timestamp : Time.Protocol.t;
     parent_hash : Ethereum_types.block_hash;
+    protocol : Protocol.t;
+    next_protocol : Protocol.t;
     operations : bytes;
   }
 
@@ -106,8 +112,20 @@ module Tezos_block : sig
   val decode_block_for_store : string -> (t, string) result
 
   module Internal_for_test : sig
+    module V0 : sig
+      type t = {
+        hash : Ethereum_types.block_hash;
+        level : int32;
+        timestamp : Time.Protocol.t;
+        parent_hash : Ethereum_types.block_hash;
+        operations : bytes;
+      }
+
+      val encode_block_for_store : t -> (string, string) result
+    end
+
     module Legacy : sig
-      type nonrec t = t
+      type nonrec t = V0.t
 
       val encode_block_for_store : t -> (string, string) result
     end

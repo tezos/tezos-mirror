@@ -8,3 +8,4 @@ pub mod encoding_test_data_helper;
 pub mod lazy_storage_diff;
 pub mod operation;
 pub mod operation_result;
+pub mod protocol;

@@ -8,13 +8,15 @@ pub mod test_helpers {
     use regex::Regex;
     use std::fs;
 
+    use crate::protocol::Protocol;
+
     pub fn fetch_generated_data(
-        protocol: &str,
+        protocol: Protocol,
         encoding: &str,
         sample_name: &str,
     ) -> Vec<u8> {
         let filepath = format!(
-            "{}/{}/{}-- {}- {}.out",
+            "{}/{}/{:?}-- {}- {}.out",
             env!("CARGO_MANIFEST_DIR"),
             "../../../tezt/tests/expected/encoding.ml",
             protocol,

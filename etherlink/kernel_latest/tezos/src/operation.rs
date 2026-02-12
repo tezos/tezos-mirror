@@ -33,9 +33,6 @@ use tezos_smart_rollup::types::PublicKey;
 use tezos_smart_rollup::types::PublicKeyHash;
 use thiserror::Error;
 
-#[cfg(test)]
-pub const TARGET_TEZOS_PROTOCOL: &str = "S023";
-
 /**
 
 There is a distance between the binary format of manager operations
@@ -313,7 +310,7 @@ mod tests {
     use super::*;
     use crate::{
         encoding_test_data_helper::test_helpers::fetch_generated_data,
-        operation::make_dummy_reveal_operation,
+        operation::make_dummy_reveal_operation, protocol::TARGET_TEZOS_PROTOCOL,
     };
     use mir::ast::michelson_address::Entrypoint;
     use pretty_assertions::assert_eq;

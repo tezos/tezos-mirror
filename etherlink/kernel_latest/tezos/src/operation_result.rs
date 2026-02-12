@@ -842,8 +842,8 @@ mod tests {
     use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
     use crate::operation::{
         ManagerOperation, OriginationContent, Parameters, TransferContent,
-        TARGET_TEZOS_PROTOCOL,
     };
+    use crate::protocol::TARGET_TEZOS_PROTOCOL;
     use mir::ast::annotations::{Annotation, Annotations, NO_ANNS};
     use mir::ast::micheline::Micheline;
     use mir::ast::Entrypoint;

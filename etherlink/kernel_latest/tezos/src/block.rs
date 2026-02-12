@@ -4,6 +4,7 @@
 
 use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
+use crate::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
 use primitive_types::H256;
 use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
@@ -57,25 +58,29 @@ impl Decodable for OperationsWithReceipts {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug)]
 pub struct TezBlock {
     pub hash: BlockHash,
     pub number: BlockNumber,
     pub previous_hash: BlockHash,
     pub timestamp: Timestamp,
+    pub protocol: Protocol,
+    pub next_protocol: Protocol,
     pub operations: OperationsWithReceipts,
 }
 
-const VERSION: u8 = 0;
+const VERSION: u8 = 1;
 
 impl Encodable for TezBlock {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(6);
+        s.begin_list(8);
         s.append(&VERSION);
         s.append(&self.hash);
         s.append(&self.number);
         s.append(&self.previous_hash);
         s.append(&self.timestamp.i64().to_le_bytes().to_vec());
+        s.append(&self.protocol);
+        s.append(&self.next_protocol);
         s.append(&self.operations);
     }
 }
@@ -114,79 +119,13 @@ impl TezBlock {
             number,
             timestamp,
             previous_hash: BlockHash(previous_hash),
+            protocol: TARGET_TEZOS_PROTOCOL,
+            next_protocol: TARGET_TEZOS_PROTOCOL,
             operations: OperationsWithReceipts { list: operations },
         };
         Ok(Self {
             hash: block.hash()?,
             ..block
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use primitive_types::H256;
-    use tezos_data_encoding::enc::BinWriter;
-    use tezos_data_encoding::nom::NomReader;
-    use tezos_smart_rollup::types::Timestamp;
-
-    use crate::operation_result::{
-        OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, RevealSuccess,
-    };
-
-    use super::{AppliedOperation, TezBlock};
-
-    pub fn block_roundtrip(block: TezBlock) {
-        let bytes = BinWriter::to_bytes(&block).expect("Encoding should succeed");
-        let decoded_block =
-            TezBlock::nom_read_exact(&bytes).expect("Block should be decodable");
-        assert_eq!(block, decoded_block, "Roundtrip failed on {block:?}")
-    }
-
-    fn dummy_applied_operation() -> AppliedOperation {
-        let hash = H256::random().into();
-        let data = crate::operation::make_dummy_reveal_operation();
-        let operations = vec![OperationWithMetadata {
-            content: data.content[0].clone(),
-            receipt: OperationResultSum::Reveal(OperationResult {
-                balance_updates: vec![],
-                result: crate::operation_result::ContentResult::Applied(RevealSuccess {
-                    consumed_milligas: 0u64.into(),
-                }),
-                internal_operation_results: vec![],
-            }),
-        }];
-        AppliedOperation {
-            hash,
-            branch: data.branch.clone(),
-            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                OperationBatchWithMetadata {
-                    operations,
-                    signature: data.signature,
-                },
-            ),
-        }
-    }
-
-    fn dummy_tezblock(operations: Vec<AppliedOperation>) -> TezBlock {
-        let number = 1u32.into();
-        let timestamp = Timestamp::from(0);
-        let previous_hash = TezBlock::genesis_block_hash();
-        TezBlock::new(number, timestamp, previous_hash, operations)
-            .expect("Block creation should have succeeded")
-    }
-
-    #[test]
-    fn test_empty_block_rlp_roundtrip() {
-        block_roundtrip(dummy_tezblock(vec![]));
-    }
-
-    #[test]
-    fn test_block_rlp_roundtrip() {
-        block_roundtrip(dummy_tezblock(vec![
-            dummy_applied_operation(),
-            dummy_applied_operation(),
-        ]));
     }
 }
