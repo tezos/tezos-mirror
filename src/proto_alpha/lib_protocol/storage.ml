@@ -2407,6 +2407,17 @@ module Dal = struct
         let name = ["dal"]
       end)
 
+  module AttestationHistory =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["attestation_history"]
+      end)
+      (struct
+        type t = Dal_attestations_repr.Accountability.history
+
+        let encoding = Dal_attestations_repr.Accountability.history_encoding
+      end)
+
   module Slot = struct
     module Level_context =
       Make_indexed_subcontext

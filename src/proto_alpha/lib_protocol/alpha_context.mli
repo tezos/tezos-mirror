@@ -3276,21 +3276,16 @@ module Dal : sig
     module History_cache :
       Bounded_history_repr.S with type key = hash and type value = t
 
-    val update_skip_list_no_cache :
-      t ->
-      published_level:Raw_level.t ->
-      number_of_slots:int ->
-      attestation_lag:attestation_lag_kind ->
-      (Slot.Header.t * Contract.t * Attestations.attestation_status) list ->
-      t tzresult
-
     val update_skip_list :
       t ->
       History_cache.t ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
       attestation_lag:attestation_lag_kind ->
-      (Slot.Header.t * Contract.t * Attestations.attestation_status) list ->
+      slots:
+        (Slot.Header.t * Contract.t * Attestations.attestation_status option)
+        list ->
+      fill_unpublished_gaps:bool ->
       (t * History_cache.t) tzresult
 
     val is_commitment_attested :

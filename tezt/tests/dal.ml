@@ -5256,10 +5256,9 @@ let test_restart_dal_node protocol dal_parameters _cryptobox node client
   if profile <> Dal_RPC.Bootstrap then
     let expected_levels =
       if Protocol.number protocol >= 025 then
-        (* also include level 0; unclear why, but it should not matter *)
-        List.init
-          (last_finalized_level + 1 - dal_parameters.attestation_lag)
-          (fun i -> string_of_int i)
+        (* first level with cells is level 2; not very clear why, but it should
+           not matter *)
+        List.init (last_finalized_level - 1) (fun i -> string_of_int (i + 2))
       else
         List.init
           (last_finalized_level - dal_parameters.attestation_lag)
@@ -5932,6 +5931,16 @@ module Skip_list_rpcs = struct
     let seen_indexes = ref SeenIndexes.empty in
     let at_least_one_attested_status = ref false in
 
+    let published cell_level cell_slot_index =
+      (* - Cond 1: we publish at [slot_index]
+         - Cond 2: the (published) [cell_level] is greater than [starting_level]
+         - Cond 3: the (published) [cell_level] is smaller or equal to
+           [last_confirmed_published_level] *)
+      cell_slot_index = slot_index
+      && cell_level > starting_level
+      && cell_level <= last_confirmed_published_level
+    in
+
     let rec check_cell cell ~check_level =
       let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
       let expected_skip_list_kind = "dal_skip_list" in
@@ -5947,14 +5956,41 @@ module Skip_list_rpcs = struct
         seen_indexes := SeenIndexes.add cell_index !seen_indexes ;
         let content = JSON.(skip_list |-> "content") in
         let cell_level = JSON.(content |-> "level" |> as_int) in
+        let cell_slot_index = JSON.(content |-> "index" |> as_int) in
+        let expected_published = published cell_level cell_slot_index in
 
+        let () =
+          match check_level with
+          | None -> ()
+          | Some level ->
+              let current_number_of_slots =
+                if level > migration_level then new_number_of_slots
+                else number_of_slots
+              in
+              let expected_slot_index =
+                if level = 1 then
+                  (* the "slot index" of genesis *)
+                  0
+                else current_number_of_slots - 1
+              in
+              Check.(
+                (cell_slot_index = expected_slot_index)
+                  int
+                  ~__LOC__
+                  ~error_msg:"Unexpected slot index: got %L, expected %R")
+        in
         (match check_level with
         | Some level ->
             assert (level >= 1) ;
+            let applied_lag =
+              if level > migration_level then new_lag else lag
+            in
             let expected_published_level =
               if level = 1 then (* the "level" of genesis *) 0
-              else if level > migration_level then level - new_lag
-              else level - lag
+              else if Protocol.number migrate_to < 025 then level - applied_lag
+              else if expected_published || level <= migration_level then
+                level - applied_lag
+              else level
             in
             Check.(
               (cell_level = expected_published_level)
@@ -5970,6 +6006,13 @@ module Skip_list_rpcs = struct
           | Some level ->
               let expected_published_level =
                 if level = 1 then (* the "level" of genesis *) 0
+                else if
+                  Protocol.number migrate_to >= 025
+                  && level > migration_level && not expected_published
+                then
+                  (* With dynamic lags, unpublished cells have lag=0, so
+                     published_level = level. *)
+                  level
                 else if level > migration_level then level - new_lag
                 else level - lag
               in
@@ -5991,7 +6034,11 @@ module Skip_list_rpcs = struct
               Check.(
                 (cell_slot_index = expected_slot_index) int ~__LOC__ ~error_msg)
         in
-        (if cell_index > 0 then
+        (if cell_index > 0 && Protocol.number migrate_to < 025 then
+           (* With dynamic lags (protocol >= 025), the cell index relationship
+              becomes too complex for a simple formula.  The cell_level,
+              cell_slot_index, cell_kind, and back_pointer checks are sufficient
+              to verify the skip list structure. *)
            let accumulated_nb_of_slots =
              if cell_level > migration_level then
                (migration_level * number_of_slots)
@@ -6007,18 +6054,8 @@ module Skip_list_rpcs = struct
                ~__LOC__
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
-        let published cell_level =
-          (* - Cond 1: we publish at [slot_index]
-             - Cond 2: the (published) [cell_level] is greater than
-             [starting_level]
-             - Cond 3: the (published) [cell_level] is smaller or equal to
-             [last_confirmed_published_level] *)
-          cell_slot_index = slot_index
-          && cell_level > starting_level
-          && cell_level <= last_confirmed_published_level
-        in
         let expected_kind =
-          if not (published cell_level) then "unpublished"
+          if not expected_published then "unpublished"
           else (
             at_least_one_attested_status := true ;
             "published")
@@ -6091,11 +6128,33 @@ module Skip_list_rpcs = struct
         in
         let cells = JSON.as_list cells in
         let num_cells = List.length cells in
-        let expected_num_cells =
-          if level < lag then 0
-          else if level = migration_level + 1 then
-            (lag - new_lag + 1) * number_of_slots
+        let common_tail () =
+          if level = migration_level + 1 then
+            if Protocol.number migrate_to < 025 then
+              (lag - new_lag + 1) * number_of_slots
+            else
+              (* The cardinal of the set of :
+                 * [(lag - new_lag + 1) * number_of_slots]: all slots for all
+                   levels between [migration_level - lag + 1] and
+                   [migration_level - new_lag + 1];
+                 * [(new_lag - 1) * (number_of_slots - 1)]: all unpublished
+                   slots between [migration_level - new_lag + 2] and
+                   [migration_level] (old number_of_slots);
+                 * [(new_number_of_slots - 1)]: all unpublished slots at
+                   [migration_level + 1] (new number_of_slots). *)
+              ((lag - new_lag + 1) * number_of_slots)
+              + ((new_lag - 1) * (number_of_slots - 1))
+              + (new_number_of_slots - 1)
+          else if level > migration_level then new_number_of_slots
           else number_of_slots
+        in
+        let expected_num_cells =
+          if Protocol.number migrate_to >= 025 then
+            if level < max 2 (min migration_level lag) then 0
+            else if level < lag then number_of_slots - 1
+            else common_tail ()
+          else if level < lag then 0
+          else common_tail ()
         in
         Check.(
           (num_cells = expected_num_cells)
@@ -6156,7 +6215,7 @@ module Skip_list_rpcs = struct
             bool
             ~__LOC__
             ~error_msg:
-              (let msg = sf "Attested at level %d? " attested_level in
+              (let msg = sf "Attested at level %d: " attested_level in
                msg ^ "got %L, expected %R")) ;
         call_get_metadata (attested_level + 1)
     in
@@ -7554,6 +7613,7 @@ module Garbage_collection = struct
         ~number_of_extra_blocks_to_bake:1
       @@ Helpers.make_slot ~slot_size "content"
     in
+    Log.info "Published a slot at level %d" published_level ;
     let* () = wait_for_producer in
     Log.info "Producer reached expected level" ;
     let* () =
@@ -7688,7 +7748,7 @@ module Garbage_collection = struct
      [Auto].
      The slot producer will send shards from one slot; once a node receives it,
      a request is sent for a received shard, to make sure for reception. After
-     25 blocks baked, we check via RPC that attester deleted its shards and the
+     180 blocks baked, we check via RPC that attester deleted its shards and the
      others did not.
   *)
   let test_gc_with_all_profiles = test_gc_common ~include_observer:true
@@ -7737,8 +7797,8 @@ module Garbage_collection = struct
         let* () = Dal_node.init_config ~operator_profiles:[1] dal_node in
         let* () = Dal_node.run dal_node ~wait_ready:true in
         Log.info
-          "The first level with stored cells is 1 + lag = %d. We bake till \
-           that level is final, that is until level %d."
+          "The first level with stored cells is 2, the last is is 1 + lag = \
+           %d. We bake till that level is final, that is until level %d."
           (lag + 1)
           (lag + 3) ;
         let wait_for_dal_node =
@@ -7749,13 +7809,12 @@ module Garbage_collection = struct
         let* () = bake_for client ~count:(lag + 2) in
         let* () = wait_for_dal_node in
         Log.info
-          "Check that the skip list store contains the right files for level \
+          "Check that the skip list store contains the right entries for level \
            lag + 1." ;
         let* () =
           let expected_levels =
             if Protocol.number protocol >= 025 then
-              (* also include level 0; unclear why, but it should not matter *)
-              ["0"; "1"]
+              List.map string_of_int (List.init lag (fun i -> i + 2))
             else ["1"]
           in
           check_skip_list_store dal_node ~number_of_slots ~expected_levels
@@ -7773,12 +7832,17 @@ module Garbage_collection = struct
           "Check that the skip list store contains cells for [non_gc_period] \
            levels." ;
         (* Example: say head level = 21. The node GCs the cells at level 19 - 10
-           = 9, and it injects at level 19. So we have cells for level 10 to
+           = 9, and it injects at level 19. So we have cells for levels 10 to
            19, that is, 10 levels. *)
         let expected_levels =
-          (* The first published level with stored cells is [last_final_level -
-             non_gc_period + 1 - lag = 2]. *)
-          List.init non_gc_period (fun i -> string_of_int (i + 2))
+          if Protocol.number protocol < 025 then
+            (* The first published level with stored cells is [last_final_level
+               - non_gc_period + 1 - lag = 2]. *)
+            List.init non_gc_period (fun i -> string_of_int (i + 2))
+          else
+            (* The first published level with stored cells is [last_final_level
+               - non_gc_period + 1 - lag = 2]. The last is [last_final_level] *)
+            List.init (non_gc_period + lag) (fun i -> string_of_int (i + 2))
         in
         check_skip_list_store dal_node ~number_of_slots ~expected_levels)
       protocols

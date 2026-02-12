@@ -909,111 +909,104 @@ module History = struct
       let* cache = History_cache.remember new_head_hash new_head cache in
       return (new_head, cache)
 
-    (* Given a list [attested_slot_headers] of well-ordered (wrt slots indices)
-       (attested) slot headers, this function builds an extension [l] of
-       [attested_slot_headers] such that:
+    (* Function to update the skip list with [slots]. [slots] is a list of
+       tuples [(slot_header, publisher, status_opt)], where the optional status
+       field distinguishes between published slots (which have a status field) and
+       unpublished slots (which don't).
 
-       - all elements in [attested_slot_headers] are in [l],
+       This function uses the [fill_unpublished_gaps] flag to control whether to
+       fill missing slot indices with Unpublished cells.
 
-       - for every slot index i in [0, number_of_slots - 1] that doesn't appear
-       in [attested_slot_headers], an unattested slot id is inserted in [l],
-
-       - [l] is well sorted wrt. slots indices. *)
-    let fill_slot_headers ~number_of_slots ~published_level ~attestation_lag
-        slot_headers_with_statuses =
+       Behavior:
+       - When [fill_unpublished_gaps = false]: only processes the provided slots;
+         all provided slots should have a status
+       - When [fill_unpublished_gaps = true]: fills gaps with [Unpublished] cells.
+         - If [status = Some _]: creates a [Published] cell
+         - If [status = None]: skips the slot (no cell added) *)
+    let update_skip_list t cache ~published_level ~number_of_slots
+        ~attestation_lag ~slots ~fill_unpublished_gaps =
       let open Result_syntax in
       let module I = Dal_slot_index_repr in
-      let* all_indices =
-        I.slots_range ~number_of_slots ~lower:0 ~upper:(number_of_slots - 1)
-      in
       let mk_unpublished index =
         Content.Unpublished
           {header_id = Header.{published_level; index}; attestation_lag}
       in
-      (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
-         indices. *)
-      let rec aux indices slots =
-        match (indices, slots) with
-        | _, [] -> List.map mk_unpublished indices |> ok
-        | [], _s :: _ -> tzfail Add_element_in_slots_skip_list_violates_ordering
-        | i :: indices', (s, publisher, status) :: slots' ->
-            if I.(i = s.Header.id.index) then
-              let* res = aux indices' slots' in
-              let Dal_attestations_repr.Accountability.
-                    {
-                      is_proto_attested;
-                      attested_shards;
-                      total_shards;
-                      attesters = _;
-                    } =
-                status
-              in
-              let content =
-                Content.(
-                  Published
-                    {
-                      header = s;
-                      attestation_lag;
-                      publisher;
-                      is_proto_attested;
-                      attested_shards;
-                      total_shards;
-                    })
-              in
-              content :: res |> ok
-            else if I.(i < s.Header.id.index) then
-              let* res = aux indices' slots in
-              mk_unpublished i :: res |> ok
-            else
-              (* i > s.Header.id.index *)
-              tzfail Add_element_in_slots_skip_list_violates_ordering
+      let mk_published header publisher
+          Dal_attestations_repr.Accountability.
+            {is_proto_attested; attested_shards; total_shards; attesters = _} =
+        Content.(
+          Published
+            {
+              header;
+              attestation_lag;
+              publisher;
+              is_proto_attested;
+              attested_shards;
+              total_shards;
+            })
       in
-      aux all_indices slot_headers_with_statuses
-
-    (* Assuming a [number_of_slots] per L1 level, we will ensure below that we
-       insert exactly [number_of_slots] cells in the skip list per level. This
-       will simplify the shape of proofs and help bounding the history cache
-       required for their generation. *)
-    let update_skip_list (t : t) cache ~published_level ~number_of_slots
-        ~attestation_lag slot_headers_with_statuses =
-      let open Result_syntax in
-      let* () =
-        List.iter_e
-          (fun (slot_header, _slot_publisher, _status) ->
-            error_unless
-              Raw_level_repr.(
-                published_level = slot_header.Header.id.published_level)
-              Add_element_in_slots_skip_list_violates_ordering)
-          slot_headers_with_statuses
+      let* slot_contents =
+        if fill_unpublished_gaps then
+          (* Fill gaps with Unpublished cells *)
+          let all_slot_indices = I.all_slots ~number_of_slots in
+          let rec aux indices provided_slots =
+            match (indices, provided_slots) with
+            | _, [] ->
+                (* All remaining indices become Unpublished *)
+                List.map mk_unpublished indices |> ok
+            | [], _ :: _ ->
+                (* Provided slots exceed [number_of_slots] *)
+                tzfail Add_element_in_slots_skip_list_violates_ordering
+            | i :: indices', (header, publisher, status_opt) :: provided_slots'
+              ->
+                let* () =
+                  error_unless
+                    Raw_level_repr.(
+                      published_level = header.Header.id.published_level)
+                    Add_element_in_slots_skip_list_violates_ordering
+                in
+                if I.(i = header.id.index) then
+                  (* This index has a provided slot *)
+                  match status_opt with
+                  | Some status ->
+                      (* Published slot with status: add Published cell *)
+                      let* res = aux indices' provided_slots' in
+                      let cell = mk_published header publisher status in
+                      cell :: res |> ok
+                  | None ->
+                      (* Published slot without status: skip it (don't add any cell). *)
+                      aux indices' provided_slots'
+                else if I.(i < header.Header.id.index) then
+                  (* Gap: create Unpublished for this index *)
+                  let* res = aux indices' provided_slots in
+                  mk_unpublished i :: res |> ok
+                else
+                  (* i > header.Header.id.index: ordering violation *)
+                  tzfail Add_element_in_slots_skip_list_violates_ordering
+          in
+          aux all_slot_indices slots
+        else
+          (* No gap filling: only process provided slots *)
+          let* () =
+            List.iter_e
+              (fun (slot_header, _publisher, _status_opt) ->
+                error_unless
+                  Raw_level_repr.(
+                    published_level = slot_header.Header.id.published_level)
+                  Add_element_in_slots_skip_list_violates_ordering)
+              slots
+          in
+          List.map_e
+            (fun (header, publisher, status_opt) ->
+              match status_opt with
+              | Some status -> return (mk_published header publisher status)
+              | None ->
+                  (* As a precondition of this function, this shouldn't happen
+                     when [fill_unpublished_gaps = false]. *)
+                  assert false)
+            slots
       in
-      let* slot_headers =
-        fill_slot_headers
-          ~number_of_slots
-          ~published_level
-          ~attestation_lag
-          slot_headers_with_statuses
-      in
-      List.fold_left_e add_cell (t, cache) slot_headers
-
-    let update_skip_list_no_cache =
-      let empty_cache = History_cache.empty ~capacity:0L in
-      fun t
-          ~published_level
-          ~number_of_slots
-          ~attestation_lag
-          slot_headers_with_statuses
-        ->
-        let open Result_syntax in
-        let+ cell, (_ : History_cache.t) =
-          update_skip_list
-            t
-            empty_cache
-            ~published_level
-            ~number_of_slots
-            ~attestation_lag
-            slot_headers_with_statuses
-        in
-        cell
+      List.fold_left_e add_cell (t, cache) slot_contents
 
     (* Dal proofs section *)
 

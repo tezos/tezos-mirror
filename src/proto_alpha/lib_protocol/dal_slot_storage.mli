@@ -29,6 +29,12 @@
 
     This module is an interface for the slot storage for the layer 1.
 
+    It is responsible for maintaining the following tables:
+    - {!Storage.Dal.Slot.LevelHistories}
+    - {!Storage.Dal.Slot.Headers}
+    - {!Storage.Dal.Slot.History}
+    - {!Storage.Dal.AttestationHistory}
+
     Depending on the current level of the context and the [attestation_lag] (a
     constant given by the context), the status of the slot may differ:
 
@@ -69,8 +75,8 @@ val find_level_histories :
    context.  *)
 val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 
-(** [finalize_pending_slot_headers ctxt] finalizes pending slot
-    headers which are old enough (i.e. registered at level [current_level -
+(** [finalize_pending_slot_headers ctxt] finalizes pending slot headers which
+    are old enough (i.e. registered at level [current_level -
     attestation_lag]). All slots marked as available are returned. All the
     pending slots at [current_level - attestation_lag] level are removed from
     the context. *)

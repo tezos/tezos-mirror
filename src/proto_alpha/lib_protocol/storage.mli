@@ -1150,6 +1150,15 @@ module Sc_rollup : sig
 end
 
 module Dal : sig
+  (** Sliding window of attestation accountability, indexed by published
+      levels. Contains attestation information (shard counts and attester sets)
+      for published levels in the range [current_level - attestation_lag + 1,
+      current_level - 1]. *)
+  module AttestationHistory :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Dal_attestations_repr.Accountability.history
+
   module Slot : sig
     (** This is a temporary storage for slot headers proposed onto the L1. The
         size of the list is at most [number_of_slots] as declared
@@ -1167,12 +1176,10 @@ module Dal : sig
          and type value = Dal_slot_repr.History.t
 
     (** This single entry stores the cells of the DAL skip list constructed
-        during the block under validation. The list is expected to have exactly
-        [number_of_slots] elements, except at the migration from T to U, where
-        it is a few times longer. Its cells ordering is not specified (and not
-        relevant). A cell's binary encoding is bounded (the only part that is
-        evolving in size over time is the number of backpointers, which is
-        bounded by 64). *)
+        during the block under validation. Its cells ordering is not specified
+        (and not relevant). A cell's binary encoding is bounded (the only part
+        that is evolving in size over time is the number of backpointers, which
+        is bounded by 64). *)
     module LevelHistories :
       Single_data_storage
         with type t := Raw_context.t
