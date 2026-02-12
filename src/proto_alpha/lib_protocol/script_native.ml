@@ -490,6 +490,43 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
+  let execute_balance_of_one (storage : Clst_contract_storage.t)
+      (responses, ctxt) ((owner, token_id) : balance_request) =
+    let open Lwt_result_syntax in
+    (* Check token_id is the one defined by the contract. *)
+    let*? () = check_token_id token_id in
+    let* balance, ctxt =
+      Clst_contract_storage.get_balance_from_storage ctxt storage owner
+    in
+    let response = ((owner, token_id), balance) in
+    return (response :: responses, ctxt)
+
+  let execute_balance_of (ctxt, (step_constants : step_constants))
+      (value : balance_of) (storage : Clst_contract_storage.t) =
+    let open Lwt_result_syntax in
+    let requests, typed_contract = value in
+    let* rev_responses, ctxt =
+      List.fold_left_es
+        (execute_balance_of_one storage)
+        ([], ctxt)
+        (Script_list.to_list requests)
+    in
+    let responses = List.rev rev_responses |> Script_list.of_list in
+    let gas_counter, outdated_ctxt =
+      Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+    in
+    let* op, outdated_ctxt, gas_counter =
+      Script_interpreter_defs.transfer
+        (outdated_ctxt, step_constants)
+        gas_counter
+        Tez.zero
+        Micheline.dummy_location
+        typed_contract
+        responses
+    in
+    let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
+    return (Script_list.of_list [op], storage, [], ctxt)
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
@@ -502,7 +539,8 @@ module CLST_contract = struct
         execute_approve (ctxt, step_constants) approvals storage
     | Update_operators operators ->
         execute_update_operators (ctxt, step_constants) operators storage
-    | Balance_of _ -> assert false
+    | Balance_of requests ->
+        execute_balance_of (ctxt, step_constants) requests storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
