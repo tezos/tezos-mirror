@@ -33,7 +33,7 @@ use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezosx_interfaces::{AliasCreationContext, Registry, RuntimeId};
+use tezosx_interfaces::{AliasCreationContext, CrossCallResult, Registry, RuntimeId};
 
 pub struct EtherlinkVMDB<'a, Host: Runtime, R: Registry> {
     pub registry: &'a R,
@@ -292,7 +292,8 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                     "Failed to get destination contract address from string: {e:?}"
                 ))
             })?;
-        self.registry
+        let result = self
+            .registry
             .bridge(
                 self.host,
                 RuntimeId::Tezos,
@@ -312,7 +313,17 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
                     "Failed to transfer tez to destination contract: {e:?}"
                 ))
             })?;
-        Ok(())
+        match result {
+            CrossCallResult::Success(_) => Ok(()),
+            CrossCallResult::Revert(data) => Err(CustomPrecompileError::Revert(format!(
+                "Cross-runtime call reverted: {}",
+                hex::encode(&data)
+            ))),
+            CrossCallResult::Halt(data) => Err(CustomPrecompileError::Revert(format!(
+                "Cross-runtime call halted: {}",
+                hex::encode(&data)
+            ))),
+        }
     }
 }
 

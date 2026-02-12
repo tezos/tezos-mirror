@@ -18,6 +18,15 @@ pub struct AliasCreationContext {
     pub block_number: U256,
 }
 
+pub enum CrossCallResult {
+    /// execution completed normally, return data is the output
+    Success(Vec<u8>),
+    /// execution explicitly reverted (Solidity revert() / require()), return data is the error message/selector. Gas not consumed is refunded. State changes are rolled back.
+    Revert(Vec<u8>),
+    /// execution stopped abnormally (out of gas, invalid opcode, stack overflow, etc.). All gas is consumed. State changes are rolled back.
+    Halt(Vec<u8>),
+}
+
 #[derive(Eq, PartialEq, Debug, Error)]
 pub enum TezosXRuntimeError {
     #[error("RuntimeId not in registry")]
@@ -42,7 +51,7 @@ pub trait Registry {
         source_address: &[u8],
         amount: U256,
         data: &[u8],
-    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+    ) -> Result<CrossCallResult, TezosXRuntimeError>;
 
     fn generate_alias<Host: Runtime>(
         &self,
@@ -86,7 +95,7 @@ pub trait RuntimeInterface {
         to: &[u8],
         amount: U256,
         data: &[u8],
-    ) -> Result<Vec<u8>, TezosXRuntimeError>;
+    ) -> Result<CrossCallResult, TezosXRuntimeError>;
 
     fn address_from_string(
         &self,

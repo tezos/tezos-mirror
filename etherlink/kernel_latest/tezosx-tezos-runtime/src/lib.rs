@@ -9,7 +9,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{account_storage::TezlinkAccount, context::Context};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezosx_interfaces::TezosXRuntimeError;
+use tezosx_interfaces::{CrossCallResult, TezosXRuntimeError};
 
 use crate::{
     account::{
@@ -52,7 +52,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         to: &[u8],
         amount: U256,
         _data: &[u8],
-    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, TezosXRuntimeError> {
         let to = Contract::nom_read_exact(to).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(
                 "Failed to decode address from bytes: {e:?}"
@@ -68,14 +68,14 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
                         )
                     })?;
                 account::set_tezos_account_info(host, &pkh, account)?;
-                Ok(vec![])
+                Ok(CrossCallResult::Success(vec![]))
             }
             Contract::Originated(kt1) => {
                 // TODO: Have our own implementation of originated contracts.
                 let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_PATH)?;
                 let originated_account = context.originated_from_kt1(&kt1)?;
                 originated_account.add_balance(host, amount.as_u64())?;
-                Ok(vec![])
+                Ok(CrossCallResult::Success(vec![]))
             }
         }
     }

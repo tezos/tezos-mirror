@@ -508,7 +508,8 @@ mod test {
         use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
-            Registry as RegistryTrait, RuntimeId, RuntimeInterface, TezosXRuntimeError,
+            CrossCallResult, Registry as RegistryTrait, RuntimeId, RuntimeInterface,
+            TezosXRuntimeError,
         };
 
         use crate::test::GAS_LIMIT;
@@ -553,7 +554,7 @@ mod test {
                 source_address: &[u8],
                 amount: primitive_types::U256,
                 data: &[u8],
-            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            ) -> Result<CrossCallResult, TezosXRuntimeError> {
                 match destination_runtime {
                     RuntimeId::Tezos => self.mock_tezos.call(
                         self,
@@ -668,7 +669,7 @@ mod test {
                 to: &[u8],
                 amount: primitive_types::U256,
                 _data: &[u8],
-            ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            ) -> Result<CrossCallResult, TezosXRuntimeError> {
                 // Store the balance for the destination address
                 let address_hex = hex::encode(to);
                 let path = OwnedPath::try_from(format!("/{address_hex}"))
@@ -692,7 +693,7 @@ mod test {
                 new_balance.to_little_endian(&mut balance_bytes);
                 host.store_write_all(&full_path, &balance_bytes)?;
 
-                Ok(vec![])
+                Ok(CrossCallResult::Success(vec![]))
             }
 
             fn address_from_string(

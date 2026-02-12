@@ -11,7 +11,7 @@ use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
-use tezosx_interfaces::{AliasCreationContext, Registry, RuntimeId};
+use tezosx_interfaces::{AliasCreationContext, CrossCallResult, Registry, RuntimeId};
 
 use crate::alias::{get_alias, store_alias};
 
@@ -124,7 +124,7 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
     let destination_contract = registry
         .address_from_string(dest, RuntimeId::Ethereum)
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    let _res = registry
+    let result = registry
         .bridge(
             host,
             RuntimeId::Ethereum,
@@ -134,7 +134,17 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
             &[0u8; 0],
         )
         .map_err(|e| TransferError::GatewayError(e.to_string()))?;
-    Ok(())
+    match result {
+        CrossCallResult::Success(_) => Ok(()),
+        CrossCallResult::Revert(data) => Err(TransferError::GatewayError(format!(
+            "Cross-runtime call reverted: {}",
+            hex::encode(&data)
+        ))),
+        CrossCallResult::Halt(data) => Err(TransferError::GatewayError(format!(
+            "Cross-runtime call halted: {}",
+            hex::encode(&data)
+        ))),
+    }
 }
 
 pub(crate) fn get_enshrined_contract_entrypoint(

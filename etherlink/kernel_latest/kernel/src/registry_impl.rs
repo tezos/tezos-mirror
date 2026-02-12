@@ -21,7 +21,7 @@ impl RegistryImpl {
 use primitive_types::U256;
 use tezos_evm_runtime::runtime::Runtime;
 use tezosx_ethereum_runtime::EthereumRuntime;
-use tezosx_interfaces::{Registry, RuntimeInterface};
+use tezosx_interfaces::{CrossCallResult, Registry, RuntimeInterface};
 use tezosx_tezos_runtime::TezosRuntime;
 impl Registry for RegistryImpl {
     fn bridge<Host: Runtime>(
@@ -32,7 +32,7 @@ impl Registry for RegistryImpl {
         source_address: &[u8],
         amount: U256,
         data: &[u8],
-    ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, tezosx_interfaces::TezosXRuntimeError> {
         match destination_runtime {
             tezosx_interfaces::RuntimeId::Tezos => self.tezos.call(
                 self,

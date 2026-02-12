@@ -22,7 +22,7 @@ use revm_etherlink::{
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime::Runtime;
 use tezosx_interfaces::{
-    AliasCreationContext, Registry, RuntimeInterface, TezosXRuntimeError,
+    AliasCreationContext, CrossCallResult, Registry, RuntimeInterface, TezosXRuntimeError,
 };
 
 alloy_sol_types::sol! {
@@ -196,7 +196,7 @@ impl RuntimeInterface for EthereumRuntime {
         to: &[u8],
         amount: primitive_types::U256,
         _data: &[u8],
-    ) -> Result<Vec<u8>, TezosXRuntimeError> {
+    ) -> Result<CrossCallResult, TezosXRuntimeError> {
         if to.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
                 "Invalid address length".to_string(),
@@ -215,7 +215,7 @@ impl RuntimeInterface for EthereumRuntime {
             .checked_add(amount)
             .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
         to_account.set_info(host, to_info)?;
-        Ok(vec![])
+        Ok(CrossCallResult::Success(vec![]))
     }
 
     fn address_from_string(
