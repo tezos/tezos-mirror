@@ -41,7 +41,7 @@ use typed_arena::Arena;
 pub struct TcCtx<'operation, Host: Runtime, C: Context> {
     pub host: &'operation mut Host,
     pub context: &'operation C,
-    pub gas: &'operation mut crate::gas::TezlinkOperationGas,
+    pub operation_gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub next_temporary_id: &'operation mut BigMapId,
 }
@@ -120,7 +120,7 @@ impl ExecCtx {
 
 impl<'a, Host: Runtime, C: Context> TypecheckingCtx<'a> for TcCtx<'a, Host, C> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
-        &mut self.gas.current_gas
+        &mut self.operation_gas.remaining
     }
 
     fn lookup_entrypoints(
@@ -689,11 +689,11 @@ pub mod tests {
     #[macro_export]
     macro_rules! make_default_ctx {
         ($ctx:ident, $host: expr, $context: expr) => {
-            let mut gas = TezlinkOperationGas::default();
+            let mut operation_gas = TezlinkOperationGas::default();
             let mut $ctx = TcCtx {
                 host: $host,
                 context: $context,
-                gas: &mut gas,
+                operation_gas: &mut operation_gas,
                 big_map_diff: BTreeMap::new(),
                 next_temporary_id: &mut BigMapId { value: (-1).into() },
             };

@@ -233,9 +233,10 @@ pub fn verify_signature(
 ) -> Result<bool, ValidityError> {
     let serialized_unsigned_operation = serialize_unsigned_operation(&branch, content)
         .map_err(|_| ValidityError::InvalidSignature)?;
-    validation_gas.consume(crate::gas::Cost(
-        mir::gas::interpret_cost::check_signature(pk, &serialized_unsigned_operation)?,
-    ))?;
+    validation_gas.consume(crate::gas::Cost::check_signature(
+        pk,
+        &serialized_unsigned_operation,
+    )?)?;
     let signature = &signature.into();
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
