@@ -53,6 +53,13 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     | Implicit pkh -> k pkh
     | Originated _ -> failwith "Only implicit account are supported"
 
+  let contract_path contract suffix =
+    Durable_storage_path.etherlink_root ^ "/contracts/index/"
+    ^ Tezlink_durable_storage.Path.to_path
+        Tezos_types.Contract.encoding
+        contract
+    ^ suffix
+
   let constants _chain (_block : block_param) =
     failwith "Not Implemented Yet (%s)" __LOC__
 
@@ -61,15 +68,33 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   let balance _chain block contract =
     let open Lwt_result_syntax in
     on_head_block block @@ fun state ->
-    on_implicit_account contract @@ fun pkh ->
-    let* read_result =
-      Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
-    in
-    match read_result with
-    | Some bytes ->
-        let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
-        return info.balance
-    | None -> return Tezos_types.Tez.zero
+    match (contract : Tezos_types.Contract.t) with
+    | Implicit pkh -> (
+        let* read_result =
+          Backend.read
+            state
+            (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+        in
+        match read_result with
+        | Some bytes ->
+            let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+            return info.balance
+        | None -> return Tezos_types.Tez.zero)
+    | Originated _ -> (
+        let path = contract_path contract "/balance" in
+        let* read_result = Backend.read state path in
+        match read_result with
+        | Some bytes -> (
+            match
+              Data_encoding.Binary.of_bytes Tezos_types.Tez.encoding bytes
+            with
+            | Ok balance -> return balance
+            | Error e ->
+                failwith
+                  "Cannot decode KT1 balance: %a"
+                  Data_encoding.Binary.pp_read_error
+                  e)
+        | None -> return Tezos_types.Tez.zero)
 
   let list_contracts _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
 

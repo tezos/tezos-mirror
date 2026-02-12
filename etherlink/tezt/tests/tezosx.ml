@@ -579,6 +579,42 @@ let test_michelson_origination_and_call =
     ~expected:(`O [("string", `String expected_storage)])
     ()
 
+(** Originate a Michelson contract and check that [Client.get_balance_for]
+    works on the KT1 address via the tezlink RPC. *)
+let test_michelson_get_balance =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Get balance of Michelson contract on Tezos X"
+    ~tags:["balance"; "michelson"; "rpc"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let init_balance = 1_234_567 in
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "store_input"]
+      ~init_storage_data:{|""|}
+      ~init_balance
+      protocol
+  in
+  let* tez_client = tezos_client sequencer in
+  let* balance = Client.get_balance_for ~account:kt1_address tez_client in
+  Check.(
+    (Tez.to_mutez balance = init_balance)
+      int
+      ~error_msg:"Expected %R mutez but got %L") ;
+  unit
+
 (** Call a non-existing KT1 address via the delayed inbox. The operation
     should be included but fail: only fees are consumed, the transferred
     amount is not deducted from the sender's balance. *)
@@ -951,6 +987,7 @@ let () =
   test_transfer [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
+  test_michelson_get_balance [Alpha] ;
   test_michelson_call_nonexistent_contract [Alpha] ;
   test_michelson_call_wrong_entrypoint [Alpha] ;
   test_michelson_origination_wrong_storage_type [Alpha] ;
