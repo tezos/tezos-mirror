@@ -1280,6 +1280,8 @@ images.debian:
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1321,6 +1323,8 @@ images.ubuntu:
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1363,6 +1367,8 @@ images.fedora:
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1405,6 +1411,8 @@ images.rockylinux:
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - trigger
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1449,6 +1457,7 @@ images.rust:
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
+  - trigger
   - images.debian
   dependencies: []
   timeout: 60 minutes
@@ -1532,6 +1541,7 @@ images.debian-homebrew:
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
+  - trigger
   - images.debian
   dependencies: []
   timeout: 60 minutes
