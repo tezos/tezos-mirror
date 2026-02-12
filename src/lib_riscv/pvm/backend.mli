@@ -102,6 +102,8 @@ val state_hash : state -> hash
 
 val set_input : state -> input -> state Lwt.t
 
+val get_outbox : state -> Bounded.Non_negative_int32.t -> output list Lwt.t
+
 val proof_start_state : proof -> hash
 
 val proof_stop_state : proof -> hash

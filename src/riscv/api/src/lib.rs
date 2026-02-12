@@ -6,6 +6,7 @@
 //! This module defines the OCaml API for the RISC-V PVM and serves as a basis for building the octez-riscv-api OCaml library.
 
 use core::panic;
+use std::collections::LinkedList;
 use std::fs;
 use std::str;
 
@@ -807,6 +808,19 @@ pub fn octez_riscv_deserialise_output_proof(
 }
 
 #[ocaml::func]
+#[ocaml::sig("state -> int32 -> output list")]
+pub fn octez_riscv_get_outbox_for_level(
+    state: SafePointer<State>,
+    level: RawLevel,
+) -> LinkedList<Output> {
+    // TODO: RV-918: return Iterator for get_outbox_messages to avoid double allocation
+    let outbox_messages = state
+        .apply_ro(|state| NodePvm::get_outbox_messages(state, level.0.into()))
+        .unwrap_or_default();
+    outbox_messages.into_iter().map(|o| o.into()).collect()
+}
+
+#[ocaml::func]
 #[ocaml::sig("state -> bytes")]
 pub fn octez_riscv_get_reveal_request(state: SafePointer<State>) -> BytesWrapper {
     let serialised_reveal_request: Vec<u8> = state.apply_ro(NodePvm::get_reveal_request);
@@ -886,10 +900,20 @@ pub fn octez_riscv_test_output_info(output_info: OutputInfo) -> OutputInfo {
     output_info
 }
 
+// TODO: RV-922: Remove redundant type check tests when E2E testing
+// is complete
 /// Test endpoint to check argument passing between OCaml and Rust.
 #[doc(hidden)]
 #[ocaml::func]
 #[ocaml::sig("output -> output")]
 pub fn octez_riscv_test_output(output: Output) -> Output {
     output
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("output list -> output list")]
+pub fn octez_riscv_test_output_list(outputs: LinkedList<Output>) -> LinkedList<Output> {
+    outputs
 }

@@ -181,6 +181,11 @@ let set_input state input =
   Lwt.return
     (Storage.State.track (Api.octez_riscv_set_input state (to_api_input input)))
 
+let get_outbox state level =
+  let level = Bounded.Non_negative_int32.to_value level in
+  let outbox_messages = Api.octez_riscv_get_outbox_for_level state level in
+  Lwt.return (List.map from_api_output outbox_messages)
+
 let proof_start_state proof =
   riscv_hash_to_rollup_state_hash @@ Api.octez_riscv_proof_start_state proof
 
