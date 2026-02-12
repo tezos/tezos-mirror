@@ -508,8 +508,8 @@ mod test {
         use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
         use tezosx_ethereum_runtime::EthereumRuntime;
         use tezosx_interfaces::{
-            CrossCallResult, Registry as RegistryTrait, RuntimeId, RuntimeInterface,
-            TezosXRuntimeError,
+            CrossCallResult, CrossRuntimeContext, Registry as RegistryTrait, RuntimeId,
+            RuntimeInterface, TezosXRuntimeError,
         };
 
         use crate::test::GAS_LIMIT;
@@ -575,7 +575,7 @@ mod test {
                 host: &mut Host,
                 native_address: &[u8],
                 runtime_id: RuntimeId,
-                context: tezosx_interfaces::AliasCreationContext,
+                context: CrossRuntimeContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 match runtime_id {
                     RuntimeId::Tezos => self.mock_tezos.generate_alias(
@@ -632,9 +632,8 @@ mod test {
             )
         }
 
-        pub(crate) fn test_alias_creation_context(
-        ) -> tezosx_interfaces::AliasCreationContext {
-            tezosx_interfaces::AliasCreationContext {
+        pub(crate) fn test_alias_creation_context() -> CrossRuntimeContext {
+            CrossRuntimeContext {
                 gas_limit: GAS_LIMIT,
                 timestamp: PU256::from(1),
                 block_number: PU256::from(1),
@@ -649,7 +648,7 @@ mod test {
                 _registry: &impl RegistryTrait,
                 _host: &mut Host,
                 native_address: &[u8],
-                _context: tezosx_interfaces::AliasCreationContext,
+                _context: CrossRuntimeContext,
             ) -> Result<Vec<u8>, TezosXRuntimeError> {
                 // Simple mock: prefix with "tz1_" marker and return a hash-like alias
                 let mut alias = vec![0u8; 22]; // tz1 address size

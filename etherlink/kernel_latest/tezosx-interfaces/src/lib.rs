@@ -7,9 +7,9 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-/// Context required for creating aliases
+/// Context shared across runtimes for cross-runtime operations.
 #[derive(Clone, Debug)]
-pub struct AliasCreationContext {
+pub struct CrossRuntimeContext {
     /// Gas limit
     pub gas_limit: u64,
     /// Timestamp for the block
@@ -58,7 +58,7 @@ pub trait Registry {
         host: &mut Host,
         native_address: &[u8],
         runtime_id: RuntimeId,
-        context: AliasCreationContext,
+        context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     fn address_from_string(
@@ -78,7 +78,7 @@ pub trait RuntimeInterface {
         registry: &impl Registry,
         host: &mut Host,
         native_address: &[u8],
-        context: AliasCreationContext,
+        context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
     // This is a just a placeholder for now to show how the

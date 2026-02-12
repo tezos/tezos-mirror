@@ -11,7 +11,7 @@ use primitive_types::U256;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_tezlink::operation_result::TransferError;
-use tezosx_interfaces::{AliasCreationContext, CrossCallResult, Registry, RuntimeId};
+use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
 
 use crate::alias::{get_alias, store_alias};
 
@@ -109,7 +109,7 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
         Some(alias) => alias,
         None => {
             let source_bytes = source.to_bytes_vec();
-            let context = AliasCreationContext {
+            let context = CrossRuntimeContext {
                 gas_limit: u64::MAX,
                 timestamp: bigint_to_u256(&timestamp)?,
                 block_number: biguint_to_u256(block_number)?,

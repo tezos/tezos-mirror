@@ -33,7 +33,7 @@ use tezos_ethereum::{block::BlockConstants, wei::mutez_from_wei};
 use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
-use tezosx_interfaces::{AliasCreationContext, CrossCallResult, Registry, RuntimeId};
+use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, Registry, RuntimeId};
 
 pub struct EtherlinkVMDB<'a, Host: Runtime, R: Registry> {
     pub registry: &'a R,
@@ -267,7 +267,7 @@ impl<Host: Runtime, R: Registry> DatabasePrecompileStateChanges
             Some(alias) => alias,
             None => {
                 // Create context for alias generation using current block constants
-                let context = AliasCreationContext {
+                let context = CrossRuntimeContext {
                     gas_limit: self.block.gas_limit,
                     timestamp: self.block.timestamp,
                     block_number: self.block.number,

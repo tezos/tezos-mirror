@@ -58,7 +58,7 @@ impl Registry for RegistryImpl {
         host: &mut Host,
         native_address: &[u8],
         runtime_id: tezosx_interfaces::RuntimeId,
-        context: tezosx_interfaces::AliasCreationContext,
+        context: tezosx_interfaces::CrossRuntimeContext,
     ) -> Result<Vec<u8>, tezosx_interfaces::TezosXRuntimeError> {
         match runtime_id {
             tezosx_interfaces::RuntimeId::Tezos => {
