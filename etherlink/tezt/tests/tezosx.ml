@@ -814,6 +814,172 @@ let test_michelson_call_failwith =
         ~amount:1_234_567
         ())
 
+(** Test inter-contract calls via TRANSFER_TOKENS.
+
+    1. Originate [execution_order_storer.tz]: takes a string parameter and
+       appends it to its string storage.
+    2. Originate [execution_order_appender.tz]: calls the storer via
+       TRANSFER_TOKENS with a string stored in its own storage.
+    3. Call the appender and verify that the storer's storage was updated,
+       proving that the target KT1's code was actually executed. *)
+let test_michelson_inter_contract_call =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson inter-contract call via TRANSFER_TOKENS on tezos X"
+    ~tags:["call"; "michelson"; "internal"; "inter_contract"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate storer (string storage, initially empty) *)
+  let* storer_hex, storer_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "execution_order_storer"]
+      ~init_storage_data:{|""|}
+      protocol
+  in
+  (* Step 2: Originate appender with storage = Pair <storer_address> "Hello" *)
+  let* _appender_hex, appender_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~script_name:["mini_scenarios"; "execution_order_appender"]
+      ~init_storage_data:(sf {|Pair "%s" "Hello"|} storer_kt1)
+      protocol
+  in
+  (* Sanity check: storer's storage is still empty *)
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex:storer_hex
+      ~expected:(`O [("string", `String "")])
+      ()
+  in
+  (* Step 3: Call the appender — it will TRANSFER_TOKENS to the storer *)
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:3
+      ~dest:appender_kt1
+      ~arg_data:"Unit"
+      ()
+  in
+  (* Step 4: Verify the storer's storage was updated to "Hello" *)
+  check_michelson_storage_value
+    ~sc_rollup_node
+    ~contract_hex:storer_hex
+    ~expected:(`O [("string", `String "Hello")])
+    ()
+
+(** Test that a failing internal call reverts all sibling internal operations.
+
+    1. Originate [balance.tz]: stores its own balance (parameter unit).
+    2. Originate [always_fails_unit.tz]: always FAILWITHs (parameter unit).
+    3. Originate [reentrancy.tz]: emits two TRANSFER_TOKENS (5 XTZ each),
+       first to [balance.tz], second to [always_fails_unit.tz].
+    4. Call [reentrancy.tz]: the second internal call fails, so everything
+       should be reverted — [balance.tz] should not receive any funds. *)
+let test_michelson_internal_call_revert =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson internal call revert on tezos X"
+    ~tags:["call"; "michelson"; "internal"; "revert"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let* tez_client = tezos_client sequencer in
+  (* Step 1: Originate balance.tz — stores its own BALANCE, accepts unit *)
+  let* _balance_hex, balance_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "balance"]
+      ~init_storage_data:"0"
+      protocol
+  in
+  (* Step 2: Originate always_fails_unit.tz — FAILWITHs on any call *)
+  let* _fails_hex, fails_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~script_name:["mini_scenarios"; "always_fails_unit"]
+      ~init_storage_data:"Unit"
+      protocol
+  in
+  (* Step 3: Originate reentrancy.tz — sends 5 XTZ to each address *)
+  let* _reentry_hex, reentry_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:3
+      ~script_name:["attic"; "reentrancy"]
+      ~init_storage_data:(sf {|Pair "%s" "%s"|} balance_kt1 fails_kt1)
+      ~init_balance:20_000_000
+      protocol
+  in
+  (* Step 4: Call reentrancy — second internal call fails, all should revert *)
+  let* () =
+    with_check_source_delta_balance
+      ~source
+      ~tez_client
+      ~expected_consumed:1000
+      (fun () ->
+        call_michelson_contract_via_delayed_inbox
+          ~sc_rollup_address
+          ~sc_rollup_node
+          ~client
+          ~l1_contracts
+          ~sequencer
+          ~source
+          ~counter:4
+          ~dest:reentry_kt1
+          ~arg_data:"Unit"
+          ())
+  in
+  (* balance.tz should NOT have received any funds (revert) *)
+  let* balance = Client.get_balance_for ~account:balance_kt1 tez_client in
+  Check.(
+    (Tez.to_mutez balance = 0)
+      int
+      ~error_msg:"Expected %R mutez but got %L (revert did not work)") ;
+  unit
+
 let test_get_tezos_ethereum_address_rpc ~runtime () =
   Setup.register_sandbox_test
     ~title:"Test the tez_getTezosEthereumAddress RPC"
@@ -992,6 +1158,8 @@ let () =
   test_michelson_call_wrong_entrypoint [Alpha] ;
   test_michelson_origination_wrong_storage_type [Alpha] ;
   test_michelson_call_failwith [Alpha] ;
+  test_michelson_inter_contract_call [Alpha] ;
+  test_michelson_internal_call_revert [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
