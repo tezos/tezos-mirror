@@ -208,7 +208,7 @@ let jobs =
     in
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.debian"
+      ~name:"images.debian"
       ~image_name:"debian"
       ~matrix:debian_matrix
       ~changes
@@ -217,7 +217,7 @@ let jobs =
   let job_ubuntu_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.ubuntu"
+      ~name:"images.ubuntu"
       ~image_name:"ubuntu"
       ~matrix:ubuntu_matrix
       ~changes:(Changeset.make Files.debian_base)
@@ -226,7 +226,7 @@ let jobs =
   let job_fedora_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.fedora"
+      ~name:"images.fedora"
       ~image_name:"fedora"
       ~matrix:fedora_matrix
       ~changes:(Changeset.make Files.rpm_base)
@@ -235,7 +235,7 @@ let jobs =
   let job_rockylinux_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.rockylinux"
+      ~name:"images.rockylinux"
       ~image_name:"rockylinux"
       ~base_name:(Upstream "rockylinux/rockylinux")
       ~matrix:rockylinux_matrix
@@ -245,7 +245,7 @@ let jobs =
   let job_rust_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.rust"
+      ~name:"images.rust"
       ~image_name:"debian-rust"
       ~base_name:(Pipeline_dep "debian")
       ~matrix:[("RELEASE", ["trixie"])]
@@ -264,7 +264,7 @@ let jobs =
   let job_rust_based_images_merge =
     job_docker_authenticated
       ~__POS__
-      ~name:"oc.base-images.rust.merge"
+      ~name:"images.rust.merge"
       ~stage:Stages.build
       ~dependencies:(Dependent [Job job_rust_based_images])
       ~rules:
@@ -293,7 +293,7 @@ let jobs =
   let job_debian_homebrew_base_images =
     make_job_base_images
       ~__POS__
-      ~name:"oc.base-images.debian-homebrew"
+      ~name:"images.debian-homebrew"
       ~image_name:"debian-homebrew"
       ~base_name:(Pipeline_dep "debian")
       ~dependencies:(Dependent [Job job_debian_based_images])
