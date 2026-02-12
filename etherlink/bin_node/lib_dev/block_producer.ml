@@ -401,91 +401,50 @@ let init_validation_state (head_info : Evm_context.head) =
   in
   return (Validation_types.empty_validation_state ~michelson_config ~evm_config)
 
-let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size =
+let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
-  (* Skip validation if chain_family is Michelson. *)
-  match tx_container with
-  | Michelson_tx_container (module Tx_container) ->
-      if maximum_cumulative_size <= Tezos_types.Operation.minimum_operation_size
-      then return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let initial_validation_state =
-          Tezlink_prevalidation.init_blueprint_validation read ()
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_tezlink_op ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map
-            (fun (raw, tx) -> (raw, Tezos_types.Operation.hash_operation tx))
-            l
-        in
-        return l
-  | Evm_tx_container (module Tx_container) ->
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let* minimum_base_fee_per_gas =
-          Etherlink_durable_storage.minimum_base_fee_per_gas_opt read
-        in
-        let* base_fee_per_gas =
-          Etherlink_durable_storage.base_fee_per_gas_opt read
-        in
-        let* maximum_gas_limit =
-          Etherlink_durable_storage.maximum_gas_per_transaction read
-        in
-        let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-        (* TODO #8236 / L2-862
-           Using optional values for [minimum_base_fee_per_gas] and
-           [base_fee_per_gas] is a temporary work around. In the context of
-           Tezlink, no EVM block exists yet so reading these values from the
-           block header raises [Invalid_block_structure]. Once the kernel writes
-           an initial EVM block for all chain families, this fallback can be
-           removed. *)
-        let evm_config =
-          Validation_types.
-            {
-              minimum_base_fee_per_gas =
-                Ethereum_types.Qty
-                  (Option.value
-                     ~default:Fees.default_minimum_base_fee_per_gas
-                     minimum_base_fee_per_gas);
-              base_fee_per_gas =
-                Option.value
-                  ~default:
-                    (Ethereum_types.Qty Fees.default_minimum_base_fee_per_gas)
-                  base_fee_per_gas;
-              maximum_gas_limit;
-              da_fee_per_byte;
-              next_nonce =
-                (fun addr -> Etherlink_durable_storage.nonce read addr);
-              balance =
-                (fun addr -> Etherlink_durable_storage.balance read addr);
-            }
-        in
-        let initial_validation_state =
-          Validation_types.empty_validation_state
-            ~michelson_config:Validation_types.dummy_michelson_config
-            ~evm_config
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_etherlink_tx ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map (fun (raw, tx) -> (raw, Transaction_object.hash tx)) l
-        in
-        return l
+  (* Low key optimization to avoid even checking the txpool if there is not
+     enough space for the smallest transaction. *)
+  if
+    maximum_cumulative_size
+    <= Int.min
+         minimum_ethereum_transaction_size
+         Tezos_types.Operation.minimum_operation_size
+  then return_nil
+  else
+    let* initial_validation_state = init_validation_state head_info in
+    let* l =
+      Tx_queue.pop_transactions
+        ~maximum_cumulative_size
+        ~validate_tx:(fun validation_state raw_tx tx_object ->
+          match tx_object with
+          | Tx_queue_types.Evm tx_object ->
+              validate_etherlink_tx
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                tx_object
+          | Tx_queue_types.Michelson operation ->
+              validate_tezlink_op
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                operation)
+        ~initial_validation_state
+    in
+    let l =
+      List.map
+        (fun (raw, tx) ->
+          let hash =
+            match tx with
+            | Tx_queue_types.Evm tx -> Transaction_object.hash tx
+            | Tx_queue_types.Michelson tx ->
+                Tezos_types.Operation.hash_operation tx
+          in
+          (raw, hash))
+        l
+    in
+    return l
 
 (** Produces a block if we find at least one valid transaction in the
     transaction pool. *)
@@ -760,7 +719,6 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
             in
             let* transactions_and_hashes =
               pop_valid_tx
-                ~tx_container
                 head_info
                 ~maximum_cumulative_size:remaining_cumulative_size
             in
