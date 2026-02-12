@@ -80,7 +80,7 @@ impl Operation {
     pub fn hash(&self) -> Result<OperationHash, BinError> {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
-        Ok(OperationHash(H256::from_slice(&op_hash)))
+        Ok(OperationHash(H256(op_hash)))
     }
 }
 

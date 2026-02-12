@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use primitive_types::U256;
-use tezos_crypto_rs::{
-    blake2b,
-    hash::{ContractKt1Hash, HashTrait},
-};
+use tezos_crypto_rs::{blake2b, hash::ContractKt1Hash};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{account_storage::TezlinkAccount, context::Context};
@@ -35,17 +32,10 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         native_address: &[u8],
         _context: tezosx_interfaces::AliasCreationContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
-        let digest = blake2b::digest(native_address, ContractKt1Hash::hash_size())
-            .map_err(|err| {
-                TezosXRuntimeError::Custom(format!(
-                    "Failed to compute Blake2b digest: {err}"
-                ))
-            })?;
         // TODO: Add code in this contract.
-        let contract = Contract::Originated(
-            HashTrait::try_from_bytes(digest.as_slice())
-                .map_err(|e| TezosXRuntimeError::ConversionError(e.to_string()))?,
-        );
+        let contract = Contract::Originated(ContractKt1Hash::from(blake2b::digest_160(
+            native_address,
+        )));
         contract.to_bytes().map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(
                 "Failed to encode address to bytes: {e}"

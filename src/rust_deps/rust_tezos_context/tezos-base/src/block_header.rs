@@ -184,3 +184,9 @@ impl From<Vec<u8>> for EncodingHash {
         Self(Some(hash))
     }
 }
+
+impl From<[u8; 32]> for EncodingHash {
+    fn from(hash: [u8; 32]) -> Self {
+        Self(Some(hash.to_vec()))
+    }
+}

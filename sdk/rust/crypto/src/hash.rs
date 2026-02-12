@@ -20,8 +20,8 @@ use tezos_data_encoding::nom::Hasher;
 
 pub struct TezosHasher;
 
-impl Hasher for TezosHasher {
-    fn hash(&self, input: &[u8]) -> Vec<u8> {
+impl Hasher<32> for TezosHasher {
+    fn hash(&self, input: &[u8]) -> [u8; 32] {
         self::blake2b::digest_256(input)
     }
 }
@@ -79,10 +79,8 @@ pub trait HashTrait<const N: usize>:
     /// Returns this hash type.
     fn hash_type() -> HashType;
 
-    /// Returns the size of this hash.
-    fn hash_size() -> usize {
-        Self::hash_type().size()
-    }
+    /// The size of this hash in bytes.
+    const SIZE: usize = N;
 
     /// Tries to create this hash from the `bytes`.
     fn try_from_bytes(bytes: &[u8]) -> Result<Self, FromBytesError>;
@@ -567,7 +565,7 @@ macro_rules! pk_with_hash {
                 let hash = blake2b::digest_160(&self.0);
                 // hash size is 20 bytes (160 bits), exactly how many
                 // ContractTz*Hash expect, safe to unwrap
-                Self::Hash::from_bytes(&hash).unwrap()
+                Self::Hash::from(hash)
             }
         }
 
@@ -630,9 +628,8 @@ pub enum PublicKeyError {
 
 impl PublicKeyEd25519 {
     /// Generates public key hash for public key ed25519
-    pub fn public_key_hash(&self) -> Result<CryptoboxPublicKeyHash, PublicKeyError> {
-        CryptoboxPublicKeyHash::try_from(crate::blake2b::digest_128(self.0.as_ref()))
-            .map_err(Into::into)
+    pub fn public_key_hash(&self) -> CryptoboxPublicKeyHash {
+        CryptoboxPublicKeyHash(self::blake2b::digest_128(self.as_ref()))
     }
 }
 
@@ -801,8 +798,7 @@ impl PublicKeySignatureVerifier for PublicKeyBls {
 
 impl OperationListHash {
     pub fn calculate(list: &[OperationHash]) -> Self {
-        OperationListHash::from_vec(blake2b::merkle_tree(list))
-            .expect("Hash size is correct as blake2b::merkle_tree returns hash of size 32")
+        OperationListHash(blake2b::merkle_tree(list))
     }
 }
 
@@ -811,18 +807,14 @@ impl BlockPayloadHash {
         predecessor: &BlockHash,
         round: u32,
         operation_list_hash: &OperationListHash,
-    ) -> Result<Self, Blake2bError> {
+    ) -> Self {
         let round = round.to_be_bytes();
         let input = [
             predecessor.0.as_ref(),
             round.as_ref(),
             operation_list_hash.0.as_ref(),
         ];
-        let digest = blake2b::digest_all(input, 32)?;
-        BlockPayloadHash::from_bytes(&digest).map_err(|_| {
-            // should never happen as digest size is correct
-            Blake2bError::InvalidLength
-        })
+        BlockPayloadHash(blake2b::digest_all_256(input))
     }
 }
 
@@ -1470,8 +1462,7 @@ mod tests {
             &BlockHash::from_base58_check(predecessor).unwrap(),
             53,
             &operation_list_hash,
-        )
-        .unwrap();
+        );
         assert_eq!(
             payload_hash.to_base58_check(),
             "vh3Ed4mvDcNYVtskGLCYKKk1aBxJTpQNc46Hyi4EedpGCmgZ4LiG",

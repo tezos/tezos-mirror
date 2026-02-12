@@ -14,9 +14,8 @@ use std::cmp::min;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::{
-    blake2b::digest as blake2bdigest,
-    hash::{ContractKt1Hash, HashTrait},
-    CryptoError, PublicKeySignatureVerifier, PublicKeyWithHash,
+    blake2b::digest_160, hash::ContractKt1Hash, CryptoError, PublicKeySignatureVerifier,
+    PublicKeyWithHash,
 };
 use typed_arena::Arena;
 
@@ -1943,8 +1942,7 @@ pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -
     input[..32].copy_from_slice(operation_group_hash);
     // append bytes representing o_index
     input[32..36].copy_from_slice(&o_index.to_be_bytes());
-    let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
-    HashTrait::try_from_bytes(digest.as_slice()).unwrap()
+    ContractKt1Hash::from(digest_160(&input))
 }
 
 fn get_nth_field_ref<'a, 'b>(
