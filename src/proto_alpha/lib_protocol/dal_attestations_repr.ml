@@ -548,6 +548,74 @@ module Accountability = struct
       (list (tup2 Raw_level_repr.encoding level_info_encoding))
 
   let empty_history = Raw_level_repr.Map.empty
+
+  (** {2 Bitset-based storage types}
+
+      These types support a more compact storage format where attestations
+      are represented as bitsets indexed by delegate position in the cycle's
+      stake distribution. *)
+
+  (** A bitset representing attestations for a single slot.
+      Bit i is set if the delegate at position i (in the cycle's stake
+      distribution) attested this slot. *)
+  type _slot_attestation_bitset = Bitset.t
+
+  (** [attesters_to_bitset ~ordered_delegates ~attesters] converts a set
+    of attester public key hashes to a bitset representation.
+
+    Each bit in the result corresponds to a delegate's position in the cycle's
+    stake distribution. Bit [i] is set if the delegate at position [i] is in the
+    [attesters] set.
+
+    @param ~ordered_delegates List of delegates in the committee
+    @param ~attesters The set of delegates who attested
+    @return A bitset where bit [i] is set if the [i]th delegate attested *)
+  let _attesters_to_bitset ~ordered_delegates ~attesters =
+    (* Build index map: delegate -> index *)
+    let delegate_to_index =
+      List.fold_left_i
+        (fun i acc delegate -> Signature.Public_key_hash.Map.add delegate i acc)
+        Signature.Public_key_hash.Map.empty
+        ordered_delegates
+    in
+    (* Set bits for attesters *)
+    Signature.Public_key_hash.Set.fold
+      (fun attester acc ->
+        match Signature.Public_key_hash.Map.find attester delegate_to_index with
+        | Some i -> (
+            (* Set bit at index i *)
+            match Bitset.add acc i with
+            | Ok bs -> bs
+            | Error _ ->
+                (* index cannot be negative *)
+                assert false)
+        | None ->
+            (* by construction only bakers in the distribution can attest *)
+            assert false)
+      attesters
+      Bitset.empty
+
+  (** [bitset_to_attesters ~ordered_delegates ~bitset] converts a bitset
+    representation back to a set of attester public key hashes.
+
+    Each set bit in the bitset corresponds to a delegate at that position in the
+    cycle's stake distribution.
+
+    @param ~ordered_delegates list of delegates in the committee
+    @param bitset The bitset where bit [i] indicates if the [i]th delegate attested
+    @return A set of public key hashes of attesters *)
+  let _bitset_to_attesters ~ordered_delegates ~bitset =
+    (* Build set from bitset indices *)
+    List.fold_left_i
+      (fun i acc delegate ->
+        let is_set =
+          match Bitset.mem bitset i with
+          | Ok b -> b
+          | Error _ -> (* [i] cannot be negative *) assert false
+        in
+        if is_set then Signature.Public_key_hash.Set.add delegate acc else acc)
+      Signature.Public_key_hash.Set.empty
+      ordered_delegates
 end
 
 module Dal_dependent_signing = struct
