@@ -37,6 +37,11 @@ type error +=
       current_chain_id : Chain_id.t;
       stored_chain_id : Chain_id.t;
     }
+  | Unexpected_slot_status of {
+      published_level : int32;
+      slot_id : Types.Slot_id.t;
+      status : Types.header_status;
+    }
   | Unexpected_slot_status_transition of {
       slot_id : Types.Slot_id.t;
       from_status_opt : Types.header_status option;
@@ -175,6 +180,31 @@ let () =
       | _ -> None)
     (fun (current_chain_id, stored_chain_id) ->
       Wrong_chain_id {current_chain_id; stored_chain_id}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.unexpected_slot_status"
+    ~title:"Unexpected slot status"
+    ~description:"A slot has an unexpected status"
+    ~pp:(fun ppf (published_level, slot_id, status) ->
+      Format.fprintf
+        ppf
+        "Unexpected status %a for slot %a at published level %ld"
+        Types.pp_header_status
+        status
+        Types.Slot_id.pp
+        slot_id
+        published_level)
+    Data_encoding.(
+      obj3
+        (req "published_level" int32)
+        (req "slot_id" Types.slot_id_encoding)
+        (req "status" Types.header_status_encoding))
+    (function
+      | Unexpected_slot_status {published_level; slot_id; status} ->
+          Some (published_level, slot_id, status)
+      | _ -> None)
+    (fun (published_level, slot_id, status) ->
+      Unexpected_slot_status {published_level; slot_id; status}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.unexpected_slot_status_transition"

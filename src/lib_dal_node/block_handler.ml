@@ -29,10 +29,10 @@ module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
    shards. In case of error, this function emits a warning instead
    of failing. *)
 let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
-  let open Lwt_syntax in
-  let* () =
+  let open Lwt_result_syntax in
+  let*! () =
     let shards_store = Store.shards store in
-    let* res = Store.Shards.remove shards_store slot_id in
+    let*! res = Store.Shards.remove shards_store slot_id in
     match res with
     | Ok () ->
         Event.emit_removed_slot_shards
@@ -44,9 +44,9 @@ let remove_slots_and_shards (store : Store.t) (slot_id : Types.slot_id) =
           ~slot_index:slot_id.slot_index
           ~error
   in
-  let* () =
+  let*! () =
     let slots_store = Store.slots store in
-    let* res = Store.Slots.remove_slot slots_store slot_id in
+    let*! res = Store.Slots.remove_slot slots_store slot_id in
     match res with
     | Ok () ->
         Event.emit_removed_slot
@@ -126,44 +126,68 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
         else return_unit
       in
       let number_of_slots = proto_parameters.Types.number_of_slots in
-      Lwt_result.ok
-      @@ List.iter_s
-           (fun slot_index ->
-             let slot_id : Types.slot_id =
-               {slot_level = oldest_level; slot_index}
-             in
-             remove_slots_and_shards store slot_id)
-           (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
+      List.iter_es
+        (fun slot_index ->
+          let slot_id : Types.slot_id =
+            {slot_level = oldest_level; slot_index}
+          in
+          remove_slots_and_shards store slot_id)
+        (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
-   remove it from the store. *)
+   remove it from the store. 
+   
+   With multi-lag attestations, a slot published at level P can be attested
+   at P + lag for any lag in attestation_lags. A slot attested at an earlier
+   lag will have its status updated to Attested, but we must not delete it when
+   processing later (higher) lags. We check the slot's stored status before
+   removing. *)
 let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
-    ~prev_proto_parameters ctxt ~attested_level attested =
-  let open Lwt_syntax in
+    ~prev_proto_parameters ctxt ~attested_level =
+  let open Lwt_result_syntax in
   let number_of_slots = prev_prev_proto_parameters.Types.number_of_slots in
   let previous_lag = prev_prev_proto_parameters.attestation_lag in
   let current_lag = prev_proto_parameters.Types.attestation_lag in
   let store = Node_context.get_store ctxt in
   let* first_seen_level =
-    let* fsl = Store.First_seen_level.load (Store.first_seen_level store) in
+    let*! fsl = Store.First_seen_level.load (Store.first_seen_level store) in
     match fsl with Ok (Some v) -> return v | Ok None | Error _ -> return 0l
   in
   (* This function removes from the store all the slots (and their shards)
      published [lag] levels before the [attested_level] and which are not
-     listed in the [attested]. *)
-  let remove_slots_and_shards lag attested =
+     attested. For that, we check the stored slot status for slots attested at
+     earlier lags. *)
+  let remove_if_not_attested lag =
     let published_level = Int32.(sub attested_level (of_int lag)) in
     (* Do not try to remove slot that will never be stored. *)
     if published_level >= first_seen_level then
-      List.iter_s
+      List.iter_es
         (fun slot_index ->
-          if attested slot_index then return_unit
-          else
-            let slot_id : Types.slot_id =
-              {slot_level = published_level; slot_index}
-            in
-            remove_slots_and_shards store slot_id)
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          let*! status_result = Slot_manager.get_slot_status ~slot_id ctxt in
+          match status_result with
+          | Ok (`Attested _) -> return_unit
+          | Ok `Unattested ->
+              (* Slot exists but not attested, safe to delete *)
+              remove_slots_and_shards store slot_id
+          | Ok `Unpublished | Error `Not_found ->
+              (* Slot was never published/stored, nothing to clean up *)
+              return_unit
+          | Ok `Waiting_attestation ->
+              tzfail
+                (Errors.Unexpected_slot_status
+                   {published_level; slot_id; status = `Waiting_attestation})
+          | Error (`Other error) ->
+              let*! () =
+                Event.emit_slot_header_status_storage_error
+                  ~published_level
+                  ~slot_index
+                  ~error
+              in
+              return_unit)
         (0 -- (number_of_slots - 1))
     else return_unit
   in
@@ -181,15 +205,13 @@ let remove_unattested_slots_and_shards ~prev_prev_proto_parameters
       let rec loop lag =
         if lag = current_lag then return_unit
         else
-          let* () =
-            remove_slots_and_shards lag (fun _slot_index : _ -> false)
-          in
+          let* () = remove_if_not_attested lag in
           loop (lag - 1)
       in
       loop previous_lag
     else return_unit
   in
-  remove_slots_and_shards current_lag attested
+  remove_if_not_attested current_lag
 
 (* Here [block_level] is the same as in [new_finalized_payload_level]. When the
    DAL node is up-to-date and the current L1 head is at level L, we call this
@@ -522,13 +544,6 @@ let update_slot_headers_statuses store ~attested_level skip_list_cells =
 let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     ~proto_parameters block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
-  let* block_info =
-    (Plugin.block_info
-       cctxt
-       ~block:(`Level block_level)
-       ~operations_metadata:`Never
-     [@profiler.record_s {verbosity = Notice} "block_info"])
-  in
   let* skip_list_cells =
     (fetch_skip_list_cells
        ctxt
@@ -547,10 +562,6 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
   in
-  let*? slot_availability =
-    (Plugin.slot_availability
-       block_info [@profiler.record_f {verbosity = Notice} "slot_availability"])
-  in
   let*? () =
     update_slot_headers_statuses
       store
@@ -565,17 +576,12 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     else Result_syntax.return prev_proto_parameters
   in
   let number_of_lags = List.length proto_parameters.Types.attestation_lags in
-  let*! () =
+  let* () =
     (remove_unattested_slots_and_shards
        ~prev_prev_proto_parameters
        ~prev_proto_parameters
        ctxt
        ~attested_level:block_level
-       (Plugin.is_protocol_attested
-          slot_availability
-          ~number_of_slots:proto_parameters.number_of_slots
-          ~number_of_lags
-          ~lag_index:(number_of_lags - 1))
      [@profiler.record_s
        {verbosity = Notice} "remove_unattested_slots_and_shards"])
   in
