@@ -145,7 +145,7 @@ module Dal = struct
   module Attestations = struct
     include Dal_attestations_repr.Accountability
     include Dal_attestations_repr
-    include Raw_context.Dal
+    include Dal_attestations_storage
   end
 
   module Attestation = struct
@@ -166,7 +166,6 @@ module Dal = struct
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
-    include Raw_context.Dal
   end
 
   module Operations = struct

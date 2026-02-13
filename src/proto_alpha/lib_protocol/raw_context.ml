@@ -2265,43 +2265,21 @@ module Dal = struct
     | Some published_level ->
         Some (Raw_level_repr.add published_level (params.attestation_lag - 1))
 
-  let record_number_of_attested_shards ctxt ~delegate ~attested_level
-      attestation committee_level_to_shard_count =
+  let[@inline] slot_accountability ctxt =
+    let ({slot_accountability; _} : Raw_dal.t) = dal ctxt in
+    slot_accountability
+
+  let[@inline] record_slot_accountability ctxt slot_accountability =
     let dal = dal ctxt in
-    let c = (constants ctxt).dal in
-    let slot_accountability =
-      Dal_attestations_repr.Accountability.record_number_of_attested_shards
-        dal.slot_accountability
-        ~number_of_slots:c.number_of_slots
-        ~attestation_lag:c.attestation_lag
-        ~lags:c.attestation_lags
-        ~delegate
-        ~attested_level
-        attestation
-        committee_level_to_shard_count
-    in
     update_dal ctxt {dal with slot_accountability}
 
-  let register_slot_header ctxt slot_header ~source =
-    let open Result_syntax in
-    let dal = dal ctxt in
-    match
-      Dal_slot_repr.Slot_market.register dal.slot_fee_market slot_header ~source
-    with
-    | None ->
-        let length = Dal_slot_repr.Slot_market.length dal.slot_fee_market in
-        tzfail
-          (Dal_errors_repr.Dal_register_invalid_slot_header
-             {length; slot_header})
-    | Some (slot_fee_market, updated) ->
-        if not updated then
-          tzfail
-            (Dal_errors_repr.Dal_publish_commitment_duplicate {slot_header})
-        else return @@ update_dal ctxt {dal with slot_fee_market}
+  let[@inline] slot_fee_market ctxt =
+    let ({slot_fee_market; _} : Raw_dal.t) = dal ctxt in
+    slot_fee_market
 
-  let[@inline] candidates ctxt =
+  let[@inline] record_slot_fee_market ctxt slot_fee_market =
     let dal = dal ctxt in
-    Dal_slot_repr.Slot_market.candidates dal.slot_fee_market
+    update_dal ctxt {dal with slot_fee_market}
 
   let record_attestation ctxt ~tb_slot attestation =
     let dal = dal ctxt in
