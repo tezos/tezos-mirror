@@ -9988,6 +9988,488 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
+let test_inject_accusation_dynamic_multi_lag protocol dal_parameters cryptobox
+    node client _bootstrap_key =
+  let attestation_lags = dal_parameters.Dal.Parameters.attestation_lags in
+  let number_of_lags = List.length attestation_lags in
+  let* () =
+    if number_of_lags < 3 then
+      Test.fail
+        "Unexpected attestation_lags. Expected at least 3 lags, got [%s]"
+        (dal_parameters.attestation_lags |> List.map string_of_int
+       |> String.concat "; ")
+    else unit
+  in
+  let lag_with_index_0 = List.nth attestation_lags 0 in
+  let lag_with_index_1 = List.nth attestation_lags 1 in
+  (* We have the invariant that [dal_parameters.Dal.Parameters.attestation_lag]
+     is the same as [List.nth attestation_lags (number_of_lags - 1)]. *)
+  let max_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  let slot_size = dal_parameters.cryptobox.slot_size in
+  let alice = Constant.bootstrap2 in
+  let publish_commitment ?(source = Constant.bootstrap1) ~index ~message () =
+    let slot = Helpers.(bytes_of_slot (make_slot ~slot_size message)) in
+    let commitment, proof, shards_with_proofs =
+      Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
+    in
+    let* _op_hash =
+      Helpers.publish_commitment ~source ~index ~commitment ~proof client
+    in
+    return (List.of_seq shards_with_proofs)
+  in
+  let publish_commitment_and_bake ?source ~index ~message () =
+    let* shards_with_proofs = publish_commitment ?source ~index ~message () in
+    Log.info "Bake after publication for slot index=%d" index ;
+    let* () = bake_for client in
+    let* published_level = Node.get_level node in
+    Log.info
+      "Publication included at level=%d for slot index=%d (message=%s)"
+      published_level
+      index
+      message ;
+    return (published_level, shards_with_proofs)
+  in
+  let ensure_level target_level =
+    let* current_level = Node.get_level node in
+    if current_level > target_level then
+      Test.fail
+        "Cannot go back in time: current level=%d, target level=%d"
+        current_level
+        target_level
+    else if current_level < target_level then
+      bake_for ~count:(target_level - current_level) client
+    else unit
+  in
+  let shard_with_proof_exn shards shard_index =
+    match
+      List.find_opt
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards
+    with
+    | Some x -> x
+    | None ->
+        Test.fail
+          "Could not find shard index %d in locally computed shards"
+          shard_index
+  in
+  let get_alice_indexes ~lag_index ~attestation_level =
+    let committee_level =
+      attestation_level + max_lag - List.nth attestation_lags lag_index
+    in
+    let* shard_assignments =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards
+           ~level:committee_level
+           ~delegates:[alice.public_key_hash]
+           ()
+    in
+    match JSON.as_list shard_assignments with
+    | [json] ->
+        let indexes = JSON.(json |-> "indexes" |> as_list |> List.map as_int) in
+        if List.is_empty indexes then
+          Test.fail
+            "Alice has no shard index at level %d, cannot build accusation \
+             scenario"
+            attestation_level
+        else return indexes
+    | _ ->
+        Test.fail
+          "No DAL shard assignment found for Alice (%s) at level %d"
+          alice.public_key_hash
+          attestation_level
+  in
+  (* [first_among_not_in from forbidden] returns the first element from [from]
+     not in [forbidden]. It fails if no such element can be found.
+     This function assumes both lists are sorted. *)
+  let rec first_among_not_in from forbidden =
+    match (from, forbidden) with
+    | [], _ ->
+        Test.fail
+          ~__LOC__
+          "Cannot find a shard assigned to Alice for lag 1 but not for lag 0."
+    | from_hd :: _, [] -> from_hd
+    | from_hd :: from_tl, forbidden_hd :: forbidden_tl ->
+        if from_hd < forbidden_hd then from_hd
+        else if from_hd = forbidden_hd then
+          first_among_not_in from_tl forbidden_tl
+        else first_among_not_in from forbidden_tl
+  in
+  let inject_accusation ~label ~error ~attestation ~lag_index ~slot_index
+      ~shard_index ~shard ~proof =
+    Log.info
+      "[%s] Inject accusation: slot_index=%d shard_index=%d expected_error=%s"
+      label
+      slot_index
+      shard_index
+      (match error with
+      | None -> "none (success expected)"
+      | Some _ -> "some (failure expected)") ;
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+        ~protocol
+        ~attestation
+        ~slot_index
+        ~lag_index
+        shard
+        proof
+    in
+    let* _op_hash = Operation.Anonymous.inject ?error accusation client in
+    Log.info "[%s] Accusation injected as expected" label ;
+    unit
+  in
+  let assert_dal_entrapment_in_head () =
+    let* anonymous_ops =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_operations_validation_pass
+           ~block:"head"
+           ~validation_pass:2
+           ()
+    in
+    let has_dal_entrapment =
+      List.exists
+        (fun op ->
+          let kind = JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string) in
+          String.equal kind "dal_entrapment_evidence")
+        (JSON.as_list anonymous_ops)
+    in
+    Check.is_true
+      has_dal_entrapment
+      ~__LOC__
+      ~error_msg:"Expected a dal_entrapment_evidence operation in pass 2" ;
+    unit
+  in
+
+  (* Scenario A *)
+  Log.info "=== Scenario A start ===" ;
+  let* _lvl_a, shards_a =
+    publish_commitment_and_bake ~index:0 ~message:"a-slot0" ()
+  in
+  let* () =
+    if lag_with_index_1 > lag_with_index_0 + 1 then
+      bake_for ~count:(lag_with_index_1 - lag_with_index_0 - 1) client
+    else unit
+  in
+  let* lvl_b, shards_b =
+    publish_commitment_and_bake ~index:0 ~message:"b-slot0" ()
+  in
+  (* For accusations, published_level + attestation_lag = attestation_level + 1.
+     To target lvl_b with lag=lag_with_index_0 use lvl_b + lag_with_index_0 - 1.
+     It is the same as lvl_a + lag_with_index_1 - 1. *)
+  let attestation_level_A = lvl_b + (lag_with_index_0 - 1) in
+  let* () = ensure_level attestation_level_A in
+  Log.info
+    "Scenario A: craft attestation at level=%d lag_index=%d slots=[0]"
+    attestation_level_A
+    0 ;
+  let* attestation_a =
+    craft_dal_attestation_exn
+      ~protocol
+      ~level:attestation_level_A
+      ~lag_index:0
+      ~signer:alice
+      (Slots [0])
+      client
+      dal_parameters
+  in
+  let* signature_a = Operation.sign attestation_a client in
+  let attestation_a = (attestation_a, signature_a) in
+  (* To make all this final, one bakes 2 blocks. *)
+  let* () = bake_for ~count:2 client in
+  let* alice_indexes_lag_0 =
+    get_alice_indexes ~lag_index:0 ~attestation_level:attestation_level_A
+  in
+  let alice_index_lag_0 = List.hd alice_indexes_lag_0 in
+  let* alice_indexes_lag_1 =
+    get_alice_indexes ~lag_index:1 ~attestation_level:attestation_level_A
+  in
+  let alice_index_lag_1 =
+    first_among_not_in alice_indexes_lag_1 alice_indexes_lag_0
+  in
+  let shard_a_1, proof_a_1 = shard_with_proof_exn shards_a alice_index_lag_0 in
+  let shard_a_2, proof_a_2 = shard_with_proof_exn shards_a alice_index_lag_1 in
+  let shard_b_wrong, proof_b_wrong =
+    shard_with_proof_exn shards_b alice_index_lag_1
+  in
+  let shard_b_ok, proof_b_ok =
+    shard_with_proof_exn shards_b alice_index_lag_0
+  in
+  let* () =
+    inject_accusation
+      ~label:"A.1 not-attested(a, getting shard index with lag index 0)"
+      ~error:(Some Operation.dal_entrapment_slot_not_attested)
+      ~attestation:attestation_a
+      ~lag_index:1
+      ~slot_index:0
+      ~shard_index:alice_index_lag_0
+      ~shard:shard_a_1
+      ~proof:proof_a_1
+  in
+  let* () =
+    inject_accusation
+      ~label:"A.2 not-attested(a, getting shard index with lag index 1)"
+      ~error:(Some Operation.dal_entrapment_slot_not_attested)
+      ~attestation:attestation_a
+      ~lag_index:1
+      ~slot_index:0
+      ~shard_index:alice_index_lag_1
+      ~shard:shard_a_2
+      ~proof:proof_a_2
+  in
+  let* () =
+    inject_accusation
+      ~label:"A.3 wrong-owner(b)"
+      ~error:(Some Operation.dal_entrapment_wrong_shard_owner)
+      ~attestation:attestation_a
+      ~lag_index:0
+      ~slot_index:0
+      ~shard_index:alice_index_lag_1
+      ~shard:shard_b_wrong
+      ~proof:proof_b_wrong
+  in
+  let* () =
+    inject_accusation
+      ~label:"A.4 success(b)"
+      ~error:None
+      ~attestation:attestation_a
+      ~lag_index:0
+      ~slot_index:0
+      ~shard_index:alice_index_lag_0
+      ~shard:shard_b_ok
+      ~proof:proof_b_ok
+  in
+  Log.info "Scenario A: bake inclusion block for successful accusation" ;
+  let* () = bake_for client in
+  let* () = assert_dal_entrapment_in_head () in
+  Log.info "=== Scenario A done ===" ;
+
+  (* Scenario B (+ ownership check) *)
+  Log.info "=== Scenario B start ===" ;
+  let* shards_a2 =
+    publish_commitment
+      ~source:Constant.bootstrap1
+      ~index:2
+      ~message:"a-slot2"
+      ()
+  in
+  let* lvl_a, shards_a3 =
+    publish_commitment_and_bake
+      ~source:Constant.bootstrap2
+      ~index:3
+      ~message:"a-slot3"
+      ()
+  in
+  let* () =
+    if lag_with_index_1 > lag_with_index_0 + 1 then
+      bake_for ~count:(lag_with_index_1 - lag_with_index_0 - 1) client
+    else unit
+  in
+  let* shards_b2 =
+    publish_commitment
+      ~source:Constant.bootstrap1
+      ~index:2
+      ~message:"b-slot2"
+      ()
+  in
+  let* lvl_b, shards_b3 =
+    publish_commitment_and_bake
+      ~source:Constant.bootstrap2
+      ~index:3
+      ~message:"b-slot3"
+      ()
+  in
+  (* For accusations, published_level + attestation_lag = attestation_level + 1.
+     To target B@lvl_b with lag=lag_with_index_0 use lvl_b + lag_with_index_0 - 1. *)
+  let attestation_level_B = lvl_b + (lag_with_index_0 - 1) in
+  let* () = ensure_level attestation_level_B in
+  Log.info
+    "Scenario B: collect round/payload/slot at level=%d"
+    attestation_level_B ;
+  let* round =
+    Client.RPC.call_via_endpoint client
+    @@ RPC.get_chain_block_helper_round
+         ~block:(string_of_int attestation_level_B)
+         ()
+  in
+  let* block_payload_hash =
+    Operation.Consensus.get_block_payload_hash
+      ~block:(string_of_int attestation_level_B)
+      client
+  in
+  let* slot =
+    Operation.Consensus.get_attestation_slot
+      ~level:attestation_level_B
+      ~delegate:alice
+      ~protocol
+      client
+  in
+  let attestation_per_lag =
+    Array.init number_of_lags (fun _ ->
+        Array.make dal_parameters.number_of_slots false)
+  in
+  (* We attest A-slot3 and B-slot2.
+     We positioned ourselves at a level such that lag_index_0 points to the
+     publication level of B and lag_index_1 points to the publication level of A. *)
+  attestation_per_lag.(0).(2) <- true ;
+  attestation_per_lag.(1).(3) <- true ;
+  let dal_attestation = Dal.Attestations.encode protocol attestation_per_lag in
+  let* attestation_B =
+    Operation.Consensus.operation
+      ~signer:alice
+      (Operation.Consensus.attestation
+         ~level:attestation_level_B
+         ~round
+         ~dal_attestation
+         ~slot
+         ~block_payload_hash
+         ())
+      client
+  in
+  let* signature_b = Operation.sign attestation_B client in
+  let attestation_B = (attestation_B, signature_b) in
+  let* alice_indexes_lag_0 =
+    get_alice_indexes ~lag_index:0 ~attestation_level:attestation_level_B
+  in
+  let alice_index_lag_0 = List.hd alice_indexes_lag_0 in
+  let* alice_indexes_lag_1 =
+    get_alice_indexes ~lag_index:1 ~attestation_level:attestation_level_B
+  in
+  let alice_index_lag_1 =
+    first_among_not_in alice_indexes_lag_1 alice_indexes_lag_0
+  in
+  let shard_a2, proof_a2 = shard_with_proof_exn shards_a2 alice_index_lag_1 in
+  let shard_a3, proof_a3 = shard_with_proof_exn shards_a3 alice_index_lag_1 in
+  let shard_b3, proof_b3 = shard_with_proof_exn shards_b3 alice_index_lag_0 in
+  let shard_b2_wrong, proof_b2_wrong =
+    shard_with_proof_exn shards_b2 alice_index_lag_1
+  in
+  let shard_b2_ok, proof_b2_ok =
+    shard_with_proof_exn shards_b2 alice_index_lag_0
+  in
+  Check.(
+    (attestation_level_B + 1 - lag_with_index_0 = lvl_b)
+      int
+      ~__LOC__
+      ~error_msg:
+        "Scenario B lag2 targets unexpected level: actual %L, expected %R") ;
+  Check.(
+    (attestation_level_B + 1 - lag_with_index_1 = lvl_a)
+      int
+      ~__LOC__
+      ~error_msg:
+        "Scenario B lag3 targets unexpected level: actual %L, expected %R") ;
+  let* () =
+    inject_accusation
+      ~label:"B.1 slot-not-attested(b-slot3)"
+      ~error:(Some Operation.dal_entrapment_slot_not_attested)
+      ~attestation:attestation_B
+      ~lag_index:0
+      ~slot_index:3
+      ~shard_index:alice_index_lag_0
+      ~shard:shard_b3
+      ~proof:proof_b3
+  in
+  let* () =
+    inject_accusation
+      ~label:"B.2 slot-not-attested(a-slot2)"
+      ~error:(Some Operation.dal_entrapment_slot_not_attested)
+      ~attestation:attestation_B
+      ~lag_index:1
+      ~slot_index:2
+      ~shard_index:alice_index_lag_1
+      ~shard:shard_a2
+      ~proof:proof_a2
+  in
+  let* () =
+    inject_accusation
+      ~label:"B.3 success(a-slot3)"
+      ~error:None
+      ~attestation:attestation_B
+      ~lag_index:1
+      ~slot_index:3
+      ~shard_index:alice_index_lag_1
+      ~shard:shard_a3
+      ~proof:proof_a3
+  in
+  let* () = bake_for client in
+  let* () = assert_dal_entrapment_in_head () in
+  let* () =
+    inject_accusation
+      ~label:"B.4 wrong-owner(b-slot2)"
+      ~error:(Some Operation.dal_entrapment_wrong_shard_owner)
+      ~attestation:attestation_B
+      ~lag_index:0
+      ~slot_index:2
+      ~shard_index:alice_index_lag_1
+      ~shard:shard_b2_wrong
+      ~proof:proof_b2_wrong
+  in
+  let* () =
+    inject_accusation
+      ~label:"B.5 success(b-slot2)"
+      ~error:None
+      ~attestation:attestation_B
+      ~lag_index:0
+      ~slot_index:2
+      ~shard_index:alice_index_lag_0
+      ~shard:shard_b2_ok
+      ~proof:proof_b2_ok
+  in
+  Log.info "Scenario B: bake inclusion block for successful accusation" ;
+  let* () = bake_for client in
+  let* () = assert_dal_entrapment_in_head () in
+  Log.info "=== Scenario B done ===" ;
+
+  (* Scenario C (lag max parity) *)
+  Log.info "=== Scenario C start ===" ;
+  let* lvl_c, shards_c =
+    publish_commitment_and_bake ~index:0 ~message:"c-slot0" ()
+  in
+  (* [published_level + lag = attestation_level + 1], since attestations included
+     in level N attests for block N-1.
+     So for lag=5 use +4. *)
+  let attestation_level_C = lvl_c + max_lag - 1 in
+  let max_index = number_of_lags - 1 in
+  let* () = ensure_level attestation_level_C in
+  Log.info
+    "Scenario C: craft attestation at level=%d lag_index=%d slots=[0]"
+    attestation_level_C
+    max_index ;
+  let* attestation_c =
+    craft_dal_attestation_exn
+      ~protocol
+      ~level:attestation_level_C
+      ~lag_index:max_index
+      ~signer:alice
+      (Slots [0])
+      client
+      dal_parameters
+  in
+  let* signature_c = Operation.sign attestation_c client in
+  let attestation_c = (attestation_c, signature_c) in
+  let* alice_indexes =
+    get_alice_indexes ~lag_index:0 ~attestation_level:attestation_level_C
+  in
+  let alice_index_lag_0 = List.hd alice_indexes in
+  let shard_c_ok, proof_c_ok =
+    shard_with_proof_exn shards_c alice_index_lag_0
+  in
+  let* () =
+    inject_accusation
+      ~label:"C.1 success(slot0 lag5)"
+      ~error:None
+      ~attestation:attestation_c
+      ~lag_index:max_index
+      ~slot_index:0
+      ~shard_index:alice_index_lag_0
+      ~shard:shard_c_ok
+      ~proof:proof_c_ok
+  in
+  Log.info "Scenario C: bake inclusion block for successful accusation" ;
+  let* () = bake_for client in
+  let* () = assert_dal_entrapment_in_head () in
+  Log.info "=== Scenario C done ===" ;
+  unit
+
 type tz4_account = {delegate_key : Account.key; companion_key : Account.key}
 
 (* [round_robin n l] distributes the values of [l] in an array of [n] elements.
@@ -12687,6 +13169,12 @@ let register ~protocols =
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_node
+    ~traps_fraction:Q.one
+    "inject accusation with dynamic multi-lag attestations"
+    ~tags:["traps"; "denunciation"; "multi_lag"]
+    test_inject_accusation_dynamic_multi_lag
+    (List.filter (fun p -> Protocol.number p >= 025) protocols) ;
   scenario_with_layer1_and_dal_nodes
     ~traps_fraction:Q.one
     ~operator_profiles:[0]
