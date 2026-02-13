@@ -265,7 +265,15 @@ type t = {
   cache_stake_info_cycles : int;
   (* in cycles *)
   cache_swrr_selected_distribution_cycles : int;
-  (* in cycles *)
+  (* Cache size (in cycles) for precomputed SWRR selected bakers.
+
+   Limits how many past cycles of baker arrays are kept in memory.
+   Memory usage is O(cache_cycles × bakers_per_cycle).
+
+   Entries are removed by Swrr_sampler.clear_outdated_sampling_data
+   after the preserved_cycles window.
+  
+  *)
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;

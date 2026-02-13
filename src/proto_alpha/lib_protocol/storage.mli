@@ -632,6 +632,9 @@ module Stake : sig
    Per-cycle precomputed baker selections stored as a [List] of
    [Signature.Public_key_hash.t].
 
+   Rationale: [get_baker] needs indexed access; [FallbackArray.get] provides
+   O(1) lookup, while lists would require linear traversal.
+
   *)
   module Selected_bakers :
     Indexed_data_storage

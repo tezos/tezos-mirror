@@ -35,6 +35,18 @@
 
 type credit_info = {pkh : Signature.public_key_hash; credit : Z.t; stake : Z.t}
 
+(* Cache infrastructure for selected baker arrays.
+
+   We use cache index 4 (fifth slot in the protocol's cache layout)
+   with namespace "swrr_selected_distribution" to store the precomputed
+   baker arrays in memory during block production.
+
+   The cache is keyed by cycle number and stores FallbackArray structures.
+   Symbolic size=1 means one entry per cycle, but actual memory usage
+   depends on blocks_per_cycle.
+
+   Cache lifetime is controlled by the protocol constant
+   [cache_swrr_selected_distribution_cycles]. *)
 module Swrr_selected_distribution = struct
   module Cache_client = struct
     type cached_value = Signature.Public_key_hash.t FallbackArray.t
@@ -75,6 +87,13 @@ module Swrr_selected_distribution = struct
         in
         return (ctxt, delegates)
 
+  (* Note: uses [remove] not [remove_existing] because SWRR data might not exist.
+
+     Unlike the alias sampler (which always creates sampler state for each cycle),
+     SWRR data only exists when [swrr_new_baker_lottery_enable] is true.
+
+     [Storage.Stake.Selected_bakers.remove] silently succeeds if data doesn't exist,
+     allowing safe cleanup regardless of whether SWRR was active for that cycle. *)
   let remove ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
@@ -239,6 +258,9 @@ let get_baker ctxt level round =
   | Some selected_bakers ->
       let len = FallbackArray.length selected_bakers in
       let idx = (Int32.to_int pos + (3 * round_int)) mod len in
+      (* Safe: [selected_bakers] is never empty (invariant documented at file level).
+         For any non-empty array [l] and index [n], accessing [l.(n mod length l)]
+         always succeeds since [n mod length l] ∈ [0, length l - 1]. *)
       let pkh = FallbackArray.get selected_bakers idx in
       let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
       return (ctxt, Some pk)
