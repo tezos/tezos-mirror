@@ -41,13 +41,14 @@ let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
    sequencer so that it can collect the DA-fee part of operation fees. *)
 let baker_initial_balance = 200000000000L
 
-let baker_initial_deposit = Alpha_context.Tez.of_mutez_exn baker_initial_balance
+let baker_initial_deposit =
+  Imported_context.Tez.of_mutez_exn baker_initial_balance
 
 let faucet_public_key_hash = Signature.V2.Public_key_hash.zero
 
 type account = {
-  pkh : Alpha_context.public_key_hash;
-  pk : Alpha_context.public_key;
+  pkh : Imported_context.public_key_hash;
+  pk : Imported_context.public_key;
   balance : int64;
 }
 
@@ -59,8 +60,8 @@ let baker_account =
     in
     match pk_opt with None -> (* Unreachable *) assert false | Some pk -> pk
   in
-  let public_key : Alpha_context.public_key = Ed25519 public_key_internal in
-  let public_key_hash : Alpha_context.public_key_hash =
+  let public_key : Imported_context.public_key = Ed25519 public_key_internal in
+  let public_key_hash : Imported_context.public_key_hash =
     Ed25519 (Tezos_crypto.Signature.Ed25519.Public_key.hash public_key_internal)
   in
   {
@@ -71,10 +72,10 @@ let baker_account =
     balance = baker_initial_balance;
   }
 
-let contents : Alpha_context.Block_header.contents =
+let contents : Imported_context.Block_header.contents =
   {
     payload_hash = Imported_protocol.Block_payload_hash.zero;
-    payload_round = Alpha_context.Round.zero;
+    payload_round = Imported_context.Round.zero;
     seed_nonce_hash = None;
     proof_of_work_nonce =
       Bytes.make
@@ -95,7 +96,7 @@ module Liquidity_baking = struct
 
   let lq_fallback_token = "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN"
 
-  let cpmm_script : Alpha_context.Script.t =
+  let cpmm_script : Imported_context.Script.t =
     let cpmm_storage =
       let open Imported_protocol in
       Script_repr.lazy_expr
@@ -118,7 +119,7 @@ module Liquidity_baking = struct
       storage = cpmm_storage;
     }
 
-  let token_script : Alpha_context.Script.t =
+  let token_script : Imported_context.Script.t =
     let open Imported_protocol in
     let lqt_storage =
       Script_repr.lazy_expr
@@ -140,7 +141,7 @@ module Liquidity_baking = struct
       storage = lqt_storage;
     }
 
-  let fallback_script : Alpha_context.Script.t =
+  let fallback_script : Imported_context.Script.t =
     let open Imported_protocol in
     let fallback_token_storage =
       Script_repr.lazy_expr
@@ -167,8 +168,8 @@ end
    Instead of really storing it, in the durable_storage, we mock the
    rpc contract as this is the only RPC needed by tzkt for
    Liquidity baking. *)
-let mocked_script (contract : Alpha_context.Contract.t) =
-  let address = Alpha_context.Contract.to_b58check contract in
+let mocked_script (contract : Imported_context.Contract.t) =
+  let address = Imported_context.Contract.to_b58check contract in
   if address = Liquidity_baking.cpmm_address then
     Some Liquidity_baking.cpmm_script
   else if address = Liquidity_baking.lqt_address then
@@ -270,12 +271,12 @@ module Storage_repr = struct
   end
 end
 
-(* Voting period type t in `alpha_context.mli` is a private type so we need to create our own
+(* Voting period type t in `Imported_context.mli` is a private type so we need to create our own
    and then do the conversion with the serialization. *)
 module Voting_period = struct
   type t = {
     index : int32;
-    kind : Alpha_context.Voting_period.kind;
+    kind : Imported_context.Voting_period.kind;
     start_position : int32;
   }
 
@@ -295,7 +296,7 @@ module Voting_period = struct
             ~description:
               "One of the several kinds of periods in the voting procedure."
             "kind"
-            Alpha_context.Voting_period.kind_encoding)
+            Imported_context.Voting_period.kind_encoding)
          (req
             ~description:
               "The relative position of the first level of the period with \
@@ -307,11 +308,12 @@ module Voting_period = struct
     Tezos_types.convert_using_serialization
       ~name:"voting_period_info"
       ~src:encoding
-      ~dst:Alpha_context.Voting_period.encoding
+      ~dst:Imported_context.Voting_period.encoding
 end
 
-let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
-  let open Alpha_context.Receipt in
+let balance_udpdate_rewards ~(baker : Imported_context.public_key_hash) ~amount
+    =
+  let open Imported_context.Receipt in
   let debited_rewards =
     item Baking_rewards (Debited amount) Block_application
   in
@@ -349,7 +351,7 @@ let init_dummy_context () =
   let* b, _cs = Context.init1 () in
   let* v = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt v in
-  let ctxt = Alpha_context.Gas.set_unlimited ctxt in
+  let ctxt = Imported_context.Gas.set_unlimited ctxt in
   return ctxt
 
 (* This an implementation taken straight from the plugin, which assumes the
@@ -358,7 +360,7 @@ let init_dummy_context () =
 let list_entrypoints code normalize_types =
   let open Imported_protocol_test_helpers in
   let open Lwt_result_wrap_syntax in
-  let open Alpha_context in
+  let open Imported_context in
   let open Imported_protocol in
   let* ctxt = init_dummy_context () in
   let expr = Script.lazy_expr code in

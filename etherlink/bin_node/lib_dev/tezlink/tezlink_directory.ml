@@ -434,7 +434,7 @@ let build_block_static_directory ~l2_chain_id
          let*? _block = check_block block in
          let*? bytes =
            Data_encoding.Binary.to_bytes
-             Tezlink_imports.Alpha_context.Operation.unsigned_encoding
+             Tezlink_imports.Imported_context.Operation.unsigned_encoding
              operation
            |> Result.map_error_e @@ fun _ ->
               Result_syntax.tzfail Failed_operation_forging
@@ -455,7 +455,7 @@ let build_block_static_directory ~l2_chain_id
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let hash =
-           Tezlink_imports.Alpha_context.Operation.hash_packed operation
+           Tezlink_imports.Imported_context.Operation.hash_packed operation
          in
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let* result =
@@ -478,7 +478,7 @@ let build_block_static_directory ~l2_chain_id
              ~chain_id
              ~skip_signature:true
              operation
-             (Tezlink_imports.Alpha_context.Operation.hash_packed operation)
+             (Tezlink_imports.Imported_context.Operation.hash_packed operation)
              block
          in
          return (operation.protocol_data, result))
@@ -496,7 +496,8 @@ let build_block_static_directory ~l2_chain_id
            List.map_es
              (fun operation ->
                let hash =
-                 Tezlink_imports.Alpha_context.Operation.hash_packed operation
+                 Tezlink_imports.Imported_context.Operation.hash_packed
+                   operation
                in
                let* result =
                  Backend.simulate_operation

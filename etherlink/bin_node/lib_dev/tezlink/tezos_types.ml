@@ -48,20 +48,20 @@ let convert_using_serialization ~name ~dst ~src value =
               (name, Format.asprintf "%a" Data_encoding.Binary.pp_read_error e))
 
 module Contract = struct
-  type t = Tezlink_imports.Alpha_context.Contract.t
+  type t = Tezlink_imports.Imported_context.Contract.t
 
-  let encoding = Tezlink_imports.Alpha_context.Contract.encoding
+  let encoding = Tezlink_imports.Imported_context.Contract.encoding
 
   let implicit_encoding =
-    Tezlink_imports.Alpha_context.Contract.implicit_encoding
+    Tezlink_imports.Imported_context.Contract.implicit_encoding
 
-  let of_implicit c = Tezlink_imports.Alpha_context.Contract.Implicit c
+  let of_implicit c = Tezlink_imports.Imported_context.Contract.Implicit c
 
-  let of_originated c = Tezlink_imports.Alpha_context.Contract.Originated c
+  let of_originated c = Tezlink_imports.Imported_context.Contract.Originated c
 
   let of_b58check s =
     Tezlink_imports.Imported_env.wrap_tzresult
-    @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
+    @@ Tezlink_imports.Imported_context.Contract.of_b58check s
 
   let of_hex contract =
     let bytes = Hex.to_bytes_exn (`Hex contract) in
@@ -69,7 +69,7 @@ module Contract = struct
 end
 
 module Tez = struct
-  include Tezlink_imports.Alpha_context.Tez
+  include Tezlink_imports.Imported_context.Tez
 
   let of_string_exn str =
     match of_string str with
@@ -81,13 +81,13 @@ module Tez = struct
 end
 
 module Operation = struct
-  module ImportedOperation = Tezlink_imports.Alpha_context.Operation
+  module ImportedOperation = Tezlink_imports.Imported_context.Operation
 
   type t = {
     source : Signature.V2.public_key_hash;
     first_counter : Z.t;
     length : int;
-    op : Tezlink_imports.Alpha_context.packed_operation;
+    op : Tezlink_imports.Imported_context.packed_operation;
     raw : bytes;
     fee : Tez.t;
     gas_limit : Z.t;
@@ -97,10 +97,10 @@ module Operation = struct
     convert_using_serialization
       ~name:"counter"
       ~dst:Data_encoding.n
-      ~src:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      ~src:Tezlink_imports.Imported_context.Manager_counter.encoding_for_RPCs
       counter
 
-  let gas_limit_to_z = Tezlink_imports.Alpha_context.Gas.Arith.integral_to_z
+  let gas_limit_to_z = Tezlink_imports.Imported_context.Gas.Arith.integral_to_z
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
@@ -113,7 +113,7 @@ module Operation = struct
          Signature.V2.Public_key_hash.encoding
          z
          int31
-         (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
+         (dynamic_size Tezlink_imports.Imported_context.Operation.encoding)
          bytes
          Tez.encoding
          z)
@@ -133,8 +133,8 @@ module Operation = struct
     Ethereum_types.Hash (Ethereum_types.Hex hex)
 
   let minimum_operation =
-    let open Tezlink_imports.Alpha_context in
-    let open Tezlink_imports.Alpha_context.Operation in
+    let open Tezlink_imports.Imported_context in
+    let open Tezlink_imports.Imported_context.Operation in
     let open Tezlink_imports.Imported_env in
     let shell : Operation.shell_header =
       {branch = Tezos_crypto.Hashed.Block_hash.zero}
@@ -171,7 +171,7 @@ module Operation = struct
   let minimum_operation_size =
     let raw =
       Data_encoding.Binary.to_bytes_exn
-        Tezlink_imports.Alpha_context.Operation.encoding
+        Tezlink_imports.Imported_context.Operation.encoding
         minimum_operation
     in
     Bytes.length raw

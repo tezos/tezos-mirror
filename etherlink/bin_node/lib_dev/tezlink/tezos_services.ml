@@ -5,21 +5,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezlink_imports
 open Tezlink_mock
+open Tezlink_imports
 
 (* Module importing, amending, and converting, protocol types. Those types
    might be difficult to actually build, so we define conversion function from
    local types to protocol types. *)
 module Protocol_types = struct
-  module Alpha_context = Imported_protocol.Alpha_context
-  module Raw_level = Alpha_context.Raw_level
+  module Raw_level = SeouLo_context.Raw_level
 
   module Cycle = struct
-    include Alpha_context.Cycle
+    include SeouLo_context.Cycle
 
     (* This function is copied from [cycle_repr.ml] because it is not exposed
-       in [alpha_context.mli]. *)
+       in [SeouLo_context.mli]. *)
     let of_int32_exn i =
       if Compare.Int32.(i >= 0l) then add root (Int32.to_int i)
       else invalid_arg "Cycle_repr.of_int32_exn"
@@ -28,9 +27,9 @@ module Protocol_types = struct
   module Level = struct
     open Tezos_types
 
-    type t = Alpha_context.Level.t
+    type t = SeouLo_context.Level.t
 
-    let encoding = Alpha_context.Level.encoding
+    let encoding = SeouLo_context.Level.encoding
 
     (** The sole purpose of this encoding is to reflect as closely as possible
           the encoding of Alpha_context.Level.t, so it can be used to convert to
@@ -69,9 +68,9 @@ module Protocol_types = struct
   end
 
   module Counter = struct
-    type t = Alpha_context.Manager_counter.t
+    type t = SeouLo_context.Manager_counter.t
 
-    let encoding = Alpha_context.Manager_counter.encoding_for_RPCs
+    let encoding = SeouLo_context.Manager_counter.encoding_for_RPCs
 
     let of_z : Z.t -> t tzresult =
       Tezos_types.convert_using_serialization
@@ -450,13 +449,14 @@ module Current_block_services = struct
 
   let transfer_receipt account balance :
       Tezlink_imported_protocol.operation_receipt =
-    let open Alpha_context.Receipt in
+    let open Imported_context.Receipt in
     let open Tezlink_imported_protocol.Apply_results in
     let contract = Tezos_types.Contract.of_implicit account in
     let mint =
       item
         (Contract
-           (Alpha_context.Contract.Implicit Tezlink_mock.faucet_public_key_hash))
+           (Imported_context.Contract.Implicit
+              Tezlink_mock.faucet_public_key_hash))
         (Debited balance)
         Block_application
     in
@@ -473,7 +473,7 @@ module Current_block_services = struct
              balance_updates;
              ticket_receipt = [];
              originated_contracts = [];
-             consumed_gas = Alpha_context.Gas.Arith.zero;
+             consumed_gas = Imported_context.Gas.Arith.zero;
              storage_size = Z.zero;
              paid_storage_size_diff = Z.zero;
              allocated_destination_contract = false;
@@ -490,22 +490,22 @@ module Current_block_services = struct
     in
     Operation_metadata {contents}
 
-  let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
+  let faucet_counter () : Imported_context.Manager_counter.t tzresult =
     Tezos_types.convert_using_serialization
       ~name:"faucet_counter"
       ~src:Data_encoding.z
-      ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      ~dst:Imported_context.Manager_counter.encoding_for_RPCs
       Z.zero
 
-  let create_transfer (account : Alpha_context.public_key_hash)
-      (balance : Alpha_context.Tez.t) =
+  let create_transfer (account : Imported_context.public_key_hash)
+      (balance : Imported_context.Tez.t) =
     let open Result_syntax in
-    let open Imported_protocol.Alpha_context in
+    let open Imported_context in
     let operation =
       Transaction
         {
           amount = balance;
-          parameters = Alpha_context.Script.unit_parameter;
+          parameters = Script.unit_parameter;
           entrypoint = Entrypoint.default;
           destination = Implicit account;
         }
@@ -572,7 +572,7 @@ module Tezlink_genesis_protocol = struct
       Imported_protocol_parameters.Default_parameters.make_bootstrap_account
         ( baker_account.pkh,
           baker_account.pk,
-          Alpha_context.Tez.of_mutez_exn baker_account.balance,
+          Imported_context.Tez.of_mutez_exn baker_account.balance,
           None,
           None )
     in
@@ -738,7 +738,7 @@ let list_entrypoints :
       Imported_protocol_plugin.Contract_services.S.normalize_types_query,
       unit,
       Imported_protocol.Michelson_v1_primitives.prim list list
-      * (string * Alpha_context.Script.expr) list )
+      * (string * Imported_context.Script.expr) list )
     Tezos_rpc.Service.t =
   import_service_with_arg
     Imported_protocol_plugin.Contract_services.S.list_entrypoints
@@ -780,7 +780,7 @@ let manager_key :
       tezlink_rpc_context * Tezos_types.Contract.t,
       unit,
       unit,
-      Protocol_types.Alpha_context.public_key option )
+      Imported_context.public_key option )
     Tezos_rpc.Service.t =
   import_service_with_arg
     Imported_protocol_plugin.Contract_services.S.manager_key
@@ -801,7 +801,7 @@ let constants :
       tezlink_rpc_context,
       unit,
       unit,
-      Protocol_types.Alpha_context.Constants.t )
+      Imported_context.Constants.t )
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.Constants_services.S.all
 
@@ -839,9 +839,9 @@ let simulate_operation :
       tezlink_rpc_context,
       < successor_level : bool
       ; version : Imported_protocol_plugin.RPC.version option >,
-      int32 option * Alpha_context.packed_operation * Chain_id.t * int,
-      Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
-    )
+      int32 option * Imported_context.packed_operation * Chain_id.t * int,
+      Imported_context.packed_protocol_data
+      * Imported_protocol.operation_receipt )
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.simulate_operation
 
@@ -850,9 +850,9 @@ let run_operation :
       tezlink_rpc_context,
       tezlink_rpc_context,
       < version : Imported_protocol_plugin.RPC.version option >,
-      Alpha_context.packed_operation * Chain_id.t,
-      Alpha_context.packed_protocol_data * Imported_protocol.operation_receipt
-    )
+      Imported_context.packed_operation * Chain_id.t,
+      Imported_context.packed_protocol_data
+      * Imported_protocol.operation_receipt )
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.run_operation
 
@@ -861,10 +861,10 @@ let pack_data :
       tezlink_rpc_context,
       tezlink_rpc_context,
       unit,
-      Alpha_context.Script.expr
-      * Alpha_context.Script.expr
-      * Alpha_context.Gas.Arith.integral option,
-      bytes * Alpha_context.Gas.t )
+      Imported_context.Script.expr
+      * Imported_context.Script.expr
+      * Imported_context.Gas.Arith.integral option,
+      bytes * Imported_context.Gas.t )
     Tezos_rpc.Service.t =
   import_service Imported_protocol_plugin.RPC.Scripts.S.pack_data
 
@@ -885,7 +885,7 @@ let get_storage_normalized :
       tezlink_rpc_context * Tezos_types.Contract.t,
       unit,
       Imported_protocol.Script_ir_unparser.unparsing_mode,
-      Alpha_context.Script.expr option )
+      Imported_context.Script.expr option )
     Tezos_rpc.Service.t =
   import_service_with_arg
     Imported_protocol_plugin.RPC.Contract.S.get_storage_normalized
@@ -896,7 +896,7 @@ let get_storage :
       tezlink_rpc_context * Tezos_types.Contract.t,
       unit,
       unit,
-      Alpha_context.Script.expr )
+      Imported_context.Script.expr )
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.storage
 
@@ -916,7 +916,7 @@ let get_script :
       tezlink_rpc_context * Tezos_types.Contract.t,
       unit,
       unit,
-      Alpha_context.Script.t )
+      Imported_context.Script.t )
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.script
 
@@ -925,9 +925,9 @@ let preapply_operations :
       tezlink_rpc_context,
       tezlink_rpc_context,
       < version : Tezlink_protocols.Shell_impl.version >,
-      Protocol_types.Alpha_context.packed_operation list,
+      Imported_context.packed_operation list,
       Tezlink_protocols.Shell_impl.version
-      * (Protocol_types.Alpha_context.packed_protocol_data
+      * (Imported_context.packed_protocol_data
         * Imported_protocol.operation_receipt)
         list )
     Tezos_rpc.Service.t =
@@ -951,11 +951,11 @@ module Big_map = struct
   let get :
       ( [`GET],
         tezlink_rpc_context,
-        (tezlink_rpc_context * Tezlink_imports.Alpha_context.Big_map.Id.t)
+        (tezlink_rpc_context * Imported_context.Big_map.Id.t)
         * Tezlink_imports.Imported_protocol.Script_expr_hash.t,
         unit,
         unit,
-        Alpha_context.Script.expr )
+        Imported_context.Script.expr )
       Tezos_rpc.Service.t =
     import_service_with_arg2
       Imported_protocol_plugin.Contract_services.S.big_map_get
@@ -963,21 +963,21 @@ module Big_map = struct
   let raw_info_encoding =
     let open Data_encoding in
     obj4
-      (req "key_type" Alpha_context.Script.expr_encoding)
-      (req "value_type" Alpha_context.Script.expr_encoding)
+      (req "key_type" Imported_context.Script.expr_encoding)
+      (req "value_type" Imported_context.Script.expr_encoding)
       (req "total_bytes" z)
-      (req "contents" (list Alpha_context.Script.expr_encoding))
+      (req "contents" (list Imported_context.Script.expr_encoding))
 
   let raw_info :
       ( [`GET],
         tezlink_rpc_context,
-        tezlink_rpc_context * Alpha_context.Big_map.Id.t,
+        tezlink_rpc_context * Imported_context.Big_map.Id.t,
         unit,
         unit,
-        Alpha_context.Script.expr
-        * Alpha_context.Script.expr
+        Imported_context.Script.expr
+        * Imported_context.Script.expr
         * Z.t
-        * Alpha_context.Script.expr list )
+        * Imported_context.Script.expr list )
       Tezos_rpc.Service.t =
     let service =
       Tezos_rpc.Service.get_service
@@ -987,7 +987,7 @@ module Big_map = struct
         ~output:raw_info_encoding
         Imported_env.RPC_path.(
           Raw_services.custom_root / "big_maps" / "index"
-          /: Alpha_context.Big_map.Id.rpc_arg)
+          /: Imported_context.Big_map.Id.rpc_arg)
     in
     import_service_with_arg service
 end
@@ -998,7 +998,7 @@ module Forge = struct
         tezlink_rpc_context,
         tezlink_rpc_context,
         unit,
-        Operation.shell_header * Alpha_context.packed_contents_list,
+        Operation.shell_header * Imported_context.packed_contents_list,
         bytes )
       Tezos_rpc.Service.t =
     import_service Imported_protocol_plugin.RPC.Forge.S.operations

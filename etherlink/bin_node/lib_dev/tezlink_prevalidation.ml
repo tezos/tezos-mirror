@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Tezlink_imports
-open Tezlink_imports.Alpha_context
+open Imported_context
 open Validation_types
 
 let ( let** ) v f =
@@ -570,7 +570,7 @@ let get_ read cache source =
     String.Map.find (Signature.V2.Public_key_hash.to_b58check source) cache
   with
   | Some v -> return v
-  | None -> read (Tezlink_imports.Alpha_context.Contract.Implicit source)
+  | None -> read (Tezlink_imports.Imported_context.Contract.Implicit source)
 
 let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
