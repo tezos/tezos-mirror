@@ -9988,6 +9988,54 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
+(* This test exercises DAL entrapment evidence validation with dynamic,
+   multi-lag DAL attestations.
+
+   Context:
+   - In dynamic-lag mode, a single attestation can carry DAL slot availability
+     information for multiple lags.
+   - An entrapment accusation includes:
+       (attestation, lag_index, slot_index, shard, proof)
+     and must be checked against the publication level derived from the
+     attested level and the selected lag index.
+   - The goal is to ensure accusation validation is performed against the
+     correct (lag, slot, level) tuple, including shard ownership checks.
+
+   Test structure:
+   - Scenario A (single-lag attestation content, cross-lag accusations):
+     - Publish a on slot 0, then b on slot 0 later.
+     - Build Alice's attestation at a level where:
+         lag_index=0 points to b, and lag_index=1 points to a.
+     - Inject four accusations:
+       A.1/A.2: accuse with lag_index=1 while Alice only attested lag_index=0
+                -> must fail with "delegate did not attest the DAL slot".
+       A.3: accuse with lag_index=0 with a shard assigned to Alice at lag_index=1
+            not lag_index=0 -> must fail with "wrong shard owner".
+       A.4: accuse with lag_index=0 with an Alice-assigned shard -> must succeed.
+
+   - Scenario B (true multi-lag attestation payload):
+     - Publish four commitments:
+         a-slot2, a-slot3 and later b-slot2, b-slot3.
+     - Craft one attestation where:
+         lag_index=0 attests slot 2, and lag_index=1 attests slot 3.
+     - Inject five accusations:
+       B.1: lag_index=0, slot 3 (not attested at this lag)
+            -> must fail with "delegate did not attest the DAL slot".
+       B.2: Same as B.1 with lag_index=1, slot 2.
+       B.3: lag_index=1, slot 3 with a valid Alice shard -> must succeed.
+       B.4: lag_index=0, slot 2 with a shard assigned to Alice at lag_index=1
+            not lag_index=0 -> must fail with "wrong shard owner".
+       B.5: lag_index=0, slot 2 with an Alice-assigned shard
+            -> must succeed.
+
+   - Scenario C (max lag sanity/parity):
+     - Publish one slot and craft an attestation targeting the largest lag
+       (i.e. lag_index = number_of_lags - 1).
+     - Inject one accusation with matching lag/slot/shard
+       -> must succeed.
+
+   Each scenario bakes after successful accusations and verifies that a
+   dal_entrapment_evidence operation is present in validation pass 2. *)
 let test_inject_accusation_dynamic_multi_lag protocol dal_parameters cryptobox
     node client _bootstrap_key =
   let attestation_lags = dal_parameters.Dal.Parameters.attestation_lags in
