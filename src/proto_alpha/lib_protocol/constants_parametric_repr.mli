@@ -276,7 +276,19 @@ type t = {
   all_bakers_attest_activation_threshold : Ratio_repr.t;
   (* Native contracts feature flag *)
   native_contracts_enable : bool;
-  (* SWRR new baker lottery feature flag *)
+  (* Feature flag to enable/disable SWRR baker lottery.
+
+     When true: use deterministic SWRR precomputed selections
+     When false: fall back to legacy alias sampler (Sampler)
+
+     Migration safety:
+     - Can be toggled between cycles without breaking consensus
+     - Both systems maintain independent state (no conflicts)
+     - Smooth protocol upgrade path from alias sampler to deterministic selection
+
+     Toggling behavior:
+     - Disabled → Enabled: SWRR is used to compute future cycles instead of alias; 
+     already computed cycles with alias are used until then. *)
   swrr_new_baker_lottery_enable : bool;
   (* Tz5 ML-DSA-44 account feature flag *)
   tz5_account_enable : bool;

@@ -5,8 +5,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** SWRR (Stake-Weighted Round Robin) Baker Selection
+
+    This module implements deterministic baker selection for block proposals.
+    At the end of each cycle, it precomputes an ordered list of [blocks_per_cycle] bakers
+    by running a weighted round-robin lottery where delegates with higher
+    stakes are selected proportionally more often.
+
+    Key design decisions:
+    - FallbackArray storage: O(1) indexed access for get_baker (called per block)
+    - Z.t credits: arbitrary precision prevents overflow, ensures exact fairness
+    - Credit persistence: carries fractional stake weights across cycles
+    - Cache index 3: in-memory array for block production performance
+
+    Note that we use {!FallbackArray}s since it's the only allowed implementation of
+    arrays in the protocol, whose constant time access property is critical
+    for the complexity of the [get_baker] function.
+
+    The algorithm ensures fairness: a delegate with stake s out of total T
+    receives approximately (s/T) * blocks_per_cycle selections.
+
+    Invariants:
+    - Selected bakers array is never empty when it exists (Some _).
+      This is guaranteed by [select_bakers_at_cycle_end] which always creates
+      an array with [blocks_per_cycle] elements.
+      This invariant ensures that [ReadonlyArray.get array (idx mod length)]
+      in [get_baker] never fails, since modulo a non-zero length always produces
+      a valid index. *)
+
 type credit_info = {pkh : Signature.public_key_hash; credit : Z.t; stake : Z.t}
 
+(** [select_bakers_at_cycle_end ctxt ~target_cycle] precomputes the ordered
+    list of bakers for [target_cycle] using the SWRR weighted round-robin
+    lottery algorithm.
+
+    Algorithm:
+    1. Initialize credits: load each delegate's credit from storage (persisted
+       from previous cycle) and their stake for [target_cycle]
+    2. For each of [blocks_per_cycle] levels:
+       - Increase all delegates' credits by their stake
+       - Select delegate with maximum credit. In case of a tie, the
+         first delegate in the credits list is chosen, but the order of the list
+         itself is unspecified (it changes for every iteration, see implementation for details)
+       - Subtract total active stake from selected delegate's credit
+    3. Store results: selected bakers as FallbackArray, updated credits
+
+    Complexity: O(blocks_per_cycle × num_delegates)
+    - Acceptable as this runs once per cycle
+    - NOT on critical path (block production uses cached result)
+
+    Fairness property: delegate with stake s receives ~(s/total_stake) * nb_slots
+    selections. Credit subtraction creates a "debt" mechanism ensuring
+    fair distribution even with fractional stake weights. *)
 let select_bakers_at_cycle_end ctxt ~target_cycle =
   let open Lwt_result_syntax in
   let* total_stake = Stake_storage.get_total_active_stake ctxt target_cycle in
@@ -67,6 +117,10 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
         match best_credit_info_opt with
         | None -> (updated_credit_list, acc) (* Should not happen *)
         | Some ({credit; pkh; _} as best_credit_info) ->
+            (* Subtract total_stake (not just proportional amount) to create "debt".
+               This ensures fairness: high-stake delegates are selected more frequently
+               but accumulate negative credit proportionally, preventing monopolization.
+               Over many iterations, this guarantees selection proportional to stake. *)
             ( {best_credit_info with credit = Z.sub credit total_stake}
               :: updated_credit_list,
               pkh :: acc )
@@ -78,6 +132,14 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   let*! ctxt =
     Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
   in
+  (* Update credits for all delegates.
+
+     Use [add] instead of [update] to handle both cases:
+     - New delegates: first time participating in SWRR, no credit entry exists yet
+     - Existing delegates: already have credit from previous cycles
+
+     [add] creates new entries or updates existing ones, making it robust to
+     delegate set changes across cycles (e.g., new delegates meeting minimal stake). *)
   let*! ctxt =
     List.fold_left_s
       (fun ctxt {pkh; credit; _} ->
@@ -90,6 +152,13 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   in
   return ctxt
 
+(** [get_baker ctxt level round] retrieves the consensus key for the baker
+    assigned to propose a block at [level] and [round].
+
+    Index formula: idx = (cycle_position + 3 * round) mod array_length
+    Complexity: O(1)
+    Returns None if SWRR is disabled or precomputed data not found for this cycle
+    (e.g., during protocol migration). Caller falls back to alias sampler. *)
 let get_baker ctxt level round =
   let open Lwt_result_syntax in
   let cycle = level.Level_repr.cycle in
@@ -102,7 +171,6 @@ let get_baker ctxt level round =
   | Some selected_bakers -> (
       let len = List.length selected_bakers in
       let idx = (Int32.to_int pos + (3 * round_int)) mod len in
-
       match List.nth_opt selected_bakers idx with
       | None ->
           assert false
@@ -111,6 +179,19 @@ let get_baker ctxt level round =
           let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
           return (ctxt, Some pk))
 
+(** [reset_credit_for_deactivated_delegates ctxt deactivated_delegates] sets
+    SWRR credits to zero for delegates that have been deactivated.
+
+    This prevents negative credits from accumulating during deactivation periods.
+    Without reset, a delegate could accumulate large negative credit while inactive,
+    making them unfairly disadvantaged when (if) they reactivate.
+
+    Called from delegate_cycles.ml during cycle finalization, before computing
+    the new stake distribution, ensuring deactivated delegates don't influence
+    next cycle's selection.
+
+    Note: credits can be negative at deactivation time if the delegate was
+    recently selected multiple times. This is expected and handled correctly. *)
 let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
   let open Lwt_result_syntax in
   let*! ctxt =

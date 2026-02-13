@@ -240,7 +240,15 @@ let cycle_end ctxt last_cycle =
   in
   (* Deactivating delegates which didn't participate to consensus for too long *)
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
-  (* Reset SWRR credits for delegates that have been deactivated *)
+  (* Reset SWRR credits for delegates deactivated at cycle end.
+
+   Must run before computing next-cycle SWRR selection state, so that
+   a reactivated delegate does not carry over stale credit (positive or negative)
+   from a previous active period.
+
+   Rationale: deactivation is treated as a participation break; fairness is
+   enforced within each active period, not across deactivations.
+*)
   let* ctxt =
     if Constants_storage.swrr_new_baker_lottery_enable ctxt then
       Swrr_sampler.reset_credit_for_deactivated_delegates

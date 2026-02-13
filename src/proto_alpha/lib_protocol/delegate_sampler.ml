@@ -224,6 +224,20 @@ module Random = struct
     return (c, pk)
 end
 
+(** [baking_rights_owner ctxt level round] returns the delegate with baking
+    rights for [level] at [round]. This function should be constant time.
+
+    Fallback chain: SWRR → Alias sampling 
+    1. Try SWRR first: deterministic precomputed selection 
+    2. If SWRR returns None: fall back to Alias sampling (stake-weighted lottery)
+
+    SWRR returns None when:
+    - Feature flag [swrr_new_baker_lottery_enable] is false
+    - Precomputed data not found (protocol migration, old cycle)
+    - Cache miss and storage lookup fails
+
+    This precedence ensures smooth migration: SWRR can be toggled on/off
+    via protocol constant without breaking consensus. *)
 let baking_rights_owner ctxt (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
   (* This committee is used for rounds *)
@@ -382,6 +396,11 @@ let select_distribution_for_cycle ctxt cycle =
       ([], 0, 0L)
       stakes
   in
+  (* Cycle-end baker selection dispatch
+
+     If SWRR enabled: precompute deterministic baker list via weighted round-robin
+     If SWRR disabled: use Alias sampling with Sampler state
+   *)
   let* ctxt =
     if Constants_storage.swrr_new_baker_lottery_enable ctxt then
       Swrr_sampler.select_bakers_at_cycle_end ctxt ~target_cycle:cycle
@@ -430,6 +449,23 @@ let select_new_distribution_at_cycle_end ctxt ~new_cycle =
   let for_cycle = Cycle_repr.add new_cycle consensus_rights_delay in
   select_distribution_for_cycle ctxt for_cycle
 
+(* Clean up old cycle data for both SWRR and alias sampler.
+
+   Alias sampler cleanup: [Delegate_sampler_state.remove] 
+   is used because when SWRR is enabled, new cycles don't create alias sampler state.
+   However, old cycles (before SWRR activation) still have alias sampler state.
+   Using [remove] allows safe cleanup of both:
+   - Old cycles with alias sampler state (created before SWRR)
+   - New cycles without alias sampler state (created after SWRR activation)
+   If [remove_existing] were used, cleanup would fail for post-SWRR cycles.
+
+   SWRR cleanup: [Swrr_sampler.remove_outdated_cycle] uses [remove] not
+   [remove_existing] because SWRR data may not exist if the feature flag
+   [swrr_new_baker_lottery_enable] was disabled during that cycle.
+   This allows safe cleanup even when toggling between SWRR/alias modes.
+
+   Timing: called after [preserved_cycles] window to bound storage growth.
+   Safe to remove: consensus only needs recent cycles for validation. *)
 let clear_outdated_sampling_data ctxt ~new_cycle =
   let open Lwt_result_syntax in
   match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
