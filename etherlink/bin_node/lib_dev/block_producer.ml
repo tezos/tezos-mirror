@@ -386,8 +386,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         let l =
           List.map
-            (fun (raw, tx) ->
-              (raw, Tx_queue_types.Tezlink_operation.hash_of_tx_object tx))
+            (fun (raw, tx) -> (raw, Tezos_types.Operation.hash_operation tx))
             l
         in
         return l

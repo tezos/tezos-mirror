@@ -21,8 +21,8 @@ val payload_method : payload_t -> string
 
 val tag_payload : transaction_object_t -> Ethereum_types.hex -> payload_t
 
-module type L2_transaction = sig
-  type t
+module L2_transaction : sig
+  type t = transaction_object_t
 
   type address
 
@@ -33,6 +33,8 @@ module type L2_transaction = sig
   val hash_of_tx_object : t -> Ethereum_types.hash
 
   val address_to_string : address -> string
+
+  val address_of_string : string -> address
 
   val from_address_of_tx_object : t -> address
 
@@ -51,10 +53,7 @@ module type L2_transaction = sig
 
   module AddressMap : Map.S with type key = address
 
-  module Forward_batch :
-    Rpc_encodings.METHOD
-      with type input = Ethereum_types.hex
-       and type output = Ethereum_types.hash
+  val forward_batch_method : t -> string
 
   val make_txpool :
     pending:t Ethereum_types.NonceMap.t AddressMap.t ->
@@ -62,16 +61,8 @@ module type L2_transaction = sig
     Transaction_object.txqueue_content
 end
 
-module Eth_transaction_object :
-  L2_transaction
-    with type t = Transaction_object.t
-     and type address = Ethereum_types.address
-     and type nonce = Ethereum_types.quantity
-     and module AddressMap = Ethereum_types.AddressMap
-
 type tezlink_batch_nonces = {first : Z.t; length : int}
 
-module Tezlink_operation :
-  L2_transaction
-    with type t = Tezos_types.Operation.t
-     and type nonce = tezlink_batch_nonces
+type shared_nonce =
+  | Evm_nonce of Ethereum_types.quantity
+  | Michelson_nonce of tezlink_batch_nonces
