@@ -9,7 +9,7 @@
 (* Provides mock values necessary for constructing L1 types that contain fields
     that are either irrelevant to the L2 or are not yet supported. *)
 
-include Tezlink_imports
+open Tezlink_imports
 
 let proto_level = 1
 

@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezlink_imports
+open Tezlink_imports
 open Tezlink_mock
 
 (* Module importing, amending, and converting, protocol types. Those types
@@ -114,8 +114,8 @@ module type Tezlink_block_service = sig
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
-module Imported_protocol = struct
-  include Imported_protocol
+module Tezlink_SeouLo_protocol = struct
+  include Tezos_protocol_023_PtSeouLo.Protocol
 
   let contents : Block_header_repr.contents =
     {
@@ -141,7 +141,7 @@ module Imported_protocol = struct
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
       ~dst:block_header_data_encoding
-      ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
+      ~src:Block_header_repr.protocol_data_encoding
       mock_protocol_data
 
   let voting_period ~cycles_per_voting_period ~position ~level_info =
@@ -185,16 +185,15 @@ module Imported_protocol = struct
       Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
     in
     let voting_period_info =
-      Imported_protocol.Alpha_context.Voting_period.
-        {voting_period; position; remaining}
+      Alpha_context.Voting_period.{voting_period; position; remaining}
     in
     return voting_period_info
 
   let mock_block_header_metadata level_info =
-    let open Imported_protocol.Apply_results in
+    let open Apply_results in
     let open Result_syntax in
     let proposer =
-      Imported_protocol.Alpha_context.Consensus_key.
+      Alpha_context.Consensus_key.
         {
           delegate = Tezlink_mock.baker_account.pkh;
           consensus_pkh = Tezlink_mock.baker_account.pkh;
@@ -226,16 +225,12 @@ module Imported_protocol = struct
         deactivated = [];
         balance_updates;
         liquidity_baking_toggle_ema =
-          Imported_protocol.Alpha_context.Per_block_votes
-          .Liquidity_baking_toggle_EMA
-          .zero;
+          Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
         adaptive_issuance_vote_ema =
-          Imported_protocol.Alpha_context.Per_block_votes
-          .Adaptive_issuance_launch_EMA
-          .zero;
+          Alpha_context.Per_block_votes.Adaptive_issuance_launch_EMA.zero;
         adaptive_issuance_launch_cycle = None;
         implicit_operations_results = [];
-        dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
+        dal_attestation = Alpha_context.Dal.Attestation.empty;
       }
 end
 
@@ -353,12 +348,16 @@ module Make_block_service
       operations
 end
 
-module Current_block_services = struct
-  include Make_block_service (Imported_protocol) (Imported_protocol)
+module Tezlink_imported_protocol = Tezlink_SeouLo_protocol
 
-  let transfer_receipt account balance : Imported_protocol.operation_receipt =
+module Current_block_services = struct
+  include
+    Make_block_service (Tezlink_imported_protocol) (Tezlink_imported_protocol)
+
+  let transfer_receipt account balance :
+      Tezlink_imported_protocol.operation_receipt =
     let open Alpha_context.Receipt in
-    let open Imported_protocol.Apply_results in
+    let open Tezlink_imported_protocol.Apply_results in
     let contract = Tezos_types.Contract.of_implicit account in
     let mint =
       item
@@ -446,8 +445,8 @@ module Current_block_services = struct
     return ops
 end
 
-module Zero_protocol = struct
-  include Zero_protocol
+module Tezlink_zero_protocol = struct
+  include Tezos_shell_services.Block_services.Fake_protocol
 
   let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
@@ -464,7 +463,7 @@ module Zero_protocol = struct
       ()
 end
 
-module Genesis_protocol = struct
+module Tezlink_genesis_protocol = struct
   include Tezos_protocol_000_Ps9mPmXa.Protocol
 
   let mock_block_header_metadata _ : block_header_metadata tzresult =
@@ -510,9 +509,9 @@ module Genesis_protocol = struct
 end
 
 module Zero_block_services =
-  Make_block_service (Zero_protocol) (Genesis_protocol)
+  Make_block_service (Tezlink_zero_protocol) (Tezlink_genesis_protocol)
 module Genesis_block_services =
-  Make_block_service (Genesis_protocol) (Imported_protocol)
+  Make_block_service (Tezlink_genesis_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
