@@ -77,16 +77,6 @@ val apply_publish_commitment :
   source:Contract.t ->
   (t * Dal.Slot.Header.t) tzresult
 
-(** [record_participation ctxt delegate tb_slot slot_availability] records the
-    number of protocol-attested slots (given in [slot_availability]) attested by
-    [delegate] (with the initial TB slot [tb_slot]) in the current block. *)
-val record_participation :
-  t ->
-  Signature.Public_key_hash.t ->
-  Slot.t ->
-  Dal.Slot_availability.t ->
-  t tzresult Lwt.t
-
 (** [finalisation ctxt] should be executed at block finalisation time. A set of
     slots attested at level [ctxt.current_level] is returned encapsulated into
     the attestation data-structure. *)

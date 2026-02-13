@@ -3092,15 +3092,6 @@ module Dal : sig
       lag_index:int ->
       Slot_index.t ->
       t
-
-    val number_of_attested_slots : t -> number_of_lags:int -> int
-
-    val intersection :
-      t ->
-      Attestations.t ->
-      number_of_slots:int ->
-      attestation_lags:int list ->
-      t
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}

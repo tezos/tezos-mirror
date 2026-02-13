@@ -139,52 +139,6 @@ let apply_publish_commitment ctxt operation ~source =
   let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
   return (ctxt, slot_header)
 
-let record_participation ctxt delegate tb_slot slot_availability =
-  let open Lwt_result_syntax in
-  let*? () = Dal.assert_feature_enabled ctxt in
-  Dal.only_if_incentives_enabled
-    ctxt
-    ~default:(fun ctxt -> return ctxt)
-    (fun ctxt ->
-      let attestation_lags = Constants.dal_attestation_lags ctxt in
-      let number_of_lags = List.length attestation_lags in
-      let number_of_slots = Constants.dal_number_of_slots ctxt in
-      let number_of_slots_attested_by_delegate =
-        match
-          Slot.Map.find_opt tb_slot (Dal.Attestations.attestations ctxt)
-        with
-        | None -> 0
-        | Some delegate_attestations ->
-            (* Note: there is no double-counting because [dal_attestations] are
-                 different in each block. *)
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
-                 This is not sufficient (too restrictive) for dynamic lags: we
-                 need to aggregate the baker's attestations during the whole
-                 attestation window, and then perform the intersection with the
-                 protocol-attested slots.  *)
-            Dal.Slot_availability.(
-              intersection
-                slot_availability
-                delegate_attestations
-                ~number_of_slots
-                ~attestation_lags
-              |> number_of_attested_slots ~number_of_lags)
-      in
-      let number_of_protocol_attested_slots =
-        Dal.Slot_availability.number_of_attested_slots
-          slot_availability
-          ~number_of_lags
-      in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8218
-           Similarly to the above, [number_of_protocol_attested_slots] may
-           include slots at levels which are not attestable by the delegate
-           because he's not in the committee? *)
-      Delegate.record_dal_participation
-        ctxt
-        ~delegate
-        ~number_of_slots_attested_by_delegate
-        ~number_of_protocol_attested_slots)
-
 let finalisation ctxt =
   let open Lwt_result_syntax in
   Dal.only_if_feature_enabled
