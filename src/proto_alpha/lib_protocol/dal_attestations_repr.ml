@@ -504,49 +504,6 @@ module Accountability = struct
   type history =
     attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
 
-  let attestation_status_encoding =
-    let open Data_encoding in
-    conv
-      (fun {total_shards; attested_shards; attesters; is_proto_attested} ->
-        ( total_shards,
-          attested_shards,
-          Signature.Public_key_hash.Set.elements attesters,
-          is_proto_attested ))
-      (fun (total_shards, attested_shards, attesters_list, is_proto_attested) ->
-        {
-          total_shards;
-          attested_shards;
-          attesters = Signature.Public_key_hash.Set.of_list attesters_list;
-          is_proto_attested;
-        })
-      (obj4
-         (req "total_shards" int31)
-         (req "attested_shards" int31)
-         (req "attesters" (list Signature.Public_key_hash.encoding))
-         (req "is_proto_attested" bool))
-
-  let level_info_encoding =
-    let open Data_encoding in
-    conv
-      (fun m -> Dal_slot_index_repr.Map.bindings m)
-      (fun bindings ->
-        List.fold_left
-          (fun m (k, v) -> Dal_slot_index_repr.Map.add k v m)
-          Dal_slot_index_repr.Map.empty
-          bindings)
-      (list (tup2 Dal_slot_index_repr.encoding attestation_status_encoding))
-
-  let history_encoding =
-    let open Data_encoding in
-    conv
-      (fun m -> Raw_level_repr.Map.bindings m)
-      (fun bindings ->
-        List.fold_left
-          (fun m (k, v) -> Raw_level_repr.Map.add k v m)
-          Raw_level_repr.Map.empty
-          bindings)
-      (list (tup2 Raw_level_repr.encoding level_info_encoding))
-
   let empty_history = Raw_level_repr.Map.empty
 
   (** {2 Bitset-based storage types}

@@ -255,8 +255,6 @@ module Accountability : sig
   type history =
     attestation_status Dal_slot_index_repr.Map.t Raw_level_repr.Map.t
 
-  val history_encoding : history Data_encoding.t
-
   val empty_history : history
 
   (** Compressed representation of the attestation history, using bitsets
