@@ -833,3 +833,11 @@ val dal_entrapment_of_not_published_commitment : Protocol.t -> rex
     [src/proto_<proto>/lib_protocol/validate_errors.ml]
 *)
 val dal_entrapment_invalid_lag_index : lag_index:int -> max_bound:int -> rex
+
+(** Matches accusation errors where the attester did not attest the targeted
+    DAL slot. *)
+val dal_entrapment_slot_not_attested : rex
+
+(** Matches accusation errors where the provided shard is not assigned to the
+    accused attester. *)
+val dal_entrapment_wrong_shard_owner : rex

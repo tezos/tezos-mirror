@@ -1268,3 +1268,9 @@ let dal_entrapment_invalid_lag_index ~lag_index ~max_bound =
         \\[0, %d\\]"
        lag_index
        max_bound)
+
+let dal_entrapment_slot_not_attested =
+  rex {|Invalid accusation .*: (the delegate did not attest the DAL slot)\.|}
+
+let dal_entrapment_wrong_shard_owner =
+  rex {|Invalid accusation .*: .* not the attester\.|}
