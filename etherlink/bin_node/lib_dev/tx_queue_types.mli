@@ -9,6 +9,18 @@ type transaction_object_t =
   | Evm of Transaction_object.t
   | Michelson of Tezos_types.Operation.t
 
+(** Wraps the transaction payload with the chain family so that code
+    can behave differently on each type. *)
+type payload_t =
+  | Evm_payload of Ethereum_types.hex
+  | Michelson_payload of Ethereum_types.hex
+
+val payload_raw : payload_t -> Ethereum_types.hex
+
+val payload_method : payload_t -> string
+
+val tag_payload : transaction_object_t -> Ethereum_types.hex -> payload_t
+
 module type L2_transaction = sig
   type t
 

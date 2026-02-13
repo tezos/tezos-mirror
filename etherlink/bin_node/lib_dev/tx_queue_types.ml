@@ -9,6 +9,21 @@ type transaction_object_t =
   | Evm of Transaction_object.t
   | Michelson of Tezos_types.Operation.t
 
+type payload_t =
+  | Evm_payload of Ethereum_types.hex
+  | Michelson_payload of Ethereum_types.hex
+
+let payload_raw = function Evm_payload hex | Michelson_payload hex -> hex
+
+let payload_method = function
+  | Evm_payload _ -> Rpc_encodings.Send_raw_transaction.method_
+  | Michelson_payload _ -> Rpc_encodings.Send_raw_tezlink_operation.method_
+
+let tag_payload tx_object payload =
+  match tx_object with
+  | Evm _ -> Evm_payload payload
+  | Michelson _ -> Michelson_payload payload
+
 module type L2_transaction = sig
   type t
 

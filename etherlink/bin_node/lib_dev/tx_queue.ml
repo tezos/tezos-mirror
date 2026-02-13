@@ -26,7 +26,7 @@ type callback = all_variant variant_callback
     node. *)
 type queue_request = {
   hash : Ethereum_types.hash;
-  payload : Ethereum_types.hex;  (** payload of the transaction *)
+  payload : Tx_queue_types.payload_t;  (** payload of the transaction *)
   queue_callback : queue_variant variant_callback;
       (** callback to call with the response given by the upstream
           node. *)
@@ -753,7 +753,6 @@ struct
 
     let build_batch transactions =
       let module M = Map.Make (String) in
-      let module Fb = Tx.Forward_batch in
       let rev_batch, hashes =
         Seq.fold_left
           (fun (rev_batch, hashes) {hash; payload; _} ->
@@ -767,14 +766,15 @@ struct
             let txn =
               Rpc_encodings.JSONRPC.
                 {
-                  method_ = Fb.method_;
+                  method_ = Tx_queue_types.payload_method payload;
                   parameters =
                     Some
-                      (Data_encoding.Json.construct Fb.input_encoding payload);
+                      (Data_encoding.Json.construct
+                         Data_encoding.(tup1 Ethereum_types.hex_encoding)
+                         (Tx_queue_types.payload_raw payload));
                   id = Some (Id_string req_id);
                 }
             in
-
             (txn :: rev_batch, M.add req_id hash hashes))
           ([], M.empty)
           transactions
@@ -827,7 +827,9 @@ struct
         match seq () with
         | Seq.Nil -> return (rev_hashes, rev_selected)
         | Seq.Cons ({hash; payload; queue_callback}, rest) -> (
-            let raw_tx = Ethereum_types.hex_to_bytes payload in
+            let raw_tx =
+              Ethereum_types.hex_to_bytes (Tx_queue_types.payload_raw payload)
+            in
             match Transaction_objects.find state.tx_object hash with
             | None ->
                 let*! () = Tx_queue_events.missing_tx_object hash in
@@ -944,7 +946,9 @@ struct
         match Queue.peek_opt state.queue with
         | None -> return rev_selected
         | Some {hash; payload; queue_callback} -> (
-            let raw_tx = Ethereum_types.hex_to_bytes payload in
+            let raw_tx =
+              Ethereum_types.hex_to_bytes (Tx_queue_types.payload_raw payload)
+            in
             let tx_object = Transaction_objects.find state.tx_object hash in
             match tx_object with
             | None ->
@@ -1098,7 +1102,14 @@ struct
           ~add:Tx.bitset_add_nonce
       in
       Queue.add
-        {hash = Tx.hash_of_tx_object tx_object; payload; queue_callback}
+        {
+          hash = Tx.hash_of_tx_object tx_object;
+          payload =
+            Tx_queue_types.tag_payload
+              (Tx.to_transaction_object_t tx_object)
+              payload;
+          queue_callback;
+        }
         state.queue ;
       return_unit
 
