@@ -67,7 +67,7 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-v24-backport-20662-daefb630
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-v24-release-2642faac
   parallel:
     matrix:
     - RELEASE:
@@ -199,7 +199,7 @@ oc.build-rockylinux-data:
       - gcp_very_high_cpu
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-v24-backport-20662-daefb630
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-v24-release-2642faac
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -255,7 +255,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-v24-backport-20662-daefb630
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-v24-release-2642faac
   parallel:
     matrix:
     - RELEASE:
@@ -299,7 +299,7 @@ oc.docker-systemd-merge-manifest.rockylinux:
       - gcp_very_high_cpu_ramfs
 
 oc.install_bin_rockylinux_9.3.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-v24-backport-20662-daefb630
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3-v24-release-2642faac
   stage: publishing_tests
   tags:
   - gcp
