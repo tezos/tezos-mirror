@@ -2462,7 +2462,23 @@ module Anonymous = struct
              })
     | Some dal_content -> (
         let* dal_params = Dal.Past_parameters.parameters vi.ctxt raw_level in
-        let attestation_lag = dal_params.attestation_lag in
+        let*? attestation_lag =
+          Option.fold
+            ~none:(ok dal_params.attestation_lag)
+            ~some:(fun lag_index ->
+              Option.fold
+                ~none:
+                  (error
+                  @@ Invalid_lag_index
+                       {
+                         given = lag_index;
+                         min = 0;
+                         max = List.length dal_params.attestation_lags - 1;
+                       })
+                ~some:ok
+                (List.nth dal_params.attestation_lags lag_index))
+            lag_index_opt
+        in
         let*? () = check_denunciation_age vi `Dal_denounciation raw_level in
         let level = Level.from_raw vi.ctxt raw_level in
         let* ctxt, consensus_key =
