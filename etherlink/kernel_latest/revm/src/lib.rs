@@ -491,8 +491,8 @@ mod test {
         storage::{
             sequencer_key_change::SequencerKeyChange,
             world_state_handler::{
-                StorageAccount, SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
-                WITHDRAWALS_TICKETER_PATH,
+                StorageAccount, NATIVE_TOKEN_TICKETER_PATH, SEQUENCER_KEY_CHANGE_PATH,
+                SEQUENCER_KEY_PATH,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
@@ -1156,7 +1156,7 @@ mod test {
 
         // Store the ticketer address required to build the outbox message
         host.store_write(
-            &WITHDRAWALS_TICKETER_PATH,
+            &NATIVE_TOKEN_TICKETER_PATH,
             "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
             0,
         )
