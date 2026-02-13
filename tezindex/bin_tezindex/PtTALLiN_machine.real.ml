@@ -31,14 +31,15 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     | Staker of Protocol.Alpha_context.Contract.t * Signature.public_key_hash
     | Shared of Signature.public_key_hash
     | Edge of Signature.public_key_hash
+    | Lost_attestation of Signature.public_key_hash
+    | Lost_dal_attestation of Signature.public_key_hash
 
   let get_balance_update
       (Balance_update_item (balance, balance_update, origin) :
         Protocol.Alpha_context.Receipt.balance_update_item) =
     let get_tz tz = Protocol.Alpha_context.Tez.to_mutez tz in
     match (balance, balance_update, origin) with
-    (* Block application *)
-    (* Debited *)
+    (* Block_application - Tracked debited sources *)
     | Block_fees, Debited tz, Block_application -> Some (Block_fees, get_tz tz)
     | Baking_rewards, Debited tz, Block_application ->
         Some (Block_rewards, get_tz tz)
@@ -48,7 +49,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some (Attestation_rewards, get_tz tz)
     | Dal_attesting_rewards, Debited tz, Block_application ->
         Some (Dal_attestation_rewards, get_tz tz)
-    (* Credited *)
+    (* Block_application - Tracked credited destinations *)
     | Contract contract, Credited tz, Block_application ->
         Some (Contract contract, get_tz tz)
     | Deposits (Baker delegate), Credited tz, Block_application ->
@@ -63,15 +64,93 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some (Shared delegate, get_tz tz)
     | Deposits (Baker_edge delegate), Credited tz, Block_application ->
         Some (Edge delegate, get_tz tz)
-    | Lost_attesting_rewards (_addr, _b, _b'), Credited _tz, Block_application
-      ->
-        None (* TODO *)
-    | Lost_dal_attesting_rewards _addr, Credited _tz, Block_application ->
-        None (* TODO *)
-    | _, _, Block_application -> None (* TODO *)
-    (* Other Origin *)
+    | Lost_attesting_rewards (addr, _, _), Credited tz, Block_application ->
+        Some (Lost_attestation addr, get_tz tz)
+    | Lost_dal_attesting_rewards addr, Credited tz, Block_application ->
+        Some (Lost_dal_attestation addr, get_tz tz)
+    (* Block_application - Reverse direction of tracked sources (not relevant) *)
+    | Block_fees, Credited _, Block_application
+    | Baking_rewards, Credited _, Block_application
+    | Baking_bonuses, Credited _, Block_application
+    | Attesting_rewards, Credited _, Block_application
+    | Dal_attesting_rewards, Credited _, Block_application ->
+        None
+    (* Block_application - Reverse direction of tracked destinations (not relevant) *)
+    | Contract _, Debited _, Block_application
+    | Deposits _, Debited _, Block_application
+    | Lost_attesting_rewards _, Debited _, Block_application
+    | Lost_dal_attesting_rewards _, Debited _, Block_application ->
+        None
+    (* Block_application - Non-tracked tez balance types *)
+    | Nonce_revelation_rewards, _, Block_application
+    | Storage_fees, _, Block_application
+    | Double_signing_punishments, _, Block_application
+    | Liquidity_baking_subsidies, _, Block_application
+    | Burned, _, Block_application
+    | Bootstrap, _, Block_application
+    | Invoice, _, Block_application
+    | Initial_commitments, _, Block_application
+    | Minted, _, Block_application
+    | Sc_rollup_refutation_punishments, _, Block_application
+    | Sc_rollup_refutation_rewards, _, Block_application ->
+        None
+    | Commitments _, _, Block_application
+    | Unstaked_deposits _, _, Block_application
+    | Frozen_bonds _, _, Block_application ->
+        None
+    (* Block_application - Staking pseudotokens (not tez, not tracked) *)
+    | Staking_delegator_numerator _, _, Block_application
+    | Staking_delegate_denominator _, _, Block_application ->
+        None
+    (* Other origins - not tracked *)
     | _, _, (Protocol_migration | Subsidy | Simulation | Delayed_operation _) ->
-        None (* TODO *)
+        None
+
+  let category_of_update = function
+    | Block_fees -> Some Data.Balance_update.Block_fees
+    | Block_rewards -> Some Data.Balance_update.Baking_rewards
+    | Block_bonuses -> Some Data.Balance_update.Baking_bonuses
+    | Attestation_rewards -> Some Data.Balance_update.Attestation_rewards
+    | Dal_attestation_rewards ->
+        Some Data.Balance_update.Dal_attestation_rewards
+    | Contract _ | Baker _ | Staker _ | Shared _ | Edge _ | Lost_attestation _
+    | Lost_dal_attestation _ ->
+        None
+
+  let destination_of_update = function
+    | Contract (Implicit address) ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash address,
+            Data.Balance_update.Contract )
+    | Contract (Originated _) -> None
+    | Baker delegate ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash delegate,
+            Data.Balance_update.Baker_own_stake )
+    | Staker (Implicit pkh, _delegate) ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash pkh,
+            Data.Balance_update.Staker )
+    | Staker (Originated _, _) -> None
+    | Shared delegate ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash delegate,
+            Data.Balance_update.Delegate )
+    | Edge delegate ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash delegate,
+            Data.Balance_update.Baker_edge )
+    | Lost_attestation addr ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash addr,
+            Data.Balance_update.Lost )
+    | Lost_dal_attestation addr ->
+        Some
+          ( Tezos_crypto.Signature.Of_V2.public_key_hash addr,
+            Data.Balance_update.Lost )
+    | Block_fees | Block_rewards | Block_bonuses | Attestation_rewards
+    | Dal_attestation_rewards ->
+        None
 
   let get_balance_updates
       (balance_updates :
@@ -82,22 +161,22 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           acc (* balance update should have a credited and debited operations *)
       | b1 :: (b2 :: _ as rest) -> (
           match (get_balance_update b1, get_balance_update b2) with
-          | ( Some (Block_fees, debited),
-              Some (Contract (Implicit address), credited) )
-            when debited = credited ->
-              let acc =
-                {
-                  Data.Balance_update.address =
-                    Tezos_crypto.Signature.Of_V2.public_key_hash address;
-                  category = Block_fees;
-                  result = Contract;
-                  value = credited;
-                }
-                :: acc
-              in
-              fold acc rest
-          | None, None -> fold acc rest
-          | _, _ -> fold acc rest)
+          | Some (source, debited), Some (dest, credited) -> (
+              match (category_of_update source, destination_of_update dest) with
+              | Some category, Some (address, result) when debited = credited ->
+                  let acc =
+                    {
+                      Data.Balance_update.address;
+                      category;
+                      result;
+                      value = credited;
+                    }
+                    :: acc
+                  in
+                  fold acc rest
+              | Some _, Some _ | Some _, None | None, Some _ | None, None ->
+                  fold acc rest)
+          | Some _, None | None, Some _ | None, None -> fold acc rest)
     in
     fold [] balance_updates
 

@@ -50,7 +50,13 @@ module Balance_update = struct
              (fun () -> Dal_attestation_rewards);
          ]
 
-  type result = Lost | Contract | Delegate | Baker_own_stake | Baker_edge
+  type result =
+    | Lost
+    | Contract
+    | Delegate
+    | Baker_own_stake
+    | Baker_edge
+    | Staker
 
   let result_encoding =
     let open Data_encoding in
@@ -87,6 +93,12 @@ module Balance_update = struct
              unit
              (function Baker_edge -> Some () | _ -> None)
              (fun () -> Baker_edge);
+           case
+             (Tag 5)
+             ~title:"Staker"
+             unit
+             (function Staker -> Some () | _ -> None)
+             (fun () -> Staker);
          ]
 
   type balance_update = {
@@ -129,7 +141,8 @@ module Balance_update = struct
       | Contract -> "Contract"
       | Delegate -> "Delegate"
       | Baker_own_stake -> "Baker_own_stake"
-      | Baker_edge -> "Baker_edge")
+      | Baker_edge -> "Baker_edge"
+      | Staker -> "Staker")
 
   let pp_balance_update fmt {address; category; result; value} =
     Format.fprintf
