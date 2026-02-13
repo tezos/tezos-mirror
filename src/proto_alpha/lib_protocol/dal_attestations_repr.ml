@@ -570,7 +570,7 @@ module Accountability = struct
     @param ~ordered_delegates List of delegates in the committee
     @param ~attesters The set of delegates who attested
     @return A bitset where bit [i] is set if the [i]th delegate attested *)
-  let _attesters_to_bitset ~ordered_delegates ~attesters =
+  let attesters_to_bitset ~ordered_delegates ~attesters =
     (* Build index map: delegate -> index *)
     let delegate_to_index =
       List.fold_left_i
@@ -604,7 +604,7 @@ module Accountability = struct
     @param ~ordered_delegates list of delegates in the committee
     @param bitset The bitset where bit [i] indicates if the [i]th delegate attested
     @return A set of public key hashes of attesters *)
-  let _bitset_to_attesters ~ordered_delegates ~bitset =
+  let bitset_to_attesters ~ordered_delegates ~bitset =
     (* Build set from bitset indices *)
     List.fold_left_i
       (fun i acc delegate ->
@@ -616,6 +616,57 @@ module Accountability = struct
         if is_set then Signature.Public_key_hash.Set.add delegate acc else acc)
       Signature.Public_key_hash.Set.empty
       ordered_delegates
+
+  (** [attested_shards ~delegate_to_shard_count ~attesters] calculates the
+      total number of attested shards for a given set of attesters.
+
+      For each attester in [attesters], looks up its shard count in
+      [delegate_to_shard_count] and sums them.
+
+      @param delegate_to_shard_count map from delegate public key hash to the
+        number of shards assigned to that delegate
+      @param attesters the set of delegates who attested
+      @return the total number of attested shards *)
+  let attested_shards ~delegate_to_shard_count ~attesters =
+    (* Sum shards for delegates with bit set *)
+    Signature.Public_key_hash.Set.fold
+      (fun delegate acc ->
+        let shard_count =
+          match
+            Signature.Public_key_hash.Map.find delegate delegate_to_shard_count
+          with
+          | None -> 0
+          | Some n -> n
+        in
+        acc + shard_count)
+      attesters
+      0
+
+  (** [bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
+      ~ordered_delegates ~delegate_to_shard_count] reconstructs an
+      {!attestation_status} from a bitset representation and other necessary
+      information. *)
+  let _bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
+      ~ordered_delegates ~delegate_to_shard_count =
+    let attesters = bitset_to_attesters ~ordered_delegates ~bitset in
+    let attested_shards = attested_shards ~delegate_to_shard_count ~attesters in
+    let is_proto_attested =
+      is_threshold_reached ~threshold ~number_of_shards ~attested_shards
+    in
+    {
+      total_shards = number_of_shards;
+      attested_shards;
+      attesters;
+      is_proto_attested;
+    }
+
+  (** [attestation_status_to_bitset ~ordered_delegates attestation_status]
+      converts an {!attestation_status} to its bitset representation by
+      extracting the attester set and encoding it as a bitset according to the
+      delegate ordering in [ordered_delegates]. *)
+  let _attestation_status_to_bitset ~ordered_delegates attestation_status =
+    let {attesters; _} = attestation_status in
+    attesters_to_bitset ~ordered_delegates ~attesters
 end
 
 module Dal_dependent_signing = struct
