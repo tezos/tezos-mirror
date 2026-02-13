@@ -116,9 +116,14 @@ fn tezosx_transfer_tez<'a, Host: Runtime>(
     let alias = match get_alias(host, &source, RuntimeId::Ethereum)? {
         Some(alias) => alias,
         None => {
-            let source_bytes = source.to_bytes_vec();
+            let source_b58 = source.to_base58_check();
             let alias = registry
-                .generate_alias(host, &source_bytes, RuntimeId::Ethereum, context.clone())
+                .generate_alias(
+                    host,
+                    source_b58.as_bytes(),
+                    RuntimeId::Ethereum,
+                    context.clone(),
+                )
                 .map_err(|e| TransferError::GatewayError(e.to_string()))?;
             store_alias(host, &source, RuntimeId::Ethereum, &alias)?;
             alias

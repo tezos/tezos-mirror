@@ -1259,12 +1259,77 @@ let test_cross_runtime_transfer_from_evm_to_tz =
     ~transfer_amount:(Tez.of_int 100)
     ()
 
+let gateway_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw"
+
+let test_cross_runtime_transfer_to_evm =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime transfer from Tezos to EVM via gateway"
+    ~tags:["cross_runtime"; "transfer"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  let source = Constant.bootstrap5 in
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let transfer_amount = Tez.of_int 100 in
+  let transfer_amount_mutez = Tez.to_mutez transfer_amount in
+  (* Build a Tezos operation that calls the gateway KT1 to transfer
+     funds to an EVM address. The gateway expects a Micheline string
+     parameter containing the EVM destination address. *)
+  let* call_op =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~counter:1
+            ~source
+            (call
+               ~dest:gateway_address
+               ~amount:transfer_amount_mutez
+               ~arg:(`O [("string", `String evm_destination)])
+               ());
+        ])
+      client
+  in
+  (* Send the operation via the delayed inbox *)
+  let* _ =
+    Delayed_inbox.send_tezos_operation_to_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~tezosx_format:true
+      call_op
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  (* Check the EVM balance of the destination.
+     The gateway passes the raw mutez amount to the EVM bridge,
+     which credits it directly as the EVM balance. *)
+  let*@ balance = Rpc.get_balance ~address:evm_destination sequencer in
+  let expected_balance = Wei.of_string (string_of_int transfer_amount_mutez) in
+  Check.(
+    (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
   test_reveal [Alpha] ;
   test_transfer [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
+  test_cross_runtime_transfer_to_evm [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_get_balance [Alpha] ;
