@@ -558,7 +558,13 @@ module Accountability = struct
   (** A bitset representing attestations for a single slot.
       Bit i is set if the delegate at position i (in the cycle's stake
       distribution) attested this slot. *)
-  type _slot_attestation_bitset = Bitset.t
+  type slot_attestation_bitset = Bitset.t
+
+  (** Compressed representation of the attestation history, using bitsets
+      instead of explicit attester sets. Maps published levels to slot-indexed
+      bitsets, where each bitset encodes which delegates attested a given slot
+      based on their position in the committee ordering. *)
+  type packed_history = slot_attestation_bitset SlotMap.t PublishedLevelMap.t
 
   (** [attesters_to_bitset ~ordered_delegates ~attesters] converts a set
     of attester public key hashes to a bitset representation.
@@ -668,21 +674,29 @@ module Accountability = struct
     let {attesters; _} = attestation_status in
     attesters_to_bitset ~ordered_delegates ~attesters
 
-  (** Precondition: all levels in [stored_history] must have an entry in
-      [ordered_delegates_for_level] *)
+  (** Precondition: all published levels in [history] must have an entry in
+      [committee_level_map] and the corresponding committee level must have an
+      entry in [ordered_delegates_for_level].  *)
   let unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
-      ~threshold ~number_of_shards ~committee_level_of_published_level
-      stored_history =
+      ~threshold ~number_of_shards ~committee_level_map stored_history =
     PublishedLevelMap.(
       fold
         (fun published_level history_of_level decoded_history ->
           let shard_assignment_level =
-            committee_level_of_published_level published_level
+            match
+              Raw_level_repr.Map.find published_level committee_level_map
+            with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                   levels of [committee_level_map] *)
+                assert false
+            | Some level -> level
           in
           let ordered_delegates =
             match ordered_delegates_for_level ~shard_assignment_level with
             | None ->
-                (* Precondition ensure that we always have en entry for levels of the stored_history  *)
+                (* The precondition ensures that we always have an entry for
+                   levels of the [stored_history] *)
                 assert false
             | Some ordered_delegates -> ordered_delegates
           in
@@ -720,15 +734,22 @@ module Accountability = struct
       {!history} into a {!packed_history} by replacing each slot's attester set
       with its bitset representation.
 
-      Precondition: all levels in [history] must have an entry in
-      [ordered_delegates_for_level]. *)
-  let pack_history ~ordered_delegates_for_level
-      ~committee_level_of_published_level history =
+      Precondition: all published levels in [history] must have an entry in
+      [committee_level_map] and the corresponding committee level must have an
+      entry in [ordered_delegates_for_level].  *)
+  let pack_history ~ordered_delegates_for_level ~committee_level_map history =
     PublishedLevelMap.(
       fold
         (fun published_level history_of_level history ->
           let shard_assignment_level =
-            committee_level_of_published_level published_level
+            match
+              Raw_level_repr.Map.find published_level committee_level_map
+            with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                 levels of [committee_level_map] *)
+                assert false
+            | Some level -> level
           in
           let ordered_delegates =
             match ordered_delegates_for_level ~shard_assignment_level with
@@ -752,6 +773,35 @@ module Accountability = struct
           add published_level encoded_history_of_level history)
         history
         empty)
+
+  (** Encoding for a single slot's attestation bitset. *)
+  let slot_attestation_encoding = Bitset.encoding
+
+  (** Encoding for a single level's attestation data: a list of
+      (slot_index, bitset) pairs. *)
+  let level_attestations_encoding =
+    let open Data_encoding in
+    conv
+      (fun m -> Dal_slot_index_repr.Map.bindings m)
+      (fun bindings ->
+        List.fold_left
+          (fun m (k, v) -> Dal_slot_index_repr.Map.add k v m)
+          Dal_slot_index_repr.Map.empty
+          bindings)
+      (list (tup2 Dal_slot_index_repr.encoding slot_attestation_encoding))
+
+  (** Encoding for {!packed_history}: a list of
+      (published_level, level_attestations) pairs. *)
+  let packed_history_encoding =
+    let open Data_encoding in
+    conv
+      (fun m -> Raw_level_repr.Map.bindings m)
+      (fun bindings ->
+        List.fold_left
+          (fun m (k, v) -> Raw_level_repr.Map.add k v m)
+          Raw_level_repr.Map.empty
+          bindings)
+      (list (tup2 Raw_level_repr.encoding level_attestations_encoding))
 end
 
 module Dal_dependent_signing = struct

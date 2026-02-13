@@ -258,14 +258,22 @@ module Accountability : sig
   val history_encoding : history Data_encoding.t
 
   val empty_history : history
+
+  (** Compressed representation of the attestation history, using bitsets
+      instead of explicit attester sets. See {!unpack_history} and
+      {!pack_history} for conversion functions. *)
+  type packed_history
+
+  (** Encoding for {!packed_history}. *)
+  val packed_history_encoding : packed_history Data_encoding.t
+
   (** [unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
-      ~threshold ~number_of_shards ~committee_level_of_published_level
-      packed_history] converts a compact bitset-based [packed_history] into
-      the full map-based [history] representation.
+      ~threshold ~number_of_shards ~committee_level_map packed_history]
+      converts a compact bitset-based [packed_history] into the full map-based
+      [history] representation.
 
       For each published level in the [packed_history]:
-      - Computes the shard assignment level using
-        [committee_level_of_published_level]
+      - Looks up the shard assignment level in [committee_level_map]
       - Retrieves the ordered list of delegates for that level
       - Converts each slot's bitset back to a full [attestation_status]
         structure by expanding the bitset using the delegate ordering
@@ -277,8 +285,8 @@ module Accountability : sig
         list of delegates for a given shard assignment level
       - [threshold]: Attestation threshold percentage (e.g., 50 for 50%)
       - [number_of_shards]: Total number of shards in the system
-      - [committee_level_of_published_level]: Function to compute the shard
-        assignment level (committee level) from a published level
+      - [committee_level_map]: Map from published levels to the corresponding
+        shard assignment levels (committee levels)
 
       Precondition: all levels in [packed_history] must have an entry in
       [ordered_delegates_for_level]. *)
@@ -290,18 +298,16 @@ module Accountability : sig
       Signature.public_key_hash list option) ->
     threshold:int ->
     number_of_shards:int ->
-    committee_level_of_published_level:(Raw_level_repr.t -> Raw_level_repr.t) ->
+    committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
     packed_history ->
     history
 
-  (** [pack_history ~ordered_delegates_for_level
-      ~committee_level_of_published_level history] converts a full map-based
-      [history] into the compact bitset-based [packed_history] representation
-      for storage.
+  (** [pack_history ~ordered_delegates_for_level ~committee_level_map history]
+      converts a full map-based [history] into the compact bitset-based
+      [packed_history] representation for storage.
 
       For each published level in the [history]:
-      - Computes the shard assignment level using
-        [committee_level_of_published_level]
+      - Looks up the shard assignment level in [committee_level_map]
       - Retrieves the ordered list of delegates for that level
       - Converts each slot's [attestation_status] to a bitset by mapping
         each attester to their position in the ordered delegate list
@@ -309,8 +315,8 @@ module Accountability : sig
       Parameters:
       - [ordered_delegates_for_level]: Lookup function returning the ordered
         list of delegates for a given shard assignment level
-      - [committee_level_of_published_level]: Function to compute the shard
-        assignment level (committee level) from a published level
+      - [committee_level_map]: Map from published levels to the corresponding
+        shard assignment levels (committee levels)
 
       Precondition: all levels in [history] must have an entry in
       [ordered_delegates_for_level]. *)
@@ -318,7 +324,7 @@ module Accountability : sig
     ordered_delegates_for_level:
       (shard_assignment_level:Raw_level_repr.t ->
       Signature.public_key_hash list option) ->
-    committee_level_of_published_level:(Raw_level_repr.t -> Raw_level_repr.t) ->
+    committee_level_map:Raw_level_repr.t Raw_level_repr.Map.t ->
     history ->
     packed_history
 end
