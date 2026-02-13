@@ -378,4 +378,19 @@ module Internal_for_tests : sig
 
       Returns an error when the given argument is negative. *)
   val of_z : Z.t -> t tzresult
+
+  val attesters_to_bitset :
+    ordered_delegates:Signature.public_key_hash list ->
+    attesters:Signature.Public_key_hash.Set.t ->
+    Bitset.t
+
+  val bitset_to_attesters :
+    ordered_delegates:Signature.public_key_hash list ->
+    bitset:Bitset.t ->
+    Signature.Public_key_hash.Set.t
+
+  val attested_shards :
+    delegate_to_shard_count:int Signature.Public_key_hash.Map.t ->
+    attesters:Signature.Public_key_hash.Set.t ->
+    int
 end

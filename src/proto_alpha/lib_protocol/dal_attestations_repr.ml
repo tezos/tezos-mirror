@@ -839,4 +839,10 @@ end
 
 module Internal_for_tests = struct
   let of_z = Bitset.from_z
+
+  let attesters_to_bitset = Accountability.attesters_to_bitset
+
+  let bitset_to_attesters = Accountability.bitset_to_attesters
+
+  let attested_shards = Accountability.attested_shards
 end

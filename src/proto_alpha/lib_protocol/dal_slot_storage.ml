@@ -912,3 +912,7 @@ let finalize_pending_slot_headers ctxt =
     (* Normal path: use new multi-lag attestation history. *)
     finalize_attestation_history ctxt
   else finalize_and_migrate_attestation_history_for_U ctxt
+
+module Internal_for_tests = struct
+  let get_delegate_ordering = get_delegate_ordering
+end
