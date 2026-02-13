@@ -129,14 +129,18 @@ module Make_daemon (Agent : AGENT) :
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
     rpc_config : Tezos_rpc_http_client_unix.RPC_client_unix.config;
-    head_stream : string Lwt_stream.t;
+    head_stream :
+      (* we switch [head_stream] from [`Live] to [`Reconnecting] on
+         disconnections, and from [`Reconnecting] to [`Live] on reconnections *)
+      [ `Live of string Lwt_stream.t
+      | `Reconnecting of string Lwt_stream.t tzresult Lwt.t ];
   }
 
   type t = state
 
   (* ---- Baker Process Management ---- *)
 
-  let rec retry_on_disconnection ~emit node_addr f arg =
+  let rec retry_on_disconnection node_addr f arg =
     let open Lwt_result_syntax in
     let*! result = f arg in
     match result with
@@ -144,15 +148,21 @@ module Make_daemon (Agent : AGENT) :
     | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
         let* _level =
           Utils.retry
-            ~emit
+            ~emit:Events.(emit retry_on_disconnection)
             ~max_delay:10.
             ~delay:1.
             ~factor:1.5
+            ~msg:(fun errs ->
+              Format.asprintf
+                "agnostic daemon failed to reach the node at %s.@.%a"
+                node_addr
+                pp_print_trace
+                errs)
             ~is_error:(function Cannot_connect_to_node _ -> true | _ -> false)
             (fun node_addr -> Rpc_services.get_level ~node_addr)
             node_addr
         in
-        retry_on_disconnection ~emit node_addr f arg
+        retry_on_disconnection node_addr f arg
     | Error trace -> fail trace
 
   (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
@@ -403,6 +413,7 @@ module Make_daemon (Agent : AGENT) :
   type event =
     | New_head
     | Head_stream_ended
+    | Head_stream_reconnected of string Lwt_stream.t
     | Old_baker_stopped
     | Current_baker_stopped
 
@@ -425,9 +436,14 @@ module Make_daemon (Agent : AGENT) :
           Lwt_utils.never_ending ()
     in
     let head_stream =
-      Lwt.map
-        (function None -> Ok Head_stream_ended | Some _head -> Ok New_head)
-        (Lwt_stream.get state.head_stream)
+      match state.head_stream with
+      | `Live stream ->
+          Lwt.map
+            (function
+              | None -> Ok Head_stream_ended | Some _head -> Ok New_head)
+            (Lwt_stream.get stream)
+      | `Reconnecting promise ->
+          Lwt_result.map (fun stream -> Head_stream_reconnected stream) promise
     in
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
@@ -435,8 +451,15 @@ module Make_daemon (Agent : AGENT) :
         let* state = monitor_voting_periods ~state in
         return (Some state)
     | Head_stream_ended ->
-        let* head_stream = monitor_heads ~node_addr:state.node_endpoint in
-        return (Some {state with head_stream})
+        let reconnect_promise =
+          retry_on_disconnection
+            state.node_endpoint
+            (fun node_addr -> monitor_heads ~node_addr)
+            state.node_endpoint
+        in
+        return (Some {state with head_stream = `Reconnecting reconnect_promise})
+    | Head_stream_reconnected stream ->
+        return (Some {state with head_stream = `Live stream})
     | Old_baker_stopped -> (
         match state.old_baker with
         | None -> assert false
@@ -456,13 +479,7 @@ module Make_daemon (Agent : AGENT) :
 
   let rec main_loop state =
     let open Lwt_result_syntax in
-    let* result =
-      retry_on_disconnection
-        ~emit:(fun _ -> Lwt.return_unit)
-        state.node_endpoint
-        main_iteration
-        state
-    in
+    let* result = main_iteration state in
     match result with
     | None -> return_unit
     | Some next_state -> main_loop next_state
@@ -480,7 +497,6 @@ module Make_daemon (Agent : AGENT) :
     let* current_baker =
       if keep_alive then
         retry_on_disconnection
-          ~emit:(Events.emit Events.cannot_connect)
           node_addr
           (fun () ->
             may_start_initial_baker cctxt rpc_config command ~node_addr)
@@ -488,10 +504,8 @@ module Make_daemon (Agent : AGENT) :
       else may_start_initial_baker cctxt rpc_config command ~node_addr
     in
     let* head_stream =
-      (* Useful if the baker is started before the node or restarted while the
-         node is down. *)
+      (* Useful if the baker is started before the node. *)
       retry_on_disconnection
-        ~emit:(fun _ -> Lwt.return_unit)
         node_addr
         (fun node_addr -> monitor_heads ~node_addr)
         node_addr
@@ -505,7 +519,7 @@ module Make_daemon (Agent : AGENT) :
         command;
         cctxt;
         rpc_config;
-        head_stream;
+        head_stream = `Live head_stream;
       }
     in
     main_loop state

@@ -107,17 +107,6 @@ let period_status =
     ("period", string)
     ("remaining", int31)
 
-(* Error *)
-let cannot_connect =
-  declare_1
-    ~section
-    ~alternative_color
-    ~level:Error
-    ~name:"cannot_connect"
-    ~msg:"Cannot connect to node. {message}"
-    ~pp1:Format.pp_print_string
-    ("message", Data_encoding.string)
-
 (* Warning *)
 let node_version_check_bypass =
   declare_0
@@ -126,6 +115,16 @@ let node_version_check_bypass =
     ~level:Warning
     ~msg:"Compatibility between node version and baker version by passed"
     ()
+
+let retry_on_disconnection =
+  declare_1
+    ~section
+    ~alternative_color
+    ~level:Warning
+    ~name:"retry_on_disconnection"
+    ~msg:"{msg}"
+    ~pp1:Format.pp_print_string
+    ("msg", Data_encoding.string)
 
 (* Debug *)
 let node_version_check =
