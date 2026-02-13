@@ -17,6 +17,8 @@ type head = {
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
+  storage_version : int;
+  tezosx_runtimes : Tezosx.runtime list;
 }
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}

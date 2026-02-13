@@ -1090,6 +1090,18 @@ let profiling_arg =
        | "false" -> Lwt_result_syntax.return_false
        | s -> failwith "Invalid value %S for --profiling" s)
 
+let blueprint_version_arg =
+  let open Evm_node_lib_dev.Sequencer_blueprint in
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~doc:"Version of blueprint format to use."
+    ~long:"blueprint-version"
+    ~placeholder:"0"
+  @@ Tezos_clic.parameter (fun () -> function
+       | "0" -> return Legacy
+       | "1" -> return V1
+       | s -> failwith "Invalid blueprint version %S" s)
+
 let common_config_args =
   Tezos_clic.args24
     data_dir_arg
@@ -1713,11 +1725,12 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   let* messages =
     match kind with
-    | `Blueprint (signer, timestamp, number, parent_hash) ->
+    | `Blueprint (signer, timestamp, number, parent_hash, version) ->
         let chunks =
           Sequencer_blueprint.make_blueprint_chunks
             ~number:(Ethereum_types.quantity_of_z number)
             {
+              version = Option.value ~default:Sequencer_blueprint.Legacy version;
               parent_hash = Ethereum_types.block_hash_of_string parent_hash;
               delayed_transactions = [];
               transactions;
@@ -1811,7 +1824,7 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup."
-    (args10
+    (args11
        config_path_arg
        data_dir_arg
        rollup_address_arg
@@ -1821,7 +1834,8 @@ let chunker_command =
        parent_hash_arg
        sequencer_key_arg
        wallet_dir_arg
-       (Client_config.password_filename_arg ()))
+       (Client_config.password_filename_arg ())
+       blueprint_version_arg)
     (prefixes ["chunk"; "data"]
     @@ seq_of_param
     @@ param
@@ -1840,7 +1854,8 @@ let chunker_command =
            blueprint_parent_hash,
            sequencer_str,
            wallet_dir,
-           password_filename )
+           password_filename,
+           blueprint_version )
          data
          ()
        ->
@@ -1863,7 +1878,8 @@ let chunker_command =
             ( signer,
               blueprint_timestamp,
               blueprint_number,
-              blueprint_parent_hash )
+              blueprint_parent_hash,
+              blueprint_version )
         else return `Transaction
       in
       let data = List.flatten data in

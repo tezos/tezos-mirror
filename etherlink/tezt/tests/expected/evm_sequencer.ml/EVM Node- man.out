@@ -789,6 +789,7 @@ Kernel commands:
       [--number <0>]
       [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]
       [--sequencer-key <edsk...>] [-d --wallet-dir <path>] [-f --password-filename <filename>]
+      [--blueprint-version <0>]
     Chunk hexadecimal data according to the message representation of the EVM rollup.
     <data or file>: Data to prepare and chunk with the EVM rollup format. If the data is
       prefixed with `file:`, the content is read from the given filename and can contain a
@@ -816,6 +817,7 @@ Kernel commands:
       Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR` if it exists, or
       `$HOME/.tezos-client` otherwise.
     -f --password-filename <filename>: path to the password filename
+    --blueprint-version <0>: Version of blueprint format to use.
   
   make upgrade payload with root hash <kernel-id> at activation timestamp
       <activation_timestamp> [-f --password-filename <filename>] [-d --wallet-dir <path>]

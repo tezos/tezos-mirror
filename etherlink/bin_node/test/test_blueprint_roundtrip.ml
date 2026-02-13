@@ -66,12 +66,13 @@ let zero_hash =
 let smart_rollup_address =
   Tezos_crypto.Hashed.Smart_rollup_address.(zero |> to_string)
 
-let make_blueprint ~delayed_transactions ~transactions =
+let make_blueprint ~delayed_transactions ~transactions ~version =
   let cctxt = wallet () in
   let chunks =
     Sequencer_blueprint.make_blueprint_chunks
       ~number:(Qty Z.zero)
       {
+        version;
         parent_hash = zero_hash;
         delayed_transactions;
         transactions;
@@ -98,10 +99,13 @@ let hash_tez_block ~encode block_without_hash =
   let block_hash = Block_hash.hash_bytes [block_bytes] in
   Ethereum_types.decode_block_hash (Block_hash.to_bytes block_hash)
 
-let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions () =
+let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions ~version
+    () =
   register ~title:(sf "Blueprint producer decoder roundtrip (%s)" title)
   @@ fun () ->
-  let* blueprint = make_blueprint ~delayed_transactions ~transactions in
+  let* blueprint =
+    make_blueprint ~delayed_transactions ~transactions ~version
+  in
   let decoding_result =
     expect_ok "could not decode the blueprint"
     @@ Blueprint_decoder.transactions blueprint
@@ -306,37 +310,56 @@ let test_tez_legacy_block_roundtrip =
 
 let () =
   test_blueprint_roundtrip
-    ~title:"empty blueprint"
+    ~title:"empty legacy blueprint"
     ~delayed_transactions:[]
     ~transactions:[]
+    ~version:Legacy
     () ;
 
   test_blueprint_roundtrip
-    ~title:"only transactions"
+    ~title:"empty V1 blueprint"
+    ~delayed_transactions:[]
+    ~transactions:[]
+    ~version:V1
+    () ;
+
+  test_blueprint_roundtrip
+    ~title:"only transactions, legacy"
     ~delayed_transactions:[]
     ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~version:Legacy
     () ;
 
   test_blueprint_roundtrip
-    ~title:"only delayed transactions"
+    ~title:"only delayed transactions, legacy"
     ~delayed_transactions:
       [
         Ethereum_types.hash_raw_tx "txntxntxntxn";
         Ethereum_types.hash_raw_tx "txntxntxn";
       ]
     ~transactions:[]
+    ~version:Legacy
     () ;
 
   test_blueprint_roundtrip
-    ~title:"both delayed and regular transactions"
+    ~title:"both delayed and regular transactions, legacy"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
     ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~version:Legacy
+    () ;
+
+  test_blueprint_roundtrip
+    ~title:"both delayed and regular transactions, V1"
+    ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
+    ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~version:V1
     () ;
 
   test_blueprint_roundtrip
     ~title:"large transaction"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
     ~transactions:["txntxntxn"; "txntxntxntxn"; String.make 10_000 't']
+    ~version:Legacy
     () ;
 
   test_tez_latest_block_roundtrip ~title:"all zeros tez block"
