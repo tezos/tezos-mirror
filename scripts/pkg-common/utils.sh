@@ -126,7 +126,7 @@ getOctezVersion() {
   SoftRelease)
     RET=$TIMESTAMP+$(echo "${CI_COMMIT_TAG:-}" | tr '-' '_')
     ;;
-  Master | TestBranch)
+  Master | TestBranch | TestProtectedBranch)
     RET=$TIMESTAMP+$COMMIT_SHORT_SHA
     ;;
   *)

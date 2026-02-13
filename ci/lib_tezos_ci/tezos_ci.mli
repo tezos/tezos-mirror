@@ -674,6 +674,14 @@ module Images : sig
     (** The prefix of the path of the base images. *)
     val path_prefix : string
 
+    val debian_version : string
+
+    val rpm_version : string
+
+    val homebrew_version : string
+
+    val rust_toolchain_version : string
+
     val debian_unstable : Image.t
 
     val debian_bookworm : Image.t

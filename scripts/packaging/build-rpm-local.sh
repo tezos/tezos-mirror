@@ -31,7 +31,7 @@ SoftRelease)
   _EPOCH=1
   _CHANGELOG="Packages for tag ${CI_COMMIT_TAG:-}"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   _VERSION=$TIMESTAMP+$CI_COMMIT_SHORT_SHA
   _EPOCH=1
   _CHANGELOG="Test package commit ${CI_COMMIT_REF_NAME:-}"

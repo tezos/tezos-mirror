@@ -26,7 +26,7 @@ Master)
 SoftRelease)
   TARGETDIR="homebrew/${CI_COMMIT_TAG}/Formula"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   TARGETDIR="homebrew/$CI_COMMIT_REF_NAME/Formula"
   ;;
 *)

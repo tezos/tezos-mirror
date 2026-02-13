@@ -70,7 +70,7 @@ Master)
 SoftRelease)
   TARGETDIR="public/$PREFIX/${CI_COMMIT_TAG}/$DISTRIBUTION"
   ;;
-TestBranch)
+TestBranch | TestProtectedBranch)
   TARGETDIR="public/$PREFIX/$CI_COMMIT_REF_NAME/$DISTRIBUTION"
   ;;
 *)

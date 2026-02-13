@@ -695,6 +695,10 @@ module Image = struct
     image
 
   let image = function Internal {image; _} | External image -> image
+
+  let pp ppf img =
+    match image img with
+    | Image image_name -> Format.fprintf ppf "%s" image_name
 end
 
 module Changeset = struct
@@ -1351,7 +1355,8 @@ module Images_external = struct
      This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
   let docker =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1363,7 +1368,8 @@ module Images_external = struct
 
   let ci_release =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
+      ~image_path:
+        "${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
 
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
@@ -1516,36 +1522,50 @@ module Images = struct
   module Base_images = struct
     let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
-    let make_img distro =
-      Image.mk_external ~image_path:(sf "%s/%s" path_prefix distro)
+    let make_img distro version =
+      Image.mk_external ~image_path:(sf "%s/%s-%s" path_prefix distro version)
 
-    let debian_bookworm = make_img "debian:bookworm"
+    (* !20799 merge commit: https://gitlab.com/tezos/tezos/-/jobs/13098086521 *)
+    let common_version = "v24-backport-20662-daefb630"
 
-    let debian_trixie = make_img "debian:trixie"
+    let debian_version = common_version
 
-    let debian_unstable = make_img "debian:unstable"
+    let debian_bookworm = make_img "debian:bookworm" debian_version
 
-    let ubuntu_noble = make_img "ubuntu:noble"
+    let debian_trixie = make_img "debian:trixie" debian_version
 
-    let ubuntu_jammy = make_img "ubuntu:jammy"
+    let debian_unstable = make_img "debian:unstable" debian_version
 
-    let ubuntu_plucky = make_img "ubuntu:plucky"
+    let ubuntu_noble = make_img "ubuntu:noble" debian_version
 
-    let rockylinux_9_3 = make_img "rockylinux:9.3"
+    let ubuntu_jammy = make_img "ubuntu:jammy" debian_version
 
-    let rockylinux_9_6 = make_img "rockylinux:9.6"
+    let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
 
-    let rockylinux_10_0 = make_img "rockylinux:10.0"
+    let rpm_version = common_version
 
-    let fedora_39 = make_img "fedora:39"
+    let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
 
-    let fedora_41 = make_img "fedora:41"
+    let rockylinux_9_6 = make_img "rockylinux:9.6" rpm_version
 
-    let fedora_42 = make_img "fedora:42"
+    let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
 
-    let homebrew = make_img "debian-homebrew:trixie"
+    let fedora_39 = make_img "fedora:39" rpm_version
 
-    let rust_toolchain_trixie = make_img "debian-rust:trixie"
+    let fedora_41 = make_img "fedora:41" rpm_version
+
+    let fedora_42 = make_img "fedora:42" rpm_version
+
+    let homebrew_version = common_version
+
+    let homebrew = make_img "debian-homebrew:trixie" homebrew_version
+
+    let rust_toolchain_version = common_version
+
+    let rust_toolchain_trixie =
+      make_img "debian-rust:trixie" rust_toolchain_version
+
+    let pp = Image.pp
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)
@@ -1591,7 +1611,10 @@ module Images = struct
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~variables:
-          [("IMAGE", Base_images.path_prefix ^ "/debian-rust:unstable")]
+          [
+            ( "IMAGE",
+              Base_images.(Format.asprintf "%a" pp rust_toolchain_trixie) );
+          ]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())

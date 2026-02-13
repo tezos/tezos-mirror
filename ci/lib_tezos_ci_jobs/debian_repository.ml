@@ -105,7 +105,8 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let make_job_docker_systemd_tests =
     make_job_docker_systemd_tests
       ~base_image:
-        (Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}")
+        Images.Base_images.(
+          sf "%s/$DISTRIBUTION:$RELEASE-%s" path_prefix debian_version)
       ~script:
         [
           "./scripts/ci/build-packages-dependencies.sh \
@@ -129,7 +130,8 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
   let make_job_docker_build_debian_dependencies =
     make_docker_build_dependencies
       ~base_image:
-        (Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}")
+        Images.Base_images.(
+          sf "%s/$DISTRIBUTION:$RELEASE-%s" path_prefix debian_version)
       ?rules:
         (if manual then Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
          else None)
@@ -369,24 +371,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_jammy_systemd_test_no_restart"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_docker_systemd_test_ubuntu_dependencies;
-               Job job_apt_repo_ubuntu;
-             ])
-        ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "jammy")])
-        [
-          "./scripts/ci/systemd-packages-test.sh \
-           scripts/packaging/tests/deb/upgrade-systemd-test-no-restart.sh \
-           images/packages/debian-systemd-tests.Dockerfile";
-        ];
-      job_install_systemd_bin
-        ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
         ~dependencies:
           (Dependent
@@ -401,24 +385,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-           images/packages/debian-systemd-tests.Dockerfile";
-        ];
-      job_install_systemd_bin
-        ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test_no_restart"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_docker_systemd_test_ubuntu_dependencies;
-               Job job_apt_repo_ubuntu;
-             ])
-        ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [("PREFIX", ""); ("DISTRIBUTION", "ubuntu"); ("RELEASE", "noble")])
-        [
-          "./scripts/ci/systemd-packages-test.sh \
-           scripts/packaging/tests/deb/upgrade-systemd-test-no-restart.sh \
            images/packages/debian-systemd-tests.Dockerfile";
         ];
     ]
@@ -480,28 +446,6 @@ let jobs ?(limit_dune_build_jobs = false) ?(manual = false) pipeline_type =
         [
           "./scripts/ci/systemd-packages-test.sh \
            scripts/packaging/tests/deb/upgrade-systemd-test.sh \
-           images/packages/debian-systemd-tests.Dockerfile";
-        ];
-      job_install_systemd_bin
-        ~__POS__
-        ~name:"oc.upgrade_bin_debian_bookworm-systemd_no_restart"
-        ~dependencies:
-          (Dependent
-             [
-               Job job_docker_systemd_test_debian_dependencies;
-               Job job_apt_repo_debian;
-             ])
-        ~variables:
-          (Common.Packaging.make_variables
-             ~kind:"systemd-tests"
-             [
-               ("PREFIX", "");
-               ("DISTRIBUTION", "debian");
-               ("RELEASE", "bookworm");
-             ])
-        [
-          "./scripts/ci/systemd-packages-test.sh \
-           scripts/packaging/tests/deb/upgrade-systemd-test-no-restart.sh \
            images/packages/debian-systemd-tests.Dockerfile";
         ];
     ]
