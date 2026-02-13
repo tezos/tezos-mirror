@@ -1180,7 +1180,7 @@ module Dal : sig
   module AttestationHistory :
     Single_data_storage
       with type t := Raw_context.t
-       and type value = Dal_attestations_repr.Accountability.history
+       and type value = Dal_attestations_repr.Accountability.packed_history
 
   module Slot : sig
     (** This is a temporary storage for slot headers proposed onto the L1. The

@@ -2426,9 +2426,10 @@ module Dal = struct
         let name = ["attestation_history"]
       end)
       (struct
-        type t = Dal_attestations_repr.Accountability.history
+        type t = Dal_attestations_repr.Accountability.packed_history
 
-        let encoding = Dal_attestations_repr.Accountability.history_encoding
+        let encoding =
+          Dal_attestations_repr.Accountability.packed_history_encoding
       end)
 
   module Slot = struct

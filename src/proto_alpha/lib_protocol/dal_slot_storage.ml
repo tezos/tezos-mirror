@@ -604,7 +604,7 @@ let committee_level_of_published_levels ctxt published_levels =
     - computing committee levels for each published level,
     - fetching ordered delegates and shard counts for each committee level,
     - delegating to {!Dal_attestations_repr.Accountability.unpack_history}. *)
-let _unpack_history ctxt ~threshold ~number_of_shards
+let unpack_history ctxt ~threshold ~number_of_shards
     (stored_history : Dal_attestations_repr.Accountability.packed_history) :
     (Raw_context.t * Dal_attestations_repr.Accountability.history) tzresult
     Lwt.t =
@@ -650,7 +650,7 @@ let _unpack_history ctxt ~threshold ~number_of_shards
     - computing committee levels for each published level,
     - fetching ordered delegates for each committee level,
     - delegating to {!Dal_attestations_repr.Accountability.pack_history}. *)
-let _pack_history ctxt history =
+let pack_history ctxt history =
   let open Lwt_result_syntax in
   let published_levels =
     Raw_level_repr.Map.fold (fun level _ acc -> level :: acc) history []
@@ -690,10 +690,11 @@ let finalize_attestation_history ctxt =
   let number_of_shards = dal.cryptobox_parameters.number_of_shards in
   let current_block_accountability = Raw_context.Dal.get_accountability ctxt in
   let* stored_history_opt = Storage.Dal.AttestationHistory.find ctxt in
-  let stored_history =
-    Option.value
-      ~default:Dal_attestations_repr.Accountability.empty_history
-      stored_history_opt
+  let* ctxt, stored_history =
+    match stored_history_opt with
+    | None -> return (ctxt, Dal_attestations_repr.Accountability.empty_history)
+    | Some stored_history ->
+        unpack_history ctxt ~threshold ~number_of_shards stored_history
   in
   let get_number_of_shards = get_number_of_shards ctxt in
   let updated_history, newly_attested =
@@ -741,6 +742,7 @@ let finalize_attestation_history ctxt =
             Raw_level_repr.(published_level > threshold_level))
           updated_history
   in
+  let* ctxt, pruned_history = pack_history ctxt pruned_history in
   let*! ctxt = Storage.Dal.AttestationHistory.add ctxt pruned_history in
   let*! ctxt =
     match Raw_level_repr.sub current_level attestation_lag with
