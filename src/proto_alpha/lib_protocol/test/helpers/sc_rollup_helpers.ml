@@ -574,6 +574,11 @@ module Node_inbox = struct
     let payloads_histories = Payloads_histories.empty in
     return {inbox; history; payloads_histories}
 
+  (** [fill_inbox ~inbox_creation_level node_inbox payloads_per_levels]
+      incrementally adds the given [payloads_per_levels] to [node_inbox].
+      Can be called multiple times on an existing inbox to append new
+      levels, e.g. to keep the local inbox in sync with the on-chain
+      inbox after baking additional blocks. *)
   let fill_inbox ~inbox_creation_level node_inbox payloads_per_levels =
     let open Result_wrap_syntax in
     let rec aux {inbox; history; payloads_histories} = function
