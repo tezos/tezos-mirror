@@ -674,6 +674,11 @@ module Accountability = struct
     let {attesters; _} = attestation_status in
     attesters_to_bitset ~ordered_delegates ~attesters
 
+  (** [levels_of_packed_history h] returns the list of published levels present
+      in the packed history [h]. *)
+  let levels_of_packed_history h =
+    Raw_level_repr.Map.fold (fun level _ acc -> level :: acc) h []
+
   (** Precondition: all published levels in [history] must have an entry in
       [committee_level_map] and the corresponding committee level must have an
       entry in [ordered_delegates_for_level].  *)

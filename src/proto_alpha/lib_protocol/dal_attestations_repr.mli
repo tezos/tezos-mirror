@@ -267,6 +267,11 @@ module Accountability : sig
   (** Encoding for {!packed_history}. *)
   val packed_history_encoding : packed_history Data_encoding.t
 
+  (** [levels_of_packed_history h] returns the list of published levels present
+      in the packed history [h]. The order is not specified and should not be
+      relied on. *)
+  val levels_of_packed_history : packed_history -> Raw_level_repr.t list
+
   (** [unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
       ~threshold ~number_of_shards ~committee_level_map packed_history]
       converts a compact bitset-based [packed_history] into the full map-based
