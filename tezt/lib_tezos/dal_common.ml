@@ -441,6 +441,7 @@ module Dal_RPC = struct
     | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
+    | Not_found
 
   type slot_header = {
     slot_level : int;
@@ -454,6 +455,7 @@ module Dal_RPC = struct
     | Attested lag -> Format.fprintf fmt "Attested(lag:%d)" lag
     | Unattested -> Format.fprintf fmt "Unattested"
     | Unpublished -> Format.fprintf fmt "Unpublished"
+    | Not_found -> Format.pp_print_string fmt "Not_found"
 
   let slot_id_status_of_json =
     let legacy_attestation_lag = 8 in

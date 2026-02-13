@@ -2028,7 +2028,7 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
   unit
 
 (** This function checks that the status of the slot at
-    [(~slot_level, ~slot_index)] on [dal_node] matches [?expected_status].
+    [(~slot_level, ~slot_index)] on [dal_node] matches [~expected_status].
 
     [?check_attested_lag] controls how the lag value is compared when both
     the actual and expected statuses are [Attested]. This is particularly
@@ -2041,11 +2041,18 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
 
     For non-[Attested] statuses, [?check_attested_lag] has no effect and exact
     equality is always used. *)
-let check_slot_status ~__LOC__ ?expected_status ?(check_attested_lag = `Exact)
+let check_slot_status ~__LOC__ ~expected_status ?(check_attested_lag = `Exact)
     dal_node ~slot_level ~slot_index =
   match expected_status with
-  | None -> unit
-  | Some expected_status ->
+  | Dal_RPC.Not_found ->
+      (* DAL node has no record for this slot. *)
+      let* response =
+        Dal_RPC.(
+          call_raw dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+      in
+      RPC_core.check_string_response ~code:404 response ;
+      unit
+  | _ ->
       let* status =
         Dal_RPC.(call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
       in
@@ -2069,12 +2076,12 @@ let check_slot_status ~__LOC__ ?expected_status ?(check_attested_lag = `Exact)
           expected_status ;
       unit
 
-let check_slots_statuses ~__LOC__ ?expected_status ?check_attested_lag dal_node
+let check_slots_statuses ~__LOC__ ~expected_status ?check_attested_lag dal_node
     ~slot_level slots_info =
   let test (slot_index, _commitment) =
     check_slot_status
       ~__LOC__
-      ?expected_status
+      ~expected_status
       ?check_attested_lag
       dal_node
       ~slot_level
@@ -2125,6 +2132,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   (* because headers are stored based on information from finalized blocks *)
   let* () =
     check_slots_statuses
+      ~expected_status:Dal_RPC.Not_found
       dal_node
       ~slot_level:level
       ~__LOC__
@@ -2145,6 +2153,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let* () =
     check_slots_statuses
       dal_node
+      ~expected_status:Dal_RPC.Not_found
       ~slot_level:level
       ~__LOC__
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
@@ -2164,9 +2173,9 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
        period is not over, so they are not yet present in the skip-list. *)
     check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let check_slots_statuses ?expected_status ?check_attested_lag l =
+  let check_slots_statuses ~expected_status ?check_attested_lag l =
     check_slots_statuses
-      ?expected_status
+      ~expected_status
       ?check_attested_lag
       dal_node
       ~slot_level:pub_level
@@ -2185,7 +2194,12 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
       ok
   in
   (* slot_2_a is not selected. *)
-  let* () = check_slots_statuses ~__LOC__ [slot2_a] in
+  let* () =
+    check_slots_statuses
+      ~expected_status:Dal_RPC.Waiting_attestation
+      ~__LOC__
+      [slot2_a]
+  in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
 
@@ -2227,14 +2241,26 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
   (* Slots that were waiting for attestation and now unattested. *)
-  let* () = check_slots_statuses ~__LOC__ unattested in
+  let* () =
+    check_slots_statuses ~expected_status:Dal_RPC.Unattested ~__LOC__ unattested
+  in
   (* slot2_a is still not selected. *)
-  let* () = check_slots_statuses ~__LOC__ [slot2_a] in
+  let* () =
+    check_slots_statuses
+      ~expected_status:(Dal_RPC.Attested lag)
+      ~check_attested_lag:`At_most
+      ~__LOC__
+      [slot2_a]
+  in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
-  let* () = check_slots_statuses ~__LOC__ [slot3] in
+  let* () =
+    check_slots_statuses ~expected_status:Dal_RPC.Unpublished ~__LOC__ [slot3]
+  in
   (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
-  let* () = check_slots_statuses ~__LOC__ [slot4] in
+  let* () =
+    check_slots_statuses ~expected_status:Dal_RPC.Unpublished ~__LOC__ [slot4]
+  in
   (* The number of stored slots has not changed. *)
   let* () =
     check_stored_level_headers
