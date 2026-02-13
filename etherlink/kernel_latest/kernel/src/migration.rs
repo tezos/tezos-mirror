@@ -777,6 +777,29 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V49 => {
             // Starting version 49, the kernel produce blocks for Michelson Runtime
             // when TezosX feature is activated.
+
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V50 => {
+            // Starting version 50, the sequencer upgrade is stored in the world state, and the sequencer key
+            // is also stored in the world state. We move them from their legacy location to the new one.
+            let legacy_sequencer_upgrade =
+                RefPath::assert_from(b"/evm/sequencer_upgrade");
+            let legacy_sequencer_key = RefPath::assert_from(b"/evm/sequencer");
+
+            // The sequencer upgrade path only exists when a governance sequencer
+            // upgrade is pending. It is not always present.
+            if host.store_has(&legacy_sequencer_upgrade)?.is_some() {
+                host.store_move(
+                    &legacy_sequencer_upgrade,
+                    &RefPath::assert_from(b"/evm/world_state/sequencer_upgrade"),
+                )?;
+            }
+            host.store_move(
+                &legacy_sequencer_key,
+                &RefPath::assert_from(b"/evm/world_state/sequencer"),
+            )?;
+
             Ok(MigrationStatus::Done)
         }
     }

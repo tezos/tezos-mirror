@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 49.
+Its storage version is 50.
 
 ### Features
 
@@ -22,6 +22,11 @@ Its storage version is 49.
 ### Bug fixes
 
 ### Internal
+
+- Migrate the sequencer key and sequencer upgrade paths to the world state.
+  The sequencer key moves from `/evm/sequencer` to `/evm/world_state/sequencer`
+  and the sequencer upgrade from `/evm/sequencer_upgrade` to
+  `/evm/world_state/sequencer_upgrade`. Storage version bumped to V50.
 
 ### Tezos X Experimental Features
 
