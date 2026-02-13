@@ -646,7 +646,7 @@ module Accountability = struct
       ~ordered_delegates ~delegate_to_shard_count] reconstructs an
       {!attestation_status} from a bitset representation and other necessary
       information. *)
-  let _bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
+  let bitset_to_attestation_status ~threshold ~number_of_shards ~bitset
       ~ordered_delegates ~delegate_to_shard_count =
     let attesters = bitset_to_attesters ~ordered_delegates ~bitset in
     let attested_shards = attested_shards ~delegate_to_shard_count ~attesters in
@@ -664,9 +664,94 @@ module Accountability = struct
       converts an {!attestation_status} to its bitset representation by
       extracting the attester set and encoding it as a bitset according to the
       delegate ordering in [ordered_delegates]. *)
-  let _attestation_status_to_bitset ~ordered_delegates attestation_status =
+  let attestation_status_to_bitset ~ordered_delegates attestation_status =
     let {attesters; _} = attestation_status in
     attesters_to_bitset ~ordered_delegates ~attesters
+
+  (** Precondition: all levels in [stored_history] must have an entry in
+      [ordered_delegates_for_level] *)
+  let unpack_history ~delegate_to_shard_count ~ordered_delegates_for_level
+      ~threshold ~number_of_shards ~committee_level_of_published_level
+      stored_history =
+    PublishedLevelMap.(
+      fold
+        (fun published_level history_of_level decoded_history ->
+          let shard_assignment_level =
+            committee_level_of_published_level published_level
+          in
+          let ordered_delegates =
+            match ordered_delegates_for_level ~shard_assignment_level with
+            | None ->
+                (* Precondition ensure that we always have en entry for levels of the stored_history  *)
+                assert false
+            | Some ordered_delegates -> ordered_delegates
+          in
+          let delegate_to_shard_count =
+            match
+              Raw_level_repr.Map.find
+                shard_assignment_level
+                delegate_to_shard_count
+            with
+            | None -> Signature.Public_key_hash.Map.empty
+            | Some map -> map
+          in
+          let decoded_history_of_level =
+            Dal_slot_index_repr.Map.(
+              fold
+                (fun slot_index bitset acc ->
+                  let attestation_status =
+                    bitset_to_attestation_status
+                      ~threshold
+                      ~number_of_shards
+                      ~bitset
+                      ~ordered_delegates
+                      ~delegate_to_shard_count
+                  in
+                  add slot_index attestation_status acc)
+                history_of_level
+                empty)
+          in
+          add published_level decoded_history_of_level decoded_history)
+        stored_history
+        empty)
+
+  (** [pack_history ~ordered_delegates_for_level
+      ~committee_level_of_published_level history] converts an unpacked
+      {!history} into a {!packed_history} by replacing each slot's attester set
+      with its bitset representation.
+
+      Precondition: all levels in [history] must have an entry in
+      [ordered_delegates_for_level]. *)
+  let pack_history ~ordered_delegates_for_level
+      ~committee_level_of_published_level history =
+    PublishedLevelMap.(
+      fold
+        (fun published_level history_of_level history ->
+          let shard_assignment_level =
+            committee_level_of_published_level published_level
+          in
+          let ordered_delegates =
+            match ordered_delegates_for_level ~shard_assignment_level with
+            | None ->
+                (* The precondition ensures that we always have an entry for
+                   levels of [history] *)
+                assert false
+            | Some ordered_delegates -> ordered_delegates
+          in
+          let encoded_history_of_level =
+            Dal_slot_index_repr.Map.(
+              fold
+                (fun slot_index status acc ->
+                  let attestation_status =
+                    attestation_status_to_bitset ~ordered_delegates status
+                  in
+                  add slot_index attestation_status acc)
+                history_of_level
+                empty)
+          in
+          add published_level encoded_history_of_level history)
+        history
+        empty)
 end
 
 module Dal_dependent_signing = struct
