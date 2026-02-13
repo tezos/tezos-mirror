@@ -531,7 +531,7 @@ oc.build_amd64-extra-exp:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-backport-20662-daefb630
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-release-2642faac
   stage: build
   tags:
   - gcp

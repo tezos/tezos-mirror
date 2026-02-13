@@ -56,7 +56,7 @@ oc.docker:rust-toolchain:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
-    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-backport-20662-daefb630
+    IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-release-2642faac
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
@@ -760,7 +760,7 @@ oc.build_amd64-extra-exp:
     when: on_success
 
 oc.build_kernels:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-backport-20662-daefb630
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-v24-release-2642faac
   stage: build
   tags:
   - gcp
