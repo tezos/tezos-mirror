@@ -232,8 +232,8 @@
   Sc_rollup_storage
   Sc_rollup_stake_storage
   Dal_storage
-  Dal_slot_storage
   Dal_attestations_storage
+  Dal_slot_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
   Address_registry_storage
@@ -545,8 +545,8 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_storage.ml dal_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli
@@ -859,8 +859,8 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_storage.ml dal_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli
@@ -1157,8 +1157,8 @@
   sc_rollup_storage.ml sc_rollup_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   dal_storage.ml dal_storage.mli
-  dal_slot_storage.ml dal_slot_storage.mli
   dal_attestations_storage.ml
+  dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
   address_registry_storage.ml address_registry_storage.mli

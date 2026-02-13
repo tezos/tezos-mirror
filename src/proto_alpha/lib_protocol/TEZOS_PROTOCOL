@@ -220,8 +220,8 @@
         "Sc_rollup_stake_storage",
 
         "Dal_storage",
-        "Dal_slot_storage",
         "Dal_attestations_storage",
+        "Dal_slot_storage",
 
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
@@ -286,7 +286,7 @@
         "Clst_contract_storage",
         "Script_interpreter_defs",
         "Script_interpreter_errors",
-	"Clst_events",
+        "Clst_events",
         "Script_native",
         "Script_interpreter",
         "Sc_rollup_management_protocol",
