@@ -228,7 +228,10 @@ pub fn fetch_blueprints<Host: Runtime>(
 mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
-        chains::{test_chain_config, test_evm_chain_config, ChainHeaderTrait},
+        chains::{
+            test_chain_config, test_evm_chain_config, ChainHeaderTrait,
+            ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        },
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -644,7 +647,7 @@ mod tests {
         };
 
         // The dummy chunk in the inbox is registered at block 10
-        store_current_number(&mut host, &chain_config.storage_root_path(), U256::from(9))
+        store_current_number(&mut host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH, U256::from(9))
             .unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")

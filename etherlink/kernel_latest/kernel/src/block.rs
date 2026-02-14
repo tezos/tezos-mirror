@@ -407,7 +407,11 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 
     let mut safe_host = SafeStorage {
         host,
-        world_state: OwnedPath::from(&chain_config.storage_root_path()),
+        world_states: chain_config
+            .storage_root_paths()
+            .iter()
+            .map(OwnedPath::from)
+            .collect(),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
 
@@ -979,7 +983,7 @@ mod tests {
         // We need to store something at the tezlink root path,
         // otherwise the copy of the root done by the safe storage will fail
         let path = concat(
-            &chain_config.storage_root_path(),
+            &TEZLINK_SAFE_STORAGE_ROOT_PATH,
             &RefPath::assert_from(b"/fee"),
         )
         .expect("Path concatenation should have succeeded");
@@ -1084,6 +1088,15 @@ mod tests {
 
         let mut host = MockKernelHost::default();
 
+        // Store bootstrap2 in the tezlink context to ensure the
+        // Tezlink context is not empty and can thus be backed up
+        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeed");
+
         let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
 
@@ -1135,6 +1148,15 @@ mod tests {
         use tezosx_tezos_runtime::account::{set_tezos_account_info, TezosAccountInfo};
 
         let mut host = MockKernelHost::default();
+
+        // Store bootstrap2 in the tezlink context to ensure the
+        // Tezlink context is not empty and can thus be backed up
+        context::TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("TezlinkContext creation should have succeed")
+            .implicit_from_public_key_hash(&bootstrap2().pkh)
+            .expect("Account interface should be correct")
+            .allocate(&mut host)
+            .expect("Contract initialization should have succeed");
 
         let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
         let mut config = dummy_configuration();
@@ -2102,7 +2124,11 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+            world_states: chain_config
+                .storage_root_paths()
+                .iter()
+                .map(OwnedPath::from)
+                .collect(),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
@@ -2200,7 +2226,11 @@ mod tests {
         // The block is in progress, therefore it is in the safe storage.
         let safe_host = SafeStorage {
             host: &mut host,
-            world_state: OwnedPath::from(&chain_config.storage_root_path()),
+            world_states: chain_config
+                .storage_root_paths()
+                .iter()
+                .map(OwnedPath::from)
+                .collect(),
         };
         let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
