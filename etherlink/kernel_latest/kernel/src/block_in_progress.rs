@@ -38,6 +38,7 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
+use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
@@ -496,6 +497,8 @@ impl BlockInProgress {
 
         if enable_tezos_runtime {
             let tez_block = TezBlock::new(
+                TARGET_TEZOS_PROTOCOL,
+                TARGET_TEZOS_PROTOCOL,
                 block_constants.michelson_runtime_block_constants.level,
                 self.timestamp,
                 self.tezos_parent_hash,

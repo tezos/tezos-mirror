@@ -397,6 +397,7 @@ pub trait ChainConfigTrait: Debug {
         host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
+        chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
         Host: StorageV1 + Logging;
@@ -685,6 +686,7 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
+        _chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
         Host: StorageV1 + Logging,
@@ -1080,12 +1082,35 @@ impl ChainConfigTrait for MichelsonChainConfig {
         host: &mut Host,
         block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
+        chain_header: Self::ChainHeader,
     ) -> anyhow::Result<L2Block>
     where
         Host: StorageV1 + Logging,
     {
+        // After a protocol upgrade, the first block has
+        // chain_header.next_protocol != TARGET_TEZOS_PROTOCOL (it still
+        // reflects the old protocol). In that case the block must be empty
+        // since we cannot execute transactions from the previous protocol.
+        anyhow::ensure!(
+            chain_header.next_protocol == TARGET_TEZOS_PROTOCOL
+                || block_in_progress
+                    .cumulative_tezos_operation_receipts
+                    .list
+                    .is_empty(),
+            "Non-empty block with mismatched protocol: expected {:?} or empty block, \
+             got protocol {:?} with {} operations",
+            TARGET_TEZOS_PROTOCOL,
+            chain_header.next_protocol,
+            block_in_progress
+                .cumulative_tezos_operation_receipts
+                .list
+                .len()
+        );
+
         // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(
+            chain_header.next_protocol,
+            TARGET_TEZOS_PROTOCOL,
             block_constants.level,
             block_in_progress.timestamp,
             block_in_progress.ethereum_parent_hash,

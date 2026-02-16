@@ -298,6 +298,7 @@ pub fn compute_bip<Host, ChainConfig: ChainConfigTrait>(
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
     coinbase: H160,
+    chain_header: ChainConfig::ChainHeader,
 ) -> anyhow::Result<BlockComputationResult>
 where
     Host: StorageV1 + Logging + WithGas,
@@ -330,7 +331,7 @@ where
                 block_in_progress.queue_length(),
             )?;
             let new_block = chain_config
-                .finalize_and_store(host, block_in_progress, &constants)
+                .finalize_and_store(host, block_in_progress, &constants, chain_header)
                 .context("Failed to finalize the block in progress")?;
             Ok(BlockComputationResult::Finished {
                 included_delayed_transactions,
@@ -454,6 +455,8 @@ where
 
     let registry = chain_config.init_registry();
 
+    let (next_bip_number, timestamp, chain_header) =
+        get_next_bip_info::<Host, ChainConfig>(safe_host.host);
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
         match read_block_in_progress(&safe_host)? {
@@ -465,9 +468,6 @@ where
                 // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
                 // because the sequencer pool address is located outside of `/evm/world_state`.
                 upgrade::possible_sequencer_upgrade(safe_host.host)?;
-
-                let (next_bip_number, timestamp, chain_header) =
-                    get_next_bip_info::<Host, ChainConfig>(safe_host.host);
 
                 log!(safe_host, Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
@@ -510,6 +510,7 @@ where
         tracer_input,
         da_fee_per_byte,
         coinbase,
+        chain_header,
     );
 
     match computation_result {
