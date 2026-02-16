@@ -157,7 +157,8 @@ let send_tezos_op_to_delayed_inbox_and_wait ~sc_rollup_address ~sc_rollup_node
       ~l1_contracts
       ~tezosx_format:true
       operation
-  and* () =
+  in
+  let* () =
     Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
       ~sequencer
       ~sc_rollup_node
