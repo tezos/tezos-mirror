@@ -240,7 +240,9 @@ pub fn handle_run_transaction<Host: Runtime>(
                     &safe_host,
                     &crate::chains::TEZOS_BLOCKS_PATH,
                 )
-                .unwrap_or_else(|_| tezos_tezlink::block::TezBlock::genesis_block_hash()),
+                .unwrap_or_else(|_| {
+                    H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
+                }),
             }
         }
     };

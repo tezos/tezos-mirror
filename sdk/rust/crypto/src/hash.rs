@@ -74,7 +74,12 @@ mod prefix_bytes {
 }
 
 pub trait HashTrait<const N: usize>:
-    Into<Vec<u8>> + Into<[u8; N]> + AsRef<[u8]> + std::ops::Deref<Target = [u8; N]> + From<[u8; N]>
+    Into<Vec<u8>>
+    + Into<[u8; N]>
+    + AsRef<[u8]>
+    + std::ops::Deref<Target = [u8; N]>
+    + From<[u8; N]>
+    + Default
 {
     /// Returns this hash type.
     fn hash_type() -> HashType;
@@ -88,6 +93,8 @@ pub trait HashTrait<const N: usize>:
     fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError>;
 
     fn to_b58check(&self) -> String;
+
+    fn zero() -> Self;
 }
 
 /// Error creating hash from bytes
@@ -158,6 +165,12 @@ macro_rules! define_hash {
             }
         }
 
+        impl Default for $name {
+            fn default() -> Self {
+                Self::zero()
+            }
+        }
+
         impl HashTrait<{ HashType::$name.size() }> for $name {
             fn hash_type() -> HashType {
                 HashType::$name
@@ -186,6 +199,10 @@ macro_rules! define_hash {
                     .unwrap_or_else(|_| {
                         unreachable!("Typed hash should always be representable in base58")
                     })
+            }
+
+            fn zero() -> Self {
+                $name([0u8; HashType::$name.size()])
             }
         }
 

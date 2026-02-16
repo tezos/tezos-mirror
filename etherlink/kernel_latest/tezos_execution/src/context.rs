@@ -138,6 +138,8 @@ pub mod contracts {
 }
 
 pub mod big_maps {
+    use tezos_crypto_rs::hash::ScriptExprHash;
+
     use super::*;
 
     const BIG_MAP_PATH: RefPath = RefPath::assert_from(b"/big_map");
@@ -189,7 +191,7 @@ pub mod big_maps {
     pub fn value_path<C: Context>(
         context: &C,
         id: &BigMapId,
-        key_hashed: &[u8],
+        key_hashed: &ScriptExprHash,
     ) -> Result<OwnedPath, PathError> {
         let key_hex = hex::encode(key_hashed);
         concat(

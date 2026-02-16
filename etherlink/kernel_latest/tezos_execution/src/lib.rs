@@ -18,13 +18,13 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use std::collections::{BTreeMap, HashMap};
+use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
-use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{
     ManagerOperationContentConv, Operation, OriginationContent, Script,
@@ -1233,10 +1233,11 @@ mod tests {
     use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
-    use primitive_types::H256;
     use std::collections::BTreeMap;
     use std::fs::read_to_string;
-    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, SecretKeyEd25519};
+    use tezos_crypto_rs::hash::{
+        ContractKt1Hash, HashTrait, OperationHash, SecretKeyEd25519,
+    };
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -1244,7 +1245,6 @@ mod tests {
     use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
-        enc_wrappers::OperationHash,
         operation::{
             sign_operation, ManagerOperation, ManagerOperationContent,
             ManagerOperationContentConv, Operation, OperationContent, OriginationContent,
@@ -1479,7 +1479,7 @@ mod tests {
         source: Bootstrap,
         content: Vec<OperationContent>,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash().into();
+        let branch = TezBlock::genesis_block_hash();
         let content = content
             .into_iter()
             .enumerate()
@@ -1681,7 +1681,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -1715,7 +1715,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -1749,7 +1749,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -1797,7 +1797,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -1863,7 +1863,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -1924,7 +1924,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -1967,7 +1967,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2043,7 +2043,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2123,7 +2123,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2216,7 +2216,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2334,7 +2334,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2469,7 +2469,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2585,7 +2585,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2667,7 +2667,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2734,7 +2734,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -2818,7 +2818,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &ctx,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             batch.clone(),
             &block_ctx!(),
             false,
@@ -3001,7 +3001,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &ctx,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             batch,
             &block_ctx!(),
             false,
@@ -3096,7 +3096,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             batch,
             &block_ctx!(),
             false,
@@ -3211,7 +3211,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3220,8 +3220,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let mut origination_nonce =
-            OriginationNonce::initial(OperationHash(H256::zero()));
+        let mut origination_nonce = OriginationNonce::default();
         let expected_kt1 = origination_nonce.generate_kt1();
 
         let expected_receipt = OperationWithMetadata {
@@ -3434,7 +3433,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -3809,7 +3808,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -3841,7 +3840,7 @@ mod tests {
             "There should be one internal operation"
         );
         let expected_address =
-            OriginationNonce::initial(OperationHash(H256::zero())).generate_kt1();
+            OriginationNonce::initial(OperationHash::default()).generate_kt1();
 
         assert_eq!(
             internal_receipts[0],
@@ -4006,7 +4005,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation.clone(),
             &block_ctx!(),
             false,
@@ -4038,7 +4037,7 @@ mod tests {
             "There should be two internal operations"
         );
         let (_expected_address_1, expected_address_2, expected_address_3) = {
-            let mut nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+            let mut nonce = OriginationNonce::initial(OperationHash::default());
             let expected_address_1 = nonce.generate_kt1();
             let expected_address_2 = nonce.generate_kt1();
             let expected_address_3 = nonce.generate_kt1();
@@ -4233,14 +4232,14 @@ mod tests {
             &mut host,
             &MockRegistry,
             &ctx,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             batch.clone(),
             &block_ctx!(),
             false,
         )
         .unwrap();
 
-        let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+        let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
         let expected_kt1_1 = orignation_nonce.generate_kt1();
         let expected_kt1_2 = orignation_nonce.generate_kt1();
         let expected_receipts = zip_operations(
@@ -4510,7 +4509,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4586,7 +4585,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4628,7 +4627,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4671,7 +4670,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4722,7 +4721,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4754,7 +4753,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let context = context::TezlinkContext::init_context();
         let src = bootstrap1();
-        let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+        let mut orignation_nonce = OriginationNonce::initial(OperationHash::default());
         let view_addr = orignation_nonce.generate_kt1();
         let caller_addr = orignation_nonce.generate_kt1();
 
@@ -4816,7 +4815,7 @@ mod tests {
             &mut host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -4919,7 +4918,7 @@ mod tests {
             ctx.host,
             &MockRegistry,
             ctx.context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -5217,7 +5216,7 @@ mod tests {
             ctx.host,
             &MockRegistry,
             &context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -5463,7 +5462,7 @@ mod tests {
             ctx.host,
             &MockRegistry,
             ctx.context,
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,
@@ -5528,7 +5527,7 @@ mod tests {
             &mut host,
             &registry,
             &context::TezlinkContext::init_context(),
-            OperationHash(H256::zero()),
+            OperationHash::default(),
             operation,
             &block_ctx!(),
             false,

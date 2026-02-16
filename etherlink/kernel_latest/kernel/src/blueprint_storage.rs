@@ -161,7 +161,9 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
                 number: block.number.into(),
                 timestamp: block.timestamp,
             },
-            chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash.0 }),
+            chain_header: ChainHeader::Tez(TezBlockHeader {
+                hash: H256(*block.hash),
+            }),
         }
     }
 }
@@ -1134,7 +1136,7 @@ mod tests {
             timestamp: Timestamp::from(10),
         };
         let tez_block_header = TezBlockHeader {
-            hash: TezBlock::genesis_block_hash(),
+            hash: H256(*TezBlock::genesis_block_hash()),
         };
         let block_header = BlockHeader {
             blueprint_header,

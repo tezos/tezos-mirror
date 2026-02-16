@@ -16,6 +16,7 @@ use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::precompiles::constants::FEED_DEPOSIT_ADDR;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
+use tezos_crypto_rs::hash::{BlockHash, HashTrait};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::block::BlockConstants;
@@ -451,8 +452,8 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
             };
 
             let applied_operation = AppliedOperation {
-                hash: H256::from(transaction_hash).into(),
-                branch: H256::zero().into(),
+                hash: transaction_hash.into(),
+                branch: BlockHash::from([0u8; BlockHash::SIZE]),
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {
                         operations: vec![OperationWithMetadata {

@@ -26,7 +26,7 @@ use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use std::fmt::{Debug, Display};
-use tezos_crypto_rs::hash::{ChainId, UnknownSignature};
+use tezos_crypto_rs::hash::{BlockHash, ChainId, UnknownSignature};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::{
@@ -273,7 +273,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 
     fn genesis_header() -> Self {
         Self {
-            hash: TezBlock::genesis_block_hash(),
+            hash: H256(*TezBlock::genesis_block_hash()),
         }
     }
 }
@@ -616,7 +616,7 @@ fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> 
     let operation = Operation::nom_read_exact(bytes).map_err(|decode_error| {
         error::Error::NomReadError(format!("{decode_error:?}"))
     })?;
-    let tx_hash = operation.hash()?.0 .0;
+    let tx_hash = operation.hash()?.into();
     Ok(TezlinkOperation {
         tx_hash,
         content: TezlinkContent::Tezos(operation),
@@ -807,8 +807,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 
                 let applied_operation = AppliedOperation {
-                    hash: H256::from_slice(&operation.tx_hash).into(),
-                    branch: block_in_progress.ethereum_parent_hash.into(),
+                    hash: operation.tx_hash.into(),
+                    branch: BlockHash::from(
+                        block_in_progress.ethereum_parent_hash.to_fixed_bytes(),
+                    ),
                     op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                         OperationBatchWithMetadata {
                             operations: vec![OperationWithMetadata {

@@ -20,9 +20,8 @@ use mir::{
     context::{CtxTrait, TypecheckingCtx},
 };
 use num_bigint::BigUint;
-use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash};
+use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, OperationHash, ScriptExprHash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
@@ -31,7 +30,7 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
-use tezos_tezlink::enc_wrappers::{BlockNumber, ScriptExprHash};
+use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
@@ -224,8 +223,8 @@ impl<'a, Host: Runtime, C: Context> CtxTrait<'a> for Ctx<'_, 'a, Host, C> {
         1u32.into()
     }
 
-    fn operation_group_hash(&self) -> [u8; 32] {
-        self.operation_ctx.origination_nonce.operation.0 .0
+    fn operation_group_hash(&self) -> &OperationHash {
+        &self.operation_ctx.origination_nonce.operation
     }
 
     fn origination_counter(&mut self) -> u32 {
@@ -310,12 +309,12 @@ impl<Host: Runtime, C: Context> TcCtx<'_, Host, C> {
     fn big_map_diff_update(
         &mut self,
         id: &Zarith,
-        key_hash: [u8; 32],
+        key_hash: ScriptExprHash,
         key: Vec<u8>,
         value: Option<Vec<u8>>,
     ) {
         let update = Update {
-            key_hash: H256::from_slice(&key_hash).into(),
+            key_hash,
             key,
             value,
         };
@@ -396,13 +395,13 @@ pub fn clear_temporary_big_maps<Host: Runtime, C: Context>(
 /// Hashes a Micheline expression using the packed format (with 0x05 prefix)
 /// to match L1's Script_expr_hash.
 /// See: https://gitlab.com/tezos/tezos/-/blob/master/src/proto_023_PtSeouLo/lib_protocol/script_ir_translator.ml#L159
-fn hash_micheline_expr(expr: &Micheline<'_>) -> [u8; 32] {
-    digest_256(&expr.encode_for_pack())
+fn hash_micheline_expr(expr: &Micheline<'_>) -> ScriptExprHash {
+    digest_256(&expr.encode_for_pack()).into()
 }
 
 /// Computes the hash of a big_map key (TypedValue), used for storage path
 /// See [hash_micheline_expr] for details on the hashing format.
-fn hash_key(key: TypedValue<'_>) -> [u8; 32] {
+fn hash_key(key: TypedValue<'_>) -> ScriptExprHash {
     let parser = Parser::new();
     let key_micheline = key.into_micheline_optimized_legacy(&parser.arena);
     hash_micheline_expr(&key_micheline)
@@ -444,11 +443,11 @@ impl BigMapKeys {
         host: &mut impl Runtime,
         context: &C,
         id: &BigMapId,
-        key: &[u8],
+        key: &ScriptExprHash,
     ) -> Result<(), LazyStorageError> {
         let path = keys_of_big_map(context, id)?;
         let size = host.store_value_size(&path).unwrap_or(0usize);
-        host.store_write(&path, key, size)?;
+        host.store_write(&path, key.as_ref(), size)?;
         Ok(())
     }
 
@@ -456,13 +455,12 @@ impl BigMapKeys {
         host: &mut impl Runtime,
         context: &C,
         id: &BigMapId,
-        key: &[u8],
+        key: &ScriptExprHash,
     ) -> Result<(), LazyStorageError> {
         let path = keys_of_big_map(context, id)?;
-        let key = ScriptExprHash(H256::from_slice(key));
         let mut big_map_keys: Self = read_nom_value(host, &path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        big_map_keys.keys.retain(|elt| elt != &key);
+        big_map_keys.keys.retain(|elt| elt != key);
         store_bin(&big_map_keys, host, &path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
         Ok(())
@@ -485,7 +483,7 @@ impl BigMapKeys {
             }
         };
         for key in big_map_keys.keys {
-            let value_path = value_path(context, id, key.0.as_bytes())?;
+            let value_path = value_path(context, id, &key)?;
             host.store_delete(&value_path)?;
         }
 
@@ -514,9 +512,8 @@ impl BigMapKeys {
         };
 
         for key in &big_map_keys.keys {
-            let key_hashed = key.0.as_bytes();
-            let source_value_path = value_path(context, source, key_hashed)?;
-            let dest_value_path = value_path(context, dest, key_hashed)?;
+            let source_value_path = value_path(context, source, key)?;
+            let dest_value_path = value_path(context, dest, key)?;
 
             // Copy the value at from source path to dest path
             let value = host.store_read_all(&source_value_path)?;
@@ -764,7 +761,7 @@ pub mod tests {
         );
 
         for key in &removed_keys.keys {
-            let value_path = value_path(ctx.context, id, key.0.as_bytes()).unwrap();
+            let value_path = value_path(ctx.context, id, key).unwrap();
             assert!(
                 ctx.host.store_has(&value_path).unwrap().is_none(),
                 "{key:?} should have been removed from the storage"
@@ -936,7 +933,7 @@ pub mod tests {
 
         // Ensure that the big_map has been removed
         let removed_keys = BigMapKeys {
-            keys: vec![ScriptExprHash(H256::from_slice(&hash_key(key)))],
+            keys: vec![hash_key(key)],
         };
         assert_big_map_removed(&storage, &map_id, &removed_keys);
 
@@ -1053,6 +1050,7 @@ pub(crate) mod mock {
         pub amount: i64,
         pub level: BigUint,
         pub now: BigInt,
+        pub operation_group_hash: OperationHash,
         pub gas: mir::gas::Gas,
     }
 
@@ -1064,6 +1062,7 @@ pub(crate) mod mock {
                 amount,
                 level: 1u32.into(),
                 now: 0.into(),
+                operation_group_hash: OperationHash::from([0u8; 32]),
                 gas: mir::gas::Gas::default(),
             }
         }
@@ -1145,8 +1144,8 @@ pub(crate) mod mock {
             1u32.into()
         }
 
-        fn operation_group_hash(&self) -> [u8; 32] {
-            [0u8; 32]
+        fn operation_group_hash(&self) -> &OperationHash {
+            &self.operation_group_hash
         }
 
         fn origination_counter(&mut self) -> u32 {

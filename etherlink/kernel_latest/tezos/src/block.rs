@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
+use crate::enc_wrappers::BlockNumber;
 use crate::operation_result::OperationDataAndMetadata;
 use crate::protocol::{Protocol, TARGET_TEZOS_PROTOCOL};
-use primitive_types::H256;
 use rlp::{Decodable, Encodable};
 use tezos_crypto_rs::blake2b::digest_256;
+use tezos_crypto_rs::hash::{BlockHash, OperationHash};
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::{self as tezos_nom};
 use tezos_enc::{BinError, BinWriter};
@@ -75,9 +75,9 @@ impl Encodable for TezBlock {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(8);
         s.append(&VERSION);
-        s.append(&self.hash);
+        s.append(&self.hash.as_ref());
         s.append(&self.number);
-        s.append(&self.previous_hash);
+        s.append(&self.previous_hash.as_ref());
         s.append(&self.timestamp.i64().to_le_bytes().to_vec());
         s.append(&self.protocol);
         s.append(&self.next_protocol);
@@ -86,22 +86,19 @@ impl Encodable for TezBlock {
 }
 
 impl TezBlock {
-    pub fn genesis_block_hash() -> H256 {
-        // This H256 comes from this b58 hash 'BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9'
-        // That is the ghostnet genesis hash according to 'devtools/get_contracts/config.ml'
-        H256::from_slice(
-            &hex::decode(
-                "8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed8423e7c02934",
-            )
-            .unwrap(),
+    /// Ghostnet genesis hash according to 'devtools/get_contracts/config.ml'
+    pub fn genesis_block_hash() -> BlockHash {
+        BlockHash::from_base58_check(
+            "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9",
         )
+        .unwrap()
     }
 
-    // This function must be used on a TezBlock whose hash field is H256::zero()
+    // This function must be used on a TezBlock whose hash field is a zero BlockHash
     fn hash(&self) -> Result<BlockHash, BinError> {
         let encoded_data = self.to_bytes();
         let hashed_data = digest_256(&encoded_data);
-        Ok(BlockHash(H256(hashed_data)))
+        Ok(BlockHash::from(hashed_data))
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -111,14 +108,14 @@ impl TezBlock {
     pub fn new(
         number: BlockNumber,
         timestamp: Timestamp,
-        previous_hash: H256,
+        previous_hash: primitive_types::H256,
         operations: Vec<AppliedOperation>,
     ) -> Result<Self, BinError> {
         let block = Self {
-            hash: BlockHash(H256::zero()), // Placeholder, will be computed
+            hash: BlockHash::default(), // Placeholder, will be computed
             number,
             timestamp,
-            previous_hash: BlockHash(previous_hash),
+            previous_hash: BlockHash::from(previous_hash.to_fixed_bytes()),
             protocol: TARGET_TEZOS_PROTOCOL,
             next_protocol: TARGET_TEZOS_PROTOCOL,
             operations: OperationsWithReceipts { list: operations },
