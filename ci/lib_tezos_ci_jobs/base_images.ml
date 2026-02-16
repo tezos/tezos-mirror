@@ -210,10 +210,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~variables
       ~rules:
         (if changeset then
-           [
-             job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
-             job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
-           ]
+           [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
          (* To force the run of the job. A bit hackish but simpler
             than to have no rule and consistent with what is done in
             [code_verification]. Will be done cleanly when migrated to
