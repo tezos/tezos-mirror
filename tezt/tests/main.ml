@@ -227,6 +227,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Testnet_dictator.register ~protocols ;
   Test_contract_bls12_381.register ~protocols ;
   Teztale_test.register ~protocols ;
+  Tezindex_test.register ~protocols ;
   Ticket_receipt_and_rpc.register ~protocols ;
   Transfer.register ~protocols ;
   Tickets.register ~protocols ;
