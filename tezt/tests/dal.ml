@@ -2184,7 +2184,19 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let check_get_commitment =
     check_get_commitment dal_node ~slot_level:pub_level
   in
-
+  let check_published_commitment ?(expected_same = true) =
+    let encapsulate = Format.sprintf "\"%s\"\n" in
+    check_get_commitment (fun expected response ->
+        let response_body = response.RPC_core.body in
+        if response_body = encapsulate expected = expected_same then ()
+        else
+          Test.fail
+            ~__LOC__
+            "Published commitment is %s whereas we expected %s%s"
+            response_body
+            (if expected_same then "" else "not ")
+            expected)
+  in
   (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_not_found ok in
   let* () =
@@ -2245,13 +2257,9 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
     check_slots_statuses ~expected_status:Dal_RPC.Unattested ~__LOC__ unattested
   in
   (* slot2_a is still not selected. *)
-  let* () =
-    check_slots_statuses
-      ~expected_status:(Dal_RPC.Attested lag)
-      ~check_attested_lag:`At_most
-      ~__LOC__
-      [slot2_a]
-  in
+  let* () = check_published_commitment ~expected_same:false [slot2_a] in
+  (* slot2_b is selected. *)
+  let* () = check_published_commitment [slot2_b] in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
   let* () =
     check_slots_statuses ~expected_status:Dal_RPC.Unpublished ~__LOC__ [slot3]
