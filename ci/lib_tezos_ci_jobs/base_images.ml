@@ -121,7 +121,7 @@ module Files = struct
     ]
 end
 
-let jobs ?start_job () =
+let jobs ?start_job ?(changeset = true) () =
   (* This function can build docker images both in an emulated environment using
      qemu or natively. The advantage of choosing emulated vs native depends on
      the build time associated with the image. Small images are more efficiently
@@ -202,10 +202,16 @@ let jobs ?start_job () =
       ~stage:Stages.build
       ~variables
       ~rules:
-        [
-          job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
-          job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
-        ]
+        (if changeset then
+           [
+             job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
+             job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
+           ]
+         (* To force the run of the job. A bit hackish but simpler
+            than to have no rule and consistent with what is done in
+            [code_verification]. Will be done cleanly when migrated to
+            Cacio. *)
+           else [job_rule ~when_:Always ()])
       ~parallel:(Matrix [matrix @ tags])
       ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
       ?dependencies
@@ -281,21 +287,26 @@ let jobs ?start_job () =
       ~stage:Stages.build
       ~dependencies:(Dependent [Job job_rust_based_images])
       ~rules:
-        [
-          job_rule
-            ~changes:
-              (Changeset.encode
-                 (Changeset.make
-                    (Files.debian_rust_merge
-                   (* Adding changesets of [debian] and
+        (if changeset then
+           [
+             job_rule
+               ~changes:
+                 (Changeset.encode
+                    (Changeset.make
+                       (Files.debian_rust_merge
+                      (* Adding changesets of [debian] and
                         [debian-rust] build jobs as if we rebuild one
                         of these images, we want to test the
                         [debian-rust] merge job *)
-                   @ Files.debian_rust_build
-                    @ Files.debian_base)))
-            ~when_:On_success
-            ();
-        ]
+                      @ Files.debian_rust_build
+                       @ Files.debian_base)))
+               ~when_:On_success
+               ();
+           ]
+         (* To force the run of the job. Similar to
+            [make_job_base_images] and cf. comment above.
+            Migration to Cacio will clean this hack. *)
+           else [job_rule ~when_:Always ()])
       ~variables:
         [
           ("RELEASE", "trixie");
