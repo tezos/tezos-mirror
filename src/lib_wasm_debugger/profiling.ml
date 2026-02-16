@@ -533,9 +533,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     in
 
     let rec eval_until_input_requested accumulated_ticks tree =
-      let* pvm_state =
-        Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
-      in
+      let* pvm_state = Wasm_utils.State.Encoding_runner.decode tree in
       let* info = Wasm_utils.Wasm.get_info tree in
       let run () =
         let* tree, ticks =
@@ -548,11 +546,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             instrumented_should_compute
             tree
         in
-        let* pvm_state =
-          Wasm_utils.Tree_encoding_runner.decode
-            Wasm_pvm.pvm_state_encoding
-            tree
-        in
+        let* pvm_state = Wasm_utils.State.Encoding_runner.decode tree in
         let accumulated_ticks = Z.add accumulated_ticks @@ Z.of_int64 ticks in
         if no_reboot && pvm_state.tick_state = Snapshot then
           return (tree, accumulated_ticks)

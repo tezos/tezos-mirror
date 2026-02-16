@@ -25,18 +25,13 @@
 
 open Tezos_scoru_wasm
 open Tezos_scoru_wasm_helpers
-open Encodings_util
 module Wasm = Wasm_utils.Wasm
 module Wasm_fast_vm = Tezos_scoru_wasm_fast.Vm
+module State = Wasm_utils.State
 
-let encode_pvm_state state tree =
-  Tree_encoding_runner.encode
-    Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-    state
-    tree
+let encode_pvm_state state tree = State.Encoding_runner.encode state tree
 
-let decode_pvm_state tree =
-  Tree_encoding_runner.decode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding tree
+let decode_pvm_state tree = State.Encoding_runner.decode tree
 
 let get_tick_from_tree tree =
   let open Lwt_syntax in

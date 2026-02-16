@@ -230,7 +230,7 @@ module Pvm_state_generator = struct
     in
     (* Encode the buffers and update the state of the pvm. *)
     let buffers = Eval.{input; output} in
-    let buffers_encoding = Wasm_pvm.durable_buffers_encoding in
+    let buffers_encoding = Tree_state.durable_buffers_encoding in
     let module Tree_encoding_runner =
       Tezos_tree_encoding.Runner.Make (Wasm_context.Tree) in
     let*! tree =

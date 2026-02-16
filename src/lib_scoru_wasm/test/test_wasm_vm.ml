@@ -56,11 +56,7 @@ let test_padding_state ~version () =
   let open Lwt_result_syntax in
   let open Wasm_pvm_state.Internal_state in
   let* tree = init_tree_with_empty_input ~version in
-  let*! pvm_state =
-    Encodings_util.Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
-      tree
-  in
+  let*! pvm_state = State.Encoding_runner.decode tree in
   let should_continue state =
     match state.tick_state with
     | Padding -> Lwt_syntax.return_false
