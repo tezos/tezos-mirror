@@ -407,7 +407,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu_ramfs
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -455,7 +455,7 @@ oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -511,7 +511,7 @@ oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   needs:
   - oc.docker:ci:amd64
   dependencies:

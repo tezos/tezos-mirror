@@ -24,13 +24,19 @@ open Common.Build
    under the 1GB hard limit set by GitLab. *)
 (* [job_build_x86_64_release] builds the released executables. *)
 let job_build_x86_64_release =
-  job_build_released_binaries ~__POS__ ~arch:Amd64 ()
+  job_build_released_binaries
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~storage:Ramfs
+    ()
 
 let job_build_x86_64_exp =
   job_build_dynamic_binaries
     ~name:"oc.build_amd64-exp"
     ~__POS__
     ~arch:Amd64
+    ~cpu:Very_high
     "script-inputs/experimental-executables"
 
 let job_build_x86_64_extra_dev =
@@ -38,6 +44,7 @@ let job_build_x86_64_extra_dev =
     ~name:"oc.build_amd64-extra-dev"
     ~__POS__
     ~arch:Amd64
+    ~cpu:Very_high
     ~extra:true
     "script-inputs/dev-executables"
 
