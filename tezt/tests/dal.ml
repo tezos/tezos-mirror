@@ -526,9 +526,9 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   return (node, client, dal_parameters)
 
 let with_layer1 ?custom_constants ?additional_bootstrap_accounts
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    ?attestation_lag ?slot_size ?number_of_slots ?page_size
-    ?attestation_threshold ?number_of_shards ?redundancy_factor
+    ?consensus_committee_size ?consensus_threshold_size ?minimal_block_delay
+    ?delay_increment_per_round ?attestation_lag ?slot_size ?number_of_slots
+    ?page_size ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?incentives_enable
     ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
@@ -576,6 +576,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ sc_rollup_activation_dal_params dal_enable
     @ [(["smart_rollup_arith_pvm_enable"], `Bool true)]
     @ make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["consensus_threshold_size"] consensus_threshold_size
     @ make_string_parameter ["minimal_block_delay"] minimal_block_delay
     @ make_string_parameter
         ["delay_increment_per_round"]
@@ -761,9 +762,9 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
     ?blocks_per_cycle ?delay_increment_per_round ?consensus_committee_size
-    ?redundancy_factor ?slot_size ?number_of_shards ?number_of_slots
-    ?attestation_lag ?attestation_threshold ?traps_fraction ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?incentives_enable
+    ?consensus_threshold_size ?redundancy_factor ?slot_size ?number_of_shards
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
+    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
     ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
     ?event_sections_levels ?operator_profiles ?history_mode ?prover
     ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready ?env
@@ -790,6 +791,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?delay_increment_per_round
         ?blocks_per_cycle
         ?consensus_committee_size
+        ?consensus_threshold_size
         ?redundancy_factor
         ?slot_size
         ?number_of_slots
