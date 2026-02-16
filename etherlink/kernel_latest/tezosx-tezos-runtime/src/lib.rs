@@ -11,11 +11,10 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
 use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, TezosXRuntimeError};
 
+use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+
 use crate::{
-    account::{
-        get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info,
-        TEZOS_ACCOUNTS_PATH,
-    },
+    account::{get_tezos_account_info_or_init, narith_to_u256, set_tezos_account_info},
     context::TezosRuntimeContext,
 };
 
@@ -73,7 +72,8 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
             }
             Contract::Originated(kt1) => {
                 // TODO: Have our own implementation of originated contracts.
-                let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_PATH)?;
+                let context =
+                    TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
                 let originated_account = context.originated_from_kt1(&kt1)?;
                 originated_account.add_balance(host, amount.as_u64())?;
                 Ok(CrossCallResult::Success(vec![]))
@@ -133,7 +133,7 @@ impl TezosRuntime {
         host: &impl Runtime,
         kt1: &ContractKt1Hash,
     ) -> Result<U256, TezosXRuntimeError> {
-        let context = TezosRuntimeContext::from_root(&TEZOS_ACCOUNTS_PATH)?;
+        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         let originated_account = context.originated_from_kt1(kt1)?;
         let balance = originated_account.balance(host)?;
         narith_to_u256(&balance)
