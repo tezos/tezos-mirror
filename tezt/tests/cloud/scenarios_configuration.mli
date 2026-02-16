@@ -53,6 +53,7 @@ module DAL : sig
     slot_size : int option;
     number_of_slots : int option;
     attestation_lag : int option;
+    attestation_lags : int list option;
     traps_fraction : Q.t option;
     publish_slots_regularly : bool;
     stresstest : Stresstest.t option;

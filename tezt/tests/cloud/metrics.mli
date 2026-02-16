@@ -59,11 +59,15 @@ val pp : bakers:Baker_helpers.baker list -> t -> unit
     registry, attaching optional [versions] labels for each baker PKH. *)
 val push : versions:(string, string) Hashtbl.t -> cloud:Cloud.t -> t -> unit
 
-(** [get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
-    ~infos infos_per_level metrics] updates the [metrics] statistics. *)
+(** [get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
+    ~infos infos_per_level metrics] updates the [metrics] statistics.
+
+    [attestation_lags] is the list of lags at which a DAL slot can be attested
+    after publication. The maximum lag is used for mapping attested levels to
+    published levels in the current metrics computations. *)
 val get :
   first_level:int ->
-  attestation_lag:int ->
+  attestation_lags:int list ->
   dal_node_producers:'a list ->
   number_of_slots:int ->
   infos:(int, per_level_info) Hashtbl.t ->

@@ -55,6 +55,7 @@ type configuration = {
   slot_size : int option;
   number_of_slots : int option;
   attestation_lag : int option;
+  attestation_lags : int list option;
   traps_fraction : Q.t option;
   stresstest : Stresstest.t option;
 }
@@ -762,10 +763,25 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             | Some number_of_slots ->
                 [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
             | None -> [])
-          @ (match configuration.attestation_lag with
-            | Some attestation_lag ->
-                [(["dal_parametric"; "attestation_lag"], `Int attestation_lag)]
-            | None -> [])
+          @ (match configuration.attestation_lags with
+            | Some attestation_lags ->
+                let max_lag = List.fold_left max 0 attestation_lags in
+                [
+                  ( ["dal_parametric"; "attestation_lags"],
+                    `A
+                      (List.map
+                         (fun l -> `Float (float_of_int l))
+                         attestation_lags) );
+                  (["dal_parametric"; "attestation_lag"], `Int max_lag);
+                ]
+            | None -> (
+                match configuration.attestation_lag with
+                | Some attestation_lag ->
+                    [
+                      ( ["dal_parametric"; "attestation_lag"],
+                        `Int attestation_lag );
+                    ]
+                | None -> []))
           @
           match configuration.traps_fraction with
           | Some {num; den} ->
@@ -1218,7 +1234,7 @@ let on_new_level t level ~metadata =
   let metrics =
     Metrics.get
       ~first_level:t.first_level
-      ~attestation_lag:t.parameters.attestation_lag
+      ~attestation_lags:t.parameters.attestation_lags
       ~dal_node_producers:t.configuration.dal_node_producers
       ~number_of_slots:t.parameters.number_of_slots
       ~infos:t.infos
@@ -1397,6 +1413,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let slot_size = Cli.slot_size in
     let number_of_slots = Cli.number_of_slots in
     let attestation_lag = Cli.attestation_lag in
+    let attestation_lags = Cli.attestation_lags in
     let traps_fraction = Cli.traps_fraction in
     let publish_slots_regularly = Cli.publish_slots_regularly in
     let stresstest = Cli.stresstest in
@@ -1439,6 +1456,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         slot_size;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         traps_fraction;
         publish_slots_regularly;
         stresstest;

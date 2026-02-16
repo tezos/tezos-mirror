@@ -594,8 +594,9 @@ let update_echo_rollup_metrics infos_per_level metrics =
     metrics.total_echo_rollup_fetched_data_size + data_size,
     data_size )
 
-let get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
+let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
     ~infos infos_per_level metrics =
+  let attestation_lag = List.fold_left max 0 attestation_lags in
   let level_first_commitment_published =
     update_level_first_commitment_published infos_per_level metrics
   in
