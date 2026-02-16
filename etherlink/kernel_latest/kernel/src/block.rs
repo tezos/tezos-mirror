@@ -213,18 +213,13 @@ where
     bip
 }
 
-#[cfg_attr(feature = "benchmark", inline(never))]
-fn next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
+fn get_next_bip_info<Host, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
-    chain_config: &ChainConfig,
-    config: &mut Configuration,
-    kernel_upgrade: &Option<KernelUpgrade>,
-) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
+) -> (U256, Timestamp, ChainConfig::ChainHeader)
 where
-    Host: HostReveal + StorageV1 + WasmHost + Logging,
+    Host: StorageV1 + Logging,
 {
-    let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
-    {
+    match read_current_block_header(host) {
         Err(_) => (
             U256::zero(),
             Timestamp::from(0),
@@ -238,14 +233,29 @@ where
             blueprint_header.timestamp,
             chain_header,
         ),
-    };
+    }
+}
+
+#[cfg_attr(feature = "benchmark", inline(never))]
+fn build_next_bip_from_blueprints<Host, ChainConfig: ChainConfigTrait>(
+    host: &mut Host,
+    chain_config: &ChainConfig,
+    next_bip_number: U256,
+    timestamp: Timestamp,
+    chain_header: &ChainConfig::ChainHeader,
+    config: &mut Configuration,
+    kernel_upgrade: &Option<KernelUpgrade>,
+) -> anyhow::Result<BlueprintParsing<BlockInProgress>>
+where
+    Host: HostReveal + StorageV1 + WasmHost + Logging,
+{
     log!(host, Debug, "Next blueprint number: {:?}", next_bip_number);
     let (blueprint, size) = read_blueprint::<_, ChainConfig>(
         host,
         config,
         next_bip_number,
         timestamp,
-        &chain_header,
+        chain_header,
     )?;
     log!(host, Benchmarking, "Size of blueprint: {}", size);
     match blueprint {
@@ -456,11 +466,20 @@ where
                 // because the sequencer pool address is located outside of `/evm/world_state`.
                 upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
+                let (next_bip_number, timestamp, chain_header) =
+                    get_next_bip_info::<Host, ChainConfig>(safe_host.host);
+
                 log!(safe_host, Debug, "Creating BIP from Blueprint.");
                 // Execute at most one of the stored blueprints
-                let block_in_progress = match next_bip_from_blueprints(
+                let block_in_progress = match build_next_bip_from_blueprints::<
+                    Host,
+                    ChainConfig,
+                >(
                     safe_host.host,
                     chain_config,
+                    next_bip_number,
+                    timestamp,
+                    &chain_header,
                     config,
                     &kernel_upgrade,
                 )? {
