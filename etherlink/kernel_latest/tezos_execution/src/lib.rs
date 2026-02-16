@@ -1154,7 +1154,9 @@ pub(crate) mod test_utils {
     use primitive_types::U256;
     use std::cell::RefCell;
     use tezos_evm_runtime::runtime::Runtime;
-    use tezosx_interfaces::{CrossCallResult, Registry, RuntimeId, TezosXRuntimeError};
+    use tezosx_interfaces::{
+        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
+    };
 
     /// Mock Registry for testing gateway operations.
     /// Tracks all calls to bridge and generate_alias for verification.
@@ -1183,6 +1185,7 @@ pub(crate) mod test_utils {
             source_address: &[u8],
             amount: U256,
             _data: &[u8],
+            _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError> {
             self.bridge_calls.borrow_mut().push((
                 destination_runtime,
@@ -1198,7 +1201,7 @@ pub(crate) mod test_utils {
             _host: &mut Host,
             native_address: &[u8],
             runtime_id: RuntimeId,
-            _context: tezosx_interfaces::AliasCreationContext,
+            _context: CrossRuntimeContext,
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             self.generate_alias_calls
                 .borrow_mut()
@@ -1270,7 +1273,7 @@ mod tests {
     };
     use crate::{make_default_ctx, COST_PER_BYTES};
     use tezosx_interfaces::{
-        AliasCreationContext, CrossCallResult, Registry, RuntimeId, TezosXRuntimeError,
+        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, TezosXRuntimeError,
     };
 
     // Mock Registry for tests that don't need cross-runtime functionality
@@ -1285,6 +1288,7 @@ mod tests {
             _source_address: &[u8],
             _amount: primitive_types::U256,
             _data: &[u8],
+            _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError> {
             Err(TezosXRuntimeError::RuntimeNotFound(destination_runtime))
         }
@@ -1294,7 +1298,7 @@ mod tests {
             _host: &mut Host,
             _native_address: &[u8],
             runtime_id: RuntimeId,
-            _context: AliasCreationContext,
+            _context: CrossRuntimeContext,
         ) -> Result<Vec<u8>, TezosXRuntimeError> {
             Err(TezosXRuntimeError::RuntimeNotFound(runtime_id))
         }

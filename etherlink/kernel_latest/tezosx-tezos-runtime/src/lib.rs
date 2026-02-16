@@ -9,7 +9,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{account_storage::TezlinkAccount, context::Context};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezosx_interfaces::{CrossCallResult, TezosXRuntimeError};
+use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, TezosXRuntimeError};
 
 use crate::{
     account::{
@@ -30,7 +30,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         _registry: &impl tezosx_interfaces::Registry,
         _host: &mut Host,
         native_address: &[u8],
-        _context: tezosx_interfaces::AliasCreationContext,
+        _context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         // TODO: Add code in this contract.
         let contract = Contract::Originated(ContractKt1Hash::from(blake2b::digest_160(
@@ -52,6 +52,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         to: &[u8],
         amount: U256,
         _data: &[u8],
+        _context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         let to = Contract::nom_read_exact(to).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(

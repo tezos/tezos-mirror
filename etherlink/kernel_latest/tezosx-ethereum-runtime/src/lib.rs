@@ -22,7 +22,7 @@ use revm_etherlink::{
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime::Runtime;
 use tezosx_interfaces::{
-    AliasCreationContext, CrossCallResult, Registry, RuntimeInterface, TezosXRuntimeError,
+    CrossCallResult, CrossRuntimeContext, Registry, RuntimeInterface, TezosXRuntimeError,
 };
 
 alloy_sol_types::sol! {
@@ -63,7 +63,7 @@ impl RuntimeInterface for EthereumRuntime {
         registry: &impl Registry,
         host: &mut Host,
         native_address: &[u8],
-        context: AliasCreationContext,
+        context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError> {
         // Step 1: Compute the alias address deterministically from the native address
         let mut hasher = Keccak256::new();
@@ -196,6 +196,7 @@ impl RuntimeInterface for EthereumRuntime {
         to: &[u8],
         amount: primitive_types::U256,
         _data: &[u8],
+        _context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         if to.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
