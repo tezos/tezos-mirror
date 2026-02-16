@@ -168,6 +168,14 @@ impl StorageV1 for EvalHost {
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.host.store_value_size(path)
     }
+
+    #[inline(always)]
+    fn store_get_hash(
+        &self,
+        path: &impl Path,
+    ) -> Result<[u8; tezos_smart_rollup_core::STORE_HASH_SIZE], RuntimeError> {
+        self.host.store_get_hash(path)
+    }
 }
 
 impl WasmHost for EvalHost {
@@ -228,7 +236,7 @@ impl ExtendedRuntime for EvalHost {
         &mut self,
         path: &T,
     ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
-        self.host.store_get_hash(path)
+        self.host.store_get_hash(path).map(|hash| hash.to_vec())
     }
 
     fn internal_store_read_all<T: Path>(

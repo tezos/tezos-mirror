@@ -6,7 +6,7 @@
 
 use super::store::Store;
 use core::slice::{from_raw_parts, from_raw_parts_mut};
-use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
+use tezos_smart_rollup_core::{MAX_FILE_CHUNK_SIZE, STORE_HASH_SIZE};
 use tezos_smart_rollup_host::{
     path::{PathError, RefPath},
     Error,
@@ -124,6 +124,25 @@ impl InMemoryStore {
     pub unsafe fn store_value_size(&self, path: *const u8, path_len: usize) -> i32 {
         let path = from_raw_parts(path, path_len);
         self.handle_store_value_size(path)
+            .unwrap_or_else(Error::code)
+    }
+
+    pub unsafe fn __internal_store_get_hash(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32 {
+        let path = from_raw_parts(path, path_len);
+        let bytes = from_raw_parts_mut(destination_addr, max_size);
+
+        self.handle_internal_store_get_hash(path)
+            .map(|hash| {
+                let to_write = bytes.len().min(hash.len());
+                bytes[..to_write].copy_from_slice(&hash[..to_write]);
+                to_write as i32
+            })
             .unwrap_or_else(Error::code)
     }
 }
@@ -311,5 +330,32 @@ impl InMemoryStore {
             return Err(Error::StoreNotAValue);
         }
         Ok(self.0.get_value(&path).len() as i32)
+    }
+
+    /// Stand in implementation deterministically returns dummy hash
+    /// values.
+    ///
+    /// This will _not_ match the values that the irmin-backed durable
+    /// storage in the WASM PVM returns.
+    pub(crate) fn handle_internal_store_get_hash(
+        &self,
+        path: &[u8],
+    ) -> Result<[u8; STORE_HASH_SIZE], Error> {
+        thread_local! {
+            static COUNTER: std::cell::Cell<i32> = const { std::cell::Cell::new(0) };
+        }
+
+        let _ = validate_path(path)?;
+
+        let count = COUNTER.with(|counter| {
+            let count = counter.get();
+            counter.set(count.wrapping_add(1));
+            count
+        });
+
+        let mut to_hash = count.to_le_bytes().to_vec();
+        to_hash.extend_from_slice(path);
+
+        Ok(tezos_crypto_rs::blake2b::digest_256(to_hash.as_slice()))
     }
 }

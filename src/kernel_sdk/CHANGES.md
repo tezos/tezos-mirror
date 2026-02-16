@@ -47,6 +47,7 @@
   - Move `reveal_` functions from `Runtime` to new `HostReveal` supertrait.
   - Move all other functions (input/ouput, reboots, runtime version) to new `WasmHost` supertrait. Experimental support
     for using `WasmHost` on RISC-V still exists.
+- Expose `store_get_hash` on `StorageV1` trait - wrapping WASM pvm's `__internal_store_get_hash` host function.
 
 ### Installer client/kernel
 

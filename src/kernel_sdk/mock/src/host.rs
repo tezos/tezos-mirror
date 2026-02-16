@@ -298,6 +298,21 @@ unsafe impl SmartRollupCore for MockHost {
             ),
         }
     }
+
+    unsafe fn __internal_store_get_hash(
+        &self,
+        path: *const u8,
+        path_len: usize,
+        destination_addr: *mut u8,
+        max_size: usize,
+    ) -> i32 {
+        self.state.borrow().store.__internal_store_get_hash(
+            path,
+            path_len,
+            destination_addr,
+            max_size,
+        )
+    }
 }
 
 #[cfg(test)]
