@@ -93,14 +93,22 @@ val opam_daily : If.t
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_RPC_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_RPC_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the node's external RPC mode will be enabled.
+    Cf. [tezt/lib_tezos/node.mli]. *)
 val schedule_extended_rpc_tests : If.t
 
 (** A rule that is true for scheduled extended validation test
     pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the node's single-process mode will be enabled.
+    Cf. [tezt/lib_tezos/node.mli]. *)
 val schedule_extended_validation_tests : If.t
 
 (** A rule that is true for scheduled extended baker with remote node test
