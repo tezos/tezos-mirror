@@ -341,6 +341,9 @@ and _ contents =
       attestation : 'a Kind.consensus operation;
       consensus_slot : Slot_repr.t;
       slot_index : Dal_slot_index_repr.t;
+      lag_index_opt : int option;
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8238
+             Introduce [Dal_lag_index_repr] module *)
       shard_with_proof : Dal_slot_repr.Shard_with_proof.t;
     }
       -> Kind.dal_entrapment_evidence contents
@@ -1496,12 +1499,13 @@ module Encoding = struct
         tag = 24;
         name = "dal_entrapment_evidence";
         encoding =
-          obj4
+          obj5
             (req
                "attestation"
                (dynamic_size inlined_consensus_operation_encoding))
             (req "consensus_slot" Slot_repr.encoding)
             (req "slot_index" Dal_slot_index_repr.encoding)
+            (opt "lag_index" Data_encoding.uint8)
             (req "shard_with_proof" Dal_slot_repr.Shard_with_proof.encoding);
         select =
           (function
@@ -1509,20 +1513,34 @@ module Encoding = struct
           | _ -> None);
         proj =
           (fun (Dal_entrapment_evidence
-                  {attestation; consensus_slot; slot_index; shard_with_proof})
+                  {
+                    attestation;
+                    consensus_slot;
+                    slot_index;
+                    lag_index_opt;
+                    shard_with_proof;
+                  })
              ->
             ( Consensus_op attestation,
               consensus_slot,
               slot_index,
+              lag_index_opt,
               shard_with_proof ));
         inj =
-          (fun ( Consensus_op attestation,
-                 consensus_slot,
-                 slot_index,
-                 shard_with_proof )
-             ->
-            Dal_entrapment_evidence
-              {attestation; consensus_slot; slot_index; shard_with_proof});
+          (function
+          | ( Consensus_op attestation,
+              consensus_slot,
+              slot_index,
+              lag_index_opt,
+              shard_with_proof ) ->
+              Dal_entrapment_evidence
+                {
+                  attestation;
+                  consensus_slot;
+                  slot_index;
+                  lag_index_opt;
+                  shard_with_proof;
+                });
       }
 
   let manager_encoding =

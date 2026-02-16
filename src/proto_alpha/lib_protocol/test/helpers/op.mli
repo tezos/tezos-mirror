@@ -489,6 +489,7 @@ val dal_entrapment :
   'a Kind.consensus operation ->
   consensus_slot:Slot.t ->
   Dal.Slot_index.t ->
+  lag_index:int ->
   Dal.Shard_with_proof.t ->
   Operation.packed
 

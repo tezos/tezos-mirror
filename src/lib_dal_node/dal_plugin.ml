@@ -27,6 +27,8 @@ type operation_application_result = Succeeded | Failed
 
 type slot_index = int
 
+type lag_index = int
+
 type attestation_lag = int
 
 type slot_header = {
@@ -106,6 +108,7 @@ module type T = sig
     attested_level:Int32.t ->
     attestation_operation ->
     slot_index:slot_index ->
+    lag_index:lag_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
     tb_slot:tb_slot ->

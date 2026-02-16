@@ -47,6 +47,7 @@
       },
       "consensus_slot": 5,
       "slot_index": 2,
+      "lag_index": 0,
       "shard_with_proof": {
         "shard": [
           117,

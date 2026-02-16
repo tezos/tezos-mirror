@@ -174,10 +174,10 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
           int
           ~__LOC__
           ~error_msg:"Expected cycle position to be 0, got %L")) ;
+  let number_of_lags = List.length blk.constants.dal.attestation_lags in
   let dal_content =
     if with_dal_content then
       let number_of_slots = blk.constants.dal.number_of_slots in
-      let number_of_lags = List.length blk.constants.dal.attestation_lags in
       let attestations =
         if attest_slot then
           Dal.Attestations.(
@@ -264,6 +264,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       attestation
       ~consensus_slot
       dal_slot_index
+      ~lag_index:(number_of_lags - 1)
       shard_with_proof
   in
 

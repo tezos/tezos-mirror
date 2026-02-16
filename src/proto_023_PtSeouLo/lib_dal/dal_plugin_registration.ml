@@ -99,8 +99,8 @@ module Plugin = struct
     else return (`Head 0)
 
   let inject_entrapment_evidence cctxt ~attested_level
-      (Op attestation : attestation_operation) ~slot_index ~shard ~proof
-      ~tb_slot =
+      (Op attestation : attestation_operation) ~slot_index ~lag_index:_ ~shard
+      ~proof ~tb_slot =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
     let chain = `Main in
