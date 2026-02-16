@@ -155,7 +155,10 @@ module Loops = struct
               let block_level = header.Block_header.shell.Block_header.level in
               let*! res = balance_updates_recorder cctx block_level in
               match res with
-              | Error _ -> assert false
+              | Error errs ->
+                  Log.info logger (fun () ->
+                      Format.asprintf "Error: %a" pp_print_trace errs) ;
+                  assert false
               | Ok (level, _block_hash, _time, balance_updates) ->
                   let*! _ =
                     maybe_add_balance_updates logger pool level balance_updates
