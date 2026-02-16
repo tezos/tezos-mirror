@@ -9324,16 +9324,13 @@ let test_deposit_and_fast_withdraw =
       client
   in
 
-  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  (* Wait for the sequencer to detect and include the deposit. *)
   let* () =
-    repeat 2 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
   in
-  (* We create a L2 block to include the deposit *)
-  let* _ = produce_block () in
-  (* We make sure the L2 block is posted on the L1 and processed by the rollup
-     node *)
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Check that the receiver's balance in the rollup matches the deposited amount. *)
@@ -9471,7 +9468,6 @@ let test_deposit_and_fa_fast_withdraw =
       client
   in
   let depositor = Constant.bootstrap5 in
-  let produce_block () = Rpc.produce_block sequencer in
 
   let withdraw_amount = 50 in
   (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
@@ -9525,16 +9521,13 @@ let test_deposit_and_fa_fast_withdraw =
       client
   in
 
-  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  (* Wait for the sequencer to detect and include the deposit. *)
   let* () =
-    repeat 2 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
   in
-  (* We create a L2 block to include the deposit *)
-  let*@ _ = produce_block () in
-  (* We make sure the L2 block is posted on the L1 and processed by the rollup
-     node *)
   let* () = bake_until_sync ~sc_rollup_node ~sequencer ~client () in
 
   (* Check that the receiver's balance in the rollup matches the deposited amount. *)
