@@ -369,6 +369,14 @@ module History = struct
     | Legacy -> Format.fprintf fmt "Legacy:%d" legacy_attestation_lag
     | Dynamic n -> Format.fprintf fmt "Dynamic:%d" n
 
+  type lag_check = Exact_lag of int | Lag_interval of int * int
+
+  let interval_lag_check ~attestation_lags =
+    let min_lag =
+      List.fold_left Compare.Int.min legacy_attestation_lag attestation_lags
+    in
+    Lag_interval (min_lag, legacy_attestation_lag)
+
   type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
 
   let cell_id_equal cid1 cid2 =
@@ -1524,35 +1532,35 @@ module History = struct
         Under these assumptions, we recall that we maintain an invariant
         ensuring that we a have a cell per slot index in the skip list at every level
         after DAL activation. *)
-    let produce_proof_repr dal_params ~page_id_is_valid
+    let produce_proof_repr dal_params ~precheck_lag ~page_id_is_valid
         ~attestation_threshold_percent ~restricted_commitments_publishers
         page_id ~page_info ~get_history slots_hist =
       let open Lwt_result_syntax in
-      (* We might be able to decide about the validity of [page_id] even
-         though we do not know the exact DAL attestation lag. To do so, we
-         over-approximate the set of admissible lags by the whole interval
-         [0, legacy_attestation_lag].
+      (* Pre-check: over-approximate the validity of [page_id] given that we
+         do not know the exact DAL attestation lag yet.
 
-           - If [page_id_is_valid] is false for both extremal lags (0 and
-             [legacy_attestation_lag]), then [page_id] is definitely invalid
-             for any admissible lag, and we can immediately return
-             [Invalid_page_id].
+         The caller provides [precheck_lag], typically a [Lag_interval]
+         covering all admissible lags for the page's published level.
+         [page_id_is_valid] with a [Lag_interval] checks whether there
+         exists a lag in that interval for which the page id would be valid.
 
-           - Otherwise, there exists at least one admissible lag for which
-             [page_id] may still be valid. In that case, a failure to fetch
-             the target skip-list cell is interpreted as missing history in
-             the operator's context rather than a definitely invalid page id.
-             The proof may later be requalified as [Invalid_page_id] once the
-             actual attestation lag is known; see the second call to
-             [page_id_is_valid] below.
+           - If it returns [false], the page id is definitely invalid for
+             every admissible lag, and we immediately return
+             [Invalid_page_id] without a target cell or inclusion proof.
 
-         This check used to be done after the skip-list search, but it was
-         moved before it in order to catch as many definitely-invalid cases as
-         possible, even when the skip-list history is incomplete. *)
-      let max_attestation_lag = legacy_attestation_lag in
+           - If it returns [true], we proceed to search the skip list for
+             the target cell. Once found, the exact lag from the cell is
+             used for an authoritative post-check (see the [Exact_lag] call
+             to [page_id_is_valid] below), which may still conclude
+             [Invalid_page_id] -- this time with the target cell attached.
+
+         This check avoids the skip-list walk and produces a cheaper proof
+         (no inclusion proof needed) for obviously-invalid page ids. It is
+         also necessary for correctness: if a malicious agent requests a
+         page whose published level is not in the skip list, the search
+         below would fail; the pre-check catches this case early. *)
       let may_be_valid_in_our_range_of_lags =
-        page_id_is_valid ~dal_attestation_lag:max_attestation_lag page_id
-        || page_id_is_valid ~dal_attestation_lag:0 page_id
+        page_id_is_valid ~lag_check:precheck_lag page_id
       in
       if not may_be_valid_in_our_range_of_lags then
         (* Page id is definitely invalid, even under the upper bound. *)
@@ -1614,7 +1622,12 @@ module History = struct
                 Content.content_id target_cell_content
               in
               let dal_attestation_lag = attestation_lag_value attestation_lag in
-              if not (page_id_is_valid ~dal_attestation_lag page_id) then
+              if
+                not
+                  (page_id_is_valid
+                     ~lag_check:(Exact_lag dal_attestation_lag)
+                     page_id)
+              then
                 return
                   ( Invalid_page_id
                       {
@@ -1680,7 +1693,7 @@ module History = struct
             in
             return (proof, page_opt)
 
-    let produce_proof dal_params ~page_id_is_valid
+    let produce_proof dal_params ~precheck_lag ~page_id_is_valid
         ~attestation_threshold_percent ~restricted_commitments_publishers
         page_id ~page_info ~get_history slots_hist :
         (proof * Page.content option) tzresult Lwt.t =
@@ -1688,6 +1701,7 @@ module History = struct
       let* proof_repr, page_data =
         produce_proof_repr
           dal_params
+          ~precheck_lag
           ~page_id_is_valid
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
@@ -1721,20 +1735,19 @@ module History = struct
            path)
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    let verify_proof_repr dal_params ~page_id_is_valid page_id snapshot proof =
+    let verify_proof_repr dal_params ~precheck_lag ~page_id_is_valid page_id
+        snapshot proof =
       let open Result_syntax in
       let Page.{slot_id = Header.{published_level; index}; page_index = _} =
         page_id
       in
       match proof with
       | Invalid_page_id {target_cell_and_inc_proof = None; _} ->
-          (* We handle this case first, before processing the others. See where
-             it is returned in [produced_proof] above for more details. *)
-          let max_attestation_lag = legacy_attestation_lag in
-          if
-            page_id_is_valid ~dal_attestation_lag:max_attestation_lag page_id
-            || page_id_is_valid ~dal_attestation_lag:0 page_id
-          then
+          (* Pre-check: the proof claims the page id is invalid and does not
+             provide a target cell. We verify that the page id is indeed
+             invalid for every admissible lag. This must use the same
+             [precheck_lag] as the producer; see [produce_proof_repr]. *)
+          if page_id_is_valid ~lag_check:precheck_lag page_id then
             tzfail
             @@ dal_proof_error
                  "page_id_is_valid returned true for an Invalid_page_id but \
@@ -1835,7 +1848,11 @@ module History = struct
                 let dal_attestation_lag =
                   attestation_lag_value attestation_lag
                 in
-                if page_id_is_valid ~dal_attestation_lag page_id then
+                if
+                  page_id_is_valid
+                    ~lag_check:(Exact_lag dal_attestation_lag)
+                    page_id
+                then
                   tzfail
                   @@ dal_proof_error
                        "page_id_is_valid returned true for an Invalid_page_id \
@@ -1844,11 +1861,17 @@ module History = struct
           in
           return data_opt
 
-    let verify_proof dal_params ~page_id_is_valid page_id snapshot
+    let verify_proof dal_params ~precheck_lag ~page_id_is_valid page_id snapshot
         serialized_proof =
       let open Result_syntax in
       let* proof_repr = deserialize_proof serialized_proof in
-      verify_proof_repr dal_params ~page_id_is_valid page_id snapshot proof_repr
+      verify_proof_repr
+        dal_params
+        ~precheck_lag
+        ~page_id_is_valid
+        page_id
+        snapshot
+        proof_repr
 
     let adal_parameters_of_proof serialized_proof =
       let open Result_syntax in

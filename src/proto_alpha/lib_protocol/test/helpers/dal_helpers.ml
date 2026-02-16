@@ -214,7 +214,8 @@ struct
     let*!@ res =
       Hist.produce_proof
         params
-        ~page_id_is_valid:(fun ~dal_attestation_lag:_ _page_id -> true)
+        ~precheck_lag:(Lag_interval (0, Hist.legacy_attestation_lag))
+        ~page_id_is_valid:(fun ~lag_check:_ _page_id -> true)
         ~page_info
         ~attestation_threshold_percent:None
         ~restricted_commitments_publishers:None
@@ -230,10 +231,11 @@ struct
         let@ res =
           Hist.verify_proof
             params
+            ~precheck_lag:(Lag_interval (0, Hist.legacy_attestation_lag))
+            ~page_id_is_valid:(fun ~lag_check:_ _page_id -> true)
             page_id
             skip_list
             proof
-            ~page_id_is_valid:(fun ~dal_attestation_lag:_ _page_id -> true)
         in
         check_verify res page_info
 

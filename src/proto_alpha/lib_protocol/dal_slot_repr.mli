@@ -309,9 +309,27 @@ module History : sig
       attestation_lag_kind. *)
   val attestation_lag_value : attestation_lag_kind -> int
 
-  (** Value of the attestation lag used by protocols prior to T. It's the same
-      on all the networks we upgrade (e.g., mainnet, ghostnet and shadownet). *)
+  (** Value of the attestation lag used by protocols up to (and including)
+      T. It's the same on all the networks we upgrade (e.g., mainnet, ghostnet
+      and shadownet). *)
   val legacy_attestation_lag : int
+
+  (** Specifies how the attestation lag is checked in {!page_id_is_valid}.
+
+      - [Exact_lag lag]: the exact attestation lag is known (read from the
+        skip-list cell). The validity check uses this precise value.
+
+      - [Lag_interval (min_lag, max_lag)]: the exact lag is not yet known
+        (the cell has not been fetched). The validity check uses the interval
+        as an over-approximation: if the page id is invalid for every lag in
+        the interval, it is definitely invalid and can be rejected early. *)
+  type lag_check = Exact_lag of int | Lag_interval of int * int
+
+  (* [interval_lag_check attestation_lags] builds a [Lag_interval (min_lag,
+     max_lag)] value, where [min_lag] is the minimum lag among
+     [dal_parameters.attestation_lags] and [max_lag] is
+     {!legacy_attestation_lag}. *)
+  val interval_lag_check : attestation_lags:int list -> lag_check
 
   (** Identify a cell not only by its published_level + slot_index (Header.id),
       but also by the attestation lag that applied when it was attested. *)
@@ -514,10 +532,16 @@ module History : sig
 
       The returned result also contains the attestation lag used for the target
       cell in the skip list so that refutation games use the correct value,
-      in particular across protocol migrations that decrease the lag. *)
+      in particular across protocol migrations that decrease the lag.
+
+      [precheck_lag] is the {!lag_check} value used by the pre-check to reject
+      obviously-invalid page ids before searching the skip list. Callers
+      should pass [Lag_interval (min_attestation_lag, max_attestation_lag)]
+      covering all admissible lags for the target page's published level. *)
   val produce_proof :
     Parameters.t ->
-    page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
+    precheck_lag:lag_check ->
+    page_id_is_valid:(lag_check:lag_check -> Page.t -> bool) ->
     attestation_threshold_percent:int option ->
     restricted_commitments_publishers:Contract_repr.t list option ->
     Page.t ->
@@ -539,10 +563,16 @@ module History : sig
       the candidate slot (if any).
 
       In both cases, the attestation lag used for the target cell in the skip
-      list is returned, alongside the page's bytes if the slot is attested. *)
+      list is returned, alongside the page's bytes if the slot is attested.
+
+      [precheck_lag] serves the same role as in {!produce_proof}: proofs
+      that claim [Invalid_page_id] without a target cell are validated
+      against this lag specification. It must match the value used by the
+      producer. *)
   val verify_proof :
     Parameters.t ->
-    page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
+    precheck_lag:lag_check ->
+    page_id_is_valid:(lag_check:lag_check -> Page.t -> bool) ->
     Page.t ->
     t ->
     proof ->

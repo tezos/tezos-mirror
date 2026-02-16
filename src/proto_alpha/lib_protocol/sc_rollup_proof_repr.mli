@@ -268,15 +268,28 @@ module Dal_helpers : sig
       is in the following boundaries:
 
       - DAL is activated and [published_level] >= [dal_activation_level]
-      - [published_level] > [origination_level]: this means that the slot of the
-      page was published after the rollup origination ;
 
-      - [published_level] + [dal_attestation_lag] <= [import_inbox_level]: this
-      means that the slot of the page has been attested before or at the
-      [import_inbox_level]. *)
+      - [published_level] > [origination_level]: this means that the slot of the
+        page was published after the rollup origination
+
+      - (attestation complete) [published_level] + [dal_attestation_lag] <=
+        [import_inbox_level]: this means that the slot of the page has been
+        attested before or at the [import_inbox_level]
+
+      - (TTL not expired) [published_level] + [dal_attestation_lag] -
+        [dal_attested_slots_validity_lag] >= [import_inbox_level]: this means that
+        slot TTL has not expired
+
+      The [dal_attestation_lag] is given by the [lag_check] value.
+      When [lag_check] is [Exact lag], then [dal_attestation_lag] is [lag].
+      When [lag_check] is [Lag_interval (min_lag, max_lag)], then
+      [dal_attestation_lag] is [min_lag] for the "attestation complete" check,
+      and is [max_lag] for the "TTL not expired" check. This means that the
+      function returns [true] if there exists at least one lag in the interval
+      for which the page would be valid. *)
   val import_level_is_valid :
     dal_activation_level:Raw_level_repr.t option ->
-    dal_attestation_lag:int ->
+    lag_check:Dal_slot_repr.History.lag_check ->
     origination_level:Raw_level_repr.t ->
     import_inbox_level:Raw_level_repr.t ->
     published_level:Raw_level_repr.t ->

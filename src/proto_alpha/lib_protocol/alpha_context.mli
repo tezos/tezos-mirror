@@ -3225,6 +3225,10 @@ module Dal : sig
 
     val legacy_attestation_lag : int
 
+    type lag_check = Exact_lag of int | Lag_interval of int * int
+
+    val interval_lag_check : attestation_lags:int list -> lag_check
+
     type cell_id = {
       header_id : Slot.Header.id;
       attestation_lag : attestation_lag_kind;
@@ -4308,7 +4312,7 @@ module Sc_rollup : sig
     module Dal_helpers : sig
       val import_level_is_valid :
         dal_activation_level:Raw_level.t option ->
-        dal_attestation_lag:int ->
+        lag_check:Dal.Slots_history.lag_check ->
         origination_level:Raw_level.t ->
         import_inbox_level:Raw_level.t ->
         published_level:Raw_level.t ->
