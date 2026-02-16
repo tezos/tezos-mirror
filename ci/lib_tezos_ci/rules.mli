@@ -115,7 +115,11 @@ val schedule_extended_validation_tests : If.t
     pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the remote mode of the baker will be enabled.
+    Cf. [tezt/lib_tezos/agnostic_baker.ml]. *)
 val schedule_extended_baker_remote_mode_tests : If.t
 
 (** A rule that is true for scheduled extended baker with baker dal
