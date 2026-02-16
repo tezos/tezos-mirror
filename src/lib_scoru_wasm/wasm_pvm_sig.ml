@@ -25,6 +25,56 @@
 (*****************************************************************************)
 open Wasm_pvm_state
 
+module type STATE = sig
+  type state
+
+  module Encoding_runner : sig
+    val encode : Wasm_pvm_state.Internal_state.pvm_state -> state -> state Lwt.t
+
+    val decode : state -> Wasm_pvm_state.Internal_state.pvm_state Lwt.t
+
+    val encode_durable_storage : Durable.t -> state -> state Lwt.t
+
+    val decode_durable_storage : state -> Durable.t Lwt.t
+
+    val decode_buffers :
+      state -> Tezos_webassembly_interpreter.Eval.buffers option Lwt.t
+  end
+
+  module Internal_for_tests : sig
+    val insert_failure : state -> state Lwt.t
+  end
+end
+
+module type STATE_PROOF = sig
+  include STATE
+
+  type context
+
+  val empty_state : unit -> state
+
+  val state_hash : state -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
+
+  type proof
+
+  val proof_encoding : proof Data_encoding.t
+
+  val proof_start_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val proof_stop_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
+
+  val produce_proof :
+    context ->
+    state ->
+    (state -> (state * 'a) Lwt.t) ->
+    (proof * 'a) option Lwt.t
+
+  val verify_proof :
+    proof -> (state -> (state * 'a) Lwt.t) -> (state * 'a) option Lwt.t
+
+  val cast_read_only : proof -> proof
+end
+
 module type Unsafe = sig
   type state
 
