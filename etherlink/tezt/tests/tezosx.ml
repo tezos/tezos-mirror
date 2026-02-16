@@ -278,6 +278,51 @@ let check_michelson_storage_value ~sc_rollup_node ~contract_hex ~expected () =
           ~error_msg:"Expected storage %R but got %L") ;
       unit
 
+(** EVM precompile address for cross-runtime gateway calls.
+    See [revm/src/precompiles/constants.rs:RUNTIME_GATEWAY_PRECOMPILE_ADDRESS]. *)
+let evm_gateway_address = "0xff00000000000000000000000000000000000007"
+
+(** [craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
+    ~abi_signature ~arguments ()] crafts an EVM transaction, sends it, produces
+    a block, and returns the receipt (asserting success). *)
+let craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
+    ~abi_signature ~arguments () =
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:300_000
+      ~gas_price:1_000_000_000
+      ~value
+      ~address
+      ~signature:abi_signature
+      ~arguments
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  match receipt with
+  | Some ({status = true; _} as r) -> return r
+  | Some {status = false; _} -> Test.fail "EVM transaction to %s failed" address
+  | None -> Test.fail "No receipt for EVM transaction to %s" address
+
+(** [call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination ()]
+    calls the cross-runtime gateway precompile to reach [destination] (a Tezos
+    address). Returns the transaction receipt.
+    Wrapper around {!craft_and_send_evm_transaction}. *)
+let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination () =
+  craft_and_send_evm_transaction
+    ~sequencer
+    ~sender
+    ~nonce
+    ~value
+    ~address:evm_gateway_address
+    ~abi_signature:"transfer(string)"
+    ~arguments:[destination]
+    ()
+
 (** [with_check_source_delta_balance ~source ~tez_client ~expected_consumed action]
     reads the balance of [source] before and after running [action ()], then
     checks that exactly [expected_consumed] mutez were consumed. The balance
