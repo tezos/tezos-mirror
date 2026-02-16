@@ -122,7 +122,11 @@ val schedule_extended_baker_remote_mode_tests : If.t
     commands.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
-    [TZ_SCHEDULE_KIND] set to [EXTENDED_DAL_USE_BAKER]. *)
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_DAL_USE_BAKER].
+
+    NB: Tests will run differently with this value of [TZ_SCHEDULE_KIND]:
+    the baker will start the DAL node.
+    Cf. [tezt/lib_tezos/dal_node.ml]. *)
 val schedule_extended_dal_use_baker : If.t
 
 (** A rule that is true for scheduled release tests.
