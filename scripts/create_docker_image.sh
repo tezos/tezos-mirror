@@ -248,16 +248,24 @@ if ! docker inspect --type=image "$image_test" > /dev/null 2>&1; then
     echo "Failed to pull CI image $image_test."
     echo "If you have modified any inputs to the CI images, then you have to rebuild them locally through ./images/create_ci_images.sh."
     exit 1
+  else
+    echo "Pull of $image_test succeeded"
   fi
 fi
 
+# ${BASE_IMAGE}/${BASE_IMAGE_VERSION} is the CI image that is built on master
+# using the latest tag from ./images/image_tag.sh images/ci  that corresponds
+# to the state of the repo specified in version.sh .
+#
+# $GIT_SHORTREF / $GIT_DATETIME / $GIT_VERSION are used by libversion to assign
+# the correct version to the octez binaries at compile time
+#
+# ${RUST_TOOLCHAIN_IMAGE_NAME}:${RUST_TOOLCHAIN_IMAGE_TAG} is the master image
+# to build L2 binaries.
+#
 echo "### Building tezos..."
 
-docker build \
-  --network host \
-  -t "$build_image_name:$image_version" \
-  -f build.Dockerfile \
-  --target "$docker_target" \
+docker buildx build \
   --build-arg "BASE_IMAGE=$ci_image_name" \
   --build-arg "BASE_IMAGE_VERSION=build:$ci_image_version" \
   --build-arg "OCTEZ_EXECUTABLES=${executables}" \
@@ -266,6 +274,9 @@ docker build \
   --build-arg "GIT_VERSION=${commit_tag}" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_NAME=$rust_toolchain_image_name" \
   --build-arg "RUST_TOOLCHAIN_IMAGE_TAG=$rust_toolchain_image_tag" \
+  --target "$docker_target" \
+  --tag "$build_image_name:$image_version" \
+  -f build.Dockerfile \
   "$src_dir"
 
 echo "### Successfully built docker image: $build_image_name:$image_version"
@@ -273,48 +284,60 @@ echo "### Successfully built docker image: $build_image_name:$image_version"
 for variant in $variants; do
   case "$variant" in
   debug)
-    docker build \
-      --network host \
-      -t "${image_name}debug:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=debug \
+      --tag "${image_name}debug:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}debug:$image_version"
     ;;
 
   bare)
-    docker build \
-      --network host \
-      -t "${image_name}bare:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=bare \
+      --tag "${image_name}bare:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name}bare:$image_version"
     ;;
 
   minimal)
-    docker build \
-      --network host \
-      -t "${image_name%?}:$image_version" \
+    docker buildx build \
       --build-arg "BASE_IMAGE=$ci_image_name" \
       --build-arg "BASE_IMAGE_VERSION=runtime:$ci_image_version" \
       --build-arg "BASE_IMAGE_VERSION_NON_MIN=build:$ci_image_version" \
       --build-arg "BUILD_IMAGE=${build_image_name}" \
       --build-arg "BUILD_IMAGE_VERSION=${image_version}" \
       --build-arg "COMMIT_SHORT_SHA=${commit_short_sha}" \
+      --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
+      --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
+      --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
+      --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
+      --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
       --target=minimal \
+      --tag "${image_name%?}:$image_version" \
       "$src_dir"
 
     echo "### Successfully built docker image: ${image_name%?}:$image_version"
