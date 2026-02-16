@@ -16,6 +16,7 @@ module type PROTOCOL_SERVICES = sig
     wrap_full ->
     Int32.t ->
     (int32
+    * int32
     * Block_hash.t
     * Time.Protocol.t
     * Data.Balance_update.balance_update list)

@@ -28,6 +28,7 @@ let create_block_balance_updates =
   "CREATE TABLE IF NOT EXISTS block_balance_updates(\n\
   \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
   \  block $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  cycle $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
   \  address $(BYTES) NOT NULL,\n\
   \  category TEXT NOT NULL,\n\
   \  result  TEXT NOT NULL,\n\
@@ -42,8 +43,16 @@ let create_block_balance_updates_idx =
   "CREATE INDEX IF NOT EXISTS block_balance_updates_idx ON \
    block_balance_updates(block)"
 
+let create_block_balance_updates_cycle_address_idx =
+  "CREATE INDEX IF NOT EXISTS block_balance_updates_cycle_address_idx ON \
+   block_balance_updates(cycle, address)"
+
 let create_tables =
-  [create_block_balance_updates; create_block_balance_updates_idx]
+  [
+    create_block_balance_updates;
+    create_block_balance_updates_idx;
+    create_block_balance_updates_cycle_address_idx;
+  ]
 
 module Type = struct
   let decode_error x =
@@ -113,13 +122,22 @@ end
 let insert_block_balance_update =
   Caqti_request.Infix.(
     Caqti_type.(
-      t5
-        (* $1 level *) int32
-        (* $2 address *) Type.public_key_hash
-        (* $3 category *) string
-        (* $4 result *) string
-        (* $5 value *)
-        int64
+      t2
+        (t3
+           (* $1 level *) int32
+           (* $2 cycle *) int32
+           (* $3 address *) Type.public_key_hash)
+        (t3
+           (* $4 category *) string
+           (* $5 result *) string
+           (* $6 value *) int64)
       ->. unit))
-    "INSERT INTO block_balance_updates (block,address,category,result,value) \
-     VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING"
+    "INSERT INTO block_balance_updates \
+     (block,cycle,address,category,result,value) VALUES (?,?,?,?,?,?) ON \
+     CONFLICT DO NOTHING"
+
+let select_cycle_balance_updates =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 Type.public_key_hash int32 ->* t3 string string int64))
+    "SELECT category, result, SUM(value) FROM block_balance_updates WHERE \
+     address = ? AND cycle = ? GROUP BY category, result"

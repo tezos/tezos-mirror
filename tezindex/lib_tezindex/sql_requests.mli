@@ -28,7 +28,14 @@ end
 val create_tables : string list
 
 val insert_block_balance_update :
-  ( int32 * Tezos_crypto.Signature.public_key_hash * string * string * int64,
+  ( (int32 * int32 * Tezos_crypto.Signature.public_key_hash)
+    * (string * string * int64),
     unit,
     [`Zero] )
+  Caqti_request.t
+
+val select_cycle_balance_updates :
+  ( Tezos_crypto.Signature.public_key_hash * int32,
+    string * string * int64,
+    [`Many | `One | `Zero] )
   Caqti_request.t
