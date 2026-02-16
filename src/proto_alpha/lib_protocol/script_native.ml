@@ -577,9 +577,13 @@ module CLST_contract = struct
     let total_supply : storage ex_view tzresult =
       let open Result_syntax in
       let* name = Script_string.of_string "get_total_supply" in
-      let implementation (ctxt, _step_constants) (() : unit)
-          ((_ledger, (total_supply, _operators_table)) : storage) =
+      let implementation (ctxt, _step_constants) (() : unit) (storage : storage)
+          =
         let open Lwt_result_syntax in
+        let total_supply =
+          Clst_contract_storage.(
+            get_total_supply_from_storage (from_clst_storage storage))
+        in
         return (total_supply, ctxt)
       in
       return

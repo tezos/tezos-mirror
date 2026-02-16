@@ -93,7 +93,11 @@ module CLST_types : sig
       tokens into tickets. Operators cannot increase the allowance. *)
   type operators_table = (address, operators) big_map
 
-  type storage = (ledger, total_supply, operators_table) tup3
+  type token_info = (Script_string.t, bytes) map
+
+  type token_metadata = (nat, nat (* token_id *) * token_info) big_map
+
+  type storage = (ledger, total_supply, operators_table, token_metadata) tup4
 
   type balance_view = (address * nat, nat) view_type
 
