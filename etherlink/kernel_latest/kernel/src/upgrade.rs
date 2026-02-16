@@ -36,8 +36,8 @@ use tezos_storage::read_optional_rlp;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
 pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
-const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
-pub use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH as SEQUENCER_KEY_CHANGE;
+use revm_etherlink::storage::world_state_handler::GOVERNANCE_SEQUENCER_UPGRADE_PATH;
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
@@ -200,7 +200,7 @@ pub fn store_sequencer_upgrade<Host: Runtime>(
     );
     let bytes = &sequencer_upgrade.rlp_bytes();
     Event::SequencerUpgrade(sequencer_upgrade).store(host)?;
-    let path = OwnedPath::from(SEQUENCER_UPGRADE);
+    let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     host.store_write_all(&path, bytes)
         .context("Failed to store sequencer upgrade")
 }
@@ -208,12 +208,12 @@ pub fn store_sequencer_upgrade<Host: Runtime>(
 pub fn read_sequencer_upgrade<Host: Runtime>(
     host: &Host,
 ) -> anyhow::Result<Option<SequencerUpgrade>> {
-    let path = OwnedPath::from(SEQUENCER_UPGRADE);
+    let path = OwnedPath::from(GOVERNANCE_SEQUENCER_UPGRADE_PATH);
     read_optional_rlp(host, &path).context("Failed to decode sequencer upgrade")
 }
 
 fn delete_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER_UPGRADE)
+    host.store_delete(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
         .context("Failed to delete sequencer upgrade")
 }
 
@@ -249,12 +249,12 @@ pub use revm_etherlink::storage::sequencer_key_change::SequencerKeyChange as EVM
 pub fn read_sequencer_key_change<Host: Runtime>(
     host: &Host,
 ) -> anyhow::Result<Option<EVMBasedSequencerKeyChange>> {
-    let path = OwnedPath::from(SEQUENCER_KEY_CHANGE);
+    let path = OwnedPath::from(SEQUENCER_KEY_CHANGE_PATH);
     read_optional_rlp(host, &path).context("Failed to decode sequencer key change")
 }
 
 fn delete_sequencer_key_change<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER_KEY_CHANGE)
+    host.store_delete(&SEQUENCER_KEY_CHANGE_PATH)
         .context("Failed to delete sequencer key change")
 }
 

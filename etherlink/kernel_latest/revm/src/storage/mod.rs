@@ -4,18 +4,14 @@
 
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup_host::path::RefPath;
 
-use crate::storage::world_state_handler::KT1_B58_SIZE;
+use crate::storage::world_state_handler::{KT1_B58_SIZE, NATIVE_TOKEN_TICKETER_PATH};
 
 pub mod block;
 pub mod code;
 pub mod sequencer_key_change;
 pub mod version;
 pub mod world_state_handler;
-
-pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/ticketer");
 
 pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
     let ticketer = host

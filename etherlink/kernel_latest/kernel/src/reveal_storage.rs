@@ -7,8 +7,9 @@
 //! production setup.
 
 use crate::configuration::{fetch_chain_configuration, fetch_configuration, CHAIN_ID};
-use crate::storage::{read_chain_id, ADMIN, SEQUENCER};
+use crate::storage::{read_chain_id, ADMIN};
 use primitive_types::U256;
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
@@ -94,7 +95,7 @@ pub fn reveal_storage(
     if let Some(sequencer) = sequencer {
         let pk_b58 = PublicKey::to_b58check(&sequencer);
         let bytes = String::as_bytes(&pk_b58);
-        host.store_write_all(&SEQUENCER, bytes).unwrap();
+        host.store_write_all(&SEQUENCER_KEY_PATH, bytes).unwrap();
     }
 
     // Change the admin if asked:

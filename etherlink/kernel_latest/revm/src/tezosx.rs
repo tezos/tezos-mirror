@@ -6,7 +6,7 @@ use tezosx_interfaces::RuntimeId;
 use crate::Error;
 
 // Path where accounts informations are stored.
-const ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/eth_accounts");
+const ACCOUNTS_PATH: RefPath = crate::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 
 pub fn store_alias(
     host: &mut impl Runtime,

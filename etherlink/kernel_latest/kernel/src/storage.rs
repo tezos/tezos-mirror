@@ -184,7 +184,7 @@ const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
-pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
+use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_PATH;
 
 pub const KEEP_EVENTS: RefPath = RefPath::assert_from(b"/evm/keep_events");
 
@@ -735,8 +735,8 @@ pub fn delete_block_in_progress<Host: Runtime>(host: &mut Host) -> anyhow::Resul
 }
 
 pub fn sequencer<Host: Runtime>(host: &Host) -> anyhow::Result<Option<PublicKey>> {
-    if host.store_has(&SEQUENCER)?.is_some() {
-        let bytes = host.store_read_all(&SEQUENCER)?;
+    if host.store_has(&SEQUENCER_KEY_PATH)?.is_some() {
+        let bytes = host.store_read_all(&SEQUENCER_KEY_PATH)?;
         let Ok(tz1_b58) = String::from_utf8(bytes) else {
             return Ok(None);
         };
@@ -834,7 +834,7 @@ pub fn read_dal_publishers_whitelist<Host: Runtime>(
 }
 
 pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&SEQUENCER).map_err(Into::into)
+    host.store_delete(&SEQUENCER_KEY_PATH).map_err(Into::into)
 }
 
 pub fn store_sequencer<Host: Runtime>(
@@ -843,7 +843,8 @@ pub fn store_sequencer<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write(&SEQUENCER, bytes, 0).map_err(Into::into)
+    host.store_write(&SEQUENCER_KEY_PATH, bytes, 0)
+        .map_err(Into::into)
 }
 
 pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {

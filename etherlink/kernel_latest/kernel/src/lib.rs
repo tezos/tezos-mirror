@@ -442,8 +442,9 @@ mod tests {
     };
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
-    use revm_etherlink::storage::world_state_handler::StorageAccount;
-    use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
+    use revm_etherlink::storage::world_state_handler::{
+        StorageAccount, NATIVE_TOKEN_TICKETER_PATH,
+    };
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;

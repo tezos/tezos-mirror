@@ -33,7 +33,7 @@ pub const EVM_ACCOUNTS_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts");
 
 /// Path where the L1 address of our withdrawals ticketer is stored.
-pub(crate) const WITHDRAWALS_TICKETER_PATH: RefPath =
+pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
 /// Size of contract hash encoded in base58.
@@ -49,7 +49,7 @@ pub const GOVERNANCE_SEQUENCER_UPGRADE_PATH: RefPath =
     RefPath::assert_from(b"/evm/sequencer_upgrade");
 
 /// Path where the sequencer key is stored. (Must be read through `internal_store_read_all`)
-pub(crate) const SEQUENCER_KEY_PATH: RefPath = RefPath::assert_from(b"/evm/sequencer");
+pub const SEQUENCER_KEY_PATH: RefPath = RefPath::assert_from(b"/evm/sequencer");
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
