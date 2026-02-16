@@ -1361,9 +1361,42 @@ let gen_game ~p1_strategy ~p2_strategy =
     ~gen:(fun rand -> generate1 ~rand (gen_game ~p1_strategy ~p2_strategy))
     ~shrink:(fun _ -> Seq.empty)
 
-(** [prepare_game block rollup lcc commitment_level p1_client p2_client contract
-    list_of_messages] prepares a context where [p1_client] and [p2_client]
-    are in conflict for one commitment. *)
+(** Bake [n] empty blocks, tracking each block's inbox entry so that
+    the players' local inboxes can be kept in sync with the on-chain inbox. *)
+let bake_and_track_inbox_levels block n =
+  let open Lwt_result_syntax in
+  let rec aux block acc remaining =
+    if remaining <= 0 then return (block, List.rev acc)
+    else
+      let predecessor = block.Block.hash in
+      let predecessor_timestamp = block.header.shell.timestamp in
+      let* block = Block.bake block in
+      let level = Raw_level.of_int32_exn block.header.shell.level in
+      let entry =
+        Sc_rollup_helpers.wrap_messages
+          level
+          ~pred_info:(predecessor_timestamp, predecessor)
+          []
+      in
+      aux block (entry :: acc) (remaining - 1)
+  in
+  aux block [] n
+
+(** Update a player client's local inbox with additional empty levels so that
+    it stays consistent with the on-chain inbox. *)
+let update_player_inbox extra_levels player_client =
+  let inbox =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Sc_rollup_helpers.Node_inbox.fill_inbox
+         ~inbox_creation_level:Raw_level.root
+         player_client.inbox
+         extra_levels
+  in
+  {player_client with inbox}
+
+(** [prepare_game block rollup lcc commitment_level p1_client p2_client]
+    prepares a context where [p1_client] and [p2_client] are in conflict
+    for one commitment. *)
 let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
     =
   let open Lwt_result_syntax in
@@ -1373,8 +1406,32 @@ let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
   let* p2_op, p2_commitment =
     operation_publish_commitment (B block) rollup lcc commitment_level p2_client
   in
-  let commit_then_commit_and_refute ~defender_op ~refuter_op refuter
-      refuter_commitment defender defender_commitment =
+  (* Publish both commitments first. Track the publish block's inbox entry
+     since it adds SOL/Info/EOL to the on-chain inbox. *)
+  let publish_predecessor = block.Block.hash in
+  let publish_predecessor_timestamp = block.header.shell.timestamp in
+  let* block = Block.bake ~operations:[p1_op; p2_op] block in
+  let publish_level = Raw_level.of_int32_exn block.header.shell.level in
+  let publish_entry =
+    Sc_rollup_helpers.wrap_messages
+      publish_level
+      ~pred_info:(publish_predecessor_timestamp, publish_predecessor)
+      []
+  in
+  (* Bake one commitment period before starting the refutation game, as
+     required by the protocol. Each empty block's inbox entry is tracked so
+     the players' local inboxes can be updated to match the on-chain inbox. *)
+  let* constants = Context.get_constants (B block) in
+  let commitment_period_in_blocks =
+    constants.parametric.sc_rollup.commitment_period_in_blocks
+  in
+  let* block, extra_levels =
+    bake_and_track_inbox_levels block (commitment_period_in_blocks - 1)
+  in
+  let extra_levels = publish_entry :: extra_levels in
+  let p1_client = update_player_inbox extra_levels p1_client in
+  let p2_client = update_player_inbox extra_levels p2_client in
+  let start_refutation refuter refuter_commitment defender defender_commitment =
     let refutation =
       Sc_rollup.Game.Start
         {
@@ -1392,32 +1449,12 @@ let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
         defender.player.pkh
         refutation
     in
-    let* refuter_batch =
-      Op.batch_operations
-        ~recompute_counters:true
-        ~source:refuter.player.contract
-        (B block)
-        [refuter_op; start_game]
-    in
-    let* block = Block.bake ~operations:[defender_op; refuter_batch] block in
+    let* block = Block.bake ~operations:[start_game] block in
     return (block, refuter, defender)
   in
   if p1_start then
-    commit_then_commit_and_refute
-      ~defender_op:p2_op
-      ~refuter_op:p1_op
-      p1_client
-      p1_commitment
-      p2_client
-      p2_commitment
-  else
-    commit_then_commit_and_refute
-      ~defender_op:p1_op
-      ~refuter_op:p2_op
-      p2_client
-      p2_commitment
-      p1_client
-      p1_commitment
+    start_refutation p1_client p1_commitment p2_client p2_commitment
+  else start_refutation p2_client p2_commitment p1_client p1_commitment
 
 let check_distribution = function
   | fst :: snd :: rst ->
