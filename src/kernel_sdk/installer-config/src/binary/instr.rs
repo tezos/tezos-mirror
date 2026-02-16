@@ -58,7 +58,8 @@ pub mod owned {
     use tezos_smart_rollup_encoding::dac::PreimageHash;
     use tezos_smart_rollup_host::{
         path::{OwnedPath, PathError},
-        runtime::Runtime,
+        reveal::HostReveal,
+        storage::StorageV1,
     };
     use thiserror::Error;
 
@@ -79,7 +80,10 @@ pub mod owned {
     pub struct OwnedConfigProgram(pub Vec<OwnedConfigInstruction>);
 
     impl OwnedConfigProgram {
-        pub fn evaluate(&self, host: &mut impl Runtime) -> Result<(), &'static str> {
+        pub fn evaluate<Host>(&self, host: &mut Host) -> Result<(), &'static str>
+        where
+            Host: StorageV1 + HostReveal,
+        {
             for instruction in self.0.iter() {
                 eval_config_instr(host, instruction)?
             }
@@ -117,7 +121,8 @@ pub mod evaluation {
     use crate::binary::instr::{MoveInstruction, RevealInstruction, SetInstruction};
     use crate::binary::reveal_root_hash_to_store;
     use tezos_smart_rollup_host::path::Path as HostPath;
-    use tezos_smart_rollup_host::runtime::Runtime;
+    use tezos_smart_rollup_host::reveal::HostReveal;
+    use tezos_smart_rollup_host::storage::StorageV1;
 
     use super::ConfigInstruction;
 
@@ -136,10 +141,14 @@ pub mod evaluation {
     /// use tezos_smart_rollup_installer_config::binary::owned::OwnedConfigProgram;
     /// use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
     /// use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
-    /// use tezos_smart_rollup_host::runtime::Runtime;
+    /// use tezos_smart_rollup_host::reveal::HostReveal;
+    /// use tezos_smart_rollup_host::storage::StorageV1;
     ///
     ///
-    /// pub fn upgrade_kernel(host: &mut impl Runtime) -> Result<(), &'static str> {
+    /// pub fn upgrade_kernel<Host>(host: &mut Host) -> Result<(), &'static str>
+    /// where
+    ///     Host: HostReveal + StorageV1
+    /// {
     ///     let root_hash = [0; PREIMAGE_HASH_SIZE];
     ///
     ///     // Create config consisting of a reveal instruction followed by a move.
@@ -148,10 +157,13 @@ pub mod evaluation {
     ///     config.evaluate(host)
     /// }
     /// ```
-    pub fn eval_config_instr<Path: HostPath, Bytes: AsRef<[u8]>>(
-        host: &mut impl Runtime,
+    pub fn eval_config_instr<Host, Path: HostPath, Bytes: AsRef<[u8]>>(
+        host: &mut Host,
         config_instr: &ConfigInstruction<Path, Bytes>,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), &'static str>
+    where
+        Host: StorageV1 + HostReveal,
+    {
         match config_instr {
             ConfigInstruction::Reveal(RevealInstruction { hash, to }) => {
                 let hash = &hash

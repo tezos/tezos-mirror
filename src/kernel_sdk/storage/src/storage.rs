@@ -8,7 +8,7 @@
 use crate::layer::Layer;
 use crate::StorageError;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 extern crate alloc;
 
@@ -34,7 +34,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// state/transaction and id
     pub fn get(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<Option<T>, StorageError> {
         if let Some(top_layer) = self.layers.last() {
@@ -47,7 +47,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Get immutable object in state before any transaction began
     pub fn get_original(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<Option<T>, StorageError> {
         if let Some(bottom_layer) = self.layers.first() {
@@ -60,7 +60,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Create a new object as part of current storage state/transaction
     pub fn create_new(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         id: &impl Path,
     ) -> Result<Option<T>, StorageError> {
         if let Some(top_layer) = self.layers.last_mut() {
@@ -72,7 +72,7 @@ impl<T: From<OwnedPath>> Storage<T> {
 
     pub fn get_or_create(
         &self,
-        host: &impl Runtime,
+        host: &impl StorageV1,
         id: &impl Path,
     ) -> Result<T, StorageError> {
         if let Some(top_layer) = self.layers.last() {
@@ -85,7 +85,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Delete an object as part of current storage state/transaction
     pub fn delete(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
         id: &impl Path,
     ) -> Result<(), StorageError> {
         if let Some(top_layer) = self.layers.last_mut() {
@@ -98,7 +98,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Begin a new transaction
     pub fn begin_transaction(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> Result<(), StorageError> {
         let new_layer_index = self.layers.len() + 1;
         if let Some(top) = self.layers.last() {
@@ -115,7 +115,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Commit current storage state
     pub fn commit_transaction(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> Result<(), StorageError> {
         if self.layers.len() > 1 {
             if let (Some(top), Some(last)) = (self.layers.pop(), self.layers.last_mut()) {
@@ -131,7 +131,7 @@ impl<T: From<OwnedPath>> Storage<T> {
     /// Abort current storage state
     pub fn rollback_transaction(
         &mut self,
-        host: &mut impl Runtime,
+        host: &mut impl StorageV1,
     ) -> Result<(), StorageError> {
         if self.layers.len() > 1 {
             if let Some(top) = self.layers.pop() {
@@ -157,7 +157,7 @@ impl<T: From<OwnedPath>> Storage<T> {
 mod test {
     use crate::storage::Storage;
     use host::path::{concat, OwnedPath, RefPath};
-    use host::runtime::Runtime;
+    use host::storage::StorageV1;
     use tezos_smart_rollup_mock::MockHost;
 
     #[derive(PartialEq, Debug)]
@@ -169,28 +169,28 @@ mod test {
     const VALUE_B_PATH: RefPath = RefPath::assert_from(b"/b");
 
     impl TestAccount {
-        pub fn set_a(&mut self, host: &mut impl Runtime, v: &str) {
+        pub fn set_a(&mut self, host: &mut impl StorageV1, v: &str) {
             let value_path = concat(&self.path, &VALUE_A_PATH)
                 .expect("The account should have a path for a");
             host.store_write(&value_path, v.as_bytes(), 0)
                 .expect("Cannot set value for b")
         }
 
-        pub fn set_b(&mut self, host: &mut impl Runtime, v: &str) {
+        pub fn set_b(&mut self, host: &mut impl StorageV1, v: &str) {
             let value_path = concat(&self.path, &VALUE_B_PATH)
                 .expect("The account should have a path for b");
             host.store_write(&value_path, v.as_bytes(), 0)
                 .expect("Cannot set value for b")
         }
 
-        pub fn get_a(&self, host: &impl Runtime) -> Vec<u8> {
+        pub fn get_a(&self, host: &impl StorageV1) -> Vec<u8> {
             let value_path = concat(&self.path, &VALUE_A_PATH)
                 .expect("The account should have a path for a");
             host.store_read(&value_path, 0, 1024)
                 .expect("No value for a")
         }
 
-        pub fn get_b(&self, host: &impl Runtime) -> Vec<u8> {
+        pub fn get_b(&self, host: &impl StorageV1) -> Vec<u8> {
             let value_path = concat(&self.path, &VALUE_B_PATH)
                 .expect("The account should have a path for b");
             host.store_read(&value_path, 0, 1024)

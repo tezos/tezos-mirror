@@ -15,17 +15,25 @@ mod entrypoint;
 use proc_macro::TokenStream;
 use proc_macro_error2::proc_macro_error;
 
-/// Mark a function of type `fn(&mut impl Runtime)` as the entrypoint of the kernel.
+/// Mark a function of type `fn<Host>(&mut Host)` as the entrypoint of the kernel.
 ///
 /// ### Example
 /// ```
 /// use tezos_smart_rollup::prelude::*;
+/// use tezos_smart_rollup::host::HostDebug;
+/// use tezos_smart_rollup::host::StorageV1;
 ///
 /// #[entrypoint::main]
-/// pub fn f(host: &mut impl Runtime) {
+/// pub fn f<Host>(host: &mut Host)
+/// where
+///     Host: HostDebug + StorageV1
+/// {
 ///     // user kernel code
 /// }
 /// ```
+///
+/// *NB* all of the traits exposed by `tezos_smart_rollup::host` are supported for use with
+/// this attribute.
 #[cfg(feature = "entrypoint")]
 #[proc_macro_error]
 #[proc_macro_attribute]
@@ -40,13 +48,17 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Example
 /// ```
 /// use tezos_smart_rollup::prelude::*;
+/// use tezos_smart_rollup::host::WasmHost;
 ///
 /// #[entrypoint::main]
 /// #[entrypoint::runtime(static_inbox = "../tests/inbox.json")]
-/// pub fn entry(host: &mut impl Runtime) {
+/// pub fn entry(host: &mut impl WasmHost) {
 ///     // do nothing
 /// }
 /// ```
+///
+/// *NB* all of the traits exposed by `tezos_smart_rollup::host` are supported for use with
+/// this attribute.
 #[cfg(feature = "runtime-options")]
 #[proc_macro_attribute]
 pub fn runtime(attr: TokenStream, item: TokenStream) -> TokenStream {

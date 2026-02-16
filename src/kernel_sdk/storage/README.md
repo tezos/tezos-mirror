@@ -8,7 +8,7 @@ should follow these guidelines:
 
 - it can be created from an [OwnedPath], ie, it implements `From<OwnedPath>`
 - it has getters and setters that operate directly on durable storage, each
-  getter and setter should take a [Runtime] as argument to do so (`mut` in
+  getter and setter should take a [StorageV1] as argument to do so (`mut` in
   case of setters).
 
 **NB** an object must only look in durable storage prefixed by its
@@ -17,7 +17,7 @@ should follow these guidelines:
 To use this crate, create the wanted value struct and storage object like so:
 
 ```
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::path::{concat, RefPath, OwnedPath};
 use tezos_smart_rollup_storage::storage::Storage;
 use tezos_smart_rollup_mock::MockHost;
@@ -29,7 +29,7 @@ struct MyValue {
 const VALUE_PATH: RefPath = RefPath::assert_from(b"/value");
 
 impl MyValue {
-  pub fn setter(&mut self, host: &mut impl Runtime, v: &str) {
+  pub fn setter(&mut self, host: &mut impl StorageV1, v: &str) {
     let value_path = concat(&self.path, &VALUE_PATH)
         .expect("Could not get path for value");
     host.store_write(&value_path, v.as_bytes(), 0)
@@ -38,7 +38,7 @@ impl MyValue {
 
   pub fn getter(
       &mut self,
-      host: &impl Runtime,
+      host: &impl StorageV1,
   ) -> Vec<u8> {
     let value_path = concat(&self.path, &VALUE_PATH)
         .expect("Could not get path for value");
@@ -76,4 +76,4 @@ storage.commit_transaction(&mut host)
 ```
 
 [OwnedPath]: host::path::OwnedPath
-[Runtime]: host::runtime::Runtime
+[StorageV1]: host::storage::StorageV1

@@ -48,6 +48,9 @@
   - Move all other functions (input/ouput, reboots, runtime version) to new `WasmHost` supertrait. Experimental support
     for using `WasmHost` on RISC-V still exists.
 - Expose `store_get_hash` on `StorageV1` trait - wrapping WASM pvm's `__internal_store_get_hash` host function.
+- Storage, DAC and Outbox utilities have been restricted to only use relevant required traits, rather than `Runtime` directly.
+  For the most part, this will be backwards compatible - though the specific traits _may_ have to be brought into scope rather than
+  just relying on a `Runtime` import.
 
 ### Installer client/kernel
 
