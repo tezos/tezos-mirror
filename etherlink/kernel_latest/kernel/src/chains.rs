@@ -129,7 +129,7 @@ pub enum ChainConfig {
 const TEZOS_OP_TAG: u8 = 1;
 const DEPOSIT_OP_TAG: u8 = 2;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TezlinkOperation {
     pub tx_hash: TransactionHash,
     pub content: TezlinkContent,
@@ -159,7 +159,7 @@ impl Decodable for TezlinkOperation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TezlinkContent {
     Tezos(Operation),
     Deposit(Deposit),
@@ -208,7 +208,7 @@ impl Decodable for TezlinkContent {
     }
 }
 
-pub trait TransactionTrait {
+pub trait TransactionTrait: Into<TezosXTransaction> + TryFrom<TezosXTransaction> {
     fn is_delayed(&self) -> bool;
 
     fn tx_hash(&self) -> TransactionHash;
@@ -230,6 +230,23 @@ impl TransactionTrait for crate::transaction::Transaction {
     }
 }
 
+impl From<crate::transaction::Transaction> for TezosXTransaction {
+    fn from(tx: crate::transaction::Transaction) -> Self {
+        Self::Ethereum(Box::new(tx))
+    }
+}
+
+impl TryFrom<TezosXTransaction> for crate::transaction::Transaction {
+    type Error = ();
+
+    fn try_from(tx: TezosXTransaction) -> Result<Self, Self::Error> {
+        match tx {
+            TezosXTransaction::Ethereum(tx) => Ok(*tx),
+            TezosXTransaction::Tezos(_) => Err(()),
+        }
+    }
+}
+
 impl TransactionTrait for TezlinkOperation {
     fn is_delayed(&self) -> bool {
         match self.content {
@@ -244,6 +261,23 @@ impl TransactionTrait for TezlinkOperation {
 
     fn data_size(&self) -> u64 {
         0
+    }
+}
+
+impl From<TezlinkOperation> for TezosXTransaction {
+    fn from(op: TezlinkOperation) -> Self {
+        Self::Tezos(op)
+    }
+}
+
+impl TryFrom<TezosXTransaction> for TezlinkOperation {
+    type Error = ();
+
+    fn try_from(tx: TezosXTransaction) -> Result<Self, Self::Error> {
+        match tx {
+            TezosXTransaction::Tezos(op) => Ok(op),
+            TezosXTransaction::Ethereum(_) => Err(()),
+        }
     }
 }
 
@@ -310,13 +344,13 @@ pub trait ChainConfigTrait: Debug {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>;
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>;
 
     fn transaction_from_bytes(
         host: &mut impl Runtime,
         bytes: &[u8],
         blueprint_version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>>;
+    ) -> anyhow::Result<TezosXTransaction>;
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
@@ -378,10 +412,52 @@ fn ethereum_transaction_from_bytes(
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TezosXTransaction {
     Ethereum(Box<crate::transaction::Transaction>),
     Tezos(TezlinkOperation),
+}
+
+impl Decodable for TezosXTransaction {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let runtime_id: u8 = decode_field(&next(&mut it)?, "runtime_id")?;
+        match RuntimeId::try_from(runtime_id) {
+            Ok(RuntimeId::Tezos) => {
+                let op = decode_field(&next(&mut it)?, "tezos_operation")?;
+                Ok(Self::Tezos(op))
+            }
+            Ok(RuntimeId::Ethereum) => {
+                let tx = decode_field(&next(&mut it)?, "ethereum_transaction")?;
+                Ok(TezosXTransaction::Ethereum(Box::new(tx)))
+            }
+            Err(message) => Err(rlp::DecoderError::Custom(message)),
+        }
+    }
+}
+
+impl Encodable for TezosXTransaction {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match self {
+            Self::Ethereum(tx) => {
+                let tag: u8 = RuntimeId::Ethereum.into();
+                stream.append(&tag);
+                stream.append(tx);
+            }
+            Self::Tezos(op) => {
+                let tag: u8 = RuntimeId::Tezos.into();
+                stream.append(&tag);
+                stream.append(op);
+            }
+        }
+    }
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -429,13 +505,13 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut impl Runtime,
         bytes: &[u8],
         blueprint_version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>> {
-        let tx: TezosXTransaction = match blueprint_version {
+    ) -> anyhow::Result<TezosXTransaction> {
+        match blueprint_version {
             0 => {
                 // Blueprints version 0 can only contain Ethereum
                 // transactions, they are not prefixed by a tag.
                 let tx = ethereum_transaction_from_bytes(bytes)?;
-                TezosXTransaction::Ethereum(Box::new(tx))
+                Ok(TezosXTransaction::Ethereum(Box::new(tx)))
             }
             1 => {
                 // Blueprints version 1 can contain both Tezos
@@ -449,32 +525,25 @@ impl ChainConfigTrait for EvmChainConfig {
                 match RuntimeId::try_from(*tag) {
                     Ok(RuntimeId::Tezos) => {
                         let op = tezos_operation_from_bytes(tx_common)?;
-                        TezosXTransaction::Tezos(op)
+                        Ok(TezosXTransaction::Tezos(op))
                     }
                     Ok(RuntimeId::Ethereum) => {
                         let tx = ethereum_transaction_from_bytes(tx_common)?;
-                        TezosXTransaction::Ethereum(Box::new(tx))
+                        Ok(TezosXTransaction::Ethereum(Box::new(tx)))
                     }
                     Err(message) => {
                         log!(host, Error, "Unknown runtime id tag: {tag}, {message}");
-                        return Ok(None);
+                        Err(DecoderError::Custom("Unknown runtime id").into())
                     }
                 }
             }
             _ => {
                 log!(
                     host,
-                    Debug,
+                    Error,
                     "Unknown blueprint version: {blueprint_version:?}"
                 );
-                return Ok(None);
-            }
-        };
-        match tx {
-            TezosXTransaction::Ethereum(tx) => Ok(Some(*tx)),
-            TezosXTransaction::Tezos(op) => {
-                log!(host, Debug, "Ignoring Tezos operation in blueprint: {op:?}");
-                Ok(None)
+                Err(DecoderError::Custom("Unknown blueprint version").into())
             }
         }
     }
@@ -484,7 +553,7 @@ impl ChainConfigTrait for EvmChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
@@ -663,7 +732,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<TezosXTransaction>, usize)>
     {
         // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
         // the logic to retrieve delayed_inbox items.
@@ -681,12 +750,14 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 DelayedTransactionFetchingResult::Ok(txs) => {
                     let mut ops = vec![];
                     for tx in txs.into_iter() {
-                        if let TransactionContent::Deposit(deposit) = tx.content {
-                            let operation = TezlinkOperation {
-                                tx_hash: tx.tx_hash,
-                                content: TezlinkContent::Deposit(deposit),
-                            };
-                            ops.push(operation)
+                        if let TezosXTransaction::Ethereum(tx) = tx {
+                            if let TransactionContent::Deposit(deposit) = tx.content {
+                                let operation = TezlinkOperation {
+                                    tx_hash: tx.tx_hash,
+                                    content: TezlinkContent::Deposit(deposit),
+                                };
+                                ops.push(TezosXTransaction::Tezos(operation))
+                            }
                         }
                     }
                     DelayedTransactionFetchingResult::Ok(ops)
@@ -706,9 +777,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _host: &mut impl Runtime,
         bytes: &[u8],
         _version: u8,
-    ) -> anyhow::Result<Option<Self::Transaction>> {
+    ) -> anyhow::Result<TezosXTransaction> {
         let operation = tezos_operation_from_bytes(bytes)?;
-        Ok(Some(operation))
+        Ok(operation.into())
     }
 
     fn read_block_in_progress(

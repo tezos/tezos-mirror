@@ -8,7 +8,7 @@ use crate::blueprint_storage::{
     clear_all_blueprints, read_current_blueprint_header, store_forced_blueprint,
     store_inbox_blueprint,
 };
-use crate::chains::{ChainConfig, ChainConfigTrait, EvmChainConfig};
+use crate::chains::{ChainConfig, ChainConfigTrait, EvmChainConfig, TezosXTransaction};
 use crate::configuration::{
     Configuration, ConfigurationMode, DalConfiguration, TezosContracts,
 };
@@ -102,7 +102,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
 
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
-            transactions: timed_out,
+            transactions: timed_out.into_iter().map(TezosXTransaction::from).collect(),
             timestamp,
         };
         // Store the blueprint.

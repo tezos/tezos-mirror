@@ -3,6 +3,7 @@
 
 use crate::{
     bridge::Deposit,
+    chains::TezosXTransaction,
     event::Event,
     linked_list::LinkedList,
     storage::{self, read_last_info_per_level_timestamp},
@@ -206,34 +207,41 @@ impl DelayedInbox {
     pub fn save_transaction<Host: Runtime>(
         &mut self,
         host: &mut Host,
-        tx: Transaction,
+        tx: TezosXTransaction,
         timestamp: Timestamp,
         level: u32,
     ) -> Result<()> {
-        let Transaction { tx_hash, content } = tx.clone();
-        let transaction = match content {
+        match tx {
+            TezosXTransaction::Ethereum(tx) => {
+                let Transaction { tx_hash, content } = *tx.clone();
+                let transaction = match content {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
             TransactionContent::FaDeposit(fa_deposit) => DelayedTransaction::FaDeposit(fa_deposit),
             TransactionContent::TezosDelayed(op) => DelayedTransaction::Tezos(op),
         };
-        let item = DelayedInboxItem {
-            transaction,
-            timestamp,
-            level,
-        };
+                let item = DelayedInboxItem {
+                    transaction,
+                    timestamp,
+                    level,
+                };
 
-        Event::NewDelayedTransaction(Box::new(tx)).store(host)?;
+                Event::NewDelayedTransaction(tx).store(host)?;
 
-        self.0.push(host, &Hash(tx_hash), &item)?;
-        log!(
-            host,
-            Info,
-            "Saved transaction {} in the delayed inbox",
-            hex::encode(tx_hash)
-        );
-        Ok(())
+                self.0.push(host, &Hash(tx_hash), &item)?;
+                log!(
+                    host,
+                    Info,
+                    "Saved transaction {} in the delayed inbox",
+                    hex::encode(tx_hash)
+                );
+                Ok(())
+            }
+            TezosXTransaction::Tezos(op) => {
+                anyhow::bail!("Non-delayed Tezos operation should not be saved to the delayed inbox. {:?}", op.tx_hash)
+            }
+        }
     }
 
     pub fn transaction_from_delayed(
@@ -459,7 +467,7 @@ mod tests {
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
         delayed_inbox
-            .save_transaction(&mut host, tx.clone(), timestamp, 0)
+            .save_transaction(&mut host, tx.clone().into(), timestamp, 0)
             .expect("Tx should be saved in the delayed inbox");
 
         let mut delayed_inbox =
@@ -485,7 +493,7 @@ mod tests {
 
         let timestamp: Timestamp =
             read_last_info_per_level_timestamp(&host).unwrap_or(Timestamp::from(0));
-        let res = delayed_inbox.save_transaction(&mut host, tx, timestamp, 0);
+        let res = delayed_inbox.save_transaction(&mut host, tx.into(), timestamp, 0);
 
         assert!(res.is_err());
     }

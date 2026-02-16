@@ -188,7 +188,7 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     next_bip_number: U256,
     hash: H256,
     tezos_parent_hash: H256,
-    blueprint: Blueprint<ChainConfig::Transaction>,
+    blueprint: Blueprint,
 ) -> BlockInProgress<ChainConfig::Transaction> {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
@@ -522,7 +522,7 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezosXTransaction,
         TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -722,23 +722,24 @@ mod tests {
         )
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transaction> {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
         Blueprint {
-            transactions,
+            transactions: transactions
+                .into_iter()
+                .map(TezosXTransaction::from)
+                .collect(),
             timestamp: Timestamp::from(0i64),
         }
     }
 
-    fn tezlink_blueprint(
-        operations: Vec<Operation>,
-        timestamp: Timestamp,
-    ) -> Blueprint<TezlinkOperation> {
+    fn tezlink_blueprint(operations: Vec<Operation>, timestamp: Timestamp) -> Blueprint {
         let operations = operations
             .into_iter()
             .map(|op| {
                 let tx_hash = op.hash().unwrap().into();
                 let content = TezlinkContent::Tezos(op);
-                TezlinkOperation { tx_hash, content }
+                let op = TezlinkOperation { tx_hash, content };
+                TezosXTransaction::Tezos(op)
             })
             .collect();
         Blueprint {
@@ -912,7 +913,7 @@ mod tests {
 
     fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
-        blueprints: Vec<Blueprint<ChainConfig::Transaction>>,
+        blueprints: Vec<Blueprint>,
     ) {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
@@ -1932,7 +1933,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint<Transaction> {
+    fn almost_empty_blueprint() -> Blueprint {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid

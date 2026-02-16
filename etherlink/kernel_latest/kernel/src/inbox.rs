@@ -7,7 +7,9 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ChainConfigTrait, EvmChainConfig, ExperimentalFeatures};
+use crate::chains::{
+    ChainConfigTrait, EvmChainConfig, ExperimentalFeatures, TezosXTransaction,
+};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -43,7 +45,7 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<TezosXTransaction>,
 }
 
 pub fn read_input<Host: Runtime, Mode: Parsable>(
@@ -112,7 +114,9 @@ impl InputHandler for ProxyInput {
         inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         match input {
-            Self::SimpleTransaction(tx) => inbox_content.transactions.push(*tx),
+            Self::SimpleTransaction(tx) => inbox_content
+                .transactions
+                .push(TezosXTransaction::Ethereum(tx)),
             Self::NewChunkedTransaction {
                 tx_hash,
                 num_chunks,
@@ -127,7 +131,7 @@ impl InputHandler for ProxyInput {
                 if let Some(tx) =
                     handle_transaction_chunk(host, tx_hash, i, chunk_hash, data)?
                 {
-                    inbox_content.transactions.push(tx)
+                    inbox_content.transactions.push(tx.into())
                 }
             }
         }
@@ -192,7 +196,12 @@ impl InputHandler for SequencerInput {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
                 log!(host, Benchmarking, "Handling a delayed input");
-                delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)
+                delayed_inbox.save_transaction(
+                    host,
+                    TezosXTransaction::Ethereum(tx),
+                    previous_timestamp,
+                    level,
+                )
             }
             Self::SequencerBlueprint(SequencerBlueprint(seq_blueprint)) => {
                 handle_blueprint_chunk(host, seq_blueprint)
@@ -336,26 +345,28 @@ fn handle_transaction_chunk<Host: Runtime>(
 fn handle_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: Deposit,
-) -> Result<Transaction, Error> {
+) -> Result<TezosXTransaction, Error> {
     let seed = host.reveal_metadata().raw_rollup_address;
     let tx_hash = deposit.hash(&seed).into();
     Ok(Transaction {
         tx_hash,
         content: TransactionContent::Deposit(deposit),
-    })
+    }
+    .into())
 }
 
 #[cfg_attr(feature = "benchmark", inline(never))]
 fn handle_fa_deposit<Host: Runtime>(
     host: &mut Host,
     fa_deposit: FaDeposit,
-) -> Result<Transaction, Error> {
+) -> Result<TezosXTransaction, Error> {
     let seed = host.reveal_metadata().raw_rollup_address;
     let tx_hash = fa_deposit.hash(&seed).into();
     Ok(Transaction {
         tx_hash,
         content: TransactionContent::FaDeposit(fa_deposit),
-    })
+    }
+    .into())
 }
 
 fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
@@ -868,7 +879,8 @@ mod tests {
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
-        }];
+        }
+        .into()];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
 
@@ -899,7 +911,8 @@ mod tests {
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
-        }];
+        }
+        .into()];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
 
@@ -1169,7 +1182,8 @@ mod tests {
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
-        }];
+        }
+        .into()];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
 
@@ -1230,7 +1244,8 @@ mod tests {
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
-        }];
+        }
+        .into()];
         assert_eq!(inbox_content.transactions, expected_transactions);
     }
 

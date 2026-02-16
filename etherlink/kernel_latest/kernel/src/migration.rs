@@ -702,7 +702,12 @@ fn migrate_to<Host: Runtime>(
                     tx_hash,
                     content: TransactionContent::FaDeposit(fa_deposit),
                 };
-                delayed_inbox.save_transaction(host, tx, previous_timestamp, level)?;
+                delayed_inbox.save_transaction(
+                    host,
+                    tx.into(),
+                    previous_timestamp,
+                    level,
+                )?;
             }
             Ok(MigrationStatus::Done)
         }

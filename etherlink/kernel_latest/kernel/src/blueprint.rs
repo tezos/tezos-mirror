@@ -5,19 +5,20 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::chains::TezosXTransaction;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// The blueprint of a block is a list of transactions.
-#[derive(PartialEq, Debug, Clone)]
-pub struct Blueprint<Tx> {
-    pub transactions: Vec<Tx>,
+#[derive(PartialEq, Debug)]
+pub struct Blueprint {
+    pub transactions: Vec<TezosXTransaction>,
     pub timestamp: Timestamp,
 }
 
-impl<Tx: Encodable> Encodable for Blueprint<Tx> {
+impl Encodable for Blueprint {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
         stream.append_list(&self.transactions);
@@ -25,7 +26,7 @@ impl<Tx: Encodable> Encodable for Blueprint<Tx> {
     }
 }
 
-impl<Tx: Decodable> Decodable for Blueprint<Tx> {
+impl Decodable for Blueprint {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -78,11 +79,12 @@ mod tests {
         )
     }
 
-    fn dummy_transaction(i: u8) -> Transaction {
+    fn dummy_transaction(i: u8) -> TezosXTransaction {
         Transaction {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
             content: Ethereum(tx_(i.into())),
         }
+        .into()
     }
 
     #[test]

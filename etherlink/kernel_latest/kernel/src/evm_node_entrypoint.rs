@@ -37,7 +37,7 @@ where
 {
     let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
     let payload = host.store_read_all(&DELAYED_INPUT_PATH).unwrap();
-    let transaction = Transaction::from_rlp_bytes(&payload).unwrap();
+    let transaction = Transaction::from_rlp_bytes(&payload).unwrap().into();
     let mut delayed_inbox = DelayedInbox::new(&mut host).unwrap();
     delayed_inbox
         .save_transaction(&mut host, transaction, 0.into(), 0u32)

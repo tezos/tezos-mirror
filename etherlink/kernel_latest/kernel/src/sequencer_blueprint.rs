@@ -313,6 +313,7 @@ pub fn rlp_roundtrip<S: Encodable + Decodable + PartialEq + std::fmt::Debug>(v: 
 mod tests {
     use super::{rlp_roundtrip, SequencerBlueprint, UnsignedSequencerBlueprint};
     use crate::blueprint::Blueprint;
+    use crate::chains::TezosXTransaction;
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent::Ethereum;
     use primitive_types::{H160, U256};
@@ -344,11 +345,12 @@ mod tests {
         )
     }
 
-    fn dummy_transaction(i: u8) -> Transaction {
+    fn dummy_transaction(i: u8) -> TezosXTransaction {
         Transaction {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
             content: Ethereum(tx_(i.into())),
         }
+        .into()
     }
 
     fn dummy_blueprint_unsigned(chain_id: Option<U256>) -> UnsignedSequencerBlueprint {
