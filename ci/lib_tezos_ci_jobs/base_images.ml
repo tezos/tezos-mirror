@@ -121,7 +121,7 @@ module Files = struct
     ]
 end
 
-let jobs =
+let jobs ?start_job () =
   (* This function can build docker images both in an emulated environment using
      qemu or natively. The advantage of choosing emulated vs native depends on
      the build time associated with the image. Small images are more efficiently
@@ -154,6 +154,19 @@ let jobs =
       ?(compilation = Emulated) ?dependencies dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
+    in
+    (* if provided, add [start_job] to the dependencies. *)
+    let dependencies =
+      match start_job with
+      | None -> dependencies
+      | Some job -> (
+          match dependencies with
+          | None -> Some (Dependent [Job job])
+          | Some (Dependent lst) -> Some (Dependent (Job job :: lst))
+          | Some (Staged _) ->
+              failwith
+                "Only job dependencies in base_image jobs. Stage dependencies \
+                 are not allowed.")
     in
     (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
     let platform, tags =
@@ -318,4 +331,4 @@ let child_pipeline =
   Pipeline.register_child
     "base_images"
     ~description:"Build CI base images"
-    ~jobs:(job_datadog_pipeline_trace :: jobs)
+    ~jobs:(job_datadog_pipeline_trace :: jobs ())

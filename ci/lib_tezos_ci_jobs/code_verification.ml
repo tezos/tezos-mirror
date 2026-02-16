@@ -576,3 +576,11 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
   start_stage @ build @ test @ manual
+  @
+  (* base image build jobs. *)
+  match pipeline_type with
+  | Before_merging -> Base_images.jobs ~start_job:job_start ()
+  | Merge_train -> Base_images.jobs ()
+  (* Not added in [schedule_extended_test]
+     as they run nightly in [base_images.daily]. *)
+  | Schedule_extended_test -> []
