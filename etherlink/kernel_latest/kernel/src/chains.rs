@@ -51,6 +51,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::wasm::WasmHost;
+use tezos_tezlink::protocol::TARGET_TEZOS_PROTOCOL;
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
@@ -323,6 +324,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
     fn genesis_header() -> Self {
         Self {
             hash: H256(*TezBlock::genesis_block_hash()),
+            next_protocol: TARGET_TEZOS_PROTOCOL,
         }
     }
 }
