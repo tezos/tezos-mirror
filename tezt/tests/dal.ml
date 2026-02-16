@@ -9096,9 +9096,10 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
     sc_rollup_address node client _pvm_name =
   let client = Client.with_dal_node client ~dal_node in
   let* () = Sc_rollup_node.run sc_node sc_rollup_address [] in
+  let slot_index = 0 in
   let* () =
     Sc_rollup_node.RPC.call sc_node
-    @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[0]
+    @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[slot_index]
   in
   let wait_injected =
     Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
@@ -9109,53 +9110,61 @@ let rollup_node_injects_dal_slots protocol parameters dal_node sc_node
          ~messages:["Hello DAL from a Smart Rollup"]
   in
   let* () = wait_injected in
-  (* We need to bake once to have the commitment included in a block, and then
-     [attestation_lag] to have it attested. *)
-  let* () =
-    repeat (1 + parameters.Dal.Parameters.attestation_lag) (fun () ->
-        let* () = bake_for client in
+
+  (* We check for each attestation lag whether the slot was attested. *)
+  let* level = Client.level client in
+  let published_level = level + 1 in
+  let rec loop current_level lag_index lags =
+    match lags with
+    | [] -> Test.fail "Slot not attested"
+    | lag :: lags ->
+        let attested_level = published_level + lag in
+        let* () = bake_for ~count:(attested_level - current_level) client in
         let* level = Client.level client in
+        assert (level = attested_level) ;
         let* _level =
           Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
         in
-        unit)
+        let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
+        let obtained_dal_attestation =
+          match metadata.dal_attestation with
+          | None ->
+              (* Field is part of the encoding when the feature flag is true *)
+              Test.fail
+                "Field dal_attestation in block headers is mandatory when DAL \
+                 is activated"
+          | Some str ->
+              (Dal.Slot_availability.decode protocol parameters str).(lag_index)
+        in
+        if obtained_dal_attestation.(slot_index) then (
+          let expected_attestation =
+            expected_attestation parameters [slot_index]
+          in
+          Check.(
+            (expected_attestation = obtained_dal_attestation)
+              (array bool)
+              ~error_msg:"Expected attestation bitset %L, got %R") ;
+          let* statuses =
+            Sc_rollup_node.RPC.call sc_node
+            @@ Sc_rollup_rpc.get_dal_injected_operations_statuses ()
+          in
+          match statuses with
+          | [status_with_hash] ->
+              let status = JSON.get "status" status_with_hash in
+              let status_str = JSON.(status |-> "status" |> as_string) in
+              if status_str <> "included" && status_str <> "committed" then
+                Test.fail
+                  "Unexpected injector operation status %s. Expecting \
+                   'included' or 'committed'"
+                  status_str ;
+              unit
+          | _ ->
+              Test.fail
+                "Expecting a status for 1 operation, got %d@."
+                (List.length statuses))
+        else loop level (lag_index + 1) lags
   in
-  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-  let number_of_lags = List.length parameters.attestation_lags in
-  let obtained_dal_attestation =
-    match metadata.dal_attestation with
-    | None ->
-        (* Field is part of the encoding when the feature flag is true *)
-        Test.fail
-          "Field dal_attestation in block headers is mandatory when DAL is \
-           activated"
-    | Some str ->
-        (Dal.Slot_availability.decode protocol parameters str).(number_of_lags
-                                                                - 1)
-  in
-  let expected_attestation = expected_attestation parameters [0] in
-  Check.(
-    (expected_attestation = obtained_dal_attestation)
-      (array bool)
-      ~error_msg:"Expected attestation bitset %L, got %R") ;
-  let* statuses =
-    Sc_rollup_node.RPC.call sc_node
-    @@ Sc_rollup_rpc.get_dal_injected_operations_statuses ()
-  in
-  match statuses with
-  | [status_with_hash] ->
-      let status = JSON.get "status" status_with_hash in
-      let status_str = JSON.(status |-> "status" |> as_string) in
-      if status_str <> "included" && status_str <> "committed" then
-        Test.fail
-          "Unexpected injector operation status %s. Expecting 'included' or \
-           'committed'"
-          status_str ;
-      unit
-  | _ ->
-      Test.fail
-        "Expecting a status for 1 operation, got %d@."
-        (List.length statuses)
+  loop level 0 parameters.attestation_lags
 
 (** This test verifies the optimal publication of DAL slots from a batch of
     messages into the DAL node and L1 via the rollup node DAL injector.
