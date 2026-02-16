@@ -445,6 +445,8 @@ module CLST_types = struct
       bool (* is_operator *) )
     view_type
 
+  type get_token_metadata_view = (nat (* token_id *), token_info) view_type
+
   let balance_view_ty =
     let open Result_syntax in
     let* {typed = input_ty; _} = pair_ty address_ty nat_ty in
@@ -464,6 +466,11 @@ module CLST_types = struct
     let open Result_syntax in
     let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
     return {input_ty; output_ty = bool_ty.typed}
+
+  let get_token_metadata_view_ty =
+    let open Result_syntax in
+    let* {typed = output_ty; _} = token_info_ty in
+    return {input_ty = nat_ty.typed; output_ty}
 
   let transfer_event_type =
     let open Result_syntax in

@@ -662,6 +662,28 @@ module CLST_contract = struct
       let* ty = CLST_types.is_operator_view_ty in
       return (Ex_view {name; ty; implementation})
 
+    let get_token_metadata : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "get_token_metadata" in
+      let implementation (ctxt, _step_constants) (token_id : nat)
+          (storage : storage) =
+        let open Lwt_result_syntax in
+        let* token_info, ctxt =
+          Clst_contract_storage.get_token_info
+            ctxt
+            (Clst_contract_storage.from_clst_storage storage)
+            ~token_id
+        in
+        let token_info =
+          Option.value
+            ~default:(Script_map.empty string_t)
+            (Option.map snd token_info)
+        in
+        return (token_info, ctxt)
+      in
+      let* ty = CLST_types.get_token_metadata_view_ty in
+      return (Ex_view {name; ty; implementation})
+
     let view_map : storage Script_native_types.view_map tzresult =
       let open Result_syntax in
       let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
@@ -674,6 +696,9 @@ module CLST_contract = struct
       in
       let* (Ex_view {name = is_operator_name; _} as is_operator) =
         is_operator
+      in
+      let* (Ex_view {name = get_token_metadata_name; _} as get_token_metadata) =
+        get_token_metadata
       in
       let view_map =
         Script_map.update
@@ -690,6 +715,12 @@ module CLST_contract = struct
       in
       let view_map =
         Script_map.update is_operator_name (Some is_operator) view_map
+      in
+      let view_map =
+        Script_map.update
+          get_token_metadata_name
+          (Some get_token_metadata)
+          view_map
       in
       return view_map
   end

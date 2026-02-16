@@ -115,6 +115,8 @@ module CLST_types : sig
       bool (* is_operator *) )
     view_type
 
+  type get_token_metadata_view = (nat (* token_id *), token_info) view_type
+
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
@@ -137,6 +139,8 @@ module CLST_types : sig
   val get_allowance_view_ty : get_allowance_view tzresult
 
   val is_operator_view_ty : is_operator_view tzresult
+
+  val get_token_metadata_view_ty : get_token_metadata_view tzresult
 
   val transfer_event_type :
     ( address (* from_ *),

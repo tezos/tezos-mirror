@@ -163,3 +163,6 @@ let set_account_operator_allowance context storage ~owner ~spender new_allowance
       storage.operators_table
   in
   return ({storage with operators_table}, context)
+
+let get_token_info context storage ~token_id =
+  Script_big_map.get context token_id storage.token_metadata
