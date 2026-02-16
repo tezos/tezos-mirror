@@ -1192,11 +1192,79 @@ let test_tezos_block_stored_after_deposit =
   Check.((level = 2) int ~error_msg:"Expected Tezos block level = 2 but got %L") ;
   unit
 
+(** [check_evm_to_michelson_transfer ~sequencer ~sender ~nonce ~tezos_destination
+    ~transfer_amount ()] sends [transfer_amount] from the EVM [sender] to the
+    Tezos [tezos_destination] via the gateway precompile, then checks that:
+    - the Michelson destination balance increased by [transfer_amount] (in mutez)
+    - the EVM sender balance decreased by exactly [value + gas_fees] *)
+let check_evm_to_michelson_transfer ~sequencer ~sender ~nonce ~tezos_destination
+    ~transfer_amount () =
+  let* tez_client = tezos_client sequencer in
+  let transfer_amount_mutez = Tez.to_mutez transfer_amount in
+  let value = Wei.of_tez transfer_amount in
+  let* mic_balance_before =
+    Client.get_balance_for ~account:tezos_destination tez_client
+  in
+  let*@ evm_balance_before =
+    Rpc.get_balance ~address:sender.Eth_account.address sequencer
+  in
+  let* receipt =
+    call_evm_gateway
+      ~sequencer
+      ~sender
+      ~nonce
+      ~value
+      ~destination:tezos_destination
+      ()
+  in
+  let* mic_balance_after =
+    Client.get_balance_for ~account:tezos_destination tez_client
+  in
+  Check.(
+    (Tez.to_mutez mic_balance_after
+    = Tez.to_mutez mic_balance_before + transfer_amount_mutez)
+      int
+      ~error_msg:"Expected Michelson balance %R but got %L") ;
+  (* Verify EVM sender balance decreased by exactly value + gas fees *)
+  let gas_fees =
+    let gas_price = receipt.effectiveGasPrice |> Z.of_int64 |> Wei.to_wei_z in
+    let gas_used = receipt.gasUsed |> Z.of_int64 in
+    Wei.(gas_price * gas_used)
+  in
+  let*@ evm_balance_after =
+    Rpc.get_balance ~address:sender.Eth_account.address sequencer
+  in
+  Check.(
+    (evm_balance_after = Wei.(evm_balance_before - value - gas_fees))
+      Wei.typ
+      ~error_msg:"Expected EVM sender balance %R but got %L") ;
+  unit
+
+let test_cross_runtime_transfer_from_evm_to_tz =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Cross-runtime transfer to an implicit Michelson address via EVM gateway"
+    ~tags:["cross_runtime"; "transfer"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@ fun {sequencer; _} _protocol ->
+  let tezos_destination = Constant.bootstrap1.public_key_hash in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  check_evm_to_michelson_transfer
+    ~sequencer
+    ~sender
+    ~nonce:0
+    ~tezos_destination
+    ~transfer_amount:(Tez.of_int 100)
+    ()
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
   test_reveal [Alpha] ;
   test_transfer [Alpha] ;
+  test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_get_balance [Alpha] ;
