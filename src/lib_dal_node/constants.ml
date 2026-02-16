@@ -48,6 +48,10 @@ let status_store_lru_size = 64
    but we cache 50 since each cache entry has quite a small memory footprint. *)
 let committee_cache_size = 50
 
+(* Size of the attestation ops cache. Similar considerations as for
+   [committee_cache_size], so we use the same value. *)
+let attestation_ops_cache_size = committee_cache_size
+
 (* The size of the shard cache is chosen large enough to enable
    publishing slots on 5 slot indices.  We need to keep shards in
    the cache for at least three levels (if the commitment is published

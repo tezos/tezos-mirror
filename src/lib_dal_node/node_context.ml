@@ -36,6 +36,7 @@ type t = {
   store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   committee_cache : Committee_cache.t;
+  attestation_ops_cache : Attestation_ops_cache.t;
   gs_worker : Gossipsub.Worker.t;
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
@@ -66,6 +67,9 @@ let init config ~identity ~network_name profile_ctxt proto_cryptoboxes
     tezos_node_cctxt = cctxt;
     committee_cache =
       Committee_cache.create ~max_size:Constants.committee_cache_size;
+    attestation_ops_cache =
+      Attestation_ops_cache.create
+        ~max_size:Constants.attestation_ops_cache_size;
     gs_worker;
     transport_layer;
     profile_ctxt;
@@ -255,6 +259,8 @@ let get_l1_current_head_level ctxt = ctxt.l1_current_level
 let get_store ctxt = ctxt.store
 
 let get_gs_worker ctxt = ctxt.gs_worker
+
+let get_attestation_ops_cache ctxt = ctxt.attestation_ops_cache
 
 let get_ongoing_amplifications ctxt = ctxt.ongoing_amplifications
 
