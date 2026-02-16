@@ -12878,21 +12878,15 @@ let test_deposit_event =
       ~sc_rollup_address
       client
   in
-  (* Bake two blocks to let the sequencer see the deposit *)
+  (* Wait for the sequencer to detect and include the deposit. *)
   let* () =
-    repeat 2 (fun () ->
-        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
   in
-  (* Produce an Etherlink block *)
-  let*@ nb_txns = produce_block ~timestamp:(next_timestamp ()) sequencer in
-  Check.(
-    (nb_txns = 1)
-      int
-      ~error_msg:
-        "Expecting the block to contain %R transaction (the deposit), got %L") ;
 
-  (* Fetch the deposit events *)
+  (* Fetch the deposit events from the block that included the deposit *)
   let* receipt = get_one_receipt_from_latest_or_fail sequencer in
 
   (* Capture the log *)
