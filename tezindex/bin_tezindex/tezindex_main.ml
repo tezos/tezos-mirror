@@ -65,6 +65,6 @@ let select_commands _http_ctxt (_config : Client_config.cli_args) =
     ]
 
 module M024 = PtTALLiN_machine.M
-(* module Malpha = Alpha_machine.M *)
+module Malpha = Alpha_machine.M
 
 let () = Client_main_run.run (module Config) ~select_commands
