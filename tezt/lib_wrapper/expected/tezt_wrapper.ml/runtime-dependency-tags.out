@@ -33,6 +33,7 @@ signer: octez-signer
 smart_rollup_node: octez-smart-rollup-node
 wasm_debugger: octez-smart-rollup-wasm-debugger
 snoop: octez-snoop
+octez_tezindex: octez-tezindex
 teztale_archiver: octez-teztale-archiver
 teztale_server: octez-teztale-server
 teztale_snitch: octez-teztale-snitch

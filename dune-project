@@ -113,6 +113,7 @@
 (package (name octez-snoop))
 (package (name octez-store-tests)(allow_empty))
 (package (name octez-testnet-scenarios))
+(package (name octez-tezindex))
 (package (name octez-teztale))
 (package (name octez-version))
 (package (name octogram))

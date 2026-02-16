@@ -1,0 +1,84 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name tezindex_main)
+ (public_name octez-tezindex)
+ (package octez-tezindex)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-rust-deps
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.base.unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  lib_tezindex
+  x509
+  (select PtTALLiN_machine.ml from
+   (octez-protocol-024-PtTALLiN-libs.client -> PtTALLiN_machine.real.ml)
+   (-> PtTALLiN_machine.no.ml))
+  (select alpha_machine.ml from
+   (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
+   (-> alpha_machine.no.ml)))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (:include %{workspace_root}/static-link-flags-tezindex.sexp))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Lib_tezindex))
+
+(rule
+ (target PtTALLiN_machine.real.ml)
+ (mode fallback)
+ (deps next_machine.real.ml)
+ (action
+  (progn
+   (copy next_machine.real.ml PtTALLiN_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_next/Tezos_client_PtTALLiN/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PtTALLiN/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtTALLiN/g
+    PtTALLiN_machine.real.ml))))
+
+(rule
+ (target PtSeouLo_machine.real.ml)
+ (mode fallback)
+ (deps next_machine.real.ml)
+ (action
+  (progn
+   (copy next_machine.real.ml PtSeouLo_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_next/Tezos_client_PtSeouLo/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PtSeouLo/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtSeouLo/g
+    PtSeouLo_machine.real.ml))))
+
+(rule
+ (target next_machine.real.ml)
+ (mode fallback)
+ (deps alpha_machine.real.ml)
+ (action
+  (progn
+   (copy alpha_machine.real.ml next_machine.real.ml)
+   (run
+    sed
+    -i.bak -e s/Tezos_client_alpha/Tezos_client_next/g -e
+    s/Tezos_protocol_alpha/Tezos_protocol_next/g -e
+    s/Tezos_protocol_plugin_alpha/Tezos_protocol_plugin_next/g
+    next_machine.real.ml))))
+
+(rule (action (write-file alpha_machine.no.ml "module M = struct end")))
+
+(rule (action (write-file PtTALLiN_machine.no.ml "module M = struct end")))

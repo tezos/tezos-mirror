@@ -37,6 +37,7 @@ module Tooling = Product_tooling
 module Etherlink = Product_etherlink
 module CIAO = Product_ciao
 module Teztale = Product_teztale
+module Tezindex = Product_tezindex
 module Tobi = Product_tobi
 module Tezt_cloud_tests = Product_tezt_cloud_tests
 

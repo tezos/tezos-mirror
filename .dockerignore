@@ -41,6 +41,7 @@ octez-teztale-archiver
 octez-teztale-server
 octez-accuser
 octez-baker
+octez-tezindex
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src

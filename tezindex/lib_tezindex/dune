@@ -1,0 +1,31 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name lib_tezindex)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.prometheus-app
+  caqti-driver-postgresql
+  caqti-driver-sqlite3
+  caqti-lwt.unix
+  cohttp-lwt-unix
+  octez-libs.base
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-libs.rpc-http-client-unix
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-rpc-process
+  safepass
+  lwt.unix)
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_rpc_http_client_unix
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+  -open Octez_rpc_process))
