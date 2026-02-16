@@ -29,9 +29,9 @@ module type CONTEXT_PROOF = sig
 
   module Wrapped_tree : Tezos_tree_encoding.TREE
 
-  val empty_tree : unit -> Wrapped_tree.tree
+  val empty_state : unit -> Wrapped_tree.tree
 
-  val tree_hash :
+  val state_hash :
     Wrapped_tree.tree -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
 
   type proof

@@ -215,9 +215,9 @@ module type CONTEXT_PROOF = sig
 
   module Wrapped_tree : Tezos_tree_encoding.TREE
 
-  val empty_tree : unit -> Wrapped_tree.tree
+  val empty_state : unit -> Wrapped_tree.tree
 
-  val tree_hash :
+  val state_hash :
     Wrapped_tree.tree -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
 
   type proof
@@ -250,9 +250,9 @@ module Make_machine_with_vm
 
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
-  let decode tree = Tree_encoding_runner.decode pvm_state_encoding tree
+  let decode state = Tree_encoding_runner.decode pvm_state_encoding state
 
-  let encode pvm_state tree =
+  let encode pvm_state state =
     let open Lwt.Syntax in
     (* {{Note tick state clean-up}}
 
@@ -269,13 +269,13 @@ module Make_machine_with_vm
 
        With this, we gain an additional 5% of proof size in the
        worst tick of the computation.wasm kernel. *)
-    let* tree = T.remove tree ["wasm"] in
-    Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+    let* state = T.remove state ["wasm"] in
+    Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-  let initial_state version empty_tree =
+  let initial_state version empty_state =
     let open Lwt.Syntax in
     let* durable =
-      Tree_encoding_runner.decode durable_storage_encoding empty_tree
+      Tree_encoding_runner.decode durable_storage_encoding empty_state
     in
     let version_str =
       Data_encoding.Binary.to_string_exn Wasm_pvm_state.version_encoding version
@@ -287,14 +287,14 @@ module Make_machine_with_vm
         Constants.version_key
         version_str
     in
-    Tree_encoding_runner.encode durable_storage_encoding durable empty_tree
+    Tree_encoding_runner.encode durable_storage_encoding durable empty_state
 
   let install_boot_sector ~ticks_per_snapshot ~outbox_validity_period
-      ~outbox_message_limit bs tree =
+      ~outbox_message_limit bs state =
     let open Lwt_syntax in
     let open Tezos_tree_encoding in
     let* durable =
-      Tree_encoding_runner.decode (scope durable_scope Durable.encoding) tree
+      Tree_encoding_runner.decode (scope durable_scope Durable.encoding) state
     in
     let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot" in
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm" in
@@ -318,12 +318,12 @@ module Make_machine_with_vm
           };
       }
     in
-    encode pvm tree
+    encode pvm state
 
   let compute_step_many ?reveal_builtins ?hooks ?write_debug ?stop_at_snapshot
-      ~wasm_entrypoint ~max_steps tree =
+      ~wasm_entrypoint ~max_steps state =
     let open Lwt.Syntax in
-    let* pvm_state = decode tree in
+    let* pvm_state = decode state in
     let* pvm_state, executed_ticks =
       Wasm_vm.compute_step_many
         ?reveal_builtins
@@ -334,29 +334,26 @@ module Make_machine_with_vm
         ~max_steps
         pvm_state
     in
-    let+ tree = encode pvm_state tree in
-    (tree, executed_ticks)
+    let+ state = encode pvm_state state in
+    (state, executed_ticks)
 
-  let compute_step_with_debug ~wasm_entrypoint ~write_debug tree =
+  let compute_step_with_debug ~wasm_entrypoint ~write_debug state =
     let open Lwt.Syntax in
-    let* initial_state = decode tree in
-    let* final_state =
-      Wasm_vm.compute_step_with_debug
-        ~wasm_entrypoint
-        ~write_debug
-        initial_state
+    let* pvm_state = decode state in
+    let* pvm_state =
+      Wasm_vm.compute_step_with_debug ~wasm_entrypoint ~write_debug pvm_state
     in
-    encode final_state tree
+    encode pvm_state state
 
-  let compute_step ~wasm_entrypoint tree =
-    compute_step_with_debug tree ~wasm_entrypoint ~write_debug:Noop
+  let compute_step ~wasm_entrypoint state =
+    compute_step_with_debug state ~wasm_entrypoint ~write_debug:Noop
 
-  let get_output output_info tree =
+  let get_output output_info state =
     let open Lwt_syntax in
     let* candidate =
       Tree_encoding_runner.decode
         (Tezos_tree_encoding.option durable_buffers_encoding)
-        tree
+        state
     in
     Lwt.catch
       (fun () ->
@@ -367,51 +364,51 @@ module Make_machine_with_vm
         | None -> Lwt.return_none)
       (fun _ -> Lwt.return_none)
 
-  let get_info tree =
+  let get_info state =
     let open Lwt_syntax in
-    let* pvm_state = decode tree in
+    let* pvm_state = decode state in
     Wasm_vm.get_info pvm_state
 
-  let set_input_step input_info message tree =
+  let set_input_step input_info message state =
     let open Lwt_syntax in
-    let* pvm_state = decode tree in
+    let* pvm_state = decode state in
     let* pvm_state = Wasm_vm.set_input_step input_info message pvm_state in
-    encode pvm_state tree
+    encode pvm_state state
 
-  let reveal_step payload tree =
+  let reveal_step payload state =
     let open Lwt_syntax in
-    let* pvm_state = decode tree in
+    let* pvm_state = decode state in
     let* pvm_state = Wasm_vm.reveal_step payload pvm_state in
-    encode pvm_state tree
+    encode pvm_state state
 
-  let get_wasm_version tree =
+  let get_wasm_version state =
     let open Lwt.Syntax in
-    let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+    let* pvm = Tree_encoding_runner.decode pvm_state_encoding state in
     Wasm_vm.get_wasm_version pvm
 
   module Unsafe = struct
-    let get_max_nb_ticks tree =
+    let get_max_nb_ticks state =
       let open Lwt_syntax in
-      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       pvm_state.max_nb_ticks
 
-    let set_max_nb_ticks n tree =
+    let set_max_nb_ticks n state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let pvm_state = {pvm_state with max_nb_ticks = n} in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-    let durable_set ~key ~value tree =
+    let durable_set ~key ~value state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let key = Durable.key_of_string_exn key in
       let* durable = Durable.set_value_exn pvm_state.durable key value in
       let pvm_state = {pvm_state with durable} in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-    let set_pvm_version ~(version : Wasm_pvm_state.version) tree =
+    let set_pvm_version ~(version : Wasm_pvm_state.version) state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let* durable =
         Durable.set_value_exn
           ~edit_readonly:true
@@ -423,41 +420,41 @@ module Make_machine_with_vm
       in
       let pvm_state = {pvm_state with durable} in
       let pvm_state = Wasm_vm.Unsafe.apply_migration version pvm_state in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
   end
 
   module Internal_for_tests = struct
     include Unsafe
 
-    let insert_failure tree =
+    let insert_failure state =
       let open Lwt_syntax in
-      let add n = T.add tree ["failures"; string_of_int n] Bytes.empty in
-      let* n = T.length tree ["failures"] in
+      let add n = T.add state ["failures"; string_of_int n] Bytes.empty in
+      let* n = T.length state ["failures"] in
       add n
 
-    let get_tick_state tree =
+    let get_tick_state state =
       let open Lwt_syntax in
-      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       pvm_state.tick_state
 
-    let get_module_instance_exn tree =
+    let get_module_instance_exn state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       match pvm_state.tick_state with
       | Eval {module_reg; _} | Init {module_reg; _} ->
           Wasm.Instance.ModuleMap.get Constants.wasm_main_module_name module_reg
       | _ -> raise (Invalid_argument "get_module_instance")
 
-    let is_stuck tree =
+    let is_stuck state =
       let open Lwt.Syntax in
-      let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm = Tree_encoding_runner.decode pvm_state_encoding state in
       match pvm.tick_state with
       | Stuck error -> Lwt.return_some error
       | _ -> Lwt.return_none
 
-    let set_maximum_reboots_per_input n tree =
+    let set_maximum_reboots_per_input n state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let pvm_state =
         {
           pvm_state with
@@ -465,41 +462,41 @@ module Make_machine_with_vm
           reboot_counter = Z.(min (succ n) pvm_state.reboot_counter);
         }
       in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-    let decr_reboot_counter tree =
+    let decr_reboot_counter state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let pvm_state =
         {pvm_state with reboot_counter = Z.pred pvm_state.reboot_counter}
       in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-    let reset_reboot_counter tree =
+    let reset_reboot_counter state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let pvm_state =
         {
           pvm_state with
           reboot_counter = Z.succ pvm_state.maximum_reboots_per_input;
         }
       in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state state
 
-    let get_output_buffer tree =
+    let get_output_buffer state =
       let open Lwt.Syntax in
-      let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let+ pvm = Tree_encoding_runner.decode pvm_state_encoding state in
       pvm.buffers.output
 
-    let get_input_buffer tree =
+    let get_input_buffer state =
       let open Lwt.Syntax in
-      let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let+ pvm = Tree_encoding_runner.decode pvm_state_encoding state in
       pvm.buffers.input
 
     let compute_step_many_until ~wasm_entrypoint ?max_steps ?hooks
-        ?reveal_builtins ?write_debug should_compute tree =
+        ?reveal_builtins ?write_debug should_compute state =
       let open Lwt.Syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding state in
       let* pvm_state, ticks =
         Wasm_vm.compute_step_many_until
           ~wasm_entrypoint
@@ -510,10 +507,10 @@ module Make_machine_with_vm
           should_compute
           pvm_state
       in
-      let+ tree =
-        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      let+ state =
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state state
       in
-      (tree, ticks)
+      (state, ticks)
   end
 end
 
@@ -531,14 +528,12 @@ module Make_pvm_machine_with_vm
 
   type state = Context.Wrapped_tree.tree
 
-  let empty_state = empty_tree
-
-  let state_hash = Context.tree_hash
+  let state_hash = Context.state_hash
 end
 
 module Make_pvm_machine = Make_pvm_machine_with_vm (Wasm_vm)
 
-module Context_in_memory = struct
+module State_in_memory = struct
   module Context = Tezos_context_memory.Context_binary
 
   type context = Context.context
@@ -557,9 +552,9 @@ module Context_in_memory = struct
     let wrap t = PVM_tree t
   end
 
-  let empty_tree () = Context.make_empty_context () |> Wrapped_tree.empty
+  let empty_state () = Context.make_empty_context () |> Wrapped_tree.empty
 
-  let tree_hash tree =
+  let state_hash tree =
     Context.Tree.hash tree
     |> Tezos_crypto.Hashed.Smart_rollup_state_hash.context_hash_to_state_hash
     |> Lwt.return
@@ -635,7 +630,7 @@ end
 
 module Wasm_pvm_in_memory :
   Wasm_pvm_sig.S
-    with type context = Context_in_memory.context
-     and type state = Context_in_memory.Wrapped_tree.tree
-     and type proof = Context_in_memory.proof =
-  Make_pvm_machine (Context_in_memory)
+    with type context = State_in_memory.context
+     and type state = State_in_memory.Wrapped_tree.tree
+     and type proof = State_in_memory.proof =
+  Make_pvm_machine (State_in_memory)

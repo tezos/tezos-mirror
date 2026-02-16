@@ -72,9 +72,9 @@ module Wasm_2_0_0_proof_format = struct
 
   module Wrapped_tree = Make_wrapped_tree (Irmin_context.Tree)
 
-  let empty_tree () = Irmin_context.Tree.empty ()
+  let empty_state () = Irmin_context.Tree.empty ()
 
-  let tree_hash tree = hash_tree tree |> Lwt.return
+  let state_hash state = hash_tree state |> Lwt.return
 end
 
 (** Durable part of the storage of this PVM. *)
