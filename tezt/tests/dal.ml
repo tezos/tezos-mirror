@@ -2898,8 +2898,6 @@ let expected_attestation dal_parameters attested_slots =
 let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
     sc_rollup_node _sc_rollup_address node client pvm_name =
   Log.info "Assert attestation_lag value." ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6270
-     Make the kernel robust against attestation_lag changes. *)
   Check.(
     (parameters.Dal.Parameters.attestation_lag = 4)
       int
@@ -5205,7 +5203,13 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       let* _op_hash =
         Operation.Anonymous.inject
           ~error:
-            (Operation.dal_entrapment_of_not_published_commitment migrate_to)
+            (if Protocol.number migrate_to >= 025 then
+               let number_of_lags = List.length new_lags in
+               Operation.dal_entrapment_invalid_lag_index
+                 ~lag_index:(number_of_lags - 1)
+                 ~max_bound:0
+             else
+               Operation.dal_entrapment_of_not_published_commitment migrate_to)
           accusation
           client
       in
