@@ -17,6 +17,16 @@ impl rlp::Encodable for Protocol {
     }
 }
 
+impl rlp::Decodable for Protocol {
+    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let val: u8 = rlp.as_val()?;
+        match val {
+            23 => Ok(Protocol::S023),
+            _ => Err(rlp::DecoderError::Custom("Unknown protocol version")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Protocol;
@@ -27,5 +37,32 @@ mod tests {
         stream.append(&Protocol::S023);
         let out = stream.out();
         assert_eq!(out, vec![23]);
+    }
+
+    #[test]
+    pub fn rlp_decode_protocol() {
+        let encoded = vec![23];
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, Protocol::S023);
+    }
+
+    #[test]
+    pub fn rlp_roundtrip_protocol() {
+        let mut stream = rlp::RlpStream::new();
+        let protocol = Protocol::S023;
+        stream.append(&protocol);
+        let encoded = stream.out();
+        let rlp = rlp::Rlp::new(&encoded);
+        let decoded: Protocol = rlp.as_val().unwrap();
+        assert_eq!(decoded, protocol);
+    }
+
+    #[test]
+    pub fn rlp_decode_unknown_protocol() {
+        let encoded = vec![42];
+        let rlp = rlp::Rlp::new(&encoded);
+        let result: Result<Protocol, _> = rlp.as_val();
+        assert!(result.is_err());
     }
 }
