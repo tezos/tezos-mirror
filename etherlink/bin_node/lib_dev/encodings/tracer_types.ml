@@ -1006,15 +1006,20 @@ module CallTracer = struct
     else
       let* selector_output = sub_bytes ~error:"decode selector" output_b 0 4 in
       if solidity_revert_selector = selector_output then
-        (* This is a solidity revert, we can decode the output as
+        (* This is a solidity revert, attempt to decode the output as
            a string to put it in revert_reason *)
-        let* revert_reason =
+        match
           decode_ethereum_string
             (Bytes.sub output_b 4 (Bytes.length output_b - 4))
-        in
-        (* When it's a solidity revert, the common error is
-           execution reverted *)
-        return (Some "execution reverted", Some revert_reason)
+        with
+        | Ok revert_reason ->
+            (* When it's a solidity revert, the common error is
+               execution reverted *)
+            return (Some "execution reverted", Some revert_reason)
+        | Error _ ->
+            (* Selector matched but data is malformed/truncated,
+               fall back to raw hex representation *)
+            return (Some "execution reverted", Some (try_to_string output_b))
       else
         (* data does not correspond to a solidity revert, we don't know how to
            recover the revert reason. *)
