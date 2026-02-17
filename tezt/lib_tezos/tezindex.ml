@@ -8,26 +8,30 @@
 type t = {process : Process.t; rpc_port : int; base_dir : string}
 
 let run ?runner ?(path = Uses.path Constant.octez_tezindex) ?name ~node
-    ?rpc_port () =
+    ?rpc_port ?(watched_addresses = []) () =
   let rpc_port = match rpc_port with Some p -> p | None -> Port.fresh () in
   let base_dir = Temp.dir ?runner "tezindex" in
   let rpc_addr = sf "localhost:%d" rpc_port in
   let node_endpoint = sf "http://localhost:%d" (Node.rpc_port node) in
   let name = match name with Some n -> n | None -> "octez-tezindex" in
+  let watched_args =
+    List.concat_map (fun addr -> ["--watched-address"; addr]) watched_addresses
+  in
   let process =
     Process.spawn
       ~name
       ?runner
       path
-      [
-        "--base-dir";
-        base_dir;
-        "--endpoint";
-        node_endpoint;
-        "run";
-        "--rpc-addr";
-        rpc_addr;
-      ]
+      ([
+         "--base-dir";
+         base_dir;
+         "--endpoint";
+         node_endpoint;
+         "run";
+         "--rpc-addr";
+         rpc_addr;
+       ]
+      @ watched_args)
   in
   {process; rpc_port; base_dir}
 
