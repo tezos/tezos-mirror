@@ -612,6 +612,40 @@ function compute_protocol_names() {
   log_blue "Tezos protocol:     ${tezos_protocol_source}"
 }
 
+# COMMIT 1: Copy protocol source directory
+#
+# MODE: both stabilise and snapshot
+# RENAMES: proto_${protocol_source} → proto_${version}
+#   Example: proto_alpha → proto_024
+#
+# DESCRIPTION:
+#   Copies the source protocol directory to a new directory named after
+#   the protocol version. Uses git archive to only copy versioned files.
+#   Removes auto-generated dune files.
+#
+# CREATES: 1 commit: "src: copy from ${protocol_source}"
+function commit_01_copy_source() {
+  if [[ $skip_copy_source ]]; then
+    log_cyan "Skipping copy_source step"
+    return 0
+  fi
+
+  log_blue "Copying src/proto_${protocol_source} to src/proto_${version}"
+
+  # Use git archive to copy only versioned files
+  mkdir /tmp/tezos_proto_snapshot
+  git archive HEAD "src/proto_${protocol_source}/" | tar -x -C /tmp/tezos_proto_snapshot
+  mv "/tmp/tezos_proto_snapshot/src/proto_${protocol_source}" "src/proto_${version}"
+  rm -rf /tmp/tezos_proto_snapshot
+
+  # Remove auto-generated dune files
+  find "src/proto_${version}" -name dune \
+    -exec grep -q "; This file was automatically generated, do not edit." {} \; \
+    -exec rm {} \;
+
+  commit_no_hooks "src: copy from ${protocol_source}"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -634,23 +668,7 @@ function update_hashes() {
 
 function copy_source() {
 
-  if [[ $skip_copy_source ]]; then
-    echo "Skipping copy_source step"
-    return 0
-  fi
-
-  # Create proto_beta source-code
-
-  # create a temporary directory until the hash is known
-  # this is equivalent to `cp src/proto_${protocol_source}/ src/proto_${version}` but only for versioned files
-  echo "Copying src/proto_${protocol_source} to src/proto_${version}"
-  mkdir /tmp/tezos_proto_snapshot
-  git archive HEAD "src/proto_${protocol_source}/" | tar -x -C /tmp/tezos_proto_snapshot
-  mv "/tmp/tezos_proto_snapshot/src/proto_${protocol_source}" "src/proto_${version}"
-  rm -rf /tmp/tezos_proto_snapshot
-  #delete all dune files in src/proto_${version} containing the line "; This file was automatically generated, do not edit."
-  find "src/proto_${version}" -name dune -exec grep -q "; This file was automatically generated, do not edit." {} \; -exec rm {} \;
-  commit_no_hooks "src: copy from ${protocol_source}"
+  commit_01_copy_source
 
   if [[ ${command} == "copy" ]]; then
     protocol_source_original="${protocol_source}"
