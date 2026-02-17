@@ -1213,8 +1213,6 @@ images.debian:
     - scripts/kiss-fetch.sh
     - scripts/packaging/homebrew_install.sh
     when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1253,8 +1251,6 @@ images.ubuntu:
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   dependencies: []
   timeout: 60 minutes
@@ -1296,8 +1292,6 @@ images.fedora:
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
     when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -1337,8 +1331,6 @@ images.rockylinux:
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   dependencies: []
   timeout: 60 minutes
@@ -1380,8 +1372,6 @@ images.rust:
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - images.debian
@@ -1463,8 +1453,6 @@ images.debian-homebrew:
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
     - scripts/packaging/homebrew_install.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - images.debian

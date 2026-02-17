@@ -48,20 +48,7 @@ images.debian:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.debian-homebrew
-    - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
-    - images/scripts/install_datadog_static.sh
-    - images/scripts/install_sccache_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker-merge-base-images.sh
-    - scripts/kiss-fetch.sh
-    - scripts/packaging/homebrew_install.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -94,15 +81,7 @@ images.ubuntu:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/scripts/install-gcloud-apt.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -135,16 +114,7 @@ images.fedora:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.rpm
-    - images/scripts/configure_rpm_proxy.sh
-    - images/scripts/install-gcloud-dnf.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -177,16 +147,7 @@ images.rockylinux:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.rpm
-    - images/scripts/configure_rpm_proxy.sh
-    - images/scripts/install-gcloud-dnf.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -218,18 +179,7 @@ images.rust:
   tags:
   - $TAGS
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
-    - images/scripts/install_datadog_static.sh
-    - images/scripts/install_sccache_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker-merge-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   needs:
   - images.debian
   dependencies: []
@@ -265,16 +215,7 @@ images.rust.merge:
   tags:
   - gcp
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.rust
-    - images/scripts/install-gcloud-apt.sh
-    - images/scripts/install_datadog_static.sh
-    - images/scripts/install_sccache_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/ci/docker-merge-base-images.sh
-    - scripts/kiss-fetch.sh
-    when: on_success
+  - when: always
   needs:
   - images.rust
   dependencies: []
@@ -302,17 +243,7 @@ images.debian-homebrew:
   tags:
   - gcp_very_high_cpu
   rules:
-  - changes:
-    - images/base-images/Dockerfile.debian
-    - images/base-images/Dockerfile.debian-homebrew
-    - images/scripts/install-gcloud-apt.sh
-    - images/scripts/install_datadog_static.sh
-    - scripts/ci/build-base-images.sh
-    - scripts/kiss-fetch.sh
-    - scripts/packaging/homebrew_install.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
+  - when: always
   needs:
   - images.debian
   dependencies: []

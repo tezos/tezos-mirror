@@ -1278,8 +1278,6 @@ images.debian:
     - scripts/kiss-fetch.sh
     - scripts/packaging/homebrew_install.sh
     when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
   needs:
   - trigger
   dependencies: []
@@ -1320,8 +1318,6 @@ images.ubuntu:
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - trigger
@@ -1365,8 +1361,6 @@ images.fedora:
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
     when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
-    when: on_success
   needs:
   - trigger
   dependencies: []
@@ -1408,8 +1402,6 @@ images.rockylinux:
     - images/scripts/install_datadog_static.sh
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - trigger
@@ -1453,8 +1445,6 @@ images.rust:
     - scripts/ci/build-base-images.sh
     - scripts/ci/docker-merge-base-images.sh
     - scripts/kiss-fetch.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - trigger
@@ -1537,8 +1527,6 @@ images.debian-homebrew:
     - scripts/ci/build-base-images.sh
     - scripts/kiss-fetch.sh
     - scripts/packaging/homebrew_install.sh
-    when: on_success
-  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
   needs:
   - trigger
