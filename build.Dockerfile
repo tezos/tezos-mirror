@@ -46,6 +46,7 @@ COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup efunc-core tezos/efunc-core
 COPY --chown=tezos:nogroup teztale tezos/teztale
 COPY --chown=tezos:nogroup contrib tezos/contrib
+COPY --chown=tezos:nogroup tezindex tezos/tezindex
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
 
