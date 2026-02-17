@@ -296,13 +296,12 @@ module Attestations = struct
     else encode_multiple_lags_after_025 attestations_per_lag
 
   (* Decode before 025 format: simple bitset where bit[i] = slot i is attested *)
-  let decode_before_025 str =
+  let decode_before_025 ~number_of_slots str =
     let attestation = Z.of_string str in
-    let length = Z.numbits attestation in
-    let array = Array.make length false in
+    let array = Array.make number_of_slots false in
     List.iter
       (fun i -> if Z.testbit attestation i then array.(i) <- true)
-      (range 0 (length - 1)) ;
+      (range 0 (number_of_slots - 1)) ;
     array
 
   (* Decode post-025 compact multi-lag format into per-lag arrays.
@@ -358,10 +357,11 @@ module Attestations = struct
     result
 
   let decode protocol parameters str =
-    if Protocol.number protocol < 025 then [|decode_before_025 str|]
+    let number_of_slots = parameters.Parameters.number_of_slots in
+    if Protocol.number protocol < 025 then
+      [|decode_before_025 ~number_of_slots str|]
     else
       let number_of_lags = List.length parameters.Parameters.attestation_lags in
-      let number_of_slots = parameters.number_of_slots in
       decode_after_025 ~number_of_lags ~number_of_slots str
 end
 
