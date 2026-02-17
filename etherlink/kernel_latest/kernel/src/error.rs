@@ -16,6 +16,7 @@ use tezos_smart_rollup_encoding::michelson::ticket::TicketError;
 use tezos_smart_rollup_host::path::PathError;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_storage::error::Error as GenStorageError;
+use tezos_tezlink::enc_wrappers::BlockNumberOverflowError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -136,6 +137,8 @@ pub enum Error {
     TryFromBigIntError(TryFromBigIntError<BigUint>),
     #[error("Unexpected error from native bridge: {0}")]
     BridgeError(String),
+    #[error(transparent)]
+    BlockNumberOverflowError(BlockNumberOverflowError),
 }
 
 impl From<revm_etherlink::Error> for Error {
@@ -260,5 +263,11 @@ impl From<GenStorageError> for Error {
             GenStorageError::TcError(msg) => Error::TcError(msg),
             GenStorageError::TryFromBigIntError(msg) => Error::TryFromBigIntError(msg),
         }
+    }
+}
+
+impl From<BlockNumberOverflowError> for Error {
+    fn from(e: BlockNumberOverflowError) -> Self {
+        Self::BlockNumberOverflowError(e)
     }
 }
