@@ -316,11 +316,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 pub trait ChainConfigTrait: Debug {
     type BlockConstants;
 
-    type Transaction: TransactionTrait + Encodable + Decodable + Debug;
-
     type ChainHeader: ChainHeaderTrait + Decodable;
-
-    type ExecutionInfo;
 
     fn get_chain_id(&self) -> U256;
 
@@ -378,12 +374,12 @@ pub trait ChainConfigTrait: Debug {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error>;
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>;
 
     fn register_valid_transaction(
         &self,
         block_in_progress: &mut BlockInProgress,
-        execution_info: Self::ExecutionInfo,
+        execution_info: RuntimeExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()>;
 
@@ -493,11 +489,7 @@ pub struct TezosXBlockConstants {
 impl ChainConfigTrait for EvmChainConfig {
     type BlockConstants = TezosXBlockConstants;
 
-    type Transaction = TezosXTransaction;
-
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
-
-    type ExecutionInfo = crate::apply::RuntimeExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
@@ -637,7 +629,7 @@ impl ChainConfigTrait for EvmChainConfig {
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
         match transaction {
             TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
                 host,
@@ -665,7 +657,7 @@ impl ChainConfigTrait for EvmChainConfig {
     fn register_valid_transaction(
         &self,
         block_in_progress: &mut BlockInProgress,
-        execution_info: Self::ExecutionInfo,
+        execution_info: RuntimeExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
         block_in_progress.register_valid_transaction(execution_info, host)
@@ -868,9 +860,7 @@ fn apply_tezos_operation(
 
 impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
-    type Transaction = TezosXTransaction;
     type ChainHeader = TezBlockHeader;
-    type ExecutionInfo = RuntimeExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
@@ -977,7 +967,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _index: u32,
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
         match transaction {
             TezosXTransaction::Ethereum(_transaction) => {
                 anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
@@ -996,7 +986,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn register_valid_transaction(
         &self,
         block_in_progress: &mut BlockInProgress,
-        execution_info: Self::ExecutionInfo,
+        execution_info: RuntimeExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
         block_in_progress.register_valid_transaction(execution_info, host)
