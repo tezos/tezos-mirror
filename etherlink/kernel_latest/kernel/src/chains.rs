@@ -716,6 +716,113 @@ pub struct TezlinkBlockConstants {
     pub context: context::TezlinkContext,
 }
 
+fn apply_tezos_operation(
+    chain_id: &ChainId,
+    block_in_progress: &BlockInProgress<TezlinkOperation>,
+    host: &mut impl Runtime,
+    registry: &impl Registry,
+    block_constants: &TezlinkBlockConstants,
+    operation: TezlinkOperation,
+) -> Result<crate::apply::ExecutionResult<AppliedOperation>, anyhow::Error> {
+    let context = &block_constants.context;
+
+    let level = block_constants.level;
+    let now = block_in_progress.timestamp;
+    let block_ctx = BlockCtx {
+        level: &level,
+        now: &now,
+        chain_id,
+    };
+
+    match operation.content {
+        TezlinkContent::Tezos(operation) => {
+            // Compute the hash of the operation
+            let hash = operation.hash()?;
+
+            let skip_signature_check = false;
+
+            let branch = operation.branch.clone();
+            let signature = operation.signature.clone();
+
+            // Try to apply the operation with the tezos_execution crate, return a receipt
+            // on whether it failed or not
+            let processed_operations = match tezos_execution::validate_and_apply_operation(
+                host,
+                registry,
+                context,
+                hash.clone(),
+                operation,
+                &block_ctx,
+                skip_signature_check,
+            ) {
+                Ok(receipt) => receipt,
+                Err(OperationError::Validation(err)) => {
+                    log!(
+                        host,
+                        Error,
+                        "Found an invalid operation, dropping it: {:?}",
+                        err
+                    );
+                    return Ok(crate::apply::ExecutionResult::Invalid);
+                }
+                Err(OperationError::RuntimeError(err)) => {
+                    return Err(err.into());
+                }
+            };
+
+            // Add the applied operation in the block in progress
+            let applied_operation = AppliedOperation {
+                hash,
+                branch,
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: processed_operations,
+                        signature,
+                    },
+                ),
+            };
+            Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+        }
+        TezlinkContent::Deposit(deposit) => {
+            log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
+
+            let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
+
+            let source = PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+
+            let applied_operation = AppliedOperation {
+                hash: operation.tx_hash.into(),
+                branch: BlockHash::from(
+                    block_in_progress.ethereum_parent_hash.to_fixed_bytes(),
+                ),
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: vec![OperationWithMetadata {
+                            content: ManagerOperationContent::Transaction(
+                                ManagerOperation {
+                                    source,
+                                    fee: 0.into(),
+                                    counter: 0.into(),
+                                    gas_limit: 0.into(),
+                                    storage_limit: 0.into(),
+                                    operation: deposit_result.outcome.1,
+                                },
+                            ),
+                            receipt: OperationResultSum::Transfer(OperationResult {
+                                balance_updates: vec![],
+                                result: deposit_result.outcome.0,
+                                internal_operation_results: vec![],
+                            }),
+                        }],
+                        signature: UnknownSignature::nom_read_exact(&[0u8; 64]).unwrap(),
+                    },
+                ),
+            };
+            Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+        }
+    }
+}
+
 impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
     type Transaction = TezlinkOperation;
@@ -828,106 +935,14 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
     ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
-        let context = &block_constants.context;
-
-        let level = block_constants.level;
-        let now = block_in_progress.timestamp;
-        let block_ctx = BlockCtx {
-            level: &level,
-            now: &now,
-            chain_id: &self.chain_id,
-        };
-
-        match operation.content {
-            TezlinkContent::Tezos(operation) => {
-                // Compute the hash of the operation
-                let hash = operation.hash()?;
-
-                let skip_signature_check = false;
-
-                let branch = operation.branch.clone();
-                let signature = operation.signature.clone();
-
-                // Try to apply the operation with the tezos_execution crate, return a receipt
-                // on whether it failed or not
-                let processed_operations =
-                    match tezos_execution::validate_and_apply_operation(
-                        host,
-                        registry,
-                        context,
-                        hash.clone(),
-                        operation,
-                        &block_ctx,
-                        skip_signature_check,
-                    ) {
-                        Ok(receipt) => receipt,
-                        Err(OperationError::Validation(err)) => {
-                            log!(
-                                host,
-                                Error,
-                                "Found an invalid operation, dropping it: {:?}",
-                                err
-                            );
-                            return Ok(crate::apply::ExecutionResult::Invalid);
-                        }
-                        Err(OperationError::RuntimeError(err)) => {
-                            return Err(err.into());
-                        }
-                    };
-
-                // Add the applied operation in the block in progress
-                let applied_operation = AppliedOperation {
-                    hash,
-                    branch,
-                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                        OperationBatchWithMetadata {
-                            operations: processed_operations,
-                            signature,
-                        },
-                    ),
-                };
-                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
-            }
-            TezlinkContent::Deposit(deposit) => {
-                log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
-
-                let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
-
-                let source =
-                    PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
-
-                let applied_operation = AppliedOperation {
-                    hash: operation.tx_hash.into(),
-                    branch: BlockHash::from(
-                        block_in_progress.ethereum_parent_hash.to_fixed_bytes(),
-                    ),
-                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                        OperationBatchWithMetadata {
-                            operations: vec![OperationWithMetadata {
-                                content: ManagerOperationContent::Transaction(
-                                    ManagerOperation {
-                                        source,
-                                        fee: 0.into(),
-                                        counter: 0.into(),
-                                        gas_limit: 0.into(),
-                                        storage_limit: 0.into(),
-                                        operation: deposit_result.outcome.1,
-                                    },
-                                ),
-                                receipt: OperationResultSum::Transfer(OperationResult {
-                                    balance_updates: vec![],
-                                    result: deposit_result.outcome.0,
-                                    internal_operation_results: vec![],
-                                }),
-                            }],
-                            signature: UnknownSignature::nom_read_exact(&[0u8; 64])
-                                .unwrap(),
-                        },
-                    ),
-                };
-                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
-            }
-        }
+        apply_tezos_operation(
+            &self.chain_id,
+            block_in_progress,
+            host,
+            registry,
+            block_constants,
+            operation,
+        )
     }
 
     fn register_valid_transaction(
