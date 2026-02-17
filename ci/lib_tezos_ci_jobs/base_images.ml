@@ -121,7 +121,14 @@ module Files = struct
     ]
 end
 
-let jobs ?start_job ?(changeset = true) () =
+(* [start_job] used to add dependency to [trigger] in [before_merging] pipelines.
+
+   [changeset] should be set to [true] for [before_merging]/[merge_train] parent pipelines only.
+   Changesets should be ignored for other pipelines:
+   - branch pipelines such as [base_images.daily] because they are then ignored by GitLab
+   - in the manually triggered base images child pipeline as we may want to trigger all base images jobs.
+ *)
+let jobs ?start_job ?(changeset = false) () =
   (* This function can build docker images both in an emulated environment using
      qemu or natively. The advantage of choosing emulated vs native depends on
      the build time associated with the image. Small images are more efficiently

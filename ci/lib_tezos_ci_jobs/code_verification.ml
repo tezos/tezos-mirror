@@ -579,8 +579,12 @@ let jobs pipeline_type =
   @
   (* base image build jobs. *)
   match pipeline_type with
-  | Before_merging -> Base_images.jobs ~start_job:job_start ()
-  | Merge_train -> Base_images.jobs ()
+  (* In [before_merging] parent pipeline, base image jobs should start only
+     if [trigger] is started and if the changesets are touched. *)
+  | Before_merging -> Base_images.jobs ~start_job:job_start ~changeset:true ()
+  (* In [merge_train] pipeline, base image jobs should start as early as
+     as possible, but only if the changesets are touched. *)
+  | Merge_train -> Base_images.jobs ~changeset:true ()
   (* Not added in [schedule_extended_test]
      as they run nightly in [base_images.daily]. *)
   | Schedule_extended_test -> []
