@@ -10,27 +10,38 @@ type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
-type dal_status =
-  | With_DAL of bool array array
+type baker_window_status =
+  | With_DAL of bool array
   | Without_DAL
+  | In_committee
   | Out_of_committee
-  | Expected_to_DAL_attest
 
-(* Summary of a single baker’s DAL performance at one block *)
+(* Summary of a single baker’s DAL performance at a given published level. *)
 type per_baker_dal_summary = {
   attestable_slots : int;
+  (* the number of slots at the given published level that are attestable by the
+     baker; a slot is attestable for a baker if the baker is in the DAL committee
+     (has assigned shards at the corresponding committee level) and it is
+     protocol-attested; computed at the end of the attestation window *)
   attested_slots : int;
+  (* the number of slots the baker actually attested at the given published
+     level; computed at the end of the attestation window *)
   in_committee : bool;
-  (* [attestation_with_dal] is [None] if one is out of the DAL committee or did
-     not send an attestation.
-     Otherwise, it is [Some the_sent_attestation_is_"with_dal"]. *)
+  (* whether the baker is in the DAL committee (i.e. has assigned shards) for
+     the corresponding committee level *)
   attestation_with_dal : bool option;
+      (* for protocols >= 025:
+         - [None] if one is out of the DAL committee or did not send any
+           attestation operation;
+         - [Some flag] otherwise; that is, it is the DAL committee and send at
+           least one attestation operation;
+             - [flag] is set to [true] if it sent at least one DAL payload
+             - [flag] is [false], that is, it sent no DAL payload *)
 }
 
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : bool array array;
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
@@ -71,7 +82,7 @@ let default =
     ratio_published_commitments = 0.;
     ratio_attested_commitments = 0.;
     ratio_published_commitments_last_level = 0.;
-    ratio_attested_commitments_per_baker = Hashtbl.create 0;
+    ratio_attested_commitments_per_baker = Hashtbl.create 13;
     etherlink_operator_balance_sum = Tez.zero;
     total_echo_rollup_unattested_slots = 0;
     total_echo_rollup_fetched_data_size = 0;
@@ -537,7 +548,8 @@ let update_published_and_attested_commitments_per_slot ~first_level ~infos
           total_attested_commitments_per_slot )
 
 let update_ratio_attested_commitments_per_baker ~first_level ~infos
-    ~attestation_lag ~attestation_lags per_level_info =
+    ~cumulative_protocol_attestations ~cumulative_baker_window_status
+    ~attestation_lag per_level_info =
   let default () = Hashtbl.create 0 in
   let published_level =
     published_level_of_attested_level ~attestation_lag per_level_info.level
@@ -556,56 +568,73 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
           "Unexpected error: The level %d is missing in the infos table"
           published_level ;
         default ()
-    | Some published_level_info ->
-        let max_lag_index = List.length attestation_lags - 1 in
+    | Some _published_level_info ->
+        let protocol_attested_slots =
+          match
+            Hashtbl.find_opt cumulative_protocol_attestations published_level
+          with
+          | Some arr -> arr
+          | None -> [||]
+        in
         let attestable_slots =
-          Hashtbl.length published_level_info.published_commitments
+          number_of_attested_slots protocol_attested_slots
         in
-        let table =
-          Hashtbl.(create (length per_level_info.baker_dal_statuses))
+        let window_status =
+          match
+            Hashtbl.find_opt cumulative_baker_window_status published_level
+          with
+          | Some tbl -> tbl
+          | None -> Hashtbl.create 0
         in
-        Hashtbl.to_seq per_level_info.baker_dal_statuses
-        |> Seq.map (fun (public_key_hash, status) ->
-               ( public_key_hash,
-                 match status with
-                 (* The baker is in the DAL committee and sent an attestation_with_dal. *)
-                 | With_DAL per_lag_bits ->
-                     let attested_slots =
-                       if max_lag_index < Array.length per_lag_bits then
-                         number_of_attested_slots per_lag_bits.(max_lag_index)
-                       else 0
-                     in
-                     {
-                       attestable_slots;
-                       attested_slots;
-                       in_committee = true;
-                       attestation_with_dal = Some true;
-                     }
-                 (* The baker is out of the DAL committee and sent an attestation. *)
-                 | Out_of_committee ->
-                     {
-                       attestable_slots;
-                       attested_slots = 0;
-                       in_committee = false;
-                       attestation_with_dal = None;
-                     }
-                 (* The baker is in the DAL committee but sent an attestation without DAL. *)
-                 | Without_DAL ->
-                     {
-                       attestable_slots;
-                       attested_slots = 0;
-                       in_committee = true;
-                       attestation_with_dal = Some false;
-                     }
-                 (* The baker is in the DAL committee but sent no attestations. *)
-                 | Expected_to_DAL_attest ->
-                     {
-                       attestable_slots;
-                       attested_slots = 0;
-                       in_committee = true;
-                       attestation_with_dal = None;
-                     } ))
-        |> Hashtbl.add_seq table ;
+        let count_attested baker_attested_slots =
+          let n =
+            min
+              (Array.length baker_attested_slots)
+              (Array.length protocol_attested_slots)
+          in
+          let count = ref 0 in
+          for i = 0 to n - 1 do
+            if baker_attested_slots.(i) && protocol_attested_slots.(i) then
+              incr count
+          done ;
+          !count
+        in
+        let table = Hashtbl.create 16 in
+        Hashtbl.iter
+          (fun pkh status ->
+            let summary =
+              match status with
+              | With_DAL arr ->
+                  {
+                    attestable_slots;
+                    attested_slots = count_attested arr;
+                    in_committee = true;
+                    attestation_with_dal = Some true;
+                  }
+              | Without_DAL ->
+                  {
+                    attestable_slots;
+                    attested_slots = 0;
+                    in_committee = true;
+                    attestation_with_dal = Some false;
+                  }
+              | In_committee ->
+                  {
+                    attestable_slots;
+                    attested_slots = 0;
+                    in_committee = true;
+                    attestation_with_dal = None;
+                  }
+              | Out_of_committee ->
+                  {
+                    attestable_slots = 0;
+                    attested_slots = 0;
+                    in_committee = false;
+                    attestation_with_dal = None;
+                  }
+            in
+            Hashtbl.replace table pkh summary)
+          window_status ;
         table
 
 let update_echo_rollup_metrics infos_per_level metrics =
@@ -621,7 +650,8 @@ let update_echo_rollup_metrics infos_per_level metrics =
     data_size )
 
 let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
-    ~infos ~cumulative_protocol_attestations infos_per_level metrics =
+    ~infos ~cumulative_protocol_attestations ~cumulative_baker_window_status
+    infos_per_level metrics =
   let attestation_lag = List.fold_left max 0 attestation_lags in
   let level_first_commitment_published =
     update_level_first_commitment_published infos_per_level metrics
@@ -692,8 +722,9 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
     update_ratio_attested_commitments_per_baker
       ~first_level
       ~infos
+      ~cumulative_protocol_attestations
+      ~cumulative_baker_window_status
       ~attestation_lag
-      ~attestation_lags
       infos_per_level
   in
   let total_published_commitments_per_slot, total_attested_commitments_per_slot
