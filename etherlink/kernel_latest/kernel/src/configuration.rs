@@ -194,7 +194,15 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
     let evm_limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    ChainConfig::new_evm_config(chain_id, evm_limits, spec_id, experimental_features)
+    let michelson_runtime_chain_id =
+        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
+    ChainConfig::new_evm_config(
+        chain_id,
+        evm_limits,
+        spec_id,
+        experimental_features,
+        michelson_runtime_chain_id,
+    )
 }
 
 pub fn fetch_pure_evm_config<Host: Runtime>(
@@ -204,7 +212,15 @@ pub fn fetch_pure_evm_config<Host: Runtime>(
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    EvmChainConfig::create_config(chain_id, limits, spec_id, experimental_features)
+    let michelson_runtime_chain_id =
+        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
+    EvmChainConfig::create_config(
+        chain_id,
+        limits,
+        spec_id,
+        experimental_features,
+        michelson_runtime_chain_id,
+    )
 }
 
 fn fetch_michelson_chain_configuration<Host: Runtime>(

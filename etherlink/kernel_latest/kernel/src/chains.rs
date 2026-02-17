@@ -107,6 +107,8 @@ pub struct EvmChainConfig {
     pub limits: EvmLimits,
     pub spec_id: SpecId,
     pub experimental_features: ExperimentalFeatures,
+    #[allow(dead_code)]
+    michelson_chain_config: MichelsonChainConfig,
 }
 
 impl EvmChainConfig {
@@ -655,12 +657,16 @@ impl EvmChainConfig {
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
+        michelson_runtime_chain_id: ChainId,
     ) -> Self {
         Self {
             chain_id,
             limits,
             spec_id,
             experimental_features,
+            michelson_chain_config: MichelsonChainConfig::create_config(
+                michelson_runtime_chain_id,
+            ),
         }
     }
 
@@ -1056,12 +1062,14 @@ impl ChainConfig {
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
+        michelson_runtime_chain_id: ChainId,
     ) -> Self {
         ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
             chain_id,
             limits,
             spec_id,
             experimental_features,
+            michelson_runtime_chain_id,
         )))
     }
 
@@ -1134,6 +1142,7 @@ impl Default for EvmChainConfig {
             EvmLimits::default(),
             SpecId::default(),
             ExperimentalFeatures::default(),
+            ChainId::from(CHAIN_ID.to_le_bytes()),
         )
     }
 }
@@ -1145,6 +1154,7 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
         EvmLimits::default(),
         SpecId::default(),
         ExperimentalFeatures::default(),
+        ChainId::from(CHAIN_ID.to_le_bytes()),
     )
 }
 

@@ -776,6 +776,7 @@ mod tests {
             EvmLimits::default(),
             spec_id,
             ExperimentalFeatures::default(),
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
 
@@ -1079,6 +1080,7 @@ mod tests {
             EvmLimits::default(),
             SpecId::default(),
             experimental_features,
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
 
