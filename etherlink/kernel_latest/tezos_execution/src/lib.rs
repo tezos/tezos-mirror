@@ -166,10 +166,18 @@ fn credit_destination_without_debiting_sender(
     receiver_account
         .set_balance(host, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
-        balance_updates: vec![],
+        // TODO: L2-882 design CRAC receipts
+        balance_updates: vec![BalanceUpdate {
+            balance: Balance::Account(receiver_account.contract()),
+            changes: receiver_delta
+                .try_into()
+                .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?,
+            update_origin: UpdateOrigin::BlockApplication,
+        }],
         ticket_receipt: vec![],
         originated_contracts: vec![],
         consumed_milligas: 0_u64.into(),
