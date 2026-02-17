@@ -161,6 +161,9 @@ let get_infos_per_level t ~level ~metadata =
       PkhSet.empty
       (JSON.as_list dal_committee_json)
   in
+  let decode_dal_attestation str =
+    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
+  in
   let get_dal_status operation =
     let contents = JSON.(operation |-> "contents" |=> 0) in
     let kind = JSON.(contents |-> "kind" |> as_string) in
@@ -170,8 +173,8 @@ let get_infos_per_level t ~level ~metadata =
         let dal =
           if not @@ PkhSet.mem pkh dal_committee then Out_of_committee
           else
-            With_DAL
-              JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
+            let str = JSON.(contents |-> "dal_attestation" |> as_string) in
+            With_DAL (decode_dal_attestation str)
         in
         [(PKH pkh, dal)]
     | "attestations_aggregate" ->
@@ -187,7 +190,7 @@ let get_infos_per_level t ~level ~metadata =
               else
                 let json = JSON.(member_info |-> "dal_attestation") in
                 if JSON.is_null json then Without_DAL
-                else With_DAL (json |> JSON.as_string |> Z.of_string)
+                else With_DAL (decode_dal_attestation (JSON.as_string json))
             in
             (PKH pkh, dal))
           committee_info

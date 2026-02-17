@@ -11,7 +11,7 @@ type public_key_hash = PKH of string
 type commitment_info = {commitment : string; publisher_pkh : string}
 
 type dal_status =
-  | With_DAL of Z.t
+  | With_DAL of bool array array
   | Without_DAL
   | Out_of_committee
   | Expected_to_DAL_attest
@@ -537,7 +537,7 @@ let update_published_and_attested_commitments_per_slot ~first_level ~infos
           total_attested_commitments_per_slot )
 
 let update_ratio_attested_commitments_per_baker ~first_level ~infos
-    ~attestation_lag per_level_info =
+    ~attestation_lag ~attestation_lags per_level_info =
   let default () = Hashtbl.create 0 in
   let published_level =
     published_level_of_attested_level ~attestation_lag per_level_info.level
@@ -557,7 +557,7 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
           published_level ;
         default ()
     | Some published_level_info ->
-        (* Retrieves the number of published commitments *)
+        let max_lag_index = List.length attestation_lags - 1 in
         let attestable_slots =
           Hashtbl.length published_level_info.published_commitments
         in
@@ -569,10 +569,15 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
                ( public_key_hash,
                  match status with
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
-                 | With_DAL attestation_bitset ->
+                 | With_DAL per_lag_bits ->
+                     let attested_slots =
+                       if max_lag_index < Array.length per_lag_bits then
+                         number_of_attested_slots per_lag_bits.(max_lag_index)
+                       else 0
+                     in
                      {
                        attestable_slots;
-                       attested_slots = Z.popcount attestation_bitset;
+                       attested_slots;
                        in_committee = true;
                        attestation_with_dal = Some true;
                      }
@@ -688,6 +693,7 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
       ~first_level
       ~infos
       ~attestation_lag
+      ~attestation_lags
       infos_per_level
   in
   let total_published_commitments_per_slot, total_attested_commitments_per_slot

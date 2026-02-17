@@ -27,7 +27,11 @@ type commitment_info = {commitment : string; publisher_pkh : string}
       `baker_dal_statuses` field of the `per_level_infos` crafted at the current level.
 *)
 type dal_status =
-  | With_DAL of Z.t
+  | With_DAL of bool array array
+      (** Per-lag attestation data from this baker's operation.
+          [With_DAL a] where [a.(lag_index).(slot_index)] is [true]
+          when the baker flagged slot [slot_index] as attested for the
+          published level corresponding to [lag_index]. *)
   | Without_DAL
   | Out_of_committee
   | Expected_to_DAL_attest
