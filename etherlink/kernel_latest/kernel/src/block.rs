@@ -21,6 +21,7 @@ use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::registry_impl::RegistryImpl;
 use crate::storage;
+use crate::storage::read_block_in_progress;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -419,7 +420,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
-        match ChainConfig::read_block_in_progress(&safe_host)? {
+        match read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
                 log!(safe_host, Debug, "Restauring BIP from storage.");
                 (BlockInProgressProvenance::Storage, block_in_progress)

@@ -351,10 +351,6 @@ pub trait ChainConfigTrait: Debug {
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
-    fn read_block_in_progress(
-        host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress>>;
-
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
@@ -590,12 +586,6 @@ impl ChainConfigTrait for EvmChainConfig {
             delayed_inbox,
             current_blueprint_size,
         )
-    }
-
-    fn read_block_in_progress(
-        host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress>> {
-        crate::storage::read_block_in_progress(host)
     }
 
     fn can_fit_in_reboot(
@@ -939,12 +929,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
     ) -> anyhow::Result<TezosXTransaction> {
         let operation = tezos_operation_from_bytes(bytes)?;
         Ok(operation.into())
-    }
-
-    fn read_block_in_progress(
-        _host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress>> {
-        Ok(None)
     }
 
     fn can_fit_in_reboot(
