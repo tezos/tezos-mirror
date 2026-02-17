@@ -460,6 +460,29 @@ impl Encodable for TezosXTransaction {
     }
 }
 
+impl TransactionTrait for TezosXTransaction {
+    fn is_delayed(&self) -> bool {
+        match self {
+            Self::Ethereum(tx) => tx.is_delayed(),
+            Self::Tezos(op) => op.is_delayed(),
+        }
+    }
+
+    fn tx_hash(&self) -> TransactionHash {
+        match self {
+            Self::Ethereum(tx) => tx.tx_hash(),
+            Self::Tezos(op) => op.tx_hash(),
+        }
+    }
+
+    fn data_size(&self) -> u64 {
+        match self {
+            Self::Ethereum(tx) => tx.data_size(),
+            Self::Tezos(op) => op.data_size(),
+        }
+    }
+}
+
 pub struct TezosXBlockConstants {
     pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
     #[allow(dead_code)]
