@@ -105,12 +105,6 @@ end
 
 type force = True | False | With_timestamp of Time.Protocol.t
 
-type preconfirmed_transactions_result = {
-  accepted : Ethereum_types.hash list;
-  refused : Ethereum_types.hash list;
-  dropped : Ethereum_types.hash list;
-}
-
 module Request = struct
   type ('a, 'b) t =
     | Produce_genesis :
@@ -124,7 +118,7 @@ module Request = struct
     | Propose_next_block_timestamp : Time.Protocol.t -> (unit, tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
-        -> (preconfirmed_transactions_result, tztrace) t
+        -> (Tx_queue_types.preconfirmed_transactions_result, tztrace) t
     | Lock_block_production : (unit, tztrace) t
     | Unlock_block_production : (unit, tztrace) t
 
@@ -365,77 +359,92 @@ let validate_tezlink_op ~maximum_cumulative_size
         let*! () = Block_producer_events.operation_rejected hash msg in
         return (`Drop msg)
 
-let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size =
+let init_validation_state (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
-  (* Skip validation if chain_family is Michelson. *)
-  match tx_container with
-  | Michelson_tx_container (module Tx_container) ->
-      if maximum_cumulative_size <= Tezos_types.Operation.minimum_operation_size
-      then return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let initial_validation_state =
-          Tezlink_prevalidation.init_blueprint_validation read ()
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_tezlink_op ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map
-            (fun (raw, tx) ->
-              (raw, Tx_queue_types.Tezlink_operation.hash_of_tx_object tx))
-            l
-        in
-        return l
-  | Evm_tx_container (module Tx_container) ->
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return_nil
-      else
-        let read = Evm_state.read head_info.evm_state in
-        let* minimum_base_fee_per_gas =
-          Etherlink_durable_storage.minimum_base_fee_per_gas read
-        in
-        let* base_fee_per_gas =
-          Etherlink_durable_storage.base_fee_per_gas read
-        in
-        let* maximum_gas_limit =
-          Etherlink_durable_storage.maximum_gas_per_transaction read
-        in
-        let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-        let evm_config =
-          Validation_types.
-            {
-              minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-              base_fee_per_gas;
-              maximum_gas_limit;
-              da_fee_per_byte;
-              next_nonce =
-                (fun addr -> Etherlink_durable_storage.nonce read addr);
-              balance =
-                (fun addr -> Etherlink_durable_storage.balance read addr);
-            }
-        in
-        let initial_validation_state =
-          Validation_types.empty_validation_state
-            ~michelson_config:Validation_types.dummy_michelson_config
-            ~evm_config
-        in
-        let* l =
-          Tx_container.pop_transactions
-            ~maximum_cumulative_size
-            ~validate_tx:(validate_etherlink_tx ~maximum_cumulative_size)
-            ~initial_validation_state
-        in
-        let l =
-          List.map (fun (raw, tx) -> (raw, Transaction_object.hash tx)) l
-        in
-        return l
+  let read = Evm_state.read head_info.evm_state in
+  let michelson_config =
+    let get_counter = Tezlink_durable_storage.counter read in
+    let get_balance = Tezlink_durable_storage.balance_z read in
+    Validation_types.{get_balance; get_counter}
+  in
+  let* minimum_base_fee_per_gas =
+    Etherlink_durable_storage.minimum_base_fee_per_gas_opt read
+  in
+  let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas_opt read in
+  let* maximum_gas_limit =
+    Etherlink_durable_storage.maximum_gas_per_transaction read
+  in
+  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
+  (* TODO #8236 / L2-862
+     Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
+     is a temporary work around. In the context of Tezlink, no EVM block
+     exists yet so reading these values from the block header raises
+     [Invalid_block_structure]. Once the kernel writes an initial EVM block for
+     all chain families, this fallback can be removed. *)
+  let evm_config =
+    Validation_types.
+      {
+        minimum_base_fee_per_gas =
+          Qty
+            (Option.value
+               ~default:Fees.default_minimum_base_fee_per_gas
+               minimum_base_fee_per_gas);
+        base_fee_per_gas =
+          Option.value
+            ~default:(Qty Fees.default_minimum_base_fee_per_gas)
+            base_fee_per_gas;
+        maximum_gas_limit;
+        da_fee_per_byte;
+        next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
+        balance = (fun addr -> Etherlink_durable_storage.balance read addr);
+      }
+  in
+  return (Validation_types.empty_validation_state ~michelson_config ~evm_config)
+
+let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
+  let open Lwt_result_syntax in
+  (* Low key optimization to avoid even checking the txpool if there is not
+     enough space for the smallest transaction. *)
+  if
+    maximum_cumulative_size
+    <= Int.min
+         minimum_ethereum_transaction_size
+         Tezos_types.Operation.minimum_operation_size
+  then return_nil
+  else
+    let* initial_validation_state = init_validation_state head_info in
+    let* l =
+      Tx_queue.pop_transactions
+        ~maximum_cumulative_size
+        ~validate_tx:(fun validation_state raw_tx tx_object ->
+          match tx_object with
+          | Tx_queue_types.Evm tx_object ->
+              validate_etherlink_tx
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                tx_object
+          | Tx_queue_types.Michelson operation ->
+              validate_tezlink_op
+                ~maximum_cumulative_size
+                validation_state
+                raw_tx
+                operation)
+        ~initial_validation_state
+    in
+    let l =
+      List.map
+        (fun (raw, tx) ->
+          let hash =
+            match tx with
+            | Tx_queue_types.Evm tx -> Transaction_object.hash tx
+            | Tx_queue_types.Michelson tx ->
+                Tezos_types.Operation.hash_operation tx
+          in
+          (raw, hash))
+        l
+    in
+    return l
 
 (** Produces a block if we find at least one valid transaction in the
     transaction pool. *)
@@ -481,49 +490,6 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
             maximum_number_of_chunks )
   in
   return (delayed_hashes, remaining_cumulative_size)
-
-let init_michelson_validation_state () =
-  let open Lwt_result_syntax in
-  return
-    (Validation_types.empty_validation_state
-       ~michelson_config:Validation_types.dummy_michelson_config
-       ~evm_config:Validation_types.dummy_evm_config)
-
-let init_evm_validation_state () =
-  let open Lwt_result_syntax in
-  let*! head_info = Evm_context.head_info () in
-  let read = Evm_state.read head_info.evm_state in
-  let* minimum_base_fee_per_gas =
-    Etherlink_durable_storage.minimum_base_fee_per_gas read
-  in
-  let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
-  let* maximum_gas_limit =
-    Etherlink_durable_storage.maximum_gas_per_transaction read
-  in
-  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-  let evm_config =
-    Validation_types.
-      {
-        minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-        base_fee_per_gas;
-        maximum_gas_limit;
-        da_fee_per_byte;
-        next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
-        balance = (fun addr -> Etherlink_durable_storage.balance read addr);
-      }
-  in
-  return
-    (Validation_types.empty_validation_state
-       ~michelson_config:Validation_types.dummy_michelson_config
-       ~evm_config)
-
-let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
-    =
-  match tx_container with
-  | Ex_tx_container tx_container -> (
-      match tx_container with
-      | Evm_tx_container _ -> init_evm_validation_state ()
-      | Michelson_tx_container _ -> init_michelson_validation_state ())
 
 (* [now] is the timestamp of the previously created block.
    We compute [next] as the maximum between:
@@ -753,7 +719,6 @@ let produce_block (state : Types.state) ~force ~with_delayed_transactions =
             in
             let* transactions_and_hashes =
               pop_valid_tx
-                ~tx_container
                 head_info
                 ~maximum_cumulative_size:remaining_cumulative_size
             in
@@ -859,8 +824,9 @@ let preconfirm_transaction ~maximum_cumulative_size validation_state ~raw_tx
 
 let preconfirm_transactions
     (preconfirmation_state : Types.preconfirmation_state)
-    ~maximum_number_of_chunks ~transactions ~tx_container =
+    ~maximum_number_of_chunks ~transactions =
   let open Lwt_result_syntax in
+  let open Tx_queue_types in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       maximum_number_of_chunks
@@ -877,7 +843,7 @@ let preconfirm_transactions
             (head_info : Evm_context.head)
             ~maximum_number_of_chunks
         in
-        let* validation_state = init_validation_state ~tx_container in
+        let* validation_state = init_validation_state head_info in
         return
           ( {
               validation_state with
@@ -886,7 +852,7 @@ let preconfirm_transactions
             },
             preconfirmation_state )
     | Selecting_delayed_txs {current_size; _} ->
-        let* validation_state = init_validation_state ~tx_container in
+        let* validation_state = init_validation_state head_info in
         return ({validation_state with current_size}, preconfirmation_state)
     | Validating_txs {validation_state; _} ->
         return (validation_state, preconfirmation_state)
@@ -944,8 +910,6 @@ let preconfirm_transactions
         dropped = List.rev rev_dropped;
       } )
 
-type error += IC_disabled
-
 module Handlers = struct
   type self = worker
 
@@ -971,17 +935,16 @@ module Handlers = struct
         protect @@ fun () ->
         (* Refuse preconfirmations when locked, before the first
            created block, or when preconfirmations are explicitly disabled *)
-        if state.locked then tzfail IC_disabled
+        if state.locked then tzfail Services_backend_sig.IC_disabled
         else
           match state.preconfirmation_state with
-          | Disabled -> tzfail IC_disabled
-          | Awaiting_first_timestamp -> tzfail IC_disabled
+          | Disabled -> tzfail Services_backend_sig.IC_disabled
+          | Awaiting_first_timestamp -> tzfail Services_backend_sig.IC_disabled
           | Enabled preconfirmation_state ->
               let* preconfirmation_state, selected_txns_hashes =
                 preconfirm_transactions
                   ~maximum_number_of_chunks:state.maximum_number_of_chunks
                   ~transactions
-                  ~tx_container:state.tx_container
                   preconfirmation_state
               in
               set_preconfirmation_state state preconfirmation_state ;
@@ -1063,8 +1026,8 @@ let () =
     ~title:"Instant_confirmation_is_disabled"
     ~description:"Instant confirmation is disabled, request can't be traited."
     Data_encoding.unit
-    (function IC_disabled -> Some () | _ -> None)
-    (fun () -> IC_disabled)
+    (function Services_backend_sig.IC_disabled -> Some () | _ -> None)
+    (fun () -> Services_backend_sig.IC_disabled)
 
 let worker =
   lazy

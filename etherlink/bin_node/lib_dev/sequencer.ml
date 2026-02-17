@@ -22,13 +22,9 @@ type sandbox_config = {
   tezlink : tezlink_sandbox option;
 }
 
-let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
-    server_public_finalizer server_private_finalizer finalizer_rpc_process
-    telemetry_cleanup =
+let install_finalizer_seq server_public_finalizer server_private_finalizer
+    finalizer_rpc_process telemetry_cleanup =
   let open Lwt_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
@@ -37,22 +33,21 @@ let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
   let* () = Option.iter_s (fun f -> f ()) finalizer_rpc_process in
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Tx_container.shutdown () in
+  let* () = Tx_queue.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   let* () = Signals_publisher.shutdown () in
   return_unit
 
-let validate_and_add_etherlink_tx
-    ~(tx_container :
-       L2_types.evm_chain_family Services_backend_sig.tx_container) raw_tx =
+let validate_and_add_etherlink_tx raw_tx =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
   let* res = Prevalidator.prevalidate_raw_transaction raw_tx in
   match res with
   | Ok {next_nonce; transaction_object} ->
       let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-      let* _ = Tx_container.add ~next_nonce transaction_object ~raw_tx in
+      let* _ =
+        Tx_queue.add ~next_nonce (Tx_queue_types.Evm transaction_object) ~raw_tx
+      in
       return_unit
   | Error reason ->
       let hash = Ethereum_types.hash_raw_tx raw_tx in
@@ -61,35 +56,32 @@ let validate_and_add_etherlink_tx
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
    Validate Tezlink operations before adding them to the queue. *)
-let validate_and_add_tezlink_operation
-    ~(tx_container :
-       L2_types.michelson_chain_family Services_backend_sig.tx_container) raw_tx
-    =
+let validate_and_add_tezlink_operation raw_tx =
   let open Lwt_result_syntax in
-  let (Michelson_tx_container (module Tx_container)) = tx_container in
   let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_tx in
   match res with
   | Ok Prevalidator.{next_nonce; transaction_object} ->
       let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-      let* _ = Tx_container.add ~next_nonce transaction_object ~raw_tx in
+      let* _ =
+        Tx_queue.add
+          ~next_nonce
+          (Tx_queue_types.Michelson transaction_object)
+          ~raw_tx
+      in
       return_unit
   | Error reason ->
       let hash = Operation_hash.hash_string [raw_tx] in
       let*! () = Events.replicate_operation_dropped hash reason in
       return_unit
 
-let validate_and_add_tx (type f)
-    ~(tx_container : f Services_backend_sig.tx_container) :
+let validate_and_add_tx (type f) ~(chain_family : f L2_types.chain_family) :
     string -> unit tzresult Lwt.t =
-  match tx_container with
-  | Evm_tx_container _ as tx_container ->
-      validate_and_add_etherlink_tx ~tx_container
-  | Michelson_tx_container _ as tx_container ->
-      validate_and_add_tezlink_operation ~tx_container
+  match chain_family with
+  | EVM -> validate_and_add_etherlink_tx
+  | Michelson -> validate_and_add_tezlink_operation
 
-let loop_sequencer (type f) multichain
-    ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
-    ~rpc_timeout ~instant_confirmations time_between_blocks =
+let loop_sequencer (type f) ~(chain_family : f L2_types.chain_family) multichain
+    ?sandbox_config ~rpc_timeout ~instant_confirmations time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
@@ -117,7 +109,7 @@ let loop_sequencer (type f) multichain
               Blueprint_decoder.transactions blueprint.blueprint.payload
             in
             let txns = List.filter_map snd all_txns in
-            let* () = List.iter_es (validate_and_add_tx ~tx_container) txns in
+            let* () = List.iter_es (validate_and_add_tx ~chain_family) txns in
             let* _ =
               Block_producer.produce_block
                 ~force:(With_timestamp blueprint.blueprint.timestamp)
@@ -458,7 +450,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   in
   Metrics.init
     ~mode:"sequencer"
-    ~tx_pool_size_info:Tx_container.size_info
+    ~tx_pool_size_info:Tx_queue.size_info
     ~smart_rollup_address:smart_rollup_address_typed
     () ;
   let* () =
@@ -499,10 +491,14 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         () ;
       return_unit
   in
+  let block_producer_endpoint =
+    Services_backend_sig.Block_producer Block_producer.preconfirm_transactions
+  in
 
   let tick () =
     when_ configuration.experimental_features.preconfirmation_stream_enabled
-    @@ fun () -> Tx_container.tx_queue_tick ~evm_node_endpoint:Block_producer
+    @@ fun () ->
+    Tx_queue.tx_queue_tick ~evm_node_endpoint:block_producer_endpoint
   in
 
   let* finalizer_public_server =
@@ -555,17 +551,16 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       finalizer_private_server
       finalizer_rpc_process
       telemetry_cleanup
-      ~tx_container
   in
   Misc.background_task ~name:"tx_queue_beacon" (fun () ->
       when_ configuration.experimental_features.preconfirmation_stream_enabled
       @@ fun () ->
-      Tx_container.tx_queue_beacon
-        ~evm_node_endpoint:Block_producer
+      Tx_queue.tx_queue_beacon
+        ~evm_node_endpoint:block_producer_endpoint
         ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)) ;
   loop_sequencer
+    ~chain_family
     enable_multichain
-    ~tx_container
     ~rpc_timeout:configuration.rpc_timeout
     ~instant_confirmations:
       configuration.experimental_features.preconfirmation_stream_enabled

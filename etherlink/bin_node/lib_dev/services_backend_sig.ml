@@ -196,13 +196,22 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     | _ -> tzfail Node_error.Unexpected_multichain
 end
 
-(** Represents the different ways transactions can be injected into the system *)
+(* Reuses [Tx_queue_types.preconfirmed_transactions_result] so sequencer can
+   pass [Block_producer.preconfirm_transactions] directly without adapters. *)
+type preconfirm_transactions =
+  transactions:(string * Tx_queue_types.transaction_object_t) list ->
+  Tx_queue_types.preconfirmed_transactions_result tzresult Lwt.t
+
+type error += IC_disabled
+
 type endpoint =
   | Rpc of Uri.t
     (* Send transactions through standard RPC calls to the node at uri *)
   | Websocket of Websocket_client.t
     (* Use an active websocket client to push transactions in real time *)
-  | Block_producer (* Inject transactions directly into the block producer. *)
+  | Block_producer of preconfirm_transactions
+(* Inject transactions directly into the block producer.
+       Callback form avoids a Tx_queue -> Block_producer dependency cycle. *)
 
 type callback_status = [`Accepted | `Confirmed | `Dropped | `Refused]
 

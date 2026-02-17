@@ -9,131 +9,113 @@ type transaction_object_t =
   | Evm of Transaction_object.t
   | Michelson of Tezos_types.Operation.t
 
-module type L2_transaction = sig
-  type t
+type payload_t =
+  | Evm_payload of Ethereum_types.hex
+  | Michelson_payload of Ethereum_types.hex
 
-  type address
+let payload_raw = function Evm_payload hex | Michelson_payload hex -> hex
 
-  type nonce
+let payload_method = function
+  | Evm_payload _ -> Rpc_encodings.Send_raw_transaction.method_
+  | Michelson_payload _ -> Rpc_encodings.Send_raw_tezlink_operation.method_
 
-  val address_encoding : address Data_encoding.t
+let tag_payload tx_object payload =
+  match tx_object with
+  | Evm _ -> Evm_payload payload
+  | Michelson _ -> Michelson_payload payload
 
-  val hash_of_tx_object : t -> Ethereum_types.hash
-
-  val address_to_string : address -> string
-
-  val from_address_of_tx_object : t -> address
-
-  val bitset_add_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
-
-  val bitset_remove_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
-
-  val next_nonce : nonce -> Z.t
-
-  val nonce_to_z_opt : nonce -> Z.t option
-
-  val nonce_of_tx_object : t -> nonce
-
-  val to_transaction_object_t : t -> transaction_object_t
-
-  module AddressMap : Map.S with type key = address
-
-  module Forward_batch :
-    Rpc_encodings.METHOD
-      with type input = Ethereum_types.hex
-       and type output = Ethereum_types.hash
-
-  val make_txpool :
-    pending:t Ethereum_types.NonceMap.t AddressMap.t ->
-    queued:t Ethereum_types.NonceMap.t AddressMap.t ->
-    Transaction_object.txqueue_content
-end
-
-module Eth_transaction_object :
-  L2_transaction
-    with type t = Transaction_object.t
-     and type address = Ethereum_types.address
-     and module AddressMap = Ethereum_types.AddressMap
-     and type nonce = Ethereum_types.quantity = struct
-  open Ethereum_types
-
-  type t = Transaction_object.t
-
-  type nonrec address = address
-
-  type nonce = quantity
-
-  let address_encoding = address_encoding
-
-  let hash_of_tx_object (tx_object : t) = Transaction_object.hash tx_object
-
-  let address_to_string (Address (Hex s)) = s
-
-  let from_address_of_tx_object (tx_object : t) =
-    Transaction_object.sender tx_object
-
-  let bitset_add_nonce bitset (Qty nonce) = Nonce_bitset.add bitset ~nonce
-
-  let bitset_remove_nonce bitset (Qty nonce) = Nonce_bitset.remove bitset ~nonce
-
-  let next_nonce (Qty nonce) = Z.succ nonce
-
-  let nonce_to_z_opt (Qty nonce) = Some nonce
-
-  let nonce_of_tx_object (tx_object : t) = Transaction_object.nonce tx_object
-
-  let to_transaction_object_t t = Evm t
-
-  module AddressMap = AddressMap
-  module Forward_batch = Rpc_encodings.Send_raw_transaction
-
-  let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
-    {pending; queued}
-end
+type preconfirmed_transactions_result = {
+  accepted : Ethereum_types.hash list;
+  refused : Ethereum_types.hash list;
+  dropped : Ethereum_types.hash list;
+}
 
 type tezlink_batch_nonces = {first : Z.t; length : int}
 
-module Tezlink_operation :
-  L2_transaction
-    with type t = Tezos_types.Operation.t
-     and type nonce = tezlink_batch_nonces = struct
-  type t = Tezos_types.Operation.t
+type shared_nonce =
+  | Evm_nonce of Ethereum_types.quantity
+  | Michelson_nonce of tezlink_batch_nonces
 
-  type address = Signature.V2.public_key_hash
+module L2_transaction = struct
+  type t = transaction_object_t
 
-  type nonce = tezlink_batch_nonces
+  type address = string
 
-  let address_encoding = Signature.V2.Public_key_hash.encoding
+  type nonce = shared_nonce
 
-  let hash_of_tx_object = Tezos_types.Operation.hash_operation
+  let address_encoding = Data_encoding.string
 
-  let address_to_string = Signature.V2.Public_key_hash.to_string
+  let hash_of_tx_object = function
+    | Evm tx_object -> Transaction_object.hash tx_object
+    | Michelson operation -> Tezos_types.Operation.hash_operation operation
 
-  let from_address_of_tx_object (op : Tezos_types.Operation.t) = op.source
+  let address_to_string addr = addr
 
-  let bitset_add_nonce bitset {first; length} =
-    Nonce_bitset.add_many bitset ~nonce:first ~length
+  let address_of_string addr = addr
 
-  let bitset_remove_nonce bitset {first; length} =
-    Nonce_bitset.remove_many bitset ~nonce:first ~length
+  let from_address_of_tx_object = function
+    | Evm tx_object ->
+        let (Ethereum_types.Address (Ethereum_types.Hex sender)) =
+          Transaction_object.sender tx_object
+        in
+        sender
+    | Michelson operation ->
+        Signature.V2.Public_key_hash.to_string operation.source
 
-  let next_nonce {first; length} = Z.(add first (of_int length))
+  let bitset_add_nonce bitset = function
+    | Evm_nonce (Ethereum_types.Qty nonce) -> Nonce_bitset.add bitset ~nonce
+    | Michelson_nonce {first; length} ->
+        Nonce_bitset.add_many bitset ~nonce:first ~length
 
-  (* This function is only called in the handler of the [Content]
-     request which is never called in the case of Tezlink. *)
-  let nonce_to_z_opt _nonce = None
+  let bitset_remove_nonce bitset = function
+    | Evm_nonce (Ethereum_types.Qty nonce) -> Nonce_bitset.remove bitset ~nonce
+    | Michelson_nonce {first; length} ->
+        Nonce_bitset.remove_many bitset ~nonce:first ~length
 
-  let nonce_of_tx_object (op : Tezos_types.Operation.t) =
-    {first = op.first_counter; length = op.length}
+  let next_nonce = function
+    | Evm_nonce (Ethereum_types.Qty nonce) -> Z.succ nonce
+    | Michelson_nonce {first; length} -> Z.(add first (of_int length))
 
-  let to_transaction_object_t t = Michelson t
+  let nonce_to_z_opt = function
+    | Evm_nonce (Ethereum_types.Qty nonce) -> Some nonce
+    | Michelson_nonce _nonce -> None
 
-  module AddressMap = Map.Make (Signature.V2.Public_key_hash)
-  module Forward_batch = Rpc_encodings.Send_raw_tezlink_operation
+  let nonce_of_tx_object = function
+    | Evm tx_object -> Evm_nonce (Transaction_object.nonce tx_object)
+    | Michelson operation ->
+        Michelson_nonce
+          {first = operation.first_counter; length = operation.length}
 
-  let make_txpool ~pending:_ ~queued:_ : Transaction_object.txqueue_content =
-    {
-      pending = Ethereum_types.AddressMap.empty;
-      queued = Ethereum_types.AddressMap.empty;
-    }
+  let to_transaction_object_t tx_object = tx_object
+
+  module AddressMap = Map.Make (String)
+
+  let forward_batch_method = function
+    | Evm _ -> Rpc_encodings.Send_raw_transaction.method_
+    | Michelson _ -> Rpc_encodings.Send_raw_tezlink_operation.method_
+
+  let add_txpool_entry tx_nonce tx_object content =
+    let sender = Transaction_object.sender tx_object in
+    let nonce_map =
+      Ethereum_types.AddressMap.find_opt sender content
+      |> Option.value ~default:Ethereum_types.NonceMap.empty
+    in
+    let nonce_map = Ethereum_types.NonceMap.add tx_nonce tx_object nonce_map in
+    Ethereum_types.AddressMap.add sender nonce_map content
+
+  let fold_txpool tx_map =
+    AddressMap.fold
+      (fun _address nonce_map content ->
+        Ethereum_types.NonceMap.fold
+          (fun tx_nonce tx_object content ->
+            match tx_object with
+            | Evm tx_object -> add_txpool_entry tx_nonce tx_object content
+            | Michelson _operation -> content)
+          nonce_map
+          content)
+      tx_map
+      Ethereum_types.AddressMap.empty
+
+  let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
+    {pending = fold_txpool pending; queued = fold_txpool queued}
 end
