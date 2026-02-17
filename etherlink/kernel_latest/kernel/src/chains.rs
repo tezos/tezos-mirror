@@ -372,13 +372,6 @@ pub trait ChainConfigTrait: Debug {
         tracer_input: Option<TracerInput>,
     ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>;
 
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress,
-        execution_info: RuntimeExecutionInfo,
-        host: &mut impl Runtime,
-    ) -> anyhow::Result<()>;
-
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
@@ -642,15 +635,6 @@ impl ChainConfigTrait for EvmChainConfig {
                 operation,
             ),
         }
-    }
-
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress,
-        execution_info: RuntimeExecutionInfo,
-        host: &mut impl Runtime,
-    ) -> anyhow::Result<()> {
-        block_in_progress.register_valid_transaction(execution_info, host)
     }
 
     fn finalize_and_store(
@@ -965,15 +949,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 operation,
             ),
         }
-    }
-
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress,
-        execution_info: RuntimeExecutionInfo,
-        host: &mut impl Runtime,
-    ) -> anyhow::Result<()> {
-        block_in_progress.register_valid_transaction(execution_info, host)
     }
 
     fn finalize_and_store(
