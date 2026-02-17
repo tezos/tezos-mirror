@@ -145,6 +145,19 @@ fn credit_destination_without_debiting_sender(
     amount: &Narith,
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
+    if amount.eq(&0_u64.into()) {
+        return Ok(TransferSuccess {
+            storage: None,
+            lazy_storage_diff: None,
+            balance_updates: vec![],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_milligas: 0_u64.into(),
+            storage_size: 0_u64.into(),
+            paid_storage_size_diff: 0_u64.into(),
+            allocated_destination_contract: false,
+        });
+    }
     let receiver_balance = receiver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
