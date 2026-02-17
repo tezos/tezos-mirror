@@ -646,6 +646,39 @@ function commit_01_copy_source() {
   commit_no_hooks "src: copy from ${protocol_source}"
 }
 
+# COMMIT 2: Set protocol version strings
+#
+# MODE: both stabilise and snapshot
+# RENAMES: version strings in constants_repr.ml, raw_context.ml, proxy.ml
+#   Example: "alpha_current" → "t_024" or "tallinn"
+#
+# DESCRIPTION:
+#   Updates the version_value constant in multiple files to reflect the
+#   new protocol name. For snapshot mode, uses exact match. For stabilise,
+#   uses pattern match to handle suffixes like "alpha_current".
+#
+# CREATES: 1 commit: "src: set current version"
+function commit_02_set_version() {
+  log_blue "Setting current version in raw_context and proxy"
+
+  local pattern
+
+  if [[ ${is_snapshot} == true ]]; then
+    # Exact match for snapshot
+    pattern="s/let version_value = \"${protocol_source}\"/let version_value = \"${protocol_target}\"/"
+  else
+    # Pattern match for stabilise (handles alpha_current, etc.)
+    pattern="s/let version_value = \"${protocol_source}.*\"/let version_value = \"${protocol_target}\"/"
+  fi
+
+  sed -i.old.old -e "${pattern}" \
+    "src/proto_${version}/lib_protocol/constants_repr.ml" \
+    "src/proto_${version}/lib_protocol/raw_context.ml" \
+    "src/proto_${version}/lib_client/proxy.ml"
+
+  commit_no_hooks "src: set current version"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -678,24 +711,7 @@ function copy_source() {
     log_blue "protocol_source is now ${protocol_source}"
   fi
 
-  # set current version
-  # Starting from 018 the version value moved to `constants_repr`. To be
-  # able to snapshot older protocol the `raw_context` file is kept even
-  # if it is not strictly needed anymore.
-  echo "Setting current version in raw_context and proxy"
-
-  if [[ ${is_snapshot} == true ]]; then
-    sed -i.old.old -e "s/let version_value = \"${protocol_source}\"/let version_value = \"${protocol_target}\"/" \
-      "src/proto_${version}/lib_protocol/constants_repr.ml" \
-      "src/proto_${version}/lib_protocol/raw_context.ml" \
-      "src/proto_${version}/lib_client/proxy.ml"
-  else
-    sed -i.old.old -e "s/let version_value = \"${protocol_source}.*\"/let version_value = \"${protocol_target}\"/" \
-      "src/proto_${version}/lib_protocol/constants_repr.ml" \
-      "src/proto_${version}/lib_protocol/raw_context.ml" \
-      "src/proto_${version}/lib_client/proxy.ml"
-  fi
-  commit_no_hooks "src: set current version"
+  commit_02_set_version
 
   cd "src/proto_${version}"/lib_protocol
   echo "${capitalized_source}"
