@@ -145,7 +145,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
          (read ~block)
          (Tezlink_durable_storage.Path.storage c)
          (Data_encoding.Binary.of_bytes_opt
-            Tezlink_imports.Alpha_context.Script.expr_encoding)
+            Tezlink_imports.Imported_context.Script.expr_encoding)
 
   let get_code chain block c =
     (* TODO: #7986
@@ -156,7 +156,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
          (read ~block)
          (Tezlink_durable_storage.Path.code c)
          (Data_encoding.Binary.of_bytes_opt
-            Tezlink_imports.Alpha_context.Script.expr_encoding)
+            Tezlink_imports.Imported_context.Script.expr_encoding)
 
   let get_script chain block c =
     let open Lwt_result_syntax in
@@ -169,7 +169,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         | Some code, Some storage ->
             return
             @@ Some
-                 Tezlink_imports.Imported_protocol.Alpha_context.Script.
+                 Tezlink_imports.Imported_context.Script.
                    {code = lazy_expr code; storage = lazy_expr storage}
         | _ -> return_none)
 

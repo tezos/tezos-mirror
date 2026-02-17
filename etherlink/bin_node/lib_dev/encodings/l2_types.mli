@@ -88,7 +88,7 @@ end
 
 module Tezos_block : sig
   module Protocol : sig
-    type t = S023
+    type t = S023 | T024
   end
 
   type t = {

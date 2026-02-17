@@ -37,7 +37,7 @@ module Path = struct
   (** Path to a specific big_map: /tezlink/context/big_map/{id} *)
   let big_map_id id =
     big_map ^ "/"
-    ^ Z.to_string (Tezlink_imports.Alpha_context.Big_map.Id.unparse_to_z id)
+    ^ Z.to_string (Tezlink_imports.Imported_context.Big_map.Id.unparse_to_z id)
 
   (** Path to a big_map value: /tezlink/context/big_map/{id}/{key_hash_hex}
       where key_hash_hex is the hex encoding of the raw Script_expr_hash bytes *)
@@ -84,7 +84,7 @@ let big_map_get read id key_hash =
   let path = Path.big_map_value id key_hash in
   let decode =
     Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Alpha_context.Script.expr_encoding
+      Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
     Durable_storage.inspect_durable_and_decode_opt read path decode
@@ -96,7 +96,7 @@ let big_map_key_type read id =
   let path = Path.big_map_key_type id in
   let decode =
     Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Alpha_context.Script.expr_encoding
+      Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
     Durable_storage.inspect_durable_and_decode_opt read path decode
@@ -108,7 +108,7 @@ let big_map_value_type read id =
   let path = Path.big_map_value_type id in
   let decode =
     Data_encoding.Binary.of_bytes_opt
-      Tezlink_imports.Alpha_context.Script.expr_encoding
+      Tezlink_imports.Imported_context.Script.expr_encoding
   in
   let+ result =
     Durable_storage.inspect_durable_and_decode_opt read path decode

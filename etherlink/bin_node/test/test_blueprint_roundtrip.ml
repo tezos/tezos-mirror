@@ -158,7 +158,9 @@ let protocol_typ =
   Check.equalable
     (fun fmt protocol ->
       let string_protocol =
-        match protocol with L2_types.Tezos_block.Protocol.S023 -> "S023"
+        match protocol with
+        | L2_types.Tezos_block.Protocol.S023 -> "S023"
+        | L2_types.Tezos_block.Protocol.T024 -> "T024"
       in
       Format.pp_print_string fmt string_protocol)
     ( = )
@@ -390,6 +392,26 @@ let () =
        ~protocol:S023
        ~next_protocol:S023
        ~operations:(Bytes.of_string "txntxntxn")
+       () ;
+
+  test_tez_latest_block_roundtrip ~title:"T024 protocol"
+  @@ Tezos_block_latest_tool.make
+       ~level:10l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~protocol:T024
+       ~next_protocol:T024
+       ~operations:Bytes.empty
+       () ;
+
+  test_tez_latest_block_roundtrip ~title:"S023 to T024 transition"
+  @@ Tezos_block_latest_tool.make
+       ~level:10l
+       ~timestamp:Time.Protocol.epoch
+       ~parent_hash:L2_types.Tezos_block.genesis_parent_hash
+       ~protocol:S023
+       ~next_protocol:T024
+       ~operations:Bytes.empty
        () ;
 
   test_tez_v0_block_roundtrip ~title:"all zeros tez block"

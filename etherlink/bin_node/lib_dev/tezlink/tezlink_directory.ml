@@ -80,7 +80,7 @@ let version () =
 
 let make_contract_info contract_balance counter_opt contract_script =
   let open Lwt_result_syntax in
-  let open Imported_protocol_plugin.Contract_services in
+  let open Tezlink_imports.Imported_protocol_plugin.Contract_services in
   let*? counter =
     let open Result_syntax in
     match counter_opt with
@@ -190,14 +190,14 @@ struct
           let* receipt =
             Tezos_types.convert_using_serialization
               ~name:"operation_receipt"
-              ~src:Imported_protocol.operation_receipt_encoding
+              ~src:Tezlink_imports.Imported_protocol.operation_receipt_encoding
               ~dst:Block_services.Proto.operation_receipt_encoding
               receipt
           in
           let* operation =
             Tezos_types.convert_using_serialization
               ~name:"operation_data"
-              ~src:Imported_protocol.operation_data_encoding
+              ~src:Tezlink_imports.Imported_protocol.operation_data_encoding
               ~dst:Block_services.Proto.operation_data_encoding
               operation
           in
@@ -262,10 +262,11 @@ struct
 end
 
 module Current_block_header =
-  Make_block_header (Imported_protocol) (Imported_protocol)
-module Zero_block_header = Make_block_header (Zero_protocol) (Genesis_protocol)
+  Make_block_header (Tezlink_imported_protocol) (Tezlink_imported_protocol)
+module Zero_block_header =
+  Make_block_header (Tezlink_zero_protocol) (Tezlink_genesis_protocol)
 module Genesis_block_header =
-  Make_block_header (Genesis_protocol) (Imported_protocol)
+  Make_block_header (Tezlink_genesis_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -302,7 +303,7 @@ let get_counter (module Backend : Tezlink_backend_sig.S) chain block contract =
     of a tz1 on an old block the encoding used will be the one of the current live protocol. *)
 let build_block_static_directory ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) :
-    tezlink_rpc_context Imported_env.RPC_directory.t =
+    tezlink_rpc_context Tezlink_imports.Imported_env.RPC_directory.t =
   let open Lwt_result_syntax in
   Tezos_rpc.Directory.empty
   |> register_with_conversion
@@ -361,20 +362,25 @@ let build_block_static_directory ~l2_chain_id
              | None -> return_none
              | Some storage ->
                  let elab_conf =
-                   Imported_protocol.Script_ir_translator_config.make
+                   Tezlink_imports.Imported_protocol.Script_ir_translator_config
+                   .make
                      ~legacy:true
                      ()
                  in
                  let* ctxt = Tezlink_mock.init_dummy_context () in
-                 let open Imported_protocol_test_helpers.Lwt_result_wrap_syntax in
+                 let open
+                   Tezlink_imports.Imported_protocol_test_helpers
+                   .Lwt_result_wrap_syntax in
                  let*@ Ex_code (Code {storage_type; _}), ctxt =
-                   Imported_protocol.Script_ir_translator.parse_code
+                   Tezlink_imports.Imported_protocol.Script_ir_translator
+                   .parse_code
                      ~elab_conf
                      ctxt
                      ~code:script.code
                  in
                  let storage =
-                   Imported_protocol_plugin.RPC.Scripts.Normalize_data
+                   Tezlink_imports.Imported_protocol_plugin.RPC.Scripts
+                   .Normalize_data
                    .normalize_data
                      ~unparsing_mode
                      storage_type
@@ -428,7 +434,7 @@ let build_block_static_directory ~l2_chain_id
          let*? _block = check_block block in
          let*? bytes =
            Data_encoding.Binary.to_bytes
-             Alpha_context.Operation.unsigned_encoding
+             Tezlink_imports.Imported_context.Operation.unsigned_encoding
              operation
            |> Result.map_error_e @@ fun _ ->
               Result_syntax.tzfail Failed_operation_forging
@@ -448,7 +454,9 @@ let build_block_static_directory ~l2_chain_id
          ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
-         let hash = Alpha_context.Operation.hash_packed operation in
+         let hash =
+           Tezlink_imports.Imported_context.Operation.hash_packed operation
+         in
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let* result =
            Backend.simulate_operation
@@ -470,7 +478,7 @@ let build_block_static_directory ~l2_chain_id
              ~chain_id
              ~skip_signature:true
              operation
-             (Alpha_context.Operation.hash_packed operation)
+             (Tezlink_imports.Imported_context.Operation.hash_packed operation)
              block
          in
          return (operation.protocol_data, result))
@@ -486,8 +494,11 @@ let build_block_static_directory ~l2_chain_id
          let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let* receipts =
            List.map_es
-             (fun (operation : Alpha_context.packed_operation) ->
-               let hash = Alpha_context.Operation.hash_packed operation in
+             (fun operation ->
+               let hash =
+                 Tezlink_imports.Imported_context.Operation.hash_packed
+                   operation
+               in
                let* result =
                  Backend.simulate_operation
                    ~chain_id
@@ -513,32 +524,39 @@ let build_block_static_directory ~l2_chain_id
          let*? block = check_block block in
          Backend.big_map_raw_info chain block id)
 
-let retrieve_level (module Backend : Tezlink_backend_sig.S) chain block =
+let retrieve_block (module Backend : Tezlink_backend_sig.S) chain block =
   let open Lwt_result_syntax in
   let*? chain = check_chain chain in
   let*? block = check_block block in
-  let* tezlink_level = Backend.current_level chain block ~offset:0l in
-  return tezlink_level.level
+  Backend.block chain block
 
-let protocol_for_block_or_level level_result :
+let tezlink_protocol_of_protocol = function
+  | L2_types.Tezos_block.Protocol.S023 ->
+      (module Tezlink_SeouLo_protocol : Tezlink_protocol)
+  | L2_types.Tezos_block.Protocol.T024 ->
+      (module Tezlink_TALLiN_protocol : Tezlink_protocol)
+
+let protocol_for_block_or_level block_result :
     (module Tezlink_protocol) * (module Tezlink_protocol) =
   let imported =
-    ( (module Tezos_services.Imported_protocol : Tezlink_protocol),
-      (module Tezos_services.Imported_protocol : Tezlink_protocol) )
+    ( (module Tezlink_imported_protocol : Tezlink_protocol),
+      (module Tezlink_imported_protocol : Tezlink_protocol) )
   in
-  match level_result with
-  | Ok level -> (
-      match level with
+  match block_result with
+  | Ok (block : L2_types.Tezos_block.t) -> (
+      match block.level with
       | 0l ->
-          ( (module Zero_protocol : Tezlink_protocol),
-            (module Genesis_protocol : Tezlink_protocol) )
+          ( (module Tezlink_zero_protocol : Tezlink_protocol),
+            (module Tezlink_genesis_protocol : Tezlink_protocol) )
       | 1l ->
-          ( (module Genesis_protocol : Tezlink_protocol),
-            (module Tezos_services.Imported_protocol : Tezlink_protocol) )
-      | _ -> imported)
+          ( (module Tezlink_genesis_protocol : Tezlink_protocol),
+            tezlink_protocol_of_protocol block.next_protocol )
+      | _ ->
+          ( tezlink_protocol_of_protocol block.protocol,
+            tezlink_protocol_of_protocol block.next_protocol ))
   | _ ->
       (* TezosX PoC also uses the same backend as Tezlink for now. So when
-        requesting the current_level, it fails as blocks are not stored at the same path.
+        requesting the block, it fails as blocks are not stored at the same path.
         Until TezosX Poc has its own backend, we should return imported to prevent the failure.*)
       imported
 
@@ -553,10 +571,14 @@ let protocol_for_block_or_level level_result :
 let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) (chain : chain) (block : block) =
   let open Lwt_result_syntax in
-  let*! tezlink_level = retrieve_level (module Backend) chain block in
+  let*! tezlink_block = retrieve_block (module Backend) chain block in
   let (module Proto : Tezlink_protocol), (module Next_proto : Tezlink_protocol)
       =
-    protocol_for_block_or_level tezlink_level
+    match block with
+    | `Head 0 ->
+        ( (module Tezlink_imported_protocol : Tezlink_protocol),
+          (module Tezlink_imported_protocol : Tezlink_protocol) )
+    | _ -> protocol_for_block_or_level tezlink_block
   in
   let module Block_header = Make_block_header (Proto) (Next_proto) in
   let module S = Block_header.Block_services.S in
@@ -643,7 +665,9 @@ let register_dynamic_block_services ~l2_chain_id
            let*? chain = check_chain chain in
            let*? block = check_block block in
            let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-           if operation_pass <> Imported_protocol.Operation_repr.manager_pass
+           if
+             operation_pass
+             <> Tezlink_imports.Imported_protocol.Operation_repr.manager_pass
            then
              (* All tezlink operations are manager operations *)
              return_none
@@ -685,7 +709,9 @@ let register_dynamic_block_services ~l2_chain_id
     |> register
          ~service:S.Operation_hashes.operation_hashes_in_pass
          ~impl:(fun ((((), chain), block), list_offset) () () ->
-           if list_offset <> Imported_protocol.Operation_repr.manager_pass
+           if
+             list_offset
+             <> Tezlink_imports.Imported_protocol.Operation_repr.manager_pass
            (* All tezlink operations are manager operations *)
            then return_nil
            else
@@ -748,9 +774,9 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
                        shell;
                        protocol_data =
                          Data_encoding.Binary.to_bytes_exn
-                           Imported_protocol.Block_header_repr
+                           Tezlink_imported_protocol.Block_header_repr
                            .protocol_data_encoding
-                           Imported_protocol.mock_protocol_data;
+                           Tezlink_imported_protocol.mock_protocol_data;
                      }
                       : Block_header.t) )
             | Error _, _ | _, Error _ -> return_none)

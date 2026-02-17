@@ -29,19 +29,19 @@ module type S = sig
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+    Tezlink_imports.Imported_context.Script.expr option tzresult Lwt.t
 
   val get_code :
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+    Tezlink_imports.Imported_context.Script.expr option tzresult Lwt.t
 
   val get_script :
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Tezlink_imports.Alpha_context.Script.t option tzresult Lwt.t
+    Tezlink_imports.Imported_context.Script.t option tzresult Lwt.t
 
   val manager_key :
     [`Main] ->
@@ -58,18 +58,18 @@ module type S = sig
   val big_map_get :
     [`Main] ->
     block_param ->
-    Tezlink_imports.Alpha_context.Big_map.Id.t ->
+    Tezlink_imports.Imported_context.Big_map.Id.t ->
     Tezlink_imports.Imported_protocol.Script_expr_hash.t ->
-    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+    Tezlink_imports.Imported_context.Script.expr option tzresult Lwt.t
 
   val big_map_raw_info :
     [`Main] ->
     block_param ->
-    Tezlink_imports.Alpha_context.Big_map.Id.t ->
-    (Tezlink_imports.Alpha_context.Script.expr
-    * Tezlink_imports.Alpha_context.Script.expr
+    Tezlink_imports.Imported_context.Big_map.Id.t ->
+    (Tezlink_imports.Imported_context.Script.expr
+    * Tezlink_imports.Imported_context.Script.expr
     * Z.t
-    * Tezlink_imports.Alpha_context.Script.expr list)
+    * Tezlink_imports.Imported_context.Script.expr list)
     option
     tzresult
     Lwt.t
@@ -87,9 +87,7 @@ module type S = sig
 
   val bootstrap_accounts :
     unit ->
-    (Tezlink_imports.Imported_protocol.Alpha_context.public_key_hash
-    * Tezos_types.Tez.t)
-    list
+    (Tezlink_imports.Imported_context.public_key_hash * Tezos_types.Tez.t) list
     tzresult
     Lwt.t
 
