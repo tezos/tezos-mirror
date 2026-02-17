@@ -526,6 +526,17 @@ module CLST_types = struct
         (add_name "is_operator" bool_ty)
     in
     return @@ add_name "operator_update" x
+
+  let token_metadata_update_event_type =
+    let open Result_syntax in
+    let* token_info_ty in
+    let* token_info_ty = option_ty token_info_ty in
+    let* x =
+      pair_ty
+        (add_name "token_id" nat_ty)
+        (add_name "new_metadata" token_info_ty)
+    in
+    return @@ add_name "token_metadata_update" x
 end
 
 type ('arg, 'storage) kind =

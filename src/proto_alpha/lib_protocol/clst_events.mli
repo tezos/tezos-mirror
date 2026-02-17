@@ -78,3 +78,15 @@ val operator_update_event :
   token_id:CLST_types.nat ->
   is_operator:bool ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** [token_metadata_update_event] returns an internal event operation of type
+    (pair %token_metadata_update
+      (nat %token_id)
+      (option %new_metadata (map string bytes)))
+    with tag [entrypoint]. *)
+val token_metadata_update_event :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  token_id:CLST_types.nat ->
+  new_metadata:CLST_types.token_info option ->
+  (Script_typed_ir.operation * context) tzresult Lwt.t

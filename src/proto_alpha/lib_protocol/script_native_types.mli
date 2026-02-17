@@ -183,6 +183,10 @@ module CLST_types : sig
     tup4
     ty_node
     tzresult
+
+  val token_metadata_update_event_type :
+    (nat (* token_id *), token_info option (* new_metadata *)) pair ty_node
+    tzresult
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)
