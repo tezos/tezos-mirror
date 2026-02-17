@@ -47,24 +47,61 @@ let predicate_from_args ?major ?minor ?rc () =
   | Some (Rc rc) -> (
       match version.rc with None -> false | Some version_rc -> version_rc = rc)
 
-(* [version_to_rss_item ~component version] converts a [version] of [component]
-   to an RSS item. *)
-let version_to_rss_item ~component version =
+(* [version_to_rss_items ~component version] converts a [version] of [component]
+   to a list of RSS items. The base release item is always included. An
+   additional item is generated for each packaging revision in
+   [version.revisions], preserving the full revision history in the feed. *)
+let version_to_rss_items ~component version =
   let version_str = Version.to_string version in
-  let title = sf "%s %s" (String.capitalize_ascii component.name) version_str in
-  let guid = Rss.Guid_name (sf "%s-%s" component.name version_str) in
   (* TODO: Deduce from command line arguments. *)
   let link = Uri.of_string "https://octez.tezos.com/releases" in
-  let pubdate = version.publication_date |> Ptime.of_float_s in
-  let desc =
-    sf
-      "%s version %d.%d%s"
-      (String.capitalize_ascii component.name)
-      version.major
-      version.minor
-      (match version.rc with Some rc -> sf "-rc%d" rc | None -> "")
+  let rc_suffix =
+    match version.rc with Some rc -> sf "-rc%d" rc | None -> ""
   in
-  Rss.item ~title ~desc ~guid ~link ?pubdate ()
+  let base_item =
+    let title =
+      sf "%s %s" (String.capitalize_ascii component.name) version_str
+    in
+    let guid = Rss.Guid_name (sf "%s-%s" component.name version_str) in
+    let pubdate = version.publication_date |> Ptime.of_float_s in
+    let desc =
+      sf
+        "%s version %d.%d%s"
+        (String.capitalize_ascii component.name)
+        version.major
+        version.minor
+        rc_suffix
+    in
+    Rss.item ~title ~desc ~guid ~link ?pubdate ()
+  in
+  let revision_items =
+    List.map
+      (fun (rev : revision) ->
+        let title =
+          sf
+            "%s %s (packaging revision %d)"
+            (String.capitalize_ascii component.name)
+            version_str
+            rev.build_number
+        in
+        let guid =
+          Rss.Guid_name
+            (sf "%s-%s-%d" component.name version_str rev.build_number)
+        in
+        let pubdate = Ptime.of_float_s rev.revision_date in
+        let desc =
+          sf
+            "%s version %d.%d%s - packaging revision %d"
+            (String.capitalize_ascii component.name)
+            version.major
+            version.minor
+            rc_suffix
+            rev.build_number
+        in
+        Rss.item ~title ~desc ~guid ~link ?pubdate ())
+      version.revisions
+  in
+  base_item :: revision_items
 
 let () =
   Clap.description
@@ -327,8 +364,8 @@ let () =
       let last_build_date = Unix.time () |> Ptime.of_float_s in
       let versions = load_from_file file in
       let items =
-        List.map
-          (fun version -> version_to_rss_item ~component version)
+        List.concat_map
+          (fun version -> version_to_rss_items ~component version)
           versions
       in
       let channel = Rss.channel ~title ~desc ~link ?last_build_date items in
