@@ -520,7 +520,7 @@ fn get_contract_entrypoint<C: Context>(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<'a, Host: Runtime, C: Context>(
+pub fn transfer_external<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
