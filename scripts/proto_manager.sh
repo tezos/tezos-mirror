@@ -787,6 +787,27 @@ function commit_04_compute_hash_and_rename() {
   fi
 }
 
+# COMMIT 5: Rename binary files
+#
+# MODE: both
+# RENAMES: main_*_${protocol_source}.ml{,i} → main_*_${new_protocol_name}.ml{,i}
+#
+# DESCRIPTION:
+#   Renames all main_*.ml and main_*.mli files in the protocol directory
+#   to use the new protocol name instead of the source protocol name.
+#   This affects binary entry point files.
+#
+# CREATES: 1 commit: "src: rename binaries main_*.ml{,i} files"
+function commit_05_rename_binaries() {
+  cd "src/proto_${new_protocol_name}"
+  # rename main_*.ml{,i} files of the binaries
+  find . -name main_\*_"${protocol_source}".ml -or -name main_\*_"${protocol_source}".mli | while read -r file; do
+    new_file=${file//_"${protocol_source}"/_"${new_protocol_name}"}
+    git mv "${file}" "${new_file}"
+  done
+  commit_no_hooks "src: rename binaries main_*.ml{,i} files"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -836,13 +857,7 @@ function copy_source() {
     protocol_source="${protocol_source_original}"
   fi
 
-  cd "src/proto_${new_protocol_name}"
-  # rename main_*.ml{,i} files of the binaries
-  find . -name main_\*_"${protocol_source}".ml -or -name main_\*_"${protocol_source}".mli | while read -r file; do
-    new_file=${file//_"${protocol_source}"/_"${new_protocol_name}"}
-    git mv "${file}" "${new_file}"
-  done
-  commit_no_hooks "src: rename binaries main_*.ml{,i} files"
+  commit_05_rename_binaries
 
   cd lib_protocol
   # We use `--print0` and `xargs -0` instead of just passing the result
