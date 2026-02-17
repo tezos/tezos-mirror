@@ -467,6 +467,70 @@ let test_decoding_rlp_revert_reason =
                  (CallTracer.to_string call)) ;
           Lwt.return_unit)
 
+let test_decoding_rlp_truncated_revert_reason =
+  register_unit_test
+    ~title:"CallTracer: Test decoding call with a truncated revert reason"
+    ~tags:
+      ["call_tracer"; "debug"; "encoding"; "rlp"; "revert_reason"; "truncated"]
+    (fun _protocol ->
+      let open Evm_node_lib_dev_encoding.Tracer_types in
+      let open Evm_node_lib_dev_encoding.Ethereum_types in
+      (* This is a call trace where the output starts with the Error(string)
+         selector (08c379a0) but the ABI data is truncated: only the offset
+         word is present, the size word is missing. This should NOT cause
+         a decoding error -- instead the revert_reason should fall back to
+         the raw hex representation of the output. *)
+      let bytes =
+        Hex.to_bytes
+          (`Hex
+             "f89c8443414c4c941919191919191919191919191919191919191919d5941919191919191919191919191919191919191919a03dd5030000000000000000000000000000000000000000000000000000000000c988881300000000000088881300000000000083000102e5a408c379a00000000000000000000000000000000000000000000000000000000000000020c9885265766572746564c0820200")
+      in
+      let expected =
+        CallTracer.
+          {
+            calls = [];
+            type_ = "CALL";
+            from = Address (Hex (make_string 20 "19"));
+            to_ = Some (Address (Hex (make_string 20 "19")));
+            value = Z.of_int 251197;
+            gas = Some (Z.of_int 5000);
+            gas_used = Z.of_int 5000;
+            input = Hex "000102";
+            output =
+              Some
+                (Hex
+                   "08c379a00000000000000000000000000000000000000000000000000000000000000020");
+            error = Some "execution reverted";
+            revert_reason =
+              Some
+                "08c379a00000000000000000000000000000000000000000000000000000000000000020";
+            logs = None;
+          }
+      in
+      let expected_depth = 2 in
+      match
+        CallTracer.decode_call
+          (Option.value bytes ~default:(Bytes.of_string "\x01"))
+      with
+      | Error e ->
+          Test.fail
+            "Failed to rebuild call (truncated revert should not fail) %a"
+            (Format.pp_print_list pp)
+            e
+      | Ok (call, depth) ->
+          Check.(
+            (depth = expected_depth)
+              int
+              ~error_msg:"wrong depth, expected %R but got %L") ;
+          Check.is_true
+            (call = expected)
+            ~error_msg:
+              (Format.asprintf
+                 "error decoding call, expected \n%s \n but got \n%s "
+                 (to_string expected)
+                 (CallTracer.to_string call)) ;
+          Lwt.return_unit)
+
 let protocols = Protocol.all
 
 let () =
@@ -481,6 +545,7 @@ let () =
   test_fail_wrong_depth_2 protocols ;
   test_decoding_rlp protocols ;
   test_decoding_rlp_revert_reason protocols ;
+  test_decoding_rlp_truncated_revert_reason protocols ;
   ()
 
 let () = Test.run ()
