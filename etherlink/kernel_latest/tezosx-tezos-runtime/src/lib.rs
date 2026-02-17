@@ -64,7 +64,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         &self,
         registry: &impl tezosx_interfaces::Registry,
         host: &mut Host,
-        _from: &[u8],
+        from: &[u8],
         to: &[u8],
         amount: U256,
         _data: &[u8],
@@ -80,7 +80,24 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         })?;
         let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
 
-        // FIXME: We use the Tezos null address as sender because the alias of
+        // Decode the sender's KT1 alias from `from` (binary-encoded Contract).
+        // In cross-runtime calls the EVM gateway provides the KT1 alias of the
+        // calling EVM address so that Michelson SENDER returns the right value.
+        let sender_account = Contract::nom_read_exact(from)
+            .map_err(|e| {
+                TezosXRuntimeError::ConversionError(format!(
+                    "Failed to decode sender address from bytes: {e:?}"
+                ))
+            })
+            .and_then(|c| {
+                context.originated_from_contract(&c).map_err(|e| {
+                    TezosXRuntimeError::Custom(format!(
+                        "Failed to fetch sender originated account: {e:?}"
+                    ))
+                })
+            })?;
+
+        // FIXME: We use the Tezos null address as source because the alias of
         // the 0x EVM source account is a KT1, and Michelson doesn't allow KT1
         // as a source. If the original call was emitted from Michelson (i.e. it
         // hit EVM before re-entering the Michelson runtime), we might want to
@@ -138,16 +155,11 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         let parameters = Parameters::default();
         let mut internal_receipts = Vec::new();
         let amount = Narith(amount_u64.into());
-        // FIXME: Currently transfer_external imposes the use of
-        // operation_ctx.source as the sender when calling transfer.
-        // We could/should expose the ability to provide the caller
-        // (original source or last/cross-runtime caller) to be able to set
-        // the KT1 alias of the calling EVM address.
         tezos_execution::transfer_external(
             &mut tc_ctx,
             &mut operation_ctx,
             registry,
-            &source_account,
+            &sender_account,
             &amount,
             &dest,
             &parameters,
