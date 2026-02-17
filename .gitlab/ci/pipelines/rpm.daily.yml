@@ -191,7 +191,7 @@ oc.build-rockylinux-data:
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-03271731
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -612,7 +612,7 @@ oc.docker-systemd-merge-manifest.rockylinux:
       - gcp_very_high_cpu
 
 oc.install_bin_rockylinux_9.doc:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.6-master-03271731
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9-master-03271731
   stage: publishing_tests
   tags:
   - gcp
