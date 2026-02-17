@@ -242,6 +242,10 @@ impl<Host: Runtime> Verbosity for SafeStorage<&mut Host> {
 
 impl<Host: Runtime> SafeStorage<&mut Host> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
+        // Clean up any leftover data in /tmp (e.g. stale traces) that
+        // store_copy would not overwrite, since it only targets the
+        // world-state subtree.
+        let _ = self.host.store_delete(&TMP_PATH);
         let tmp_path = safe_path(&self.world_state)?;
         self.host.store_copy(&self.world_state, &tmp_path)
     }
