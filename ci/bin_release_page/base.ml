@@ -124,24 +124,43 @@ end
 
 (* Version management operations and types *)
 module Version = struct
+  type revision = {build_number : int; revision_date : float}
+
   type t = {
     major : int;
     minor : int;
     rc : int option;
+    revisions : revision list;
     latest : bool;
     active : bool;
     announcement : string option;
     publication_date : float;
   }
 
-  let make ~major ~minor ?rc ~latest ~active ?announcement ~publication_date ()
-      =
-    {major; minor; rc; latest; active; announcement; publication_date}
+  let make ~major ~minor ?rc ?(revisions = []) ~latest ~active ?announcement
+      ~publication_date () =
+    {
+      major;
+      minor;
+      rc;
+      revisions;
+      latest;
+      active;
+      announcement;
+      publication_date;
+    }
 
   let to_string {major; minor; rc; _} =
     match rc with
     | Some rc -> sf "v%d.%d-rc%d" major minor rc
     | None -> sf "v%d.%d" major minor
+
+  let revision_of_json json =
+    let open JSON in
+    {
+      build_number = json |-> "buildNumber" |> as_int;
+      revision_date = json |-> "revisionDate" |> as_float;
+    }
 
   (* [of_json json] converts a JSON object to a version record. *)
   let of_json json =
@@ -151,6 +170,9 @@ module Version = struct
         major = json |-> "major" |> as_int;
         minor = json |-> "minor" |> as_int;
         rc = json |-> "rc" |> as_int_opt;
+        revisions =
+          json |-> "revisions" |> as_list
+          |> List.map revision_of_json;
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
         active = json |-> "active" |> as_bool_opt |> Option.value ~default:false;
         announcement = json |-> "announcement" |> as_string_opt;
@@ -164,9 +186,25 @@ module Version = struct
         failwith
           (sf "Unexpected error parsing version: %s" (Printexc.to_string exn))
 
+  let revision_to_json {build_number; revision_date} : JSON.u =
+    `O
+      [
+        ("buildNumber", `Float (Int.to_float build_number));
+        ("revisionDate", `Float revision_date);
+      ]
+
   (* [to_json version] converts a version record to a JSON object. *)
-  let to_json {major; minor; rc; latest; active; announcement; publication_date}
-      : JSON.u =
+  let to_json
+      {
+        major;
+        minor;
+        rc;
+        revisions;
+        latest;
+        active;
+        announcement;
+        publication_date;
+      } : JSON.u =
     `O
       ([
          ("major", `Float (Int.to_float major));
@@ -178,6 +216,9 @@ module Version = struct
       @ (match rc with
         | None -> []
         | Some rc -> [("rc", `Float (Int.to_float rc))])
+      @ (match revisions with
+        | [] -> []
+        | revs -> [("revisions", `A (List.map revision_to_json revs))])
       @
       match announcement with
       | None -> []
