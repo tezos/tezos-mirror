@@ -52,8 +52,7 @@ use tezos_tezlink::{
 };
 use tezosx_interfaces::{Registry, RuntimeId};
 
-pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state");
+pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
 pub const TEZLINK_SAFE_STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/tezlink");
 
