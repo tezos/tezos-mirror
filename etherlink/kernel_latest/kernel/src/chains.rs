@@ -326,9 +326,9 @@ pub trait ChainConfigTrait: Debug {
 
     fn storage_root_paths(&self) -> Vec<RefPath>;
 
-    fn constants(
+    fn constants<Tx: TransactionTrait>(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress<Tx>,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants>;
@@ -476,9 +476,9 @@ impl ChainConfigTrait for EvmChainConfig {
         ChainFamily::Evm
     }
 
-    fn constants(
+    fn constants<Tx: TransactionTrait>(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress<Tx>,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -710,9 +710,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ChainFamily::Michelson
     }
 
-    fn constants(
+    fn constants<Tx: TransactionTrait>(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress<Tx>,
         _da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
