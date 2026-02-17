@@ -512,6 +512,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block_in_progress::BlockInProgress;
     use crate::block_storage;
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
@@ -2144,7 +2145,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip = read_block_in_progress(&safe_host)
+        let bip: BlockInProgress<Transaction> = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 
@@ -2246,7 +2247,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip = read_block_in_progress(&safe_host)
+        let bip: BlockInProgress<Transaction> = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 

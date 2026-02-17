@@ -333,8 +333,10 @@ pub fn assemble_block<Host: Runtime>(
             .collect(),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let block_in_progress = crate::storage::read_block_in_progress(&safe_host)?
-        .ok_or_else(|| anyhow!("Critical: BIP is not available for assemble block"))?;
+    let block_in_progress: BlockInProgress<Transaction> =
+        crate::storage::read_block_in_progress(&safe_host)?.ok_or_else(|| {
+            anyhow!("Critical: BIP is not available for assemble block")
+        })?;
     let delayed_hashes = block_in_progress.delayed_txs.clone();
     let block = block_in_progress.finalize_and_store(
         &mut safe_host,

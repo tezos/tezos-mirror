@@ -15,7 +15,6 @@ use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
 use crate::tick_model;
-use crate::transaction::Transaction;
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
@@ -377,9 +376,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
     pub fn repush_tx(&mut self, tx: Tx) {
         self.tx_queue.push_front(tx)
     }
-}
 
-impl BlockInProgress<Transaction> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
