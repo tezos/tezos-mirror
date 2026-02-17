@@ -27,18 +27,19 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
 
   let balance_update_recorder ctxt level =
     let cctx = Services.wrap_full ctxt in
-    let* level, block_hash, time, balance_updates =
+    let* level, cycle, block_hash, time, balance_updates =
       Services.get_balance_updates cctx level
     in
     let logger = Log.logger () in
     Log.info logger (fun () ->
         Format.asprintf
-          "@.  Level:%ld@.  Hash:%a@.  Balance_updates:%d"
+          "@.  Level:%ld@.  Cycle:%ld@.  Hash:%a@.  Balance_updates:%d"
           level
+          cycle
           Block_hash.pp_short
           block_hash
           (List.length balance_updates)) ;
-    return (level, block_hash, time, balance_updates)
+    return (level, cycle, block_hash, time, balance_updates)
 
   let () =
     Protocol_hash.Table.add
@@ -73,16 +74,15 @@ module Loops = struct
      (e.g. use the level as cache key instead of one key for each list element) *)
     with_cache mutex request (fun _ -> false) (fun _ -> ())
 
-  let maybe_add_balance_updates logger pool level
+  let maybe_add_balance_updates logger pool level cycle
       (balance_updates : Data.Balance_update.balance_update list) =
     let rows =
       List.map
         (fun (balance_update : Data.Balance_update.balance_update) ->
-          ( level,
-            balance_update.address,
-            Data.Balance_update.category_to_string balance_update.category,
-            Data.Balance_update.result_to_string balance_update.result,
-            balance_update.value ))
+          ( (level, cycle, balance_update.address),
+            ( Data.Balance_update.category_to_string balance_update.category,
+              Data.Balance_update.result_to_string balance_update.result,
+              balance_update.value ) ))
         balance_updates
     in
     let out =
@@ -155,10 +155,18 @@ module Loops = struct
               let block_level = header.Block_header.shell.Block_header.level in
               let*! res = balance_updates_recorder cctx block_level in
               match res with
-              | Error _ -> assert false
-              | Ok (level, _block_hash, _time, balance_updates) ->
+              | Error errs ->
+                  Log.info logger (fun () ->
+                      Format.asprintf "Error: %a" pp_print_trace errs) ;
+                  assert false
+              | Ok (level, cycle, _block_hash, _time, balance_updates) ->
                   let*! _ =
-                    maybe_add_balance_updates logger pool level balance_updates
+                    maybe_add_balance_updates
+                      logger
+                      pool
+                      level
+                      cycle
+                      balance_updates
                   in
                   Lwt.return acc')
             head_stream

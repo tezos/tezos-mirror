@@ -190,6 +190,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     let balance_updates =
       get_balance_updates metadata.protocol_data.balance_updates
     in
+    let cycle =
+      Tezos_protocol_024_PtTALLiN.Protocol.Alpha_context.Cycle.to_int32
+        metadata.protocol_data.level_info.cycle
+    in
     Format.eprintf
       "%a@."
       (Format.pp_print_list
@@ -197,7 +201,11 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
          Data.Balance_update.pp_balance_update)
       balance_updates ;
     return
-      (header.shell.level, header.hash, header.shell.timestamp, balance_updates)
+      ( header.shell.level,
+        cycle,
+        header.hash,
+        header.shell.timestamp,
+        balance_updates )
 end
 
 module M = General_archiver.Define (Services)

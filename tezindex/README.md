@@ -15,9 +15,11 @@ querying the indexed data.
 - **SQLite storage** -- Stores indexed balance updates in a local SQLite
   database using Caqti (with dialect support for PostgreSQL).
 - **RPC server** -- Optional local HTTP server for querying indexed data.
+- **Cycle aggregation** -- Each balance update is tagged with its cycle,
+  enabling per-cycle reward queries via the RPC server.
 - **Protocol-aware architecture** -- Uses a plugin system where each protocol
   version registers its own balance update extractor. Currently supports
-  protocol `024_PtTALLiN`.
+  protocol `024_PtTALLiN` and `alpha`.
 
 ## Building
 
@@ -123,9 +125,10 @@ The database contains a `block_balance_updates` table:
 
 ```sql
 CREATE TABLE IF NOT EXISTS block_balance_updates(
-  id    INTEGER PRIMARY KEY,
-  block INTEGER NOT NULL,
-  address BLOB NOT NULL,
+  id       INTEGER PRIMARY KEY,
+  block    INTEGER NOT NULL,
+  cycle    INTEGER NOT NULL,
+  address  BLOB NOT NULL,
   category TEXT NOT NULL,
   result   TEXT NOT NULL,
   value    INTEGER NOT NULL,
@@ -134,9 +137,12 @@ CREATE TABLE IF NOT EXISTS block_balance_updates(
 
 CREATE INDEX IF NOT EXISTS block_balance_updates_idx
   ON block_balance_updates(block);
+CREATE INDEX IF NOT EXISTS block_balance_updates_cycle_address_idx
+  ON block_balance_updates(cycle, address);
 ```
 
 - `block` -- Block level (int32)
+- `cycle` -- Cycle number (int32)
 - `address` -- Public key hash stored as binary
 - `category` -- One of the categories above (text)
 - `result` -- One of the results above (text)
@@ -149,8 +155,51 @@ When started with `--rpc-addr`, tezindex exposes a local HTTP RPC server.
 ### Endpoints
 
 | Method | Path | Description |
-|---|---|
+|---|---|---|
 | GET | `/health` | Returns `"ok"` if the service is running |
+| GET | `/v1/rewards/split/<baker>/<cycle>` | Returns baker rewards for a cycle in TzKT-compatible format |
+
+#### `GET /v1/rewards/split/<baker>/<cycle>`
+
+Returns a flat JSON object with baker rewards for the given cycle, using
+camelCase field names compatible with the
+[TzKT `/v1/rewards/split` API](https://api.tzkt.io/#operation/Rewards_GetRewardSplit).
+The data is aggregated from per-block balance updates using
+`SUM(value) GROUP BY category, result`.
+
+Currently populated fields:
+
+| Field | Source |
+|---|---|
+| `blockRewardsStakedOwn/Edge/Shared/Delegated` | `Baking_rewards` + `Baking_bonuses` |
+| `missedBlockRewards` | `Baking_rewards` / `Baking_bonuses` with `Lost` result |
+| `attestationRewardsStakedOwn/Edge/Shared/Delegated` | `Attestation_rewards` |
+| `missedAttestationRewards` | `Attestation_rewards` with `Lost` result |
+| `dalAttestationRewardsStakedOwn/Edge/Shared/Delegated` | `Dal_attestation_rewards` |
+| `missedDalAttestationRewards` | `Dal_attestation_rewards` with `Lost` result |
+| `blockFees` | `Block_fees` (non-Lost) |
+| `missedBlockFees` | `Block_fees` with `Lost` result |
+
+All other TzKT fields are present in the response but default to zero/empty.
+
+Example:
+
+```
+curl http://localhost:8733/v1/rewards/split/tz1.../800
+```
+
+```json
+{
+  "cycle": 800,
+  "blockRewardsStakedOwn": "123456",
+  "blockRewardsStakedEdge": "0",
+  "blockRewardsStakedShared": "0",
+  "blockRewardsDelegated": "0",
+  "attestationRewardsStakedOwn": "789012",
+  "missedAttestationRewards": "0",
+  ...
+}
+```
 
 ## Architecture
 
@@ -158,15 +207,17 @@ When started with `--rpc-addr`, tezindex exposes a local HTTP RPC server.
 tezindex/
   lib_tezindex/           Library
     config.ml               CLI arguments and configuration
-    data.ml                 Balance update types and encodings
+    data.ml                 Balance update types and encodings (DB-level)
+    split_data.ml           TzKT-compatible reward split types and encodings
     db.ml                   Database pool initialization and table creation
-    sql_requests.ml         SQL schema, dialect env, insert queries
-    rpc_server.ml           Local RPC server (health endpoint)
+    sql_requests.ml         SQL schema, dialect env, insert/select queries
+    rpc_server.ml           Local RPC server (health, v1/rewards/split endpoints)
     log.ml                  Logging with verbosity levels
   bin_tezindex/           Executable
     tezindex_main.ml        Entry point, wires DB + RPC + archiver
     general_archiver.ml     Main loop: monitors head stream, dispatches to protocol machines
     protocol_machinery.ml   PROTOCOL_SERVICES module type interface
+    alpha_machine.real.ml     Alpha protocol balance update extractor (canonical source)
     PtTALLiN_machine.real.ml  Protocol 024 balance update extractor
 ```
 
