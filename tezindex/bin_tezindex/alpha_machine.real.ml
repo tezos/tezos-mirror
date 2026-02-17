@@ -187,6 +187,37 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         header.hash,
         header.shell.timestamp,
         balance_updates )
+
+  let get_delegators ctxt level baker_pkh =
+    let cctxt = new Tezos_client_alpha.Protocol_client_context.wrap_full ctxt in
+    let block = (cctxt#chain, `Level level) in
+    let* contracts =
+      Delegate_services.delegated_contracts cctxt block baker_pkh
+    in
+    let logger = Log.logger () in
+    let*! delegators =
+      Lwt_list.filter_map_s
+        (fun contract ->
+          match contract with
+          | Protocol.Alpha_context.Contract.Originated _ -> Lwt.return_none
+          | Implicit pkh -> (
+              let*! result =
+                Contract_services.balance_and_frozen_bonds cctxt block contract
+              in
+              match result with
+              | Ok balance ->
+                  let bal = Protocol.Alpha_context.Tez.to_mutez balance in
+                  Lwt.return_some (pkh, bal)
+              | Error e ->
+                  Log.error logger (fun () ->
+                      Format.asprintf
+                        "Error fetching balance for delegator: %a"
+                        Error_monad.pp_print_trace
+                        e) ;
+                  Lwt.return_none))
+        contracts
+    in
+    return delegators
 end
 
 module M = General_archiver.Define (Services)

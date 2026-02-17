@@ -20,6 +20,7 @@ val run :
   ?name:string ->
   node:Node.t ->
   ?rpc_port:int ->
+  ?watched_addresses:string list ->
   unit ->
   t
 

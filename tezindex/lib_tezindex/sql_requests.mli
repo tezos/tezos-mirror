@@ -39,3 +39,15 @@ val select_cycle_balance_updates :
     string * string * int64,
     [`Many | `One | `Zero] )
   Caqti_request.t
+
+val insert_cycle_delegator :
+  ( (Tezos_crypto.Signature.public_key_hash * int32) * (string * int64),
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
+val select_cycle_delegators :
+  ( Tezos_crypto.Signature.public_key_hash * int32,
+    string * int64,
+    [`Many | `One | `Zero] )
+  Caqti_request.t

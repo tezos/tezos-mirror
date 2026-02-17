@@ -47,11 +47,21 @@ let create_block_balance_updates_cycle_address_idx =
   "CREATE INDEX IF NOT EXISTS block_balance_updates_cycle_address_idx ON \
    block_balance_updates(cycle, address)"
 
+let create_cycle_delegators =
+  "CREATE TABLE IF NOT EXISTS cycle_delegators(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  baker $(BYTES) NOT NULL,\n\
+  \  cycle $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  delegator TEXT NOT NULL,\n\
+  \  delegated_balance INTEGER NOT NULL,\n\
+  \  UNIQUE (baker, cycle, delegator))"
+
 let create_tables =
   [
     create_block_balance_updates;
     create_block_balance_updates_idx;
     create_block_balance_updates_cycle_address_idx;
+    create_cycle_delegators;
   ]
 
 module Type = struct
@@ -141,3 +151,19 @@ let select_cycle_balance_updates =
     Caqti_type.(t2 Type.public_key_hash int32 ->* t3 string string int64))
     "SELECT category, result, SUM(value) FROM block_balance_updates WHERE \
      address = ? AND cycle = ? GROUP BY category, result"
+
+let insert_cycle_delegator =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t2
+        (t2 (* $1 baker *) Type.public_key_hash (* $2 cycle *) int32)
+        (t2 (* $3 delegator *) string (* $4 delegated_balance *) int64)
+      ->. unit))
+    "INSERT INTO cycle_delegators (baker,cycle,delegator,delegated_balance) \
+     VALUES (?,?,?,?) ON CONFLICT DO NOTHING"
+
+let select_cycle_delegators =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 Type.public_key_hash int32 ->* t2 string int64))
+    "SELECT delegator, delegated_balance FROM cycle_delegators WHERE baker = ? \
+     AND cycle = ?"

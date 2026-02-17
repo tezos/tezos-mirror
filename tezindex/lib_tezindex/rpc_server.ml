@@ -60,6 +60,22 @@ let query_cycle_rewards pool baker cycle =
         [])
     pool
 
+let query_cycle_delegators pool baker cycle =
+  Caqti_lwt_unix.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.fold
+        Sql_requests.select_cycle_delegators
+        (fun (addr, balance) acc ->
+          {
+            Split_data.del_address = addr;
+            delegated_balance = balance;
+            emptied = false;
+          }
+          :: acc)
+        (baker, cycle)
+        [])
+    pool
+
 let build_rpc_directory pool =
   let dir = Tezos_rpc.Directory.empty in
   let dir =
@@ -73,10 +89,31 @@ let build_rpc_directory pool =
       (fun baker cycle () () ->
         let open Lwt_result_syntax in
         let*! result = query_cycle_rewards pool baker cycle in
-        match result with
-        | Ok entries ->
-            return (Split_data.tzkt_baker_rewards_of_entries ~cycle entries)
-        | Error e ->
+        let*! delegators_result = query_cycle_delegators pool baker cycle in
+        match (result, delegators_result) with
+        | Ok entries, Ok delegators ->
+            let rewards =
+              Split_data.tzkt_baker_rewards_of_entries ~cycle entries
+            in
+            let baker_b58 = Signature.Public_key_hash.to_b58check baker in
+            let own_delegated_balance, external_delegated_balance =
+              List.fold_left
+                (fun (own, ext) (d : Split_data.tzkt_delegator) ->
+                  if String.equal d.del_address baker_b58 then
+                    (Int64.add own d.delegated_balance, ext)
+                  else (own, Int64.add ext d.delegated_balance))
+                (0L, 0L)
+                delegators
+            in
+            return
+              {
+                rewards with
+                tzkt_delegators = delegators;
+                delegators_count = List.length delegators;
+                own_delegated_balance;
+                external_delegated_balance;
+              }
+        | Error e, _ | _, Error e ->
             let msg = Caqti_error.show e in
             failwith "Database error: %s" msg)
   in

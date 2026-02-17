@@ -25,7 +25,13 @@ let run cctxt config =
   let* _rpc_server = init_rpc_server cctxt config pool in
   let main =
     let*! () =
-      Lwt.join [General_archiver.Loops.balance_update_loop cctxt pool]
+      Lwt.join
+        [
+          General_archiver.Loops.balance_update_loop
+            cctxt
+            pool
+            config.watched_addresses;
+        ]
     in
     Lwt.return_unit
   in
