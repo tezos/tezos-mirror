@@ -328,9 +328,9 @@ pub trait ChainConfigTrait: Debug {
 
     fn storage_root_paths(&self) -> Vec<RefPath>;
 
-    fn constants<Tx: TransactionTrait>(
+    fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Tx>,
+        block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants>;
@@ -357,24 +357,24 @@ pub trait ChainConfigTrait: Debug {
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>>;
+    ) -> anyhow::Result<Option<BlockInProgress>>;
 
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
-        tx: &Self::Transaction,
+        tx: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool>;
 
     #[allow(clippy::too_many_arguments)]
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        transaction: Self::Transaction,
+        transaction: TezosXTransaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
@@ -382,7 +382,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
+        block_in_progress: &mut BlockInProgress,
         execution_info: Self::ExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()>;
@@ -390,7 +390,7 @@ pub trait ChainConfigTrait: Debug {
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block>;
 
@@ -507,9 +507,9 @@ impl ChainConfigTrait for EvmChainConfig {
         ChainFamily::Evm
     }
 
-    fn constants<Tx: TransactionTrait>(
+    fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Tx>,
+        block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -602,14 +602,14 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
+    ) -> anyhow::Result<Option<BlockInProgress>> {
         crate::storage::read_block_in_progress(host)
     }
 
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
-        transaction: &Self::Transaction,
+        transaction: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
         match transaction {
@@ -628,12 +628,12 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        transaction: Self::Transaction,
+        transaction: TezosXTransaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
@@ -664,7 +664,7 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
+        block_in_progress: &mut BlockInProgress,
         execution_info: Self::ExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
@@ -674,7 +674,7 @@ impl ChainConfigTrait for EvmChainConfig {
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         block_in_progress.finalize_and_store(
@@ -757,7 +757,7 @@ pub struct TezlinkBlockConstants {
 
 fn apply_tezos_operation(
     chain_id: &ChainId,
-    block_in_progress: &BlockInProgress<TezosXTransaction>,
+    block_in_progress: &BlockInProgress,
     host: &mut impl Runtime,
     registry: &impl Registry,
     block_constants: &TezlinkBlockConstants,
@@ -880,9 +880,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ChainFamily::Michelson
     }
 
-    fn constants<Tx: TransactionTrait>(
+    fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Tx>,
+        block_in_progress: &BlockInProgress,
         _da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -953,14 +953,14 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn read_block_in_progress(
         _host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
+    ) -> anyhow::Result<Option<BlockInProgress>> {
         Ok(None)
     }
 
     fn can_fit_in_reboot(
         &self,
         _executed_gas: U256,
-        _tx: &Self::Transaction,
+        _tx: &TezosXTransaction,
         _block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
         Ok(true)
@@ -968,12 +968,12 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        transaction: Self::Transaction,
+        transaction: TezosXTransaction,
         _index: u32,
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
@@ -995,7 +995,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn register_valid_transaction(
         &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
+        block_in_progress: &mut BlockInProgress,
         execution_info: Self::ExecutionInfo,
         host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
@@ -1005,7 +1005,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         // Create a Tezos block from the block in progress

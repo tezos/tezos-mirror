@@ -71,10 +71,10 @@ pub enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Tx: TransactionTrait>(
+fn on_invalid_transaction(
     is_delayed: bool,
     tx_hash: TransactionHash,
-    block_in_progress: &mut BlockInProgress<Tx>,
+    block_in_progress: &mut BlockInProgress,
 ) {
     if is_delayed {
         block_in_progress.register_delayed_transaction(tx_hash);
@@ -103,7 +103,7 @@ pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut BlockInProgress<ChainConfig::Transaction>,
+    block_in_progress: &mut BlockInProgress,
     block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -189,7 +189,7 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     hash: H256,
     tezos_parent_hash: H256,
     blueprint: Blueprint,
-) -> BlockInProgress<ChainConfig::Transaction> {
+) -> BlockInProgress {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
@@ -210,7 +210,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> anyhow::Result<BlueprintParsing<BlockInProgress<ChainConfig::Transaction>>> {
+) -> anyhow::Result<BlueprintParsing<BlockInProgress>> {
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -251,7 +251,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     .unwrap_or_else(|_| {
                         H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
                     });
-            let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
+            let bip: BlockInProgress = bip_from_blueprint(
                 host,
                 chain_config,
                 next_bip_number,
@@ -271,7 +271,7 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: BlockInProgress<ChainConfig::Transaction>,
+    mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
@@ -2146,7 +2146,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip: BlockInProgress<TezosXTransaction> = read_block_in_progress(&safe_host)
+        let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 
@@ -2248,7 +2248,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip: BlockInProgress<TezosXTransaction> = read_block_in_progress(&safe_host)
+        let bip = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 

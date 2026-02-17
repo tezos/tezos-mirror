@@ -8,7 +8,7 @@
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{
-    TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+    TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -39,11 +39,11 @@ use tezos_tezlink::enc_wrappers::BlockNumber;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
-pub struct BlockInProgress<Transaction> {
+pub struct BlockInProgress {
     /// block number
     pub number: U256,
     /// queue containing the transactions to execute
-    pub tx_queue: VecDeque<Transaction>,
+    pub tx_queue: VecDeque<TezosXTransaction>,
     /// list of transactions executed without issue
     pub valid_txs: Vec<TransactionHash>,
     pub delayed_txs: Vec<TransactionHash>,
@@ -74,7 +74,7 @@ pub struct BlockInProgress<Transaction> {
     pub tezos_parent_hash: H256,
 }
 
-impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
+impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let BlockInProgress {
             number,
@@ -142,7 +142,7 @@ fn append_tx_objects(stream: &mut rlp::RlpStream, objects: &[TransactionObject])
     })
 }
 
-impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
+impl Decodable for BlockInProgress {
     fn decode(decoder: &rlp::Rlp<'_>) -> Result<Self, rlp::DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -153,7 +153,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
 
         let mut it = decoder.iter();
         let number: U256 = decode_field(&next(&mut it)?, "number")?;
-        let tx_queue: VecDeque<Tx> = decode_queue(&next(&mut it)?)?;
+        let tx_queue: VecDeque<TezosXTransaction> = decode_queue(&next(&mut it)?)?;
         let valid_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let delayed_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let cumulative_gas: U256 = decode_field(&next(&mut it)?, "cumulative_gas")?;
@@ -252,7 +252,7 @@ fn decode_tx_objects(
     Ok(objects)
 }
 
-impl<Tx: TransactionTrait> BlockInProgress<Tx> {
+impl BlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
     }
@@ -262,7 +262,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         number: U256,
         ethereum_parent_hash: H256,
         tezos_parent_hash: H256,
-        transactions: VecDeque<Tx>,
+        transactions: VecDeque<TezosXTransaction>,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
     ) -> Self {
@@ -288,7 +288,11 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
 
     // constructor of raw structure, used in tests
     #[cfg(test)]
-    pub fn new(number: U256, transactions: VecDeque<Tx>, base_fee_per_gas: U256) -> Self {
+    pub fn new(
+        number: U256,
+        transactions: VecDeque<TezosXTransaction>,
+        base_fee_per_gas: U256,
+    ) -> Self {
         Self::new_with_ticks(
             number,
             H256::zero(),
@@ -336,11 +340,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         base_fee_per_gas: U256,
     ) -> Self {
         // filter transactions, dropping any transaction from other runtimes
-        let transactions: Vec<Tx> = blueprint
-            .transactions
-            .into_iter()
-            .filter_map(|tx| Tx::try_from(tx).ok())
-            .collect();
+        let transactions: Vec<TezosXTransaction> = blueprint.transactions;
         // blueprint is turn into a ring to allow popping from the front
         let ring = transactions.into();
         Self::new_with_ticks(
@@ -365,7 +365,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         self.delayed_txs.push(hash);
     }
 
-    pub fn pop_tx(&mut self) -> Option<Tx> {
+    pub fn pop_tx(&mut self) -> Option<TezosXTransaction> {
         self.tx_queue.pop_front()
     }
 
@@ -373,7 +373,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         !self.tx_queue.is_empty()
     }
 
-    pub fn repush_tx(&mut self, tx: Tx) {
+    pub fn repush_tx(&mut self, tx: TezosXTransaction) {
         self.tx_queue.push_front(tx)
     }
 

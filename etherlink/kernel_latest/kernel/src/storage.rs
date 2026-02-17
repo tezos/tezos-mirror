@@ -686,9 +686,9 @@ pub fn store_kernel_version<Host: Runtime>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_block_in_progress<Host: Runtime, Tx: Encodable>(
+pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
-    bip: &BlockInProgress<Tx>,
+    bip: &BlockInProgress,
 ) -> anyhow::Result<()> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     let bytes = &bip.rlp_bytes();
@@ -706,9 +706,9 @@ pub fn store_block_in_progress<Host: Runtime, Tx: Encodable>(
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
-pub fn read_block_in_progress<Host: Runtime, Tx: Decodable>(
+pub fn read_block_in_progress<Host: Runtime>(
     host: &Host,
-) -> anyhow::Result<Option<BlockInProgress<Tx>>> {
+) -> anyhow::Result<Option<BlockInProgress>> {
     let path = OwnedPath::from(EVM_BLOCK_IN_PROGRESS);
     if let Some(ValueType::Value) = host.store_has(&path)? {
         let bytes = host

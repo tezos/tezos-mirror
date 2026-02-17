@@ -160,7 +160,6 @@ fn f64_to_u64(f: F64) -> u64 {
 #[cfg(test)]
 mod test {
     use crate::block_in_progress::BlockInProgress;
-    use crate::transaction::Transaction;
 
     use super::*;
     use primitive_types::H160;
@@ -208,7 +207,7 @@ mod test {
             H160::zero(),
         );
 
-        let mut bip: BlockInProgress<Transaction> = BlockInProgress::new_with_ticks(
+        let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
             Default::default(),
@@ -237,7 +236,7 @@ mod test {
         assert_eq!(gas_price, gas_price_now);
 
         // register more blocks - now double tolerance
-        let mut bip: BlockInProgress<Transaction> = BlockInProgress::new_with_ticks(
+        let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
             Default::default(),
