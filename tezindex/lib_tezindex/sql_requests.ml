@@ -37,6 +37,10 @@ let create_block_balance_updates =
 
 module Mutex = struct
   let balance_updates = Lwt_mutex.create ()
+
+  let block_bakers = Lwt_mutex.create ()
+
+  let expected_blocks = Lwt_mutex.create ()
 end
 
 let create_block_balance_updates_idx =
@@ -56,12 +60,35 @@ let create_cycle_delegators =
   \  delegated_balance INTEGER NOT NULL,\n\
   \  UNIQUE (baker, cycle, delegator))"
 
+let create_block_bakers =
+  "CREATE TABLE IF NOT EXISTS block_bakers(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  block $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  cycle $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  baker $(BYTES) NOT NULL,\n\
+  \  UNIQUE (block))"
+
+let create_block_bakers_cycle_baker_idx =
+  "CREATE INDEX IF NOT EXISTS block_bakers_cycle_baker_idx ON \
+   block_bakers(cycle, baker)"
+
+let create_expected_blocks =
+  "CREATE TABLE IF NOT EXISTS expected_blocks(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  cycle $(SMALL_PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  baker $(BYTES) NOT NULL,\n\
+  \  count INTEGER NOT NULL,\n\
+  \  UNIQUE (cycle, baker))"
+
 let create_tables =
   [
     create_block_balance_updates;
     create_block_balance_updates_idx;
     create_block_balance_updates_cycle_address_idx;
     create_cycle_delegators;
+    create_block_bakers;
+    create_block_bakers_cycle_baker_idx;
+    create_expected_blocks;
   ]
 
 module Type = struct
@@ -167,3 +194,33 @@ let select_cycle_delegators =
     Caqti_type.(t2 Type.public_key_hash int32 ->* t2 string int64))
     "SELECT delegator, delegated_balance FROM cycle_delegators WHERE baker = ? \
      AND cycle = ?"
+
+let insert_block_baker =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t3
+        (* $1 level *) int32
+        (* $2 cycle *) int32
+        (* $3 baker *) Type.public_key_hash
+      ->. unit))
+    "INSERT INTO block_bakers (block, cycle, baker) VALUES (?, ?, ?) ON \
+     CONFLICT DO NOTHING"
+
+let insert_expected_blocks =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t3
+        (* $1 cycle *) int32
+        (* $2 baker *) Type.public_key_hash
+        (* $3 count *) int32
+      ->. unit))
+    "INSERT INTO expected_blocks (cycle, baker, count) VALUES (?, ?, ?) ON \
+     CONFLICT (cycle, baker) DO UPDATE SET count = excluded.count"
+
+let select_num_blocks =
+  Caqti_request.Infix.(Caqti_type.(t2 Type.public_key_hash int32 ->! int64))
+    "SELECT COUNT(*) FROM block_bakers WHERE baker = ? AND cycle = ?"
+
+let select_expected_blocks =
+  Caqti_request.Infix.(Caqti_type.(t2 Type.public_key_hash int32 ->? int32))
+    "SELECT count FROM expected_blocks WHERE baker = ? AND cycle = ?"

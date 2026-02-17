@@ -175,6 +175,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Protocol.Alpha_context.Cycle.to_int32
         metadata.protocol_data.level_info.cycle
     in
+    let proposer = metadata.protocol_data.proposer.delegate in
     Format.eprintf
       "%a@."
       (Format.pp_print_list
@@ -186,6 +187,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         cycle,
         header.hash,
         header.shell.timestamp,
+        proposer,
         balance_updates )
 
   let get_delegators ctxt level baker_pkh =
@@ -218,6 +220,30 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         contracts
     in
     return delegators
+
+  let get_cycle_baking_rights_count cctxt cycle_int32 (level : Int32.t) =
+    let cycle =
+      Protocol.Alpha_context.Cycle.add
+        Protocol.Alpha_context.Cycle.root
+        (Int32.to_int cycle_int32)
+    in
+    let* rights =
+      Plugin.RPC.Baking_rights.get
+        cctxt
+        ~cycle
+        ~max_round:0
+        (cctxt#chain, `Level level)
+    in
+    let module Pkh_map = Map.Make (Signature.Public_key_hash) in
+    let counts =
+      List.fold_left
+        (fun acc (r : Plugin.RPC.Baking_rights.t) ->
+          let n = Option.value ~default:0 (Pkh_map.find_opt r.delegate acc) in
+          Pkh_map.add r.delegate (n + 1) acc)
+        Pkh_map.empty
+        rights
+    in
+    return (Pkh_map.bindings counts)
 end
 
 module M = General_archiver.Define (Services)

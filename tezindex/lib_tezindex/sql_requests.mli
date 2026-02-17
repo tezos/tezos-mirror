@@ -23,6 +23,10 @@ val env : Caqti_driver_info.t -> string -> Caqti_query.t
 
 module Mutex : sig
   val balance_updates : Lwt_mutex.t
+
+  val block_bakers : Lwt_mutex.t
+
+  val expected_blocks : Lwt_mutex.t
 end
 
 val create_tables : string list
@@ -50,4 +54,24 @@ val select_cycle_delegators :
   ( Tezos_crypto.Signature.public_key_hash * int32,
     string * int64,
     [`Many | `One | `Zero] )
+  Caqti_request.t
+
+val insert_block_baker :
+  (int32 * int32 * Tezos_crypto.Signature.public_key_hash, unit, [`Zero])
+  Caqti_request.t
+
+val insert_expected_blocks :
+  (int32 * Tezos_crypto.Signature.public_key_hash * int32, unit, [`Zero])
+  Caqti_request.t
+
+val select_num_blocks :
+  ( Tezos_crypto.Signature.public_key_hash * int32,
+    int64,
+    [`One] )
+  Caqti_request.t
+
+val select_expected_blocks :
+  ( Tezos_crypto.Signature.public_key_hash * int32,
+    int32,
+    [`One | `Zero] )
   Caqti_request.t

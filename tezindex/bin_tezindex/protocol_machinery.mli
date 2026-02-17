@@ -19,6 +19,7 @@ module type PROTOCOL_SERVICES = sig
     * int32
     * Block_hash.t
     * Time.Protocol.t
+    * Signature.Public_key_hash.t
     * Data.Balance_update.balance_update list)
     tzresult
     Lwt.t
@@ -28,4 +29,10 @@ module type PROTOCOL_SERVICES = sig
     Int32.t ->
     Signature.Public_key_hash.t ->
     (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
+
+  val get_cycle_baking_rights_count :
+    wrap_full ->
+    int32 ->
+    Int32.t ->
+    (Signature.Public_key_hash.t * int) list tzresult Lwt.t
 end
