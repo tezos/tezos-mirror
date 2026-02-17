@@ -170,9 +170,7 @@ module Version = struct
         major = json |-> "major" |> as_int;
         minor = json |-> "minor" |> as_int;
         rc = json |-> "rc" |> as_int_opt;
-        revisions =
-          json |-> "revisions" |> as_list
-          |> List.map revision_of_json;
+        revisions = json |-> "revisions" |> as_list |> List.map revision_of_json;
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
         active = json |-> "active" |> as_bool_opt |> Option.value ~default:false;
         announcement = json |-> "announcement" |> as_string_opt;
@@ -260,6 +258,49 @@ module Version = struct
     if List.exists version_exists versions then
       failwith (sf "Version %s already exists" (to_string new_version))
     else versions @ [new_version]
+
+  (* [add_build_number ~major ~minor ?rc ~build_number ~revision_date versions]
+     appends a new packaging revision to the version matching major/minor/rc.
+     Each call adds a new entry to the [revisions] list, preserving the full
+     history. Fails if no matching version is found. *)
+  let add_build_number ~major ~minor ?rc ~build_number ~revision_date versions =
+    let matches version =
+      version.major = major && version.minor = minor && version.rc = rc
+    in
+    let rc_suffix = match rc with Some rc -> sf "-rc%d" rc | None -> "" in
+    match List.filter matches versions with
+    | [] ->
+        failwith
+          (sf
+             "Version v%d.%d%s not found, cannot add build number"
+             major
+             minor
+             rc_suffix)
+    | [version] ->
+        if
+          List.exists (fun r -> r.build_number = build_number) version.revisions
+        then
+          failwith
+            (sf
+               "Build number %d already exists for version v%d.%d%s"
+               build_number
+               major
+               minor
+               rc_suffix) ;
+        List.map
+          (fun version ->
+            if matches version then
+              let new_revision = {build_number; revision_date} in
+              {version with revisions = version.revisions @ [new_revision]}
+            else version)
+          versions
+    | _ ->
+        failwith
+          (sf
+             "Multiple versions v%d.%d%s found, data is inconsistent"
+             major
+             minor
+             rc_suffix)
 
   (* [set_latest target_version versions] sets a specific version as latest, unset all others. *)
   let set_latest target_version versions =

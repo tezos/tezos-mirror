@@ -116,6 +116,14 @@ let () =
       ~description:"Link to the announcement"
       ()
   in
+  let build_number =
+    Clap.optional_int
+      ~long:"build-number"
+      ~short:'b'
+      ~placeholder:"BUILD_NUMBER"
+      ~description:"Build number for packaging revision"
+      ()
+  in
   let list_versions =
     Clap.case ~description:"Display all versions" "list" @@ fun () -> `list
   in
@@ -148,6 +156,12 @@ let () =
     Clap.case ~description:"Upload versions.json to remote storage" "upload"
     @@ fun () -> `upload
   in
+  let update_build_number =
+    Clap.case
+      ~description:"Update the build number of an existing version"
+      "update-build-number"
+    @@ fun () -> `update_build_number
+  in
   let command =
     Clap.subcommand
       [
@@ -159,6 +173,7 @@ let () =
         generate_rss;
         download;
         upload;
+        update_build_number;
       ]
   in
   let remote_path =
@@ -193,7 +208,19 @@ let () =
       List.iter
         (fun version ->
           let latest_mark = if version.latest then " (latest)" else "" in
-          Format.printf "  %s%s@." (to_string version) latest_mark)
+          let build_mark =
+            match version.revisions with
+            | [] -> ""
+            | revs ->
+                let latest_bn =
+                  List.fold_left
+                    (fun acc (r : revision) -> max acc r.build_number)
+                    0
+                    revs
+                in
+                sf " [build %d]" latest_bn
+          in
+          Format.printf "  %s%s%s@." (to_string version) latest_mark build_mark)
         versions
   | `add ->
       let publication_date = Unix.time () in
@@ -253,6 +280,33 @@ let () =
       else (
         Format.printf "The following version(s) remain active:@." ;
         List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
+  | `update_build_number ->
+      let major =
+        match major with Some m -> m | None -> failwith "--major is required"
+      in
+      let minor =
+        match minor with Some m -> m | None -> failwith "--minor is required"
+      in
+      let bn =
+        match build_number with
+        | Some bn -> bn
+        | None -> failwith "--build-number is required"
+      in
+      let rc =
+        match rc with None | Some Stable -> None | Some (Rc rc) -> Some rc
+      in
+      let revision_date = Unix.time () in
+      let updated =
+        Base.Version.add_build_number
+          ~major
+          ~minor
+          ?rc
+          ~build_number:bn
+          ~revision_date
+        @@ load_from_file file
+      in
+      save_to_file updated file ;
+      Format.printf "Updated build number of v%d.%d to %d@." major minor bn
   | `generate_rss -> (
       let component_name = "octez" in
       let path = require_path () in
