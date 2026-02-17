@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    apply::RuntimeExecutionInfo,
     block_in_progress::BlockInProgress,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -746,7 +747,7 @@ fn apply_tezos_operation(
     registry: &impl Registry,
     block_constants: &TezlinkBlockConstants,
     operation: TezlinkOperation,
-) -> Result<crate::apply::ExecutionResult<AppliedOperation>, anyhow::Error> {
+) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
     let context = &block_constants.context;
 
     let level = block_constants.level;
@@ -804,7 +805,9 @@ fn apply_tezos_operation(
                     },
                 ),
             };
-            Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+            Ok(crate::apply::ExecutionResult::Valid(
+                RuntimeExecutionInfo::Tezos(applied_operation),
+            ))
         }
         TezlinkContent::Deposit(deposit) => {
             log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
@@ -841,7 +844,9 @@ fn apply_tezos_operation(
                     },
                 ),
             };
-            Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+            Ok(crate::apply::ExecutionResult::Valid(
+                RuntimeExecutionInfo::Tezos(applied_operation),
+            ))
         }
     }
 }
@@ -850,7 +855,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
     type Transaction = TezlinkOperation;
     type ChainHeader = TezBlockHeader;
-    type ExecutionInfo = AppliedOperation;
+    type ExecutionInfo = RuntimeExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
@@ -972,13 +977,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         &self,
         block_in_progress: &mut BlockInProgress<Self::Transaction>,
         execution_info: Self::ExecutionInfo,
-        _host: &mut impl Runtime,
+        host: &mut impl Runtime,
     ) -> anyhow::Result<()> {
-        block_in_progress
-            .cumulative_tezos_operation_receipts
-            .list
-            .push(execution_info);
-        Ok(())
+        block_in_progress.register_valid_transaction(execution_info, host)
     }
 
     fn finalize_and_store(
