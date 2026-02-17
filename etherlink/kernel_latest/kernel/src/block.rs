@@ -522,7 +522,8 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezosXTransaction,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
         TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -1792,7 +1793,7 @@ mod tests {
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
-    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
+    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> TezosXBlockConstants {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -1800,13 +1801,22 @@ mod tests {
         let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
-        BlockConstants::first_block(
-            timestamp,
-            chain_id.unwrap(),
-            block_fees.unwrap(),
-            crate::block::GAS_LIMIT,
-            H160::zero(),
-        )
+        TezosXBlockConstants {
+            evm_runtime_block_constants: BlockConstants::first_block(
+                timestamp,
+                chain_id.unwrap(),
+                block_fees.unwrap(),
+                crate::block::GAS_LIMIT,
+                H160::zero(),
+            ),
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level: (0.into()),
+                context: context::TezlinkContext::from_root(
+                    &TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                )
+                .unwrap(),
+            },
+        }
     }
 
     #[test]
@@ -1831,7 +1841,10 @@ mod tests {
         let mut block_in_progress = BlockInProgress::new(
             U256::from(1),
             transactions,
-            block_constants.block_fees.base_fee_per_gas(),
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
         );
         // run is almost full wrt gas consumption in the current run
         let limits = EvmLimits::default();

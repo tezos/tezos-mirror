@@ -107,7 +107,6 @@ pub struct EvmChainConfig {
     pub limits: EvmLimits,
     pub spec_id: SpecId,
     pub experimental_features: ExperimentalFeatures,
-    #[allow(dead_code)]
     michelson_chain_config: MichelsonChainConfig,
 }
 
@@ -461,8 +460,14 @@ impl Encodable for TezosXTransaction {
     }
 }
 
+pub struct TezosXBlockConstants {
+    pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
+    #[allow(dead_code)]
+    pub michelson_runtime_block_constants: TezlinkBlockConstants,
+}
+
 impl ChainConfigTrait for EvmChainConfig {
-    type BlockConstants = tezos_ethereum::block::BlockConstants;
+    type BlockConstants = TezosXBlockConstants;
 
     type Transaction = crate::transaction::Transaction;
 
@@ -484,14 +489,21 @@ impl ChainConfigTrait for EvmChainConfig {
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
-        Ok(block_in_progress.constants(
-            self.chain_id,
-            self.limits.minimum_base_fee_per_gas,
-            da_fee_per_byte,
-            crate::block::GAS_LIMIT,
-            coinbase,
-            self.enable_tezos_runtime(),
-        ))
+        Ok(TezosXBlockConstants {
+            evm_runtime_block_constants: block_in_progress.constants(
+                self.chain_id,
+                self.limits.minimum_base_fee_per_gas,
+                da_fee_per_byte,
+                crate::block::GAS_LIMIT,
+                coinbase,
+                self.enable_tezos_runtime(),
+            ),
+            michelson_runtime_block_constants: self.michelson_chain_config.constants(
+                block_in_progress,
+                da_fee_per_byte,
+                coinbase,
+            )?,
+        })
     }
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
@@ -579,7 +591,9 @@ impl ChainConfigTrait for EvmChainConfig {
         Ok(crate::block::can_fit_in_reboot(
             &self.limits,
             executed_gas,
-            transaction.execution_gas_limit(&block_constants.block_fees)?,
+            transaction.execution_gas_limit(
+                &block_constants.evm_runtime_block_constants.block_fees,
+            )?,
         ))
     }
 
@@ -589,7 +603,7 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_constants: &tezos_ethereum::block::BlockConstants,
+        block_constants: &Self::BlockConstants,
         transaction: Self::Transaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
@@ -599,7 +613,7 @@ impl ChainConfigTrait for EvmChainConfig {
             host,
             registry,
             outbox_queue,
-            block_constants,
+            &block_constants.evm_runtime_block_constants,
             transaction,
             index,
             sequencer_pool_address,
@@ -626,7 +640,7 @@ impl ChainConfigTrait for EvmChainConfig {
     ) -> anyhow::Result<L2Block> {
         block_in_progress.finalize_and_store(
             host,
-            block_constants,
+            &block_constants.evm_runtime_block_constants,
             self.enable_tezos_runtime(),
         )
     }
