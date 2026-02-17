@@ -808,6 +808,32 @@ function commit_05_rename_binaries() {
   commit_no_hooks "src: rename binaries main_*.ml{,i} files"
 }
 
+# COMMIT 6: Update protocol references in lib_protocol
+#
+# MODE: both
+# RENAMES: protocol_${protocol_source} → protocol_${new_protocol_name}
+#          protocol-${tezos_protocol_source} → protocol-${new_tezos_protocol}
+#          protocol-functor-${tezos_protocol_source} → protocol-functor-${new_tezos_protocol}
+#
+# DESCRIPTION:
+#   Updates all protocol references in lib_protocol files using sed.
+#   Replaces protocol identifiers with underscore and hyphen variants,
+#   then reformats all OCaml files with ocamlformat.
+#
+# CREATES: 1 commit: "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+function commit_06_update_protocol_references() {
+  cd lib_protocol
+  # We use `--print0` and `xargs -0` instead of just passing the result
+  # of find to sed in order to support spaces in filenames.
+  find . -type f -print0 | xargs -0 \
+    sed -i.old -e "s/protocol_${protocol_source}/protocol_${new_protocol_name}/" \
+    -e "s/protocol-${tezos_protocol_source}/protocol-${new_tezos_protocol}/" \
+    -e "s/protocol-functor-${tezos-protocol-source}/protocol-functor-${new_tezos_protocol}/"
+  find . -type f -name "*.ml" -exec ocamlformat -i {} \;
+  find . -type f -name "*.mli" -exec ocamlformat -i {} \;
+  commit_no_hooks "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -859,16 +885,7 @@ function copy_source() {
 
   commit_05_rename_binaries
 
-  cd lib_protocol
-  # We use `--print0` and `xargs -0` instead of just passing the result
-  # of find to sed in order to support spaces in filenames.
-  find . -type f -print0 | xargs -0 \
-    sed -i.old -e "s/protocol_${protocol_source}/protocol_${new_protocol_name}/" \
-    -e "s/protocol-${tezos_protocol_source}/protocol-${new_tezos_protocol}/" \
-    -e "s/protocol-functor-${tezos-protocol-source}/protocol-functor-${new_tezos_protocol}/"
-  find . -type f -name "*.ml" -exec ocamlformat -i {} \;
-  find . -type f -name "*.mli" -exec ocamlformat -i {} \;
-  commit_no_hooks "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
+  commit_06_update_protocol_references
 
   # add this protocol to the immutable list
   if [[ ${is_snapshot} == true ]]; then
