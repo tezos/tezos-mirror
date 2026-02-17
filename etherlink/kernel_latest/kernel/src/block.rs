@@ -1835,7 +1835,8 @@ mod tests {
         let valid_tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
-        };
+        }
+        .into();
         let transactions = vec![valid_tx].into();
 
         // init block in progress
@@ -2145,7 +2146,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip: BlockInProgress<Transaction> = read_block_in_progress(&safe_host)
+        let bip: BlockInProgress<TezosXTransaction> = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 
@@ -2247,7 +2248,7 @@ mod tests {
                 .map(OwnedPath::from)
                 .collect(),
         };
-        let bip: BlockInProgress<Transaction> = read_block_in_progress(&safe_host)
+        let bip: BlockInProgress<TezosXTransaction> = read_block_in_progress(&safe_host)
             .expect("Should be able to read the block in progress")
             .expect("The reboot context should have a block in progress");
 

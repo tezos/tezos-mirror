@@ -493,7 +493,7 @@ pub struct TezosXBlockConstants {
 impl ChainConfigTrait for EvmChainConfig {
     type BlockConstants = TezosXBlockConstants;
 
-    type Transaction = crate::transaction::Transaction;
+    type Transaction = TezosXTransaction;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 
@@ -612,18 +612,23 @@ impl ChainConfigTrait for EvmChainConfig {
         transaction: &Self::Transaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
-        Ok(crate::block::can_fit_in_reboot(
-            &self.limits,
-            executed_gas,
-            transaction.execution_gas_limit(
-                &block_constants.evm_runtime_block_constants.block_fees,
-            )?,
-        ))
+        match transaction {
+            TezosXTransaction::Ethereum(transaction) => {
+                Ok(crate::block::can_fit_in_reboot(
+                    &self.limits,
+                    executed_gas,
+                    transaction.execution_gas_limit(
+                        &block_constants.evm_runtime_block_constants.block_fees,
+                    )?,
+                ))
+            }
+            TezosXTransaction::Tezos(_operation) => Ok(true),
+        }
     }
 
     fn apply_transaction(
         &self,
-        _block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress<Self::Transaction>,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -633,18 +638,28 @@ impl ChainConfigTrait for EvmChainConfig {
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
     ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
-        crate::apply::apply_transaction(
-            host,
-            registry,
-            outbox_queue,
-            &block_constants.evm_runtime_block_constants,
-            transaction,
-            index,
-            sequencer_pool_address,
-            tracer_input,
-            &self.spec_id,
-            &self.limits,
-        )
+        match transaction {
+            TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
+                host,
+                registry,
+                outbox_queue,
+                &block_constants.evm_runtime_block_constants,
+                *transaction,
+                index,
+                sequencer_pool_address,
+                tracer_input,
+                &self.spec_id,
+                &self.limits,
+            ),
+            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
+                &self.michelson_chain_config.chain_id,
+                block_in_progress,
+                host,
+                registry,
+                &block_constants.michelson_runtime_block_constants,
+                operation,
+            ),
+        }
     }
 
     fn register_valid_transaction(

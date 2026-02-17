@@ -261,7 +261,7 @@ pub fn handle_run_transaction<Host: Runtime>(
         }
     };
 
-    block_in_progress.repush_tx(input_data.tx);
+    block_in_progress.repush_tx(input_data.tx.into());
 
     let result = compute(
         &mut safe_host,
