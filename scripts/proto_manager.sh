@@ -857,6 +857,33 @@ function commit_07_update_final_protocol_versions() {
   cd ../../..
 }
 
+# COMMIT 8: Update or remove README
+#
+# MODE: conditional (different behavior per mode)
+# MODIFIES: src/proto_${new_protocol_name}/README.md or src/proto_${label}/README.md
+#
+# DESCRIPTION:
+#   Handles README file based on command mode:
+#   - copy mode: copies alpha README and renames protocol references (2 commits)
+#   - snapshot mode: removes README (1 commit)
+#   - stabilise mode: renames protocol references in existing README (1 commit)
+#
+# CREATES: 1-2 commits depending on mode
+function commit_08_update_readme() {
+  if [[ ${command} == "copy" ]]; then
+    cp "src/proto_alpha/README.md" "src/proto_${label}/README.md"
+    commit_no_hooks "src: copy alpha/README"
+    sed -i "s/alpha/${label}/g" "src/proto_${label}/README.md"
+    commit_no_hooks "src: rename protocol in the README"
+  elif [[ ${is_snapshot} == true ]]; then
+    rm "src/proto_${new_protocol_name}/README.md"
+    commit_no_hooks "src: remove README"
+  else
+    sed -i "s/${protocol_source}/${label}/g" "src/proto_${label}/README.md"
+    commit_no_hooks "src: rename protocol in the README"
+  fi
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -912,18 +939,7 @@ function copy_source() {
 
   commit_07_update_final_protocol_versions
 
-  if [[ ${command} == "copy" ]]; then
-    cp "src/proto_alpha/README.md" "src/proto_${label}/README.md"
-    commit_no_hooks "src: copy alpha/README"
-    sed -i "s/alpha/${label}/g" "src/proto_${label}/README.md"
-    commit_no_hooks "src: rename protocol in the README"
-  elif [[ ${is_snapshot} == true ]]; then
-    rm "src/proto_${new_protocol_name}/README.md"
-    commit_no_hooks "src: remove README"
-  else
-    sed -i "s/${protocol_source}/${label}/g" "src/proto_${label}/README.md"
-    commit_no_hooks "src: rename protocol in the README"
-  fi
+  commit_08_update_readme
 
   echo -e "\e[33mLinking protocol in the node, client and codec\e[0m"
   if [[ ${is_snapshot} == true ]]; then
