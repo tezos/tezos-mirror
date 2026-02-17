@@ -338,7 +338,7 @@ pub fn assemble_block<Host: Runtime>(
     let delayed_hashes = block_in_progress.delayed_txs.clone();
     let block = block_in_progress.finalize_and_store(
         &mut safe_host,
-        &block_constants.evm_runtime_block_constants,
+        &block_constants,
         config.enable_tezos_runtime(),
     )?;
 

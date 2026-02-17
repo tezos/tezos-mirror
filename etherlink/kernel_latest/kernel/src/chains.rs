@@ -645,7 +645,7 @@ impl ChainConfigTrait for EvmChainConfig {
     ) -> anyhow::Result<L2Block> {
         block_in_progress.finalize_and_store(
             host,
-            &block_constants.evm_runtime_block_constants,
+            block_constants,
             self.enable_tezos_runtime(),
         )
     }

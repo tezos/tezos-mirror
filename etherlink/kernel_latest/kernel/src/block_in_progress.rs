@@ -8,7 +8,8 @@
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{
-    TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+    TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+    TEZOS_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
@@ -35,7 +36,6 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
-use tezos_tezlink::enc_wrappers::BlockNumber;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
@@ -461,7 +461,7 @@ impl BlockInProgress {
     pub fn finalize_and_store<Host: Runtime>(
         self,
         host: &mut Host,
-        block_constants: &BlockConstants,
+        block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
@@ -480,12 +480,15 @@ impl BlockInProgress {
         let base_fee_per_gas = base_fee_per_gas(
             host,
             self.timestamp,
-            block_constants.block_fees.minimum_base_fee_per_gas(),
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .minimum_base_fee_per_gas(),
         );
 
         if enable_tezos_runtime {
-            let tez_block = Self::create_tez_block(
-                self.number,
+            let tez_block = TezBlock::new(
+                block_constants.michelson_runtime_block_constants.level,
                 self.timestamp,
                 self.tezos_parent_hash,
                 self.cumulative_tezos_operation_receipts.list,
@@ -505,7 +508,7 @@ impl BlockInProgress {
             state_root,
             receipts_root,
             self.cumulative_gas,
-            block_constants,
+            &block_constants.evm_runtime_block_constants,
             base_fee_per_gas,
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
@@ -513,21 +516,6 @@ impl BlockInProgress {
             .context("Failed to store the current block")?;
 
         Ok(new_block)
-    }
-
-    /// Creates a TezBlock from the accumulated Tezos operations.
-    fn create_tez_block(
-        block_number: U256,
-        timestamp: Timestamp,
-        previous_hash: H256,
-        operations: Vec<tezos_tezlink::block::AppliedOperation>,
-    ) -> Result<TezBlock, anyhow::Error> {
-        let block_number: BlockNumber = block_number
-            .try_into()
-            .context("Block number overflow when converting to Tezos block number")?;
-
-        TezBlock::new(block_number, timestamp, previous_hash, operations)
-            .context("Failed to create TezBlock")
     }
 
     pub fn make_receipt(
