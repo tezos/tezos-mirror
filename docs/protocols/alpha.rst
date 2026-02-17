@@ -51,7 +51,7 @@ Data Availability Layer
   used in the DAL payload of consensus attestation operation, and
   protocol-attested DAL slots, used in a block metadata's field
   ``"dal_attestation"``. The format is described in the header of the file
-  ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`)
+  ``src/proto_alpha/lib_protocol/dal_attestations_repr.mli``. (MR :gl:`!20734`) and (MR :gl:`!20731`)
 - Increase number of slots to 160. (MR :gl:`!20457`)
 - Increase slot size to 380_832 bytes. (MR :gl:`!20457`)
 - Introduced a new optional field ``lag_index`` to DAL entrapment evidence

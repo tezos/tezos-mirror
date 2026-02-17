@@ -16,6 +16,87 @@ let is_empty = Bitset.is_empty
 
 let to_z = Bitset.to_z
 
+(* Erros when reading/writing the [dal_content] of an attestation. *)
+type dal_indices = Lag_index of int | Slot_index of int
+
+let dal_indices_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Lag_index"
+        int31
+        (function Lag_index i -> Some i | _ -> None)
+        (fun i -> Lag_index i);
+      case
+        (Tag 1)
+        ~title:"Slot_index"
+        int31
+        (function Slot_index i -> Some i | _ -> None)
+        (fun i -> Slot_index i);
+    ]
+
+type error +=
+  | Dal_invalid_attestation_bitset of Bitset.t
+  | Dal_invalid_read_of_attestaion_bitset of dal_indices
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal_invalid_attestation_bitset"
+    ~title:"Dal invalid attestation bitset"
+    ~description:"The attestation features an invalid DAL content"
+    ~pp:(fun ppf bitset ->
+      Format.fprintf
+        ppf
+        "DAL content of the attestation is %a which is not a valid \
+         representation of a DAL attestation."
+        Z.pp_print
+        (Bitset.to_z bitset))
+    Data_encoding.(obj1 (req "bitset" Bitset.encoding))
+    (function
+      | Dal_invalid_attestation_bitset bitset -> Some bitset | _ -> None)
+    (fun bitset -> Dal_invalid_attestation_bitset bitset) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal_invalid_read_of_attestaion_bitset"
+    ~title:"Dal invalid read of attestaion bitset"
+    ~description:"The DAL attestation bitset was read with invalid indices"
+    ~pp:(fun ppf dal_index ->
+      match dal_index with
+      | Lag_index i ->
+          Format.fprintf
+            ppf
+            "The DAL attestation bitset cannot be read at lag index %d."
+            i
+      | Slot_index i ->
+          Format.fprintf
+            ppf
+            "The DAL attestation bitset cannot be read at slot index %d."
+            i)
+    Data_encoding.(obj1 (req "index" dal_indices_encoding))
+    (function
+      | Dal_invalid_read_of_attestaion_bitset dal_index -> Some dal_index
+      | _ -> None)
+    (fun dal_index -> Dal_invalid_read_of_attestaion_bitset dal_index)
+
+(* A DAL attestation is made of chunks with 1 bit [is_last] followed by
+   [slots_per_chunk] bits to state which slots are attested. *)
+let slots_per_chunk = 7
+
+let bits_per_chunk = slots_per_chunk + 1
+
+let max_chunks ~number_of_slots =
+  let ceil_div a b = (a + b - 1) / b in
+  ceil_div number_of_slots slots_per_chunk
+
+(* [lag_data] contains the information about the representation of a specific
+   lag in the attestation.
+   We assume that the represented lag is non empty, so [nb_chunks > 0] and
+   [offset_start < offset_after] *)
+type lag_data = {offset_start : int; offset_after : int; nb_chunks : int}
+
 (* Helper to safely check membership in a bitset, returning false on error. *)
 let bitset_mem bitset idx =
   match Bitset.mem bitset idx with Ok b -> b | Error _ -> false
@@ -24,46 +105,129 @@ let bitset_mem bitset idx =
 let bitset_add bitset idx =
   match Bitset.add bitset idx with Ok b -> b | Error _ -> bitset
 
+(* Helper to safely remove from a bitset, returning the original bitset on error. *)
+let bitset_remove bitset idx =
+  match Bitset.remove bitset idx with Ok b -> b | Error _ -> bitset
+
 (* Check if the attestation at [lag_index] is empty *)
 let is_empty_at_lag_index t ~lag_index = not @@ bitset_mem t lag_index
+
+(* Shift all bits at or after [from] by [shift] positions. *)
+let shift_bits_after bitset ~from ~shift =
+  if Compare.Int.(shift = 0) then bitset
+  else
+    List.fold_left
+      (fun res index ->
+        let new_index =
+          if Compare.Int.(index >= from) then index + shift else index
+        in
+        bitset_add res new_index)
+      Bitset.empty
+      (Bitset.to_list bitset)
+
+(* Scan chunks starting at [start] and return (chunks_count, end_offset). *)
+let scan_chunks t ~start ~max_chunks =
+  let rec loop nb_chunks offset =
+    let open Result_syntax in
+    (* The last chunk has to have the [is_last] bit to true. *)
+    let* () =
+      error_unless
+        Compare.Int.(nb_chunks < max_chunks)
+        (Dal_invalid_attestation_bitset t)
+    in
+    let next_offset = offset + bits_per_chunk in
+    let is_last = bitset_mem t offset in
+    if is_last then return (nb_chunks + 1, next_offset)
+    else loop (nb_chunks + 1) next_offset
+  in
+  loop 0 start
+
+(* Scan the data section from lag 0 up to [lag_index], returning the lag data
+   for [lag_index] (if any) and its offset.  *)
+let scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index =
+  let max_chunks = max_chunks ~number_of_slots in
+  let rec scan current_lag_index offset =
+    let open Result_syntax in
+    let* () =
+      error_unless
+        Compare.Int.(current_lag_index < number_of_lags)
+        (Dal_invalid_attestation_bitset t)
+    in
+    if bitset_mem t current_lag_index then
+      let* nb_chunks, next_offset = scan_chunks t ~start:offset ~max_chunks in
+      if Compare.Int.(current_lag_index = lag_index) then
+        return
+          ( Some {offset_start = offset; offset_after = next_offset; nb_chunks},
+            offset )
+      else scan (current_lag_index + 1) next_offset
+    else if Compare.Int.(current_lag_index = lag_index) then
+      return (None, offset)
+    else scan (current_lag_index + 1) offset
+  in
+  scan 0 number_of_lags
+
+let find_lag_data t ~number_of_slots ~number_of_lags ~lag_index =
+  Result.map fst (scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index)
+
+(* Return the data offset before [lag_index]. *)
+let data_offset_before_lag t ~number_of_slots ~number_of_lags ~lag_index =
+  Result.map snd (scan_to_lag t ~number_of_slots ~number_of_lags ~lag_index)
+
+let slot_bit_position ~offset_start ~slot_index =
+  let chunk_index = slot_index / slots_per_chunk in
+  (* The first bit in each chunk is [is_last] which tells if the chunk is the
+     last associated to current lag. *)
+  let bit_in_chunk = 1 + (slot_index mod slots_per_chunk) in
+  offset_start + (chunk_index * bits_per_chunk) + bit_in_chunk
 
 (* Helper: compute the data bit position for a slot at a given lag_index.
    Returns None if the attestation at lag_index is empty. *)
 let compute_data_bit_position t ~number_of_slots ~number_of_lags ~lag_index
     slot_index =
+  let open Result_syntax in
   (* Check if the attestation at [lag_index] is non-empty *)
   let is_non_empty = bitset_mem t lag_index in
-  if not is_non_empty then None
+  if not is_non_empty then return None
   else
-    (* Count non-empty attestations before [lag_index] *)
-    let rec count_preceding acc idx =
-      if Compare.Int.(idx >= lag_index) then acc
-      else
-        let is_set = bitset_mem t idx in
-        count_preceding (if is_set then acc + 1 else acc) (idx + 1)
+    let* lag_data =
+      find_lag_data t ~number_of_slots ~number_of_lags ~lag_index
     in
-    let num_preceding_non_empty = count_preceding 0 0 in
-    let slot_bit_idx = Dal_slot_index_repr.to_int slot_index in
-    let data_bit_pos =
-      number_of_lags
-      + (num_preceding_non_empty * number_of_slots)
-      + slot_bit_idx
-    in
-    Some data_bit_pos
+    match lag_data with
+    | None -> return_none
+    | Some {offset_start; nb_chunks = chunks; _} ->
+        let slot_bit_idx = Dal_slot_index_repr.to_int slot_index in
+        let chunk_index = slot_bit_idx / slots_per_chunk in
+        if Compare.Int.(chunk_index >= chunks) then return_none
+        else
+          return_some (slot_bit_position ~offset_start ~slot_index:slot_bit_idx)
 
 let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
-  assert (Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)) ;
-  assert (Compare.Int.(Dal_slot_index_repr.to_int slot_index < number_of_slots)) ;
-  match
-    compute_data_bit_position
-      t
-      ~number_of_slots
-      ~number_of_lags
-      ~lag_index
-      slot_index
-  with
-  | None -> false
-  | Some data_bit_pos -> bitset_mem t data_bit_pos
+  let open Result_syntax in
+  let read_attested =
+    let* () =
+      error_unless
+        Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
+        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+    in
+    let slot = Dal_slot_index_repr.to_int slot_index in
+    let* () =
+      error_unless
+        Compare.Int.(slot >= 0 && slot < number_of_slots)
+        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot))
+    in
+    let* data_bit_pos =
+      compute_data_bit_position
+        t
+        ~number_of_slots
+        ~number_of_lags
+        ~lag_index
+        slot_index
+    in
+    match data_bit_pos with
+    | None -> return false
+    | Some data_bit_pos -> return (bitset_mem t data_bit_pos)
+  in
+  match read_attested with Ok is_attested -> is_attested | Error _ -> false
 
 (* Set a slot bit at a given lag in the encoded bitset.
    [bitset] is the full attestations bitset.
@@ -77,53 +241,93 @@ let is_attested t ~number_of_slots ~number_of_lags ~lag_index slot_index =
    - Empty -> Non-empty (slow path: inserts attestation data)
    - Non-empty -> Non-empty (fast path: sets bit in place) *)
 let commit bitset ~number_of_slots ~number_of_lags ~lag_index slot_index =
-  assert (Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)) ;
-  assert (Compare.Int.(Dal_slot_index_repr.to_int slot_index < number_of_slots)) ;
-
-  let is_non_empty_at idx = bitset_mem bitset idx in
-
-  (* Count non-empty attestations before [lag_index] *)
-  let rec count_before acc idx =
-    if Compare.Int.(idx >= lag_index) then acc
-    else count_before (if is_non_empty_at idx then acc + 1 else acc) (idx + 1)
-  in
-  let num_before = count_before 0 0 in
-
-  if is_non_empty_at lag_index then
-    (* Fast path: attestation already exists, just set the bit *)
-    let data_start = number_of_lags + (num_before * number_of_slots) in
-    let slot_idx = Dal_slot_index_repr.to_int slot_index in
-    bitset_add bitset (data_start + slot_idx)
-  else
-    (* Slow path: attestation is empty. Build new bitset by copying old bits,
-       shifting those at or after [insertion_point] by [number_of_slots] to make
-       room for the new attestation data. *)
-    let insertion_point = number_of_lags + (num_before * number_of_slots) in
-    (* Copy all existing bits, shifting data bits at or after [insertion_point] *)
+  let open Result_syntax in
+  (* Write chunk data for a lag at [offset_start] into [bitset].
+   [slots] is a list of attested slot indices.
+   [chunks_needed] is the number of chunks to allocate.
+   Sets the [is_last] bit on the last chunk and each slot's bit.
+   Does NOT clear the potentially already existing [is_last] bits.
+   Does NOT set the prefix bit — the caller must do that. *)
+  let write_lag_data bitset ~offset_start ~chunks_needed slots =
     let result =
-      List.fold_left
-        (fun res index ->
-          let new_index =
-            if Compare.Int.(index >= insertion_point) then
-              index + number_of_slots
-            else index
-          in
-          bitset_add res new_index)
-        Bitset.empty
-        (Bitset.to_list bitset)
+      bitset_add bitset (offset_start + ((chunks_needed - 1) * bits_per_chunk))
     in
-    (* Set the new lag index bit in the prefix *)
-    let result = bitset_add result lag_index in
-    (* Set the new slot bit at the insertion point *)
-    let slot_idx = Dal_slot_index_repr.to_int slot_index in
-    bitset_add result (insertion_point + slot_idx)
+    List.fold_left
+      (fun acc slot_index ->
+        bitset_add acc (slot_bit_position ~offset_start ~slot_index))
+      result
+      slots
+  in
+  let is_non_empty_at idx = bitset_mem bitset idx in
+  let slot_idx = Dal_slot_index_repr.to_int slot_index in
+  let chunk_index = slot_idx / slots_per_chunk in
+  let chunks_needed = chunk_index + 1 in
+  let commit_result =
+    let* () =
+      error_unless
+        Compare.Int.(lag_index >= 0 && lag_index < number_of_lags)
+        (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+    in
+    let* () =
+      error_unless
+        Compare.Int.(slot_idx >= 0 && slot_idx < number_of_slots)
+        (Dal_invalid_read_of_attestaion_bitset (Slot_index slot_idx))
+    in
+    if is_non_empty_at lag_index then
+      let* lag_data =
+        find_lag_data bitset ~number_of_slots ~number_of_lags ~lag_index
+      in
+      match lag_data with
+      | None ->
+          tzfail (Dal_invalid_read_of_attestaion_bitset (Lag_index lag_index))
+      | Some {offset_start; nb_chunks; offset_after} ->
+          if Compare.Int.(chunk_index < nb_chunks) then
+            (* Fast path: slot is within existing chunks. *)
+            return
+              (bitset_add
+                 bitset
+                 (slot_bit_position ~offset_start ~slot_index:slot_idx))
+          else
+            (* Extend the lag with extra chunks. *)
+            let extra_chunks = chunks_needed - nb_chunks in
+            let shift = extra_chunks * bits_per_chunk in
+            let result = shift_bits_after bitset ~from:offset_after ~shift in
+            let result =
+              (* The previously last chunk is not the last anymore. *)
+              bitset_remove
+                result
+                (offset_start + ((nb_chunks - 1) * bits_per_chunk))
+            in
+            return
+              (write_lag_data result ~offset_start ~chunks_needed [slot_idx])
+    else
+      (* Lag is empty: insert its chunks in order. *)
+      let* insertion_point =
+        data_offset_before_lag
+          bitset
+          ~number_of_slots
+          ~number_of_lags
+          ~lag_index
+      in
+      let shift = chunks_needed * bits_per_chunk in
+      let result = shift_bits_after bitset ~from:insertion_point ~shift in
+      (* The lag index is not empty anymore, so one has to update the prefix. *)
+      let result = bitset_add result lag_index in
+      return
+        (write_lag_data
+           result
+           ~offset_start:insertion_point
+           ~chunks_needed
+           [slot_idx])
+  in
+  match commit_result with Ok bitset -> bitset | Error _ -> bitset
 
 let occupied_size_in_bits = Bitset.occupied_size_in_bits
 
 let expected_max_size_in_bits ~number_of_slots ~number_of_lags =
-  (* [number_of_lags] for the prefix and [number_of_lags * number_of_slots] for
-     the data section. *)
-  number_of_lags * (1 + number_of_slots)
+  (* [number_of_lags] for the prefix and [number_of_lags] chunks of 8 bits. *)
+  let max_chunks = max_chunks ~number_of_slots in
+  number_of_lags + (number_of_lags * max_chunks * bits_per_chunk)
 
 let weight t = Bitset.cardinal t
 
@@ -222,12 +426,12 @@ module Accountability = struct
         published_level_map
     in
     let number_of_lags = List.length lags in
-    let _number_of_lags, published_level_map =
-      List.fold_left
-        (fun (lag_index, published_level_map) lag ->
+    let published_level_map =
+      List.fold_left_i
+        (fun lag_index published_level_map lag ->
           let published_level_opt = Raw_level_repr.sub attested_level lag in
           match published_level_opt with
-          | None -> (lag_index + 1, published_level_map)
+          | None -> published_level_map
           | Some published_level ->
               let committee_level =
                 Raw_level_repr.add published_level (attestation_lag - 1)
@@ -263,8 +467,8 @@ module Accountability = struct
                   published_level_map
                   (Dal_slot_index_repr.all_slots ~number_of_slots)
               in
-              (lag_index + 1, published_level_map))
-        (0, t.shard_attestations)
+              published_level_map)
+        t.shard_attestations
         lags
     in
     {t with shard_attestations = published_level_map}

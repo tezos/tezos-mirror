@@ -93,7 +93,7 @@ module Attestations : sig
       For protocols < 025, the [attestations_per_lag] array must
       only contain a single element and will be encoded using the pre-025
       single-lag format. *)
-  val encode : Protocol.t -> Parameters.t -> bool array array -> string
+  val encode : Protocol.t -> bool array array -> string
 
   (** [decode protocol parameters str] decodes and returns an array of
       size [number_of_lags], where each element is a bool array of size

@@ -444,15 +444,82 @@ let test_include_valid_dal_content =
   let number_of_slots =
     Default_parameters.constants_mainnet.dal.number_of_slots
   in
+  let attestation_lags =
+    Default_parameters.constants_mainnet.dal.attestation_lags
+  in
+  let number_of_lags = List.length attestation_lags in
   let consensus_rights_delay =
     Default_parameters.constants_mainnet.consensus_rights_delay
   in
+  (* Encode a list of slot indices into the chunk data for a single lag,
+     with chunk offsets starting at bit 0 (i.e. without the prefix).
+     Each 8-bit chunk is: [is_last (1 bit)][slot bits (7 bits)].
+     Only as many chunks as needed to cover the highest slot are emitted. *)
+  let dal_lag_content_of_slots slots =
+    let max_slot = List.fold_left Int.max 0 slots in
+    let chunks_needed = (max_slot / 7) + 1 in
+    (* Set [is_last] on the final chunk *)
+    let with_is_last = Z.shift_left Z.one ((chunks_needed - 1) * 8) in
+    (* Set each slot's bit within its chunk *)
+    List.fold_left
+      (fun acc slot ->
+        let chunk_index = slot / 7 in
+        let bit_in_chunk = 1 + (slot mod 7) in
+        let bit = Z.shift_left Z.one ((chunk_index * 8) + bit_in_chunk) in
+        Z.logor acc bit)
+      with_is_last
+      slots
+  in
+  (* A collection of single-lag data values exercising various edge cases:
+     single slot, multiple slots, last slot in a chunk ([6]), first slot
+     in the second chunk ([7]), slots spanning two chunks, etc. *)
+  let valid_dal_lag_content =
+    List.map
+      (fun indices -> dal_lag_content_of_slots indices)
+      [
+        [0];
+        [1];
+        [1; 2];
+        [1; 3];
+        [6] (* last slot in chunk 0 *);
+        [7] (* first slot in chunk 1 — forces 2 chunks *);
+        [1; 8] (* slots in different chunks *);
+        [1; 2; 9] (* slots spanning 2 chunks *);
+        [0; 1; 2; 3; 6; 7; 9] (* many slots across 2 chunks *);
+      ]
+  in
+  (* Assemble a full attestation bitset from lag data and a prefix.
+     [make_attestation ~prefix lag_data_list]. *)
+  let make_attestation ~prefix lag_data_list =
+    let _offset, result =
+      List.fold_left
+        (fun (offset, acc) lag_data ->
+          let nbits = Z.numbits lag_data in
+          (offset + nbits, Z.(logor acc (shift_left lag_data offset))))
+        (number_of_lags, Z.of_int prefix)
+        lag_data_list
+    in
+    result
+  in
   let valid_dal_contents =
-    Z.(pred (pow (of_int 2) number_of_slots))
-    :: List.map Z.of_int [0; 1; 2; 3; 12]
+    [Z.zero]
+    @ List.concat_map
+        (fun prefix ->
+          List.map
+            (fun content -> make_attestation ~prefix [content])
+            valid_dal_lag_content)
+        [1; 2]
+    @ List.map
+        (fun content ->
+          make_attestation ~prefix:6 [content; dal_lag_content_of_slots [0]])
+        valid_dal_lag_content
+  in
+  let default_valid_dal_attestation =
+    make_attestation ~prefix:1 [dal_lag_content_of_slots [0]]
   in
   init_constants ()
   --> set S.Dal.number_of_slots number_of_slots
+  --> set S.Dal.attestation_lags attestation_lags
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
         ~abaab_activation_levels:[Some 0; None]
@@ -473,9 +540,14 @@ let test_include_valid_dal_content =
                   (fun x ->
                     attest_aggreg_with
                       ~delegates_with_dal:
-                        [("delegate_1", x); ("delegate_2", Z.of_int 7)]
+                        [
+                          ("delegate_1", x);
+                          ("delegate_2", default_valid_dal_attestation);
+                        ]
                       []
-                    --> attest_with ~dal_content:(Z.of_int 11) "delegate_3")
+                    --> attest_with
+                          ~dal_content:default_valid_dal_attestation
+                          "delegate_3")
                   Z.to_string
                   valid_dal_contents
            |+ Tag "two dal attesters"
@@ -483,7 +555,10 @@ let test_include_valid_dal_content =
                     (fun x ->
                       attest_aggreg_with
                         ~delegates_with_dal:
-                          [("delegate_1", x); ("delegate_2", Z.of_int 7)]
+                          [
+                            ("delegate_1", x);
+                            ("delegate_2", default_valid_dal_attestation);
+                          ]
                         []
                       --> attest_with "delegate_3")
                     Z.to_string
