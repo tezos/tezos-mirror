@@ -90,6 +90,11 @@ type t = {
   parameters : Dal_common.Parameters.t;
   infos : (int, Metrics.per_level_info) Hashtbl.t;
   metrics : (int, Metrics.t) Hashtbl.t;
+  cumulative_protocol_attestations : (int, bool array) Hashtbl.t;
+      (* Maps published_level to per-slot cumulative attestation status.
+         For each published level P, accumulates newly-confirmed attestations
+         across all levels in the attestation window [P, P + max_lag].
+         An entry is removed once the window closes and metrics are computed. *)
   disconnection_state : Disconnect.t option;
   first_level : int;
   teztale : Teztale.t option;
@@ -113,7 +118,8 @@ let get_infos_per_level t ~level ~metadata =
     RPC_core.call endpoint @@ RPC.get_chain_block_operations ~block ()
   in
   let attested_commitments =
-    JSON.(metadata |-> "dal_attestation" |> as_string |> Z.of_string)
+    let str = JSON.(metadata |-> "dal_attestation" |> as_string) in
+    Dal_common.Attestations.decode t.configuration.protocol t.parameters str
   in
   let manager_operation_batches = JSON.(operations |=> 3 |> as_list) in
   let is_published_commitment operation =
@@ -1178,6 +1184,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       parameters;
       infos;
       metrics;
+      cumulative_protocol_attestations = Hashtbl.create 101;
       disconnection_state;
       first_level;
       teztale;
@@ -1202,7 +1209,8 @@ let wait_for_level t level =
 
 let clean_up t level =
   Hashtbl.remove t.infos level ;
-  Hashtbl.remove t.metrics level
+  Hashtbl.remove t.metrics level ;
+  Hashtbl.remove t.cumulative_protocol_attestations level
 
 let update_bakers_infos t =
   let open Baker_helpers in
@@ -1231,13 +1239,35 @@ let on_new_level t level ~metadata =
   let* infos_per_level = get_infos_per_level t ~level ~metadata in
   toplog "Level %d's info processed" level ;
   Hashtbl.replace t.infos level infos_per_level ;
+  (* Update cumulative attestations: for each lag, OR the newly-confirmed
+     slots into the entry for the corresponding published level. *)
+  let number_of_slots = t.parameters.number_of_slots in
+  List.iteri
+    (fun lag_index lag ->
+      let published_level = level - lag in
+      if published_level >= t.first_level then (
+        let existing =
+          match
+            Hashtbl.find_opt t.cumulative_protocol_attestations published_level
+          with
+          | Some arr -> arr
+          | None -> Array.make number_of_slots false
+        in
+        let newly_attested = infos_per_level.attested_commitments.(lag_index) in
+        Array.iteri (fun i v -> if v then existing.(i) <- true) newly_attested ;
+        Hashtbl.replace
+          t.cumulative_protocol_attestations
+          published_level
+          existing))
+    t.parameters.attestation_lags ;
   let metrics =
     Metrics.get
       ~first_level:t.first_level
       ~attestation_lags:t.parameters.attestation_lags
       ~dal_node_producers:t.configuration.dal_node_producers
-      ~number_of_slots:t.parameters.number_of_slots
+      ~number_of_slots
       ~infos:t.infos
+      ~cumulative_protocol_attestations:t.cumulative_protocol_attestations
       infos_per_level
       (Hashtbl.find t.metrics (level - 1))
   in

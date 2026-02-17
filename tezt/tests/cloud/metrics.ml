@@ -31,7 +31,7 @@ type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
   baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
-  attested_commitments : Z.t;
+  attested_commitments : bool array array;
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
 }
@@ -367,6 +367,9 @@ let push ~versions ~cloud
     ~name:"tezt_last_echo_rollup_fetched_data"
     (float_of_int last_echo_rollup_fetched_data_size)
 
+let number_of_attested_slots arr =
+  Array.fold_left (fun acc b -> if b then acc + 1 else acc) 0 arr
+
 let published_level_of_attested_level ~attestation_lag level =
   level - attestation_lag
 
@@ -383,7 +386,9 @@ let update_level_first_commitment_attested ~first_level ~attestation_lag
   match metrics.level_first_commitment_attested with
   | None ->
       if
-        Z.popcount per_level_info.attested_commitments > 0
+        Array.exists
+          (fun lag_arr -> Array.exists Fun.id lag_arr)
+          per_level_info.attested_commitments
         && per_level_info.level >= first_level + attestation_lag
       then Some per_level_info.level
       else None
@@ -403,9 +408,19 @@ let update_expected_published_commitments ~dal_node_producers ~number_of_slots
       let producers = min (List.length dal_node_producers) number_of_slots in
       metrics.expected_published_commitments + producers
 
-let update_total_attested_commitments per_level_info metrics =
-  metrics.total_attested_commitments
-  + Z.popcount per_level_info.attested_commitments
+(* Count attested commitments for the published level whose attestation window
+   just closed ([published_level = current_level - max_lag]). Uses the cumulative
+   tracker which has accumulated all attestation confirmations across the
+   entire window. *)
+let update_total_attested_commitments ~cumulative_protocol_attestations
+    ~attestation_lag per_level_info metrics =
+  let published_level =
+    published_level_of_attested_level ~attestation_lag per_level_info.level
+  in
+  match Hashtbl.find_opt cumulative_protocol_attestations published_level with
+  | None -> metrics.total_attested_commitments
+  | Some arr ->
+      metrics.total_attested_commitments + number_of_attested_slots arr
 
 let update_ratio_published_commitments metrics =
   if metrics.expected_published_commitments = 0 then 0.
@@ -425,8 +440,8 @@ let update_ratio_published_commitments_last_level ~dal_node_producers
         float_of_int (Hashtbl.length per_level_info.published_commitments)
         *. 100. /. float_of_int producers
 
-let update_ratio_attested_commitments ~first_level ~infos ~attestation_lag
-    per_level_info metrics =
+let update_ratio_attested_commitments ~first_level ~infos
+    ~cumulative_protocol_attestations ~attestation_lag per_level_info metrics =
   let published_level =
     published_level_of_attested_level ~attestation_lag per_level_info.level
   in
@@ -444,16 +459,21 @@ let update_ratio_attested_commitments ~first_level ~infos ~attestation_lag
           "Unexpected error: The level %d is missing in the infos table"
           published_level ;
         metrics.ratio_attested_commitments
-    | Some old_per_level_info ->
+    | Some old_per_level_info -> (
         let n = Hashtbl.length old_per_level_info.published_commitments in
         if n = 0 then metrics.ratio_attested_commitments
         else
-          float (Z.popcount per_level_info.attested_commitments)
-          *. 100. /. float n
+          match
+            Hashtbl.find_opt cumulative_protocol_attestations published_level
+          with
+          | Some cumulative ->
+              float (number_of_attested_slots cumulative) *. 100. /. float n
+          | None -> 0.)
 
 let update_published_and_attested_commitments_per_slot ~first_level ~infos
-    ~number_of_slots ~attestation_lag per_level_info
-    total_published_commitments_per_slot total_attested_commitments_per_slot =
+    ~cumulative_protocol_attestations ~number_of_slots ~attestation_lag
+    per_level_info total_published_commitments_per_slot
+    total_attested_commitments_per_slot =
   let published_level =
     published_level_of_attested_level ~attestation_lag per_level_info.level
   in
@@ -474,6 +494,13 @@ let update_published_and_attested_commitments_per_slot ~first_level ~infos
           total_attested_commitments_per_slot )
     | Some old_per_level_info ->
         let published_commitments = old_per_level_info.published_commitments in
+        let cumulative =
+          match
+            Hashtbl.find_opt cumulative_protocol_attestations published_level
+          with
+          | Some arr -> arr
+          | None -> [||]
+        in
         for slot_index = 0 to pred number_of_slots do
           let is_published = Hashtbl.mem published_commitments slot_index in
           let total_published_commitments =
@@ -489,14 +516,8 @@ let update_published_and_attested_commitments_per_slot ~first_level ~infos
             total_published_commitments_per_slot
             slot_index
             new_total_published_commitments ;
-          (* per_level_info.attested_commitments is a binary
-             sequence of length parameters.number_of_slots
-             (e.g. '00111111001110100010101011100101').
-             For each index i:
-             - 1 indicates the slot has been attested
-             - 0 indicates the slot has not been attested. *)
           let is_attested =
-            Z.testbit per_level_info.attested_commitments slot_index
+            slot_index < Array.length cumulative && cumulative.(slot_index)
           in
           let total_attested_commitments =
             Option.value
@@ -595,7 +616,7 @@ let update_echo_rollup_metrics infos_per_level metrics =
     data_size )
 
 let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
-    ~infos infos_per_level metrics =
+    ~infos ~cumulative_protocol_attestations infos_per_level metrics =
   let attestation_lag = List.fold_left max 0 attestation_lags in
   let level_first_commitment_published =
     update_level_first_commitment_published infos_per_level metrics
@@ -632,7 +653,11 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
       metrics
   in
   let total_attested_commitments =
-    update_total_attested_commitments infos_per_level metrics
+    update_total_attested_commitments
+      ~cumulative_protocol_attestations
+      ~attestation_lag
+      infos_per_level
+      metrics
   in
   (* Metrics below depends on the new value for the metrics above. *)
   let metrics =
@@ -653,6 +678,7 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
     update_ratio_attested_commitments
       ~first_level
       ~infos
+      ~cumulative_protocol_attestations
       ~attestation_lag
       infos_per_level
       metrics
@@ -669,6 +695,7 @@ let get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
     update_published_and_attested_commitments_per_slot
       ~first_level
       ~infos
+      ~cumulative_protocol_attestations
       ~number_of_slots
       ~attestation_lag
       infos_per_level

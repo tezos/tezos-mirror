@@ -36,7 +36,11 @@ type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
   baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
-  attested_commitments : Z.t;
+  attested_commitments : bool array array;
+      (** Per-lag attestation data decoded from block metadata.
+          [attested_commitments.(lag_index).(slot_index)] is [true] when
+          slot [slot_index] was newly confirmed as attested for the
+          published level corresponding to [lag_index]. *)
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
 }
@@ -60,17 +64,23 @@ val pp : bakers:Baker_helpers.baker list -> t -> unit
 val push : versions:(string, string) Hashtbl.t -> cloud:Cloud.t -> t -> unit
 
 (** [get ~first_level ~attestation_lags ~dal_node_producers ~number_of_slots
-    ~infos infos_per_level metrics] updates the [metrics] statistics.
+    ~infos ~cumulative_protocol_attestations infos_per_level metrics] updates the
+    [metrics] statistics.
 
     [attestation_lags] is the list of lags at which a DAL slot can be attested
-    after publication. The maximum lag is used for mapping attested levels to
-    published levels in the current metrics computations. *)
+    after publication. The maximum lag determines when a published level's
+    attestation window closes.
+
+    [cumulative_protocol_attestations] maps each published level to the per-slot
+    cumulative attestation status accumulated across all levels in the
+    attestation window. *)
 val get :
   first_level:int ->
   attestation_lags:int list ->
   dal_node_producers:'a list ->
   number_of_slots:int ->
   infos:(int, per_level_info) Hashtbl.t ->
+  cumulative_protocol_attestations:(int, bool array) Hashtbl.t ->
   per_level_info ->
   t ->
   t
