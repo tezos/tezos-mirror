@@ -102,8 +102,20 @@ This file is a JSON file with the following schema:
       "major": { "type": "integer" },
       "minor": { "type": "integer" },
       "rc": { "type": "integer" },
+      "revisions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "buildNumber": { "type": "integer" },
+            "revisionDate": { "type": "number" }
+          },
+          "required": ["buildNumber", "revisionDate"]
+        }
+      },
       "latest": { "type": "boolean" },
-      "announcement": { "type": "string" }
+      "announcement": { "type": "string" },
+      "pubDate": { "type": "number" }
     },
     "required": ["major", "minor"]
   }
@@ -112,6 +124,10 @@ This file is a JSON file with the following schema:
 
 Each item of the array represents a version `<major>.<minor>[~rc]`.
 If `latest` is `true`, the version will be identified as "latest" in the generated page, for instance by appending "(latest)" to its section title. Only one version should be identified as latest, although this is not enforced by the script.
+
+The `revisions` field is an optional array that tracks packaging revisions. Each time a packaging revision tag (e.g. `octez-v20.0-1`, `octez-v20.0-2`) is processed, a new entry is appended with the revision's `buildNumber` and `revisionDate`. This preserves the full history of packaging revisions. The version string and S3 paths are not affected. The RSS feed generates a distinct entry for each revision alongside the original release entry.
+
+For backward compatibility, the parser also accepts the legacy flat fields `buildNumber` (integer) and `revisionDate` (number) and converts them into a single-element `revisions` list.
 
 For instance, a valid JSON would look like:
 
@@ -132,6 +148,10 @@ For instance, a valid JSON would look like:
     "major": 23,
     "minor": 0,
     "latest": true,
+    "revisions": [
+      { "buildNumber": 1, "revisionDate": 1740000000.0 },
+      { "buildNumber": 2, "revisionDate": 1741000000.0 }
+    ],
     "announcement": "https://octez.tezos.com/docs/releases/version-23.html"
   }
 ]
