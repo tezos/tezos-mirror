@@ -571,6 +571,47 @@ function recompute_names() {
   fi
 }
 
+# Compute all protocol names and paths upfront before any operations.
+# This function centralizes all naming logic to make workflows predictable.
+#
+# INPUTS (global variables):
+#   - protocol_source: source protocol name (e.g., "alpha", "024")
+#   - protocol_target: target protocol label (e.g., "t024", "tallinn")
+#   - version: protocol version number (e.g., "024")
+#   - is_snapshot: whether to create hashed protocol
+#   - short_hash: protocol hash (if known)
+#
+# OUTPUTS (sets global variables):
+#   - capitalized_label: variant name (e.g., "Tallinn" or "T")
+#   - capitalized_source: source variant name
+#   - tezos_protocol_source: protocol name with dashes
+#   - long_hash, short_hash: initialized if not set
+#
+function compute_protocol_names() {
+  # Compute capitalized label
+  capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
+
+  # Compute capitalized source
+  if [[ ${command} == "copy" ]]; then
+    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
+  else
+    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
+  fi
+
+  # Protocol name with dashes instead of underscores
+  tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
+
+  # Initialize hashes if not set
+  long_hash=${long_hash:-}
+  short_hash=${short_hash:-}
+
+  log_blue "=== Protocol Naming ==="
+  log_blue "Label:              ${label}"
+  log_blue "Capitalized label:  ${capitalized_label}"
+  log_blue "Capitalized source: ${capitalized_source}"
+  log_blue "Tezos protocol:     ${tezos_protocol_source}"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -1564,20 +1605,7 @@ function generate_doc() {
 }
 
 function snapshot_protocol() {
-  capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${label:0:1}")${label:1}
-
-  if [[ ${command} == "copy" ]]; then
-    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
-  else
-    capitalized_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
-  fi
-  #replace _ with - in protocol_source
-  tezos_protocol_source=$(echo "${protocol_source}" | tr '_' '-')
-
-  # e.g. Pt8PY9P47nYw7WgPqpr49JZX5iU511ZJ9UPrBKu1CuYtBsLy7q7 (set below)
-  long_hash=
-  # e.g. Pt8PY9P4 (set below)
-  short_hash=
+  compute_protocol_names
 
   if [[ ${is_snapshot} == true ]]; then
     # by default only propose to use one character values for variant and label
