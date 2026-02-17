@@ -45,9 +45,10 @@ use tezos_tezlink::{
 use tezosx_interfaces::Registry;
 
 use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
-use crate::address::OriginationNonce;
+pub use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
+pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, HasHost,
     OperationCtx, TcCtx,
@@ -124,6 +125,38 @@ fn transfer_tez<Host: Runtime>(
         storage: None,
         lazy_storage_diff: None,
         balance_updates,
+        ticket_receipt: vec![],
+        originated_contracts: vec![],
+        consumed_milligas: 0_u64.into(),
+        storage_size: 0_u64.into(),
+        paid_storage_size_diff: 0_u64.into(),
+        allocated_destination_contract: false,
+    })
+}
+
+/// Credit the receiver without debiting any sender.
+/// Used for cross-runtime calls where the sender's balance was already
+/// debited on the EVM side.
+///
+/// Assumption: this path is enabled from a foreign calling runtime,
+/// and the sender was already debited in that runtime.
+fn credit_destination_without_debiting_sender(
+    host: &mut impl Runtime,
+    amount: &Narith,
+    receiver_account: &impl TezlinkAccount,
+) -> Result<TransferSuccess, TransferError> {
+    let receiver_balance = receiver_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
+        .0;
+    let new_receiver_balance = (&receiver_balance + &amount.0).into();
+    receiver_account
+        .set_balance(host, &new_receiver_balance)
+        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    Ok(TransferSuccess {
+        storage: None,
+        lazy_storage_diff: None,
+        balance_updates: vec![],
         ticket_receipt: vec![],
         originated_contracts: vec![],
         consumed_milligas: 0_u64.into(),
@@ -418,7 +451,11 @@ fn transfer<'a, Host: Runtime, C: Context>(
                 .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let receipt = if skip_sender_debit {
-                todo!("credit_only: credit receiver without debiting sender")
+                credit_destination_without_debiting_sender(
+                    tc_ctx.host,
+                    amount,
+                    &dest_account,
+                )?
             } else {
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
@@ -438,7 +475,11 @@ fn transfer<'a, Host: Runtime, C: Context>(
                 .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = if skip_sender_debit {
-                todo!("credit_only: credit receiver without debiting sender")
+                credit_destination_without_debiting_sender(
+                    tc_ctx.host,
+                    amount,
+                    &dest_account,
+                )?
             } else {
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
             };
