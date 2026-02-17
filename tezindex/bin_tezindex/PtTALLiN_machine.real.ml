@@ -206,6 +206,48 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         header.hash,
         header.shell.timestamp,
         balance_updates )
+
+  let get_delegators ctxt level baker_pkh =
+    let cctxt =
+      new Tezos_client_024_PtTALLiN.Protocol_client_context.wrap_full ctxt
+    in
+    match Tezos_crypto.Signature.V2.Of_V_latest.public_key_hash baker_pkh with
+    | None -> failwith "Cannot convert baker address to protocol V2 type"
+    | Some v2_pkh ->
+        let block = (cctxt#chain, `Level level) in
+        let* contracts =
+          Delegate_services.delegated_contracts cctxt block v2_pkh
+        in
+        let logger = Log.logger () in
+        let*! delegators =
+          Lwt_list.filter_map_s
+            (fun contract ->
+              match contract with
+              | Protocol.Alpha_context.Contract.Originated _ -> Lwt.return_none
+              | Implicit pkh -> (
+                  let*! result =
+                    Contract_services.balance_and_frozen_bonds
+                      cctxt
+                      block
+                      contract
+                  in
+                  match result with
+                  | Ok balance ->
+                      let bal = Protocol.Alpha_context.Tez.to_mutez balance in
+                      let pkh =
+                        Tezos_crypto.Signature.Of_V2.public_key_hash pkh
+                      in
+                      Lwt.return_some (pkh, bal)
+                  | Error e ->
+                      Log.error logger (fun () ->
+                          Format.asprintf
+                            "Error fetching balance for delegator: %a"
+                            Error_monad.pp_print_trace
+                            e) ;
+                      Lwt.return_none))
+            contracts
+        in
+        return delegators
 end
 
 module M = General_archiver.Define (Services)

@@ -22,4 +22,10 @@ module type PROTOCOL_SERVICES = sig
     * Data.Balance_update.balance_update list)
     tzresult
     Lwt.t
+
+  val get_delegators :
+    Tezos_client_base.Client_context.full ->
+    Int32.t ->
+    Signature.Public_key_hash.t ->
+    (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
 end

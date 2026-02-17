@@ -22,6 +22,14 @@ let supported_protocols = ref []
 
 let balance_update_machine = Protocol_hash.Table.create 10
 
+let delegator_machine :
+    (Tezos_client_base.Client_context.full ->
+    Int32.t ->
+    Signature.Public_key_hash.t ->
+    (Signature.Public_key_hash.t * int64) list tzresult Lwt.t)
+    Protocol_hash.Table.t =
+  Protocol_hash.Table.create 10
+
 module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
   let () = supported_protocols := Services.hash :: !supported_protocols
 
@@ -46,6 +54,12 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
       balance_update_machine
       Services.hash
       balance_update_recorder
+
+  let () =
+    Protocol_hash.Table.add
+      delegator_machine
+      Services.hash
+      Services.get_delegators
 end
 
 module Loops = struct
@@ -101,7 +115,70 @@ module Loops = struct
           Log.error logger (fun () -> Caqti_error.show e) ;
           Lwt.return_unit)
 
-  let balance_update_loop cctx pool =
+  let maybe_add_delegators logger pool baker cycle delegators =
+    let rows =
+      List.map
+        (fun (pkh, balance) ->
+          let addr = Signature.Public_key_hash.to_b58check pkh in
+          ((baker, cycle), (addr, balance)))
+        delegators
+    in
+    let out =
+      Caqti_lwt_unix.Pool.use
+        (fun (module Db : Caqti_lwt.CONNECTION) ->
+          without_cache
+            Sql_requests.Mutex.balance_updates
+            Sql_requests.insert_cycle_delegator
+            (module Db)
+            rows)
+        pool
+    in
+    Lwt.bind out (function
+      | Ok () -> Lwt.return_unit
+      | Error e ->
+          Log.error logger (fun () -> Caqti_error.show e) ;
+          Lwt.return_unit)
+
+  let snapshot_delegators logger pool cctx level cycle next_protocol
+      watched_addresses =
+    match Protocol_hash.Table.find delegator_machine next_protocol with
+    | None ->
+        Log.info logger (fun () ->
+            "No delegator recorder found for current protocol") ;
+        Lwt.return_unit
+    | Some get_delegators ->
+        Log.info logger (fun () ->
+            Format.asprintf
+              "Snapshotting delegators for cycle %ld (%d watched bakers)"
+              cycle
+              (Signature.Public_key_hash.Set.cardinal watched_addresses)) ;
+        Lwt_list.iter_s
+          (fun baker ->
+            Log.info logger (fun () ->
+                Format.asprintf
+                  "  Fetching delegators for %a"
+                  Signature.Public_key_hash.pp_short
+                  baker) ;
+            let*! result = get_delegators cctx level baker in
+            match result with
+            | Ok delegators ->
+                Log.info logger (fun () ->
+                    Format.asprintf
+                      "  Found %d delegators"
+                      (List.length delegators)) ;
+                maybe_add_delegators logger pool baker cycle delegators
+            | Error e ->
+                Log.error logger (fun () ->
+                    Format.asprintf
+                      "Error fetching delegators for %a: %a"
+                      Signature.Public_key_hash.pp_short
+                      baker
+                      Error_monad.pp_print_trace
+                      e) ;
+                Lwt.return_unit)
+          (Signature.Public_key_hash.Set.elements watched_addresses)
+
+  let balance_update_loop cctx pool watched_addresses =
     let logger = Log.logger () in
     let*! head_stream = Shell_services.Monitor.heads cctx cctx#chain in
     match head_stream with
@@ -109,15 +186,15 @@ module Loops = struct
     | Ok (head_stream, _stopper) ->
         let*! _ =
           Lwt_stream.fold_s
-            (fun (hash, header) acc ->
+            (fun (hash, header) (proto_acc, prev_cycle) ->
               Log.info logger (fun () ->
                   Format.sprintf "Level %ld" header.Block_header.shell.level) ;
-              let*! balance_updates_recorder, acc' =
-                match acc with
-                | Some (f, proto_level)
+              let*! balance_updates_recorder, proto_acc', next_protocol =
+                match proto_acc with
+                | Some (f, proto_level, next_protocol)
                   when proto_level
                        = header.Block_header.shell.Block_header.proto_level ->
-                    Lwt.return (f, acc)
+                    Lwt.return (f, proto_acc, next_protocol)
                 | _ -> (
                     let*! proto_result =
                       Shell_services.Blocks.protocols
@@ -127,7 +204,9 @@ module Loops = struct
                         ()
                     in
                     match proto_result with
-                    | Error e -> Lwt.return ((fun _ _ -> fail e), None)
+                    | Error e ->
+                        Lwt.return
+                          ((fun _ _ -> fail e), None, Protocol_hash.zero)
                     | Ok Shell_services.Blocks.{next_protocol; _} -> (
                         let recorder =
                           Protocol_hash.Table.find
@@ -150,7 +229,9 @@ module Loops = struct
                                 Some
                                   ( recorder,
                                     header.Block_header.shell
-                                      .Block_header.proto_level ) )))
+                                      .Block_header.proto_level,
+                                    next_protocol ),
+                                next_protocol )))
               in
               let block_level = header.Block_header.shell.Block_header.level in
               let*! res = balance_updates_recorder cctx block_level in
@@ -168,11 +249,42 @@ module Loops = struct
                       cycle
                       balance_updates
                   in
-                  Lwt.return acc')
+                  (* Snapshot delegators on cycle change *)
+                  let*! () =
+                    match prev_cycle with
+                    | Some pc when pc <> cycle ->
+                        snapshot_delegators
+                          logger
+                          pool
+                          cctx
+                          level
+                          cycle
+                          next_protocol
+                          watched_addresses
+                    | None ->
+                        (* First block seen — snapshot if we have watched bakers *)
+                        if
+                          not
+                            (Signature.Public_key_hash.Set.is_empty
+                               watched_addresses)
+                        then
+                          snapshot_delegators
+                            logger
+                            pool
+                            cctx
+                            level
+                            cycle
+                            next_protocol
+                            watched_addresses
+                        else Lwt.return_unit
+                    | _ -> Lwt.return_unit
+                  in
+                  Lwt.return (proto_acc', Some cycle))
             head_stream
-            None
+            (None, None)
         in
         Lwt.return_unit
 
-  let blocks_loop cctx pool = Lwt.join [balance_update_loop cctx pool]
+  let blocks_loop cctx pool watched_addresses =
+    Lwt.join [balance_update_loop cctx pool watched_addresses]
 end
