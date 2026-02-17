@@ -847,14 +847,26 @@ open struct
       ~level:Warning
       ()
 
+  let amplificator_stopped =
+    declare_0
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"amplificator_stopped"
+      ~msg:"the amplificator process worker was stopped"
+      ~level:Info
+      ()
+
   let crypto_process_received_query =
-    declare_1
+    declare_2
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"crypto_process_received_query"
-      ~msg:"cryptographic child process: received query #{query_id}."
+      ~msg:
+        "cryptographic child process: received query #{query_id} for level \
+         {level}."
       ~level:Notice
       ("query_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
 
   let crypto_process_sending_reply =
     declare_1
@@ -875,15 +887,16 @@ open struct
       ("query_id", Data_encoding.int31)
 
   let main_process_sending_query =
-    declare_1
+    declare_2
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"main_process_sending_query"
       ~msg:
-        "main process: sending query #{query_id} to cryptographic child \
-         process."
+        "main process: sending query #{query_id} for level {level} to \
+         cryptographic child process."
       ~level:Info
       ("query_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
 
   let main_process_received_reply =
     declare_1
@@ -1578,8 +1591,10 @@ let emit_crypto_process_fatal ~msg = emit crypto_process_fatal msg
 
 let emit_amplificator_uninitialized () = emit amplificator_uninitialized ()
 
-let emit_crypto_process_received_query ~query_id =
-  emit crypto_process_received_query query_id
+let emit_amplificator_stopped () = emit amplificator_stopped ()
+
+let emit_crypto_process_received_query ~query_id ~level =
+  emit crypto_process_received_query (query_id, level)
 
 let emit_crypto_process_sending_reply ~query_id =
   emit crypto_process_sending_reply query_id
@@ -1587,8 +1602,8 @@ let emit_crypto_process_sending_reply ~query_id =
 let emit_crypto_process_sending_reply_error ~query_id =
   emit crypto_process_sending_reply_error query_id
 
-let emit_main_process_sending_query ~query_id =
-  emit main_process_sending_query query_id
+let emit_main_process_sending_query ~query_id ~level =
+  emit main_process_sending_query (query_id, level)
 
 let emit_main_process_received_reply ~query_id =
   emit main_process_received_reply query_id

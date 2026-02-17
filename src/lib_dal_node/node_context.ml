@@ -128,7 +128,7 @@ let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
   let old_proto_plugins = ctxt.proto_plugins in
   match Proto_plugins.current_proto_level old_proto_plugins with
-  | Some lvl when lvl = proto_level -> return_unit
+  | Some lvl when lvl = proto_level -> return_false
   | _ -> (
       let* new_proto_plugins =
         Proto_plugins.may_add
@@ -166,7 +166,7 @@ let may_add_plugin_and_cryptobox ctxt cctxt ~block_level ~proto_level =
           in
           Store.resize_caches ctxt.store params ;
           ctxt.proto_cryptoboxes <- new_cryptoboxes ;
-          return_unit)
+          return_true)
 
 let get_plugin_and_parameters_for_level ctxt ~level =
   Proto_plugins.get_plugin_and_parameters_for_level ctxt.proto_plugins ~level
