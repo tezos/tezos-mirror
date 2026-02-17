@@ -24,7 +24,7 @@ type commitment_info = {commitment : string; publisher_pkh : string}
     - The attester is out of the DAL committee and did not send an attestation
       (this case can happen either because they are out of the Tenderbake committee or
       because their baker had an issue at this level) -> Those bakers will not be in the
-      `attestations` field of the `per_level_infos` crafted at the current level.
+      `baker_dal_statuses` field of the `per_level_infos` crafted at the current level.
 *)
 type dal_status =
   | With_DAL of Z.t
@@ -35,7 +35,7 @@ type dal_status =
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, dal_status) Hashtbl.t;
+  baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;

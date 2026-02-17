@@ -19,7 +19,7 @@ type dal_status =
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, dal_status) Hashtbl.t;
+  baker_dal_statuses : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
   echo_rollup_fetched_data : (int, int) Hashtbl.t;
@@ -537,8 +537,10 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
         let attestable_slots =
           Hashtbl.length published_level_info.published_commitments
         in
-        let table = Hashtbl.(create (length per_level_info.attestations)) in
-        Hashtbl.to_seq per_level_info.attestations
+        let table =
+          Hashtbl.(create (length per_level_info.baker_dal_statuses))
+        in
+        Hashtbl.to_seq per_level_info.baker_dal_statuses
         |> Seq.map (fun (public_key_hash, status) ->
                ( public_key_hash,
                  match status with

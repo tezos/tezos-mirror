@@ -184,8 +184,8 @@ let get_infos_per_level t ~level ~metadata =
     RPC_core.call endpoint
     @@ RPC.get_chain_block_helper_attestation_rights ~level ()
   in
-  (* We fill the [attestations] table with [Expected_to_DAL_attest] when a baker is in the DAL committee. *)
-  let attestations =
+  (* We fill the [baker_dal_statuses] table with [Expected_to_DAL_attest] when a baker is in the DAL committee. *)
+  let baker_dal_statuses =
     JSON.(attestation_rights |-> "delegates" |> as_list |> List.to_seq)
     |> Seq.filter_map (fun delegate ->
            let slot = JSON.(delegate |-> "first_slot" |> as_int) in
@@ -195,14 +195,14 @@ let get_infos_per_level t ~level ~metadata =
            else None)
     |> Hashtbl.of_seq
   in
-  (* And then update the [attestations] table with the attestations actually received. *)
+  (* And then update the [baker_dal_statuses] table with the operations actually received. *)
   let () =
     consensus_operations
     |> List.iter (fun operation ->
            let dal_attestations = get_dal_attestations operation in
            List.iter
              (fun (pkh, dal_status) ->
-               Hashtbl.replace attestations pkh dal_status)
+               Hashtbl.replace baker_dal_statuses pkh dal_status)
              dal_attestations)
   in
   let* etherlink_operator_balance_sum =
@@ -245,7 +245,7 @@ let get_infos_per_level t ~level ~metadata =
     {
       level;
       published_commitments;
-      attestations;
+      baker_dal_statuses;
       attested_commitments;
       etherlink_operator_balance_sum;
       echo_rollup_fetched_data;
