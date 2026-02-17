@@ -679,6 +679,38 @@ function commit_02_set_version() {
   commit_no_hooks "src: set current version"
 }
 
+# COMMIT 3: Adapt protocol predecessors
+#
+# MODE: both stabilise and snapshot
+# RENAMES: predecessor variants in raw_context.ml, init_storage.ml
+#   Example: Alpha → T024 or T
+#
+# DESCRIPTION:
+#   Updates the previous_protocol variant and migration logic to reference
+#   the new protocol. Replaces capitalized_source with capitalized_label.
+#
+# CREATES: 1 commit: "src: adapt ${capitalized_label} predecessors"
+function commit_03_adapt_predecessors() {
+  log_blue "Adapting ${capitalized_label} predecessors"
+
+  cd "src/proto_${version}/lib_protocol"
+
+  # Update predecessor check in raw_context.ml
+  local replace_line="else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
+  sed -i.old -e "s/.*return (${capitalized_source}, ctxt).*/${replace_line}/" raw_context.ml
+
+  # Replace all occurrences of old variant with new
+  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old raw_context.ml
+  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old raw_context.mli
+  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old init_storage.ml
+
+  ocamlformat -i raw_context.ml raw_context.mli init_storage.ml
+
+  cd ../../..
+
+  commit_no_hooks "src: adapt ${capitalized_label} predecessors"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -713,22 +745,7 @@ function copy_source() {
 
   commit_02_set_version
 
-  cd "src/proto_${version}"/lib_protocol
-  echo "${capitalized_source}"
-  ### FIX ${capitalized_label} PREDECESSORS
-  replace_line="else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
-  # replace line containing "return (${capitalized_source}, ctxt)) with replace_line in raw_context.ml
-  sed -i.old -e "s/.*return (${capitalized_source}, ctxt).*/${replace_line}/" raw_context.ml
-  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old raw_context.ml
-  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old raw_context.mli
-  ocamlformat -i raw_context.ml
-  ocamlformat -i raw_context.mli
-
-  sed -e "s/${capitalized_source}/${capitalized_label}/g" -i.old init_storage.ml
-  ocamlformat -i init_storage.ml
-  commit_no_hooks "src: adapt ${capitalized_label} predecessors"
-
-  cd ../../..
+  commit_03_adapt_predecessors
 
   if [[ ${command} == "copy" ]]; then
     sed -i 's/Vanity nonce: .* /Vanity nonce: TBD /' "src/proto_${version}/lib_protocol/main.ml"
