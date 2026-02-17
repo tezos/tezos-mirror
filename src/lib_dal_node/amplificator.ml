@@ -615,8 +615,11 @@ let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
   let shards =
     Data_encoding.(Binary.to_bytes_exn (list Cryptobox.shard_encoding)) shards
   in
-  (* Should be atomic incr in the context of a lwt concurrency
-   * Could overflow some day on 32 bits machines, more difficult on 64 *)
+  (* This get/set is safe with the current cooperative Lwt execution model:
+     there is no yield point in this critical section.
+     If this path becomes truly parallel in the future (e.g. multi-domain shared
+     state), this code can race and should be replaced by serialized ownership
+     of the state (or a proper synchronization strategy). *)
   let query_id = amplificator.query_id in
   amplificator.query_id <- amplificator.query_id + 1 ;
   (* Store some arguments in a query table, because they are necessary to publish, but not to calculate,
