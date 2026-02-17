@@ -834,6 +834,29 @@ function commit_06_update_protocol_references() {
   commit_no_hooks "src: replace protocol_${protocol_source} with protocol_${new_protocol_name}"
 }
 
+# COMMIT 7: Add protocol to final_protocol_versions
+#
+# MODE: both (but different behavior per mode)
+# MODIFIES: lib_protocol_compiler/final_protocol_versions
+#
+# DESCRIPTION:
+#   Updates the immutable protocol versions list.
+#   - snapshot mode: replaces source_hash with long_hash
+#   - stabilise/copy mode: appends long_hash to the file
+#   Then changes directory back to repository root.
+#
+# CREATES: 1 commit: "src: add protocol to final_protocol_versions"
+function commit_07_update_final_protocol_versions() {
+  # add this protocol to the immutable list
+  if [[ ${is_snapshot} == true ]]; then
+    sed -e "s/${source_hash}/${long_hash}/" -i ../../lib_protocol_compiler/final_protocol_versions
+  else
+    printf "%s\n" "${long_hash}" >> ../../lib_protocol_compiler/final_protocol_versions
+  fi
+  commit_no_hooks "src: add protocol to final_protocol_versions"
+  cd ../../..
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -887,14 +910,7 @@ function copy_source() {
 
   commit_06_update_protocol_references
 
-  # add this protocol to the immutable list
-  if [[ ${is_snapshot} == true ]]; then
-    sed -e "s/${source_hash}/${long_hash}/" -i ../../lib_protocol_compiler/final_protocol_versions
-  else
-    printf "%s\n" "${long_hash}" >> ../../lib_protocol_compiler/final_protocol_versions
-  fi
-  commit_no_hooks "src: add protocol to final_protocol_versions"
-  cd ../../..
+  commit_07_update_final_protocol_versions
 
   if [[ ${command} == "copy" ]]; then
     cp "src/proto_alpha/README.md" "src/proto_${label}/README.md"
