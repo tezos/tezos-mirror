@@ -742,7 +742,7 @@ pub struct TezlinkBlockConstants {
 
 fn apply_tezos_operation(
     chain_id: &ChainId,
-    block_in_progress: &BlockInProgress<TezlinkOperation>,
+    block_in_progress: &BlockInProgress<TezosXTransaction>,
     host: &mut impl Runtime,
     registry: &impl Registry,
     block_constants: &TezlinkBlockConstants,
@@ -853,7 +853,7 @@ fn apply_tezos_operation(
 
 impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
-    type Transaction = TezlinkOperation;
+    type Transaction = TezosXTransaction;
     type ChainHeader = TezBlockHeader;
     type ExecutionInfo = RuntimeExecutionInfo;
 
@@ -958,19 +958,24 @@ impl ChainConfigTrait for MichelsonChainConfig {
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        operation: Self::Transaction,
+        transaction: Self::Transaction,
         _index: u32,
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
     ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
-        apply_tezos_operation(
-            &self.chain_id,
-            block_in_progress,
-            host,
-            registry,
-            block_constants,
-            operation,
-        )
+        match transaction {
+            TezosXTransaction::Ethereum(_transaction) => {
+                anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
+            }
+            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
+                &self.chain_id,
+                block_in_progress,
+                host,
+                registry,
+                block_constants,
+                operation,
+            ),
+        }
     }
 
     fn register_valid_transaction(
