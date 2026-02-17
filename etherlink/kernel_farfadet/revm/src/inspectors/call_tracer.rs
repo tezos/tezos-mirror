@@ -70,7 +70,7 @@ impl Decodable for CallTracerInput {
 pub struct CallTrace {
     type_: Vec<u8>,
     from: Address,
-    /// `to` will be [None] if type is CREATE / CREATE2.
+    /// `to` will be the created contract address if type is CREATE / CREATE2.
     to: Option<Address>,
     value: U256,
     /// `gas` will be [None] if no gas limit was provided.
@@ -416,6 +416,10 @@ where
         _: &CreateInputs,
         outcome: &mut CreateOutcome,
     ) {
+        let depth = context.journal().depth() as u16;
+        if let Some(call_trace) = self.call_trace.get_mut(&depth) {
+            call_trace.add_to(outcome.address);
+        }
         self.end_transaction_layer(
             context,
             outcome.gas().spent(),

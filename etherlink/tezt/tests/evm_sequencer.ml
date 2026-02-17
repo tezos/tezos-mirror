@@ -8140,6 +8140,96 @@ let test_trace_transaction_calltracer_all_types =
     call_list ;
   unit
 
+let test_trace_transaction_calltracer_create_to_field =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "create"; "to"]
+    ~title:
+      "debug_traceTransaction with calltracer includes to field for \
+       CREATE/CREATE2"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* call_types = Solidity_contracts.call_types evm_version in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
+      sequencer
+  in
+  let*@ _ = produce_block sequencer in
+  let* tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:sender.private_key
+         ~endpoint
+         ~abi_label:call_types.label
+         ~address:contract_address
+         ~method_call:"testProduceOpcodes()")
+      sequencer
+  in
+  let*@ _ = produce_block sequencer in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash:tx_hash
+      ~tracer_config:[("withLog", `Bool false); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  let call_list = JSON.(trace_result |-> "calls" |> as_list) in
+  (* CREATE is at position 0, CREATE2 is at position 1 *)
+  List.iteri
+    (fun position call ->
+      match position with
+      | 0 ->
+          (* CREATE should have a non-null "to" field with a valid address *)
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CREATE")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L") ;
+          Check.(
+            (JSON.is_null JSON.(call |-> "to") = false)
+              bool
+              ~error_msg:
+                "CREATE trace should have a 'to' field with the created \
+                 contract address") ;
+          let to_addr = JSON.(call |-> "to" |> as_string) in
+          Check.(
+            (String.length to_addr = 42)
+              int
+              ~error_msg:
+                "CREATE 'to' address should be 42 chars (0x + 40 hex), got \
+                 length %L")
+      | 1 ->
+          (* CREATE2 should have a non-null "to" field with a valid address *)
+          Check.(
+            (JSON.(call |-> "type" |> as_string) = "CREATE2")
+              string
+              ~error_msg:"Wrong type, expected %R but got %L") ;
+          Check.(
+            (JSON.is_null JSON.(call |-> "to") = false)
+              bool
+              ~error_msg:
+                "CREATE2 trace should have a 'to' field with the created \
+                 contract address") ;
+          let to_addr = JSON.(call |-> "to" |> as_string) in
+          Check.(
+            (String.length to_addr = 42)
+              int
+              ~error_msg:
+                "CREATE2 'to' address should be 42 chars (0x + 40 hex), got \
+                 length %L")
+      | _ -> ())
+    call_list ;
+  unit
+
 let test_trace_transaction_call_tracer_with_logs =
   register_all
     ~__FILE__
@@ -14963,6 +15053,7 @@ let () =
   test_batch_limit_size_rpc protocols ;
   test_trace_delegate_call protocols ;
   test_trace_transaction_calltracer_all_types protocols ;
+  test_trace_transaction_calltracer_create_to_field protocols ;
   test_trace_transaction_call_tracer_with_logs protocols ;
   test_trace_transaction_call_revert protocols ;
   test_trace_transaction_call_trace_certain_depth protocols ;
