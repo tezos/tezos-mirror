@@ -57,11 +57,15 @@ val select_cycle_delegators :
   Caqti_request.t
 
 val insert_block_baker :
-  (int32 * int32 * Tezos_crypto.Signature.public_key_hash, unit, [`Zero])
+  ( int32 * int32 * Tezos_crypto.Signature.public_key_hash,
+    unit,
+    [`Zero] )
   Caqti_request.t
 
 val insert_expected_blocks :
-  (int32 * Tezos_crypto.Signature.public_key_hash * int32, unit, [`Zero])
+  ( int32 * Tezos_crypto.Signature.public_key_hash * int32,
+    unit,
+    [`Zero] )
   Caqti_request.t
 
 val select_num_blocks :

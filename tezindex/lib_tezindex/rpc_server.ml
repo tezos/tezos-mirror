@@ -76,6 +76,18 @@ let query_cycle_delegators pool baker cycle =
         [])
     pool
 
+let query_num_blocks pool baker cycle =
+  Caqti_lwt_unix.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.find Sql_requests.select_num_blocks (baker, cycle))
+    pool
+
+let query_expected_blocks pool baker cycle =
+  Caqti_lwt_unix.Pool.use
+    (fun (module Db : Caqti_lwt.CONNECTION) ->
+      Db.find_opt Sql_requests.select_expected_blocks (baker, cycle))
+    pool
+
 let build_rpc_directory pool =
   let dir = Tezos_rpc.Directory.empty in
   let dir =
@@ -90,10 +102,26 @@ let build_rpc_directory pool =
         let open Lwt_result_syntax in
         let*! result = query_cycle_rewards pool baker cycle in
         let*! delegators_result = query_cycle_delegators pool baker cycle in
+        let*! num_blocks_result = query_num_blocks pool baker cycle in
+        let*! expected_blocks_result = query_expected_blocks pool baker cycle in
         match (result, delegators_result) with
         | Ok entries, Ok delegators ->
+            let num_blocks =
+              match num_blocks_result with
+              | Ok n -> Int64.to_int n
+              | Error _ -> 0
+            in
+            let expected_blocks =
+              match expected_blocks_result with
+              | Ok (Some n) -> Int32.to_int n
+              | Ok None | Error _ -> 0
+            in
             let rewards =
-              Split_data.tzkt_baker_rewards_of_entries ~cycle entries
+              Split_data.tzkt_baker_rewards_of_entries
+                ~cycle
+                ~num_blocks
+                ~expected_blocks
+                entries
             in
             let baker_b58 = Signature.Public_key_hash.to_b58check baker in
             let own_delegated_balance, external_delegated_balance =
