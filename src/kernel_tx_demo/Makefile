@@ -39,6 +39,7 @@ test:
 .PHONY: check
 check:
 	@cargo clippy --features testing --all-targets --locked -- --deny warnings
+	@cargo clippy --features testing,dal,debug --all-targets --locked -- --deny warnings
 
 .PHONY: clean
 clean:

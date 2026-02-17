@@ -16,17 +16,21 @@ use tezos_smart_rollup_host::path::OwnedPath;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 #[allow(dead_code)]
-pub(crate) fn store_dal_slot(
-    host: &mut impl Runtime,
+pub(crate) fn store_dal_slot<Host>(
+    host: &mut Host,
     published_level: i32,
     num_pages: usize,
     page_size: usize,
     slot_index: u8,
     path_to_store: OwnedPath,
-) {
+) where
+    Host: StorageV1 + HostReveal + HostDebug,
+{
     let mut buffer = vec![0u8; page_size];
     for page_index in 0..(num_pages as i16) {
         let result = host.reveal_dal_page(published_level, slot_index, page_index, &mut buffer);

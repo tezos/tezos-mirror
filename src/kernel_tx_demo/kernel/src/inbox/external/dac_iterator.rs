@@ -11,7 +11,8 @@ use tezos_data_encoding::{
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::path::OwnedPath;
 use tezos_smart_rollup_host::path::PathError;
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+use tezos_smart_rollup_host::runtime::RuntimeError;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use super::v1::verifiable::VerifiableOperation;
 
@@ -67,7 +68,10 @@ pub struct IteratorState {
 impl IteratorState {
     /// Initializes the iterator. [VerifiableOperation]s are retrieved from the
     /// input data, which is persisted on the host's store.
-    pub fn new(host: &mut impl Runtime, idx: u32) -> Result<IteratorState, IteratorStateError> {
+    pub fn new<Host: StorageV1>(
+        host: &mut Host,
+        idx: u32,
+    ) -> Result<IteratorState, IteratorStateError> {
         let half_buffer_size = MAX_FILE_CHUNK_SIZE;
         let dac_payload_path = Self::dac_payload_path(idx)?;
         let total_length = host
@@ -127,13 +131,16 @@ impl IteratorState {
     }
 
     /// Removes the state of the iterator from the host store.
-    pub fn clear(host: &mut impl Runtime, idx: u32) -> Result<(), IteratorStateError> {
+    pub fn clear<Host: StorageV1>(host: &mut Host, idx: u32) -> Result<(), IteratorStateError> {
         let iterator_state_path = Self::dac_iterator_state_path(idx)?;
         host.store_delete_value(&iterator_state_path)
             .map_err(IteratorStateError::HostStoreWriteIteratorStateError)
     }
 
-    fn update_buffer(&mut self, host: &mut impl Runtime) -> Result<(), IteratorStateError> {
+    fn update_buffer<Host: StorageV1>(
+        &mut self,
+        host: &mut Host,
+    ) -> Result<(), IteratorStateError> {
         // This function requires the following preconditions:
         // 1. self.buffer_offset >= MAX_FILE_CHUNK_SIZE
         let half_buffer_size = MAX_FILE_CHUNK_SIZE;
@@ -200,7 +207,7 @@ impl IteratorState {
     /// Unlike standard iterators, this function can return a [Result]
     /// where an Error of type [IteratorStateError] is returned
     /// when reading the next element fails.
-    pub fn next<Host: Runtime>(
+    pub fn next<Host: StorageV1>(
         &mut self,
         host: &mut Host,
     ) -> Result<Option<VerifiableOperation<'_>>, IteratorStateError> {
@@ -228,7 +235,7 @@ impl IteratorState {
     ///
     /// Note that only iterating through a single DAC payload is supported at one time.
     /// Attempting to iterate over multiple DAC payloads simultaneously will likely cause issues.
-    pub fn persist<Host: Runtime>(self, host: &mut Host) -> Result<(), IteratorStateError> {
+    pub fn persist<Host: StorageV1>(self, host: &mut Host) -> Result<(), IteratorStateError> {
         let mut iterator_state_buf = Vec::with_capacity(self.buffer.len() + 100);
         self.bin_write(&mut iterator_state_buf)
             .map_err(IteratorStateError::EncodeIteratorStateError)?;
@@ -250,7 +257,7 @@ impl IteratorState {
 
     /// Loads the state of the iterator from disk. If no iterator state is present in the host store,
     /// a new one is created that can be used to traverse the whole DAC payload
-    pub fn load<Host: Runtime>(host: &mut Host, idx: u32) -> Result<Self, IteratorStateError> {
+    pub fn load<Host: StorageV1>(host: &mut Host, idx: u32) -> Result<Self, IteratorStateError> {
         let dac_iterator_state_path = Self::dac_iterator_state_path(idx)?;
         if let Ok(None) = host.store_has(&dac_iterator_state_path) {
             IteratorState::new(host, idx)
