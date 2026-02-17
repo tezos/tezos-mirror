@@ -161,3 +161,9 @@ let insert_cycle_delegator =
       ->. unit))
     "INSERT INTO cycle_delegators (baker,cycle,delegator,delegated_balance) \
      VALUES (?,?,?,?) ON CONFLICT DO NOTHING"
+
+let select_cycle_delegators =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 Type.public_key_hash int32 ->* t2 string int64))
+    "SELECT delegator, delegated_balance FROM cycle_delegators WHERE baker = ? \
+     AND cycle = ?"
