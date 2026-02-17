@@ -225,6 +225,7 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
                         value,
                         parser,
                         all_internal_receipts,
+                        false,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -375,6 +376,10 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+///
+/// When `skip_sender_debit` is true, only the receiver is credited without
+/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
+/// where the sender's balance was already debited by the calling runtime.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
@@ -387,6 +392,7 @@ fn transfer<'a, Host: Runtime, C: Context>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    skip_sender_debit: bool,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -411,8 +417,11 @@ fn transfer<'a, Host: Runtime, C: Context>(
             let _allocated = dest_account
                 .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            let receipt =
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
+            let receipt = if skip_sender_debit {
+                todo!("credit_only: credit receiver without debiting sender")
+            } else {
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+            };
             Ok(TransferSuccess {
                 // This boolean is kept at false on purpose to maintain compatibility with TZKT.
                 // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
@@ -428,8 +437,11 @@ fn transfer<'a, Host: Runtime, C: Context>(
                 .context
                 .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt =
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
+            let receipt = if skip_sender_debit {
+                todo!("credit_only: credit receiver without debiting sender")
+            } else {
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+            };
             let code = dest_account
                 .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
@@ -529,6 +541,7 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
+    skip_sender_debit: bool,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         tc_ctx.host,
@@ -550,6 +563,7 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
         value,
         parser,
         all_internal_receipts,
+        skip_sender_debit,
     )
     .map(Into::into)
 }
@@ -1085,6 +1099,7 @@ fn apply_operation<Host: Runtime, C: Context>(
                 parameters,
                 &mut internal_operations_receipts,
                 &parser,
+                false,
             );
 
             if transfer_result.is_err() {
