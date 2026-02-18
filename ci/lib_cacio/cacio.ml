@@ -191,6 +191,7 @@ type job = {
   arch : Tezos_ci.Runner.Arch.t option;
   cpu : Tezos_ci.Runner.CPU.t option;
   storage : Tezos_ci.Runner.Storage.t option;
+  tag : Tezos_ci.Runner.Tag.t option;
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
@@ -532,6 +533,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     arch;
                     cpu;
                     storage;
+                    tag;
                     image;
                     needs;
                     needs_legacy;
@@ -621,6 +623,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?arch
                 ?cpu
                 ?storage
+                ?tag
                 ~image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
@@ -695,6 +698,7 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
@@ -727,6 +731,7 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
@@ -935,10 +940,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ~image ?only_if_changed ?(force = false) ?(force_if_label = [])
-      ?(needs = []) ?(needs_legacy = []) ?parallel ?variables ?artifacts ?cache
-      ?(cargo_cache = false) ?sccache ?(dune_cache = false) ?allow_failure
-      ?retry ?timeout ?(image_dependencies = []) ?services name script =
+      ?storage ?tag ~image ?only_if_changed ?(force = false)
+      ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
+      ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
+      ?(dune_cache = false) ?allow_failure ?retry ?timeout
+      ?(image_dependencies = []) ?services name script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -962,6 +968,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       arch;
       cpu;
       storage;
+      tag;
       image;
       needs;
       needs_legacy;
@@ -1014,11 +1021,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?only_if_changed ?(needs = [])
-      ?needs_legacy ?allow_failure ?tezt_exe ?(global_timeout = Minutes 30)
-      ?(test_timeout = Minutes 9) ?(parallel_jobs = 1) ?(parallel_tests = 1)
-      ?retry_jobs ?(retry_tests = 0) ?(test_selection = Tezt_core.TSL_AST.True)
-      ?(before_script = []) variant =
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
+      ?(needs = []) ?needs_legacy ?allow_failure ?tezt_exe
+      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
+      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
+      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
@@ -1203,6 +1210,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?arch
       ~cpu
       ?storage
+      ?tag
       ~image:Tezos_ci.Images.CI.e2etest
       ?only_if_changed
       ~needs
