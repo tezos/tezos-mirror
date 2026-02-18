@@ -365,7 +365,31 @@ module Loops = struct
                           next_protocol
                           watched_addresses
                     | None ->
-                        (* First block seen — snapshot if we have watched bakers *)
+                        (* First block seen — fetch baking rights for the
+                           current cycle so they are available before the
+                           next cycle transition. *)
+                        let*! baking_rights_result =
+                          baking_rights_fn cctx cycle level
+                        in
+                        let*! () =
+                          match baking_rights_result with
+                          | Ok counts ->
+                              maybe_store_expected_blocks
+                                logger
+                                pool
+                                cycle
+                                counts
+                          | Error errs ->
+                              Log.error logger (fun () ->
+                                  Format.asprintf
+                                    "Failed to fetch baking rights for initial \
+                                     cycle %ld: %a"
+                                    cycle
+                                    pp_print_trace
+                                    errs) ;
+                              Lwt.return_unit
+                        in
+                        (* Snapshot delegators if we have watched bakers *)
                         if
                           not
                             (Signature.Public_key_hash.Set.is_empty
