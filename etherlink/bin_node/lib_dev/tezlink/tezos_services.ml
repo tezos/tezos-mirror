@@ -91,6 +91,10 @@ end
 module type Tezlink_protocol = sig
   include Tezos_shell_services.Block_services.PROTO
 
+  val activate_bootstraps_with_transfers :
+    (module Tezlink_backend_sig.S) ->
+    (operation_receipt * operation_data) trace tzresult Lwt.t
+
   val mock_block_header_data : chain_id:Chain_id.t -> block_header_data tzresult
 
   val mock_block_header_metadata :
@@ -170,6 +174,22 @@ let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info =
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Tezlink_SeouLo_protocol = struct
   include SeouLo_protocol
+
+  let activate_bootstraps_with_transfers
+      (module Backend : Tezlink_backend_sig.S) =
+    let open Lwt_result_syntax in
+    let* bootstrap_accounts = Backend.bootstrap_accounts () in
+    let*? ops =
+      List.map_e
+        (fun (account, balance) ->
+          let balance =
+            SeouLo_context.Tez.of_mutez_exn
+              (Imported_context.Tez.to_mutez balance)
+          in
+          Tezlink_mock.seoulo_bootstrap_transfer account balance)
+        bootstrap_accounts
+    in
+    return ops
 
   let contents : Block_header_repr.contents =
     {
@@ -253,6 +273,18 @@ end
 (** We add to Imported_protocol_024 the mocked protocol data used in headers *)
 module Tezlink_TALLiN_protocol = struct
   include TALLiN_protocol
+
+  let activate_bootstraps_with_transfers
+      (module Backend : Tezlink_backend_sig.S) =
+    let open Lwt_result_syntax in
+    let* bootstrap_accounts = Backend.bootstrap_accounts () in
+    let*? ops =
+      List.map_e
+        (fun (account, balance) ->
+          Tezlink_mock.tallin_bootstrap_transfer account balance)
+        bootstrap_accounts
+    in
+    return ops
 
   let contents : Block_header_repr.contents =
     {
@@ -437,106 +469,14 @@ module Make_block_service
 end
 
 module Tezlink_imported_protocol = Tezlink_TALLiN_protocol
-
-module Current_block_services = struct
-  include
-    Make_block_service (Tezlink_imported_protocol) (Tezlink_imported_protocol)
-
-  let transfer_receipt account balance :
-      Tezlink_imported_protocol.operation_receipt =
-    let open Imported_context.Receipt in
-    let open Tezlink_imported_protocol.Apply_results in
-    let contract = Tezos_types.Contract.of_implicit account in
-    let mint =
-      item
-        (Contract
-           (Imported_context.Contract.Implicit
-              Tezlink_mock.faucet_public_key_hash))
-        (Debited balance)
-        Block_application
-    in
-    let bootstrap =
-      item (Contract contract) (Credited balance) Block_application
-    in
-    let balance_updates = [mint; bootstrap] in
-    let operation_result =
-      Transaction_result
-        (Transaction_to_contract_result
-           {
-             storage = None;
-             lazy_storage_diff = None;
-             balance_updates;
-             ticket_receipt = [];
-             originated_contracts = [];
-             consumed_gas = Imported_context.Gas.Arith.zero;
-             storage_size = Z.zero;
-             paid_storage_size_diff = Z.zero;
-             allocated_destination_contract = false;
-             address_registry_diff = [];
-           })
-    in
-    let internal_operation_results = [] in
-    let operation_result =
-      Imported_protocol.Apply_operation_result.Applied operation_result
-    in
-    let contents =
-      Single_result
-        (Manager_operation_result
-           {balance_updates = []; operation_result; internal_operation_results})
-    in
-    Operation_metadata {contents}
-
-  let faucet_counter () : Imported_context.Manager_counter.t tzresult =
-    Tezos_types.convert_using_serialization
-      ~name:"faucet_counter"
-      ~src:Data_encoding.z
-      ~dst:Imported_context.Manager_counter.encoding_for_RPCs
-      Z.zero
-
-  let create_transfer (account : Imported_context.public_key_hash)
-      (balance : Imported_context.Tez.t) =
-    let open Result_syntax in
-    let open Imported_context in
-    let operation =
-      Transaction
-        {
-          amount = balance;
-          parameters = Script.unit_parameter;
-          entrypoint = Entrypoint.default;
-          destination = Implicit account;
-        }
-    in
-    let* counter = faucet_counter () in
-    let contents =
-      Single
-        (Manager_operation
-           {
-             source = Tezlink_mock.faucet_public_key_hash;
-             fee = Tez.zero;
-             counter;
-             operation;
-             gas_limit = Gas.Arith.zero;
-             storage_limit = Z.zero;
-           })
-    in
-    let signature = None in
-    let receipt = transfer_receipt account balance in
-    return (receipt, Operation_data {contents; signature})
-
-  let activate_bootstraps_with_transfers
-      (module Backend : Tezlink_backend_sig.S) =
-    let open Lwt_result_syntax in
-    let* bootstrap_accounts = Backend.bootstrap_accounts () in
-    let*? ops =
-      List.map_e
-        (fun (account, balance) -> create_transfer account balance)
-        bootstrap_accounts
-    in
-    return ops
-end
+module Current_block_services =
+  Make_block_service (Tezlink_imported_protocol) (Tezlink_imported_protocol)
 
 module Tezlink_zero_protocol = struct
   include Tezos_shell_services.Block_services.Fake_protocol
+
+  let activate_bootstraps_with_transfers (module _ : Tezlink_backend_sig.S) =
+    Lwt.return (Ok [])
 
   let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
@@ -555,6 +495,9 @@ end
 
 module Tezlink_genesis_protocol = struct
   include Tezos_protocol_000_Ps9mPmXa.Protocol
+
+  let activate_bootstraps_with_transfers (module _ : Tezlink_backend_sig.S) =
+    Lwt.return (Ok [])
 
   let mock_block_header_metadata _ : block_header_metadata tzresult =
     Tezos_types.convert_using_serialization
@@ -597,11 +540,6 @@ module Tezlink_genesis_protocol = struct
         signature = Signature.V0.zero;
       }
 end
-
-module Zero_block_services =
-  Make_block_service (Tezlink_zero_protocol) (Tezlink_genesis_protocol)
-module Genesis_block_services =
-  Make_block_service (Tezlink_genesis_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)

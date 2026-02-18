@@ -188,40 +188,18 @@ struct
 
   let bootstrap_transfers_receipt chain_id backend =
     let open Lwt_result_syntax in
-    let* transfers =
-      Current_block_services.activate_bootstraps_with_transfers backend
-    in
-    let*? transfers =
-      List.fold_left
-        (fun acc (receipt, operation) ->
-          let open Result_syntax in
-          let* acc = acc in
-          let* receipt =
-            Tezos_types.convert_using_serialization
-              ~name:"operation_receipt"
-              ~src:Tezlink_imports.Imported_protocol.operation_receipt_encoding
-              ~dst:Block_services.Proto.operation_receipt_encoding
-              receipt
-          in
-          let* operation =
-            Tezos_types.convert_using_serialization
-              ~name:"operation_data"
-              ~src:Tezlink_imports.Imported_protocol.operation_data_encoding
-              ~dst:Block_services.Proto.operation_data_encoding
-              operation
-          in
-          let item =
-            Block_services.
-              {
-                chain_id;
-                hash = Operation_hash.zero;
-                shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
-                protocol_data = operation;
-                receipt = Receipt receipt;
-              }
-          in
-          Ok (item :: acc))
-        (Ok [])
+    let* transfers = Proto.activate_bootstraps_with_transfers backend in
+    let transfers =
+      List.map
+        (fun (receipt, operation) ->
+          Block_services.
+            {
+              chain_id;
+              hash = Operation_hash.zero;
+              shell = {branch = Tezos_crypto.Hashed.Block_hash.zero};
+              protocol_data = operation;
+              receipt = Receipt receipt;
+            })
         transfers
     in
     return transfers
@@ -272,10 +250,6 @@ end
 
 module Current_block_header =
   Make_block_header (Tezlink_imported_protocol) (Tezlink_imported_protocol)
-module Zero_block_header =
-  Make_block_header (Tezlink_zero_protocol) (Tezlink_genesis_protocol)
-module Genesis_block_header =
-  Make_block_header (Tezlink_genesis_protocol) (Tezlink_imported_protocol)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
