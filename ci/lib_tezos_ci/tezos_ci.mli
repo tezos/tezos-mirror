@@ -642,8 +642,6 @@ module Images : sig
 
     val fedora_39 : Image.t
 
-    val fedora_41 : Image.t
-
     val fedora_42 : Image.t
 
     val homebrew : Image.t
