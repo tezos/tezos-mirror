@@ -1246,6 +1246,29 @@ function source_commit_01_update_teztale() {
   commit_if_changes "teztale: update teztale_archiver_main.ml"
 }
 
+# SOURCE HELPER: Update alpha constants previous
+#
+# MODE: stabilise/copy only (not snapshot)
+# MODIFIES: src/proto_alpha/lib_protocol/constants_parametric_previous_repr.*
+#
+# DESCRIPTION:
+#   Copies current alpha parametric constants to previous versions.
+#   Previous parametric constants are the same in Alpha and Beta,
+#   so we replace Alpha previous with Alpha current.
+#   Removes protocol-specific comments from .mli using perl multiline regex.
+#   Does not create a commit (changes included in later commits).
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_update_alpha_constants_previous() {
+  log_blue "update proto_alpha constants_parametric_previous_repr.ml"
+  # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
+  cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
+  cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  # Remove comment that is meant for constants_parametric_repr and should not be copied to constants_parametric_previous_repr.
+  perl -0777 -i -pe 's/\(\*\* Protocol-specific constants\..*?\*\)//s' src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+}
+
 function update_source() {
 
   if [[ $skip_update_source ]]; then
@@ -1256,13 +1279,7 @@ function update_source() {
   source_commit_01_update_teztale
 
   if [[ ${is_snapshot} == false ]]; then
-    log_blue "update proto_alpha constants_parametric_previous_repr.ml"
-    # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
-    cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
-    cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
-    # Remove comment that is meant for constants_parametric_repr and should not be copied to constants_parametric_previous_repr.
-    perl -0777 -i -pe 's/\(\*\* Protocol-specific constants\..*?\*\)//s' src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
-    ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+    source_helper_update_alpha_constants_previous
   fi
 
   log_blue "update raw_context.ml"
