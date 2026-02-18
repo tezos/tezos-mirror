@@ -21,7 +21,7 @@ let rockylinux_releases = ["9"; "10"]
 
 let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
 
-let fedora_releases = ["39"; "41"; "42"]
+let fedora_releases = ["39"; "42"]
 
 let fedora_matrix = [("RELEASE", fedora_releases)]
 

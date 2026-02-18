@@ -126,7 +126,6 @@ images.fedora:
     matrix:
     - RELEASE:
       - "39"
-      - "41"
       - "42"
 
 images.rockylinux:
