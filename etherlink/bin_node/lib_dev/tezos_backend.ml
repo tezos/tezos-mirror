@@ -60,8 +60,10 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         contract
     ^ suffix
 
-  let constants _chain (_block : block_param) =
-    failwith "Not Implemented Yet (%s)" __LOC__
+  let constants chain (_block : block_param) =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    return Tezlink_constants.all_constants
 
   let current_level _ _ ~offset:_ = failwith "Not Implemented Yet (%s)" __LOC__
 
@@ -119,7 +121,18 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
         return info.public_key
     | None -> failwith "Account not found"
 
-  let counter _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
+  let counter _chain block contract =
+    let open Lwt_result_syntax in
+    on_head_block block @@ fun state ->
+    on_implicit_account contract @@ fun pkh ->
+    let* read_result =
+      Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+    in
+    match read_result with
+    | Some bytes ->
+        let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+        return_some (Z.of_int64 info.nonce)
+    | None -> return_none
 
   let big_map_get _chain _block _id _key_hash =
     failwith "Not Implemented Yet (%s)" __LOC__
@@ -135,9 +148,22 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   let monitor_heads _chain _query =
     Stdlib.failwith (Format.sprintf "Not Implemented Yet (%s)" __LOC__)
 
-  let bootstrapped () = failwith "Not Implemented Yet (%s)" __LOC__
+  (* TODO: #7963 Support Observer Mode
+     Here the catchup mechanism to fetch blueprints is not taken into account as
+     the observer mode is not supported yet *)
+  let bootstrapped () =
+    let open Lwt_result_syntax in
+    let* (Qty current_block_number) =
+      Backend.block_param_to_block_number (Block_parameter Latest)
+    in
+    let* block = Block_storage.nth_block current_block_number in
+    return (block.hash, block.timestamp)
 
-  let block_hash _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
+  let block_hash chain block =
+    let open Lwt_result_syntax in
+    let `Main = chain in
+    let* number = shell_block_param_to_block_number block in
+    Block_storage.nth_block_hash (Z.of_int32 number)
 
   let simulate_operation ~chain_id:_ ~skip_signature:_
       (op : Tezlink_imports.SeouLo_context.packed_operation) hash _block =
