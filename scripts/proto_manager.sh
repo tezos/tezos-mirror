@@ -1098,19 +1098,20 @@ function protocol_tests_commit_02_fix_test_registrations() {
   commit_no_hooks "tests: fix tests registrations"
 }
 
-function update_protocol_tests() {
-
-  if [[ $skip_update_protocol_tests ]]; then
-    echo "Skipping protocol tests update"
-    return 0
-  fi
-
-  # Update protocol tests
-
-  protocol_tests_commit_01_fix_test_invocation_headers
-
-  protocol_tests_commit_02_fix_test_registrations
-
+# PROTOCOL_TESTS COMMIT 3: Update SCORU WASM protocol migration
+#
+# MODE: conditional (snapshot vs stabilise/copy with nested copy/stabilise)
+# MODIFIES: src/lib_scoru_wasm files (test_protocol_migration.ml, constants.ml,
+#           pvm_input_kind.ml/mli, wasm_vm.ml)
+#
+# DESCRIPTION:
+#   Updates SCORU WASM protocol migration files with complex mode-specific logic:
+#   - snapshot mode: replaces source protocol with new protocol
+#   - stabilise/copy mode: adds new protocol alongside existing protocols
+#   Each mode updates multiple files with different sed patterns.
+#
+# CREATES: 1 commit: "scoru: update scoru_wasm protocol_migration"
+function protocol_tests_commit_03_update_scoru_wasm_migration() {
   #update scoru_wasm protocol_migration tests
   # add proto_${label} to proto_name before Proto_alpha -> "Proto_alpha"
   if [[ ${is_snapshot} == true ]]; then
@@ -1159,6 +1160,22 @@ function update_protocol_tests() {
   fi
 
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
+}
+
+function update_protocol_tests() {
+
+  if [[ $skip_update_protocol_tests ]]; then
+    echo "Skipping protocol tests update"
+    return 0
+  fi
+
+  # Update protocol tests
+
+  protocol_tests_commit_01_fix_test_invocation_headers
+
+  protocol_tests_commit_02_fix_test_registrations
+
+  protocol_tests_commit_03_update_scoru_wasm_migration
 
   if [[ ${command} == "copy" ]]; then
     sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
