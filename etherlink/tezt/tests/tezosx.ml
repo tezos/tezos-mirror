@@ -284,9 +284,10 @@ let evm_gateway_address = "0xff00000000000000000000000000000000000007"
 
 (** [craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
     ~abi_signature ~arguments ()] crafts an EVM transaction, sends it, produces
-    a block, and returns the receipt (asserting success). *)
+    a block, asserts the receipt status matches [expected_status] (default
+    [true]), and returns the receipt. *)
 let craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
-    ~abi_signature ~arguments () =
+    ~abi_signature ~arguments ?(expected_status = true) () =
   let* raw_tx =
     Cast.craft_tx
       ~source_private_key:sender.Eth_account.private_key
@@ -304,15 +305,20 @@ let craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
   let*@ _block_number = Rpc.produce_block sequencer in
   let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
   match receipt with
-  | Some ({status = true; _} as r) -> return r
-  | Some {status = false; _} -> Test.fail "EVM transaction to %s failed" address
+  | Some r ->
+      Check.(
+        (r.status = expected_status)
+          bool
+          ~error_msg:"Expected receipt status %R but got %L") ;
+      return r
   | None -> Test.fail "No receipt for EVM transaction to %s" address
 
 (** [call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination ()]
     calls the cross-runtime gateway precompile to reach [destination] (a Tezos
-    address). Returns the transaction receipt.
-    Wrapper around {!craft_and_send_evm_transaction}. *)
-let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination () =
+    address).  Asserts the receipt status matches [expected_status] (default
+    [true]).  Returns the transaction receipt. *)
+let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination
+    ?expected_status () =
   craft_and_send_evm_transaction
     ~sequencer
     ~sender
@@ -321,6 +327,7 @@ let call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination () =
     ~address:evm_gateway_address
     ~abi_signature:"transfer(string)"
     ~arguments:[destination]
+    ?expected_status
     ()
 
 (** [with_check_source_delta_balance ~source ~tez_client ~expected_consumed action]
