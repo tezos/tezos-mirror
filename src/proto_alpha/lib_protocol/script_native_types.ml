@@ -276,9 +276,12 @@ module CLST_types = struct
     pair
     s_list
 
+  type import_ticket =
+    (address (* to_ *), ticket_with_token_id s_list (* tickets *)) pair s_list
+
   type allowance_entrypoints = (approve, update_operators) or_
 
-  type tickets_entrypoints = export_ticket
+  type tickets_entrypoints = (export_ticket, import_ticket) or_
 
   type fa21_entrypoints =
     ( (transfer, balance_of) or_,
@@ -310,6 +313,7 @@ module CLST_types = struct
     | Approve of approve
     | Update_operators of update_operators
     | Export_ticket of export_ticket
+    | Import_ticket of import_ticket
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L (L p)) -> Deposit p
@@ -319,7 +323,8 @@ module CLST_types = struct
     | R (L (R p)) -> Balance_of p
     | R (R (L (L p))) -> Approve p
     | R (R (L (R p))) -> Update_operators p
-    | R (R (R p)) -> Export_ticket p
+    | R (R (R (L p))) -> Export_ticket p
+    | R (R (R (R p))) -> Import_ticket p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L (L p))
@@ -329,7 +334,8 @@ module CLST_types = struct
     | Balance_of p -> R (L (R p))
     | Approve p -> R (R (L (L p)))
     | Update_operators p -> R (R (L (R p)))
-    | Export_ticket p -> R (R (R p))
+    | Export_ticket p -> R (R (R (L p)))
+    | Import_ticket p -> R (R (R (R p)))
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -455,6 +461,17 @@ module CLST_types = struct
     let* export_tickets_ty = list_ty export_ticket_ty in
     make_entrypoint_leaf "export_ticket" export_tickets_ty
 
+  let import_ticket_type :
+      (import_ticket ty_node * import_ticket entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* ticket_ty = ticket_with_token_id_type in
+    let* tickets_ty = list_ty ticket_ty in
+    let* import_ticket_ty =
+      pair_ty (add_name "to_" address_ty) (add_name "tickets" tickets_ty)
+    in
+    let* import_tickets_ty = list_ty import_ticket_ty in
+    make_entrypoint_leaf "import_ticket" import_tickets_ty
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
@@ -465,6 +482,7 @@ module CLST_types = struct
     let* approve_type in
     let* update_operators_type in
     let* export_ticket_type in
+    let* import_ticket_type in
     let* clst_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
     in
@@ -477,8 +495,11 @@ module CLST_types = struct
     let* allowance_entrypoints_type =
       make_entrypoint_node approve_type update_operators_type
     in
+    let* tickets_entrypoints_type =
+      make_entrypoint_node export_ticket_type import_ticket_type
+    in
     let* fa21_entrypoints_type_r =
-      make_entrypoint_node allowance_entrypoints_type export_ticket_type
+      make_entrypoint_node allowance_entrypoints_type tickets_entrypoints_type
     in
     let* fa21_entrypoints_type =
       make_entrypoint_node fa21_entrypoints_type_l fa21_entrypoints_type_r

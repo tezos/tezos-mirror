@@ -731,6 +731,7 @@ module CLST_contract = struct
         execute_update_operators (ctxt, step_constants) operators storage
     | Export_ticket txs ->
         execute_export_ticket (ctxt, step_constants) txs storage
+    | Import_ticket _ -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
