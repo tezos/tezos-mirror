@@ -207,7 +207,7 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
-    image:Tezos_ci.Image.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
     ?force_if_label:string list ->

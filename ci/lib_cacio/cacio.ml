@@ -192,7 +192,7 @@ type job = {
   cpu : Tezos_ci.Runner.CPU.t option;
   storage : Tezos_ci.Runner.Storage.t option;
   tag : Tezos_ci.Runner.Tag.t option;
-  image : Tezos_ci.Image.t;
+  image : Tezos_ci.Image.t option;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
   parallel : Gitlab_ci.Types.parallel option;
@@ -626,7 +626,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?cpu
                 ?storage
                 ?tag
-                ~image
+                ?image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?parallel
@@ -702,7 +702,7 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     ?tag:Tezos_ci.Runner.Tag.t ->
-    image:Tezos_ci.Image.t ->
+    ?image:Tezos_ci.Image.t ->
     ?only_if_changed:string list ->
     ?force:bool ->
     ?force_if_label:string list ->
@@ -945,7 +945,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     | Some component -> component ^ "." ^ name
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ?tag ~image ?only_if_changed ?(force = false)
+      ?storage ?tag ?image ?only_if_changed ?(force = false)
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
       ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
