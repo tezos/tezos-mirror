@@ -1208,13 +1208,21 @@ function update_protocol_tests() {
 
 }
 
-function update_source() {
-
-  if [[ $skip_update_source ]]; then
-    echo "Skipping source update"
-    return 0
-  fi
-
+# SOURCE COMMIT 1: Update teztale archiver
+#
+# MODE: conditional (snapshot vs stabilise/copy)
+# MODIFIES: teztale/bin_teztale_archiver/*.ml files
+#
+# DESCRIPTION:
+#   Updates teztale archiver machine files for the new protocol.
+#   - snapshot mode: renames machine file from source to new hash,
+#                    updates protocol references in both files
+#   - stabilise/copy mode: copies machine file and adds new module to main,
+#                          updates protocol references in copied file
+#   Both modes reformat files with ocamlformat.
+#
+# CREATES: 0-1 commits: "teztale: update teztale_archiver_main.ml" (if changes)
+function source_commit_01_update_teztale() {
   log_blue "update teztale"
   #  Teztale
   source_short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
@@ -1236,6 +1244,16 @@ function update_source() {
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
   commit_if_changes "teztale: update teztale_archiver_main.ml"
+}
+
+function update_source() {
+
+  if [[ $skip_update_source ]]; then
+    echo "Skipping source update"
+    return 0
+  fi
+
+  source_commit_01_update_teztale
 
   if [[ ${is_snapshot} == false ]]; then
     log_blue "update proto_alpha constants_parametric_previous_repr.ml"
