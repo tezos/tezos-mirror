@@ -401,6 +401,7 @@ module type COMPONENT_API = sig
       This function must be called only once per component.
 
       [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
 
       Not implemented for the [Shared] component. *)
   val register_dedicated_release_pipeline :
@@ -414,6 +415,7 @@ module type COMPONENT_API = sig
       This function must be called only once per component.
 
       [tag_rex] allows to specify a custom tag regular expression.
+      It is registered to be returned by {!get_release_tag_rexes}.
 
       Not implemented for the [Shared] component. *)
   val register_dedicated_test_release_pipeline :

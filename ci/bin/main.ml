@@ -172,17 +172,6 @@ let () =
   let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/" in
   (* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
-  (* Matches EVM node release tags, e.g. [octez-evm-node-v1.2] or
-     [octez-evm-node-v1.2-rc4]. *)
-  let octez_evm_node_release_tag_re =
-    "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
-  in
-  (* Matches smart rollup node release tags,
-     e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
-     [octez-smart-rollup-node-v1.2-rc4]. *)
-  let octez_smart_rollup_node_release_tag_re =
-    "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
-  in
   (* Matches Octez packaging revision tags, e.g. [octez-v1.0-2]. *)
   let octez_packaging_revision_tag_re = "/^octez-v\\d+\\.\\d+\\-\\d+$/" in
   let open Rules in
@@ -207,12 +196,7 @@ let () =
   let has_non_release_tag =
     let release_tags =
       octez_release_tags
-      @ [
-          octez_evm_node_release_tag_re;
-          octez_smart_rollup_node_release_tag_re;
-          Sdk_bindings_ci.Release.tag_re;
-          octez_packaging_revision_tag_re;
-        ]
+      @ [Sdk_bindings_ci.Release.tag_re; octez_packaging_revision_tag_re]
       @ Cacio.get_release_tag_rexes ()
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
