@@ -9,22 +9,6 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let debian_releases = ["unstable"; "bookworm"; "trixie"]
-
-let debian_matrix = [("RELEASE", debian_releases)]
-
-let ubuntu_releases = ["22.04"; "24.04"; "25.10"]
-
-let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
-
-let rockylinux_releases = ["9"; "10"]
-
-let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
-
-let fedora_releases = ["39"; "42"]
-
-let fedora_matrix = [("RELEASE", fedora_releases)]
-
 (* Helper function to standardise the path of a base image built in the same
    pipeline. Used to build more complex base images and avoid code duplications *)
 let base_dep_img_name image =

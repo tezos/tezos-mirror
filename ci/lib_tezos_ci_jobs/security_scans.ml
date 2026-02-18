@@ -37,7 +37,7 @@ let jobs : tezos_job list =
             Images.Base_images.(
               Format.asprintf "tezos-debian-%s-%s" release debian_version);
         })
-      Base_images.debian_releases
+      (Base_images.Distribution.releases Debian)
     @ List.map
         (fun release ->
           {
@@ -51,7 +51,7 @@ let jobs : tezos_job list =
               Images.Base_images.(
                 Format.asprintf "tezos-ubuntu-%s-%s" release debian_version);
           })
-        Base_images.ubuntu_releases
+        (Base_images.Distribution.releases Ubuntu)
     @ List.map
         (fun release ->
           {
@@ -64,7 +64,7 @@ let jobs : tezos_job list =
               Images.Base_images.(
                 Format.asprintf "tezos-fedora-%s-%s" release rpm_version);
           })
-        Base_images.fedora_releases
+        (Base_images.Distribution.releases Fedora)
     @ List.map
         (fun release ->
           {
@@ -77,7 +77,7 @@ let jobs : tezos_job list =
               Images.Base_images.(
                 Format.asprintf "tezos-rockylinux-%s-%s" release rpm_version);
           })
-        Base_images.rockylinux_releases
+        (Base_images.Distribution.releases Rockylinux)
   in
   (* Scans [docker_image:docker_tag] image. A scanning report artifact
      is produced.
