@@ -25,6 +25,8 @@ tezos-smart-rollup.workspace = true
 tezos-smart-rollup-host.workspace = true
 tezos-execution.workspace = true
 tezos_data_encoding.workspace = true
+tezos_tezlink.workspace = true
+mir.workspace = true
 tezos-storage.workspace = true
 
 [dev-dependencies]

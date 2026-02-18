@@ -3533,6 +3533,7 @@ dependencies = [
 name = "tezosx-tezos-runtime"
 version = "0.1.0"
 dependencies = [
+ "mir",
  "num-bigint",
  "primitive-types",
  "rlp",
@@ -3545,6 +3546,7 @@ dependencies = [
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
+ "tezos_tezlink_latest",
  "tezosx-interfaces",
  "thiserror 1.0.69",
 ]

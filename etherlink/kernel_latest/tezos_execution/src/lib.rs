@@ -45,9 +45,10 @@ use tezos_tezlink::{
 use tezosx_interfaces::Registry;
 
 use crate::account_storage::{TezosImplicitAccount, TezosOriginatedAccount};
-use crate::address::OriginationNonce;
+pub use crate::address::OriginationNonce;
 use crate::context::Context;
 use crate::gas::Cost;
+pub use crate::gas::TezlinkOperationGas;
 use crate::mir_ctx::{
     clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, HasHost,
     OperationCtx, TcCtx,
@@ -124,6 +125,59 @@ fn transfer_tez<Host: Runtime>(
         storage: None,
         lazy_storage_diff: None,
         balance_updates,
+        ticket_receipt: vec![],
+        originated_contracts: vec![],
+        consumed_milligas: 0_u64.into(),
+        storage_size: 0_u64.into(),
+        paid_storage_size_diff: 0_u64.into(),
+        allocated_destination_contract: false,
+    })
+}
+
+/// Credit the receiver without debiting any sender.
+/// Used for cross-runtime calls where the sender's balance was already
+/// debited on the EVM side.
+///
+/// Assumption: this path is enabled from a foreign calling runtime,
+/// and the sender was already debited in that runtime.
+fn credit_destination_without_debiting_sender(
+    host: &mut impl Runtime,
+    amount: &Narith,
+    receiver_account: &impl TezlinkAccount,
+) -> Result<TransferSuccess, TransferError> {
+    if amount.eq(&0_u64.into()) {
+        return Ok(TransferSuccess {
+            storage: None,
+            lazy_storage_diff: None,
+            balance_updates: vec![],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_milligas: 0_u64.into(),
+            storage_size: 0_u64.into(),
+            paid_storage_size_diff: 0_u64.into(),
+            allocated_destination_contract: false,
+        });
+    }
+    let receiver_balance = receiver_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
+        .0;
+    let new_receiver_balance = (&receiver_balance + &amount.0).into();
+    receiver_account
+        .set_balance(host, &new_receiver_balance)
+        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+    Ok(TransferSuccess {
+        storage: None,
+        lazy_storage_diff: None,
+        // TODO: L2-882 design CRAC receipts
+        balance_updates: vec![BalanceUpdate {
+            balance: Balance::Account(receiver_account.contract()),
+            changes: receiver_delta
+                .try_into()
+                .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?,
+            update_origin: UpdateOrigin::BlockApplication,
+        }],
         ticket_receipt: vec![],
         originated_contracts: vec![],
         consumed_milligas: 0_u64.into(),
@@ -225,6 +279,7 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
                         value,
                         parser,
                         all_internal_receipts,
+                        false,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -375,6 +430,10 @@ fn execute_internal_operations<'a, Host: Runtime, C: Context>(
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+///
+/// When `skip_sender_debit` is true, only the receiver is credited without
+/// debiting the sender. This is used for cross-runtime calls (e.g. EVM gateway)
+/// where the sender's balance was already debited by the calling runtime.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
@@ -387,6 +446,7 @@ fn transfer<'a, Host: Runtime, C: Context>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    skip_sender_debit: bool,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -411,8 +471,15 @@ fn transfer<'a, Host: Runtime, C: Context>(
             let _allocated = dest_account
                 .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            let receipt =
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
+            let receipt = if skip_sender_debit {
+                credit_destination_without_debiting_sender(
+                    tc_ctx.host,
+                    amount,
+                    &dest_account,
+                )?
+            } else {
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+            };
             Ok(TransferSuccess {
                 // This boolean is kept at false on purpose to maintain compatibility with TZKT.
                 // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
@@ -428,8 +495,15 @@ fn transfer<'a, Host: Runtime, C: Context>(
                 .context
                 .originated_from_kt1(kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt =
-                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
+            let receipt = if skip_sender_debit {
+                credit_destination_without_debiting_sender(
+                    tc_ctx.host,
+                    amount,
+                    &dest_account,
+                )?
+            } else {
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?
+            };
             let code = dest_account
                 .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
@@ -520,7 +594,7 @@ fn get_contract_entrypoint<C: Context>(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<'a, Host: Runtime, C: Context>(
+pub fn transfer_external<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
@@ -529,6 +603,7 @@ fn transfer_external<'a, Host: Runtime, C: Context>(
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
+    skip_sender_debit: bool,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         tc_ctx.host,
@@ -550,6 +625,7 @@ fn transfer_external<'a, Host: Runtime, C: Context>(
         value,
         parser,
         all_internal_receipts,
+        skip_sender_debit,
     )
     .map(Into::into)
 }
@@ -1085,6 +1161,7 @@ fn apply_operation<Host: Runtime, C: Context>(
                 parameters,
                 &mut internal_operations_receipts,
                 &parser,
+                false,
             );
 
             if transfer_result.is_err() {
