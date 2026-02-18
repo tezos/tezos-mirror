@@ -161,7 +161,7 @@ images.rockylinux:
       - "9"
       - "10"
 
-images.rust:
+images.debian-rust:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
@@ -198,7 +198,7 @@ images.rust:
       - gcp_very_high_cpu
       - gcp_arm64
 
-images.rust.merge:
+images.debian-rust.merge:
   image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
@@ -206,7 +206,7 @@ images.rust.merge:
   rules:
   - when: always
   needs:
-  - images.rust
+  - images.debian-rust
   dependencies: []
   timeout: 60 minutes
   interruptible: false
