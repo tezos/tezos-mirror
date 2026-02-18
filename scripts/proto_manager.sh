@@ -1269,6 +1269,32 @@ function source_helper_update_alpha_constants_previous() {
   ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
 }
 
+# SOURCE HELPER: Define stitching markers
+#
+# MODE: both (used by snapshot/copy and stabilise)
+# DEFINES: Global marker variables for protocol stitching operations
+#
+# DESCRIPTION:
+#   Defines escaped comment markers used by perl regex operations
+#   in raw_context.ml and init_storage.ml stitching.
+#   These markers control where code is extracted, replaced, or removed.
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_define_stitching_markers() {
+  start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
+  end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
+  start_predecessor="\(\* Start of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
+  end_predecessor="\(\* End of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
+  type_to_remove="\(\* Alpha predecessor \*\)"
+
+  start_remove="\(\* Start of code to remove at next automatic protocol snapshot \*\)"
+  remove_comment="\(\* Please add here any code that should be removed at the next automatic protocol snapshot \*\)"
+  end_remove="\(\* End of code to remove at next automatic protocol snapshot \*\)"
+
+  start_typechecker="\(\* This line is only here to please the typechecker\,"
+  end_typechecker="let\*\! c = get_previous_protocol_constants ctxt in"
+}
+
 # SOURCE COMMIT 2: Fix alpha raw_context (snapshot/copy modes)
 #
 # MODE: snapshot OR copy
@@ -1287,6 +1313,8 @@ function source_helper_update_alpha_constants_previous() {
 #
 # CREATES: 1 commit: "alpha: add ${capitalized_label} as Alpha previous protocol"
 function source_commit_02_fix_alpha_raw_context_snapshot() {
+  source_helper_define_stitching_markers
+
   if [[ ${command} == "copy" ]]; then
     protocol_source_original="${protocol_source}"
     #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
@@ -1355,6 +1383,7 @@ function source_commit_03_fix_alpha_raw_context_stabilise() {
   # Call helper to update alpha constants (needed for stabilise mode)
   source_helper_update_alpha_constants_previous
 
+  source_helper_define_stitching_markers
   # === Process raw_context.ml ===
 
   # Step 1: Extract code between source stitching markers
@@ -1423,19 +1452,6 @@ function update_source() {
   log_blue "update raw_context.ml"
   # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
-
-  start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
-  start_predecessor="\(\* Start of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  end_predecessor="\(\* End of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
-  type_to_remove="\(\* Alpha predecessor \*\)"
-
-  start_remove="\(\* Start of code to remove at next automatic protocol snapshot \*\)"
-  remove_comment="\(\* Please add here any code that should be removed at the next automatic protocol snapshot \*\)"
-  end_remove="\(\* End of code to remove at next automatic protocol snapshot \*\)"
-
-  start_typechecker="\(\* This line is only here to please the typechecker\,"
-  end_typechecker="let\*\! c = get_previous_protocol_constants ctxt in"
 
   log_blue "fix prepare_first_block"
 
