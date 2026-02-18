@@ -1065,24 +1065,53 @@ function copy_source() {
 
 }
 
-function update_protocol_tests() {
-
-  if [[ $skip_update_protocol_tests ]]; then
-    echo "Skipping protocol tests update"
-    return 0
-  fi
-
-  # Update protocol tests
-
+# PROTOCOL_TESTS COMMIT 1: Fix test invocation headers
+#
+# MODE: both
+# MODIFIES: test files in src/proto_${new_protocol_name}
+#
+# DESCRIPTION:
+#   Updates test invocation header comments in test files to reference
+#   the new protocol path instead of the source protocol path.
+#
+# CREATES: 1 commit: "tests: fix test invocation headers"
+function protocol_tests_commit_01_fix_test_invocation_headers() {
   # Replace test invocation headers that mention protocol_source
   find "src/proto_${new_protocol_name}" -type f -path \*/test/\*.ml \
     -exec sed -i "s@Invocation:\(.*\)/proto_${protocol_source}/\(.*\)@Invocation:\1/proto_${new_protocol_name}/\2@" \{\} \;
   commit_no_hooks "tests: fix test invocation headers"
+}
 
+# PROTOCOL_TESTS COMMIT 2: Fix test registrations
+#
+# MODE: both
+# MODIFIES: test files in src/proto_${new_protocol_name}
+#
+# DESCRIPTION:
+#   Updates test registration names in all test files.
+#   Replaces [${capitalized_source}] with [${capitalized_label}].
+#
+# CREATES: 1 commit: "tests: fix tests registrations"
+function protocol_tests_commit_02_fix_test_registrations() {
   #Replace all occurences of \[capitalized_protocol_source\] with \[capitalized_label\] in src_proto_${new_protocol_name}
   find "src/proto_${new_protocol_name}" -type f -exec sed -i "s/\\[${capitalized_source}\\]/\\[${capitalized_label}\\]/g" {} \;
   commit_no_hooks "tests: fix tests registrations"
+}
 
+# PROTOCOL_TESTS COMMIT 3: Update SCORU WASM protocol migration
+#
+# MODE: conditional (snapshot vs stabilise/copy with nested copy/stabilise)
+# MODIFIES: src/lib_scoru_wasm files (test_protocol_migration.ml, constants.ml,
+#           pvm_input_kind.ml/mli, wasm_vm.ml)
+#
+# DESCRIPTION:
+#   Updates SCORU WASM protocol migration files with complex mode-specific logic:
+#   - snapshot mode: replaces source protocol with new protocol
+#   - stabilise/copy mode: adds new protocol alongside existing protocols
+#   Each mode updates multiple files with different sed patterns.
+#
+# CREATES: 1 commit: "scoru: update scoru_wasm protocol_migration"
+function protocol_tests_commit_03_update_scoru_wasm_migration() {
   #update scoru_wasm protocol_migration tests
   # add proto_${label} to proto_name before Proto_alpha -> "Proto_alpha"
   if [[ ${is_snapshot} == true ]]; then
@@ -1131,7 +1160,21 @@ function update_protocol_tests() {
   fi
 
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
+}
 
+# PROTOCOL_TESTS COMMIT 4: Update SC rollup WASM test
+#
+# MODE: conditional (copy vs stabilise)
+# MODIFIES: src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml
+#
+# DESCRIPTION:
+#   Updates the SC rollup WASM test file in the protocol directory.
+#   - copy mode: uses source_label for constant reference
+#   - stabilise mode: uses protocol_source for constant reference
+#   Updates protocol names, migration constants, and WASM constants.
+#
+# CREATES: 1 commit: "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+function protocol_tests_commit_04_update_sc_rollup_test() {
   if [[ ${command} == "copy" ]]; then
     sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
       -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
@@ -1145,6 +1188,23 @@ function update_protocol_tests() {
   fi
   ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
   commit_no_hooks "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+}
+function update_protocol_tests() {
+
+  if [[ $skip_update_protocol_tests ]]; then
+    echo "Skipping protocol tests update"
+    return 0
+  fi
+
+  # Update protocol tests
+
+  protocol_tests_commit_01_fix_test_invocation_headers
+
+  protocol_tests_commit_02_fix_test_registrations
+
+  protocol_tests_commit_03_update_scoru_wasm_migration
+
+  protocol_tests_commit_04_update_sc_rollup_test
 
 }
 
