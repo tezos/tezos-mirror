@@ -101,33 +101,36 @@ module Release = struct
         |> enable_cargo_cache |> enable_sccache
       in
 
-      let macos : tezos_job =
-        job
-          ~__POS__
-          ~name:"build_python_sdk_macos"
-          ~description:"Build Python SDK on macOS"
-          ~image:Images.macosx_15
-          ~variables:macos_variables
-          ~tag:Dynamic
-          ~artifacts
-          ~before_script:
-            [
-              "export CARGO_NET_OFFLINE=false";
-              "export CARGO_HOME=$HOME/.cargo";
-              "python3 -m venv $HOME/.venv";
-              ". $HOME/.venv/bin/activate";
-              "curl https://sh.rustup.rs -sSf | sh -s -- -y";
-              ". $HOME/.cargo/env";
-              "pip install maturin==1.5.1";
-              "brew install sccache";
-            ]
-          ["make -C contrib/sdk-bindings/rust -f python.mk build"]
-        |> enable_cargo_cache |> enable_sccache
-      in
-
-      [linux; macos]
+      [linux]
     in
     build_python_sdk
+
+  let job_build_python_macos =
+    CI.job
+      "build_python_macos"
+      ~__POS__
+      ~description:"Build Python SDK on macOS"
+      ~stage:Build
+      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
+      ~image:Images.macosx_15
+      ~variables:macos_variables
+      ~tag:Dynamic
+      ~artifacts
+      ~cargo_cache:true
+      ~sccache:(Cacio.sccache ())
+      [
+        (* Prepare *)
+        "export CARGO_NET_OFFLINE=false";
+        "export CARGO_HOME=$HOME/.cargo";
+        "python3 -m venv $HOME/.venv";
+        ". $HOME/.venv/bin/activate";
+        "curl https://sh.rustup.rs -sSf | sh -s -- -y";
+        ". $HOME/.cargo/env";
+        "pip install maturin==1.5.1";
+        "brew install sccache";
+        (* Build *)
+        "make -C contrib/sdk-bindings/rust -f python.mk build";
+      ]
 
   let job_build_python_windows =
     CI.job
@@ -169,7 +172,11 @@ module Release = struct
           ("MATURIN_REPOSITORY", "testpypi");
           ("MATURIN_PYPI_TOKEN", "$CI_TESTPYPI_TOKEN");
         ]
-      ~needs:[(Artifacts, job_build_python_windows)]
+      ~needs:
+        [
+          (Artifacts, job_build_python_macos);
+          (Artifacts, job_build_python_windows);
+        ]
       ~needs_legacy:
         (List.map (fun job -> (Cacio.Artifacts, job)) jobs_build_sdk)
       [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]

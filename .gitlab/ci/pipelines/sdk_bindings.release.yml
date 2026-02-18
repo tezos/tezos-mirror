@@ -118,7 +118,7 @@ build_python_sdk_linux:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
 
-build_python_sdk_macos:
+sdk_bindings.build_python_macos:
   image: macos-15-xcode-16
   stage: build
   tags:
@@ -134,9 +134,13 @@ build_python_sdk_macos:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
   - export CARGO_NET_OFFLINE=false
   - export CARGO_HOME=$HOME/.cargo
   - python3 -m venv $HOME/.venv
@@ -145,9 +149,6 @@ build_python_sdk_macos:
   - . $HOME/.cargo/env
   - pip install maturin==1.5.1
   - brew install sccache
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
   - make -C contrib/sdk-bindings/rust -f python.mk build
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -204,12 +205,12 @@ sdk_bindings.publish:
   needs:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
-  - build_python_sdk_macos
+  - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
-  - build_python_sdk_macos
+  - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
   timeout: 60 minutes
   interruptible: false
