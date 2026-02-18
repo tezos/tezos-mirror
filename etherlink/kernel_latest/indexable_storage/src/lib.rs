@@ -189,6 +189,26 @@ impl IndexableStorage {
         self.store_index(host, new_index, value)
     }
 
+    /// Push multiple values in batch, reading and writing the length only once.
+    /// This reduces storage operations from 3*N to N+2 compared to calling
+    /// `push_value` N times.
+    pub fn push_values<Host: Runtime>(
+        &self,
+        host: &mut Host,
+        values: &[Vec<u8>],
+    ) -> Result<(), IndexableStorageError> {
+        if values.is_empty() {
+            return Ok(());
+        }
+        let length_path = concat(&self.path, &LENGTH)?;
+        let base_index = read_u64_le(host, &length_path).unwrap_or(0);
+        for (i, value) in values.iter().enumerate() {
+            self.store_index(host, base_index + i as u64, value)?;
+        }
+        write_u64_le(host, &length_path, base_index + values.len() as u64)?;
+        Ok(())
+    }
+
     pub fn clear<Host: Runtime>(
         &self,
         host: &mut Host,
@@ -257,5 +277,56 @@ mod tests {
             storage.get_value(&host, 1),
             Err(IndexableStorageError::IndexOutOfBounds)
         )
+    }
+
+    #[test]
+    fn test_push_values_batch() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        let batch = vec![b"first".to_vec(), b"second".to_vec(), b"third".to_vec()];
+        storage
+            .push_values(&mut host, &batch)
+            .expect("Batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(3));
+        assert_eq!(storage.get_value(&host, 0), Ok(b"first".to_vec()));
+        assert_eq!(storage.get_value(&host, 1), Ok(b"second".to_vec()));
+        assert_eq!(storage.get_value(&host, 2), Ok(b"third".to_vec()));
+    }
+
+    #[test]
+    fn test_push_values_appends_to_existing() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        storage
+            .push_value(&mut host, b"existing")
+            .expect("Push failed");
+
+        let batch = vec![b"new1".to_vec(), b"new2".to_vec()];
+        storage
+            .push_values(&mut host, &batch)
+            .expect("Batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(3));
+        assert_eq!(storage.get_value(&host, 0), Ok(b"existing".to_vec()));
+        assert_eq!(storage.get_value(&host, 1), Ok(b"new1".to_vec()));
+        assert_eq!(storage.get_value(&host, 2), Ok(b"new2".to_vec()));
+    }
+
+    #[test]
+    fn test_push_values_empty_is_noop() {
+        let mut host = MockKernelHost::default();
+        let values = RefPath::assert_from(b"/values");
+        let storage = IndexableStorage::new(&values).expect("Path to index is invalid");
+
+        storage
+            .push_values(&mut host, &[])
+            .expect("Empty batch push failed");
+
+        assert_eq!(storage.length(&host), Ok(0));
     }
 }
