@@ -253,7 +253,7 @@ let jobs ?start_job ?(changeset = false) () =
      - if [changes] is not provided, we use the base changeset of the
      distribution. This applies to base images that are not a
      dependency of other images.  *)
-  let _make_job_base_image_distribution ?base_name ?changes distro =
+  let make_job_base_image_distribution ?base_name ?changes distro =
     make_job_base_images
       ~__POS__
       ~matrix:(Distribution.release_matrix distro)
@@ -276,37 +276,18 @@ let jobs ?start_job ?(changeset = false) () =
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
        @ Files.debian_rust_merge)
     in
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian"
-      ~matrix:debian_matrix
-      ~changes
-      "images/base-images/Dockerfile.debian"
+    make_job_base_image_distribution ~changes Distribution.Debian
   in
   let job_ubuntu_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"ubuntu"
-      ~matrix:ubuntu_matrix
-      ~changes:(Changeset.make Files.debian_base)
-      "images/base-images/Dockerfile.debian"
+    make_job_base_image_distribution Distribution.Ubuntu
   in
   let job_fedora_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"fedora"
-      ~matrix:fedora_matrix
-      ~changes:(Changeset.make Files.rpm_base)
-      "images/base-images/Dockerfile.rpm"
+    make_job_base_image_distribution Distribution.Fedora
   in
   let job_rockylinux_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"rockylinux"
+    make_job_base_image_distribution
       ~base_name:(Upstream "rockylinux/rockylinux")
-      ~matrix:rockylinux_matrix
-      ~changes:(Changeset.make Files.rpm_base)
-      "images/base-images/Dockerfile.rpm"
+      Distribution.Rockylinux
   in
   (* debian-rust: based on [debian:trixie]. *)
   let job_rust_based_images =
