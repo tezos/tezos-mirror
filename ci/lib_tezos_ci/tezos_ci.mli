@@ -247,6 +247,10 @@ module Image : sig
   (** A registered Docker image in which a job can execute. *)
   type t
 
+  (* FIXME do not expose this builder.
+     Requires non-trivial refactoring as used in some jobs.
+     Check via [git grep -B3 "mk_external" ci/lib_tezos_ci_jobs] *)
+
   (** Register an external image of the given [image_path]. *)
   val mk_external : image_path:string -> t
 end
