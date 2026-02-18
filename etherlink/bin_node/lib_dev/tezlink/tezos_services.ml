@@ -130,7 +130,7 @@ module Tezlink_SeouLo_protocol = struct
         };
     }
 
-  let signature : Alpha_context.signature =
+  let signature : SeouLo_context.signature =
     Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
 
   let mock_protocol_data : Block_header_repr.protocol_data =
@@ -153,7 +153,7 @@ module Tezlink_SeouLo_protocol = struct
        given in parameter. *)
     let start_position = Int32.(sub (sub level_info.level 1l) position) in
     Voting_period.
-      {index; kind = Alpha_context.Voting_period.Proposal; start_position}
+      {index; kind = SeouLo_context.Voting_period.Proposal; start_position}
 
   let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
       =
@@ -184,7 +184,7 @@ module Tezlink_SeouLo_protocol = struct
       Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
     in
     let voting_period_info =
-      Alpha_context.Voting_period.{voting_period; position; remaining}
+      SeouLo_context.Voting_period.{voting_period; position; remaining}
     in
     return voting_period_info
 
@@ -192,14 +192,14 @@ module Tezlink_SeouLo_protocol = struct
     let open Apply_results in
     let open Result_syntax in
     let proposer =
-      Alpha_context.Consensus_key.
+      SeouLo_context.Consensus_key.
         {
           delegate = Tezlink_mock.baker_account.pkh;
           consensus_pkh = Tezlink_mock.baker_account.pkh;
         }
     in
     let balance_updates =
-      let amount = Alpha_context.Tez.of_mutez_exn 0L in
+      let amount = SeouLo_context.Tez.of_mutez_exn 0L in
       Tezlink_mock.balance_udpdate_rewards
         ~baker:Tezlink_mock.baker_account.pkh
         ~amount
@@ -220,16 +220,16 @@ module Tezlink_SeouLo_protocol = struct
         level_info;
         voting_period_info;
         nonce_hash = None;
-        consumed_gas = Alpha_context.Gas.Arith.zero;
+        consumed_gas = SeouLo_context.Gas.Arith.zero;
         deactivated = [];
         balance_updates;
         liquidity_baking_toggle_ema =
-          Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
+          SeouLo_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
         adaptive_issuance_vote_ema =
-          Alpha_context.Per_block_votes.Adaptive_issuance_launch_EMA.zero;
+          SeouLo_context.Per_block_votes.Adaptive_issuance_launch_EMA.zero;
         adaptive_issuance_launch_cycle = None;
         implicit_operations_results = [];
-        dal_attestation = Alpha_context.Dal.Attestation.empty;
+        dal_attestation = SeouLo_context.Dal.Attestation.empty;
       }
 end
 
@@ -247,7 +247,7 @@ module Tezlink_TALLiN_protocol = struct
       per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
     }
 
-  let signature : Alpha_context.signature =
+  let signature : TALLiN_context.signature =
     Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
 
   let mock_protocol_data : Block_header_repr.protocol_data =
@@ -264,14 +264,14 @@ module Tezlink_TALLiN_protocol = struct
     let open Apply_results in
     let open Result_syntax in
     let proposer =
-      Alpha_context.Consensus_key.
+      TALLiN_context.Consensus_key.
         {
           delegate = Tezlink_mock.baker_account.pkh;
           consensus_pkh = Tezlink_mock.baker_account.pkh;
         }
     in
     let* balance_updates =
-      let amount = Tezlink_SeouLo_protocol.Alpha_context.Tez.of_mutez_exn 0L in
+      let amount = SeouLo_context.Tez.of_mutez_exn 0L in
       let seoul_balance_update =
         Tezlink_mock.balance_udpdate_rewards
           ~baker:Tezlink_mock.baker_account.pkh
@@ -279,9 +279,8 @@ module Tezlink_TALLiN_protocol = struct
       in
       Tezos_types.convert_using_serialization
         ~name:"Tallinn balance updates"
-        ~src:
-          Tezlink_SeouLo_protocol.Alpha_context.Receipt.balance_updates_encoding
-        ~dst:Alpha_context.Receipt.balance_updates_encoding
+        ~src:SeouLo_context.Receipt.balance_updates_encoding
+        ~dst:TALLiN_context.Receipt.balance_updates_encoding
         seoul_balance_update
     in
 
@@ -295,16 +294,16 @@ module Tezlink_TALLiN_protocol = struct
       in
       Tezos_types.convert_using_serialization
         ~name:"Tallinn period info"
-        ~src:Tezlink_SeouLo_protocol.Alpha_context.Voting_period.info_encoding
-        ~dst:Alpha_context.Voting_period.info_encoding
+        ~src:SeouLo_context.Voting_period.info_encoding
+        ~dst:TALLiN_context.Voting_period.info_encoding
         seoul_period_info
     in
     let* level_info =
       let* level_info = Protocol_types.Level.convert level_info in
       Tezos_types.convert_using_serialization
         ~name:"Tallinn level info"
-        ~src:Tezlink_SeouLo_protocol.Alpha_context.Level.encoding
-        ~dst:Alpha_context.Level.encoding
+        ~src:SeouLo_context.Level.encoding
+        ~dst:TALLiN_context.Level.encoding
         level_info
     in
     return
@@ -314,13 +313,13 @@ module Tezlink_TALLiN_protocol = struct
         level_info;
         voting_period_info;
         nonce_hash = None;
-        consumed_gas = Alpha_context.Gas.Arith.zero;
+        consumed_gas = TALLiN_context.Gas.Arith.zero;
         deactivated = [];
         balance_updates;
         liquidity_baking_toggle_ema =
-          Alpha_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
+          TALLiN_context.Per_block_votes.Liquidity_baking_toggle_EMA.zero;
         implicit_operations_results = [];
-        dal_attestation = Alpha_context.Dal.Attestation.empty;
+        dal_attestation = TALLiN_context.Dal.Attestation.empty;
         abaab_activation_level = None;
         attestations = None;
         preattestations = None;
