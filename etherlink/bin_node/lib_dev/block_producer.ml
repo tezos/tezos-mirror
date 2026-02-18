@@ -362,9 +362,14 @@ let validate_tezlink_op ~maximum_cumulative_size
 let init_validation_state (head_info : Evm_context.head) =
   let open Lwt_result_syntax in
   let read = Evm_state.read head_info.evm_state in
+  let data_model =
+    if List.mem ~equal:( = ) Tezosx.Tezos head_info.tezosx_runtimes then
+      Tezlink_durable_storage.Rlp
+    else Tezlink_durable_storage.Path
+  in
   let michelson_config =
-    let get_counter = Tezlink_durable_storage.counter read in
-    let get_balance = Tezlink_durable_storage.balance_z read in
+    let get_counter = Tezlink_durable_storage.counter read ~data_model in
+    let get_balance = Tezlink_durable_storage.balance_z read ~data_model in
     Validation_types.{get_balance; get_counter}
   in
   let* minimum_base_fee_per_gas =
@@ -376,11 +381,11 @@ let init_validation_state (head_info : Evm_context.head) =
   in
   let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
   (* TODO #8236 / L2-862
-     Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
-     is a temporary work around. In the context of Tezlink, no EVM block
-     exists yet so reading these values from the block header raises
-     [Invalid_block_structure]. Once the kernel writes an initial EVM block for
-     all chain families, this fallback can be removed. *)
+   Using optional values for [minimum_base_fee_per_gas] and [base_fee_per_gas]
+   is a temporary work around. In the context of Tezlink, no EVM block
+   exists yet so reading these values from the block header raises
+   [Invalid_block_structure]. Once the kernel writes an initial EVM block for
+   all chain families, this fallback can be removed. *)
   let evm_config =
     Validation_types.
       {

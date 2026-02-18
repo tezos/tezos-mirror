@@ -320,7 +320,7 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
           log_kernel_debug_file = Some "simulate_call";
         }
 
-  let simulate_operation ~chain_id ~skip_signature ~read
+  let simulate_operation ~chain_id ~skip_signature ~read ~data_model
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -335,6 +335,7 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
       Tezlink_prevalidation.parse_and_validate_for_queue
         ~check_signature:(not skip_signature)
         ~read
+        ~data_model
         input
     in
     let* () =
