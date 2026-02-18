@@ -1082,6 +1082,22 @@ function protocol_tests_commit_01_fix_test_invocation_headers() {
   commit_no_hooks "tests: fix test invocation headers"
 }
 
+# PROTOCOL_TESTS COMMIT 2: Fix test registrations
+#
+# MODE: both
+# MODIFIES: test files in src/proto_${new_protocol_name}
+#
+# DESCRIPTION:
+#   Updates test registration names in all test files.
+#   Replaces [${capitalized_source}] with [${capitalized_label}].
+#
+# CREATES: 1 commit: "tests: fix tests registrations"
+function protocol_tests_commit_02_fix_test_registrations() {
+  #Replace all occurences of \[capitalized_protocol_source\] with \[capitalized_label\] in src_proto_${new_protocol_name}
+  find "src/proto_${new_protocol_name}" -type f -exec sed -i "s/\\[${capitalized_source}\\]/\\[${capitalized_label}\\]/g" {} \;
+  commit_no_hooks "tests: fix tests registrations"
+}
+
 function update_protocol_tests() {
 
   if [[ $skip_update_protocol_tests ]]; then
@@ -1093,9 +1109,7 @@ function update_protocol_tests() {
 
   protocol_tests_commit_01_fix_test_invocation_headers
 
-  #Replace all occurences of \[capitalized_protocol_source\] with \[capitalized_label\] in src_proto_${new_protocol_name}
-  find "src/proto_${new_protocol_name}" -type f -exec sed -i "s/\\[${capitalized_source}\\]/\\[${capitalized_label}\\]/g" {} \;
-  commit_no_hooks "tests: fix tests registrations"
+  protocol_tests_commit_02_fix_test_registrations
 
   #update scoru_wasm protocol_migration tests
   # add proto_${label} to proto_name before Proto_alpha -> "Proto_alpha"
