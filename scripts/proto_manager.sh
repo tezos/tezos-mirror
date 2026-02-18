@@ -884,6 +884,32 @@ function commit_08_update_readme() {
   fi
 }
 
+# COMMIT 9: Link protocol in manifest
+#
+# MODE: conditional (different behavior per mode)
+# MODIFIES: manifest/product_octez.ml
+#
+# DESCRIPTION:
+#   Links the new protocol in manifest/product_octez.ml:
+#   - snapshot mode: replaces source protocol line with versioned+hash entry
+#   - copy mode: inserts new protocol entry before alpha
+#   - stabilise mode: inserts new protocol entry before source protocol
+#   Then formats the manifest file with ocamlformat.
+#
+# CREATES: 1 commit: "manifest: link protocol in the node, client and codec"
+function commit_09_link_in_manifest() {
+  echo -e "\e[33mLinking protocol in the node, client and codec\e[0m"
+  if [[ ${is_snapshot} == true ]]; then
+    sed "s/let _${protocol_source} = active .*/  let _${version}_${short_hash} = active (Name.v \"${short_hash}\" ${version})\n/" -i manifest/product_octez.ml
+  elif [[ ${command} == "copy" ]]; then
+    sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
+  else
+    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
+  fi
+  ocamlformat -i manifest/product_octez.ml
+  commit_no_hooks "manifest: link protocol in the node, client and codec"
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -941,16 +967,7 @@ function copy_source() {
 
   commit_08_update_readme
 
-  echo -e "\e[33mLinking protocol in the node, client and codec\e[0m"
-  if [[ ${is_snapshot} == true ]]; then
-    sed "s/let _${protocol_source} = active .*/  let _${version}_${short_hash} = active (Name.v \"${short_hash}\" ${version})\n/" -i manifest/product_octez.ml
-  elif [[ ${command} == "copy" ]]; then
-    sed "/let alpha = active (Name.dev \"alpha\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
-  else
-    sed "/let *${protocol_source} = active (Name.dev \"${protocol_source}\")/i \  let _${label} = active (Name.dev \"${label}\")\n" -i manifest/product_octez.ml
-  fi
-  ocamlformat -i manifest/product_octez.ml
-  commit_no_hooks "manifest: link protocol in the node, client and codec"
+  commit_09_link_in_manifest
 
   if [[ ${is_snapshot} == true ]]; then
     # find all dune files in src/proto_${protocol_source} and remove them
