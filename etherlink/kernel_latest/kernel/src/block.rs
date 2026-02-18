@@ -563,11 +563,14 @@ mod tests {
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
     };
-    use crate::block_storage::{self, read_tezlink_current_block};
+    use crate::block_storage::{
+        self, read_tezlink_current_block, read_tezos_x_current_block,
+    };
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::blueprint_storage::{
-        store_inbox_blueprint, BlueprintHeader, TezBlockHeader,
+        store_current_tez_block_header, store_inbox_blueprint, BlueprintHeader,
+        TezBlockHeader,
     };
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
@@ -2584,5 +2587,81 @@ mod tests {
             .expect("The block production should have succeeded.");
         assert_eq!(ComputationResult::Finished, computation);
         assert_eq!(U256::from(2), read_current_number(&host).unwrap());
+    }
+
+    #[test]
+    fn test_tezos_x_upgrade_tez_protocol() {
+        fn read_protocol_and_next_protocol(tez_block: &[u8]) -> (Protocol, Protocol) {
+            let rlp = rlp::Rlp::new(tez_block);
+            let protocol: Protocol = rlp.val_at(5).unwrap();
+            let next_protocol: Protocol = rlp.val_at(6).unwrap();
+            (protocol, next_protocol)
+        }
+
+        let mut host = MockKernelHost::default();
+
+        // We need to store something at the tezlink root path,
+        // otherwise the copy of the root done by the safe storage will fail
+        let path = concat(
+            &TEZLINK_SAFE_STORAGE_ROOT_PATH,
+            &RefPath::assert_from(b"/fee"),
+        )
+        .expect("Path concatenation should have succeeded");
+        host.store_write_all(&path, &[4; 32])
+            .expect("Write in durable storage should have succeeded");
+
+        let chain_config = dummy_evm_config_with_tezos_runtime(&mut host);
+        let mut config = dummy_configuration();
+
+        // The upgrade direction here is T024 -> S023 which is
+        // numerically "backwards". This is because TARGET_TEZOS_PROTOCOL
+        // is hardcoded to S023 and we cannot change it for a test.
+        // When TARGET_TEZOS_PROTOCOL switches to T024, update
+        // previous_protocol to S023 so the test upgrades in the natural
+        // order.
+        assert_eq!(TARGET_TEZOS_PROTOCOL, Protocol::S023);
+
+        let previous_protocol = Protocol::T024;
+        let current_protocol = TARGET_TEZOS_PROTOCOL;
+
+        // Store a TezBlockHeader with next_protocol set to the previous
+        // protocol to simulate that the previous block was produced from
+        // a kernel whose protocol is the previous one.
+        let header = TezBlockHeader {
+            hash: H256(*TezBlock::genesis_block_hash()),
+            next_protocol: previous_protocol,
+        };
+        store_current_tez_block_header(&mut host, &header).unwrap();
+
+        // First block: protocol = previous (from stored header),
+        // next_protocol = current (TARGET_TEZOS_PROTOCOL)
+        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
+        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let block = read_tezos_x_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, previous_protocol);
+        assert_eq!(next_protocol, current_protocol);
+
+        // Second block: both protocol and next_protocol should be current
+        store_inbox_blueprint_by_number(&mut host, blueprint(vec![]), U256::from(1))
+            .expect("Should have stored blueprint");
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let block = read_tezos_x_current_block(&mut host).unwrap();
+        let (protocol, next_protocol) = read_protocol_and_next_protocol(&block);
+        assert_eq!(protocol, current_protocol);
+        assert_eq!(next_protocol, current_protocol);
     }
 }
