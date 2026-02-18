@@ -313,6 +313,30 @@ let craft_and_send_evm_transaction ~sequencer ~sender ~nonce ~value ~address
       return r
   | None -> Test.fail "No receipt for EVM transaction to %s" address
 
+(** [deploy_evm_contract ~sequencer ~sender ~nonce ~init_code ()] deploys an
+    EVM contract from [init_code], produces a block, and returns the deployed
+    contract address.  Fails if the deployment transaction reverts or yields no
+    contract address. *)
+let deploy_evm_contract ~sequencer ~sender ~nonce ~init_code () =
+  let* raw_tx =
+    Cast.craft_deploy_tx
+      ~source_private_key:sender.Eth_account.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:2_000_000
+      ~gas_price:1_000_000_000
+      ~data:init_code
+      ()
+  in
+  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ _block_number = Rpc.produce_block sequencer in
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  match receipt with
+  | Some {contractAddress = Some addr; status = true; _} -> return addr
+  | Some {status = false; _} ->
+      Test.fail "Contract deployment transaction failed"
+  | _ -> Test.fail "No receipt or no contract address for deployment tx"
+
 (** [call_evm_gateway ~sequencer ~sender ~nonce ~value ~destination ()]
     calls the cross-runtime gateway precompile to reach [destination] (a Tezos
     address).  Asserts the receipt status matches [expected_status] (default
@@ -1345,25 +1369,8 @@ let test_cross_runtime_call_executes_evm_bytecode =
      Init code copies runtime code to memory and returns it. *)
   let init_code = "600880600b6000396000f36042600155600154" in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* raw_tx =
-    Cast.craft_deploy_tx
-      ~source_private_key:sender.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas:2_000_000
-      ~gas_price:1_000_000_000
-      ~data:init_code
-      ()
-  in
-  let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
-  let*@ _block_number = Rpc.produce_block sequencer in
-  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  let contract_address =
-    match receipt with
-    | Some {contractAddress = Some addr; status = true; _} -> addr
-    | Some {status = false; _} ->
-        Test.fail "Contract deployment transaction failed"
-    | _ -> Test.fail "No receipt or no contract address for deployment tx"
+  let* contract_address =
+    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
   in
   (* Step 2: Call the Michelson gateway with the deployed EVM contract
      as destination. The gateway sends a cross-runtime call that
@@ -1550,6 +1557,134 @@ let test_cross_runtime_call_failwith =
       ~error_msg:"Expected KT1 balance %R but got %L") ;
   unit
 
+(** Test cross-runtime call from EVM to Michelson with calldata.
+
+    1. Originate [store_input.tz] via delayed inbox.
+    2. Call [call(string,string,bytes)] on the EVM gateway precompile,
+       passing the KT1 address, "default" entrypoint, and Micheline-encoded
+       string "Hello from EVM" as parameters.
+    3. Verify the Michelson contract storage is updated to "Hello from EVM". *)
+let test_cross_runtime_call_from_evm_to_michelson =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime call from EVM to Michelson with calldata"
+    ~tags:["cross_runtime"; "call"; "calldata"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate store_input_ep.tz — like store_input but with a named
+     entrypoint %save instead of %default. *)
+  let* contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "store_input_ep"]
+      ~init_storage_data:{|""|}
+      protocol
+  in
+  (* Step 2: Call the gateway precompile with call(string,string,bytes).
+     The bytes parameter is the Micheline binary encoding of the string
+     "Hello from EVM":
+       0x01 = string tag
+       0x0000000e = length (14)
+       48656c6c6f2066726f6d2045564d = "Hello from EVM" *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let micheline_hello = "0x010000000e48656c6c6f2066726f6d2045564d" in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value:(Wei.of_tez (Tez.of_int 1))
+      ~address:evm_gateway_address
+      ~abi_signature:"call(string,string,bytes)"
+      ~arguments:[kt1_address; "save"; micheline_hello]
+      ()
+  in
+  (* Step 3: Sync and verify storage *)
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  check_michelson_storage_value
+    ~sc_rollup_node
+    ~contract_hex
+    ~expected:(`O [("string", `String "Hello from EVM")])
+    ()
+
+(** Test cross-runtime call from Michelson to EVM with calldata.
+
+    1. Deploy a simple EVM contract that stores [calldataload(4)] in
+       storage slot 0 (i.e., the first ABI-encoded uint256 argument).
+    2. From Michelson, call the gateway KT1 with entrypoint "call" and
+       a Pair containing the EVM contract address, method signature
+       "store(uint256)", and ABI-encoded value 42.
+    3. Verify that EVM storage slot 0 = 42, proving calldata was
+       forwarded through the cross-runtime gateway. *)
+let test_cross_runtime_call_from_michelson_to_evm =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime call from Michelson to EVM with calldata"
+    ~tags:["cross_runtime"; "call"; "calldata"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      _protocol
+    ->
+  (* Step 1: Deploy EVM contract that stores calldataload(4) in slot 0.
+     Runtime bytecode: PUSH1 04 | CALLDATALOAD | PUSH1 00 | SSTORE | STOP
+     = 60 04 35 60 00 55 00 (7 bytes) *)
+  let init_code = "600780600b6000396000f360043560005500" in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* contract_address =
+    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+  in
+  (* Step 2: Call the gateway KT1 from Michelson with entrypoint "call".
+     The parameter is Pair <evm_addr> (Pair "store(uint256)" <abi_bytes>)
+     where abi_bytes is the ABI encoding of uint256(42). *)
+  let source = Constant.bootstrap5 in
+  let abi_encoded_42 =
+    "000000000000000000000000000000000000000000000000000000000000002a"
+  in
+  let* () =
+    call_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~dest:gateway_address
+      ~arg_data:
+        (sf
+           {|Pair "%s" (Pair "store(uint256)" 0x%s)|}
+           contract_address
+           abi_encoded_42)
+      ~entrypoint:"call"
+      ~amount:1_000_000
+      ()
+  in
+  (* Step 3: Verify EVM storage slot 0 = 42 *)
+  let*@ storage =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+  in
+  let expected_storage =
+    "0x000000000000000000000000000000000000000000000000000000000000002a"
+  in
+  Check.(
+    (storage = expected_storage)
+      string
+      ~error_msg:"Expected storage slot 0 = %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -1560,6 +1695,8 @@ let () =
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_cross_runtime_call_failwith [Alpha] ;
+  test_cross_runtime_call_from_evm_to_michelson [Alpha] ;
+  test_cross_runtime_call_from_michelson_to_evm [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_get_balance [Alpha] ;
