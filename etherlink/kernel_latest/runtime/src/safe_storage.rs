@@ -309,11 +309,7 @@ mod tests {
 
     fn trace_entry_path(index: u32) -> OwnedPath {
         let suffix: Vec<u8> = format!("/{index}").into();
-        concat(
-            &trace_call_trace_path(),
-            &RefPath::assert_from(&suffix),
-        )
-        .unwrap()
+        concat(&trace_call_trace_path(), &RefPath::assert_from(&suffix)).unwrap()
     }
 
     /// Simulate writing trace entries into /tmp/evm/trace/call_trace/,

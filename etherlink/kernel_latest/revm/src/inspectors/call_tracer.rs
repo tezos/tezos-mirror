@@ -283,19 +283,15 @@ impl CallTracer {
         // traces to storage in a single batch operation.
         if depth == 0 && !self.pending_traces.is_empty() {
             let traces = std::mem::take(&mut self.pending_traces);
-            flush_call_traces(
-                context.db_mut().host,
-                &traces,
-                &self.transaction_hash,
-            )
-            .inspect_err(|err| {
-                log!(
-                    context.db_mut().host,
-                    Debug,
-                    "Flushing call traces failed with: {err:?}"
-                );
-            })
-            .ok();
+            flush_call_traces(context.db_mut().host, &traces, &self.transaction_hash)
+                .inspect_err(|err| {
+                    log!(
+                        context.db_mut().host,
+                        Debug,
+                        "Flushing call traces failed with: {err:?}"
+                    );
+                })
+                .ok();
         }
     }
 }
