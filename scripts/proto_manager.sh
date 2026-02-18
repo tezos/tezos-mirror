@@ -976,6 +976,28 @@ function commit_11_remove_source_protocol() {
   fi
 }
 
+# COMMIT 12: Add protocol to agnostic baker
+#
+# MODE: both
+# MODIFIES: src/lib_agnostic_baker/parameters.ml
+#
+# DESCRIPTION:
+#   Adds the new protocol hash to the agnostic baker parameters.ml file.
+#   Inserts the long_hash before the alpha protocol placeholder.
+#   Only adds if the hash is not already present (idempotent).
+#
+# CREATES: 0-1 commits: "src: add protocol to agnostic_baker" (if hash not already present)
+function commit_12_update_agnostic_baker() {
+  ## update agnostic_baker
+  ## add protocol as active before alpha in parameters.ml
+  if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
+    ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
+    sed -i.old "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"/i\"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
+    ocamlformat -i src/lib_agnostic_baker/parameters.ml
+    commit "src: add protocol to agnostic_baker"
+  fi
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -1039,14 +1061,7 @@ function copy_source() {
 
   commit_11_remove_source_protocol
 
-  ## update agnostic_baker
-  ## add protocol as active before alpha in parameters.ml
-  if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
-    ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
-    sed -i.old "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"/i\"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
-    ocamlformat -i src/lib_agnostic_baker/parameters.ml
-    commit "src: add protocol to agnostic_baker"
-  fi
+  commit_12_update_agnostic_baker
 
 }
 
