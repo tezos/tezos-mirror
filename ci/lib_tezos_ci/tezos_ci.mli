@@ -646,6 +646,13 @@ module Images : sig
 
     val rockylinux_9 : Image.t
 
+    (* FIXME: Images.rockylinux_10 is currently not used in the CI
+       code. However the corresponding base image is used but called
+       via an interpolated string:
+       cf. https://gitlab.com/tezos/tezos/-/blob/fc6f196b819642ce7c3a39f588de00bd8ebc28e8/.gitlab/ci/pipelines/rpm.daily.yml#L58
+       "${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}-master-03271731"
+       We choose to keep this expression
+       for now anticipating a future refactoring that would use it. *)
     val rockylinux_10 : Image.t
 
     val fedora_39 : Image.t
