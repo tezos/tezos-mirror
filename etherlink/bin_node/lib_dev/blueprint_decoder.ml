@@ -50,9 +50,11 @@ let from_rlp rlp =
     List.map_e
       (function
         | Value bytes ->
-            let* raw_tx =
+            let* raw_tx, common_tx =
               match version with
-              | Legacy -> return (Bytes.to_string bytes)
+              | Legacy ->
+                  let raw_tx = Bytes.to_string bytes in
+                  return (raw_tx, Broadcast.Evm raw_tx)
               | V1 ->
                   let length = Bytes.length bytes in
                   if length = 0 then tzfail Sequencer_blueprint.Not_a_blueprint
@@ -61,11 +63,15 @@ let from_rlp rlp =
                     let raw_tx =
                       String.sub (Bytes.to_string bytes) 1 (length - 1)
                     in
-                    if String.make 1 tag = Sequencer_blueprint.evm_runtime_id
-                    then return raw_tx
+                    let tag_string = String.make 1 tag in
+                    if tag_string = Sequencer_blueprint.evm_runtime_id then
+                      return (raw_tx, Broadcast.Evm raw_tx)
+                    else if
+                      tag_string = Sequencer_blueprint.michelson_runtime_id
+                    then return (raw_tx, Broadcast.Michelson raw_tx)
                     else tzfail Sequencer_blueprint.Not_a_blueprint
             in
-            return (Ethereum_types.hash_raw_tx raw_tx, Some raw_tx)
+            return (Ethereum_types.hash_raw_tx raw_tx, Some common_tx)
         | _ -> tzfail Sequencer_blueprint.Not_a_blueprint)
       transactions
   in

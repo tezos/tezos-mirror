@@ -71,7 +71,8 @@ module Types = struct
     | Validating_txs of {
         timestamp : Time.Protocol.t;
         rev_delayed_txs : Ethereum_types.hash list;
-        rev_validated_txs : (string * Ethereum_types.hash) list;
+        rev_validated_txs :
+          (Broadcast.common_transaction * Ethereum_types.hash) list;
         validation_state : Validation_types.validation_state;
       }
 
@@ -440,13 +441,11 @@ let pop_valid_tx (head_info : Evm_context.head) ~maximum_cumulative_size =
     let l =
       List.map
         (fun (raw, tx) ->
-          let hash =
-            match tx with
-            | Tx_queue_types.Evm tx -> Transaction_object.hash tx
-            | Tx_queue_types.Michelson tx ->
-                Tezos_types.Operation.hash_operation tx
-          in
-          (raw, hash))
+          match tx with
+          | Tx_queue_types.Evm tx ->
+              (Broadcast.Evm raw, Transaction_object.hash tx)
+          | Tx_queue_types.Michelson tx ->
+              (Broadcast.Michelson raw, Tezos_types.Operation.hash_operation tx))
         l
     in
     return l
@@ -569,11 +568,6 @@ let add_selected_delayed_txs (head_info : Evm_context.head)
 let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
     validation_state preconfirmation_state =
   let open Lwt_result_syntax in
-  let raw_tx =
-    match wrapped_raw_tx with
-    | Broadcast.Evm raw_tx -> raw_tx
-    | Broadcast.Michelson raw_tx -> raw_tx
-  in
   match preconfirmation_state with
   | Types.Potential_next_block_timestamp timestamp ->
       let* () =
@@ -588,7 +582,7 @@ let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
              timestamp;
              rev_delayed_txs = [];
              validation_state;
-             rev_validated_txs = [(raw_tx, tx_hash)];
+             rev_validated_txs = [(wrapped_raw_tx, tx_hash)];
            })
   | Selecting_delayed_txs {timestamp; rev_delayed_txs; current_size = _} ->
       let*! () = notify_common_tx ~wrapped_raw_tx ~tx_hash in
@@ -598,7 +592,7 @@ let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
              timestamp;
              rev_delayed_txs;
              validation_state;
-             rev_validated_txs = [(raw_tx, tx_hash)];
+             rev_validated_txs = [(wrapped_raw_tx, tx_hash)];
            })
   | Validating_txs
       {timestamp; rev_delayed_txs; rev_validated_txs; validation_state = _} ->
@@ -608,7 +602,7 @@ let add_validated_tx (head_info : Evm_context.head) ~wrapped_raw_tx ~tx_hash
            {
              timestamp;
              rev_delayed_txs;
-             rev_validated_txs = (raw_tx, tx_hash) :: rev_validated_txs;
+             rev_validated_txs = (wrapped_raw_tx, tx_hash) :: rev_validated_txs;
              validation_state;
            })
 

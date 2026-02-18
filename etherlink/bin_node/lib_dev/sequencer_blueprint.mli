@@ -83,11 +83,16 @@ type blueprint_version = Legacy | V1
 
 val evm_runtime_id : string
 
+val michelson_runtime_id : string
+
+(** Prepend to a raw transaction the id of its runtime. *)
+val tag_transaction : Broadcast.common_transaction -> string
+
 type kernel_blueprint = {
   version : blueprint_version;
   parent_hash : Ethereum_types.block_hash;
   delayed_transactions : Ethereum_types.hash list;
-  transactions : string list;
+  transactions : Broadcast.common_transaction list;
   timestamp : Time.Protocol.t;
 }
 

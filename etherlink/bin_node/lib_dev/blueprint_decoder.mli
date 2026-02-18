@@ -9,4 +9,5 @@
     transactions along with their hash (except for delayed transactions, as the
     raw transaction is not contained in the blueprint in this case). *)
 val transactions :
-  Blueprint_types.payload -> (Ethereum_types.hash * string option) list tzresult
+  Blueprint_types.payload ->
+  (Ethereum_types.hash * Broadcast.common_transaction option) list tzresult

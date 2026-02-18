@@ -26,6 +26,8 @@ let bytes_typ =
     (fun fmt bytes -> Hex.pp fmt (Hex.of_bytes bytes))
     Bytes.compare
 
+let common_tx_typ = Check.(convert Sequencer_blueprint.tag_transaction string)
+
 let register ?(tags = []) =
   Test.register
     ~uses_node:false
@@ -122,7 +124,7 @@ let test_blueprint_roundtrip ~title ~delayed_transactions ~transactions ~version
       ~error_msg:"Wrong decoded of delayed transactions: got %L instead of %R") ;
   Check.(
     (transactions_decoded = transactions)
-      (list string)
+      (list common_tx_typ)
       ~error_msg:"Wrong decoded of delayed transactions: got %L instead of %R") ;
   unit
 
@@ -328,7 +330,7 @@ let () =
   test_blueprint_roundtrip
     ~title:"only transactions, legacy"
     ~delayed_transactions:[]
-    ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~transactions:[Evm "txntxntxn"; Evm "txntxntxntxn"]
     ~version:Legacy
     () ;
 
@@ -346,22 +348,31 @@ let () =
   test_blueprint_roundtrip
     ~title:"both delayed and regular transactions, legacy"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
-    ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~transactions:[Evm "txntxntxn"; Evm "txntxntxntxn"]
     ~version:Legacy
     () ;
 
   test_blueprint_roundtrip
     ~title:"both delayed and regular transactions, V1"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
-    ~transactions:["txntxntxn"; "txntxntxntxn"]
+    ~transactions:[Evm "txntxntxn"; Michelson "txntxntxntxn"]
     ~version:V1
     () ;
 
   test_blueprint_roundtrip
-    ~title:"large transaction"
+    ~title:"large transaction, Legacy"
     ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
-    ~transactions:["txntxntxn"; "txntxntxntxn"; String.make 10_000 't']
+    ~transactions:
+      [Evm "txntxntxn"; Evm "txntxntxntxn"; Evm (String.make 10_000 't')]
     ~version:Legacy
+    () ;
+
+  test_blueprint_roundtrip
+    ~title:"large transaction, V1"
+    ~delayed_transactions:[Ethereum_types.hash_raw_tx "txntxntxntxn"]
+    ~transactions:
+      [Evm "txntxntxn"; Michelson "txntxntxntxn"; Evm (String.make 10_000 't')]
+    ~version:V1
     () ;
 
   test_tez_latest_block_roundtrip ~title:"all zeros tez block"

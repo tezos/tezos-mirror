@@ -1049,11 +1049,14 @@ let reconstruct_from_transactions_list transactions
       (* It is a delayed transaction, there is nothing we can do except
          returning the potentially incorrect transaction object *)
       return (from_store_transaction_object obj)
-  | Some (Some raw_txn) ->
+  | Some (Some (Broadcast.Evm raw_txn)) ->
       (* We have the original transaction, let's try to reconstruct the
          transaction object *)
       let* res = reconstruct_from_raw_transaction obj raw_txn in
       return res
+  | Some (Some (Broadcast.Michelson _)) ->
+      (* Reconstructing a Tezos operation does not make sense. *)
+      error_with "Tezos operations cannot be reconstructed"
 
 let reconstruct payload (obj : legacy_transaction_object) =
   let open Result_syntax in

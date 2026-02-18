@@ -102,17 +102,26 @@ type blueprint_version = Legacy | V1
 
 let evm_runtime_id = "\001"
 
-let encode_transaction ~version raw =
+let michelson_runtime_id = "\000"
+
+let tag_transaction (tx : Broadcast.common_transaction) : string =
+  match tx with
+  | Evm raw -> evm_runtime_id ^ raw
+  | Michelson raw -> michelson_runtime_id ^ raw
+
+let encode_transaction ~version (tx : Broadcast.common_transaction) =
   let open Rlp in
   match version with
-  | Legacy -> Value (Bytes.of_string raw)
-  | V1 -> Value (Bytes.of_string (evm_runtime_id ^ raw))
+  | Legacy ->
+      let raw = match tx with Evm raw -> raw | Michelson raw -> raw in
+      Value (Bytes.of_string raw)
+  | V1 -> Value (Bytes.of_string (tag_transaction tx))
 
 type kernel_blueprint = {
   version : blueprint_version;
   parent_hash : block_hash;
   delayed_transactions : hash list;
-  transactions : string list;
+  transactions : Broadcast.common_transaction list;
   timestamp : Time.Protocol.t;
 }
 
