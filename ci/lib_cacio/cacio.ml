@@ -204,6 +204,7 @@ type job = {
   cargo_cache : bool;
   sccache : sccache_config option;
   dune_cache : bool;
+  disable_datadog : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   timeout : Gitlab_ci.Types.time_interval option;
@@ -546,6 +547,7 @@ let convert_graph ?(interruptible_pipeline = true)
                     cargo_cache;
                     sccache;
                     dune_cache;
+                    disable_datadog;
                     allow_failure;
                     retry;
                     timeout;
@@ -641,6 +643,7 @@ let convert_graph ?(interruptible_pipeline = true)
                 ?timeout
                 ?variables
                 ?artifacts
+                ~datadog:(not disable_datadog)
                 ?allow_failure
                 ?cache
                 script
@@ -712,6 +715,7 @@ module type COMPONENT_API = sig
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:bool ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
@@ -735,6 +739,7 @@ module type COMPONENT_API = sig
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?disable_datadog:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -943,8 +948,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?storage ?tag ~image ?only_if_changed ?(force = false)
       ?(force_if_label = []) ?(needs = []) ?(needs_legacy = []) ?parallel
       ?variables ?artifacts ?cache ?(cargo_cache = false) ?sccache
-      ?(dune_cache = false) ?allow_failure ?retry ?timeout
-      ?(image_dependencies = []) ?services name script =
+      ?(dune_cache = false) ?(disable_datadog = false) ?allow_failure ?retry
+      ?timeout ?(image_dependencies = []) ?services name script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -989,6 +994,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       cargo_cache;
       sccache;
       dune_cache;
+      disable_datadog;
       allow_failure;
       retry;
       timeout;
@@ -1022,7 +1028,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
       ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?tag ?only_if_changed
-      ?(needs = []) ?needs_legacy ?allow_failure ?tezt_exe
+      ?(needs = []) ?needs_legacy ?disable_datadog ?allow_failure ?tezt_exe
       ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
       ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
@@ -1230,6 +1236,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
            ]
            ~expire_in:(Duration (Days 7))
            ~when_:Always)
+      ?disable_datadog
       ?allow_failure
       ?retry:
         (match retry_jobs with
