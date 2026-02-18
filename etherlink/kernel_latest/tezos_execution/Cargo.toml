@@ -32,6 +32,7 @@ tezos_tezlink.workspace = true
 tezos-evm-logging.workspace = true
 mir.workspace = true
 tezos-protocol.workspace = true
+sha3.workspace = true
 
 tezosx-interfaces.workspace = true
 

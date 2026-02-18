@@ -1298,7 +1298,7 @@ pub(crate) mod test_utils {
     /// Tracks all calls to bridge and generate_alias for verification.
     pub struct MockRegistry {
         pub generate_alias_calls: RefCell<Vec<(Vec<u8>, RuntimeId)>>,
-        pub bridge_calls: RefCell<Vec<(RuntimeId, Vec<u8>, Vec<u8>, U256)>>,
+        pub bridge_calls: RefCell<Vec<(RuntimeId, Vec<u8>, Vec<u8>, U256, Vec<u8>)>>,
         generated_alias: Vec<u8>,
     }
 
@@ -1320,7 +1320,7 @@ pub(crate) mod test_utils {
             destination_address: &[u8],
             source_address: &[u8],
             amount: U256,
-            _data: &[u8],
+            data: &[u8],
             _context: CrossRuntimeContext,
         ) -> Result<CrossCallResult, TezosXRuntimeError> {
             self.bridge_calls.borrow_mut().push((
@@ -1328,6 +1328,7 @@ pub(crate) mod test_utils {
                 destination_address.to_vec(),
                 source_address.to_vec(),
                 amount,
+                data.to_vec(),
             ));
             Ok(CrossCallResult::Success(vec![]))
         }
