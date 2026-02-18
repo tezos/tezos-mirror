@@ -437,20 +437,6 @@ let jobs pipeline_type =
       in
       [job_test_sdk_rust]
     in
-    let jobs_sdk_bindings : tezos_job list =
-      let job_test_sdk_bindings =
-        Sdk_bindings_ci.job_test
-          ~dependencies:dependencies_needs_start
-          ~rules:
-            (job_rule ~allow_failure:Yes ()
-            :: make_rules
-                 ~dependent:true
-                 ~changes:changeset_test_sdk_bindings
-                 ())
-          ()
-      in
-      [job_test_sdk_bindings]
-    in
 
     let jobs_packaging =
       match pipeline_type with
@@ -458,7 +444,7 @@ let jobs pipeline_type =
           [job_debian_repository_trigger_auto; job_homebrew_trigger_auto]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_install_octez
+    jobs_packaging @ jobs_sdk_rust @ jobs_install_octez
   in
 
   (* Manual jobs *)

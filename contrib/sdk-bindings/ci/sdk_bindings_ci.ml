@@ -8,22 +8,50 @@
 open Tezos_ci
 open Tezos_ci.Cache
 
-(** Set of SDK-bindings related files *)
-let changeset = Changeset.make ["sdk/rust/**/*"; "contrib/sdk-bindings/**/*"]
+module Files = struct
+  let image =
+    [
+      "images/rust-sdk-bindings/**/*";
+      "images/create_image.sh";
+      "images/scripts/install_datadog_static.sh";
+      "scripts/version.sh";
+    ]
 
-let job_test ?dependencies ?rules () =
-  job
+  let code = ["sdk/rust/**/*"; "contrib/sdk-bindings/**/*"]
+
+  let all = image @ code
+end
+
+module CI = Cacio.Make (struct
+  let name = "sdk_bindings"
+
+  let paths = Files.all
+end)
+
+(** Set of SDK-bindings related files *)
+let changeset = Changeset.make Files.all
+
+let job_test =
+  CI.job
+    "test"
     ~__POS__
-    ~name:"test_sdk_bindings"
     ~description:"Tests bindings of the Rust SDK"
     ~image:Images.rust_sdk_bindings
-    ~stage:Stages.test
-    ?dependencies
-    ~before_script:[". $HOME/.venv/bin/activate"]
-    ?rules
-    ["make -C contrib/sdk-bindings check"; "make -C contrib/sdk-bindings test"]
-  |> enable_cargo_cache
-  |> enable_sccache ~policy:Pull_push
+    ~stage:Test
+    ~allow_failure:Yes
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ~policy:Pull_push ())
+    [
+      ". $HOME/.venv/bin/activate";
+      "make -C contrib/sdk-bindings check";
+      "make -C contrib/sdk-bindings test";
+    ]
+
+let () =
+  CI.register_merge_request_jobs [(Auto, job_test)] ;
+  (* TODO: split into a new pipeline [sdk_bindings.daily] *)
+  Cacio.Shared.register_schedule_extended_test_jobs [(Auto, job_test)] ;
+  ()
 
 module Release = struct
   (** Jobs and pipelines to release SDK bindings for each supported language *)

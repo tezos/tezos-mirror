@@ -651,48 +651,6 @@ test_sdk_rust:
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
 
-test_sdk_bindings:
-  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-    allow_failure: true
-  - when: on_success
-  needs:
-  - oc.docker:rust-sdk-bindings:amd64
-  dependencies:
-  - oc.docker:rust-sdk-bindings:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C contrib/sdk-bindings check
-  - make -C contrib/sdk-bindings test
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_WRITE
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
 oc.install_opam_noble:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
   stage: test
@@ -783,6 +741,45 @@ oc.compile_sources_doc:
     - IMAGE:
       - build-debian-trixie:master
       - build-ubuntu-noble:master
+
+sdk_bindings.test:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-sdk-bindings:amd64
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  allow_failure: true
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - . $HOME/.venv/bin/activate
+  - make -C contrib/sdk-bindings check
+  - make -C contrib/sdk-bindings test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 check_riscv_kernels:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-rust:trixie-master-03271731
