@@ -1162,6 +1162,33 @@ function protocol_tests_commit_03_update_scoru_wasm_migration() {
   commit_no_hooks "scoru: update scoru_wasm protocol_migration"
 }
 
+# PROTOCOL_TESTS COMMIT 4: Update SC rollup WASM test
+#
+# MODE: conditional (copy vs stabilise)
+# MODIFIES: src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml
+#
+# DESCRIPTION:
+#   Updates the SC rollup WASM test file in the protocol directory.
+#   - copy mode: uses source_label for constant reference
+#   - stabilise mode: uses protocol_source for constant reference
+#   Updates protocol names, migration constants, and WASM constants.
+#
+# CREATES: 1 commit: "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+function protocol_tests_commit_04_update_sc_rollup_test() {
+  if [[ ${command} == "copy" ]]; then
+    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
+      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
+      -e "s/Tezos_scoru_wasm.Constants.proto_${source_label}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
+      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+  else
+    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
+      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
+      -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
+      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+  fi
+  ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
+  commit_no_hooks "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+}
 function update_protocol_tests() {
 
   if [[ $skip_update_protocol_tests ]]; then
@@ -1177,19 +1204,7 @@ function update_protocol_tests() {
 
   protocol_tests_commit_03_update_scoru_wasm_migration
 
-  if [[ ${command} == "copy" ]]; then
-    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
-      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
-      -e "s/Tezos_scoru_wasm.Constants.proto_${source_label}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
-      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
-  else
-    sed -e "s/Proto_${protocol_source}/${capitalized_label}/g" \
-      -e "s/\(Protocol_migration ${capitalized_source}\)/(Protocol_migration ${capitalized_label})/g" \
-      -e "s/Tezos_scoru_wasm.Constants.proto_${protocol_source}_name/Tezos_scoru_wasm.Constants.proto_${label}_name/g" \
-      -i.old "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
-  fi
-  ocamlformat -i "src/proto_${new_protocol_name}/lib_protocol/test/unit/test_sc_rollup_wasm.ml"
-  commit_no_hooks "sc_rollup: update proto_${new_protocol_name}/test/unit/test_sc_rollup_wasm"
+  protocol_tests_commit_04_update_sc_rollup_test
 
 }
 
