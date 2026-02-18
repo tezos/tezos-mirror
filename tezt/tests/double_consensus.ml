@@ -540,7 +540,7 @@ let attestation_and_aggregation_wrong_payload_hash =
           (["allow_tz4_delegate_enable"], `Bool true);
           (["aggregate_attestation"], `Bool true);
           (* Diminish some constants to activate consensus keys faster *)
-          (["blocks_per_cycle"], `Int 2);
+          (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);
         ]
        @
@@ -575,7 +575,7 @@ let attestation_and_aggregation_wrong_payload_hash =
       ]
   in
   (* Bake until consensus keys become active *)
-  let* level = Client.bake_for_and_wait_level ~keys ~count:6 client in
+  let* level = Client.bake_for_and_wait_level ~keys ~count:8 client in
   (* Bake a block: it is expected to contain an attestations_aggregate with all
      bootstrap accounts *)
   let* () = Client.bake_for_and_wait ~keys client in
@@ -662,7 +662,7 @@ let double_aggregation_wrong_payload_hash =
           (["allow_tz4_delegate_enable"], `Bool true);
           (["aggregate_attestation"], `Bool true);
           (* Diminish some constants to activate consensus keys faster. *)
-          (["blocks_per_cycle"], `Int 3);
+          (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);
         ]
        @
@@ -725,7 +725,7 @@ let double_aggregation_wrong_payload_hash =
     [ck1.public_key_hash; ck2.public_key_hash; bootstrap4.public_key_hash]
   in
   (* Bake until consensus keys become active *)
-  let* level = Client.bake_for_and_wait_level ~keys ~count:5 client1 in
+  let* level = Client.bake_for_and_wait_level ~keys ~count:7 client1 in
   let* _ = Node.wait_for_level node2 level in
   (* Disconnect nodes *)
   let* () = Client.Admin.kick_peer ~peer:node2_id client1 in
@@ -908,7 +908,7 @@ let preattestation_and_aggregation_wrong_payload_hash =
       ~base:(Right (protocol, None))
       (([
           (* Diminish some constants to activate consensus keys faster. *)
-          (["blocks_per_cycle"], `Int 3);
+          (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);
         ]
        @
@@ -952,7 +952,7 @@ let preattestation_and_aggregation_wrong_payload_hash =
     ]
   in
   (* Bake until consensus keys become active *)
-  let* level = Client.bake_for_and_wait_level ~keys ~count:7 client in
+  let* level = Client.bake_for_and_wait_level ~keys ~count:9 client in
   (* Inject preattestations with a (dummy) block_payload_hash *)
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client in
@@ -1063,7 +1063,7 @@ let double_preattestation_aggregation_wrong_payload_hash =
       ~base:(Right (protocol, None))
       (([
           (* Diminish some constants to activate consensus keys faster. *)
-          (["blocks_per_cycle"], `Int 3);
+          (["blocks_per_cycle"], `Int 4);
           (["nonce_revelation_threshold"], `Int 1);
         ]
        @
@@ -1124,7 +1124,7 @@ let double_preattestation_aggregation_wrong_payload_hash =
   in
   let double_preattesting_keys = public_key_hashes [ck1; ck2; bootstrap4] in
   (* Bake until consensus keys become active *)
-  let* level = Client.bake_for_and_wait_level ~keys ~count:5 client1 in
+  let* level = Client.bake_for_and_wait_level ~keys ~count:7 client1 in
   let* _ = Node.wait_for_level node2 level in
   (* Disconnect nodes *)
   let* () = Client.Admin.kick_peer ~peer:node2_id client1 in
