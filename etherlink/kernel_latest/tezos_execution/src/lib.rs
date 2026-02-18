@@ -597,23 +597,21 @@ fn get_contract_entrypoint<C: Context>(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-pub fn transfer_external<'a, Host: Runtime, C: Context>(
+fn transfer_external<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
-    sender: &impl TezlinkAccount,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     parser: &'a Parser<'a>,
-    skip_sender_debit: bool,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         tc_ctx.host,
         Debug,
         "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
-        sender.contract()
+        operation_ctx.source.contract()
     );
     let entrypoint = &parameters.entrypoint;
     let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
@@ -622,14 +620,14 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
         tc_ctx,
         operation_ctx,
         registry,
-        sender,
+        operation_ctx.source,
         amount,
         dest,
         entrypoint,
         value,
         parser,
         all_internal_receipts,
-        skip_sender_debit,
+        false, // external operations always debit the sender
     )
     .map(Into::into)
 }
@@ -1218,13 +1216,11 @@ fn apply_operation<Host: Runtime, C: Context>(
                 &mut tc_ctx,
                 &mut operation_ctx,
                 registry,
-                source_account,
                 amount,
                 destination,
                 parameters,
                 &mut internal_operations_receipts,
                 &parser,
-                false,
             );
 
             if transfer_result.is_err() {
