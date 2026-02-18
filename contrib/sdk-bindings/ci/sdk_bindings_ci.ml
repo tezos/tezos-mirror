@@ -161,31 +161,25 @@ module Release = struct
     build_python_sdk
 
   let job_publish_sdk =
-    let maturin_variables : Gitlab_ci.Types.variables =
-      [
-        ("MATURIN_REPOSITORY", "testpypi");
-        ("MATURIN_PYPI_TOKEN", "$CI_TESTPYPI_TOKEN");
-      ]
-    in
-    let dependencies =
-      Dependent (List.map (fun job -> Artifacts job) jobs_build_sdk)
-    in
-    job
+    CI.job
+      "publish"
       ~__POS__
-      ~name:"publish_sdk"
       ~description:"Publish all previously built SDK"
-      ~stage:Stages.publish
+      ~stage:Publish
       ~image:Images.rust_sdk_bindings
-      ~variables:maturin_variables
-      ~dependencies
-      ~before_script:[". $HOME/.venv/bin/activate"]
-      ["make -C contrib/sdk-bindings publish"]
+      ~variables:
+        [
+          ("MATURIN_REPOSITORY", "testpypi");
+          ("MATURIN_PYPI_TOKEN", "$CI_TESTPYPI_TOKEN");
+        ]
+      ~needs_legacy:
+        (List.map (fun job -> (Cacio.Artifacts, job)) jobs_build_sdk)
+      [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
 
   let () =
     (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
     CI.register_dedicated_release_pipeline
       ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
-      ~legacy_jobs:
-        ([job_check_matching_tag] @ jobs_build_sdk @ [job_publish_sdk])
-      []
+      ~legacy_jobs:([job_check_matching_tag] @ jobs_build_sdk)
+      [(Auto, job_publish_sdk)]
 end

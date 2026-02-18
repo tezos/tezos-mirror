@@ -195,11 +195,11 @@ build_python_sdk_windows:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
 
-publish_sdk:
+sdk_bindings.publish:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:rust-sdk-bindings:amd64
   - build_python_sdk_linux
@@ -211,12 +211,13 @@ publish_sdk:
   - build_python_sdk_macos
   - build_python_sdk_windows
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - . $HOME/.venv/bin/activate
   - make -C contrib/sdk-bindings publish
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -224,3 +225,4 @@ publish_sdk:
   variables:
     MATURIN_REPOSITORY: testpypi
     MATURIN_PYPI_TOKEN: $CI_TESTPYPI_TOKEN
+  retry: 0
