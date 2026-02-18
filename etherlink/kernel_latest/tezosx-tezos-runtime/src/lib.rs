@@ -68,7 +68,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         to: &[u8],
         amount: U256,
         _data: &[u8],
-        _context: CrossRuntimeContext,
+        cross_ctx: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         let dest = Contract::nom_read_exact(to).map_err(|e| {
             TezosXRuntimeError::ConversionError(format!(
@@ -120,7 +120,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         // the actual values through RuntimeInterface::call:
         //   - gas_limit (currently MAX_LIMIT)
         //   - next_temporary_id for big maps (currently 0)
-        //   - block level, timestamp, chain_id (currently zeros)
+        //   - chain_id (currently zeros)
         //   - operation hash, origination nonce, counter (currently zeros)
 
         let mut gas = TezlinkOperationGas::start(&Narith(
@@ -138,8 +138,20 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
             big_map_diff: BTreeMap::new(),
             next_temporary_id: &mut next_temp_id,
         };
-        let level = tezos_tezlink::enc_wrappers::BlockNumber { block_number: 0 };
-        let now = tezos_smart_rollup::types::Timestamp::from(0i64);
+        let level = tezos_tezlink::enc_wrappers::BlockNumber {
+            block_number: cross_ctx.block_number.try_into().map_err(|_| {
+                TezosXRuntimeError::ConversionError(
+                    "block_number exceeds u32::MAX".to_string(),
+                )
+            })?,
+        };
+        let now = tezos_smart_rollup::types::Timestamp::from(
+            i64::try_from(cross_ctx.timestamp).map_err(|_| {
+                TezosXRuntimeError::ConversionError(
+                    "timestamp exceeds i64::MAX".to_string(),
+                )
+            })?,
+        );
         let chain_id = tezos_crypto_rs::hash::ChainId::try_from_bytes(&[0u8; 4]).unwrap();
         let mut nonce = OriginationNonce::initial(OperationHash::default());
         let mut counter = 0u128;
