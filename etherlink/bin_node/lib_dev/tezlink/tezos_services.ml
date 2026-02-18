@@ -217,10 +217,17 @@ module Tezlink_SeouLo_protocol = struct
 
     let constant = Tezlink_constants.all_constants.parametric in
     let* voting_period_info =
-      voting_period_info
-        ~block_per_cycle:constant.blocks_per_cycle
-        ~cycles_per_voting_period:constant.cycles_per_voting_period
-        ~level_info
+      let* imported_protocol_period_info =
+        voting_period_info
+          ~block_per_cycle:constant.blocks_per_cycle
+          ~cycles_per_voting_period:constant.cycles_per_voting_period
+          ~level_info
+      in
+      Tezos_types.convert_using_serialization
+        ~name:"SeouLo period info"
+        ~src:Imported_context.Voting_period.info_encoding
+        ~dst:SeouLo_context.Voting_period.info_encoding
+        imported_protocol_period_info
     in
     let* level_info = Protocol_types.Level.convert_seoulo level_info in
     return
@@ -289,17 +296,10 @@ module Tezlink_TALLiN_protocol = struct
 
     let constant = Tezlink_constants.all_constants.parametric in
     let* voting_period_info =
-      let* imported_protocol_period_info =
-        voting_period_info
-          ~block_per_cycle:constant.blocks_per_cycle
-          ~cycles_per_voting_period:constant.cycles_per_voting_period
-          ~level_info
-      in
-      Tezos_types.convert_using_serialization
-        ~name:"Tallinn period info"
-        ~src:Imported_context.Voting_period.info_encoding
-        ~dst:TALLiN_context.Voting_period.info_encoding
-        imported_protocol_period_info
+      voting_period_info
+        ~block_per_cycle:constant.blocks_per_cycle
+        ~cycles_per_voting_period:constant.cycles_per_voting_period
+        ~level_info
     in
     let* level_info = Protocol_types.Level.convert_tallin level_info in
     return
@@ -436,7 +436,7 @@ module Make_block_service
       operations
 end
 
-module Tezlink_imported_protocol = Tezlink_SeouLo_protocol
+module Tezlink_imported_protocol = Tezlink_TALLiN_protocol
 
 module Current_block_services = struct
   include
@@ -472,6 +472,7 @@ module Current_block_services = struct
              storage_size = Z.zero;
              paid_storage_size_diff = Z.zero;
              allocated_destination_contract = false;
+             address_registry_diff = [];
            })
     in
     let internal_operation_results = [] in
@@ -646,8 +647,8 @@ module Adaptive_issuance_services = struct
     {
       cycle = i;
       baking_reward_fixed_portion = Tez.one;
-      baking_reward_bonus_per_slot = Tez.one;
-      attesting_reward_per_slot = Tez.one;
+      baking_reward_bonus_per_block = Tez.one;
+      attesting_reward_per_block = Tez.one;
       dal_attesting_reward_per_shard = Tez.one;
       seed_nonce_revelation_tip = Tez.one;
       vdf_revelation_tip = Tez.one;

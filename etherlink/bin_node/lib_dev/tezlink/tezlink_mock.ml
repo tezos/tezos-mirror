@@ -78,11 +78,7 @@ let contents : Imported_context.Block_header.contents =
       Bytes.make
         Imported_protocol.Constants_repr.proof_of_work_nonce_size
         '\000';
-    per_block_votes =
-      {
-        liquidity_baking_vote = Per_block_vote_pass;
-        adaptive_issuance_vote = Per_block_vote_pass;
-      };
+    per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
   }
 
 let signature : Imported_protocol.Alpha_context.signature =
@@ -137,6 +133,7 @@ module Operation_metadata = struct
                   ticket_receipt = [];
                   originated_contracts = [];
                   consumed_gas = consumed_gas length;
+                  address_registry_diff = [];
                   storage_size = Z.zero;
                   paid_storage_size_diff = Z.zero;
                   allocated_destination_contract = false;

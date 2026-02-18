@@ -22,13 +22,13 @@ module TALLiN_plugin = Tezos_protocol_plugin_024_PtTALLiN
 module TALLiN_test_helpers = Tezos_024_PtTALLiN_test_helpers
 
 (* Current Tezlink protocol *)
-module Imported_protocol = SeouLo_protocol
-module Imported_protocol_plugin = SeouLo_plugin
-module Imported_protocol_parameters = SeouLo_parameter
-module Imported_env = SeouLo_env
-module Imported_context = SeouLo_context
+module Imported_protocol = TALLiN_protocol
+module Imported_protocol_plugin = TALLiN_plugin
+module Imported_protocol_parameters = TALLiN_parameter
+module Imported_env = TALLiN_env
+module Imported_context = TALLiN_context
 
 (* This is code only intended for testing. So this import is
    to be used sparingly, for temporary code. We import it to implement a
    temporary quick and dirty `list_entrypoints`. *)
-module Imported_protocol_test_helpers = SeouLo_test_helpers
+module Imported_protocol_test_helpers = TALLiN_test_helpers
