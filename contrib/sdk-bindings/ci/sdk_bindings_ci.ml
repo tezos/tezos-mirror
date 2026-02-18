@@ -181,21 +181,11 @@ module Release = struct
       ~before_script:[". $HOME/.venv/bin/activate"]
       ["make -C contrib/sdk-bindings publish"]
 
-  let jobs = [job_check_matching_tag] @ jobs_build_sdk @ [job_publish_sdk]
-
-  (* Matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
-  let tag_re = "/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
-
   let () =
-    let open Gitlab_ci in
-    let open Rules in
-    Pipeline.register
-      "publish_sdk_bindings_releases"
-      If.(on_tezos_namespace && push && has_tag_match tag_re)
-      ~jobs
-      ~description:
-        "Release tag pipeline for SDK-bindings.\n\n\
-         Created when the release manager pushes a tag in the format \
-         tezos-sdk-vX.Y.Z. Creates and publishes releases on each supported \
-         package manager. Supported package managers are: 'TestPyPI'"
+    (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
+    CI.register_dedicated_release_pipeline
+      ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
+      ~legacy_jobs:
+        ([job_check_matching_tag] @ jobs_build_sdk @ [job_publish_sdk])
+      []
 end

@@ -196,7 +196,7 @@ let () =
   let has_non_release_tag =
     let release_tags =
       octez_release_tags
-      @ [Sdk_bindings_ci.Release.tag_re; octez_packaging_revision_tag_re]
+      @ [octez_packaging_revision_tag_re]
       @ Cacio.get_release_tag_rexes ()
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))

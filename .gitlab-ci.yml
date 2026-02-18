@@ -7,7 +7,7 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^tezos-sdk-v\d+\.\d+\.\d+$/
     variables:
-      PIPELINE_TYPE: publish_sdk_bindings_releases
+      PIPELINE_TYPE: sdk_bindings.release
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "grafazos.daily"
     variables:
@@ -147,20 +147,20 @@ workflow:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
-      && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
-      && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
-      && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
-      && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
     when: always
@@ -285,7 +285,7 @@ dummy_job:
   - echo "This job will never execute"
 
 include:
-- local: .gitlab/ci/pipelines/publish_sdk_bindings_releases.yml
+- local: .gitlab/ci/pipelines/sdk_bindings.release.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^tezos-sdk-v\d+\.\d+\.\d+$/
@@ -424,20 +424,20 @@ include:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
-      && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
-      && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/non_release_tag_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
-      && $CI_COMMIT_TAG !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/
-      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/
-      && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
-      && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-\d+$/ && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
+      && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/ && $CI_COMMIT_TAG
+      !~ /^tezos-sdk-v\d+\.\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:
