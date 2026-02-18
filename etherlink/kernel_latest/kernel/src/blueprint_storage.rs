@@ -50,6 +50,9 @@ const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/evm/current_block_header");
 
+const EVM_CURRENT_TEZ_BLOCK_HEADER: RefPath =
+    RefPath::assert_from(b"/evm/world_state/tezlink/current_chain_header");
+
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
 /// which can be chunked, and blueprints constructed from
@@ -516,6 +519,23 @@ where
 {
     let block_header = read_current_block_header::<_, rlp_helpers::IgnoredField>(host)?;
     Ok(block_header.blueprint_header)
+}
+
+pub fn store_current_tez_block_header<Host>(
+    host: &mut Host,
+    header: &TezBlockHeader,
+) -> Result<(), Error>
+where
+    Host: StorageV1 + Logging,
+{
+    store_rlp(header, host, &EVM_CURRENT_TEZ_BLOCK_HEADER).map_err(Error::from)
+}
+
+pub fn read_current_tez_block_header<Host>(host: &Host) -> Result<TezBlockHeader, Error>
+where
+    Host: StorageV1 + Logging,
+{
+    Ok(read_rlp(host, &EVM_CURRENT_TEZ_BLOCK_HEADER)?)
 }
 
 /// For the tick model we only accept blueprints where cumulative size of chunks
