@@ -669,6 +669,18 @@ module Image = struct
 
   let mk_external ~image_path : t = External (Image image_path)
 
+  (** Register internal image for [image_path] built by [image_builder_amd64].
+
+      Optionally, a builder for an arm64 version of the image can be
+      registered by supplying [image_builder_arm64]. If
+      [image_builder_arm64] is supplied, then it must have a distinct
+      name from [image_builder_amd64].
+
+      Note: the name of the image builder(s) must uniquely identify the
+      job definition. If two image builders with the same name but
+      differing job definitions (as per polymorphic comparison of the
+      underlying {!Gitlab_ci.Types.job}) are registered, then this
+      function throws a run-time error. *)
   let mk_internal ?image_builder_arm64 ~image_builder_amd64 ~image_path () : t =
     let image =
       Internal
