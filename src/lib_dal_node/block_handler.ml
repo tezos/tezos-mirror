@@ -339,6 +339,24 @@ let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     attestations ;
   count_per_slot
 
+let convert_attestations_to_cache_format (type tb_slot dal_attestations)
+    (module Plugin : Dal_plugin.T
+      with type tb_slot = tb_slot
+       and type dal_attestations = dal_attestations) attestations =
+  List.map
+    (fun (tb_slot, _op, dal_att_opt) ->
+      ( Plugin.tb_slot_to_int tb_slot,
+        Option.map
+          (fun dal_att ~number_of_slots ~number_of_lags ~lag_index slot_index ->
+            Plugin.is_baker_attested
+              dal_att
+              ~number_of_slots
+              ~number_of_lags
+              ~lag_index
+              slot_index)
+          dal_att_opt ))
+    attestations
+
 let check_attesters_attested cctxt node_ctxt committee slot_to_committee
     parameters ~block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
@@ -363,25 +381,14 @@ let check_attesters_attested cctxt node_ctxt committee slot_to_committee
             let* attestations =
               Plugin.get_attestations ~block_level:attested_level cctxt
             in
-            return
-            @@ List.map
-                 (fun (tb_slot, _op, dal_att_opt) ->
-                   ( Plugin.tb_slot_to_int tb_slot,
-                     Option.map
-                       (fun dal_att
-                            ~number_of_slots
-                            ~number_of_lags
-                            ~lag_index
-                            slot_index
-                          ->
-                         Plugin.is_baker_attested
-                           dal_att
-                           ~number_of_slots
-                           ~number_of_lags
-                           ~lag_index
-                           slot_index)
-                       dal_att_opt ))
-                 attestations
+            let attestation_ops =
+              convert_attestations_to_cache_format (module Plugin) attestations
+            in
+            Attestation_ops_cache.add
+              cache
+              ~level:attested_level
+              ~attestation_ops ;
+            return attestation_ops
       in
       let* attestations_per_lag =
         List.mapi_es
@@ -656,24 +663,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
   let () =
     let cache = Node_context.get_attestation_ops_cache ctxt in
     let attestation_ops =
-      List.map
-        (fun (tb_slot, _op, dal_att_opt) ->
-          ( Plugin.tb_slot_to_int tb_slot,
-            Option.map
-              (fun dal_att
-                   ~number_of_slots
-                   ~number_of_lags
-                   ~lag_index
-                   slot_index
-                 ->
-                Plugin.is_baker_attested
-                  dal_att
-                  ~number_of_slots
-                  ~number_of_lags
-                  ~lag_index
-                  slot_index)
-              dal_att_opt ))
-        attestations
+      convert_attestations_to_cache_format (module Plugin) attestations
     in
     Attestation_ops_cache.add cache ~level:block_level ~attestation_ops
   in
