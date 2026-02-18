@@ -17,7 +17,7 @@ use revm_etherlink::{
     storage::{
         code::CodeStorage, version::read_evm_version, world_state_handler::StorageAccount,
     },
-    GasData,
+    ExecutionOutcome, GasData,
 };
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime::Runtime;
@@ -229,44 +229,30 @@ impl RuntimeInterface for EthereumRuntime {
         // TODO: L2-869
         let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
 
-        // TODO: L2-870 — pass the real amount to the EVM without debiting the
-        // caller. For now we credit the destination manually and pass zero
-        // value to the EVM.
-        let transfer_amount = u256_to_alloy(&amount);
-        if transfer_amount > AlloyU256::ZERO {
-            let mut to_account = StorageAccount::from_address(&destination)?;
-            let mut to_info = to_account.info(host)?;
-            to_info.balance =
-                to_info
-                    .balance
-                    .checked_add(transfer_amount)
-                    .ok_or_else(|| {
-                        TezosXRuntimeError::Custom("Balance overflow".to_string())
-                    })?;
-            to_account.set_info(host, to_info)?;
-        }
-        let value = AlloyU256::ZERO;
+        let value = u256_to_alloy(&amount);
         let call_data = Bytes::from(data.to_vec());
 
-        // Run the EVM transaction
-        let outcome = run_transaction(
-            host,
-            registry,
-            evm_version.into(),
-            &block_constants,
-            None, // no transaction hash for cross-runtime transactions
-            caller,
-            Some(destination),
-            call_data,
-            gas_data,
-            value,
-            revm::context::transaction::AccessList(vec![]),
-            None,  // no authorization list
-            None,  // no tracer
-            false, // not a simulation
-        )
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+        // TODO: L2-885 this should be done using the revm journal.
+        let outcome = with_temporary_credit(caller, host, value, |host| {
+            run_transaction(
+                host,
+                registry,
+                evm_version.into(),
+                &block_constants,
+                None, // no transaction hash for cross-runtime transactions
+                caller,
+                Some(destination),
+                call_data,
+                gas_data,
+                value,
+                revm::context::transaction::AccessList(vec![]),
+                None,  // no authorization list
+                None,  // no tracer
+                false, // not a simulation
+            )
+            .map_err(|e| {
+                TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+            })
         })?;
 
         match outcome.result {
@@ -275,37 +261,11 @@ impl RuntimeInterface for EthereumRuntime {
                 Output::Create(bytes, _) => Ok(CrossCallResult::Success(bytes.to_vec())),
             },
             ExecutionResult::Revert { output, .. } => {
-                // TODO: L2-870 — That revert should be part of run_transaction.
-                if transfer_amount > AlloyU256::ZERO {
-                    let mut to_account = StorageAccount::from_address(&destination)?;
-                    let mut to_info = to_account.info(host)?;
-                    to_info.balance = to_info
-                        .balance
-                        .checked_sub(transfer_amount)
-                        .ok_or_else(|| {
-                            TezosXRuntimeError::Custom("Balance underflow".to_string())
-                        })?;
-                    to_account.set_info(host, to_info)?;
-                }
                 Ok(CrossCallResult::Revert(output.to_vec()))
             }
-            ExecutionResult::Halt { reason, .. } => {
-                // TODO: L2-870 — That revert should be part of run_transaction.
-                if transfer_amount > AlloyU256::ZERO {
-                    let mut to_account = StorageAccount::from_address(&destination)?;
-                    let mut to_info = to_account.info(host)?;
-                    to_info.balance = to_info
-                        .balance
-                        .checked_sub(transfer_amount)
-                        .ok_or_else(|| {
-                            TezosXRuntimeError::Custom("Balance underflow".to_string())
-                        })?;
-                    to_account.set_info(host, to_info)?;
-                }
-                Ok(CrossCallResult::Halt(
-                    format!("EVM call halted: {reason:?}").into_bytes(),
-                ))
-            }
+            ExecutionResult::Halt { reason, .. } => Ok(CrossCallResult::Halt(
+                format!("EVM call halted: {reason:?}").into_bytes(),
+            )),
         }
     }
 
@@ -334,6 +294,74 @@ impl RuntimeInterface for EthereumRuntime {
     fn string_from_address(&self, _address: &[u8]) -> Result<String, TezosXRuntimeError> {
         unimplemented!("Use mocks if you are in tests")
     }
+}
+
+/// Credits the caller alias with `value` so revm can debit it normally during
+/// execution (the real debit already happened on the source runtime), then
+/// runs `f`.
+///
+/// - On success: verifies that revm fully debited the alias — if not,
+///   resets the balance to zero and returns an error.
+/// - On revert/halt: revm reverted the debit so the temporary credit is
+///   still present — reset the balance to zero and return the outcome.
+/// - On error: resets the alias balance to zero.
+///
+/// TODO: L2-885 this should be done using the revm journal.
+fn with_temporary_credit<Host: Runtime>(
+    caller: Address,
+    host: &mut Host,
+    value: AlloyU256,
+    f: impl FnOnce(&mut Host) -> Result<ExecutionOutcome, TezosXRuntimeError>,
+) -> Result<ExecutionOutcome, TezosXRuntimeError> {
+    if value == AlloyU256::ZERO {
+        return f(host);
+    }
+
+    // value > zero
+    let mut caller_account = StorageAccount::from_address(&caller)?;
+    let mut caller_info = caller_account.info(host)?;
+    caller_info.balance = caller_info
+        .balance
+        .checked_add(value)
+        .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
+    caller_account.set_info(host, caller_info)?;
+
+    let outcome = f(host);
+
+    if matches!(
+        &outcome,
+        Ok(ExecutionOutcome {
+            result: ExecutionResult::Success { .. },
+            ..
+        })
+    ) {
+        // On success revm debited the alias — verify it's fully spent.
+        let caller_account = StorageAccount::from_address(&caller)?;
+        let caller_info = caller_account.info(host)?;
+        if caller_info.balance != AlloyU256::ZERO {
+            let remaining = caller_info.balance;
+            reset_balance(host, &caller)?;
+            return Err(TezosXRuntimeError::Custom(format!(
+                "Caller alias balance not zero after EVM execution: {remaining}"
+            )));
+        }
+    } else {
+        // On revert/halt revm reverted the debit, on error we just clean up.
+        reset_balance(host, &caller)?;
+    }
+
+    outcome
+}
+
+fn reset_balance<Host: Runtime>(
+    host: &mut Host,
+    address: &Address,
+) -> Result<(), TezosXRuntimeError> {
+    let mut account = StorageAccount::from_address(address)?;
+    let mut info = account.info(host)?;
+    info.balance = AlloyU256::ZERO;
+    account.set_info(host, info)?;
+    Ok(())
 }
 
 #[cfg(test)]
