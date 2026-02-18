@@ -121,6 +121,32 @@ module Files = struct
     ]
 end
 
+module Distribution = struct
+  type t = Debian | Ubuntu | Fedora | Rockylinux
+
+  let name = function
+    | Debian -> "debian"
+    | Ubuntu -> "ubuntu"
+    | Fedora -> "fedora"
+    | Rockylinux -> "rockylinux"
+
+  let releases = function
+    | Debian -> ["unstable"; "bookworm"; "trixie"]
+    | Ubuntu -> ["22.04"; "24.04"; "25.10"]
+    | Fedora -> ["39"; "42"]
+    | Rockylinux -> ["9"; "10"]
+
+  let release_matrix distro = [("RELEASE", releases distro)]
+
+  let dockerfile = function
+    | Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
+    | Fedora | Rockylinux -> "images/base-images/Dockerfile.rpm"
+
+  let base_changeset = function
+    | Debian | Ubuntu -> Files.debian_base
+    | Fedora | Rockylinux -> Files.rpm_base
+end
+
 (* [start_job] used to add dependency to [trigger] in [before_merging] pipelines.
 
    [changeset] should be set to [true] for [before_merging]/[merge_train] parent pipelines only.
@@ -221,6 +247,26 @@ let jobs ?start_job ?(changeset = false) () =
       ?dependencies
       [script]
   in
+
+  (* specialisation of [make_job_base_images] for distribution images.
+     - [base_name] used only for Rockylinux.
+     - if [changes] is not provided, we use the base changeset of the
+     distribution. This applies to base images that are not a
+     dependency of other images.  *)
+  let _make_job_base_image_distribution ?base_name ?changes distro =
+    make_job_base_images
+      ~__POS__
+      ~matrix:(Distribution.release_matrix distro)
+      ~image_name:(Distribution.name distro)
+      ?base_name
+      ~changes:
+        (* except for Debian, job changeset is the [Distribution.base_changeset] *)
+        (match changes with
+        | None -> Changeset.make @@ Distribution.base_changeset distro
+        | Some changes -> changes)
+      (Distribution.dockerfile distro)
+  in
+
   (* base images: deb and rpm distros *)
   let job_debian_based_images =
     let changes =
