@@ -75,7 +75,7 @@ check_sdk_version:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-build_python_sdk_linux:
+sdk_bindings.build_python_linux:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: build
   tags:
@@ -93,14 +93,15 @@ build_python_sdk_linux:
     - $CI_PROJECT_DIR/.cargo/registry/index
     - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - export CARGO_NET_OFFLINE=false
-  - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
+  - export CARGO_NET_OFFLINE=false
+  - . $HOME/.venv/bin/activate
   - make -C contrib/sdk-bindings/rust -f python.mk build
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -204,12 +205,12 @@ sdk_bindings.publish:
   - gcp_not_interruptible
   needs:
   - oc.docker:rust-sdk-bindings:amd64
-  - build_python_sdk_linux
+  - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
-  - build_python_sdk_linux
+  - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
   timeout: 60 minutes

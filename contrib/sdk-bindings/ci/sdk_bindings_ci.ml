@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 open Tezos_ci
-open Tezos_ci.Cache
 
 module Files = struct
   let image =
@@ -80,30 +79,22 @@ module Release = struct
   let artifacts =
     Gitlab_ci.Util.artifacts ["contrib/sdk-bindings/rust/target/wheels/*"]
 
-  let jobs_build_sdk =
-    let job =
-      job
-        ~stage:Stages.build
-        ~dependencies:(Dependent [Job job_check_matching_tag])
-    in
-
-    let build_python_sdk =
-      let linux : tezos_job =
-        job
-          ~__POS__
-          ~name:"build_python_sdk_linux"
-          ~description:"Build Python SDK for Linux"
-          ~image:Images.rust_sdk_bindings
-          ~artifacts
-          ~before_script:
-            ["export CARGO_NET_OFFLINE=false"; ". $HOME/.venv/bin/activate"]
-          ["make -C contrib/sdk-bindings/rust -f python.mk build"]
-        |> enable_cargo_cache |> enable_sccache
-      in
-
-      [linux]
-    in
-    build_python_sdk
+  let job_build_python_linux =
+    CI.job
+      "build_python_linux"
+      ~__POS__
+      ~description:"Build Python SDK for Linux"
+      ~stage:Build
+      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
+      ~image:Images.rust_sdk_bindings
+      ~artifacts
+      ~cargo_cache:true
+      ~sccache:(Cacio.sccache ())
+      [
+        "export CARGO_NET_OFFLINE=false";
+        ". $HOME/.venv/bin/activate";
+        "make -C contrib/sdk-bindings/rust -f python.mk build";
+      ]
 
   let job_build_python_macos =
     CI.job
@@ -174,17 +165,16 @@ module Release = struct
         ]
       ~needs:
         [
+          (Artifacts, job_build_python_linux);
           (Artifacts, job_build_python_macos);
           (Artifacts, job_build_python_windows);
         ]
-      ~needs_legacy:
-        (List.map (fun job -> (Cacio.Artifacts, job)) jobs_build_sdk)
       [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
 
   let () =
     (* [~tag_rex] matches Tezos SDK release tags, e.g. [tezos-sdk-v1.2.0]. *)
     CI.register_dedicated_release_pipeline
       ~tag_rex:"/^tezos-sdk-v\\d+\\.\\d+\\.\\d+$/"
-      ~legacy_jobs:([job_check_matching_tag] @ jobs_build_sdk)
+      ~legacy_jobs:[job_check_matching_tag]
       [(Auto, job_publish_sdk)]
 end
