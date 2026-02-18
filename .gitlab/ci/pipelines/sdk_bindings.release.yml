@@ -5,6 +5,7 @@ stages:
 - start
 - images
 - build
+- test
 - publish
 
 oc.docker:rust-sdk-bindings:amd64:
@@ -54,14 +55,15 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-check_sdk_version:
+sdk_bindings.check_version:
   image: datadog/ci:v4.1.0
-  stage: start
+  stage: test
   tags:
   - gcp
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -202,7 +204,7 @@ sdk_bindings.publish:
   - gcp_not_interruptible
   needs:
   - oc.docker:rust-sdk-bindings:amd64
-  - check_sdk_version
+  - sdk_bindings.check_version
   - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows
