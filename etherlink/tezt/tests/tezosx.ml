@@ -1411,6 +1411,65 @@ let test_cross_runtime_call_executes_evm_bytecode =
       ~error_msg:"Expected storage slot 1 = %R but got %L") ;
   unit
 
+let test_cross_runtime_transfer_from_evm_to_kt1 =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime transfer to a Michelson KT1 via EVM gateway"
+    ~tags:["cross_runtime"; "transfer"; "kt1"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate transfer_amount.tz — stores AMOUNT in storage *)
+  let* contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "transfer_amount"]
+      ~init_storage_data:"0"
+      protocol
+  in
+  (* Step 2: Verify initial storage is 0 *)
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex
+      ~expected:(`O [("int", `String "0")])
+      ()
+  in
+  (* Step 3: Transfer from EVM to the KT1 via the gateway precompile *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let transfer_amount = Tez.of_int 100 in
+  let* () =
+    check_evm_to_michelson_transfer
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~tezos_destination:kt1_address
+      ~transfer_amount
+      ()
+  in
+  (* Step 4: Sync the rollup node with the sequencer so it sees the
+     EVM gateway state changes. *)
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* Step 5: Verify the contract storage contains the transferred amount *)
+  let transfer_amount_mutez = Tez.to_mutez transfer_amount in
+  check_michelson_storage_value
+    ~sc_rollup_node
+    ~contract_hex
+    ~expected:(`O [("int", `String (string_of_int transfer_amount_mutez))])
+    ()
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -1419,6 +1478,7 @@ let () =
   test_cross_runtime_transfer_from_evm_to_tz [Alpha] ;
   test_cross_runtime_transfer_to_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
+  test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_get_balance [Alpha] ;
