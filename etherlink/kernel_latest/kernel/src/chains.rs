@@ -37,7 +37,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{
-    context::{self, Context as _},
+    context::{self, Context as _, TezlinkContext},
     mir_ctx::BlockCtx,
 };
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
@@ -52,6 +52,7 @@ use tezos_tezlink::{
     },
 };
 use tezosx_interfaces::{Registry, RuntimeId};
+use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
 pub use tezos_evm_runtime::safe_storage::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 
@@ -472,7 +473,7 @@ impl TransactionTrait for TezosXTransaction {
 pub struct TezosXBlockConstants {
     pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
     #[allow(dead_code)]
-    pub michelson_runtime_block_constants: TezlinkBlockConstants,
+    pub michelson_runtime_block_constants: TezlinkBlockConstants<TezosRuntimeContext>,
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -494,6 +495,8 @@ impl ChainConfigTrait for EvmChainConfig {
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
+        let level = block_in_progress.number.try_into()?;
+        let context = TezosRuntimeContext::from_root(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
         Ok(TezosXBlockConstants {
             evm_runtime_block_constants: block_in_progress.constants(
                 self.chain_id,
@@ -503,11 +506,7 @@ impl ChainConfigTrait for EvmChainConfig {
                 coinbase,
                 self.enable_tezos_runtime(),
             ),
-            michelson_runtime_block_constants: self.michelson_chain_config.constants(
-                block_in_progress,
-                da_fee_per_byte,
-                coinbase,
-            )?,
+            michelson_runtime_block_constants: TezlinkBlockConstants { level, context },
         })
     }
 
@@ -716,9 +715,9 @@ fn tezos_operation_from_bytes(bytes: &[u8]) -> anyhow::Result<TezlinkOperation> 
     })
 }
 
-pub struct TezlinkBlockConstants {
+pub struct TezlinkBlockConstants<Context: context::Context> {
     pub level: BlockNumber,
-    pub context: context::TezlinkContext,
+    pub context: Context,
 }
 
 fn apply_tezos_operation(
@@ -726,7 +725,7 @@ fn apply_tezos_operation(
     block_in_progress: &BlockInProgress,
     host: &mut impl Runtime,
     registry: &impl Registry,
-    block_constants: &TezlinkBlockConstants,
+    block_constants: &TezlinkBlockConstants<impl context::Context>,
     operation: TezlinkOperation,
 ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
     let context = &block_constants.context;
@@ -833,7 +832,7 @@ fn apply_tezos_operation(
 }
 
 impl ChainConfigTrait for MichelsonChainConfig {
-    type BlockConstants = TezlinkBlockConstants;
+    type BlockConstants = TezlinkBlockConstants<TezlinkContext>;
     type ChainHeader = TezBlockHeader;
 
     fn get_chain_id(&self) -> U256 {

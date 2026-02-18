@@ -162,14 +162,15 @@ mod test {
     use super::*;
     use crate::block_in_progress::BlockInProgress;
     use crate::chains::{
-        TezlinkBlockConstants, TezosXBlockConstants, TEZLINK_SAFE_STORAGE_ROOT_PATH,
+        TezlinkBlockConstants, TezosXBlockConstants, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
     };
     use primitive_types::H160;
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
-    use tezos_execution::context::{Context, TezlinkContext};
+    use tezos_execution::context::Context;
+    use tezosx_tezos_runtime::context::TezosRuntimeContext;
 
     proptest! {
         #[test]
@@ -212,8 +213,10 @@ mod test {
             ),
             michelson_runtime_block_constants: TezlinkBlockConstants {
                 level: 0.into(),
-                context: TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
-                    .unwrap(),
+                context: TezosRuntimeContext::from_root(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                )
+                .unwrap(),
             },
         };
 
