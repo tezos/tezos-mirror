@@ -1065,6 +1065,23 @@ function copy_source() {
 
 }
 
+# PROTOCOL_TESTS COMMIT 1: Fix test invocation headers
+#
+# MODE: both
+# MODIFIES: test files in src/proto_${new_protocol_name}
+#
+# DESCRIPTION:
+#   Updates test invocation header comments in test files to reference
+#   the new protocol path instead of the source protocol path.
+#
+# CREATES: 1 commit: "tests: fix test invocation headers"
+function protocol_tests_commit_01_fix_test_invocation_headers() {
+  # Replace test invocation headers that mention protocol_source
+  find "src/proto_${new_protocol_name}" -type f -path \*/test/\*.ml \
+    -exec sed -i "s@Invocation:\(.*\)/proto_${protocol_source}/\(.*\)@Invocation:\1/proto_${new_protocol_name}/\2@" \{\} \;
+  commit_no_hooks "tests: fix test invocation headers"
+}
+
 function update_protocol_tests() {
 
   if [[ $skip_update_protocol_tests ]]; then
@@ -1074,10 +1091,7 @@ function update_protocol_tests() {
 
   # Update protocol tests
 
-  # Replace test invocation headers that mention protocol_source
-  find "src/proto_${new_protocol_name}" -type f -path \*/test/\*.ml \
-    -exec sed -i "s@Invocation:\(.*\)/proto_${protocol_source}/\(.*\)@Invocation:\1/proto_${new_protocol_name}/\2@" \{\} \;
-  commit_no_hooks "tests: fix test invocation headers"
+  protocol_tests_commit_01_fix_test_invocation_headers
 
   #Replace all occurences of \[capitalized_protocol_source\] with \[capitalized_label\] in src_proto_${new_protocol_name}
   find "src/proto_${new_protocol_name}" -type f -exec sed -i "s/\\[${capitalized_source}\\]/\\[${capitalized_label}\\]/g" {} \;
