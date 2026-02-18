@@ -434,19 +434,25 @@ module Make_daemon (Agent : AGENT) :
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
     | New_head ->
+        let*! () = Events.(emit new_head ()) in
         let* state = monitor_voting_periods ~state in
         return (Some state)
     | Head_stream_ended ->
+        let*! () = Events.(emit head_stream_ended) state.node_endpoint in
         let reconnect_promise =
           retry_on_disconnection state.node_endpoint monitor_heads state.cctxt
         in
         return (Some {state with head_stream = `Reconnecting reconnect_promise})
     | Head_stream_reconnected stream ->
+        let*! () = Events.(emit head_stream_reconnected) state.node_endpoint in
         return (Some {state with head_stream = `Live stream})
     | Old_baker_stopped -> (
         match state.old_baker with
         | None -> assert false
         | Some old_baker ->
+            let*! () =
+              Events.(emit old_baker_stopped old_baker.baker.protocol_hash)
+            in
             let* head_level =
               (Rpc_services.get_level
                  ~node_addr:state.node_endpoint

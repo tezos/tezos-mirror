@@ -107,6 +107,31 @@ let period_status =
     ("period", string)
     ("remaining", int31)
 
+let head_stream_ended =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"head_stream_ended"
+    ~msg:"agnostic daemon lost stream connection with node {node}"
+    ("node", string)
+
+let head_stream_reconnected =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"head_stream_reconnected"
+    ~msg:"agnostic daemon managed to reconnect to node {node}"
+    ("node", string)
+
+let old_baker_stopped =
+  declare_1
+    ~section
+    ~level:Notice
+    ~name:"old_baker_stopped"
+    ~msg:"agnostic daemon witnessed shutdown of protocol {protocol} baker"
+    ~pp1:Protocol_hash.pp
+    ("protocol", Protocol_hash.encoding)
+
 (* Warning *)
 let node_version_check_bypass =
   declare_0
@@ -151,6 +176,14 @@ let node_version_check =
     ( "baker_commit",
       Data_encoding.option Tezos_version.Octez_node_version.commit_info_encoding
     )
+
+let new_head =
+  declare_0
+    ~section
+    ~name:"new_head"
+    ~level:Debug
+    ~msg:"agnostic daemon received a new head"
+    ()
 
 module Per_block_votes = struct
   include Internal_event.Simple
