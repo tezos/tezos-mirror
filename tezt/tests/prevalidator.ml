@@ -2645,10 +2645,10 @@ module Revamped = struct
       [
         (["blocks_per_cycle"], `Int blocks_per_cycle);
         (["nonce_revelation_threshold"], `Int 2);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay
     in
     let* parameter_file =
       Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters

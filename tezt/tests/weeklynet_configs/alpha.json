@@ -71,6 +71,7 @@
     "cache_script_size": 100000000,
     "cache_stake_distribution_cycles": 5,
     "cache_sampler_state_cycles": 5,
+    "cache_stake_info_cycles": 5,
     "dal_parametric": {
         "feature_enable": true,
         "incentives_enable": false,

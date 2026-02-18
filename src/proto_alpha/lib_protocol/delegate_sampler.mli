@@ -73,25 +73,13 @@ val load_sampler_for_cycle :
 val stake_info_for_cycle :
   Raw_context.t ->
   Cycle_repr.t ->
-  (Raw_context.t * Int64.t * (Delegate_consensus_key.pk * Int64.t) list)
-  tzresult
-  Lwt.t
+  (Raw_context.t * Raw_context.stake_info) tzresult Lwt.t
 
 (** Same as [stake_info_for_cycle], but for the given level (uses the level's cycle) *)
 val stake_info :
   Raw_context.t ->
   Level_repr.t ->
-  (Raw_context.t * Int64.t * (Delegate_consensus_key.pk * Int64.t) list)
-  tzresult
-  Lwt.t
-
-(** [load_stake_info_for_cycle ctxt cycle] caches the stake info
-    for [cycle] in [ctxt]. If the stake info was already cached,
-    then [ctxt] is returned unchanged.
-
-    This function has the same effect on [ctxt] as {!stake_info} *)
-val load_stake_info_for_cycle :
-  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Raw_context.stake_info) tzresult Lwt.t
 
 val select_new_distribution_at_cycle_end :
   Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t tzresult Lwt.t

@@ -683,6 +683,13 @@ module Delegate_sampler_state :
      and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
+(** Delegate stake info for a given cycle. *)
+module Delegate_stake_info :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Raw_context.stake_info
+     and type t := Raw_context.t
+
 (** Compounding reward bonus for Adaptive Issuance *)
 module Issuance_bonus :
   Indexed_data_storage

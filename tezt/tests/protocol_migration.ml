@@ -124,8 +124,8 @@ let check_adaptive_issuance_launch_cycle ~loc client =
       ~error_msg:"Expected adaptive_issuance_launch_cycle = %R but got %L") ;
   unit
 
-(* Check for R to S migration. Remove after S. *)
-let check_delegate_sampler_state client =
+(* Check for T to U migration. Remove after U. *)
+let check_delegate_stake_info client =
   let check_failure rpc =
     let*? process = Client.RPC.spawn client @@ rpc in
     Process.check ~expect_failure:true process
@@ -149,7 +149,7 @@ let check_delegate_sampler_state client =
         let* () =
           check_success
           @@ RPC.get_chain_block_context_raw_json
-               ~path:["cycle"; string_of_int cycle; "delegate_sampler_state"]
+               ~path:["cycle"; string_of_int cycle; "delegate_stake_info"]
                ()
         in
         unit)
@@ -163,7 +163,7 @@ let check_delegate_sampler_state client =
            [
              "cycle";
              string_of_int (current_cycle + consensus_rights_delay + 1);
-             "delegate_sampler_state";
+             "delegate_stake_info";
            ]
          ()
   in
@@ -171,9 +171,7 @@ let check_delegate_sampler_state client =
     check_failure
     @@ RPC.get_chain_block_context_raw_json
          ~path:
-           [
-             "cycle"; string_of_int (current_cycle - 2); "delegate_sampler_state";
-           ]
+           ["cycle"; string_of_int (current_cycle - 2); "delegate_stake_info"]
          ()
   in
   unit
@@ -215,8 +213,8 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~level:migration_level
   in
   let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
-  (* Remove check_delegate_sampler_state after S. *)
-  let* () = check_delegate_sampler_state client in
+  (* Remove check_delegate_stake_info after U. *)
+  let* () = check_delegate_stake_info client in
   let* () = Client.bake_for_and_wait client in
   (* Ensure that we migrated *)
   Log.info "Checking migration block consistency" ;
@@ -228,17 +226,17 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
       ~migrate_to
       ~level:(migration_level + 1)
   in
-  (* Test that R to S stitching for Delegate_sampler worked correctly.
-     Remove after S. *)
-  let* () = check_delegate_sampler_state client in
+  (* Test that T to U stitching for Delegate_stake_info worked correctly.
+     Remove after U. *)
+  let* () = check_delegate_stake_info client in
   (* Test that we can still bake after migration *)
   let* () =
     repeat baked_blocks_after_migration (fun () ->
         Client.bake_for_and_wait client)
   in
   let* () = check_adaptive_issuance_launch_cycle ~loc:__LOC__ client in
-  (* Remove check_delegate_sampler_state after S. *)
-  let* () = check_delegate_sampler_state client in
+  (* Remove check_delegate_stake_info after U. *)
+  let* () = check_delegate_stake_info client in
   return (client, node)
 
 (** Test all levels for one cycle, after the first cycle. *)

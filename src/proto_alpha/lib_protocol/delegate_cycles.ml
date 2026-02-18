@@ -141,7 +141,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
     Delegate_rewards.attesting_reward_per_block ctxt
   in
   (* Attesting power is staking power *)
-  let* ctxt, total_active_stake_weight, _ =
+  let* ctxt, {total_stake_weight = total_active_stake_weight; _} =
     Delegate_sampler.stake_info_for_cycle ctxt last_cycle
   in
   let unrevealed_nonces_set =

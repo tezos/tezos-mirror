@@ -698,11 +698,11 @@ let simple_attestation_aggregation ~abaab ~remote_mode protocol =
          (* Diminish some constants to activate consensus keys faster *)
          (["blocks_per_cycle"], `Int 2);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -931,11 +931,11 @@ let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
          (["delay_increment_per_round"], `String "0");
          (["blocks_per_cycle"], `Int 2);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol
@@ -1244,11 +1244,11 @@ let aggregated_operations_retrival_from_block_content ~abaab =
          (* Diminish some constants to activate consensus keys faster *)
          (["blocks_per_cycle"], `Int 2);
          (["nonce_revelation_threshold"], `Int 1);
-         (["consensus_rights_delay"], `Int consensus_rights_delay);
-         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
        ]
-      @ abaab_threshold ~abaab ~protocol)
+       @ abaab_threshold ~abaab ~protocol
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -1472,29 +1472,29 @@ let test_reproposal_at_abaab_activation_level =
     Protocol.write_parameter_file
       ~overwrite_bootstrap_accounts
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Using custom consensus constants to be able to trigger reproposals *)
-        (["consensus_committee_size"], `Int consensus_committee_size);
-        (["consensus_threshold_size"], `Int 70);
-        (* Diminish some constants to activate consensus keys faster,
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Using custom consensus constants to be able to trigger reproposals *)
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int 70);
+         (* Diminish some constants to activate consensus keys faster,
            and make round durations as small as possible *)
-        (["minimal_block_delay"], `String "4");
-        (["delay_increment_per_round"], `String "0");
-        (["blocks_per_cycle"], `Int 2);
-        (* [blocks_per_cycle] is too short in this testing scenario,
+         (["minimal_block_delay"], `String "4");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 2);
+         (* [blocks_per_cycle] is too short in this testing scenario,
            so we increase [tolerated_inactivity_period] *)
-        (["tolerated_inactivity_period"], `Int 99);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-        (* We start with 6 bootstrap accounts, 3 with a tz4 consensus key,
+         (["tolerated_inactivity_period"], `Int 99);
+         (["nonce_revelation_threshold"], `Int 1);
+         (* We start with 6 bootstrap accounts, 3 with a tz4 consensus key,
            a 4th one will activate his later, triggering abaab. *)
-        (["all_bakers_attest_activation_threshold"; "numerator"], `Int 4);
-        (["all_bakers_attest_activation_threshold"; "denominator"], `Int 6);
-      ]
+         (["all_bakers_attest_activation_threshold"; "numerator"], `Int 4);
+         (["all_bakers_attest_activation_threshold"; "denominator"], `Int 6);
+       ]
+      |> Protocol.parameters_with_custom_consensus_rights_delay
+           ~protocol
+           ~consensus_rights_delay)
   in
   let* node, client =
     Client.init_with_protocol

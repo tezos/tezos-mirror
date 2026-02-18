@@ -119,10 +119,15 @@ let attesting_rights (ctxt : t) ~attested_level =
     Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
   in
   let open Lwt_result_syntax in
-  let* ctxt, _, delegates = Stake_distribution.stake_info ctxt attested_level in
+  let* ctxt, {delegates; _} =
+    Stake_distribution.stake_info ctxt attested_level
+  in
   let* attesting_power_map, _ =
     List.fold_left_es
-      (fun (acc_map, i) ((consensus_pk : Consensus_key.pk), power) ->
+      (fun (acc_map, i)
+           Stake_distribution.
+             {consensus_pk : Consensus_key.pk; stake_weight = power}
+         ->
         let acc_map =
           Signature.Public_key_hash.Map.add
             consensus_pk.delegate
@@ -271,16 +276,17 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
   let all_bakers_attest_enabled =
     Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
   in
-  let* ctxt, _, stake_info_list =
+  let* ctxt, {delegates = stake_info_list; _} =
     Stake_distribution.stake_info ctxt attested_level
   in
   let* slots_map, _ =
     List.fold_left_es
-      (fun (acc, i) ((consensus_key, weight) : Consensus_key.pk * Int64.t) ->
+      (fun (acc, i)
+           ({consensus_pk; stake_weight} :
+             Stake_distribution.delegate_stake_info)
+         ->
         match
-          Signature.Public_key_hash.Map.find
-            consensus_key.delegate
-            delegates_map
+          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
         with
         | None ->
             if all_bakers_attest_enabled then
@@ -291,9 +297,9 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                 ( Slot.Map.add
                     i
                     {
-                      Consensus_key.consensus_key;
+                      Consensus_key.consensus_key = consensus_pk;
                       attesting_power =
-                        Attesting_power.make ~slots:0 ~baking_power:weight;
+                        Attesting_power.make ~slots:0 ~baking_power:stake_weight;
                     }
                     acc,
                   succ_i )
@@ -308,7 +314,7 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                     attesting_power =
                       Attesting_power.(
                         add
-                          (make ~slots:0 ~baking_power:weight)
+                          (make ~slots:0 ~baking_power:stake_weight)
                           v.attesting_power);
                   }
                 in

@@ -309,11 +309,6 @@ type back = {
   non_consensus_operations_rev : Operation_hash.t list;
   dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
-  (* [stake_info] maps cycles to a pair [(total_weight, distribution)], where
-     [total_weight] is the total active staking weight for that cycle, and [distribution]
-     is a list associating consensus keys with their respective staking weight, ordered
-     lexicographically by their delegate public key hash. *)
-  stake_info : (int64 * (consensus_pk * int64) list) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Stake_repr.t Signature.Public_key_hash.Map.t option;
   reward_coeff_for_current_cycle : Q.t;
@@ -387,8 +382,6 @@ let[@inline] dictator_proposal_seen ctxt = ctxt.back.dictator_proposal_seen
 
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
-let[@inline] stake_info ctxt = ctxt.back.stake_info
-
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
@@ -437,9 +430,6 @@ let[@inline] update_dictator_proposal_seen ctxt dictator_proposal_seen =
 
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
-
-let[@inline] update_stake_info ctxt stake_info =
-  update_back ctxt {ctxt.back with stake_info}
 
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
@@ -958,7 +948,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp
         non_consensus_operations_rev = [];
         dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
-        stake_info = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
@@ -1284,6 +1273,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  cache_script_size;
                  cache_stake_distribution_cycles;
                  cache_sampler_state_cycles;
+                 cache_stake_info_cycles;
                  dal = _;
                  sc_rollup = _;
                  zk_rollup = _;
@@ -1339,6 +1329,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cache_script_size;
             cache_stake_distribution_cycles;
             cache_sampler_state_cycles;
+            cache_stake_info_cycles;
             dal;
             sc_rollup;
             zk_rollup;
@@ -1646,6 +1637,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cache_script_size;
             cache_stake_distribution_cycles;
             cache_sampler_state_cycles;
+            cache_stake_info_cycles = cache_stake_distribution_cycles;
             dal;
             sc_rollup;
             zk_rollup;
@@ -1990,40 +1982,6 @@ let sampler_for_cycle ~read ctxt cycle =
       let ctxt = update_sampler_state ctxt map in
       return (ctxt, seed, state)
 
-let sort_stakes_pk_for_stake_info stakes_pk =
-  (* The stakes_pk is supposedly already sorted by decreasing stake, from
-     the call to get_selected_distribution when it was initialized.
-     We sort them here by lexicographical order on the pkh of the delegate instead.
-  *)
-  List.sort
-    (fun ((consensus_pk1 : consensus_pk), _) (consensus_pk2, _) ->
-      Signature.Public_key_hash.compare
-        consensus_pk1.delegate
-        consensus_pk2.delegate)
-    stakes_pk
-
-let init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk =
-  let open Result_syntax in
-  let map = stake_info ctxt in
-  if Cycle_repr.Map.mem cycle map then tzfail (Stake_info_already_set cycle)
-  else
-    let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-    let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
-    let ctxt = update_stake_info ctxt map in
-    return ctxt
-
-let stake_info_for_cycle ~read ctxt cycle =
-  let open Lwt_result_syntax in
-  let map = stake_info ctxt in
-  match Cycle_repr.Map.find cycle map with
-  | Some (total_stake, stakes_pk) -> return (ctxt, total_stake, stakes_pk)
-  | None ->
-      let* ctxt, total_stake, stakes_pk = read ctxt in
-      let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-      let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
-      let ctxt = update_stake_info ctxt map in
-      return (ctxt, total_stake, stakes_pk)
-
 let find_stake_distribution_for_current_cycle ctxt =
   ctxt.back.stake_distribution_for_current_cycle
 
@@ -2042,6 +2000,29 @@ let init_stake_distribution_for_current_cycle ctxt
       stake_distribution_for_current_cycle =
         Some stake_distribution_for_current_cycle;
     }
+
+type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
+
+type stake_info = {
+  total_stake_weight : Int64.t;
+  delegates : delegate_stake_info list;
+}
+
+let delegate_stake_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {consensus_pk; stake_weight} -> (consensus_pk, stake_weight))
+    (fun (consensus_pk, stake_weight) -> {consensus_pk; stake_weight})
+    (obj2 (req "consensus_pk" consensus_pk_encoding) (req "stake_weight" int64))
+
+let stake_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {total_stake_weight; delegates} -> (total_stake_weight, delegates))
+    (fun (total_stake_weight, delegates) -> {total_stake_weight; delegates})
+    (obj2
+       (req "total_stake_weight" int64)
+       (req "delegates" (list delegate_stake_info_encoding)))
 
 module Internal_for_tests = struct
   let add_level ctxt l =

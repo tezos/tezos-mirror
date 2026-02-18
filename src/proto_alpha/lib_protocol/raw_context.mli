@@ -296,31 +296,6 @@ val sampler_for_cycle :
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
-(** [init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk] caches the stakes
-    of the active delegates for [cycle] in memory for quick access.
-
-    @return [Error Stake_info_already_set] if the info was already
-    cached. *)
-val init_stake_info_for_cycle :
-  t ->
-  Cycle_repr.t ->
-  total_stake:Int64.t ->
-  (consensus_pk * Int64.t) list ->
-  t tzresult
-
-(** [stake_info_for_cycle ~read ctxt cycle] returns the stakes
-    for [cycle]. The stake info is read in memory if
-    [init_stake_info_for_cycle] or [stake_info_for_cycle] was previously
-    called for the same [cycle]. Otherwise, it is read "on-disk" with
-    the [read] function and then cached in [ctxt] like
-    [init_stake_info_for_cycle].
-    The list follows a lexicographical order on the delegate pkh. *)
-val stake_info_for_cycle :
-  read:(t -> (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
-  t ->
-  Cycle_repr.t ->
-  (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t
-
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
 val stake_distribution_for_current_cycle :
@@ -333,6 +308,17 @@ val find_stake_distribution_for_current_cycle :
 
 val init_stake_distribution_for_current_cycle :
   t -> Stake_repr.t Signature.Public_key_hash.Map.t -> t
+
+type delegate_stake_info = {consensus_pk : consensus_pk; stake_weight : Int64.t}
+
+type stake_info = {
+  total_stake_weight : Int64.t;
+  delegates : delegate_stake_info list;
+}
+
+val delegate_stake_info_encoding : delegate_stake_info Data_encoding.encoding
+
+val stake_info_encoding : stake_info Data_encoding.encoding
 
 (** Returns the reward coefficient for the current cycle
     This value is equal to the value in {!Storage.Issuance_coeff} if it exists,

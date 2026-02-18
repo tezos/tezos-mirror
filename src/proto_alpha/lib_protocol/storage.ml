@@ -1398,6 +1398,18 @@ module Cycle = struct
         let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
+  module Delegate_stake_info =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["delegate_stake_info"]
+      end)
+      (struct
+        type t = Raw_context.stake_info
+
+        let encoding = Raw_context.stake_info_encoding
+      end)
+
   module Issuance_bonus =
     Indexed_context.Make_map
       (Registered)
@@ -1582,6 +1594,7 @@ type consensus_pk_in_R = Cycle.consensus_pk_in_R = {
 
 module Delegate_sampler_state_up_to_R = Cycle.Delegate_sampler_state_up_to_R
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
+module Delegate_stake_info = Cycle.Delegate_stake_info
 module Issuance_bonus = Cycle.Issuance_bonus
 module Issuance_coeff = Cycle.Issuance_coeff
 
