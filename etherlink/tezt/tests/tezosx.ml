@@ -1477,6 +1477,79 @@ let test_cross_runtime_transfer_from_evm_to_kt1 =
     ~expected:(`O [("int", `String (string_of_int transfer_amount_mutez))])
     ()
 
+let test_cross_runtime_call_failwith =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:
+      "Cross-runtime transfer to a FAILWITH Michelson KT1 reverts via EVM \
+       gateway"
+    ~tags:["cross_runtime"; "transfer"; "kt1"; "failwith"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate always_fails.tz *)
+  let* _contract_hex, kt1_address =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["mini_scenarios"; "always_fails"]
+      ~init_storage_data:"Unit"
+      protocol
+  in
+  (* Step 2: Call the KT1 from EVM via the gateway precompile *)
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let transfer_amount = Tez.of_int 100 in
+  let value = Wei.of_tez transfer_amount in
+  let* tez_client = tezos_client sequencer in
+  let*@ evm_balance_before =
+    Rpc.get_balance ~address:sender.Eth_account.address sequencer
+  in
+  let* kt1_balance_before =
+    Client.get_balance_for ~account:kt1_address tez_client
+  in
+  let* receipt =
+    call_evm_gateway
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~value
+      ~destination:kt1_address
+      ~expected_status:false
+      ()
+  in
+  (* Step 3: The EVM sender should only have lost gas fees, not the
+     transfer amount — the value is refunded on revert. *)
+  let gas_fees =
+    let gas_price = receipt.effectiveGasPrice |> Z.of_int64 |> Wei.to_wei_z in
+    let gas_used = receipt.gasUsed |> Z.of_int64 in
+    Wei.(gas_price * gas_used)
+  in
+  let*@ evm_balance_after =
+    Rpc.get_balance ~address:sender.Eth_account.address sequencer
+  in
+  Check.(
+    (evm_balance_after = Wei.(evm_balance_before - gas_fees))
+      Wei.typ
+      ~error_msg:"Expected EVM sender balance %R but got %L") ;
+  (* Step 4: The Michelson contract balance should be unchanged *)
+  let* kt1_balance_after =
+    Client.get_balance_for ~account:kt1_address tez_client
+  in
+  Check.(
+    (Tez.to_mutez kt1_balance_after = Tez.to_mutez kt1_balance_before)
+      int
+      ~error_msg:"Expected KT1 balance %R but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -1486,6 +1559,7 @@ let () =
   test_cross_runtime_transfer_to_evm [Alpha] ;
   test_cross_runtime_call_executes_evm_bytecode [Alpha] ;
   test_cross_runtime_transfer_from_evm_to_kt1 [Alpha] ;
+  test_cross_runtime_call_failwith [Alpha] ;
   test_tezos_block_stored_after_deposit [Alpha] ;
   test_michelson_origination_and_call [Alpha] ;
   test_michelson_get_balance [Alpha] ;
