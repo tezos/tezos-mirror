@@ -5,6 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* SeouLo modules *)
 module SeouLo_protocol = Tezos_protocol_023_PtSeouLo.Protocol
 module SeouLo_context = SeouLo_protocol.Alpha_context
 module SeouLo_parameter = Tezos_protocol_023_PtSeouLo_parameters
@@ -12,8 +13,15 @@ module SeouLo_env = Tezos_protocol_environment_023_PtSeouLo
 module SeouLo_plugin = Tezos_protocol_plugin_023_PtSeouLo
 module SeouLo_test_helpers = Tezos_023_PtSeouLo_test_helpers
 
-(* Current Tezlink protocol *)
+(* TALLiN modules *)
+module TALLiN_protocol = Tezos_protocol_024_PtTALLiN.Protocol
+module TALLiN_context = TALLiN_protocol.Alpha_context
+module TALLiN_parameter = Tezos_protocol_024_PtTALLiN_parameters
+module TALLiN_env = Tezos_protocol_environment_024_PtTALLiN
+module TALLiN_plugin = Tezos_protocol_plugin_024_PtTALLiN
+module TALLiN_test_helpers = Tezos_024_PtTALLiN_test_helpers
 
+(* Current Tezlink protocol *)
 module Imported_protocol = SeouLo_protocol
 module Imported_protocol_plugin = SeouLo_plugin
 module Imported_protocol_parameters = SeouLo_parameter

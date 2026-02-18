@@ -114,7 +114,7 @@ end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Tezlink_SeouLo_protocol = struct
-  include Tezos_protocol_023_PtSeouLo.Protocol
+  include Tezlink_imports.SeouLo_protocol
 
   let contents : Block_header_repr.contents =
     {
@@ -235,7 +235,7 @@ end
 
 (** We add to Imported_protocol_024 the mocked protocol data used in headers *)
 module Tezlink_TALLiN_protocol = struct
-  include Tezos_protocol_024_PtTALLiN.Protocol
+  include Tezlink_imports.TALLiN_protocol
 
   let contents : Block_header_repr.contents =
     {
