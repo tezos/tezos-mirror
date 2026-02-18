@@ -5,7 +5,7 @@
 use alloy_primitives::{hex::FromHex, Address, Bytes, Keccak256, U256 as AlloyU256};
 use alloy_sol_types::SolCall;
 use primitive_types::U256;
-use revm::context::result::ExecutionResult;
+use revm::context::result::{ExecutionResult, Output};
 use revm::state::Bytecode;
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy,
@@ -42,6 +42,29 @@ impl Default for EthereumRuntime {
 impl EthereumRuntime {
     pub fn new(chain_id: primitive_types::U256) -> Self {
         Self { chain_id }
+    }
+
+    fn create_block_constants<Host: Runtime>(
+        &self,
+        host: &Host,
+        context: &CrossRuntimeContext,
+    ) -> BlockConstants {
+        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+
+        BlockConstants {
+            number: context.block_number,
+            coinbase,
+            timestamp: context.timestamp,
+            gas_limit: context.gas_limit,
+            block_fees: BlockFees::new(
+                primitive_types::U256::zero(),
+                primitive_types::U256::zero(),
+                primitive_types::U256::zero(),
+            ),
+            chain_id: self.chain_id,
+            tezos_experimental_features: true,
+            prevrandao: None,
+        }
     }
 }
 
@@ -127,22 +150,7 @@ impl RuntimeInterface for EthereumRuntime {
 
         // Set up block constants for EVM execution
         let evm_version = read_evm_version(host);
-        let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-
-        let block_constants = BlockConstants {
-            number: context.block_number,
-            coinbase,
-            timestamp: context.timestamp,
-            gas_limit: context.gas_limit,
-            block_fees: BlockFees::new(
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-                primitive_types::U256::zero(),
-            ),
-            chain_id: self.chain_id,
-            tezos_experimental_features: true,
-            prevrandao: None,
-        };
+        let block_constants = self.create_block_constants(host, &context);
 
         // Set up gas data (zero gas price since this is an internal transaction)
         let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
@@ -190,33 +198,115 @@ impl RuntimeInterface for EthereumRuntime {
 
     fn call<Host: Runtime>(
         &self,
-        _registry: &impl tezosx_interfaces::Registry,
+        registry: &impl tezosx_interfaces::Registry,
         host: &mut Host,
-        _from: &[u8],
+        from: &[u8],
         to: &[u8],
         amount: primitive_types::U256,
-        _data: &[u8],
-        _context: CrossRuntimeContext,
+        data: &[u8],
+        context: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
-        if to.len() != 20 {
+        if from.len() != 20 {
             return Err(TezosXRuntimeError::Custom(
-                "Invalid address length".to_string(),
+                "Invalid 'from' address length".to_string(),
             ));
         }
-        let mut addr = [0u8; 20];
-        addr.copy_from_slice(to);
-        let to = Address::from(addr);
-        // TODO: Implement a real EVM call here.
-        // For now it only implements a transfer of amount.
-        let amount = u256_to_alloy(&amount);
-        let mut to_account = StorageAccount::from_address(&to)?;
-        let mut to_info = to_account.info(host)?;
-        to_info.balance = to_info
-            .balance
-            .checked_add(amount)
-            .ok_or_else(|| TezosXRuntimeError::Custom("Balance overflow".to_string()))?;
-        to_account.set_info(host, to_info)?;
-        Ok(CrossCallResult::Success(vec![]))
+        if to.len() != 20 {
+            return Err(TezosXRuntimeError::Custom(
+                "Invalid 'to' address length".to_string(),
+            ));
+        }
+
+        let caller = Address::from_slice(from);
+        let destination = Address::from_slice(to);
+
+        let evm_version = read_evm_version(host);
+        let block_constants = self.create_block_constants(host, &context);
+
+        // Set up gas data (zero gas price since this is a cross-runtime transaction)
+        // unlimited gas for now (ie current block gas limit, to make sure the transaction will
+        // fit and not be rejected)
+        // TODO: L2-869
+        let gas_data = GasData::new(context.gas_limit, 0, context.gas_limit);
+
+        // TODO: L2-870 — pass the real amount to the EVM without debiting the
+        // caller. For now we credit the destination manually and pass zero
+        // value to the EVM.
+        let transfer_amount = u256_to_alloy(&amount);
+        if transfer_amount > AlloyU256::ZERO {
+            let mut to_account = StorageAccount::from_address(&destination)?;
+            let mut to_info = to_account.info(host)?;
+            to_info.balance =
+                to_info
+                    .balance
+                    .checked_add(transfer_amount)
+                    .ok_or_else(|| {
+                        TezosXRuntimeError::Custom("Balance overflow".to_string())
+                    })?;
+            to_account.set_info(host, to_info)?;
+        }
+        let value = AlloyU256::ZERO;
+        let call_data = Bytes::from(data.to_vec());
+
+        // Run the EVM transaction
+        let outcome = run_transaction(
+            host,
+            registry,
+            evm_version.into(),
+            &block_constants,
+            None, // no transaction hash for cross-runtime transactions
+            caller,
+            Some(destination),
+            call_data,
+            gas_data,
+            value,
+            revm::context::transaction::AccessList(vec![]),
+            None,  // no authorization list
+            None,  // no tracer
+            false, // not a simulation
+        )
+        .map_err(|e| {
+            TezosXRuntimeError::Custom(format!("EVM execution failed: {e:?}"))
+        })?;
+
+        match outcome.result {
+            ExecutionResult::Success { output, .. } => match output {
+                Output::Call(bytes) => Ok(CrossCallResult::Success(bytes.to_vec())),
+                Output::Create(bytes, _) => Ok(CrossCallResult::Success(bytes.to_vec())),
+            },
+            ExecutionResult::Revert { output, .. } => {
+                // TODO: L2-870 — That revert should be part of run_transaction.
+                if transfer_amount > AlloyU256::ZERO {
+                    let mut to_account = StorageAccount::from_address(&destination)?;
+                    let mut to_info = to_account.info(host)?;
+                    to_info.balance = to_info
+                        .balance
+                        .checked_sub(transfer_amount)
+                        .ok_or_else(|| {
+                            TezosXRuntimeError::Custom("Balance underflow".to_string())
+                        })?;
+                    to_account.set_info(host, to_info)?;
+                }
+                Ok(CrossCallResult::Revert(output.to_vec()))
+            }
+            ExecutionResult::Halt { reason, .. } => {
+                // TODO: L2-870 — That revert should be part of run_transaction.
+                if transfer_amount > AlloyU256::ZERO {
+                    let mut to_account = StorageAccount::from_address(&destination)?;
+                    let mut to_info = to_account.info(host)?;
+                    to_info.balance = to_info
+                        .balance
+                        .checked_sub(transfer_amount)
+                        .ok_or_else(|| {
+                            TezosXRuntimeError::Custom("Balance underflow".to_string())
+                        })?;
+                    to_account.set_info(host, to_info)?;
+                }
+                Ok(CrossCallResult::Halt(
+                    format!("EVM call halted: {reason:?}").into_bytes(),
+                ))
+            }
+        }
     }
 
     fn address_from_string(
@@ -248,7 +338,178 @@ impl RuntimeInterface for EthereumRuntime {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::Keccak256;
+    use alloy_primitives::{hex::FromHex, Bytes, Keccak256};
+    use primitive_types::U256;
+    use revm::primitives::Address;
+    use revm::state::{AccountInfo, Bytecode};
+    use revm_etherlink::{
+        helpers::storage::bytes_hash,
+        storage::{code::CodeStorage, world_state_handler::StorageAccount},
+    };
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezosx_interfaces::{
+        CrossCallResult, CrossRuntimeContext, Registry, RuntimeId, RuntimeInterface,
+        TezosXRuntimeError,
+    };
+
+    use crate::EthereumRuntime;
+
+    /// Minimal Registry stub for testing EthereumRuntime in isolation.
+    struct StubRegistry;
+
+    impl Registry for StubRegistry {
+        fn bridge<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _destination_runtime: RuntimeId,
+            _destination_address: &[u8],
+            _source_address: &[u8],
+            _amount: U256,
+            _data: &[u8],
+            _context: CrossRuntimeContext,
+        ) -> Result<CrossCallResult, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+
+        fn generate_alias<Host: tezos_evm_runtime::runtime::Runtime>(
+            &self,
+            _host: &mut Host,
+            _native_address: &[u8],
+            _runtime_id: RuntimeId,
+            _context: CrossRuntimeContext,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+
+        fn address_from_string(
+            &self,
+            _address_str: &str,
+            _runtime_id: RuntimeId,
+        ) -> Result<Vec<u8>, TezosXRuntimeError> {
+            unimplemented!("not needed for this test")
+        }
+    }
+
+    /// Adapted from `test_simple_transfer` in `revm/src/lib.rs`.
+    #[test]
+    fn test_call_simple_transfer() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let caller = Address::from_slice(&[0x11; 20]);
+        let destination = Address::from_slice(&[0x22; 20]);
+        let value = U256::from(5);
+
+        // Set up caller with sufficient balance
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::from(1000),
+                    nonce: 0,
+                    code_hash: Default::default(),
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        let context = CrossRuntimeContext {
+            gas_limit: u64::MAX,
+            timestamp: U256::from(1),
+            block_number: U256::from(1),
+        };
+
+        let result = runtime.call(
+            &registry,
+            &mut host,
+            &caller.0 .0,
+            &destination.0 .0,
+            value,
+            &[],
+            context,
+        );
+        assert!(result.is_ok(), "EVM call should succeed: {result:?}");
+
+        // Verify destination received the transfer
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+        let info = destination_account.info(&mut host).unwrap();
+        assert_eq!(info.balance, revm::primitives::U256::from(5));
+    }
+
+    /// Adapted from `test_contract_call_sload_sstore` in `revm/src/lib.rs`.
+    #[test]
+    fn test_call_executes_contract_bytecode() {
+        let mut host = MockKernelHost::default();
+        let runtime = EthereumRuntime::default();
+        let registry = StubRegistry;
+
+        let caller = Address::from_slice(&[0x11; 20]);
+        let contract = Address::from_slice(&[0x22; 20]);
+
+        // Set up caller with balance
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+        caller_account
+            .set_info_without_code(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::from(1000),
+                    nonce: 0,
+                    code_hash: Default::default(),
+                    account_id: None,
+                    code: None,
+                },
+            )
+            .unwrap();
+
+        // Deploy a tiny contract:
+        //   PUSH1 0x42   (value to store)
+        //   PUSH1 0x01   (storage slot)
+        //   SSTORE       (store 0x42 at slot 1)
+        //   PUSH1 0x01
+        //   SLOAD        (load from slot 1)
+        let bytecode_raw = Bytes::from_hex("6042600155600154").unwrap();
+        let code_hash = bytes_hash(&bytecode_raw);
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
+        contract_account
+            .set_info(
+                &mut host,
+                AccountInfo {
+                    balance: revm::primitives::U256::ZERO,
+                    nonce: 0,
+                    code_hash,
+                    account_id: None,
+                    code: Some(Bytecode::new_raw(bytecode_raw.clone())),
+                },
+            )
+            .unwrap();
+        CodeStorage::add(&mut host, &bytecode_raw, Some(code_hash)).unwrap();
+
+        let context = CrossRuntimeContext {
+            gas_limit: u64::MAX,
+            timestamp: U256::from(1),
+            block_number: U256::from(1),
+        };
+
+        let result = runtime.call(
+            &registry,
+            &mut host,
+            &caller.0 .0,
+            &contract.0 .0,
+            U256::zero(),
+            &[],
+            context,
+        );
+        assert!(result.is_ok(), "EVM call should succeed: {result:?}");
+
+        // Verify the contract wrote 0x42 to storage slot 1
+        let slot_value = contract_account
+            .get_storage(&host, &revm::primitives::U256::from(1))
+            .unwrap();
+        assert_eq!(slot_value, revm::primitives::U256::from(0x42));
+    }
 
     /// Test that alias addresses are computed deterministically from native addresses.
     #[test]
