@@ -30,6 +30,7 @@ module CLST_contract = struct
     | Balance_too_low of Destination.t * nat * nat
     | Amount_too_large of Destination.t * nat
     | Only_owner_can_change_operator of Destination.t * Destination.t
+    | Empty_ticket
 
   let is_implicit : Destination.t -> bool = function
     | Destination.Contract (Contract.Implicit _) -> true
@@ -541,6 +542,179 @@ module CLST_contract = struct
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     return (Script_list.of_list [op], storage, [], ctxt)
 
+  (** Implementation of the [export_ticket] entrypoint, compliant with
+      the FA2.1 standard:
+      https://tzip.tezosagora.org/proposal/tzip-26/#entrypoint-semantics
+
+      The entrypoint MUST comply with the same policy as the [transfer]
+      entrypoint. The balance of [from_] MUST be decreased by [amount]
+      for each associated [token_id]. The balance of [to_] and
+      [destination] MUST remain unchanged. The total supply MUST remain
+      unchanged. *)
+  let execute_export_ticket
+      (ctxt, (step_constants : Script_typed_ir.step_constants))
+      (export_ticket : export_ticket) (storage : Clst_contract_storage.t) :
+      entrypoint_execution_result tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? entrypoint_str = Entrypoint.of_string_lax "export_ticket" in
+    let*? () =
+      error_unless
+        Tez.(step_constants.amount = zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let create_ticket_one (ctxt, storage, ops) (from_, (token_id, amount)) =
+      let* ctxt, storage, op_balance_event_source =
+        execute_transfer_one_from
+          step_constants
+          entrypoint_str
+          (ctxt, storage)
+          from_
+          (token_id, amount)
+      in
+      let* ticket_amount =
+        match Ticket_amount.of_n amount with
+        | Some amount -> return amount
+        | None -> tzfail Empty_ticket
+      in
+      let ticket =
+        {
+          ticketer = Contract.Originated step_constants.self;
+          contents = (token_id, (None : bytes option));
+          amount = ticket_amount;
+        }
+      in
+      return (ctxt, storage, op_balance_event_source :: ops, ticket)
+    in
+
+    let transfer_ticket (ctxt, ops) (to_, ticket) =
+      let*? ticket_ty = CLST_types.clst_ticket_ty in
+      let* typed_contract =
+        match to_.destination with
+        | Contract (Implicit pkh) ->
+            return (Typed_implicit_with_ticket {destination = pkh; ticket_ty})
+        | Contract (Originated hash) ->
+            return
+              (Typed_originated
+                 {
+                   arg_ty = ticket_ty;
+                   contract_hash = hash;
+                   entrypoint = to_.entrypoint;
+                 })
+        | Sc_rollup sc ->
+            return
+              (Typed_sc_rollup
+                 {
+                   arg_ty = ticket_ty;
+                   sc_rollup = sc;
+                   entrypoint = to_.entrypoint;
+                 })
+        | _ -> tzfail (standard_error ~mnemonic:"FA2.1_INVALID_DESTINATION")
+      in
+      let gas_counter, outdated_ctxt =
+        Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+      in
+      let* op, outdated_ctxt, gas_counter =
+        Script_interpreter_defs.transfer
+          (outdated_ctxt, step_constants)
+          gas_counter
+          Tez.zero
+          Micheline.dummy_location
+          typed_contract
+          ticket
+      in
+      let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
+      return (ctxt, op :: ops)
+    in
+
+    let execute_export_ticket_one (ctxt, storage, all_ops) (destination, txs) =
+      let* ctxt, storage, rev_ops =
+        match destination with
+        | None ->
+            (* None, an operation is emitted for each exported ticket to
+             its corresponding address %to_ and this address MUST be
+             typed as a (contract (ticket (pair nat (option
+             bytes))). This allows tz addresses to receive tickets
+             directly. The contract MUST fail with the error mnemonic
+             "FA2.1_INVALID_DESTINATION" if an address %to_ can't be
+             correctly typed. *)
+            List.fold_left_es
+              (fun (ctxt, storage, ops) (to_, tickets_to_export) ->
+                List.fold_left_es
+                  (fun acc ticket_to_export ->
+                    let* ctxt, storage, ops, ticket =
+                      create_ticket_one acc ticket_to_export
+                    in
+                    let* ctxt, ops =
+                      transfer_ticket (ctxt, ops) (to_, ticket)
+                    in
+                    return (ctxt, storage, ops))
+                  (ctxt, storage, ops)
+                  (Script_list.to_list tickets_to_export))
+              (ctxt, storage, all_ops)
+              (Script_list.to_list txs)
+        | Some destination_contract ->
+            (* (Some contract), only one operation is necessary to
+               transfer the tickets to this contract. The contract
+               parameter (list (pair address (list (ticket (pair nat
+               (option bytes)))))) MUST be constructed using (address
+               %to_) and (list %tickets_to_export). *)
+            let* ctxt, storage, rev_ops, rev_tickets =
+              List.fold_left_es
+                (fun (ctxt, storage, ops, tickets_acc)
+                     (to_, tickets_to_export)
+                   ->
+                  let* ctxt, storage, ops, tickets_rev =
+                    List.fold_left_es
+                      (fun (ctxt, storage, ops, tickets) ticket_to_export ->
+                        let* ctxt, storage, ops, ticket =
+                          create_ticket_one
+                            (ctxt, storage, ops)
+                            ticket_to_export
+                        in
+                        return (ctxt, storage, ops, ticket :: tickets))
+                      (ctxt, storage, ops, [])
+                      (Script_list.to_list tickets_to_export)
+                  in
+                  let tickets = List.rev tickets_rev in
+                  return (ctxt, storage, ops, (to_, tickets) :: tickets_acc))
+                (ctxt, storage, all_ops, [])
+                (Script_list.to_list txs)
+            in
+            let tickets = List.rev rev_tickets in
+            let param =
+              Script_list.of_list
+                (List.map
+                   (fun (to_, tks) -> (to_, Script_list.of_list tks))
+                   tickets)
+            in
+            let gas_counter, outdated_ctxt =
+              Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+            in
+            let* op, outdated_ctxt, gas_counter =
+              Script_interpreter_defs.transfer
+                (outdated_ctxt, step_constants)
+                gas_counter
+                Tez.zero
+                Micheline.dummy_location
+                destination_contract
+                param
+            in
+            let ctxt =
+              Local_gas_counter.update_context gas_counter outdated_ctxt
+            in
+            return (ctxt, storage, op :: rev_ops)
+      in
+      return (ctxt, storage, rev_ops)
+    in
+
+    let* ctxt, storage, rev_ops =
+      List.fold_left_es
+        execute_export_ticket_one
+        (ctxt, storage, [])
+        (Script_list.to_list export_ticket)
+    in
+    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
@@ -555,7 +729,8 @@ module CLST_contract = struct
         execute_approve (ctxt, step_constants) approvals storage
     | Update_operators operators ->
         execute_update_operators (ctxt, step_constants) operators storage
-    | Export_ticket _ -> assert false
+    | Export_ticket txs ->
+        execute_export_ticket (ctxt, step_constants) txs storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
@@ -874,4 +1049,13 @@ let () =
           Some (sender, owner)
       | _ -> None)
     (fun (sender, owner) ->
-      CLST_contract.Only_owner_can_change_operator (sender, owner))
+      CLST_contract.Only_owner_can_change_operator (sender, owner)) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.empty_ticket"
+    ~title:"Empty ticket"
+    ~description:"Forbidden to create a zero ticket."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Zero tickets are forbidden.")
+    Data_encoding.unit
+    (function CLST_contract.Empty_ticket -> Some () | _ -> None)
+    (fun () -> CLST_contract.Empty_ticket)
