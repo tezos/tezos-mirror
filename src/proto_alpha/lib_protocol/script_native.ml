@@ -222,6 +222,75 @@ module CLST_contract = struct
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     return (Script_list.of_list [op], storage, balance_updates, ctxt)
 
+  let execute_transfer_one_from (step_constants : step_constants) entrypoint_str
+      (ctxt, storage) from_ (token_id, amount) =
+    let open Lwt_result_syntax in
+    let*? () = check_token_id token_id in
+    (* Checking that [from_] is the sender here instead of in
+       [execute_from] means that we repeat the check for each new
+       transfer from the same origin. On the other hand, it lets the
+       whole execution succeed if [from_] is not the sender but its
+       associated list of transfers is empty, which satisfies the
+       atomical behavior prescribed by the standard. Moreover, once
+       operators are implemented, the transferred [amount] will be
+       relevant to determining permission. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8214 Update
+       permission policy once operators are implemented *)
+    let from_is_sender =
+      let {destination; entrypoint} = from_ in
+      Destination.equal destination step_constants.sender
+      && Entrypoint.is_default entrypoint
+    in
+    let*? () =
+      error_unless from_is_sender (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
+    in
+
+    (* Smart contracts cannot hold tokens at all.
+
+       We do check that [from_] is implicit too, because otherwise a
+       transfer of zero would succeed and make it appear in the
+       storage, which might break invariants in some tools. *)
+    let*? () =
+      error_unless
+        (is_implicit from_.destination)
+        (Non_implicit_contract from_.destination)
+    in
+    let* balance_from, ctxt =
+      Clst_contract_storage.get_balance_from_storage ctxt storage from_
+    in
+    let*? () =
+      error_when
+        Compare.Int.(Script_int.compare balance_from amount < 0)
+        (standard_error ~mnemonic:"FA2_INSUFFICIENT_BALANCE")
+    in
+    let new_balance_from = Script_int.(abs (sub balance_from amount)) in
+    (* Note: Transferring 0 from or to an account that didn't have a
+       balance, will set its balance to 0. This is in accordance with
+       the FA2 standard: transfers of zero must be treated as normal
+       transfers.
+
+       And if we ever want to add an invariant that accounts with no
+       tokens are not present at all in the ledger, then it's probably
+       {!Clst_storage.set_balance_from_storage}'s job to enforce it
+       anyway. *)
+    let* storage, ctxt =
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        from_
+        new_balance_from
+    in
+    let* op_balance_event_from, ctxt =
+      Clst_events.balance_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner:from_
+        ~token_id:Clst_contract_storage.token_id
+        ~new_balance:new_balance_from
+        ~diff:(Script_int.neg amount)
+    in
+    return (ctxt, storage, op_balance_event_from)
+
   (** Implementation of the [transfer] entrypoint, compliant with the
       FA2.1 standard:
       https://tzip.tezosagora.org/proposal/tzip-26/#entrypoint-semantics
@@ -242,84 +311,29 @@ module CLST_contract = struct
         (Non_empty_transfer (step_constants.sender, step_constants.amount))
     in
     let execute_one from_ (ctxt, storage, ops) (to_, (token_id, amount)) =
-      let*? () = check_token_id token_id in
-      (* Checking that [from_] is the sender here instead of in
-         [execute_from] means that we repeat the check for each new
-         transfer from the same origin. On the other hand, it lets the
-         whole execution succeed if [from_] is not the sender but its
-         associated list of transfers is empty, which satisfies the
-         atomical behavior prescribed by the standard. Moreover, once
-         operators are implemented, the transferred [amount] will be
-         relevant to determining permission. *)
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/8214
-         Update permission policy once operators are implemented *)
-      let from_is_sender =
-        let {destination; entrypoint} = from_ in
-        Destination.equal destination step_constants.sender
-        && Entrypoint.is_default entrypoint
-      in
-      let*? () =
-        error_unless
-          from_is_sender
-          (standard_error ~mnemonic:"FA2_NOT_OPERATOR")
-      in
-      (* Smart contracts cannot hold tokens at all.
-
-         We do check that [from_] is implicit too, because otherwise a
-         transfer of zero would succeed and make it appear in the
-         storage, which might break invariants in some tools. *)
-      let*? () =
-        error_unless
-          (is_implicit from_.destination)
-          (Non_implicit_contract from_.destination)
-      in
       let*? () =
         error_unless
           (is_implicit to_.destination)
           (Non_implicit_contract to_.destination)
       in
-      let* balance_from, ctxt =
-        Clst_contract_storage.get_balance_from_storage ctxt storage from_
-      in
-      let*? () =
-        error_when
-          Compare.Int.(Script_int.compare balance_from amount < 0)
-          (standard_error ~mnemonic:"FA2_INSUFFICIENT_BALANCE")
-      in
-      (* Note: Transferring 0 from or to an account that didn't have a
-         balance, will set its balance to 0. This is in accordance
-         with the FA2 standard: transfers of zero must be treated as
-         normal transfers.
-
-         And if we ever want to add an invariant that accounts with no
-         tokens are not present at all in the ledger, then it's
-         probably {!Clst_storage.set_balance_from_storage}'s job to
-         enforce it anyway. *)
-      let* storage, ctxt =
-        Clst_contract_storage.set_balance_from_storage
-          ctxt
-          storage
+      let* ctxt, storage, op_balance_event_source =
+        execute_transfer_one_from
+          step_constants
+          entrypoint_str
+          (ctxt, storage)
           from_
-          Script_int.(abs (sub balance_from amount))
+          (token_id, amount)
       in
       let* balance_to, ctxt =
         Clst_contract_storage.get_balance_from_storage ctxt storage to_
       in
+      let new_balance_to = Script_int.(add_n balance_to amount) in
       let* storage, ctxt =
         Clst_contract_storage.set_balance_from_storage
           ctxt
           storage
           to_
-          Script_int.(add_n balance_to amount)
-      in
-      let* op_balance_event_source, ctxt =
-        Clst_events.balance_update_event
-          (ctxt, step_constants)
-          ~entrypoint:entrypoint_str
-          ~owner:from_
-          ~token_id:Clst_contract_storage.token_id
-          ~new_balance:balance_from
-          ~diff:(Script_int.neg amount)
+          new_balance_to
       in
       let* op_balance_event_dest, ctxt =
         Clst_events.balance_update_event
@@ -327,7 +341,7 @@ module CLST_contract = struct
           ~entrypoint:entrypoint_str
           ~owner:to_
           ~token_id:Clst_contract_storage.token_id
-          ~new_balance:balance_to
+          ~new_balance:new_balance_to
           ~diff:(Script_int.int amount)
       in
       let* op_transfer_event, ctxt =
