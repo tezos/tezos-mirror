@@ -1685,6 +1685,145 @@ let test_cross_runtime_call_from_michelson_to_evm =
       ~error_msg:"Expected storage slot 0 = %R but got %L") ;
   unit
 
+(** Test that a Michelson FAILWITH in a cross-runtime subcall does not
+    force-revert the entire EVM transaction. Deploys a Solidity contract
+    that makes two low-level gateway calls: one to a KT1 that succeeds
+    (transfer_amount) and one to a KT1 that always FAILWITHs
+    (always_fails_unit). The EVM caller catches the revert and
+    continues execution. *)
+let test_evm_gateway_catch_revert =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Michelson revert does not force EVM revert"
+    ~tags:["cross_runtime"; "gateway"; "revert"]
+    ~with_runtimes:[Tezos]
+    ~tez_bootstrap_accounts:Evm_node.tez_default_bootstrap_accounts
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        evm_version;
+        _;
+      }
+      protocol
+    ->
+  let source = Constant.bootstrap5 in
+  (* Step 1: Originate transfer_amount.tz — stores AMOUNT in storage *)
+  let* success_hex, success_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "transfer_amount"]
+      ~init_storage_data:"0"
+      protocol
+  in
+  (* Step 2: Originate always_fails_unit.tz — FAILWITHs on any call *)
+  let* _fails_hex, fails_kt1 =
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:2
+      ~script_name:["mini_scenarios"; "always_fails_unit"]
+      ~init_storage_data:"Unit"
+      protocol
+  in
+  (* Step 3: Compile and deploy the Solidity catch-revert contract *)
+  let* contract = Solidity_contracts.gateway_catch_revert evm_version in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let bytecode = Tezt.Base.read_file contract.bin in
+  let* contract_address =
+    deploy_evm_contract
+      ~sequencer
+      ~sender
+      ~nonce:0
+      ~init_code:("0x" ^ bytecode)
+      ()
+  in
+  (* Step 4: Call testCatchRevert(successKT1, failsKT1) with value *)
+  let value = Wei.of_tez (Tez.of_int 200) in
+  let* _receipt =
+    craft_and_send_evm_transaction
+      ~sequencer
+      ~sender
+      ~nonce:1
+      ~value
+      ~address:contract_address
+      ~abi_signature:"testCatchRevert(string,string)"
+      ~arguments:[success_kt1; fails_kt1]
+      ()
+  in
+  (* Step 5: Sync rollup node so Michelson state changes are visible *)
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
+  in
+  (* Step 6: Verify results *)
+  (* Storage layout: all three bools are packed in slot 0.
+     byte 0 = firstCallSuccess, byte 1 = secondCallSuccess,
+     byte 2 = executionCompleted.
+     Expected: 0x...00010001 (first=true, second=false, completed=true). *)
+  let*@ slot0 =
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x0" sequencer
+  in
+  let byte_at hex pos =
+    let len = String.length hex in
+    if len >= 2 * (pos + 1) then String.sub hex (len - (2 * (pos + 1))) 2
+    else "00"
+  in
+  let first_call = byte_at slot0 0 in
+  let second_call = byte_at slot0 1 in
+  let completed = byte_at slot0 2 in
+  Check.(
+    (first_call = "01")
+      string
+      ~error_msg:"Expected firstCallSuccess=true but got %L") ;
+  Check.(
+    (second_call = "00")
+      string
+      ~error_msg:"Expected secondCallSuccess=false but got %L") ;
+  Check.(
+    (completed = "01")
+      string
+      ~error_msg:"Expected executionCompleted=true but got %L") ;
+  (* Verify the success call actually transferred funds: transfer_amount.tz
+     stores AMOUNT (in mutez) so its storage should contain half the value. *)
+  let half_mutez = Tez.to_mutez (Tez.of_int 200) / 2 in
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node
+      ~contract_hex:success_hex
+      ~expected:(`O [("int", `String (string_of_int half_mutez))])
+      ()
+  in
+  (* Verify the EVM contract got the 100 XTZ back from the failed subcall. *)
+  let*@ contract_balance =
+    Rpc.get_balance ~address:contract_address sequencer
+  in
+  let expected_contract_balance = Wei.of_tez (Tez.of_int 100) in
+  Check.(
+    (contract_balance = expected_contract_balance)
+      Wei.typ
+      ~error_msg:"Expected EVM contract balance %R but got %L") ;
+  (* Verify the failing contract received no funds — the revert was atomic. *)
+  let* tez_client = tezos_client sequencer in
+  let* fails_balance = Client.get_balance_for ~account:fails_kt1 tez_client in
+  Check.(
+    (Tez.to_mutez fails_balance = 0)
+      int
+      ~error_msg:"Expected failing contract balance 0 but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
@@ -1706,6 +1845,7 @@ let () =
   test_michelson_call_failwith [Alpha] ;
   test_michelson_inter_contract_call [Alpha] ;
   test_michelson_internal_call_revert [Alpha] ;
+  test_evm_gateway_catch_revert [Alpha] ;
   test_eth_rpc_with_alias ~runtime:Tezos [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos () ;
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
