@@ -52,7 +52,8 @@ let ci_sdk_bindings =
     ~path:"contrib/sdk-bindings/ci"
     ~bisect_ppx:No
     ~modules:["sdk_bindings_ci"]
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let ci_lib_tezos_ci_jobs =
