@@ -221,6 +221,7 @@ let jobs ?start_job ?(changeset = false) () =
       ?dependencies
       [script]
   in
+  (* base images: deb and rpm distros *)
   let job_debian_based_images =
     let changes =
       (* we need the [debian] base job if we have [debian-homebrew] or
@@ -261,6 +262,7 @@ let jobs ?start_job ?(changeset = false) () =
       ~changes:(Changeset.make Files.rpm_base)
       "images/base-images/Dockerfile.rpm"
   in
+  (* debian-rust: based on [debian:trixie]. *)
   let job_rust_based_images =
     make_job_base_images
       ~__POS__
@@ -279,6 +281,8 @@ let jobs ?start_job ?(changeset = false) () =
            @ Files.debian_rust_merge))
       "images/base-images/Dockerfile.rust"
   in
+  (* dedicated merge job exist because QEMU compilation takes too much
+     time. Build job reached timeout. *)
   let job_rust_based_images_merge =
     job_docker_authenticated
       ~__POS__
@@ -313,6 +317,7 @@ let jobs ?start_job ?(changeset = false) () =
         ]
       ["scripts/ci/docker-merge-base-images.sh"]
   in
+  (* debian-homebrew: based on [debian:trixie] *)
   let job_debian_homebrew_base_images =
     make_job_base_images
       ~__POS__
