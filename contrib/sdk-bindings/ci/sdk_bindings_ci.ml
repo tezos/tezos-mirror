@@ -77,6 +77,9 @@ module Release = struct
         "./contrib/sdk-bindings/scripts/ci/check_tag_version.sh";
       ]
 
+  let artifacts =
+    Gitlab_ci.Util.artifacts ["contrib/sdk-bindings/rust/target/wheels/*"]
+
   let jobs_build_sdk =
     let job =
       job
@@ -85,10 +88,6 @@ module Release = struct
     in
 
     let build_python_sdk =
-      let artifacts =
-        Gitlab_ci.Util.artifacts ["contrib/sdk-bindings/rust/target/wheels/*"]
-      in
-
       let linux : tezos_job =
         job
           ~__POS__
@@ -126,39 +125,37 @@ module Release = struct
         |> enable_cargo_cache |> enable_sccache
       in
 
-      let windows : tezos_job =
-        job
-          ~__POS__
-          ~name:"build_python_sdk_windows"
-          ~description:"Build Python SDK on Windows"
-          ~variables:windows_variables
-          ~tag:Dynamic
-          ~datadog:false
-          ~artifacts
-          ~before_script:
-            [
-              (* Install Rust *)
-              "[Environment]::SetEnvironmentVariable('CARGO_NET_OFFLINE','false')";
-              "[Environment]::SetEnvironmentVariable('CARGO_HOME','.cargo')";
-              {|$env:Path = "$Env:CI_PROJECT_DIR\.cargo\bin;$env:Path"|};
-              "Invoke-WebRequest -Uri https://win.rustup.rs -OutFile \
-               rustup-init.exe";
-              "./rustup-init.exe -y";
-              "Remove-Item rustup-init.exe";
-              (* Install Maturin *)
-              "pip install maturin==1.5.1";
-              (* Install make *)
-              "choco install make";
-            ]
-          [
-            "make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f \
-             python.mk build";
-          ]
-      in
-
-      [linux; macos; windows]
+      [linux; macos]
     in
     build_python_sdk
+
+  let job_build_python_windows =
+    CI.job
+      "build_python_windows"
+      ~__POS__
+      ~description:"Build Python SDK on Windows"
+      ~stage:Build
+      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
+      ~variables:windows_variables
+      ~tag:Dynamic
+      ~disable_datadog:true
+      ~artifacts
+      [
+        (* Install Rust *)
+        "[Environment]::SetEnvironmentVariable('CARGO_NET_OFFLINE','false')";
+        "[Environment]::SetEnvironmentVariable('CARGO_HOME','.cargo')";
+        {|$env:Path = "$Env:CI_PROJECT_DIR\.cargo\bin;$env:Path"|};
+        "Invoke-WebRequest -Uri https://win.rustup.rs -OutFile rustup-init.exe";
+        "./rustup-init.exe -y";
+        "Remove-Item rustup-init.exe";
+        (* Install Maturin *)
+        "pip install maturin==1.5.1";
+        (* Install make *)
+        "choco install make";
+        (* Build *)
+        "make -C $Env:CI_PROJECT_DIR/contrib/sdk-bindings/rust -f python.mk \
+         build";
+      ]
 
   let job_publish_sdk =
     CI.job
@@ -172,6 +169,7 @@ module Release = struct
           ("MATURIN_REPOSITORY", "testpypi");
           ("MATURIN_PYPI_TOKEN", "$CI_TESTPYPI_TOKEN");
         ]
+      ~needs:[(Artifacts, job_build_python_windows)]
       ~needs_legacy:
         (List.map (fun job -> (Cacio.Artifacts, job)) jobs_build_sdk)
       [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
