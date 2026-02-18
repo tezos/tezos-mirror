@@ -24,12 +24,19 @@ let rewards_split_test =
     ~uses:(fun _protocol ->
       [Constant.octez_agnostic_baker; Constant.octez_tezindex])
   @@ fun protocol ->
-  (* Step 1: Start node and activate protocol (sandbox: blocks_per_cycle=4) *)
+  let baker1 =
+    Constant.bootstrap3
+    (* we choose bootstrap3 because it has the higher number of expected block
+       avoiding CI flakyness in case it misses some *)
+  in
+  let baker2 = Constant.bootstrap2 in
+
+  (* Step 1: Start node and activate protocol *)
   Log.info "Starting node and activating protocol" ;
   let parameter_file =
     Protocol.parameter_file ~constants:Constants_sandbox protocol
   in
-  (* Create a delegator account that delegates to bootstrap1 *)
+  (* Create a delegator account that delegates to baker1 *)
   let delegator1_balance = 500_000_000_000 in
   let delegator1 =
     Account.generate_new_key
@@ -43,19 +50,19 @@ let rewards_split_test =
           {
             Protocol.balance = Some delegator1_balance;
             consensus_key = None;
-            delegate = Some Constant.bootstrap1;
+            delegate = Some baker1;
           },
         true );
     ]
   in
+  let cycle_length = 16 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~additional_bootstrap_accounts
       ~base:(Left parameter_file)
       [
         (["minimal_block_delay"], `String "4");
-        (["blocks_per_cycle"], `Int 4);
-        (["nonce_revelation_threshold"], `Int 1);
+        (["blocks_per_cycle"], `Int cycle_length);
       ]
   in
   let* node, client =
@@ -67,40 +74,43 @@ let rewards_split_test =
       ()
   in
 
+  (* Exclude baker2 from the list of baking delegate to ensure that it will miss
+     block and attestation rewards. *)
   let delegates =
     [
       Constant.bootstrap1.alias;
-      Constant.bootstrap2.alias;
       Constant.bootstrap3.alias;
       Constant.bootstrap4.alias;
+      Constant.bootstrap5.alias;
     ]
   in
   (* Bake one block to ensure the head is on the target protocol *)
   let* () = Client.bake_for ~keys:delegates client in
 
-  (* Step 2: Start tezindex connected to the node, watching bootstrap1 *)
-  Log.info "Starting tezindex" ;
-  let bootstrap1_pkh = Constant.bootstrap1.public_key_hash in
-  let bootstrap5_pkh = Constant.bootstrap5.public_key_hash in
+  (* Step 2: Start tezindex connected to the node, watching baker1 and baker2 *)
+  Log.info "Starting tezindex watching %s and %s" baker1.alias baker2.alias ;
   let tezindex =
-    Tezindex.run ~node ~watched_addresses:[bootstrap1_pkh; bootstrap5_pkh] ()
+    Tezindex.run
+      ~node
+      ~watched_addresses:[baker1.public_key_hash; baker2.public_key_hash]
+      ()
   in
 
   (* Step 3: Wait for tezindex to be ready *)
   Log.info "Waiting for tezindex to be ready" ;
   let* () = Tezindex.wait_for_ready tezindex in
 
-  (* Step 4: Start baker with bootstrap1-4, excluding bootstrap5 *)
-  Log.info "Starting baker with bootstrap1-4 (excluding bootstrap5)" ;
+  (* Step 4: Start baker with delegates *)
+  Log.info "Starting baker (excluding %s)" baker2.alias ;
   let* _baker = Agnostic_baker.init ~delegates node client in
 
-  (* Step 5: Wait for enough blocks (cycle 1 completes at level 4,
-     cycle 2 starts at level 5 with blocks_per_cycle=4) *)
-  let target_level = 9 in
+  (* Step 5: Wait for enough blocks to complete a full cycle *)
+  let target_level = cycle_length + 1 in
   Log.info "Waiting for level %d" target_level ;
   let* _level = Node.wait_for_level node target_level in
-  (* Step 6: Query v1/rewards/split for cycle 1 data *)
-  let query_cycle = 1 in
+
+  (* Step 6: Query v1/rewards/split for cycle 0 data *)
+  let query_cycle = 0 in
 
   let check_field ~who ~field ?expected json =
     let v = JSON.(json |-> field |> as_int64) in
@@ -114,26 +124,26 @@ let rewards_split_test =
           ~error_msg:(sf "%s %s should be positive, got %%L" who field)
   in
 
-  (* Step 7: Assert bootstrap1 rewards *)
-  Log.info "Checking bootstrap1 rewards" ;
+  (* Step 7: Assert baker1 rewards *)
+  Log.info "Checking %s rewards" baker1.alias ;
   let* baker1_json =
     Tezindex.get_v1_rewards_split
       tezindex
-      ~baker:bootstrap1_pkh
+      ~baker:baker1.public_key_hash
       ~cycle:query_cycle
   in
-  check_field ~who:"bootstrap1" ~field:"blockRewardsStakedOwn" baker1_json ;
-  check_field ~who:"bootstrap1" ~field:"attestationRewardsStakedOwn" baker1_json ;
+  check_field ~who:baker1.alias ~field:"blockRewardsStakedOwn" baker1_json ;
+  check_field ~who:baker1.alias ~field:"attestationRewardsStakedOwn" baker1_json ;
   check_field
-    ~who:"bootstrap1"
+    ~who:baker1.alias
     ~field:"dalAttestationRewardsStakedOwn"
     baker1_json ;
 
-  (* Step 8: Assert bootstrap1 has delegators (itself + delegator1) *)
-  Log.info "Checking bootstrap1 delegators" ;
+  (* Step 8: Assert baker1 has delegators (itself + delegator1) *)
+  Log.info "Checking %s delegators" baker1.alias ;
   let delegators = JSON.(baker1_json |-> "delegators" |> as_list) in
   check_field
-    ~who:"bootstrap1"
+    ~who:baker1.alias
     ~field:"delegatorsCount"
     ~expected:(Int64.of_int (List.length delegators))
     baker1_json ;
@@ -157,16 +167,17 @@ let rewards_split_test =
   in
   Check.(delegator1_found = true)
     Check.bool
-    ~error_msg:"delegator1 should appear in bootstrap1's delegators list" ;
+    ~error_msg:
+      (sf "delegator1 should appear in %s's delegators list" baker1.alias) ;
 
   (* Step 8b: Assert ownDelegatedBalance matches baker's entry in delegators
      and externalDelegatedBalance matches delegator1's known balance *)
-  Log.info "Checking bootstrap1 delegated balances" ;
+  Log.info "Checking %s delegated balances" baker1.alias ;
   let baker_delegator_balance =
     List.find_map
       (fun d ->
         let addr = JSON.(d |-> "address" |> as_string) in
-        if String.equal addr bootstrap1_pkh then
+        if String.equal addr baker1.public_key_hash then
           Some JSON.(d |-> "delegatedBalance" |> as_int64)
         else None)
       delegators
@@ -177,28 +188,38 @@ let rewards_split_test =
     | None -> Test.fail "baker should appear in its own delegators list"
   in
   check_field
-    ~who:"bootstrap1"
+    ~who:baker1.alias
     ~field:"ownDelegatedBalance"
     ~expected:baker_delegator_balance
     baker1_json ;
   check_field
-    ~who:"bootstrap1"
+    ~who:baker1.alias
     ~field:"externalDelegatedBalance"
     ~expected:(Int64.of_int delegator1_balance)
     baker1_json ;
 
-  (* Step 9: Assert bootstrap5 has lost attestation rewards *)
-  Log.info "Checking bootstrap5 rewards" ;
-  let* bootstrap5_json =
+  (* Step 8c: Check blocks and expectedBlocks for baker1 *)
+  Log.info "Checking blocks and expectedBlocks for %s" baker1.alias ;
+  check_field ~who:baker1.alias ~field:"blocks" baker1_json ;
+  check_field ~who:baker1.alias ~field:"expectedBlocks" baker1_json ;
+
+  (* Step 9: Verify baker2 (not baking) has expectedBlocks > 0 but blocks = 0,
+     and has lost attestation/DAL rewards *)
+  Log.info "Checking %s has expected blocks but 0 baked blocks" baker2.alias ;
+  let* baker2_json =
     Tezindex.get_v1_rewards_split
       tezindex
-      ~baker:bootstrap5_pkh
+      ~baker:baker2.public_key_hash
       ~cycle:query_cycle
   in
   check_field
-    ~who:"bootstrap5"
-    ~field:"missedAttestationRewards"
-    bootstrap5_json ;
+    ~who:baker2.alias
+    ~field:"blocks"
+    ~expected:(Int64.of_int 0)
+    baker2_json ;
+  check_field ~who:baker2.alias ~field:"expectedBlocks" baker2_json ;
+  check_field ~who:baker2.alias ~field:"missedAttestationRewards" baker2_json ;
+  check_field ~who:baker2.alias ~field:"missedDalAttestationRewards" baker2_json ;
   unit
 
 let register ~protocols = rewards_split_test protocols

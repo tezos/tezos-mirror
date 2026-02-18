@@ -191,7 +191,10 @@ let update_stake_split split (result : Data.Balance_update.result) total =
   | Delegate -> {split with ss_delegated = Int64.add split.ss_delegated total}
   | Lost -> split
 
-let tzkt_baker_rewards_of_entries ~cycle entries =
+let tzkt_baker_rewards_of_entries ~cycle ?(num_blocks = 0)
+    ?(expected_blocks = 0) entries =
+  let base = empty_tzkt_baker_rewards ~cycle in
+  let base = {base with num_blocks; expected_blocks} in
   List.fold_left
     (fun r ((cat : Data.Balance_update.category), res, total) ->
       match cat with
@@ -241,7 +244,7 @@ let tzkt_baker_rewards_of_entries ~cycle entries =
           | Lost ->
               {r with missed_block_fees = Int64.add r.missed_block_fees total}
           | _ -> {r with tzkt_block_fees = Int64.add r.tzkt_block_fees total}))
-    (empty_tzkt_baker_rewards ~cycle)
+    base
     entries
 
 (* --- Data_encoding for TzKT types --- *)
