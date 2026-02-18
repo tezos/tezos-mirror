@@ -82,7 +82,6 @@ sdk_bindings.build_python_linux:
   - gcp
   needs:
   - oc.docker:rust-sdk-bindings:amd64
-  - check_sdk_version
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
@@ -124,8 +123,7 @@ sdk_bindings.build_python_macos:
   stage: build
   tags:
   - $TAGS
-  needs:
-  - check_sdk_version
+  needs: []
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -172,8 +170,7 @@ sdk_bindings.build_python_windows:
   stage: build
   tags:
   - $TAGS
-  needs:
-  - check_sdk_version
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: true
@@ -205,6 +202,7 @@ sdk_bindings.publish:
   - gcp_not_interruptible
   needs:
   - oc.docker:rust-sdk-bindings:amd64
+  - check_sdk_version
   - sdk_bindings.build_python_linux
   - sdk_bindings.build_python_macos
   - sdk_bindings.build_python_windows

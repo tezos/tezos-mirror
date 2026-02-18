@@ -85,7 +85,6 @@ module Release = struct
       ~__POS__
       ~description:"Build Python SDK for Linux"
       ~stage:Build
-      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
       ~image:Images.rust_sdk_bindings
       ~artifacts
       ~cargo_cache:true
@@ -102,7 +101,6 @@ module Release = struct
       ~__POS__
       ~description:"Build Python SDK on macOS"
       ~stage:Build
-      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
       ~image:Images.macosx_15
       ~variables:macos_variables
       ~tag:Dynamic
@@ -129,7 +127,6 @@ module Release = struct
       ~__POS__
       ~description:"Build Python SDK on Windows"
       ~stage:Build
-      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
       ~variables:windows_variables
       ~tag:Dynamic
       ~disable_datadog:true
@@ -169,6 +166,7 @@ module Release = struct
           (Artifacts, job_build_python_macos);
           (Artifacts, job_build_python_windows);
         ]
+      ~needs_legacy:[(Cacio.Job, job_check_matching_tag)]
       [". $HOME/.venv/bin/activate"; "make -C contrib/sdk-bindings publish"]
 
   let () =
