@@ -22,7 +22,10 @@ use tezos_crypto_rs::hash::OperationHash;
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
-use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
+use tezos_evm_runtime::{
+    runtime::Runtime,
+    safe_storage::{safe_path, SafeStorage},
+};
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
@@ -629,6 +632,64 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
         skip_sender_debit,
     )
     .map(Into::into)
+}
+
+/// Execute a cross-runtime transfer with automatic rollback on failure.
+///
+/// Snapshots the world state before executing the transfer.  On success
+/// the snapshot is discarded; on failure it is restored, undoing any
+/// balance credits or storage writes that occurred before the error
+/// (e.g. Michelson `FAILWITH`).
+// TODO: L2-888 replace the low level revert mechanism by more general one
+#[allow(clippy::too_many_arguments)]
+pub fn cross_runtime_transfer<'a, Host: Runtime, C: Context>(
+    tc_ctx: &mut TcCtx<'a, Host, C>,
+    operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
+    registry: &impl Registry,
+    sender: &impl TezlinkAccount,
+    amount: &Narith,
+    dest: &Contract,
+    parameters: &Parameters,
+    parser: &'a Parser<'a>,
+) -> Result<TransferTarget, TransferError> {
+    let entrypoint = &parameters.entrypoint;
+    let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
+
+    let world_state = tc_ctx.context.path();
+    let tmp_path = safe_path(&world_state)
+        .map_err(|e| TransferError::GatewayError(format!("safe_path: {e:?}")))?;
+
+    // start: snapshot the world state
+    tc_ctx
+        .host
+        .store_copy(&world_state, &tmp_path)
+        .map_err(|e| TransferError::GatewayError(format!("start: {e:?}")))?;
+
+    let mut internal_receipts = Vec::new();
+    match transfer(
+        tc_ctx,
+        operation_ctx,
+        registry,
+        sender,
+        amount,
+        dest,
+        entrypoint,
+        value,
+        parser,
+        &mut internal_receipts,
+        true, // skip_sender_debit: the calling runtime already debited the sender
+    ) {
+        Ok(success) => {
+            // promote: discard the snapshot, keep changes
+            let _ = tc_ctx.host.store_delete(&tmp_path);
+            Ok(success.into())
+        }
+        Err(e) => {
+            // revert: restore the snapshot
+            let _ = tc_ctx.host.store_move(&tmp_path, &world_state);
+            Err(e)
+        }
+    }
 }
 
 /// This function typechecks both fields of a &Script: the code and the storage.
