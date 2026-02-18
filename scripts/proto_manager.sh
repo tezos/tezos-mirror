@@ -956,6 +956,26 @@ function commit_10_make_manifest() {
   commit_no_hooks "manifest: make manifest"
 }
 
+# COMMIT 11: Remove source protocol directory (snapshot only)
+#
+# MODE: snapshot only
+# REMOVES: src/proto_${protocol_source} directory
+#
+# DESCRIPTION:
+#   In snapshot mode, after the manifest has been regenerated and the
+#   source protocol has been unlinked, removes the entire source protocol
+#   directory from the repository.
+#   Does nothing in stabilise or copy modes.
+#
+# CREATES: 1 commit: "src: remove proto_${protocol_source}"
+function commit_11_remove_source_protocol() {
+  if [[ ${is_snapshot} == true ]]; then
+    warning "${protocol_source} has been unlinked in the manifest,  removing it from the source code"
+    rm -rf "src/proto_${protocol_source}"
+    commit_no_hooks "src: remove proto_${protocol_source}"
+  fi
+}
+
 # Assert that ${version} and ${label} are already defined
 function update_hashes() {
   if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
@@ -1017,11 +1037,7 @@ function copy_source() {
 
   commit_10_make_manifest
 
-  if [[ ${is_snapshot} == true ]]; then
-    warning "${protocol_source} has been unlinked in the manifest,  removing it from the source code"
-    rm -rf "src/proto_${protocol_source}"
-    commit_no_hooks "src: remove proto_${protocol_source}"
-  fi
+  commit_11_remove_source_protocol
 
   ## update agnostic_baker
   ## add protocol as active before alpha in parameters.ml
