@@ -22,6 +22,7 @@ use tezos_smart_rollup::types::PublicKeyHash;
 // `tezos_tezlink` for types that live only there (OperationHash, BlockNumber,
 // TransferError). To avoid the dependency altogether, those types would need
 // to be moved to a shared crate.
+use tezos_protocol::entrypoint::Entrypoint;
 use tezos_tezlink::operation::Parameters;
 use tezosx_interfaces::{CrossCallResult, CrossRuntimeContext, TezosXRuntimeError};
 
@@ -36,6 +37,37 @@ pub struct TezosRuntime;
 
 pub mod account;
 pub mod context;
+
+/// Decode cross-runtime call data into Michelson [`Parameters`].
+///
+/// Format: `[2 bytes: entrypoint name length (big-endian)][entrypoint UTF-8][Micheline bytes]`.
+/// Empty data yields [`Parameters::default()`] (the `default` entrypoint with
+/// unit value).
+fn decode_cross_runtime_parameters(
+    data: &[u8],
+) -> Result<Parameters, TezosXRuntimeError> {
+    if data.is_empty() {
+        return Ok(Parameters::default());
+    }
+    if data.len() < 2 {
+        return Err(TezosXRuntimeError::Custom(
+            "Cross-runtime call data too short: missing entrypoint length".into(),
+        ));
+    }
+    let ep_len = u16::from_be_bytes([data[0], data[1]]) as usize;
+    if data.len() < 2 + ep_len {
+        return Err(TezosXRuntimeError::Custom(
+            "Cross-runtime call data too short: entrypoint truncated".into(),
+        ));
+    }
+    let ep_str = std::str::from_utf8(&data[2..2 + ep_len]).map_err(|_| {
+        TezosXRuntimeError::Custom("Invalid UTF-8 in entrypoint name".into())
+    })?;
+    let entrypoint = Entrypoint::try_from(ep_str)
+        .map_err(|e| TezosXRuntimeError::Custom(format!("Invalid entrypoint: {e}")))?;
+    let value = data[2 + ep_len..].to_vec();
+    Ok(Parameters { entrypoint, value })
+}
 
 impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
     fn generate_alias<Host: Runtime>(
@@ -67,7 +99,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         from: &[u8],
         to: &[u8],
         amount: U256,
-        _data: &[u8],
+        data: &[u8],
         cross_ctx: CrossRuntimeContext,
     ) -> Result<CrossCallResult, TezosXRuntimeError> {
         let dest = Contract::nom_read_exact(to).map_err(|e| {
@@ -164,7 +196,7 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
             chain_id: &chain_id,
         };
         let parser = mir::parser::Parser::new();
-        let parameters = Parameters::default();
+        let parameters = decode_cross_runtime_parameters(data)?;
         let amount = Narith(amount_u64.into());
         match tezos_execution::cross_runtime_transfer(
             &mut tc_ctx,
