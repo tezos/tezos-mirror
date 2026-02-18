@@ -95,6 +95,11 @@ workflow:
     variables:
       PIPELINE_TYPE: octez_latest_release
     when: always
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND
+      == "LATEST"
+    variables:
+      PIPELINE_TYPE: octez_latest_release_api
+    when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release-test"
     variables:
@@ -380,6 +385,11 @@ include:
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "latest-release"
+    when: always
+- local: .gitlab/ci/pipelines/octez_latest_release_api.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND
+      == "LATEST"
     when: always
 - local: .gitlab/ci/pipelines/octez_latest_release_test.yml
   rules:

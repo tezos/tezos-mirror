@@ -238,6 +238,20 @@ let () =
         associated with the git tag pushed to the 'latest-release' branch."
      ^ release_description) ;
   register
+    "octez_latest_release_api"
+    ~jobs:(Octez_latest_release.jobs ())
+    If.(on_tezos_namespace && api_latest)
+    ~description:
+      ("Updates 'latest' tag of the Octez Docker distribution on Docker Hub.\n\n\
+        This pipeline is created on each push to the 'latest-release' branch \
+        of 'tezos/tezos', typically performed by the release manager. On each \
+        release, the 'latest-release' branch is updated to point to the git \
+        tag of the release. This resulting pipeline then updates the Docker \
+        tag 'latest' of the Octez Docker distribution published to Docker hub \
+        (https://hub.docker.com/r/tezos/tezos) to point to the Docker release \
+        associated with the git tag pushed to the 'latest-release' branch."
+     ^ release_description) ;
+  register
     "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
     ~jobs:(Octez_latest_release.jobs ~test:true ())

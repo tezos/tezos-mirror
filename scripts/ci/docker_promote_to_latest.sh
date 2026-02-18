@@ -5,9 +5,7 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-ci_commit_tag=$(git tag --points-at HEAD)
-
-export CI_COMMIT_TAG="${ci_commit_tag}"
+export CI_COMMIT_TAG="octez-v24.1"
 
 . scripts/ci/docker.env
 
