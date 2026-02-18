@@ -1598,8 +1598,6 @@ module Images = struct
 
     let fedora_39 = make_img "fedora:39" rpm_version
 
-    let fedora_41 = make_img "fedora:41" rpm_version
-
     let fedora_42 = make_img "fedora:42" rpm_version
 
     let homebrew_version = common_version
