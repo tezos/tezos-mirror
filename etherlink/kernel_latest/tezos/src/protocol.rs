@@ -9,7 +9,7 @@ pub enum Protocol {
     T024 = 24,
 }
 
-pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::S023;
+pub const TARGET_TEZOS_PROTOCOL: Protocol = Protocol::T024;
 
 /// The first protocol to support the `next_protocol` field in block
 /// headers. Used as the default when decoding headers from kernels
