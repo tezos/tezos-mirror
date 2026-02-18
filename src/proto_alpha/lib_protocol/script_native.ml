@@ -535,12 +535,13 @@ module CLST_contract = struct
     | Finalize () -> execute_finalize (ctxt, step_constants) () storage
     | Transfer transfer ->
         execute_transfer (ctxt, step_constants) transfer storage
+    | Balance_of requests ->
+        execute_balance_of (ctxt, step_constants) requests storage
     | Approve approvals ->
         execute_approve (ctxt, step_constants) approvals storage
     | Update_operators operators ->
         execute_update_operators (ctxt, step_constants) operators storage
-    | Balance_of requests ->
-        execute_balance_of (ctxt, step_constants) requests storage
+    | Export_ticket _ -> assert false
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in

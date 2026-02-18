@@ -73,8 +73,28 @@ module CLST_types : sig
     balance_request s_list
     * (balance_request * nat (* balance*)) s_list typed_contract
 
+  type ticket_with_token_id = (nat (* token_id *) * bytes option) ticket
+
+  type export_ticket =
+    ( (address * ticket_with_token_id s_list) s_list typed_contract option
+    (* destination *),
+      ( address (* to_ *),
+        (address (* from_ *), nat (* token_id *), nat (* amount *)) tup3 s_list
+      (* tickets_to_export *) )
+      pair
+      s_list
+    (* txs *) )
+    pair
+    s_list
+
+  type allowance_entrypoints = (approve, update_operators) or_
+
+  type tickets_entrypoints = export_ticket
+
   type fa21_entrypoints =
-    ((transfer, approve) or_, (update_operators, balance_of) or_) or_
+    ( (transfer, balance_of) or_,
+      (allowance_entrypoints, tickets_entrypoints) or_ )
+    or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -122,13 +142,18 @@ module CLST_types : sig
     | Redeem of redeem
     | Finalize of finalize
     | Transfer of transfer
+    | Balance_of of balance_of
     | Approve of approve
     | Update_operators of update_operators
-    | Balance_of of balance_of
+    | Export_ticket of export_ticket
 
   val entrypoint_from_arg : arg -> entrypoint
 
   val entrypoint_to_arg : entrypoint -> arg
+
+  val clst_contents_ticket_ty : (nat * bytes option) comparable_ty tzresult
+
+  val clst_ticket_ty : (ticket_with_token_id, Dependent_bool.no) ty tzresult
 
   val balance_view_ty : balance_view tzresult
 
