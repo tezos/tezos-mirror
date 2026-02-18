@@ -9,7 +9,7 @@ open Tezos_ci
 open Tezos_ci.Cache
 
 (** Set of SDK-bindings related files *)
-let changeset = Changeset.make ["sdk/rust/**/*"; "contrib/sdk-bindings"]
+let changeset = Changeset.make ["sdk/rust/**/*"; "contrib/sdk-bindings/**/*"]
 
 let job_test ?dependencies ?rules () =
   job

@@ -972,7 +972,7 @@ test_sdk_bindings:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/sdk-bindings
+    - contrib/sdk-bindings/**/*
     - images/create_image.sh
     - images/rust-sdk-bindings/**/*
     - images/scripts/install_datadog_static.sh
