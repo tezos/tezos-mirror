@@ -1269,6 +1269,50 @@ function source_helper_update_alpha_constants_previous() {
   ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
 }
 
+# SOURCE COMMIT 2: Fix alpha raw_context (snapshot/copy modes)
+#
+# MODE: snapshot OR copy
+# MODIFIES: src/proto_alpha/lib_protocol/raw_context.ml/mli, init_storage.ml
+#
+# DESCRIPTION:
+#   Updates alpha protocol files to reference the new protocol as predecessor.
+#   Uses simple sed replacements to update protocol names and references.
+#
+#   - copy mode: performs special protocol_source name manipulation
+#                (e.g., 023_PtStockholm + stockholm -> stockholm_023)
+#   - snapshot mode: straightforward replacement with version
+#
+#   This is the simpler path compared to stabilise mode which uses
+#   complex stitching logic (see source_commit_03).
+#
+# CREATES: 1 commit: "alpha: add ${capitalized_label} as Alpha previous protocol"
+function source_commit_02_fix_alpha_raw_context_snapshot() {
+  if [[ ${command} == "copy" ]]; then
+    protocol_source_original="${protocol_source}"
+    #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
+    protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
+    protocol_source="${source_label}_${protocol_source}"
+    log_blue "protocol_source is now ${protocol_source}"
+
+    sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}\"/g" \
+      "src/proto_alpha/lib_protocol/raw_context.ml"
+    protocol_source="${protocol_source_original}"
+  else
+    sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
+      "src/proto_alpha/lib_protocol/raw_context.ml"
+  fi
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.mli"
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/init_storage.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
+  commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+}
+
 function update_source() {
 
   if [[ $skip_update_source ]]; then
@@ -1302,30 +1346,7 @@ function update_source() {
   log_blue "fix prepare_first_block"
 
   if [[ ${is_snapshot} == true ]] || [[ ${command} == "copy" ]]; then
-    if [[ ${command} == "copy" ]]; then
-      protocol_source_original="${protocol_source}"
-      #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
-      protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
-      protocol_source="${source_label}_${protocol_source}"
-      log_blue "protocol_source is now ${protocol_source}"
-
-      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}\"/g" \
-        "src/proto_alpha/lib_protocol/raw_context.ml"
-      protocol_source="${protocol_source_original}"
-    else
-      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
-        "src/proto_alpha/lib_protocol/raw_context.ml"
-    fi
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.mli"
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/init_storage.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+    source_commit_02_fix_alpha_raw_context_snapshot
   else
     prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_alpha/lib_protocol/raw_context.ml")
     # shellcheck disable=SC2001
