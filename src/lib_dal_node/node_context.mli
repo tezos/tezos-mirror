@@ -168,6 +168,9 @@ val get_store : t -> Store.t
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t
 
+(** [get_attestation_ops_cache ctxt] returns the attestation operations cache. *)
+val get_attestation_ops_cache : t -> Attestation_ops_cache.t
+
 (** [get_tezos_node_cctxt ctxt] returns the Tezos node's client context. *)
 val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 

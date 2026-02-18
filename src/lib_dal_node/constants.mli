@@ -39,6 +39,10 @@ val status_store_lru_size : int
 (** [committee_cache_size] is the size of the DAL committee cache. *)
 val committee_cache_size : int
 
+(** [attestation_ops_cache_size] is the size of the attestation operations
+    cache. *)
+val attestation_ops_cache_size : int
+
 (** [not_yet_published_cache_size] is the size (in number of slots) of the cache
     of not-yet-published slots, shards, and shard proofs. *)
 val not_yet_published_cache_size : int

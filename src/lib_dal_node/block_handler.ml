@@ -136,8 +136,8 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
 
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
-   remove it from the store. 
-   
+   remove it from the store.
+
    With multi-lag attestations, a slot published at level P can be attested
    at P + lag for any lag in attestation_lags. A slot attested at an earlier
    lag will have its status updated to Attested, but we must not delete it when
@@ -589,6 +589,30 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     (Plugin.get_attestations
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "get_attestations"])
+  in
+  let () =
+    let cache = Node_context.get_attestation_ops_cache ctxt in
+    let attestation_ops =
+      List.map
+        (fun (tb_slot, _op, dal_att_opt) ->
+          ( Plugin.tb_slot_to_int tb_slot,
+            Option.map
+              (fun dal_att
+                   ~number_of_slots
+                   ~number_of_lags
+                   ~lag_index
+                   slot_index
+                 ->
+                Plugin.is_baker_attested
+                  dal_att
+                  ~number_of_slots
+                  ~number_of_lags
+                  ~lag_index
+                  slot_index)
+              dal_att_opt ))
+        attestations
+    in
+    Attestation_ops_cache.add cache ~level:block_level ~attestation_ops
   in
   let* committees =
     let committee_level = Int32.pred block_level in
