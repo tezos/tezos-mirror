@@ -165,9 +165,8 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
         };
         let parser = mir::parser::Parser::new();
         let parameters = Parameters::default();
-        let mut internal_receipts = Vec::new();
         let amount = Narith(amount_u64.into());
-        tezos_execution::transfer_external(
+        match tezos_execution::cross_runtime_transfer(
             &mut tc_ctx,
             &mut operation_ctx,
             registry,
@@ -175,14 +174,11 @@ impl tezosx_interfaces::RuntimeInterface for TezosRuntime {
             &amount,
             &dest,
             &parameters,
-            &mut internal_receipts,
             &parser,
-            true,
-        )
-        .map_err(|e| {
-            TezosXRuntimeError::Custom(format!("Cross-runtime transfer failed: {e:?}"))
-        })?;
-        Ok(CrossCallResult::Success(vec![]))
+        ) {
+            Ok(_) => Ok(CrossCallResult::Success(vec![])),
+            Err(e) => Ok(CrossCallResult::Revert(format!("{e}").into_bytes())),
+        }
     }
 
     fn address_from_string(
