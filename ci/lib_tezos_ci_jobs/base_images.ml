@@ -156,7 +156,7 @@ let jobs ?start_job ?(changeset = false) () =
      If [compilation] is set to [Native] we build for both architectures using
      a native runner. In this case we also must add a merge manifest job.
      *)
-  let make_job_base_images ~__POS__ ~name ~matrix ~image_name
+  let make_job_base_images ~__POS__ ~matrix ~image_name
       ?(base_name = Upstream image_name) ?(changes = Changeset.make [])
       ?(compilation = Emulated) ?dependencies dockerfile =
     let script =
@@ -205,7 +205,7 @@ let jobs ?start_job ?(changeset = false) () =
     in
     job_docker_authenticated
       ~__POS__
-      ~name
+      ~name:("images." ^ image_name)
       ~stage:Stages.build
       ~variables
       ~rules:
@@ -231,7 +231,6 @@ let jobs ?start_job ?(changeset = false) () =
     in
     make_job_base_images
       ~__POS__
-      ~name:"images.debian"
       ~image_name:"debian"
       ~matrix:debian_matrix
       ~changes
@@ -240,7 +239,6 @@ let jobs ?start_job ?(changeset = false) () =
   let job_ubuntu_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"images.ubuntu"
       ~image_name:"ubuntu"
       ~matrix:ubuntu_matrix
       ~changes:(Changeset.make Files.debian_base)
@@ -249,7 +247,6 @@ let jobs ?start_job ?(changeset = false) () =
   let job_fedora_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"images.fedora"
       ~image_name:"fedora"
       ~matrix:fedora_matrix
       ~changes:(Changeset.make Files.rpm_base)
@@ -258,7 +255,6 @@ let jobs ?start_job ?(changeset = false) () =
   let job_rockylinux_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"images.rockylinux"
       ~image_name:"rockylinux"
       ~base_name:(Upstream "rockylinux/rockylinux")
       ~matrix:rockylinux_matrix
@@ -268,7 +264,6 @@ let jobs ?start_job ?(changeset = false) () =
   let job_rust_based_images =
     make_job_base_images
       ~__POS__
-      ~name:"images.rust"
       ~image_name:"debian-rust"
       ~base_name:(Pipeline_dep "debian")
       ~matrix:[("RELEASE", ["trixie"])]
@@ -287,7 +282,7 @@ let jobs ?start_job ?(changeset = false) () =
   let job_rust_based_images_merge =
     job_docker_authenticated
       ~__POS__
-      ~name:"images.rust.merge"
+      ~name:"images.debian-rust.merge"
       ~stage:Stages.build
       ~dependencies:(Dependent [Job job_rust_based_images])
       ~rules:
@@ -321,7 +316,6 @@ let jobs ?start_job ?(changeset = false) () =
   let job_debian_homebrew_base_images =
     make_job_base_images
       ~__POS__
-      ~name:"images.debian-homebrew"
       ~image_name:"debian-homebrew"
       ~base_name:(Pipeline_dep "debian")
       ~dependencies:(Dependent [Job job_debian_based_images])
