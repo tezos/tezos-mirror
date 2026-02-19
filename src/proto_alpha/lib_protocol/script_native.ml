@@ -408,6 +408,57 @@ module CLST_contract = struct
     in
     return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
 
+  let execute_update_operator (step_constants : step_constants)
+      (operations, storage, ctxt) ((owner, (operator, token_id)) : operator)
+      action =
+    let open Lwt_result_syntax in
+    let*? entrypoint_str = Entrypoint.of_string_lax "update_operators" in
+    (* Restrict operator updates only to the owner of the token. *)
+    let*? () =
+      error_when
+        (not (Destination.equal step_constants.sender owner.destination))
+        (Only_owner_can_change_operator
+           (step_constants.sender, owner.destination))
+    in
+    (* Check token_id is the one defined by the contract. *)
+    let*? () = check_token_id token_id in
+    let new_allowance, is_operator =
+      match action with `Add -> (Some None, true) | `Remove -> (None, false)
+    in
+    let* storage, ctxt =
+      Clst_contract_storage.set_account_operator_allowance
+        ctxt
+        storage
+        ~owner
+        ~spender:operator
+        new_allowance
+    in
+    let* op_operator_update_event, ctxt =
+      Clst_events.operator_update_event
+        (ctxt, step_constants)
+        ~entrypoint:entrypoint_str
+        ~owner
+        ~operator
+        ~token_id:Clst_contract_storage.token_id
+        ~is_operator
+    in
+    return (op_operator_update_event :: operations, storage, ctxt)
+
+  let execute_update_operators (ctxt, (step_constants : step_constants))
+      (value : update_operators) (storage : Clst_contract_storage.t) =
+    let open Lwt_result_syntax in
+    let* rev_ops, storage, ctxt =
+      List.fold_left_es
+        (fun acc add_or_remove ->
+          let action, op =
+            match add_or_remove with L op -> (`Add, op) | R op -> (`Remove, op)
+          in
+          execute_update_operator step_constants acc op action)
+        ([], storage, ctxt)
+        (Script_list.to_list value)
+    in
+    return (Script_list.of_list (List.rev rev_ops), storage, [], ctxt)
+
   let execute_with_wrapped_storage (ctxt, (step_constants : step_constants))
       (value : arg) (storage : Clst_contract_storage.t) =
     match entrypoint_from_arg value with
@@ -417,6 +468,8 @@ module CLST_contract = struct
         execute_transfer (ctxt, step_constants) transfer storage
     | Approve approvals ->
         execute_approve (ctxt, step_constants) approvals storage
+    | Update_operators operators ->
+        execute_update_operators (ctxt, step_constants) operators storage
 
   let execute (ctxt, step_constants) value storage =
     let open Lwt_result_syntax in
@@ -504,6 +557,36 @@ module CLST_contract = struct
       let* ty = CLST_types.get_allowance_view_ty in
       return (Ex_view {name; ty; implementation})
 
+    let is_operator : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "is_operator" in
+      let implementation (ctxt, _step_constants) (owner, (operator, token_id))
+          (storage : storage) =
+        let open Lwt_result_syntax in
+        if
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
+        then
+          let* allowance, ctxt =
+            Clst_contract_storage.get_account_operator_allowance
+              ctxt
+              (Clst_contract_storage.from_clst_storage storage)
+              ~owner
+              ~spender:operator
+          in
+          (* According to TZIP26, an operator has an infinite
+             allowance. *)
+          let is_operator =
+            match allowance with
+            | Some None -> true
+            | None | Some (Some _) -> false
+          in
+          return (is_operator, ctxt)
+        else return (false, ctxt)
+      in
+      let* ty = CLST_types.is_operator_view_ty in
+      return (Ex_view {name; ty; implementation})
+
     let view_map : storage Script_native_types.view_map tzresult =
       let open Result_syntax in
       let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
@@ -513,6 +596,9 @@ module CLST_contract = struct
       let* (Ex_view {name = is_token_name; _} as is_token) = is_token in
       let* (Ex_view {name = get_allowance_name; _} as get_allowance) =
         get_allowance
+      in
+      let* (Ex_view {name = is_operator_name; _} as is_operator) =
+        is_operator
       in
       let view_map =
         Script_map.update
@@ -526,6 +612,9 @@ module CLST_contract = struct
       let view_map = Script_map.update is_token_name (Some is_token) view_map in
       let view_map =
         Script_map.update get_allowance_name (Some get_allowance) view_map
+      in
+      let view_map =
+        Script_map.update is_operator_name (Some is_operator) view_map
       in
       return view_map
   end

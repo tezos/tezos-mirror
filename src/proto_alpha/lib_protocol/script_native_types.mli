@@ -57,7 +57,15 @@ module CLST_types : sig
 
   type approve = approval s_list
 
-  type fa21_entrypoints = (transfer, approve) or_
+  type operator =
+    (address (* owner *), address (* operator *), nat (* token_id *)) tup3
+
+  type operator_delta =
+    (operator (* add_operator *), operator (* remove_operator *)) or_
+
+  type update_operators = operator_delta s_list
+
+  type fa21_entrypoints = ((transfer, approve) or_, update_operators) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -89,11 +97,17 @@ module CLST_types : sig
       nat (* allowance *) )
     view_type
 
+  type is_operator_view =
+    ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
+      bool (* is_operator *) )
+    view_type
+
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
     | Transfer of transfer
     | Approve of approve
+    | Update_operators of update_operators
 
   val entrypoint_from_arg : arg -> entrypoint
 
@@ -106,6 +120,8 @@ module CLST_types : sig
   val is_token_view_ty : is_token_view
 
   val get_allowance_view_ty : get_allowance_view tzresult
+
+  val is_operator_view_ty : is_operator_view tzresult
 
   val transfer_event_type :
     ( address (* from_ *),
@@ -137,6 +153,15 @@ module CLST_types : sig
       nat (* new_allowance *),
       int (* diff *) )
     tup5
+    ty_node
+    tzresult
+
+  val operator_update_event_type :
+    ( address (* owner *),
+      address (* operator *),
+      nat (* token_id *),
+      bool (* is_operator *) )
+    tup4
     ty_node
     tzresult
 end

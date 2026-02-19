@@ -1651,3 +1651,48 @@ let clst_approve ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     src
     (Contract.Originated clst_hash)
     Tez.zero
+
+let clst_update_operator ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) ~(src : Contract.t) ?(owner = src)
+    ~(operator : Contract.t) action =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let open Environment.Micheline in
+  let elm =
+    (* add or remove (owner, operator, token_id) *)
+    let l_or_r =
+      match action with `Add -> Script.D_Left | `Remove -> Script.D_Right
+    in
+    Prim
+      ( dummy_location,
+        l_or_r,
+        [
+          Prim
+            ( dummy_location,
+              Script.D_Pair,
+              [
+                String (dummy_location, Contract.to_b58check owner);
+                String (dummy_location, Contract.to_b58check operator);
+                Int (dummy_location, Z.zero);
+              ],
+              [] );
+        ],
+        [] )
+  in
+  let parameters =
+    Alpha_context.Script.lazy_expr
+      Environment.Micheline.(Seq (dummy_location, [elm]) |> strip_locations)
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "update_operators")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero

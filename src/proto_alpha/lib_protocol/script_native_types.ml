@@ -222,7 +222,15 @@ module CLST_types = struct
 
   type approve = approval s_list
 
-  type fa21_entrypoints = (transfer, approve) or_
+  type operator =
+    (address (* owner *), address (* operator *), nat (* token_id *)) tup3
+
+  type operator_delta =
+    (operator (* add_operator *), operator (* remove_operator *)) or_
+
+  type update_operators = operator_delta s_list
+
+  type fa21_entrypoints = ((transfer, approve) or_, update_operators) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -241,18 +249,21 @@ module CLST_types = struct
     | Redeem of redeem
     | Transfer of transfer
     | Approve of approve
+    | Update_operators of update_operators
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L p) -> Deposit p
     | L (R p) -> Redeem p
-    | R (L p) -> Transfer p
-    | R (R p) -> Approve p
+    | R (L (L p)) -> Transfer p
+    | R (L (R p)) -> Approve p
+    | R (R p) -> Update_operators p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L p)
     | Redeem p -> L (R p)
-    | Transfer p -> R (L p)
-    | Approve p -> R (R p)
+    | Transfer p -> R (L (L p))
+    | Approve p -> R (L (R p))
+    | Update_operators p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -290,17 +301,38 @@ module CLST_types = struct
     let* approve_type = list_ty approval_type in
     make_entrypoint_leaf "approve" approve_type
 
+  let update_operators_type :
+      (update_operators ty_node * update_operators entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* operator_type =
+      tup3_ty
+        (add_name "owner" address_ty)
+        (add_name "operator" address_ty)
+        (add_name "token_id" nat_ty)
+    in
+    let* operator_delta_type =
+      or_ty
+        (add_name "add_operator" operator_type)
+        (add_name "remove_operator" operator_type)
+    in
+    let* update_operators_type = list_ty operator_delta_type in
+    make_entrypoint_leaf "update_operators" update_operators_type
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
     let* transfer_type in
     let* approve_type in
+    let* update_operators_type in
     let* clst_entrypoints_type =
       make_entrypoint_node deposit_type redeem_type
     in
-    let* fa21_entrypoints_type =
+    let* fa21_entrypoints_type_l =
       make_entrypoint_node transfer_type approve_type
+    in
+    let* fa21_entrypoints_type =
+      make_entrypoint_node fa21_entrypoints_type_l update_operators_type
     in
     let* arg_type =
       make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type
@@ -330,6 +362,11 @@ module CLST_types = struct
       nat (* allowance *) )
     view_type
 
+  type is_operator_view =
+    ( (address (* owner *), address (* operator *), nat (* token_id *)) tup3,
+      bool (* is_operator *) )
+    view_type
+
   let balance_view_ty =
     let open Result_syntax in
     let* {typed = input_ty; _} = pair_ty address_ty nat_ty in
@@ -344,6 +381,11 @@ module CLST_types = struct
     let open Result_syntax in
     let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
     return {input_ty; output_ty = nat_ty.typed}
+
+  let is_operator_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
+    return {input_ty; output_ty = bool_ty.typed}
 
   let transfer_event_type =
     let open Result_syntax in
@@ -388,6 +430,17 @@ module CLST_types = struct
         (add_name "diff" int_ty)
     in
     return @@ add_name "allowance_update" x
+
+  let operator_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup4_ty
+        (add_name "owner" address_ty)
+        (add_name "operator" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "is_operator" bool_ty)
+    in
+    return @@ add_name "operator_update" x
 end
 
 type ('arg, 'storage) kind =

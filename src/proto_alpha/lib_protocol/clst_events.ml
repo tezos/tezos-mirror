@@ -97,3 +97,25 @@ let allowance_update_event (ctxt, sc) ~(entrypoint : Entrypoint.t)
   in
   let ctxt = update_context lgs outdated_ctxt in
   return (op, ctxt)
+
+let operator_update_event (ctxt, sc) ~(entrypoint : Entrypoint.t)
+    ~(owner : address) ~(operator : address) ~(token_id : CLST_types.nat)
+    ~(is_operator : bool) : (Script_typed_ir.operation * context) tzresult Lwt.t
+    =
+  let open Lwt_result_syntax in
+  let lgs, ctxt = local_gas_counter_and_outdated_context ctxt in
+  let*? {untyped; typed} = CLST_types.operator_update_event_type in
+  let unparsed_ty = Micheline.strip_locations untyped in
+  let (Ty_ex_c event_type) = typed in
+  let event_data = (owner, (operator, (token_id, is_operator))) in
+  let* op, outdated_ctxt, lgs =
+    Script_interpreter_defs.emit_event
+      (ctxt, sc)
+      lgs
+      ~event_type
+      ~unparsed_ty
+      ~tag:entrypoint
+      ~event_data
+  in
+  let ctxt = update_context lgs outdated_ctxt in
+  return (op, ctxt)

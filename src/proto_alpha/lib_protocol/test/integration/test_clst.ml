@@ -620,3 +620,69 @@ let () =
       Error_helpers.expect_clst_only_owner_can_change_operator
         ~loc:__LOC__
         trace
+
+let () =
+  register_test ~title:"Test update_operator entrypoint and is_operator view"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let is_operator_view ~owner ~operator b =
+    let* clst_hash = get_clst_hash (B b) in
+    let* is_operator =
+      run_view
+        ~contract:clst_hash
+        ~view_name:"is_operator"
+        ~input:
+          Environment.Micheline.(
+            Prim
+              ( dummy_location,
+                Script.D_Pair,
+                [
+                  String (dummy_location, Contract.to_b58check owner);
+                  String (dummy_location, Contract.to_b58check operator);
+                  Int (dummy_location, Z.zero);
+                ],
+                [] )
+            |> strip_locations)
+        b
+    in
+    let is_operator =
+      match is_operator |> Environment.Micheline.root with
+      | Environment.Micheline.Prim (_, Script.D_True, [], []) -> true
+      | Environment.Micheline.Prim (_, Script.D_False, [], []) -> false
+      | _ -> Test.fail "Unexpected output"
+    in
+    return is_operator
+  in
+
+  let* b, (owner, operator) = Context.init2 ~consensus_threshold_size:0 () in
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) owner amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* is_operator = is_operator_view ~owner ~operator b in
+  let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
+
+  let* update_operator_tx =
+    Op.clst_update_operator (B b) ~src:owner ~operator `Add
+  in
+  let* b = Block.bake ~operation:update_operator_tx b in
+  let* is_operator = is_operator_view ~owner ~operator b in
+  let* () = Assert.equal_bool ~loc:__LOC__ true is_operator in
+
+  let* update_operator_tx =
+    Op.clst_update_operator (B b) ~src:owner ~operator `Remove
+  in
+  let* b = Block.bake ~operation:update_operator_tx b in
+  let* is_operator = is_operator_view ~owner ~operator b in
+  let* () = Assert.equal_bool ~loc:__LOC__ false is_operator in
+
+  let* update_operator_tx =
+    Op.clst_update_operator (B b) ~src:operator ~owner ~operator `Add
+  in
+  let*! b = Block.bake ~operation:update_operator_tx b in
+  match b with
+  | Ok _ -> Test.fail "Only owner can change the allowance."
+  | Error trace ->
+      Error_helpers.expect_clst_only_owner_can_change_operator
+        ~loc:__LOC__
+        trace

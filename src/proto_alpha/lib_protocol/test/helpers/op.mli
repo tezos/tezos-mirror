@@ -953,3 +953,21 @@ val clst_approve :
   spender:Contract.t ->
   int64 ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_update_operator ctxt src ?owner operator is_operator]
+    approves or revokes an infinite allowance of clst tokens set to
+    [operator] regarding a token [owner].
+   
+    [owner] defaults to [src]. *)
+val clst_update_operator :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  src:Contract.t ->
+  ?owner:Contract.t ->
+  operator:Contract.t ->
+  [< `Add | `Remove] ->
+  Operation.packed tzresult Lwt.t
