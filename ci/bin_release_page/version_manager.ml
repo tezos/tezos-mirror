@@ -138,9 +138,38 @@ let () =
     Clap.case ~description:"Generate RSS feed for releases" "generate-rss"
     @@ fun () -> `generate_rss
   in
+  let download =
+    Clap.case
+      ~description:"Download versions.json from remote storage"
+      "download"
+    @@ fun () -> `download
+  in
+  let upload =
+    Clap.case ~description:"Upload versions.json to remote storage" "upload"
+    @@ fun () -> `upload
+  in
   let command =
     Clap.subcommand
-      [list_versions; add; set_latest; set_active; set_inactive; generate_rss]
+      [
+        list_versions;
+        add;
+        set_latest;
+        set_active;
+        set_inactive;
+        generate_rss;
+        download;
+        upload;
+      ]
+  in
+  let remote_path =
+    Clap.optional_string
+      ~long:"path"
+      ~short:'p'
+      ~description:
+        "Remote storage path (used by download, upload and generate-rss \
+         commands)."
+      ~placeholder:"PATH"
+      ()
   in
   let base_url =
     Clap.optional_string
@@ -152,6 +181,11 @@ let () =
       ()
   in
   Clap.close () ;
+  let require_path () =
+    match remote_path with
+    | Some path -> path
+    | None -> failwith "The --path option is required for this command."
+  in
   match command with
   | `list ->
       let versions = load_from_file file in
@@ -251,3 +285,9 @@ let () =
         Printf.printf "RSS feed generated: %s\n%!" output_file
       with Sys_error msg ->
         failwith (sf "System error writing %s: %s" output_file msg))
+  | `download ->
+      let path = require_path () in
+      Storage.download_file ~path ~remote_file:"versions.json" ~local_file:file
+  | `upload ->
+      let path = require_path () in
+      Storage.upload_file ~path ~local_file:file ~remote_file:"versions.json"

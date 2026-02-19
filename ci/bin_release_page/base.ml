@@ -27,27 +27,6 @@ module Storage = struct
   (* Temporary directory for downloaded files *)
   let temp_dir = Filename.temp_dir "release_page" ""
 
-  (* [get_path ~path ?target file] copies the [file] from [path] from the S3 bucket to
-     [temp_dir]/target. If [target] is not provided [file] is used instead.
-     Fails if the file does not exist. *)
-  let get_file ~path ?target file =
-    let target = Option.value ~default:file target in
-    Format.printf "Getting %s from %s@." file path ;
-    let command =
-      sf
-        "aws s3 cp \"s3://%s/%s\" \"%s\""
-        path
-        file
-        (Filename.concat temp_dir target)
-    in
-    match Sys.command command with
-    | 0 ->
-        Format.printf
-          "File %s stored in %s@."
-          file
-          (Filename.concat temp_dir target)
-    | _ -> failwith (sf "Unable to get %s in %s" file path)
-
   (* [upload_file ~path ~local_file ~remote_file] uploads [local_file] to [path]/[remote_file] in the S3 bucket.
      Fails if the upload is unsuccessful. *)
   let upload_file ~path ~local_file ~remote_file =
@@ -65,6 +44,26 @@ module Storage = struct
     | _ ->
         failwith
           (sf "Failed to upload %s to s3://%s/%s" local_file path remote_file)
+
+  (* [download_file ~path ~remote_file ~local_file] downloads [remote_file]
+     from [path] to [local_file]. Fails if the download is unsuccessful. *)
+  let download_file ~path ~remote_file ~local_file =
+    Format.printf "Downloading %s from %s@." remote_file path ;
+    let command =
+      sf "aws s3 cp \"s3://%s/%s\" \"%s\"" path remote_file local_file
+    in
+    match Sys.command command with
+    | 0 -> Format.printf "Downloaded to %s@." local_file
+    | _ -> failwith (sf "Unable to download %s from %s" remote_file path)
+
+  (* [get_path ~path ?target file] copies the [file] from [path] from the S3 bucket to
+     [temp_dir]/target. If [target] is not provided [file] is used instead.
+     Fails if the file does not exist. *)
+  let get_file ~path ?target file =
+    download_file
+      ~path
+      ~remote_file:file
+      ~local_file:(Filename.concat temp_dir @@ Option.value ~default:file target)
 
   (* [get_folder_content ~path] returns the list of files in [path]. *)
   let get_folder_content ~path =
