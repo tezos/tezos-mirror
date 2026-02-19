@@ -237,6 +237,7 @@ module RPC : sig
     | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
+    | Not_found
 
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
