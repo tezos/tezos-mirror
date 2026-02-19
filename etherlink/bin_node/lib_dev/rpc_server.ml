@@ -145,6 +145,38 @@ let monitor_performances ~data_dir =
   (* Run in background *)
   ignore domain
 
+let add_operation (type f) ~(mode : f Mode.t) ~keep_alive ~timeout raw_op =
+  let open Lwt_result_syntax in
+  let raw_str = Bytes.to_string raw_op in
+  let raw_hex = Ethereum_types.hex_of_bytes raw_op in
+  let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_str in
+  match res with
+  | Error err ->
+      let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_hex in
+      failwith "Prevalidation of operation %s failed with error: %s" raw_str err
+  | Ok {next_nonce; transaction_object} ->
+      let* hash_res =
+        match mode with
+        | Observer _ | Proxy _ | Sequencer _ ->
+            Tx_queue.add
+              ~next_nonce
+              (Tx_queue_types.Michelson transaction_object)
+              ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
+        | Rpc {evm_node_private_endpoint; _} ->
+            Injector.inject_tezlink_operation
+              ~keep_alive
+              ~timeout
+              ~base:evm_node_private_endpoint
+              ~op:transaction_object
+              ~raw_op
+      in
+      let* hash =
+        match hash_res with
+        | Ok hash -> return hash
+        | Error s -> failwith "%s" s
+      in
+      return hash
+
 let start_public_server (type f) ~(mode : f Mode.t)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id ~tick
     ?evm_services (config : Configuration.t) ctxt =
@@ -170,21 +202,6 @@ let start_public_server (type f) ~(mode : f Mode.t)
     let (module Backend : Services_backend_sig.S), _ = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
-        let add_transaction ~next_nonce op ~raw_op =
-          match mode with
-          | Observer _ | Proxy _ | Sequencer _ ->
-              Tx_queue.add
-                ~next_nonce
-                (Michelson op)
-                ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
-          | Rpc {evm_node_private_endpoint; _} ->
-              Injector.inject_tezlink_operation
-                ~keep_alive:config.keep_alive
-                ~timeout:config.rpc_timeout
-                ~base:evm_node_private_endpoint
-                ~op
-                ~raw_op
-        in
         let* l2_chain_id =
           match l2_chain_id with
           | Some l2_chain_id -> return l2_chain_id
@@ -194,36 +211,11 @@ let start_public_server (type f) ~(mode : f Mode.t)
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
-             ~add_operation:(fun raw ->
-               (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
-                  Validate the operation and use the resulting "next_nonce" *)
-               let raw_str = Bytes.to_string raw in
-               let raw_hex = Ethereum_types.hex_of_bytes raw in
-               let* res =
-                 Prevalidator.prevalidate_raw_transaction_tezlink raw_str
-               in
-               match res with
-               | Error err ->
-                   let*! () =
-                     Tx_pool_events.invalid_transaction ~transaction:raw_hex
-                   in
-                   failwith
-                     "Prevalidation of operation %s failed with error: %s"
-                     raw_str
-                     err
-               | Ok {next_nonce; transaction_object} ->
-                   let* hash_res =
-                     add_transaction
-                       ~next_nonce
-                       transaction_object
-                       ~raw_op:(Bytes.of_string raw_str)
-                   in
-                   let* hash =
-                     match hash_res with
-                     | Ok hash -> return hash
-                     | Error s -> failwith "%s" s
-                   in
-                   return hash)
+             ~add_operation:
+               (add_operation
+                  ~mode
+                  ~keep_alive:config.keep_alive
+                  ~timeout:config.rpc_timeout)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
         let*! runtimes = Backend.list_runtimes () in
         match runtimes with
