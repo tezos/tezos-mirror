@@ -40,6 +40,7 @@ module Make
   Wasm_utils_intf.S with type t = Ctx.t and type state = Ctx.Tree.tree = struct
   module Ctx = Ctx
   module Tree_encoding_runner = Ctx.Tree_encoding_runner
+  module State = Tree_state.Make (Ctx.Tree)
   module Wasm = Wasm
   module Wasm_fast = Wasm_fast
 
@@ -305,9 +306,7 @@ module Make
           false
       | No_input_required, _ -> true
     in
-    let* pvm_state =
-      Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding state
-    in
+    let* pvm_state = State.Encoding_runner.decode state in
     Wasm.Internal_for_tests.compute_step_many_until
       ~wasm_entrypoint
       ?write_debug

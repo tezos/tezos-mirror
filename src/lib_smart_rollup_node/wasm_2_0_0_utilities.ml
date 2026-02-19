@@ -162,7 +162,7 @@ let preload_kernel (node_ctxt : _ Node_context.t) header =
   let tree = !(Context_wrapper.Irmin.of_node_pvmstate pvm_state) in
   let*! durable =
     Plugin.Pvm.Wasm_2_0_0.decode_durable_state
-      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
+      Tezos_scoru_wasm.Tree_state.durable_storage_encoding
       tree
   in
   let*! () =

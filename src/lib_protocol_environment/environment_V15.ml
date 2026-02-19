@@ -1259,7 +1259,9 @@ struct
     struct
       type Tezos_tree_encoding.tree_instance += PVM_tree of Tree.tree
 
-      include Tezos_scoru_wasm.Wasm_pvm.Make_machine (struct
+      include
+        Tezos_scoru_wasm.Wasm_pvm.Make_machine (Tezos_scoru_wasm.Tree_state.Make
+                                                  (struct
         include Tree
 
         let select = function
@@ -1267,7 +1269,7 @@ struct
           | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
         let wrap t = PVM_tree t
-      end)
+      end))
 
       let compute_step =
         compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint

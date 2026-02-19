@@ -14,7 +14,7 @@ let durable_lookup (module PVM : Pvm_plugin_sig.S) state key_str =
   let tree = !(Context_wrapper.Irmin.of_node_pvmstate state) in
   let* durable =
     PVM.Wasm_2_0_0.decode_durable_state
-      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
+      Tezos_scoru_wasm.Tree_state.durable_storage_encoding
       tree
   in
   let* res_opt = Tezos_scoru_wasm.Durable.find_value durable key in

@@ -186,6 +186,8 @@ module type S = sig
   module Tree_encoding_runner :
     Tezos_tree_encoding.Runner.S with type tree = state
 
+  module State : Wasm_pvm_sig.STATE with type state = state
+
   module Wasm : Wasm_pvm_sig.Machine with type state = state
 
   module Wasm_fast : Wasm_pvm_sig.Machine with type state = state

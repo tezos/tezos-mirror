@@ -63,7 +63,9 @@ module Make_wrapped_tree (Tree : TreeS) :
 end
 
 module Make_backend (Tree : TreeS) = struct
-  include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+  include
+    Tezos_scoru_wasm_fast.Pvm.Make
+      (Tezos_scoru_wasm.Tree_state.Make (Make_wrapped_tree (Tree)))
 
   let compute_step =
     compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
@@ -93,14 +95,12 @@ end
 module Make_durable_state
     (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
   Durable_state with type state = T.tree = struct
+  module State = Tezos_scoru_wasm.Tree_state.Make (T)
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
   type state = T.tree
 
-  let decode_durable tree =
-    Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
-      tree
+  let decode_durable tree = State.Encoding_runner.decode_durable_storage tree
 
   let value_length tree key_str =
     let open Lwt_syntax in

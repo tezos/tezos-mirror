@@ -171,6 +171,17 @@ module Internal_state = struct
     message_limit : Z.t;  (** Maximum number of messages per inbox *)
   }
 
+  let default_buffers validity_period message_limit () =
+    Tezos_webassembly_interpreter.Eval.
+      {
+        input = Tezos_webassembly_interpreter.Input_buffer.alloc ();
+        output =
+          Tezos_webassembly_interpreter.Output_buffer.alloc
+            ~validity_period
+            ~message_limit
+            ~last_level:None;
+      }
+
   type pvm_state = {
     last_input_info : input_info option;  (** Info about last read input. *)
     current_tick : Z.t;  (** Current tick of the PVM. *)

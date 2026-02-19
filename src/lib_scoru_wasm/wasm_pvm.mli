@@ -24,57 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CONTEXT_PROOF = sig
-  type context
-
-  module Wrapped_tree : Tezos_tree_encoding.TREE
-
-  val empty_tree : unit -> Wrapped_tree.tree
-
-  val tree_hash :
-    Wrapped_tree.tree -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t Lwt.t
-
-  type proof
-
-  val proof_encoding : proof Data_encoding.t
-
-  val proof_start_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
-
-  val proof_stop_state : proof -> Tezos_crypto.Hashed.Smart_rollup_state_hash.t
-
-  val produce_proof :
-    context ->
-    Wrapped_tree.tree ->
-    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
-    (proof * 'a) option Lwt.t
-
-  val verify_proof :
-    proof ->
-    (Wrapped_tree.tree -> (Wrapped_tree.tree * 'a) Lwt.t) ->
-    (Wrapped_tree.tree * 'a) option Lwt.t
-
-  val cast_read_only : proof -> proof
-end
-
-val pvm_state_encoding :
-  Wasm_pvm_state.Internal_state.pvm_state Tezos_tree_encoding.t
-
-val durable_buffers_encoding :
-  Tezos_webassembly_interpreter.Eval.buffers Tezos_tree_encoding.t
-
-val durable_storage_encoding : Durable.t Tezos_tree_encoding.t
-
-module Make_machine (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.Machine with type state = T.tree
+module Make_machine (S : Wasm_pvm_sig.STATE) :
+  Wasm_pvm_sig.Machine with type state = S.state
 
 module Make_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
     module type of Make_machine
 
-module Make_pvm_machine (Context : CONTEXT_PROOF) :
+module Make_pvm_machine (State : Wasm_pvm_sig.STATE_PROOF) :
   Wasm_pvm_sig.S
-    with type context = Context.context
-     and type proof = Context.proof
-     and type state = Context.Wrapped_tree.tree
+    with type context = State.context
+     and type proof = State.proof
+     and type state = State.state
 
 module Make_pvm_machine_with_vm (Wasm_vm : Wasm_vm_sig.S) :
     module type of Make_pvm_machine

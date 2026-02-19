@@ -71,10 +71,11 @@ module Wasm_2_0_0_proof_format = struct
   let proof_stop_state = proof_after
 
   module Wrapped_tree = Make_wrapped_tree (Irmin_context.Tree)
+  include Tezos_scoru_wasm.Tree_state.Make (Wrapped_tree)
 
-  let empty_tree () = Irmin_context.Tree.empty ()
+  let empty_state () = Irmin_context.Tree.empty ()
 
-  let tree_hash tree = hash_tree tree |> Lwt.return
+  let state_hash tree = hash_tree tree |> Lwt.return
 end
 
 (** Durable part of the storage of this PVM. *)
@@ -101,14 +102,12 @@ end
 module Make_durable_state
     (T : Tezos_tree_encoding.TREE with type tree = Irmin_context.tree) :
   Durable_state with type state = T.tree = struct
+  module State = Tezos_scoru_wasm.Tree_state.Make (T)
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
   type state = T.tree
 
-  let decode_durable tree =
-    Tree_encoding_runner.decode
-      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
-      tree
+  let decode_durable tree = State.Encoding_runner.decode_durable_storage tree
 
   let value_length tree key_str =
     let open Lwt_syntax in
@@ -145,14 +144,14 @@ type unsafe_patch =
 module Wasm_fast_pvm_machine :
   Tezos_scoru_wasm.Wasm_pvm_sig.S
     with type context = Wasm_2_0_0_proof_format.context
-     and type state = Wasm_2_0_0_proof_format.Tree.tree
+     and type state = Wasm_2_0_0_proof_format.state
      and type proof = Wasm_2_0_0_proof_format.proof =
   Tezos_scoru_wasm_fast.Pvm.Make_pvm_machine (Wasm_2_0_0_proof_format)
 
 module Wasm_pvm_on_disk :
   Sc_rollup.Wasm_2_0_0PVM.S
     with type context = Wasm_2_0_0_proof_format.context
-     and type state = Wasm_2_0_0_proof_format.Tree.tree
+     and type state = Wasm_2_0_0_proof_format.state
      and type proof = Wasm_2_0_0_proof_format.proof =
 Sc_rollup.Wasm_2_0_0PVM.Make_pvm (struct
   include Wasm_fast_pvm_machine

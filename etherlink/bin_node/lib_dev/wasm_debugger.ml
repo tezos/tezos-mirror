@@ -46,7 +46,9 @@ end
    To avoid introducing a dependency to Wasmer, we redefine a `Wasm_utils`
    module which uses the (slow) PVM both for fast and slow execution. *)
 module Ctx = Tezos_tree_encoding.Encodings_util.Make (Bare_context)
-module Slow_pvm = Tezos_scoru_wasm.Wasm_pvm.Make_machine (Ctx.Tree)
+module Slow_pvm =
+  Tezos_scoru_wasm.Wasm_pvm.Make_machine
+    (Tezos_scoru_wasm.Tree_state.Make (Ctx.Tree))
 module Wasm_utils = Wasm_utils_functor.Make (Ctx) (Slow_pvm) (Slow_pvm)
 
 module Wasm =
@@ -78,10 +80,8 @@ let eval = Wasm.Commands.eval
 
 let profile = Wasm.Commands.profile
 
-let encode =
-  Ctx.Tree_encoding_runner.encode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+let encode = Wasm_utils.State.Encoding_runner.encode
 
-let decode =
-  Ctx.Tree_encoding_runner.decode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+let decode = Wasm_utils.State.Encoding_runner.decode
 
 let get_wasm_version = Wasm_utils.Wasm.get_wasm_version
