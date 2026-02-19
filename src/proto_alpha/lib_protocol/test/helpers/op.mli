@@ -936,6 +936,18 @@ val clst_redeem :
   int64 ->
   Operation.packed tzresult Lwt.t
 
+(** [clst_finalize ctxt src] returns a finalize operation on the CLST
+    contract. *)
+val clst_finalize :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Operation.packed tzresult Lwt.t
+
 (** [clst_approve ctxt src ?owner spender amount] increases or
     decreases the allowance by [amount] clst tokens set to [spender]
     regarding a token [owner].
@@ -957,7 +969,7 @@ val clst_approve :
 (** [clst_update_operator ctxt src ?owner operator is_operator]
     approves or revokes an infinite allowance of clst tokens set to
     [operator] regarding a token [owner].
-   
+
     [owner] defaults to [src]. *)
 val clst_update_operator :
   ?force_reveal:bool ->

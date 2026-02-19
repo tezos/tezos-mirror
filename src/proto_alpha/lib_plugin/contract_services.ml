@@ -442,11 +442,24 @@ module S = struct
         ~description:
           "Access the balance of a contract that was requested for a redeem \
            operation, but is still frozen for the duration of the slashing \
-           period. Returns None if the contract is originated."
+           operation, but is still frozen for the standard unstake \
+           finalization delay. Returns None if the contract is originated."
         ~query:RPC_query.empty
         ~output:(option Tez.encoding)
         RPC_path.(
           custom_root /: Contract.rpc_arg / "clst_redeemed_frozen_balance")
+
+    let redeemed_finalizable_balance =
+      RPC_service.get_service
+        ~description:
+          "Access the balance of a contract that was requested for a redeem \
+           operation, and is no longer frozen, which means it will appear in \
+           the spendable balance of the contract after any finalize operation. \
+           Returns None if the contract is originated."
+        ~query:RPC_query.empty
+        ~output:(option Tez.encoding)
+        RPC_path.(
+          custom_root /: Contract.rpc_arg / "clst_redeemed_finalizable_balance")
 
     let register () =
       register0 ~chunked:false contract_hash (fun ctxt () () ->
@@ -482,7 +495,12 @@ module S = struct
         ~chunked:false
         redeemed_frozen_balance
         (fun ctxt contract () () ->
-          Clst.For_RPC.get_redeemed_balance ctxt contract)
+          Clst.For_RPC.get_unfinalizable_redeemed_balance ctxt contract) ;
+      register1
+        ~chunked:false
+        redeemed_finalizable_balance
+        (fun ctxt contract () () ->
+          Clst.For_RPC.get_finalizable_redeemed_balance ctxt contract)
   end
 end
 
@@ -999,6 +1017,15 @@ let clst_exchange_rate ctxt block =
 let clst_redeemed_frozen_balance ctxt block contract =
   RPC_context.make_call1
     S.CLST.redeemed_frozen_balance
+    ctxt
+    block
+    contract
+    ()
+    ()
+
+let clst_redeemed_finalizable_balance ctxt block contract =
+  RPC_context.make_call1
+    S.CLST.redeemed_finalizable_balance
     ctxt
     block
     contract

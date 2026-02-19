@@ -4656,8 +4656,21 @@ module Clst : sig
   val add_redemption_request :
     context -> Contract.t -> Cycle.t -> Tez.t -> context tzresult Lwt.t
 
+  val finalize :
+    context ->
+    clst_contract:Contract.t ->
+    staker:Contract.t ->
+    (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
+
   module For_RPC : sig
-    val get_redeemed_balance :
+    (** [get_finalizable_redeemed_balance ctxt contract] returns the
+        finalizable tez redeemed by [contract]. *)
+    val get_finalizable_redeemed_balance :
+      context -> Contract.t -> Tez.t option tzresult Lwt.t
+
+    (** [get_unfinalizable_redeemed_balance] returns the unfinalizable
+        tez redeemed by [contract]. *)
+    val get_unfinalizable_redeemed_balance :
       context -> Contract.t -> Tez.t option tzresult Lwt.t
   end
 end

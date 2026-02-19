@@ -16,7 +16,7 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
-(** Type of the storage of the CLST contract. 
+(** Type of the storage of the CLST contract.
     It contains the ledger and the total number of CLST tokens. *)
 type t
 
@@ -85,6 +85,15 @@ val redeem_from_clst_deposits :
   staker:Contract.t ->
   Tez.t ->
   (context * Receipt.balance_updates) tzresult Lwt.t
+
+(** [finalize context ~clst_cotnract_hash ~staker] finalizes all finalizable redemption
+    requests from [staker], moving redeemed frozen deposits to
+    [clst_contract_hash] spendable balance. *)
+val finalize :
+  context ->
+  clst_contract_hash:Contract_hash.t ->
+  staker:Contract.t ->
+  (context * Receipt.balance_updates * Tez.t) tzresult Lwt.t
 
 (** [get_account_operator_allowance context storage owner spender] get
     [spender] allowance on [owner]'s tokens:

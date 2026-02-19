@@ -201,7 +201,9 @@ module CLST_types = struct
 
   type redeem = nat
 
-  type clst_entrypoints = (deposit, redeem) or_
+  type finalize = unit
+
+  type clst_entrypoints = ((deposit, redeem) or_, finalize) or_
 
   type transfer =
     ( address (* from_ *),
@@ -247,20 +249,23 @@ module CLST_types = struct
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
+    | Finalize of finalize
     | Transfer of transfer
     | Approve of approve
     | Update_operators of update_operators
 
   let entrypoint_from_arg : arg -> entrypoint = function
-    | L (L p) -> Deposit p
-    | L (R p) -> Redeem p
+    | L (L (L p)) -> Deposit p
+    | L (L (R p)) -> Redeem p
+    | L (R p) -> Finalize p
     | R (L (L p)) -> Transfer p
     | R (L (R p)) -> Approve p
     | R (R p) -> Update_operators p
 
   let entrypoint_to_arg : entrypoint -> arg = function
-    | Deposit p -> L (L p)
-    | Redeem p -> L (R p)
+    | Deposit p -> L (L (L p))
+    | Redeem p -> L (L (R p))
+    | Finalize p -> L (R p)
     | Transfer p -> R (L (L p))
     | Approve p -> R (L (R p))
     | Update_operators p -> R (R p)
@@ -283,6 +288,9 @@ module CLST_types = struct
     let* elt = pair_ty (add_name "from_" address_ty) (add_name "txs" txs) in
     let* transfer = list_ty elt in
     make_entrypoint_leaf "transfer" transfer
+
+  let finalize_type : (finalize ty_node * finalize entrypoints_node) tzresult =
+    make_entrypoint_leaf "finalize" unit_ty
 
   let approval_type : approval ty_node tzresult =
     let open Result_syntax in
@@ -322,11 +330,15 @@ module CLST_types = struct
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
+    let* finalize_type in
     let* transfer_type in
     let* approve_type in
     let* update_operators_type in
-    let* clst_entrypoints_type =
+    let* clst_entrypoints_type_l =
       make_entrypoint_node deposit_type redeem_type
+    in
+    let* clst_entrypoints_type =
+      make_entrypoint_node clst_entrypoints_type_l finalize_type
     in
     let* fa21_entrypoints_type_l =
       make_entrypoint_node transfer_type approve_type

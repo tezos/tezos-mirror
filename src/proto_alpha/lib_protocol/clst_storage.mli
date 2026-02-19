@@ -35,17 +35,3 @@ val increase_redeemed_frozen_deposit_only_call_from_token :
     [cycle]. *)
 val decrease_redeemed_frozen_deposit_only_call_from_token :
   Raw_context.t -> Cycle_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
-
-(** [add_redemption_request ctxt staker cycle amount] registers an redemption
-    request of [amount] tez from [staker] at cycle [cycle]. *)
-val add_redemption_request :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Cycle_repr.t ->
-  Tez_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
-module For_RPC : sig
-  val get_redeemed_balance :
-    Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
-end

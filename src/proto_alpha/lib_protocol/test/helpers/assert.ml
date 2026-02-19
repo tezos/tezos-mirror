@@ -403,12 +403,39 @@ let clst_frozen_redeemed_balance_was_credited ~loc b contract old_balance amount
   let* ctxt = Context.get_alpha_ctxt b in
   let*?@ expected = Alpha_context.Tez.(old_balance +? amount) in
   let*@ frozen_unstaked_balance =
-    Alpha_context.Clst.For_RPC.get_redeemed_balance ctxt contract
+    Alpha_context.Clst.For_RPC.get_unfinalizable_redeemed_balance ctxt contract
   in
   equal_tez
     ~loc
     (Option.value ~default:Alpha_context.Tez.zero frozen_unstaked_balance)
     expected
+
+let clst_redeemed_balance_is kind ~loc b contract amount =
+  let open Lwt_result_wrap_syntax in
+  let* redeemed_balance =
+    match kind with
+    | `Frozen ->
+        Plugin.Contract_services.clst_redeemed_frozen_balance
+          Block.rpc_ctxt
+          b
+          contract
+    | `Finalizable ->
+        Plugin.Contract_services.clst_redeemed_finalizable_balance
+          Block.rpc_ctxt
+          b
+          contract
+  in
+  match redeemed_balance with
+  | None ->
+      Test.fail
+        "Redeemed balance is None, %a is not an implicit account"
+        Contract.pp
+        contract
+  | Some redeemed_balance -> equal_tez ~loc amount redeemed_balance
+
+let clst_frozen_redeemed_balance_is = clst_redeemed_balance_is `Frozen
+
+let clst_finalizable_redeemed_balance_is = clst_redeemed_balance_is `Finalizable
 
 let to_json_string encoding x =
   x
