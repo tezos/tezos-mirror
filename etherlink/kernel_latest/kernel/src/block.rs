@@ -21,6 +21,7 @@ use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::registry_impl::RegistryImpl;
 use crate::storage;
+use crate::storage::read_block_in_progress;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -71,10 +72,10 @@ pub enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Tx: TransactionTrait>(
+fn on_invalid_transaction(
     is_delayed: bool,
     tx_hash: TransactionHash,
-    block_in_progress: &mut BlockInProgress<Tx>,
+    block_in_progress: &mut BlockInProgress,
 ) {
     if is_delayed {
         block_in_progress.register_delayed_transaction(tx_hash);
@@ -103,7 +104,7 @@ pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut BlockInProgress<ChainConfig::Transaction>,
+    block_in_progress: &mut BlockInProgress,
     block_constants: &ChainConfig::BlockConstants,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
@@ -161,11 +162,7 @@ pub fn compute<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     block_in_progress.register_delayed_transaction(tx_hash);
                 }
 
-                chain_config.register_valid_transaction(
-                    block_in_progress,
-                    execution_info,
-                    host,
-                )?;
+                block_in_progress.register_valid_transaction(execution_info, host)?;
             }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(is_delayed, tx_hash, block_in_progress)
@@ -189,7 +186,7 @@ pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     hash: H256,
     tezos_parent_hash: H256,
     blueprint: Blueprint,
-) -> BlockInProgress<ChainConfig::Transaction> {
+) -> BlockInProgress {
     let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
@@ -210,7 +207,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> anyhow::Result<BlueprintParsing<BlockInProgress<ChainConfig::Transaction>>> {
+) -> anyhow::Result<BlueprintParsing<BlockInProgress>> {
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -251,7 +248,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     .unwrap_or_else(|_| {
                         H256(*tezos_tezlink::block::TezBlock::genesis_block_hash())
                     });
-            let bip: BlockInProgress<ChainConfig::Transaction> = bip_from_blueprint(
+            let bip: BlockInProgress = bip_from_blueprint(
                 host,
                 chain_config,
                 next_bip_number,
@@ -271,7 +268,7 @@ pub fn compute_bip<Host: Runtime, ChainConfig: ChainConfigTrait>(
     registry: &impl Registry,
     chain_config: &ChainConfig,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: BlockInProgress<ChainConfig::Transaction>,
+    mut block_in_progress: BlockInProgress,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     da_fee_per_byte: U256,
@@ -419,7 +416,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
-        match ChainConfig::read_block_in_progress(&safe_host)? {
+        match read_block_in_progress(&safe_host)? {
             Some(block_in_progress) => {
                 log!(safe_host, Debug, "Restauring BIP from storage.");
                 (BlockInProgressProvenance::Storage, block_in_progress)
@@ -512,6 +509,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block_in_progress::BlockInProgress;
     use crate::block_storage;
     use crate::block_storage::internal_for_tests::{
         read_transaction_receipt, read_transaction_receipt_status,
@@ -522,7 +520,8 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezosXTransaction,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
+        TezlinkBlockConstants, TezosXBlockConstants, TezosXTransaction,
         TEZLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -776,6 +775,7 @@ mod tests {
             EvmLimits::default(),
             spec_id,
             ExperimentalFeatures::default(),
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
 
@@ -1079,6 +1079,7 @@ mod tests {
             EvmLimits::default(),
             SpecId::default(),
             experimental_features,
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
         )
     }
 
@@ -1790,7 +1791,7 @@ mod tests {
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
     }
 
-    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {
+    fn first_block<MockHost: Runtime>(host: &mut MockHost) -> TezosXBlockConstants {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -1798,13 +1799,22 @@ mod tests {
         let block_fees = retrieve_block_fees(host);
         assert!(chain_id.is_ok(), "chain_id should be defined");
         assert!(block_fees.is_ok(), "block fees should be defined");
-        BlockConstants::first_block(
-            timestamp,
-            chain_id.unwrap(),
-            block_fees.unwrap(),
-            crate::block::GAS_LIMIT,
-            H160::zero(),
-        )
+        TezosXBlockConstants {
+            evm_runtime_block_constants: BlockConstants::first_block(
+                timestamp,
+                chain_id.unwrap(),
+                block_fees.unwrap(),
+                crate::block::GAS_LIMIT,
+                H160::zero(),
+            ),
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level: (0.into()),
+                context: context::TezlinkContext::from_root(
+                    &TEZLINK_SAFE_STORAGE_ROOT_PATH,
+                )
+                .unwrap(),
+            },
+        }
     }
 
     #[test]
@@ -1822,14 +1832,18 @@ mod tests {
         let valid_tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
-        };
+        }
+        .into();
         let transactions = vec![valid_tx].into();
 
         // init block in progress
         let mut block_in_progress = BlockInProgress::new(
             U256::from(1),
             transactions,
-            block_constants.block_fees.base_fee_per_gas(),
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .base_fee_per_gas(),
         );
         // run is almost full wrt gas consumption in the current run
         let limits = EvmLimits::default();

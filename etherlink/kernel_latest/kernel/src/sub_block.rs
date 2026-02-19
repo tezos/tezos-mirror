@@ -13,7 +13,10 @@ use crate::{
     },
     block_in_progress::BlockInProgress,
     block_storage,
-    chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
+    chains::{
+        ChainConfigTrait, EvmChainConfig, TezlinkBlockConstants, TezosXBlockConstants,
+        ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZLINK_SAFE_STORAGE_ROOT_PATH,
+    },
     configuration::{fetch_configuration, fetch_pure_evm_config},
     error::{Error, StorageError},
     gas_price::base_fee_per_gas,
@@ -36,6 +39,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
+use tezos_execution::context::{Context, TezlinkContext};
 use tezos_smart_rollup::{host::RuntimeError, outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_tezlink::block::OperationsWithReceipts;
@@ -145,22 +149,29 @@ fn block_constants<Host: Runtime>(
     config: &EvmChainConfig,
     timestamp: Timestamp,
     number: U256,
-) -> Result<BlockConstants, Error> {
+) -> Result<TezosXBlockConstants, Error> {
     let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
     let da_fee_per_byte = retrieve_da_fee(host)?;
     let minimum_base_fee_per_gas = config.get_limits().minimum_base_fee_per_gas;
     let base_fee_per_gas = base_fee_per_gas(host, timestamp, minimum_base_fee_per_gas);
     let block_fees =
         BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee_per_byte);
-    Ok(BlockConstants {
-        number,
-        coinbase,
-        timestamp: timestamp.as_u64().into(),
-        gas_limit: GAS_LIMIT,
-        tezos_experimental_features: config.enable_tezos_runtime(),
-        block_fees,
-        chain_id: config.get_chain_id(),
-        prevrandao: None,
+    let michelson_runtime_block_constants = TezlinkBlockConstants {
+        level: number.try_into()?,
+        context: TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)?,
+    };
+    Ok(TezosXBlockConstants {
+        evm_runtime_block_constants: BlockConstants {
+            number,
+            coinbase,
+            timestamp: timestamp.as_u64().into(),
+            gas_limit: GAS_LIMIT,
+            tezos_experimental_features: config.enable_tezos_runtime(),
+            block_fees,
+            chain_id: config.get_chain_id(),
+            prevrandao: None,
+        },
+        michelson_runtime_block_constants,
     })
 }
 
@@ -193,8 +204,9 @@ pub fn handle_run_transaction<Host: Runtime>(
     let config = get_evm_config(host)?;
     let block_constants =
         block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
-    let sequencer_pool_address =
-        (block_constants.coinbase != H160::default()).then_some(block_constants.coinbase);
+    let sequencer_pool_address = (block_constants.evm_runtime_block_constants.coinbase
+        != H160::default())
+    .then_some(block_constants.evm_runtime_block_constants.coinbase);
 
     let mut safe_host = SafeStorage {
         host,
@@ -231,7 +243,9 @@ pub fn handle_run_transaction<Host: Runtime>(
                 logs_bloom: Bloom::default(),
                 logs_offset: 0,
                 timestamp: input_data.timestamp,
-                base_fee_per_gas: block_constants.base_fee_per_gas(),
+                base_fee_per_gas: block_constants
+                    .evm_runtime_block_constants
+                    .base_fee_per_gas(),
                 cumulative_execution_gas: U256::zero(),
                 cumulative_receipts: Vec::new(),
                 cumulative_tx_objects: Vec::new(),
@@ -247,7 +261,7 @@ pub fn handle_run_transaction<Host: Runtime>(
         }
     };
 
-    block_in_progress.repush_tx(input_data.tx);
+    block_in_progress.repush_tx(input_data.tx.into());
 
     let result = compute(
         &mut safe_host,

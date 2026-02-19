@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    apply::RuntimeExecutionInfo,
     block_in_progress::BlockInProgress,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -107,6 +108,7 @@ pub struct EvmChainConfig {
     pub limits: EvmLimits,
     pub spec_id: SpecId,
     pub experimental_features: ExperimentalFeatures,
+    michelson_chain_config: MichelsonChainConfig,
 }
 
 impl EvmChainConfig {
@@ -314,11 +316,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 pub trait ChainConfigTrait: Debug {
     type BlockConstants;
 
-    type Transaction: TransactionTrait + Encodable + Decodable + Debug;
-
     type ChainHeader: ChainHeaderTrait + Decodable;
-
-    type ExecutionInfo;
 
     fn get_chain_id(&self) -> U256;
 
@@ -328,7 +326,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants>;
@@ -353,42 +351,31 @@ pub trait ChainConfigTrait: Debug {
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
-    fn read_block_in_progress(
-        host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>>;
-
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
-        tx: &Self::Transaction,
+        tx: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool>;
 
     #[allow(clippy::too_many_arguments)]
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        transaction: Self::Transaction,
+        transaction: TezosXTransaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error>;
-
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
-        execution_info: Self::ExecutionInfo,
-        host: &mut impl Runtime,
-    ) -> anyhow::Result<()>;
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error>;
 
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block>;
 
@@ -459,14 +446,39 @@ impl Encodable for TezosXTransaction {
     }
 }
 
-impl ChainConfigTrait for EvmChainConfig {
-    type BlockConstants = tezos_ethereum::block::BlockConstants;
+impl TransactionTrait for TezosXTransaction {
+    fn is_delayed(&self) -> bool {
+        match self {
+            Self::Ethereum(tx) => tx.is_delayed(),
+            Self::Tezos(op) => op.is_delayed(),
+        }
+    }
 
-    type Transaction = crate::transaction::Transaction;
+    fn tx_hash(&self) -> TransactionHash {
+        match self {
+            Self::Ethereum(tx) => tx.tx_hash(),
+            Self::Tezos(op) => op.tx_hash(),
+        }
+    }
+
+    fn data_size(&self) -> u64 {
+        match self {
+            Self::Ethereum(tx) => tx.data_size(),
+            Self::Tezos(op) => op.data_size(),
+        }
+    }
+}
+
+pub struct TezosXBlockConstants {
+    pub evm_runtime_block_constants: tezos_ethereum::block::BlockConstants,
+    #[allow(dead_code)]
+    pub michelson_runtime_block_constants: TezlinkBlockConstants,
+}
+
+impl ChainConfigTrait for EvmChainConfig {
+    type BlockConstants = TezosXBlockConstants;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
-
-    type ExecutionInfo = crate::apply::RuntimeExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
@@ -478,18 +490,25 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         da_fee_per_byte: U256,
         coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
-        Ok(block_in_progress.constants(
-            self.chain_id,
-            self.limits.minimum_base_fee_per_gas,
-            da_fee_per_byte,
-            crate::block::GAS_LIMIT,
-            coinbase,
-            self.enable_tezos_runtime(),
-        ))
+        Ok(TezosXBlockConstants {
+            evm_runtime_block_constants: block_in_progress.constants(
+                self.chain_id,
+                self.limits.minimum_base_fee_per_gas,
+                da_fee_per_byte,
+                crate::block::GAS_LIMIT,
+                coinbase,
+                self.enable_tezos_runtime(),
+            ),
+            michelson_runtime_block_constants: self.michelson_chain_config.constants(
+                block_in_progress,
+                da_fee_per_byte,
+                coinbase,
+            )?,
+        })
     }
 
     fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
@@ -562,64 +581,66 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn read_block_in_progress(
-        host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
-        crate::storage::read_block_in_progress(host)
-    }
-
     fn can_fit_in_reboot(
         &self,
         executed_gas: U256,
-        transaction: &Self::Transaction,
+        transaction: &TezosXTransaction,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
-        Ok(crate::block::can_fit_in_reboot(
-            &self.limits,
-            executed_gas,
-            transaction.execution_gas_limit(&block_constants.block_fees)?,
-        ))
+        match transaction {
+            TezosXTransaction::Ethereum(transaction) => {
+                Ok(crate::block::can_fit_in_reboot(
+                    &self.limits,
+                    executed_gas,
+                    transaction.execution_gas_limit(
+                        &block_constants.evm_runtime_block_constants.block_fees,
+                    )?,
+                ))
+            }
+            TezosXTransaction::Tezos(_operation) => Ok(true),
+        }
     }
 
     fn apply_transaction(
         &self,
-        _block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_constants: &tezos_ethereum::block::BlockConstants,
-        transaction: Self::Transaction,
+        block_constants: &Self::BlockConstants,
+        transaction: TezosXTransaction,
         index: u32,
         sequencer_pool_address: Option<H160>,
         tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
-        crate::apply::apply_transaction(
-            host,
-            registry,
-            outbox_queue,
-            block_constants,
-            transaction,
-            index,
-            sequencer_pool_address,
-            tracer_input,
-            &self.spec_id,
-            &self.limits,
-        )
-    }
-
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
-        execution_info: Self::ExecutionInfo,
-        host: &mut impl Runtime,
-    ) -> anyhow::Result<()> {
-        block_in_progress.register_valid_transaction(execution_info, host)
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+        match transaction {
+            TezosXTransaction::Ethereum(transaction) => crate::apply::apply_transaction(
+                host,
+                registry,
+                outbox_queue,
+                &block_constants.evm_runtime_block_constants,
+                *transaction,
+                index,
+                sequencer_pool_address,
+                tracer_input,
+                &self.spec_id,
+                &self.limits,
+            ),
+            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
+                &self.michelson_chain_config.chain_id,
+                block_in_progress,
+                host,
+                registry,
+                &block_constants.michelson_runtime_block_constants,
+                operation,
+            ),
+        }
     }
 
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         block_in_progress.finalize_and_store(
@@ -655,12 +676,16 @@ impl EvmChainConfig {
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
+        michelson_runtime_chain_id: ChainId,
     ) -> Self {
         Self {
             chain_id,
             limits,
             spec_id,
             experimental_features,
+            michelson_chain_config: MichelsonChainConfig::create_config(
+                michelson_runtime_chain_id,
+            ),
         }
     }
 
@@ -696,11 +721,120 @@ pub struct TezlinkBlockConstants {
     pub context: context::TezlinkContext,
 }
 
+fn apply_tezos_operation(
+    chain_id: &ChainId,
+    block_in_progress: &BlockInProgress,
+    host: &mut impl Runtime,
+    registry: &impl Registry,
+    block_constants: &TezlinkBlockConstants,
+    operation: TezlinkOperation,
+) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+    let context = &block_constants.context;
+
+    let level = block_constants.level;
+    let now = block_in_progress.timestamp;
+    let block_ctx = BlockCtx {
+        level: &level,
+        now: &now,
+        chain_id,
+    };
+
+    match operation.content {
+        TezlinkContent::Tezos(operation) => {
+            // Compute the hash of the operation
+            let hash = operation.hash()?;
+
+            let skip_signature_check = false;
+
+            let branch = operation.branch.clone();
+            let signature = operation.signature.clone();
+
+            // Try to apply the operation with the tezos_execution crate, return a receipt
+            // on whether it failed or not
+            let processed_operations = match tezos_execution::validate_and_apply_operation(
+                host,
+                registry,
+                context,
+                hash.clone(),
+                operation,
+                &block_ctx,
+                skip_signature_check,
+            ) {
+                Ok(receipt) => receipt,
+                Err(OperationError::Validation(err)) => {
+                    log!(
+                        host,
+                        Error,
+                        "Found an invalid operation, dropping it: {:?}",
+                        err
+                    );
+                    return Ok(crate::apply::ExecutionResult::Invalid);
+                }
+                Err(OperationError::RuntimeError(err)) => {
+                    return Err(err.into());
+                }
+            };
+
+            // Add the applied operation in the block in progress
+            let applied_operation = AppliedOperation {
+                hash,
+                branch,
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: processed_operations,
+                        signature,
+                    },
+                ),
+            };
+            Ok(crate::apply::ExecutionResult::Valid(
+                RuntimeExecutionInfo::Tezos(applied_operation),
+            ))
+        }
+        TezlinkContent::Deposit(deposit) => {
+            log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
+
+            let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
+
+            let source = PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+
+            let applied_operation = AppliedOperation {
+                hash: operation.tx_hash.into(),
+                branch: BlockHash::from(
+                    block_in_progress.ethereum_parent_hash.to_fixed_bytes(),
+                ),
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: vec![OperationWithMetadata {
+                            content: ManagerOperationContent::Transaction(
+                                ManagerOperation {
+                                    source,
+                                    fee: 0.into(),
+                                    counter: 0.into(),
+                                    gas_limit: 0.into(),
+                                    storage_limit: 0.into(),
+                                    operation: deposit_result.outcome.1,
+                                },
+                            ),
+                            receipt: OperationResultSum::Transfer(OperationResult {
+                                balance_updates: vec![],
+                                result: deposit_result.outcome.0,
+                                internal_operation_results: vec![],
+                            }),
+                        }],
+                        signature: UnknownSignature::nom_read_exact(&[0u8; 64]).unwrap(),
+                    },
+                ),
+            };
+            Ok(crate::apply::ExecutionResult::Valid(
+                RuntimeExecutionInfo::Tezos(applied_operation),
+            ))
+        }
+    }
+}
+
 impl ChainConfigTrait for MichelsonChainConfig {
     type BlockConstants = TezlinkBlockConstants;
-    type Transaction = TezlinkOperation;
     type ChainHeader = TezBlockHeader;
-    type ExecutionInfo = AppliedOperation;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
@@ -712,7 +846,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn constants(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         _da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<Self::BlockConstants> {
@@ -781,16 +915,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         Ok(operation.into())
     }
 
-    fn read_block_in_progress(
-        _host: &impl Runtime,
-    ) -> anyhow::Result<Option<BlockInProgress<Self::Transaction>>> {
-        Ok(None)
-    }
-
     fn can_fit_in_reboot(
         &self,
         _executed_gas: U256,
-        _tx: &Self::Transaction,
+        _tx: &TezosXTransaction,
         _block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<bool> {
         Ok(true)
@@ -798,135 +926,35 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn apply_transaction(
         &self,
-        block_in_progress: &BlockInProgress<Self::Transaction>,
+        block_in_progress: &BlockInProgress,
         host: &mut impl Runtime,
         registry: &impl Registry,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_constants: &Self::BlockConstants,
-        operation: Self::Transaction,
+        transaction: TezosXTransaction,
         _index: u32,
         _sequencer_pool_address: Option<H160>,
         _tracer_input: Option<TracerInput>,
-    ) -> Result<crate::apply::ExecutionResult<Self::ExecutionInfo>, anyhow::Error> {
-        let context = &block_constants.context;
-
-        let level = block_constants.level;
-        let now = block_in_progress.timestamp;
-        let block_ctx = BlockCtx {
-            level: &level,
-            now: &now,
-            chain_id: &self.chain_id,
-        };
-
-        match operation.content {
-            TezlinkContent::Tezos(operation) => {
-                // Compute the hash of the operation
-                let hash = operation.hash()?;
-
-                let skip_signature_check = false;
-
-                let branch = operation.branch.clone();
-                let signature = operation.signature.clone();
-
-                // Try to apply the operation with the tezos_execution crate, return a receipt
-                // on whether it failed or not
-                let processed_operations =
-                    match tezos_execution::validate_and_apply_operation(
-                        host,
-                        registry,
-                        context,
-                        hash.clone(),
-                        operation,
-                        &block_ctx,
-                        skip_signature_check,
-                    ) {
-                        Ok(receipt) => receipt,
-                        Err(OperationError::Validation(err)) => {
-                            log!(
-                                host,
-                                Error,
-                                "Found an invalid operation, dropping it: {:?}",
-                                err
-                            );
-                            return Ok(crate::apply::ExecutionResult::Invalid);
-                        }
-                        Err(OperationError::RuntimeError(err)) => {
-                            return Err(err.into());
-                        }
-                    };
-
-                // Add the applied operation in the block in progress
-                let applied_operation = AppliedOperation {
-                    hash,
-                    branch,
-                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                        OperationBatchWithMetadata {
-                            operations: processed_operations,
-                            signature,
-                        },
-                    ),
-                };
-                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
+    ) -> Result<crate::apply::ExecutionResult<RuntimeExecutionInfo>, anyhow::Error> {
+        match transaction {
+            TezosXTransaction::Ethereum(_transaction) => {
+                anyhow::bail!("Unexpected Ethereum transaction in Michelson chain family")
             }
-            TezlinkContent::Deposit(deposit) => {
-                log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
-
-                let deposit_result = execute_tezlink_deposit(host, context, &deposit)?;
-
-                let source =
-                    PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
-
-                let applied_operation = AppliedOperation {
-                    hash: operation.tx_hash.into(),
-                    branch: BlockHash::from(
-                        block_in_progress.ethereum_parent_hash.to_fixed_bytes(),
-                    ),
-                    op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                        OperationBatchWithMetadata {
-                            operations: vec![OperationWithMetadata {
-                                content: ManagerOperationContent::Transaction(
-                                    ManagerOperation {
-                                        source,
-                                        fee: 0.into(),
-                                        counter: 0.into(),
-                                        gas_limit: 0.into(),
-                                        storage_limit: 0.into(),
-                                        operation: deposit_result.outcome.1,
-                                    },
-                                ),
-                                receipt: OperationResultSum::Transfer(OperationResult {
-                                    balance_updates: vec![],
-                                    result: deposit_result.outcome.0,
-                                    internal_operation_results: vec![],
-                                }),
-                            }],
-                            signature: UnknownSignature::nom_read_exact(&[0u8; 64])
-                                .unwrap(),
-                        },
-                    ),
-                };
-                Ok(crate::apply::ExecutionResult::Valid(applied_operation))
-            }
+            TezosXTransaction::Tezos(operation) => apply_tezos_operation(
+                &self.chain_id,
+                block_in_progress,
+                host,
+                registry,
+                block_constants,
+                operation,
+            ),
         }
-    }
-
-    fn register_valid_transaction(
-        &self,
-        block_in_progress: &mut BlockInProgress<Self::Transaction>,
-        execution_info: Self::ExecutionInfo,
-        _host: &mut impl Runtime,
-    ) -> anyhow::Result<()> {
-        block_in_progress
-            .cumulative_tezos_operation_receipts
-            .list
-            .push(execution_info);
-        Ok(())
     }
 
     fn finalize_and_store(
         &self,
         host: &mut impl Runtime,
-        block_in_progress: BlockInProgress<Self::Transaction>,
+        block_in_progress: BlockInProgress,
         block_constants: &Self::BlockConstants,
     ) -> anyhow::Result<L2Block> {
         // Create a Tezos block from the block in progress
@@ -1056,12 +1084,14 @@ impl ChainConfig {
         limits: EvmLimits,
         spec_id: SpecId,
         experimental_features: ExperimentalFeatures,
+        michelson_runtime_chain_id: ChainId,
     ) -> Self {
         ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
             chain_id,
             limits,
             spec_id,
             experimental_features,
+            michelson_runtime_chain_id,
         )))
     }
 
@@ -1134,6 +1164,7 @@ impl Default for EvmChainConfig {
             EvmLimits::default(),
             SpecId::default(),
             ExperimentalFeatures::default(),
+            ChainId::from(CHAIN_ID.to_le_bytes()),
         )
     }
 }
@@ -1145,6 +1176,7 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
         EvmLimits::default(),
         SpecId::default(),
         ExperimentalFeatures::default(),
+        ChainId::from(CHAIN_ID.to_le_bytes()),
     )
 }
 

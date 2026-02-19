@@ -194,7 +194,15 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
     let evm_limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    ChainConfig::new_evm_config(chain_id, evm_limits, spec_id, experimental_features)
+    let michelson_runtime_chain_id =
+        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
+    ChainConfig::new_evm_config(
+        chain_id,
+        evm_limits,
+        spec_id,
+        experimental_features,
+        michelson_runtime_chain_id,
+    )
 }
 
 pub fn fetch_pure_evm_config<Host: Runtime>(
@@ -204,7 +212,15 @@ pub fn fetch_pure_evm_config<Host: Runtime>(
     let limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     let experimental_features = ExperimentalFeatures::read_from_storage(host);
-    EvmChainConfig::create_config(chain_id, limits, spec_id, experimental_features)
+    let michelson_runtime_chain_id =
+        try_chain_id_from_u256(host, chain_id).unwrap_or_else(|| ChainId::from([0; 4]));
+    EvmChainConfig::create_config(
+        chain_id,
+        limits,
+        spec_id,
+        experimental_features,
+        michelson_runtime_chain_id,
+    )
 }
 
 fn fetch_michelson_chain_configuration<Host: Runtime>(
@@ -212,6 +228,33 @@ fn fetch_michelson_chain_configuration<Host: Runtime>(
     chain_id: ChainId,
 ) -> ChainConfig {
     ChainConfig::new_michelson_config(chain_id)
+}
+
+fn try_chain_id_from_u256(host: &impl Runtime, chain_id: U256) -> Option<ChainId> {
+    // Tezos-compatible chain ids have only 4 bytes.
+    let chain_id_low_bytes = chain_id.low_u32();
+
+    if chain_id != chain_id_low_bytes.into() {
+        log!(
+            host,
+            Error,
+            "Configured chain family is Michelson but chain id does not fit on 4 bytes."
+        );
+        return None;
+    }
+
+    match ChainId::try_from_bytes(&chain_id_low_bytes.to_le_bytes()) {
+        Err(_) => {
+            // This is unexpected, any u32 should be decodable as a chain id
+            log!(
+                host,
+                Error,
+                "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed."
+            );
+            None
+        }
+        Ok(chain_id) => Some(chain_id),
+    }
 }
 
 pub fn fetch_chain_configuration<Host: Runtime>(
@@ -223,21 +266,11 @@ pub fn fetch_chain_configuration<Host: Runtime>(
     match chain_family {
         ChainFamily::Evm => fetch_evm_chain_configuration(host, chain_id),
         ChainFamily::Michelson => {
-            // Tezos-compatible chain ids have only 4 bytes.
-            let chain_id_low_bytes = chain_id.low_u32();
-
-            if chain_id != chain_id_low_bytes.into() {
-                log!(host, Error, "Configured chain family is Michelson but chain id does not fit on 4 bytes; falling back to EVM chain family.");
-                return fetch_evm_chain_configuration(host, chain_id);
-            }
-
-            match ChainId::try_from_bytes(&chain_id_low_bytes.to_le_bytes()) {
-                Err(_) => {
-                    // This is unexpected, any u32 should be decodable as a chain id
-                    log!(host, Error, "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed; falling back to EVM chain family.");
-                    fetch_evm_chain_configuration(host, chain_id)
-                }
-                Ok(chain_id) => fetch_michelson_chain_configuration(host, chain_id),
+            if let Some(chain_id) = try_chain_id_from_u256(host, chain_id) {
+                fetch_michelson_chain_configuration(host, chain_id)
+            } else {
+                log!(host, Error, "Falling back to EVM chain family.");
+                fetch_evm_chain_configuration(host, chain_id)
             }
         }
     }

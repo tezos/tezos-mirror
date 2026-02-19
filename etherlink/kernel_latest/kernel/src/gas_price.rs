@@ -159,14 +159,17 @@ fn f64_to_u64(f: F64) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use crate::block_in_progress::BlockInProgress;
-
     use super::*;
+    use crate::block_in_progress::BlockInProgress;
+    use crate::chains::{
+        TezlinkBlockConstants, TezosXBlockConstants, TEZLINK_SAFE_STORAGE_ROOT_PATH,
+    };
     use primitive_types::H160;
     use proptest::prelude::*;
     use std::collections::VecDeque;
     use tezos_ethereum::block::BlockConstants;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+    use tezos_execution::context::{Context, TezlinkContext};
 
     proptest! {
         #[test]
@@ -199,13 +202,20 @@ mod test {
         let mut host = MockKernelHost::default();
         let timestamp = 0_i64;
         let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
-        let dummy_block_constants = BlockConstants::first_block(
-            timestamp.into(),
-            U256::zero(),
-            block_fees,
-            crate::block::GAS_LIMIT,
-            H160::zero(),
-        );
+        let dummy_block_constants = TezosXBlockConstants {
+            evm_runtime_block_constants: BlockConstants::first_block(
+                timestamp.into(),
+                U256::zero(),
+                block_fees,
+                crate::block::GAS_LIMIT,
+                H160::zero(),
+            ),
+            michelson_runtime_block_constants: TezlinkBlockConstants {
+                level: 0.into(),
+                context: TezlinkContext::from_root(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+                    .unwrap(),
+            },
+        };
 
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),

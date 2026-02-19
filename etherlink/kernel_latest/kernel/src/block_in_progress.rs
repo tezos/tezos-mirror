@@ -8,14 +8,14 @@
 use crate::apply::{EthereumExecutionInfo, RuntimeExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{
-    TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH, TEZOS_BLOCKS_PATH,
+    TezosXBlockConstants, TezosXTransaction, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+    TEZOS_BLOCKS_PATH,
 };
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
 use crate::tick_model;
-use crate::transaction::Transaction;
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
@@ -36,15 +36,14 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_tezlink::block::{OperationsWithReceipts, TezBlock};
-use tezos_tezlink::enc_wrappers::BlockNumber;
 
 #[derive(Debug, PartialEq)]
 /// Container for all data needed during block computation
-pub struct BlockInProgress<Transaction> {
+pub struct BlockInProgress {
     /// block number
     pub number: U256,
     /// queue containing the transactions to execute
-    pub tx_queue: VecDeque<Transaction>,
+    pub tx_queue: VecDeque<TezosXTransaction>,
     /// list of transactions executed without issue
     pub valid_txs: Vec<TransactionHash>,
     pub delayed_txs: Vec<TransactionHash>,
@@ -75,7 +74,7 @@ pub struct BlockInProgress<Transaction> {
     pub tezos_parent_hash: H256,
 }
 
-impl<Tx: Encodable> Encodable for BlockInProgress<Tx> {
+impl Encodable for BlockInProgress {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let BlockInProgress {
             number,
@@ -143,7 +142,7 @@ fn append_tx_objects(stream: &mut rlp::RlpStream, objects: &[TransactionObject])
     })
 }
 
-impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
+impl Decodable for BlockInProgress {
     fn decode(decoder: &rlp::Rlp<'_>) -> Result<Self, rlp::DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -154,7 +153,7 @@ impl<Tx: Decodable> Decodable for BlockInProgress<Tx> {
 
         let mut it = decoder.iter();
         let number: U256 = decode_field(&next(&mut it)?, "number")?;
-        let tx_queue: VecDeque<Tx> = decode_queue(&next(&mut it)?)?;
+        let tx_queue: VecDeque<TezosXTransaction> = decode_queue(&next(&mut it)?)?;
         let valid_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let delayed_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let cumulative_gas: U256 = decode_field(&next(&mut it)?, "cumulative_gas")?;
@@ -253,7 +252,7 @@ fn decode_tx_objects(
     Ok(objects)
 }
 
-impl<Tx: TransactionTrait> BlockInProgress<Tx> {
+impl BlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
     }
@@ -263,7 +262,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         number: U256,
         ethereum_parent_hash: H256,
         tezos_parent_hash: H256,
-        transactions: VecDeque<Tx>,
+        transactions: VecDeque<TezosXTransaction>,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
     ) -> Self {
@@ -289,7 +288,11 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
 
     // constructor of raw structure, used in tests
     #[cfg(test)]
-    pub fn new(number: U256, transactions: VecDeque<Tx>, base_fee_per_gas: U256) -> Self {
+    pub fn new(
+        number: U256,
+        transactions: VecDeque<TezosXTransaction>,
+        base_fee_per_gas: U256,
+    ) -> Self {
         Self::new_with_ticks(
             number,
             H256::zero(),
@@ -337,11 +340,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         base_fee_per_gas: U256,
     ) -> Self {
         // filter transactions, dropping any transaction from other runtimes
-        let transactions: Vec<Tx> = blueprint
-            .transactions
-            .into_iter()
-            .filter_map(|tx| Tx::try_from(tx).ok())
-            .collect();
+        let transactions: Vec<TezosXTransaction> = blueprint.transactions;
         // blueprint is turn into a ring to allow popping from the front
         let ring = transactions.into();
         Self::new_with_ticks(
@@ -366,7 +365,7 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         self.delayed_txs.push(hash);
     }
 
-    pub fn pop_tx(&mut self) -> Option<Tx> {
+    pub fn pop_tx(&mut self) -> Option<TezosXTransaction> {
         self.tx_queue.pop_front()
     }
 
@@ -374,12 +373,10 @@ impl<Tx: TransactionTrait> BlockInProgress<Tx> {
         !self.tx_queue.is_empty()
     }
 
-    pub fn repush_tx(&mut self, tx: Tx) {
+    pub fn repush_tx(&mut self, tx: TezosXTransaction) {
         self.tx_queue.push_front(tx)
     }
-}
 
-impl BlockInProgress<Transaction> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
@@ -464,7 +461,7 @@ impl BlockInProgress<Transaction> {
     pub fn finalize_and_store<Host: Runtime>(
         self,
         host: &mut Host,
-        block_constants: &BlockConstants,
+        block_constants: &TezosXBlockConstants,
         enable_tezos_runtime: bool,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
@@ -483,12 +480,15 @@ impl BlockInProgress<Transaction> {
         let base_fee_per_gas = base_fee_per_gas(
             host,
             self.timestamp,
-            block_constants.block_fees.minimum_base_fee_per_gas(),
+            block_constants
+                .evm_runtime_block_constants
+                .block_fees
+                .minimum_base_fee_per_gas(),
         );
 
         if enable_tezos_runtime {
-            let tez_block = Self::create_tez_block(
-                self.number,
+            let tez_block = TezBlock::new(
+                block_constants.michelson_runtime_block_constants.level,
                 self.timestamp,
                 self.tezos_parent_hash,
                 self.cumulative_tezos_operation_receipts.list,
@@ -508,7 +508,7 @@ impl BlockInProgress<Transaction> {
             state_root,
             receipts_root,
             self.cumulative_gas,
-            block_constants,
+            &block_constants.evm_runtime_block_constants,
             base_fee_per_gas,
         );
         let new_block = L2Block::Etherlink(Box::new(new_block));
@@ -516,21 +516,6 @@ impl BlockInProgress<Transaction> {
             .context("Failed to store the current block")?;
 
         Ok(new_block)
-    }
-
-    /// Creates a TezBlock from the accumulated Tezos operations.
-    fn create_tez_block(
-        block_number: U256,
-        timestamp: Timestamp,
-        previous_hash: H256,
-        operations: Vec<tezos_tezlink::block::AppliedOperation>,
-    ) -> Result<TezBlock, anyhow::Error> {
-        let block_number: BlockNumber = block_number
-            .try_into()
-            .context("Block number overflow when converting to Tezos block number")?;
-
-        TezBlock::new(block_number, timestamp, previous_hash, operations)
-            .context("Failed to create TezBlock")
     }
 
     pub fn make_receipt(
@@ -601,6 +586,7 @@ mod tests {
 
     use super::BlockInProgress;
     use crate::bridge::Deposit;
+    use crate::chains::TezosXTransaction;
     use crate::transaction::{Transaction, TransactionContent};
     use primitive_types::{H160, H256, U256};
     use rlp::{Decodable, Encodable, Rlp};
@@ -612,8 +598,6 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_tezlink::block::OperationsWithReceipts;
-
-    type EthBlockInProgress = BlockInProgress<Transaction>;
 
     fn new_sig_unsafe(v: u64, r: H256, s: H256) -> TxSignature {
         TxSignature::new(U256::from(v), r, s).unwrap()
@@ -640,14 +624,15 @@ mod tests {
         )
     }
 
-    fn dummy_tx_eth(i: u8) -> Transaction {
+    fn dummy_tx_eth(i: u8) -> TezosXTransaction {
         Transaction {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_etc(i)),
         }
+        .into()
     }
 
-    fn dummy_tx_deposit(i: u8) -> Transaction {
+    fn dummy_tx_deposit(i: u8) -> TezosXTransaction {
         let deposit = Deposit {
             amount: i.into(),
             receiver: crate::bridge::DepositReceiver::Ethereum(H160([i; 20])),
@@ -658,11 +643,12 @@ mod tests {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Deposit(deposit),
         }
+        .into()
     }
 
     #[test]
     fn test_encode_bip_ethereum() {
-        let bip = EthBlockInProgress {
+        let bip = BlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_eth(1), dummy_tx_eth(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -682,20 +668,20 @@ mod tests {
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902862af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
+        let expected = "f9028c2af8ecf87401f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f87401f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
+            BlockInProgress::decode(&decoder).expect("Should have decoded data");
         assert_eq!(decoded, bip);
     }
 
     #[test]
     fn test_encode_bip_deposit() {
-        let bip = EthBlockInProgress {
+        let bip = BlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_deposit(1), dummy_tx_deposit(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -715,20 +701,20 @@ mod tests {
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9023d2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
+        let expected = "f902432af882f83f01f83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83f01f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
+            BlockInProgress::decode(&decoder).expect("Should have decoded data");
         assert_eq!(decoded, bip);
     }
 
     #[test]
     fn test_encode_bip_mixed() {
-        let bip = EthBlockInProgress {
+        let bip = BlockInProgress {
             number: U256::from(42),
             tx_queue: vec![dummy_tx_eth(1), dummy_tx_deposit(8)].into(),
             valid_txs: vec![[2; TRANSACTION_HASH_SIZE], [9; TRANSACTION_HASH_SIZE]],
@@ -749,14 +735,14 @@ mod tests {
 
         let encoded = bip.rlp_bytes();
         let expected =
-            "f902512af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
+            "f902572af8b7f87401f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83f01f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a00505050505050505050505050505050505050505050505050505050505050505b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c080a00000000000000000000000000000000000000000000000000000000000000000";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
         let bytes = hex::decode(expected).expect("Should be valid hex string");
         let decoder = Rlp::new(&bytes);
         let decoded =
-            EthBlockInProgress::decode(&decoder).expect("Should have decoded data");
+            BlockInProgress::decode(&decoder).expect("Should have decoded data");
         assert_eq!(decoded, bip);
     }
 }
