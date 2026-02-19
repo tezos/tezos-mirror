@@ -146,7 +146,10 @@ module Make_daemon (Agent : AGENT) :
     let*! result = f arg in
     match result with
     | Ok res -> return res
-    | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
+    | Error
+        ( Tezos_rpc_http.RPC_client_errors.Request_failed _ :: _
+        | Lost_node_connection :: _
+        | Cannot_connect_to_node _ :: _ ) ->
         let* _level =
           Utils.retry
             ~emit:Events.(emit retry_on_disconnection)
@@ -159,7 +162,11 @@ module Make_daemon (Agent : AGENT) :
                 node_addr
                 pp_print_trace
                 errs)
-            ~is_error:(function Cannot_connect_to_node _ -> true | _ -> false)
+            ~is_error:(function
+              | Tezos_rpc_http.RPC_client_errors.Request_failed _
+              | Cannot_connect_to_node _ ->
+                  true
+              | _ -> false)
             (fun node_addr -> Rpc_services.get_level ~node_addr)
             node_addr
         in
