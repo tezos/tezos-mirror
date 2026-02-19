@@ -9,22 +9,6 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let debian_releases = ["unstable"; "bookworm"; "trixie"]
-
-let debian_matrix = [("RELEASE", debian_releases)]
-
-let ubuntu_releases = ["22.04"; "24.04"; "25.10"]
-
-let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
-
-let rockylinux_releases = ["9"; "10"]
-
-let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
-
-let fedora_releases = ["39"; "42"]
-
-let fedora_matrix = [("RELEASE", fedora_releases)]
-
 (* Helper function to standardise the path of a base image built in the same
    pipeline. Used to build more complex base images and avoid code duplications *)
 let base_dep_img_name image =
@@ -119,6 +103,32 @@ module Files = struct
       (* job script *)
       "scripts/ci/docker-merge-base-images.sh";
     ]
+end
+
+module Distribution = struct
+  type t = Debian | Ubuntu | Fedora | Rockylinux
+
+  let name = function
+    | Debian -> "debian"
+    | Ubuntu -> "ubuntu"
+    | Fedora -> "fedora"
+    | Rockylinux -> "rockylinux"
+
+  let releases = function
+    | Debian -> ["unstable"; "bookworm"; "trixie"]
+    | Ubuntu -> ["22.04"; "24.04"; "25.10"]
+    | Fedora -> ["39"; "42"]
+    | Rockylinux -> ["9"; "10"]
+
+  let release_matrix distro = [("RELEASE", releases distro)]
+
+  let dockerfile = function
+    | Debian | Ubuntu -> "images/base-images/Dockerfile.debian"
+    | Fedora | Rockylinux -> "images/base-images/Dockerfile.rpm"
+
+  let base_changeset = function
+    | Debian | Ubuntu -> Files.debian_base
+    | Fedora | Rockylinux -> Files.rpm_base
 end
 
 (* [start_job] used to add dependency to [trigger] in [before_merging] pipelines.
@@ -221,6 +231,27 @@ let jobs ?start_job ?(changeset = false) () =
       ?dependencies
       [script]
   in
+
+  (* specialisation of [make_job_base_images] for distribution images.
+     - [base_name] used only for Rockylinux.
+     - if [changes] is not provided, we use the base changeset of the
+     distribution. This applies to base images that are not a
+     dependency of other images.  *)
+  let make_job_base_image_distribution ?base_name ?changes distro =
+    make_job_base_images
+      ~__POS__
+      ~matrix:(Distribution.release_matrix distro)
+      ~image_name:(Distribution.name distro)
+      ?base_name
+      ~changes:
+        (* except for Debian, job changeset is the [Distribution.base_changeset] *)
+        (match changes with
+        | None -> Changeset.make @@ Distribution.base_changeset distro
+        | Some changes -> changes)
+      (Distribution.dockerfile distro)
+  in
+
+  (* base images: deb and rpm distros *)
   let job_debian_based_images =
     let changes =
       (* we need the [debian] base job if we have [debian-homebrew] or
@@ -229,38 +260,20 @@ let jobs ?start_job ?(changeset = false) () =
         (Files.debian_base @ Files.debian_homebrew @ Files.debian_rust_build
        @ Files.debian_rust_merge)
     in
-    make_job_base_images
-      ~__POS__
-      ~image_name:"debian"
-      ~matrix:debian_matrix
-      ~changes
-      "images/base-images/Dockerfile.debian"
+    make_job_base_image_distribution ~changes Distribution.Debian
   in
   let job_ubuntu_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"ubuntu"
-      ~matrix:ubuntu_matrix
-      ~changes:(Changeset.make Files.debian_base)
-      "images/base-images/Dockerfile.debian"
+    make_job_base_image_distribution Distribution.Ubuntu
   in
   let job_fedora_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"fedora"
-      ~matrix:fedora_matrix
-      ~changes:(Changeset.make Files.rpm_base)
-      "images/base-images/Dockerfile.rpm"
+    make_job_base_image_distribution Distribution.Fedora
   in
   let job_rockylinux_based_images =
-    make_job_base_images
-      ~__POS__
-      ~image_name:"rockylinux"
+    make_job_base_image_distribution
       ~base_name:(Upstream "rockylinux/rockylinux")
-      ~matrix:rockylinux_matrix
-      ~changes:(Changeset.make Files.rpm_base)
-      "images/base-images/Dockerfile.rpm"
+      Distribution.Rockylinux
   in
+  (* debian-rust: based on [debian:trixie]. *)
   let job_rust_based_images =
     make_job_base_images
       ~__POS__
@@ -279,6 +292,8 @@ let jobs ?start_job ?(changeset = false) () =
            @ Files.debian_rust_merge))
       "images/base-images/Dockerfile.rust"
   in
+  (* dedicated merge job exist because QEMU compilation takes too much
+     time. Build job reached timeout. *)
   let job_rust_based_images_merge =
     job_docker_authenticated
       ~__POS__
@@ -313,6 +328,7 @@ let jobs ?start_job ?(changeset = false) () =
         ]
       ["scripts/ci/docker-merge-base-images.sh"]
   in
+  (* debian-homebrew: based on [debian:trixie] *)
   let job_debian_homebrew_base_images =
     make_job_base_images
       ~__POS__
