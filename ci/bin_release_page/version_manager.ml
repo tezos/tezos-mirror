@@ -68,15 +68,15 @@ let version_to_rss_item ~component version =
 
 let () =
   Clap.description
-    "Manage versions.json files for Octez release pages stored in S3. This \
-     tool provides commands to list, add, remove, and manage version entries." ;
-  let s3_path =
-    Clap.mandatory_string
-      ~long:"path"
-      ~short:'p'
-      ~description:"S3 path where versions.json is stored."
-      ~placeholder:"PATH"
-      ()
+    "Manage versions.json files for Octez release pages. This tool provides \
+     commands to list, add, remove, and manage version entries." ;
+  let file =
+    Clap.default_string
+      ~long:"file"
+      ~short:'f'
+      ~description:"Path to local versions.json file."
+      ~placeholder:"FILE"
+      "versions.json"
   in
   let major =
     Clap.optional_int
@@ -147,15 +147,15 @@ let () =
       ~long:"base-url"
       ~description:
         "Base URL for RSS feed links (used with generate-rss command). \
-         Defaults to: https://<S3_PATH>"
+         Defaults to: https://<PATH>"
       ~placeholder:"URL"
       ()
   in
   Clap.close () ;
   match command with
   | `list ->
-      let versions = load_from_storage ~path:s3_path in
-      Format.printf "Versions in s3://%s/versions.json:@." s3_path ;
+      let versions = load_from_file file in
+      Format.printf "Versions in %s:@." file ;
       List.iter
         (fun version ->
           let latest_mark = if version.latest then " (latest)" else "" in
@@ -172,23 +172,24 @@ let () =
           ~publication_date
           ()
       in
-      ignore @@ update_in_storage ~path:s3_path (add_version new_version) ;
+      let updated = add_version new_version (load_from_file file) in
+      save_to_file updated file ;
       Format.printf "Added %s@." (to_string new_version)
   | `set_latest -> (
       let target_version =
         create_version_from_args ?announcement ?rc ?major ?minor ()
       in
       let updated =
-        update_in_storage ~path:s3_path (Base.Version.set_latest target_version)
+        Base.Version.set_latest target_version (load_from_file file)
       in
+      save_to_file updated file ;
       match find_latest updated with
       | Some latest -> Format.printf "Set %s as latest@." (to_string latest)
       | None -> Format.printf "Warning: No version marked as latest@.")
   | `set_active ->
       let predicate = predicate_from_args ?major ?minor ?rc () in
-      let updated =
-        update_in_storage ~path:s3_path (Base.Version.set_active predicate)
-      in
+      let updated = Base.Version.set_active predicate (load_from_file file) in
+      save_to_file updated file ;
       let active_versions = find_active updated in
       if List.is_empty active_versions then
         Format.printf "No versions marked as active.@."
@@ -199,9 +200,8 @@ let () =
           active_versions)
   | `set_inactive ->
       let predicate = predicate_from_args ?major ?minor ?rc () in
-      let updated =
-        update_in_storage ~path:s3_path (Base.Version.set_inactive predicate)
-      in
+      let updated = Base.Version.set_inactive predicate (load_from_file file) in
+      save_to_file updated file ;
       let still_active = find_active updated in
       let now_inactive =
         List.filter
@@ -221,11 +221,12 @@ let () =
         List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
   | `generate_rss -> (
       let component_name = "octez" in
-      let url = Option.value base_url ~default:("https://" ^ s3_path) in
+      let path = require_path () in
+      let url = Option.value base_url ~default:("https://" ^ path) in
       let component =
         {
           name = component_name;
-          path = s3_path;
+          path;
           asset_path = (fun _ _ -> "");
           (* [asset_path] is not used for RSS generation *)
           url;
@@ -236,7 +237,7 @@ let () =
       (* TODO: Deduce from command line arguments. *)
       let link = Uri.of_string "https://octez.tezos.com/releases" in
       let last_build_date = Unix.time () |> Ptime.of_float_s in
-      let versions = Base.Version.load_from_storage ~path:component.path in
+      let versions = load_from_file file in
       let items =
         List.map
           (fun version -> version_to_rss_item ~component version)

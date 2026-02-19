@@ -254,50 +254,6 @@ module Version = struct
   (* [find_active versions] finds all active versions in the list. *)
   let find_active versions =
     List.filter (fun version -> version.active) versions
-
-  (* [load_from_storage ~path] loads versions.json from a storage path. *)
-  let load_from_storage ~path =
-    try
-      Storage.get_file ~path "versions.json" ;
-      let local_file = Filename.concat Storage.temp_dir "versions.json" in
-      load_from_file local_file
-    with
-    | Sys_error msg ->
-        Format.printf
-          "Warning: Failed to load versions.json from %s: %s@."
-          path
-          msg ;
-        Format.printf "Starting with empty version list.@." ;
-        []
-    | Failure msg ->
-        Format.printf
-          "Warning: Failed to parse versions.json from %s: %s@."
-          path
-          msg ;
-        Format.printf "Starting with empty version list.@." ;
-        []
-
-  (* [save_to_storage ~path versions] saves [versions].json to a storage path (S3). *)
-  let save_to_storage ~path versions =
-    try
-      let local_file = Filename.concat Storage.temp_dir "versions.json" in
-      save_to_file versions local_file ;
-      Format.printf "Versions saved locally to %s@." local_file ;
-      Storage.upload_file ~path ~local_file ~remote_file:"versions.json"
-    with exn ->
-      failwith
-        (sf
-           "Failed to save versions.json to storage %s: %s"
-           path
-           (Printexc.to_string exn))
-
-  (* [update_in_storage ~path update_fn] performs a complete workflow:
-     load from storage, modify, save back to storage. *)
-  let update_in_storage ~path update_fn =
-    let versions = load_from_storage ~path in
-    let updated_versions = update_fn versions in
-    save_to_storage ~path updated_versions ;
-    updated_versions
 end
 
 type component = {
