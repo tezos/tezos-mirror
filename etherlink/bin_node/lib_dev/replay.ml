@@ -69,8 +69,8 @@ let make_executor ro_ctxt ~disable_da_fees ~kernel ~kernel_verbosity ?profile ()
           number
       in
       match result with
-      | Replay_success {block; evm_state; _} ->
-          Evm_state.Apply_success {block; evm_state}
+      | Replay_success {block; evm_state; tezos_block; _} ->
+          Evm_state.Apply_success {block; evm_state; tezos_block}
       | Replay_failure -> Apply_failure
 
     let execute ?alter_evm_state:_ _ _ =

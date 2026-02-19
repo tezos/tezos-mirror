@@ -474,6 +474,7 @@ type replay_result =
       diverged : bool;
       process_time : Ptime.span;
       execution_gas : Ethereum_types.quantity;
+      tezos_block : L2_types.Tezos_block.t option;
     }
   | Replay_failure
 
@@ -592,7 +593,7 @@ let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
   in
 
   match apply_result with
-  | Apply_success {block; evm_state} ->
+  | Apply_success {block; evm_state; tezos_block} ->
       let* (Qty base_fee_per_gas) =
         Etherlink_durable_storage.base_fee_per_gas (fun path ->
             let*! result = Evm_state.inspect evm_state path in
@@ -614,6 +615,7 @@ let replay ctxt ?log_file ?profile ?(alter_evm_state = Lwt_result_syntax.return)
              diverged = L2_types.block_hash block <> expected_block.hash;
              process_time = !process_time;
              execution_gas;
+             tezos_block;
            })
   | Apply_failure -> return Replay_failure
 
@@ -640,7 +642,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
       in
       match result with
       | Replay_success {block; evm_state; _} ->
-          Evm_state.Apply_success {block; evm_state}
+          Evm_state.Apply_success {block; evm_state; tezos_block = None}
       | Replay_failure -> Apply_failure
 
     let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
