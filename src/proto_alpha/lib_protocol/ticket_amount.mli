@@ -33,6 +33,8 @@ val encoding : t Data_encoding.t
 (* Converts a natural number to a ticket amount value unless the input is zero *)
 val of_n : n num -> t option
 
+val to_n : t -> n num
+
 (* Converts a integral number to a ticket amount value unless the input is not positive *)
 val of_z : z num -> t option
 
