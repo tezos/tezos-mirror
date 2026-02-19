@@ -88,6 +88,125 @@ let contents : Imported_context.Block_header.contents =
       };
   }
 
+let signature : Imported_protocol.Alpha_context.signature =
+  Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
+
+let protocol_data : Imported_protocol.Alpha_context.Block_header.protocol_data =
+  {contents; signature}
+
+module Operation_metadata = struct
+  open Imported_protocol.Apply_results
+  open Imported_protocol.Alpha_context
+
+  type error += Unsupported_operation_kind of string
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"evm_node.dev.tezlink.unsupported_operation_kind"
+      ~title:"Unsupported operation kind"
+      ~description:"In a RPC call, an operation of unsupported kind was given."
+      ~pp:(fun ppf s -> Format.fprintf ppf "Unsupported operation kind: %s" s)
+      Data_encoding.(obj1 (req "message" string))
+      (function
+        | Unsupported_operation_kind message -> Some message | _ -> None)
+      (fun message -> Unsupported_operation_kind message)
+
+  let hard_gas_limit_per_operation =
+    Gas.Arith.integral_to_z
+      Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+
+  (** A safe value of gas to return after simulation: almost the hard cap, with
+      a little of room because client add a little extra to be safe *)
+  let safe_value = Z.(hard_gas_limit_per_operation - of_int 1000 |> to_int)
+
+  let consumed_gas length =
+    Gas.Arith.fp @@ Gas.Arith.integral_of_int_exn (safe_value / length)
+
+  let manager_op_result (type kind) (length : int) (hash : Operation_hash.t)
+      (contents : kind manager_operation) :
+      kind successful_manager_operation_result tzresult =
+    let open Result_syntax in
+    match contents with
+    | Reveal _ -> return (Reveal_result {consumed_gas = consumed_gas length})
+    | Transaction _ ->
+        return
+          (Transaction_result
+             (Transaction_to_contract_result
+                {
+                  storage = None;
+                  lazy_storage_diff = None;
+                  balance_updates = [];
+                  ticket_receipt = [];
+                  originated_contracts = [];
+                  consumed_gas = consumed_gas length;
+                  storage_size = Z.zero;
+                  paid_storage_size_diff = Z.zero;
+                  allocated_destination_contract = false;
+                }))
+    | Origination _ ->
+        let nonce = Imported_protocol.Origination_nonce.(incr (initial hash)) in
+        let kt1 = Imported_protocol.Contract_hash.of_nonce nonce in
+        return
+          (Origination_result
+             {
+               lazy_storage_diff = None;
+               balance_updates = [];
+               originated_contracts = [kt1];
+               consumed_gas = consumed_gas length;
+               storage_size = Z.zero;
+               paid_storage_size_diff = Z.zero;
+             })
+    | _ ->
+        tzfail
+          (Unsupported_operation_kind
+             "only supported kinds are 'reveal' and 'transaction' and \
+              'origination'")
+
+  let contents_result (type kind) (length : int) (hash : Operation_hash.t)
+      (contents : kind contents) : kind contents_result tzresult =
+    let open Result_syntax in
+    match contents with
+    | Manager_operation {operation; _} ->
+        let* result = manager_op_result length hash operation in
+        return
+          (Manager_operation_result
+             {
+               balance_updates = [];
+               internal_operation_results = [];
+               operation_result = Applied result;
+             })
+    | _ ->
+        tzfail
+          (Unsupported_operation_kind "only manager operations are supported")
+
+  let rec size : type kind. kind contents_list -> int =
+   fun contents ->
+    match contents with Single _ -> 1 | Cons (_, rest) -> 1 + size rest
+
+  let rec contents_list_result : type kind.
+      int ->
+      Operation_hash.t ->
+      kind contents_list ->
+      kind contents_result_list tzresult =
+   fun length hash contents ->
+    let open Result_syntax in
+    match contents with
+    | Single contents ->
+        let* result = contents_result length hash contents in
+        return (Single_result result)
+    | Cons (contents, contents_list) ->
+        let* result = contents_result length hash contents in
+        let* result_list = contents_list_result length hash contents_list in
+        return (Cons_result (result, result_list))
+
+  let operation_metadata (hash : Operation_hash.t) (Operation_data op) =
+    let open Result_syntax in
+    let length = size op.contents in
+    let* contents = contents_list_result length hash op.contents in
+    return (Operation_metadata {contents})
+end
+
 (* When indexing Tezlink, Tzkt requires Liquidity baking contracts. *)
 module Liquidity_baking = struct
   let cpmm_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
