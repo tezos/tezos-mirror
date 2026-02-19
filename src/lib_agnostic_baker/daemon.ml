@@ -132,8 +132,9 @@ module Make_daemon (Agent : AGENT) :
     head_stream :
       (* we switch [head_stream] from [`Live] to [`Reconnecting] on
          disconnections, and from [`Reconnecting] to [`Live] on reconnections *)
-      [ `Live of string Lwt_stream.t
-      | `Reconnecting of string Lwt_stream.t tzresult Lwt.t ];
+      [ `Live of (Block_hash.t * Block_header.t) Lwt_stream.t
+      | `Reconnecting of
+        (Block_hash.t * Block_header.t) Lwt_stream.t tzresult Lwt.t ];
   }
 
   type t = state
@@ -269,31 +270,9 @@ module Make_daemon (Agent : AGENT) :
 
   (* ---- Baker and Chain Monitoring ---- *)
 
-  (** [monitor_heads ~node_addr] creates a stream which returns the data
-    of the heads of the current network; this information is received
-    from the RPC calls at the endpoint given by [~node_addr]. *)
-  let monitor_heads ~node_addr =
+  let monitor_heads cctxt =
     let open Lwt_result_syntax in
-    let uri = Format.sprintf "%s/monitor/heads/main" node_addr in
-    let* _, body = Rpc_services.request_uri ~node_addr ~uri in
-    let cohttp_stream = Cohttp_lwt.Body.to_stream body in
-    let buffer = Buffer.create 2048 in
-    let stream, push = Lwt_stream.create () in
-    let on_chunk v = push (Some v) and on_close () = push None in
-    let rec loop () =
-      let*! v = Lwt_stream.get cohttp_stream in
-      match v with
-      | None ->
-          on_close () ;
-          Lwt.return_unit
-      | Some chunk ->
-          Buffer.add_string buffer chunk ;
-          let data = Buffer.contents buffer in
-          Buffer.reset buffer ;
-          on_chunk data ;
-          loop ()
-    in
-    ignore (loop () : unit Lwt.t) ;
+    let* stream, _stopper = Monitor_services.heads cctxt cctxt#chain in
     return stream
 
   (** [monitor_voting_periods ~state] continuously monitors chain data to detect
@@ -378,7 +357,7 @@ module Make_daemon (Agent : AGENT) :
                     (proto_status, protocol_hash)
                 in
                 let*! () = Events.(emit waiting_for_active_protocol) () in
-                monitor_heads ~node_addr
+                monitor_heads cctxt
           in
           let*! v = Lwt_stream.get head_stream in
           match v with
@@ -413,7 +392,7 @@ module Make_daemon (Agent : AGENT) :
   type event =
     | New_head
     | Head_stream_ended
-    | Head_stream_reconnected of string Lwt_stream.t
+    | Head_stream_reconnected of (Block_hash.t * Block_header.t) Lwt_stream.t
     | Old_baker_stopped
     | Current_baker_stopped
 
@@ -452,10 +431,7 @@ module Make_daemon (Agent : AGENT) :
         return (Some state)
     | Head_stream_ended ->
         let reconnect_promise =
-          retry_on_disconnection
-            state.node_endpoint
-            (fun node_addr -> monitor_heads ~node_addr)
-            state.node_endpoint
+          retry_on_disconnection state.node_endpoint monitor_heads state.cctxt
         in
         return (Some {state with head_stream = `Reconnecting reconnect_promise})
     | Head_stream_reconnected stream ->
@@ -505,10 +481,7 @@ module Make_daemon (Agent : AGENT) :
     in
     let* head_stream =
       (* Useful if the baker is started before the node. *)
-      retry_on_disconnection
-        node_addr
-        (fun node_addr -> monitor_heads ~node_addr)
-        node_addr
+      retry_on_disconnection node_addr monitor_heads cctxt
     in
     let state =
       {
