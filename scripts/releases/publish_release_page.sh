@@ -19,6 +19,14 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
+dune build ci/bin_release_page/version_manager.exe
+VM=_build/default/ci/bin_release_page/version_manager.exe
+S3_PATH="${S3_BUCKET}${BUCKET_PATH}"
+
+# Download versions.json from remote storage
+echo "Downloading versions.json..."
+$VM download --path "${S3_PATH}"
+
 # If it's a release, we actually push the assets to the s3 bucket
 if [ -n "${CI_COMMIT_TAG}" ]; then
 
@@ -37,8 +45,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     # Add the new version using version_manager
     # [gitlab_release_rc_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
     echo "Adding version ${gitlab_release} to release page..."
-    dune exec ./ci/bin_release_page/version_manager.exe -- \
-      --path "${S3_BUCKET}${BUCKET_PATH}" \
+    $VM \
       add \
       --major "${gitlab_release_major_version}" \
       --minor "${gitlab_release_minor_version}" \
@@ -48,8 +55,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     # Set as latest only if not an RC
     if [ -z "${gitlab_release_rc_version}" ]; then
       echo "Setting version as latest..."
-      dune exec ./ci/bin_release_page/version_manager.exe -- \
-        --path "${S3_BUCKET}${BUCKET_PATH}" \
+      $VM \
         set-latest \
         --major "${gitlab_release_major_version}" \
         --minor "${gitlab_release_minor_version}"
@@ -62,16 +68,14 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
       prev_major=$((gitlab_release_major_version - 1))
       if [ "$prev_major" -ge 0 ]; then
-        dune exec ./ci/bin_release_page/version_manager.exe -- \
-          --path "${S3_BUCKET}${BUCKET_PATH}" \
+        $VM \
           set-inactive \
           --major "${prev_major}" || true
       fi
     fi
 
     echo "Set versions ${gitlab_release_major_version} as active..."
-    dune exec ./ci/bin_release_page/version_manager.exe -- \
-      --path "${S3_BUCKET}${BUCKET_PATH}" \
+    $VM \
       set-active \
       --major "${gitlab_release_major_version}"
 
@@ -111,10 +115,14 @@ fi
 
 # Generate RSS feed for all releases
 echo "Generating RSS feed..."
-dune exec ./ci/bin_release_page/version_manager.exe -- \
-  --path "${S3_BUCKET}${BUCKET_PATH}" \
+$VM \
   generate-rss \
+  --path "${S3_PATH}" \
   --base-url "${URL:-https://${S3_BUCKET}}"
+
+# Upload versions.json back to remote storage
+echo "Uploading versions.json..."
+$VM upload --path "${S3_PATH}"
 
 echo "Building older releases page (inactive versions only)"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
