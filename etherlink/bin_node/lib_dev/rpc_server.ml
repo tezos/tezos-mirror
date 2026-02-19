@@ -237,7 +237,14 @@ let start_public_server (type f) ~(mode : f Mode.t)
             in
             return @@ Evm_directory.init_from_resto_directory
             @@ List.fold_left
-                 (Tezosx_rpc.add_rpc_directory (module Backend) ~l2_chain_id)
+                 (Tezosx_rpc.add_rpc_directory
+                    (module Backend)
+                    ~l2_chain_id
+                    ~add_operation:
+                      (add_operation
+                         ~mode
+                         ~keep_alive:config.keep_alive
+                         ~timeout:config.rpc_timeout))
                  Tezos_rpc.Directory.empty
                  runtimes
         | Error e ->
