@@ -28,6 +28,10 @@ module CLST_types : sig
 
   type ('a, 'b, 'c, 'd) tup4 = 'a * ('b * ('c * 'd))
 
+  type ('a, 'b, 'c, 'd, 'e) tup5 = 'a * ('b * ('c * ('d * 'e)))
+
+  type 'a s_list = 'a Script_list.t
+
   type deposit = unit
 
   type redeem = nat
@@ -42,7 +46,18 @@ module CLST_types : sig
     pair
     Script_list.t
 
-  type fa21_entrypoints = transfer
+  type allowance_delta = (nat (* increase *), nat (* decrease *)) or_
+
+  type approval =
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      allowance_delta (* action *) )
+    tup4
+
+  type approve = approval s_list
+
+  type fa21_entrypoints = (transfer, approve) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -50,7 +65,18 @@ module CLST_types : sig
 
   type total_supply = nat
 
-  type storage = ledger * total_supply
+  type operators = (address, nat option) map
+
+  (** The operators table associates each token owner with a list of
+      accounts that have permission to transfer tokens on their
+      behalf. This permission can either be a finite allowance (`Some
+      allowance`) or an infinite allowance (`None`).
+
+      A finite allowance decreases with each transfer or export of
+      tokens into tickets. Operators cannot increase the allowance. *)
+  type operators_table = (address, operators) big_map
+
+  type storage = (ledger, total_supply, operators_table) tup3
 
   type balance_view = (address * nat, nat) view_type
 
@@ -58,10 +84,16 @@ module CLST_types : sig
 
   type is_token_view = (nat, bool) view_type
 
+  type get_allowance_view =
+    ( (address (* owner *), address (* spender *), nat (* token_id *)) tup3,
+      nat (* allowance *) )
+    view_type
+
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
     | Transfer of transfer
+    | Approve of approve
 
   val entrypoint_from_arg : arg -> entrypoint
 
@@ -72,6 +104,8 @@ module CLST_types : sig
   val total_supply_view_ty : total_supply_view
 
   val is_token_view_ty : is_token_view
+
+  val get_allowance_view_ty : get_allowance_view tzresult
 
   val transfer_event_type :
     ( address (* from_ *),
@@ -93,6 +127,16 @@ module CLST_types : sig
 
   val total_supply_update_event_type :
     (nat (* token_id *), nat (* new_total_supply *), int (* diff *)) tup3
+    ty_node
+    tzresult
+
+  val allowance_update_event_type :
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      nat (* new_allowance *),
+      int (* diff *) )
+    tup5
     ty_node
     tzresult
 end

@@ -53,6 +53,34 @@ let total_amount_of_tez ctxt =
   let*@ amount = Clst.total_amount_of_tez alpha_ctxt in
   return amount
 
+let get_allowance ~owner ~spender b =
+  let open Lwt_result_wrap_syntax in
+  let* clst_hash = get_clst_hash (B b) in
+  let* allowance =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"get_allowance"
+      ~input:
+        Environment.Micheline.(
+          Prim
+            ( dummy_location,
+              Script.D_Pair,
+              [
+                String (dummy_location, Contract.to_b58check owner);
+                String (dummy_location, Contract.to_b58check spender);
+                Int (dummy_location, Z.zero);
+              ],
+              [] )
+          |> strip_locations)
+      b
+  in
+  let allowance =
+    match allowance |> Environment.Micheline.root with
+    | Environment.Micheline.Int (_, allowance_z) -> allowance_z |> Z.to_int64
+    | _ -> Test.fail "Unexpected output"
+  in
+  return allowance
+
 let create_funded_account ~funder ~amount_mutez b =
   let open Lwt_result_wrap_syntax in
   let account = Account.new_account () in
@@ -553,3 +581,42 @@ let () =
   in
   let* () = Assert.is_true ~loc:__LOC__ (Q.equal exchange_rate Q.one) in
   return_unit
+
+let () =
+  register_test ~title:"Test allowance entrypoint and get_allowance view"
+  @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, (owner, spender) = Context.init2 ~consensus_threshold_size:0 () in
+  let amount = Tez.of_mutez_exn 100_000_000L in
+  let* deposit_tx = Op.clst_deposit (B b) owner amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+
+  let* allowance = get_allowance ~owner ~spender b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 0L allowance in
+
+  let amount_incr_allowance = 40_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~src:owner ~spender amount_incr_allowance
+  in
+  let* b = Block.bake ~operation:approve_tx b in
+  let* allowance = get_allowance ~owner ~spender b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ amount_incr_allowance allowance in
+
+  let amount_decr_allowance = -30_000L in
+  let* approve_tx =
+    Op.clst_approve (B b) ~src:owner ~spender amount_decr_allowance
+  in
+  let* b = Block.bake ~operation:approve_tx b in
+  let* allowance = get_allowance ~owner ~spender b in
+  let* () = Assert.equal_int64 ~loc:__LOC__ 10_000L allowance in
+
+  let* approve_tx =
+    Op.clst_approve (B b) ~src:spender ~owner ~spender amount_incr_allowance
+  in
+  let*! b = Block.bake ~operation:approve_tx b in
+  match b with
+  | Ok _ -> Test.fail "Only owner can change the allowance."
+  | Error trace ->
+      Error_helpers.expect_clst_only_owner_can_change_operator
+        ~loc:__LOC__
+        trace

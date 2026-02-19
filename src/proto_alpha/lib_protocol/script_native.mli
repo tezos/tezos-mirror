@@ -16,6 +16,7 @@ module CLST_contract : sig
     | Non_implicit_contract of Destination.t
     | Balance_too_low of Destination.t * CLST_types.nat * CLST_types.nat
     | Amount_too_large of Destination.t * CLST_types.nat
+    | Only_owner_can_change_operator of Destination.t * Destination.t
 end
 
 val get_views :

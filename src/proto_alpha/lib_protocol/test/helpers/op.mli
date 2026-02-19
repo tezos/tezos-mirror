@@ -935,3 +935,21 @@ val clst_redeem :
   Contract.t ->
   int64 ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_approve ctxt src ?owner spender amount] increases or
+    decreases the allowance by [amount] clst tokens set to [spender]
+    regarding a token [owner].
+
+    [owner] defaults to [src]. *)
+val clst_approve :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  src:Contract.t ->
+  ?owner:Contract.t ->
+  spender:Contract.t ->
+  int64 ->
+  Operation.packed tzresult Lwt.t

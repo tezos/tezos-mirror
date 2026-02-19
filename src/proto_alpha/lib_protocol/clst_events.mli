@@ -48,3 +48,19 @@ val total_supply_update_event :
   new_total_supply:CLST_types.nat ->
   diff:CLST_types.int ->
   (Script_typed_ir.operation * context) tzresult Lwt.t
+
+(** [allowance_update_event] returns an internal event operation of type
+    (pair %allowance_update
+      (address %owner)
+      (pair (address %spender)
+      (pair (nat %token_id) (pair (nat %new_allowance) (int %diff)))))
+    with tag [entrypoint]. *)
+val allowance_update_event :
+  context * step_constants ->
+  entrypoint:Entrypoint.t ->
+  owner:address ->
+  spender:address ->
+  token_id:CLST_types.nat ->
+  new_allowance:CLST_types.nat ->
+  diff:CLST_types.int ->
+  (Script_typed_ir.operation * context) tzresult Lwt.t

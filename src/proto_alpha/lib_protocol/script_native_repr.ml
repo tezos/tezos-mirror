@@ -15,7 +15,14 @@ module CLST_contract = struct
       Prim
         ( dummy_location,
           Michelson_v1_primitives.D_Pair,
-          [Seq (dummy_location, []); Int (dummy_location, Z.zero)],
+          [
+            Seq (dummy_location, []);
+            Prim
+              ( dummy_location,
+                Michelson_v1_primitives.D_Pair,
+                [Int (dummy_location, Z.zero); Seq (dummy_location, [])],
+                [] );
+          ],
           [] ))
     |> Micheline.strip_locations |> Script_repr.lazy_expr
 

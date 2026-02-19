@@ -18,6 +18,8 @@ module Helpers = struct
 
   type ('a, 'b, 'c, 'd) tup4 = 'a * ('b, 'c, 'd) tup3
 
+  type ('a, 'b, 'c, 'd, 'e) tup5 = 'a * ('b, 'c, 'd, 'e) tup4
+
   (* Node describing a type in its typed and untyped version, that serves as
      combinator to define native contract types. *)
   type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
@@ -44,6 +46,14 @@ module Helpers = struct
 
   let address_ty =
     {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
+
+  let address_map_ty (type value)
+      ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
+      (address, value) map ty_node tzresult =
+    let open Result_syntax in
+    let* map_t : ((address, value) map, _) ty = map_t loc address_t ty_value in
+    let untyped_map = prim Script.T_map [address_ty.untyped; unty_value] in
+    return {untyped = untyped_map; typed = Ty_ex_c map_t}
 
   let address_big_map_ty (type value)
       ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
@@ -75,6 +85,12 @@ module Helpers = struct
     let* r = tup3_ty ty2 ty3 ty4 in
     pair_ty ty1 r
 
+  let tup5_ty (type a b c d e) ty1 ty2 ty3 ty4 ty5 :
+      (a, b, c, d, e) tup5 ty_node tzresult =
+    let open Result_syntax in
+    let* r = tup4_ty ty2 ty3 ty4 ty5 in
+    pair_ty ty1 r
+
   let or_ty (type l r) ({untyped = untyl; typed = Ty_ex_c tyl; _} : l ty_node)
       ({untyped = untyr; typed = Ty_ex_c tyr; _} : r ty_node) :
       (l, r) or_ ty_node tzresult =
@@ -87,6 +103,12 @@ module Helpers = struct
     let open Result_syntax in
     let* ty_list = Script_typed_ir.list_t loc ty_elt in
     return {untyped = prim Script.T_list [untyped]; typed = Ty_ex_c ty_list}
+
+  let option_ty (type t) ({untyped; typed = Ty_ex_c ty; _} : t ty_node) :
+      t option ty_node tzresult =
+    let open Result_syntax in
+    let+ typed = Script_typed_ir.option_t loc ty in
+    {untyped = prim Script.T_option [untyped]; typed = Ty_ex_c typed}
 
   (** Entrypoints combinator *)
 
@@ -167,6 +189,10 @@ module CLST_types = struct
 
   type ('a, 'b, 'c, 'd) tup4 = ('a, 'b, 'c, 'd) Helpers.tup4
 
+  type ('a, 'b, 'c, 'd, 'e) tup5 = ('a, 'b, 'c, 'd, 'e) Helpers.tup5
+
+  type 'a s_list = 'a Script_list.t
+
   type nat = Script_int.n Script_int.num
 
   type int = Script_int.z Script_int.num
@@ -185,7 +211,18 @@ module CLST_types = struct
     pair
     Script_list.t
 
-  type fa21_entrypoints = transfer
+  type allowance_delta = (nat (* increase *), nat (* decrease *)) or_
+
+  type approval =
+    ( address (* owner *),
+      address (* spender *),
+      nat (* token_id *),
+      allowance_delta (* action *) )
+    tup4
+
+  type approve = approval s_list
+
+  type fa21_entrypoints = (transfer, approve) or_
 
   type arg = (clst_entrypoints, fa21_entrypoints) or_
 
@@ -193,22 +230,29 @@ module CLST_types = struct
 
   type total_supply = nat
 
-  type storage = ledger * total_supply
+  type operators = (address, nat option) map
+
+  type operators_table = (address, operators) big_map
+
+  type storage = (ledger, total_supply, operators_table) tup3
 
   type entrypoint =
     | Deposit of deposit
     | Redeem of redeem
     | Transfer of transfer
+    | Approve of approve
 
   let entrypoint_from_arg : arg -> entrypoint = function
     | L (L p) -> Deposit p
     | L (R p) -> Redeem p
-    | R p -> Transfer p
+    | R (L p) -> Transfer p
+    | R (R p) -> Approve p
 
   let entrypoint_to_arg : entrypoint -> arg = function
     | Deposit p -> L (L p)
     | Redeem p -> L (R p)
-    | Transfer p -> R p
+    | Transfer p -> R (L p)
+    | Approve p -> R (R p)
 
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" unit_ty
@@ -229,30 +273,62 @@ module CLST_types = struct
     let* transfer = list_ty elt in
     make_entrypoint_leaf "transfer" transfer
 
+  let approval_type : approval ty_node tzresult =
+    let open Result_syntax in
+    let* token_id_approval =
+      or_ty (add_name "increase" nat_ty) (add_name "decrease" nat_ty)
+    in
+    tup4_ty
+      (add_name "owner" address_ty)
+      (add_name "spender" address_ty)
+      (add_name "token_id" nat_ty)
+      (add_name "action" token_id_approval)
+
+  let approve_type : (approve ty_node * approve entrypoints_node) tzresult =
+    let open Result_syntax in
+    let* approval_type in
+    let* approve_type = list_ty approval_type in
+    make_entrypoint_leaf "approve" approve_type
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
     let* deposit_type in
     let* redeem_type in
     let* transfer_type in
+    let* approve_type in
     let* clst_entrypoints_type =
       make_entrypoint_node deposit_type redeem_type
     in
-    let fa21_entrypoints_type = transfer_type in
+    let* fa21_entrypoints_type =
+      make_entrypoint_node transfer_type approve_type
+    in
     let* arg_type =
       make_entrypoint_node clst_entrypoints_type fa21_entrypoints_type
     in
     return (finalize_entrypoint arg_type)
 
+  let operators_table_ty : operators_table ty_node tzresult =
+    let open Result_syntax in
+    let* allowance_ty = option_ty nat_ty in
+    let* operators_ty = address_map_ty allowance_ty in
+    address_big_map_ty operators_ty
+
   let storage_type : storage ty_node tzresult =
     let open Result_syntax in
     let* ledger_ty = address_big_map_ty nat_ty in
-    pair_ty ledger_ty nat_ty
+    let* operators_table_ty in
+    tup3_ty ledger_ty nat_ty operators_table_ty
 
   type balance_view = (address * nat, nat) view_type
 
   type total_supply_view = (unit, nat) view_type
 
   type is_token_view = (nat, bool) view_type
+
+  type get_allowance_view =
+    ( (address (* owner *), address (* spender *), nat (* token_id *)) tup3,
+      nat (* allowance *) )
+    view_type
 
   let balance_view_ty =
     let open Result_syntax in
@@ -263,6 +339,11 @@ module CLST_types = struct
     {input_ty = unit_ty.typed; output_ty = nat_ty.typed}
 
   let is_token_view_ty = {input_ty = nat_ty.typed; output_ty = bool_ty.typed}
+
+  let get_allowance_view_ty =
+    let open Result_syntax in
+    let* {typed = input_ty; _} = tup3_ty address_ty address_ty nat_ty in
+    return {input_ty; output_ty = nat_ty.typed}
 
   let transfer_event_type =
     let open Result_syntax in
@@ -295,6 +376,18 @@ module CLST_types = struct
         (add_name "diff" int_ty)
     in
     return @@ add_name "total_supply_update" x
+
+  let allowance_update_event_type =
+    let open Result_syntax in
+    let* x =
+      tup5_ty
+        (add_name "owner" address_ty)
+        (add_name "spender" address_ty)
+        (add_name "token_id" nat_ty)
+        (add_name "new_allowance" nat_ty)
+        (add_name "diff" int_ty)
+    in
+    return @@ add_name "allowance_update" x
 end
 
 type ('arg, 'storage) kind =

@@ -22,17 +22,6 @@ let test_context () =
   let* v = Incremental.begin_construction b in
   return (Incremental.alpha_ctxt v)
 
-let test_unparse_ty loc ctxt expected ty =
-  let open Result_syntax in
-  let* actual, ctxt =
-    Script_ir_unparser.unparse_ty
-      ctxt
-      ~loc:Environment.Micheline.dummy_location
-      ty
-  in
-  if actual = expected then Ok ctxt
-  else Alcotest.failf "Unexpected error: unparsing %s" loc
-
 let pp_expr fmt x =
   Data_encoding.Json.pp
     fmt
@@ -67,6 +56,28 @@ let rec fold_pairs =
       Prim (loc, name, List.map fold_pairs args, annot)
   | Seq (loc, ts) -> Seq (loc, List.map fold_pairs ts)
   | x -> x
+
+let test_unparse_ty loc ctxt expected ty =
+  let open Result_syntax in
+  let* actual, ctxt =
+    Script_ir_unparser.unparse_ty
+      ctxt
+      ~loc:Environment.Micheline.dummy_location
+      ty
+  in
+  if actual = fold_pairs expected then Ok ctxt
+  else
+    Alcotest.failf
+      "@[<v 2>Unexpected unparsing at %s:@,\
+       @[<v 2>Expected:@,\
+       %a@]@,\
+       @[<v 2>Actual:@,\
+       %a@]],"
+      loc
+      pp_node
+      expected
+      pp_node
+      actual
 
 let test_unparse_parameter_ty ctxt expected ty entrypoints =
   let open Result_syntax in
