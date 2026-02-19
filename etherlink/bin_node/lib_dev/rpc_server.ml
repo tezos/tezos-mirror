@@ -170,21 +170,19 @@ let start_public_server (type f) ~(mode : f Mode.t)
     let (module Backend : Services_backend_sig.S), _ = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
-        let add_transaction ~next_nonce transaction_object ~raw_op =
+        let add_transaction ~next_nonce op ~raw_op =
           match mode with
-          | Observer (Michelson_tx_container (module Tx_container))
-          | Proxy (Michelson_tx_container (module Tx_container))
-          | Sequencer (Michelson_tx_container (module Tx_container)) ->
-              Tx_container.add
+          | Observer _ | Proxy _ | Sequencer _ ->
+              Tx_queue.add
                 ~next_nonce
-                transaction_object
+                (Michelson op)
                 ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
           | Rpc {evm_node_private_endpoint; _} ->
               Injector.inject_tezlink_operation
                 ~keep_alive:config.keep_alive
                 ~timeout:config.rpc_timeout
                 ~base:evm_node_private_endpoint
-                ~op:transaction_object
+                ~op
                 ~raw_op
         in
         let* l2_chain_id =
