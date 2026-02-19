@@ -33,10 +33,24 @@ The script lists the assets by reading the contents of directories in
 
 Currently, the release page uses S3 buckets for asset storage.
 
-As mentioned in the usage documentation , you should use the `--bucket BUCKET` and `--path PATH` arguments to specify the bucket and path where the release page assets are stored. `BUCKET` is the address of the bucket, and `PATH` is the location within the bucket where the assets are kept.
+As mentioned in the usage documentation, you should use the `--bucket BUCKET` and `--path PATH` arguments to specify the bucket and path where the release page assets are stored. `BUCKET` is the address of the bucket, and `PATH` is the location within the bucket where the assets are kept.
 The `PATH` argument is optional; if not provided, the root of the bucket will be used.
 
-The script makes the following assumptions:
+The `version_manager` tool operates on a local `versions.json` file specified by `--file`. To interact with remote storage, use the `download` and `upload` subcommands with `--path`:
+
+```shell
+# Download versions.json from remote storage
+version_manager --file versions.json download --path BUCKET/PATH
+
+# Operate on local file (no remote access needed)
+version_manager --file versions.json add --major 25 --minor 0
+version_manager --file versions.json set-latest --major 25 --minor 0
+
+# Upload versions.json back to remote storage
+version_manager --file versions.json upload --path BUCKET/PATH
+```
+
+The `release_page` script makes the following assumptions:
 
   - Each component `COMPONENT` has a base path of `BUCKET/PATH/COMPONENT`, which we refer to as `COMPONENT_LOCATION`.
     The only exception is component `octez`, for which the base path is `BUCKET/PATH`.
