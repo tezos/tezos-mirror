@@ -32,10 +32,7 @@
 //! Merkle tree encodings of DAC pages are versioned, to allow for multiple
 //! hashing schemes to be used.
 
-use host::{
-    reveal::HostReveal,
-    runtime::{Runtime, RuntimeError},
-};
+use host::{reveal::HostReveal, runtime::RuntimeError};
 
 /// Maximum size of dac pages is 4Kb.
 pub const MAX_PAGE_SIZE: usize = 4096;
@@ -342,7 +339,7 @@ pub fn fetch_page_raw<'a, Host: HostReveal>(
 /// however, to run into tick-limit issues while doing so, depending on what `save_content` does.
 ///
 /// Instead, it is recommended to use `DacCertificate::reveal_to_store` where possible.
-pub fn reveal_loop<Host: Runtime>(
+pub fn reveal_loop<Host: HostReveal>(
     host: &mut Host,
     level: usize,
     hash: &[u8; PREIMAGE_HASH_SIZE],

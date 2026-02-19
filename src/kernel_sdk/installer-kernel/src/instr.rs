@@ -4,12 +4,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_smart_rollup::host::Runtime;
+use tezos_smart_rollup::host::StorageV1;
 use tezos_smart_rollup::storage::path::{Path, RefPath};
 use tezos_smart_rollup_installer_config::binary::read_size;
 
 pub fn read_config_program_size(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     config_interpretation_path: &RefPath,
 ) -> Result<u32, &'static str> {
     let kernel_size = host
@@ -25,7 +25,7 @@ pub fn read_config_program_size(
 }
 
 pub fn read_instruction_bytes(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     offset: &mut usize,
     mut buffer: &mut [u8],

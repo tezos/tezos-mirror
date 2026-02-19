@@ -8,7 +8,8 @@ use tezos_smart_rollup_encoding::dac::pages::reveal_loop;
 use tezos_smart_rollup_encoding::dac::pages::V0SliceContentPage;
 use tezos_smart_rollup_encoding::dac::pages::MAX_PAGE_SIZE;
 use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 // Support 3 levels of hashes pages, and then bottom layer of content.
 const MAX_DAC_LEVELS: usize = 4;
@@ -17,11 +18,14 @@ const MAX_DAC_LEVELS: usize = 4;
 ///
 /// This function will reveal the root hash by writing and storing the
 /// hash at the appropriate and intended path.
-pub fn reveal_root_hash_to_store(
-    host: &mut impl Runtime,
+pub fn reveal_root_hash_to_store<Host>(
+    host: &mut Host,
     root_hash: &[u8; PREIMAGE_HASH_SIZE],
     reveal_to: &impl Path,
-) -> Result<(), &'static str> {
+) -> Result<(), &'static str>
+where
+    Host: HostReveal + StorageV1,
+{
     let mut reveal_buffer = [0; MAX_PAGE_SIZE * MAX_DAC_LEVELS];
 
     let mut write_kernel_page = write_kernel_page(reveal_to);
@@ -37,7 +41,7 @@ pub fn reveal_root_hash_to_store(
 }
 
 /// Appends the content of the page path given.
-fn write_kernel_page<Host: Runtime>(
+fn write_kernel_page<Host: StorageV1>(
     reveal_to: &impl Path,
 ) -> impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), &'static str> + '_ {
     let mut kernel_size = 0;
@@ -48,7 +52,7 @@ fn write_kernel_page<Host: Runtime>(
     }
 }
 
-fn append_content<Host: Runtime>(
+fn append_content<Host: StorageV1>(
     host: &mut Host,
     kernel_size: usize,
     content: V0SliceContentPage,

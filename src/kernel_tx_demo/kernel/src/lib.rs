@@ -14,7 +14,6 @@
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
 
-#[cfg(feature = "dal")]
 pub mod dal;
 pub mod inbox;
 pub mod storage;
@@ -36,7 +35,11 @@ use thiserror::Error;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::inbox::{InboxMessage, InternalInboxMessage, Transfer};
-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError, ValueType};
+use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use transactions::external_inbox::ProcessExtMsgError;
 use transactions::process::execute_one_operation;
 use transactions::store::{CACHED_MESSAGES_STORE_PREFIX, DAL_PAYLOAD_PATH};
@@ -65,7 +68,7 @@ impl TryFrom<MichelsonPair<MichelsonString, StringTicket>> for InboxDeposit {
 #[cfg_attr(feature = "tx-kernel", entrypoint::main)]
 pub fn transactions_run<Host>(host: &mut Host)
 where
-    Host: Runtime,
+    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
 {
     #[cfg(feature = "debug")]
     host.write_debug("======\nTX: Entry\n======\n");
@@ -186,14 +189,17 @@ enum TransactionError<'a> {
     CacheMessage(RuntimeError),
 }
 
-fn filter_inbox_message<'a, Host: Runtime>(
+fn filter_inbox_message<'a, Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     _inbox_level: u32,
     inbox_message: &'a [u8],
     counter: &mut u32,
     rollup_address: &SmartRollupHash,
-) -> Result<(), TransactionError<'a>> {
+) -> Result<(), TransactionError<'a>>
+where
+    Host: StorageV1 + HostReveal + HostDebug,
+{
     let (remaining, message) = InboxMessage::<
         MichelsonPair<MichelsonString, Ticket<MichelsonString>>,
     >::parse(inbox_message)
@@ -216,7 +222,7 @@ fn filter_inbox_message<'a, Host: Runtime>(
                 let published_level = (_inbox_level - attestation_lag - import_extra_delay) as i32;
                 // TODO: https://gitlab.com/tezos/tezos/-/issues/6400
                 // Make it possible to track multiple slot indexes.
-                let slot_index = storage::dal::get_or_set_slot_index(host, 0 as u8)?;
+                let slot_index = storage::dal::get_or_set_slot_index(host, 0)?;
                 dal::store_dal_slot(
                     host,
                     published_level,

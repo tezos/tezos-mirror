@@ -18,8 +18,11 @@ use crate::CachedTransactionError;
 use crate::MAX_ENVELOPE_CONTENT_SIZE;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::Path;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 use thiserror::Error;
 
 use super::external_inbox::reveal_and_store_dac_message;
@@ -30,10 +33,13 @@ use super::store::PROGRESS_KEY;
 use super::store::TRANSACTIONS_PER_KERNEL_RUN;
 use super::utils::read_large_store_chunk;
 
-pub(crate) fn execute_one_operation<Host: Runtime>(
+pub(crate) fn execute_one_operation<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+{
     let progress = if host
         .store_has(&PROGRESS_KEY)
         .map_err(CachedTransactionError::Store)?
@@ -81,16 +87,19 @@ pub(crate) enum Decision {
     MessageNextStage(MessageStage),
 }
 
-fn cleanup(host: &mut impl Runtime) -> Result<(), CachedTransactionError> {
+fn cleanup<Host: StorageV1>(host: &mut Host) -> Result<(), CachedTransactionError> {
     host.store_delete(&KERNEL_PRIVATE_STATE)
         .map_err(CachedTransactionError::Store)
 }
 
-fn message_next_stage(
-    host: &mut impl Runtime,
+fn message_next_stage<Host>(
+    host: &mut Host,
     stage_path: &impl Path,
     stage: MessageStage,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: WasmHost + StorageV1,
+{
     host.mark_for_reboot()
         .map_err(CachedTransactionError::Reboot)?;
 
@@ -98,10 +107,10 @@ fn message_next_stage(
         .map_err(CachedTransactionError::Store)
 }
 
-fn next_message_or_next_level(
-    host: &mut impl Runtime,
-    idx: u32,
-) -> Result<(), CachedTransactionError> {
+fn next_message_or_next_level<Host>(host: &mut Host, idx: u32) -> Result<(), CachedTransactionError>
+where
+    Host: WasmHost + StorageV1,
+{
     let next = idx + 1;
     let has_next_message = host
         .store_has(&cached_message_path(next).map_err(CachedTransactionError::Path)?)
@@ -119,11 +128,14 @@ fn next_message_or_next_level(
     }
 }
 
-pub(crate) fn make_decision<Host: Runtime>(
+pub(crate) fn make_decision<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<(), CachedTransactionError> {
+) -> Result<(), CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+{
     let stage_path = cached_message_stage_path(idx).map_err(CachedTransactionError::Path)?;
 
     let stage: MessageStage = {
@@ -153,11 +165,14 @@ pub(crate) fn make_decision<Host: Runtime>(
     }
 }
 
-fn get_cached_message<'a, Host: Runtime>(
+fn get_cached_message<'a, Host>(
     host: &mut Host,
     idx: u32,
     payload: &'a mut [u8; MAX_ENVELOPE_CONTENT_SIZE],
-) -> Result<ParsedExternalInboxMessage<'a>, CachedTransactionError> {
+) -> Result<ParsedExternalInboxMessage<'a>, CachedTransactionError>
+where
+    Host: StorageV1 + HostDebug,
+{
     let message = read_large_store_chunk(
         host,
         &cached_message_path(idx).map_err(CachedTransactionError::Path)?,
@@ -167,11 +182,14 @@ fn get_cached_message<'a, Host: Runtime>(
     external_inbox::parse_external(host, message).ok_or(CachedTransactionError::MessageUnparsable)
 }
 
-fn process_at_start<Host: Runtime>(
+fn process_at_start<Host>(
     host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostDebug,
+{
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
         Ok(message) => message,
@@ -215,10 +233,10 @@ fn process_at_start<Host: Runtime>(
     }
 }
 
-fn process_verified<Host: Runtime>(
-    host: &mut Host,
-    idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+fn process_verified<Host>(host: &mut Host, idx: u32) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + HostReveal + HostDebug,
+{
     let mut payload = [0; MAX_ENVELOPE_CONTENT_SIZE];
     let message = match get_cached_message(host, idx, &mut payload) {
         Ok(message) => message,
@@ -248,11 +266,14 @@ fn process_verified<Host: Runtime>(
     }
 }
 
-fn process_revealed(
-    host: &mut impl Runtime,
+fn process_revealed<Host>(
+    host: &mut Host,
     account_storage: &mut AccountStorage,
     idx: u32,
-) -> Result<Decision, CachedTransactionError> {
+) -> Result<Decision, CachedTransactionError>
+where
+    Host: StorageV1 + WasmHost + HostDebug,
+{
     let mut tx_per_kernel_run_buffer = [0; core::mem::size_of::<i32>()];
     let read_tx_per_kernel_run_result = host.store_read_slice(
         &TRANSACTIONS_PER_KERNEL_RUN,

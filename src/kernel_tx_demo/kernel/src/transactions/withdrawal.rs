@@ -14,7 +14,8 @@ use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::StringTicket;
 use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransaction};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::debug::HostDebug;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
 /// Withdrawal to be sent to L1.
 #[derive(Debug, PartialEq, Eq)]
@@ -34,7 +35,10 @@ pub struct Withdrawal {
 /// The tickets have already been removed from the source account
 /// but we need to remove the ticket from durable storage and an
 /// withdrawal message goes into the rollup outbox.
-pub fn process_withdrawals(host: &mut impl Runtime, withdrawals: Vec<Withdrawal>) {
+pub fn process_withdrawals<Host>(host: &mut Host, withdrawals: Vec<Withdrawal>)
+where
+    Host: WasmHost + HostDebug,
+{
     if withdrawals.is_empty() {
         return;
     }

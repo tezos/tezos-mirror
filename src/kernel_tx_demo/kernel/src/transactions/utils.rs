@@ -5,11 +5,11 @@
 //! Supporting functions for transaction processors
 
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError};
 
-pub(crate) fn read_large_store_chunk<'a>(
-    host: &mut impl Runtime,
+pub(crate) fn read_large_store_chunk<'a, Host: StorageV1>(
+    host: &mut Host,
     path: &impl Path,
     buf: &'a mut [u8],
 ) -> Result<&'a mut [u8], RuntimeError> {

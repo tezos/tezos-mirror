@@ -23,8 +23,9 @@ use tezos_data_encoding::nom::NomReader;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_encoding::michelson::ticket::TicketHashError;
+use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::OwnedPath;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 use thiserror::Error;
 
 /// Errors that may occur when verifying and executing transactions.
@@ -98,9 +99,9 @@ pub struct VerifiableOperation<'a> {
 }
 
 impl<'a> VerifiableOperation<'a> {
-    fn verify_sig(
+    fn verify_sig<Host: StorageV1>(
         &self,
-        host: &mut impl Runtime,
+        host: &mut Host,
         account: &mut crate::storage::Account,
     ) -> Result<(), TransactionError> {
         let pk = match &self.operation.signer {
@@ -125,11 +126,14 @@ impl<'a> VerifiableOperation<'a> {
     /// Execute the operation directly on durable storage. Assumes that a current
     /// transaction is in progress in durable storage and will operate on that. Also,
     /// assumes that the transaction will be rolled back, if an error is returned.
-    pub fn execute<Host: Runtime>(
+    pub fn execute<Host>(
         self,
         host: &mut Host,
         account_storage: &mut AccountStorage,
-    ) -> Result<Vec<Withdrawal>, TransactionError> {
+    ) -> Result<Vec<Withdrawal>, TransactionError>
+    where
+        Host: StorageV1 + HostDebug,
+    {
         let signer_address = self.operation.signer.address();
 
         let signer_path: OwnedPath = account_path(&signer_address)?;
@@ -226,14 +230,17 @@ impl<'a> VerifiableOperation<'a> {
     }
 }
 
-fn handle_transfer(
-    host: &mut impl Runtime,
+fn handle_transfer<Host>(
+    host: &mut Host,
     account_storage: &mut AccountStorage,
     signer_account: &mut Account,
     destination: ContractTz1Hash,
     ticket: u64,
     amount: u64,
-) -> Result<(), TransactionError> {
+) -> Result<(), TransactionError>
+where
+    Host: StorageV1 + HostDebug,
+{
     let dest_account_path: OwnedPath = account_path(&destination)?;
 
     let mut dest_account = account_storage.get_or_create(host, &dest_account_path)?;

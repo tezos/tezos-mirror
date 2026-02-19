@@ -25,7 +25,7 @@ use core::panic::PanicInfo;
 use instr::read_config_program_size;
 #[cfg(feature = "entrypoint")]
 use tezos_smart_rollup::entrypoint;
-use tezos_smart_rollup::host::{HostDebug, Runtime};
+use tezos_smart_rollup::host::{HostDebug, HostReveal, StorageV1, WasmHost};
 use tezos_smart_rollup::storage::path::RefPath;
 use tezos_smart_rollup_installer_config::binary::evaluation::eval_config_instr;
 use tezos_smart_rollup_installer_config::binary::{
@@ -42,7 +42,10 @@ const AUXILIARY_CONFIG_INTERPRETATION_PATH: RefPath =
 
 /// Installer.
 #[cfg_attr(feature = "entrypoint", entrypoint::main)]
-pub fn installer<Host: Runtime>(host: &mut Host) {
+pub fn installer<Host>(host: &mut Host)
+where
+    Host: WasmHost + StorageV1 + HostDebug + HostReveal,
+{
     if let Err(e) = install_kernel(host, KERNEL_BOOT_PATH) {
         HostDebug::write_debug(host, e)
     } else {
@@ -70,10 +73,13 @@ fn panic(_info: &PanicInfo) -> ! {
 ///     - Finally execute the config program by calling `install_kernel`, with the path the config
 ///       was written to.
 // TODO: provide a concrete example (see https://gitlab.com/tezos/tezos/-/issues/5855)
-pub fn install_kernel(
-    host: &mut impl Runtime,
+pub fn install_kernel<Host>(
+    host: &mut Host,
     config_interpretation_path: RefPath,
-) -> Result<(), &'static str> {
+) -> Result<(), &'static str>
+where
+    Host: StorageV1 + HostReveal,
+{
     if let Ok(config_program_size) =
         read_config_program_size(host, &config_interpretation_path)
     {

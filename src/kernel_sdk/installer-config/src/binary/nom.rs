@@ -10,7 +10,7 @@ use nom::sequence::tuple;
 use nom::{error::ErrorKind, number::Endianness};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::path::{Path, RefPath, PATH_MAX_SIZE};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::storage::StorageV1;
 
 use super::{
     ConfigInstruction, MoveInstruction, RefBytes, RevealInstruction, SetInstruction,
@@ -75,7 +75,7 @@ fn nom_read_ref_path(input: &[u8]) -> NomResult<RefPath> {
 }
 
 pub fn read_size(
-    host: &impl Runtime,
+    host: &impl StorageV1,
     path: &impl Path,
     offset: &mut usize,
 ) -> Result<u32, &'static str> {

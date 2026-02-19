@@ -6,16 +6,21 @@
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
+use tezos_smart_rollup_host::debug::HostDebug;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::reveal::HostReveal;
+use tezos_smart_rollup_host::storage::StorageV1;
+use tezos_smart_rollup_host::wasm::WasmHost;
 
-fn process_slot(
-    host: &mut impl Runtime,
+fn process_slot<Host>(
+    host: &mut Host,
     published_level: i32,
     num_pages: usize,
     page_size: usize,
     slot_index: u8,
-) {
+) where
+    Host: HostReveal + StorageV1 + HostDebug,
+{
     let mut buffer = vec![0u8; page_size * num_pages];
 
     let mut read_bytes = 0;
@@ -67,7 +72,7 @@ fn process_slot(
         .unwrap_or_default();
 }
 
-fn get_slots_from_storage(host: &impl Runtime, number_of_slots: u64) -> Vec<u8> {
+fn get_slots_from_storage<Host: StorageV1>(host: &Host, number_of_slots: u64) -> Vec<u8> {
     let path = RefPath::assert_from("/slots".as_bytes());
     let bitvec_bytes = host.store_read_all(&path).unwrap();
 
@@ -93,7 +98,10 @@ fn get_slots_from_storage(host: &impl Runtime, number_of_slots: u64) -> Vec<u8> 
 }
 
 #[entrypoint::main]
-pub fn entry(host: &mut impl Runtime) {
+pub fn entry<Host>(host: &mut Host)
+where
+    Host: StorageV1 + WasmHost + HostDebug + HostReveal,
+{
     let parameters = host.reveal_dal_parameters();
     debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
     let RollupDalParameters {

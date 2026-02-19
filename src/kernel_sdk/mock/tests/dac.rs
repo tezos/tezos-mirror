@@ -9,7 +9,6 @@ use tezos_smart_rollup_encoding::dac::certificate::CertificateError;
 use tezos_smart_rollup_encoding::dac::certificate::*;
 use tezos_smart_rollup_encoding::dac::pages::*;
 use tezos_smart_rollup_host::path::RefPath;
-use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_host::storage::StorageV1;
 
 const MAX_DAC_ONE_SHOT_SIZE: usize = 10063860;
@@ -165,7 +164,7 @@ fn encode_decode_preimages() {
     assert_eq!(data, revealed, "Revealed different contents to original")
 }
 
-fn save_content<Host: Runtime>(
+fn save_content<Host>(
     buffer: &mut Vec<u8>,
 ) -> impl FnMut(&mut Host, V0SliceContentPage) -> Result<(), &'static str> + '_ {
     |_, page| {
