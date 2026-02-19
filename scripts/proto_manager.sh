@@ -1208,13 +1208,21 @@ function update_protocol_tests() {
 
 }
 
-function update_source() {
-
-  if [[ $skip_update_source ]]; then
-    echo "Skipping source update"
-    return 0
-  fi
-
+# SOURCE COMMIT 1: Update teztale archiver
+#
+# MODE: conditional (snapshot vs stabilise/copy)
+# MODIFIES: teztale/bin_teztale_archiver/*.ml files
+#
+# DESCRIPTION:
+#   Updates teztale archiver machine files for the new protocol.
+#   - snapshot mode: renames machine file from source to new hash,
+#                    updates protocol references in both files
+#   - stabilise/copy mode: copies machine file and adds new module to main,
+#                          updates protocol references in copied file
+#   Both modes reformat files with ocamlformat.
+#
+# CREATES: 0-1 commits: "teztale: update teztale_archiver_main.ml" (if changes)
+function source_commit_01_update_teztale() {
   log_blue "update teztale"
   #  Teztale
   source_short_hash=$(echo "${protocol_source}" | cut -d'_' -f2)
@@ -1236,21 +1244,43 @@ function update_source() {
   fi
   ocamlformat -i "teztale/bin_teztale_archiver/teztale_archiver_main.ml"
   commit_if_changes "teztale: update teztale_archiver_main.ml"
+}
 
-  if [[ ${is_snapshot} == false ]]; then
-    log_blue "update proto_alpha constants_parametric_previous_repr.ml"
-    # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
-    cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
-    cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
-    # Remove comment that is meant for constants_parametric_repr and should not be copied to constants_parametric_previous_repr.
-    perl -0777 -i -pe 's/\(\*\* Protocol-specific constants\..*?\*\)//s' src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
-    ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
-  fi
+# SOURCE HELPER: Update alpha constants previous
+#
+# MODE: stabilise/copy only (not snapshot)
+# MODIFIES: src/proto_alpha/lib_protocol/constants_parametric_previous_repr.*
+#
+# DESCRIPTION:
+#   Copies current alpha parametric constants to previous versions.
+#   Previous parametric constants are the same in Alpha and Beta,
+#   so we replace Alpha previous with Alpha current.
+#   Removes protocol-specific comments from .mli using perl multiline regex.
+#   Does not create a commit (changes included in later commits).
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_update_alpha_constants_previous() {
+  log_blue "update proto_alpha constants_parametric_previous_repr.ml"
+  # Previous parametrics constants are the same in Alpha and Beta, so it is correct to just replace the Alpha previous one by the Alpha current one
+  cp src/proto_alpha/lib_protocol/constants_parametric_repr.ml src/proto_alpha/lib_protocol/constants_parametric_previous_repr.ml
+  cp src/proto_alpha/lib_protocol/constants_parametric_repr.mli src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  # Remove comment that is meant for constants_parametric_repr and should not be copied to constants_parametric_previous_repr.
+  perl -0777 -i -pe 's/\(\*\* Protocol-specific constants\..*?\*\)//s' src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+  ocamlformat -i src/proto_alpha/lib_protocol/constants_parametric_previous_repr.mli
+}
 
-  log_blue "update raw_context.ml"
-  # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
-  #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
-
+# SOURCE HELPER: Define stitching markers
+#
+# MODE: both (used by snapshot/copy and stabilise)
+# DEFINES: Global marker variables for protocol stitching operations
+#
+# DESCRIPTION:
+#   Defines escaped comment markers used by perl regex operations
+#   in raw_context.ml and init_storage.ml stitching.
+#   These markers control where code is extracted, replaced, or removed.
+#
+# CREATES: 0 commits (helper function only)
+function source_helper_define_stitching_markers() {
   start_source="\(\* Start of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
   end_source="\(\* End of ${capitalized_source} stitching. Comment used for automatic snapshot \*\)"
   start_predecessor="\(\* Start of alpha predecessor stitching. Comment used for automatic snapshot \*\)"
@@ -1263,71 +1293,172 @@ function update_source() {
 
   start_typechecker="\(\* This line is only here to please the typechecker\,"
   end_typechecker="let\*\! c = get_previous_protocol_constants ctxt in"
+}
+
+# SOURCE COMMIT 2: Fix alpha raw_context (snapshot/copy modes)
+#
+# MODE: snapshot OR copy
+# MODIFIES: src/proto_alpha/lib_protocol/raw_context.ml/mli, init_storage.ml
+#
+# DESCRIPTION:
+#   Updates alpha protocol files to reference the new protocol as predecessor.
+#   Uses simple sed replacements to update protocol names and references.
+#
+#   - copy mode: performs special protocol_source name manipulation
+#                (e.g., 023_PtStockholm + stockholm -> stockholm_023)
+#   - snapshot mode: straightforward replacement with version
+#
+#   This is the simpler path compared to stabilise mode which uses
+#   complex stitching logic (see source_commit_03).
+#
+# CREATES: 1 commit: "alpha: add ${capitalized_label} as Alpha previous protocol"
+function source_commit_02_fix_alpha_raw_context_snapshot() {
+  source_helper_define_stitching_markers
+
+  if [[ ${command} == "copy" ]]; then
+    protocol_source_original="${protocol_source}"
+    #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
+    protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
+    protocol_source="${source_label}_${protocol_source}"
+    log_blue "protocol_source is now ${protocol_source}"
+
+    sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}\"/g" \
+      "src/proto_alpha/lib_protocol/raw_context.ml"
+    protocol_source="${protocol_source_original}"
+  else
+    sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
+      "src/proto_alpha/lib_protocol/raw_context.ml"
+  fi
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.mli"
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
+  sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
+    -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/init_storage.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
+  commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+}
+
+# SOURCE COMMIT 3: Fix alpha raw_context (stabilise mode)
+#
+# MODE: stabilise only
+# MODIFIES: src/proto_alpha/lib_protocol/raw_context.ml/mli, init_storage.ml
+#
+# DESCRIPTION:
+#   Updates alpha protocol files with complex stitching logic for stabilise mode.
+#   This is significantly more complex than snapshot/copy mode.
+#
+#   ⚠️  COMPLEXITY WARNING: This function uses:
+#   - Perl multiline regex replacements (-0777 flag)
+#   - Complex bash string escaping
+#   - Multiple sed pattern transformations
+#   - Heredoc-style text processing
+#   These operations are preserved exactly as-is to maintain behavior.
+#
+#   Process overview:
+#   1. Call helper to update alpha constants (stabilise mode needs this)
+#   2. Process raw_context.ml:
+#      a. Extract code between source stitching markers
+#      b. Patch extracted code (rename comments, update protocol names,
+#         change constants module, remove typechecker code, update functions)
+#      c. Escape patched code for perl regex
+#      d. Replace alpha predecessor stitching section
+#      e. Clear code marked for removal
+#      f. Update type annotations
+#      g. Update Compare.String condition
+#   3. Process init_storage.ml with similar stitching (simpler variant)
+#
+#   Variables used (defined in parent update_source() scope):
+#   - start_source, end_source: markers for source protocol stitching
+#   - start_predecessor, end_predecessor: markers for alpha predecessor
+#   - start_remove, end_remove: markers for code to remove
+#   - type_to_remove: marker for type annotations
+#   - start_typechecker, end_typechecker: typechecker placeholder markers
+#
+# CREATES: 1 commit: "Alpha: add ${capitalized_label} as Alpha previous protocol"
+#          (Note: "Alpha" capitalized, unlike snapshot/copy mode)
+function source_commit_03_fix_alpha_raw_context_stabilise() {
+  # Call helper to update alpha constants (needed for stabilise mode)
+  source_helper_update_alpha_constants_previous
+
+  source_helper_define_stitching_markers
+  # === Process raw_context.ml ===
+
+  # Step 1: Extract code between source stitching markers
+  prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_alpha/lib_protocol/raw_context.ml")
+
+  # Step 2: Patch extracted code
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(sed "s/${capitalized_source} stitching/alpha predecessor stitching/g" <<< "${prepare_first_block}")
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(sed "s/${capitalized_source}/${capitalized_label}/g" <<< "${prepare_first_block_patched}")
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(sed "s/let module Previous = Constants_parametric_repr in/let module Previous = Constants_parametric_previous_repr in/" <<< "${prepare_first_block_patched}")
+  # Remove typechecker placeholder code using perl multiline
+  prepare_first_block_patched=$(perl -0777 -pe "s/${start_typechecker}.*${end_typechecker}//s" <<< "${prepare_first_block_patched}")
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(sed -e "s/let\* c = get_constants ctxt in/let*! c = get_previous_protocol_constants ctxt in/" <<< "${prepare_first_block_patched}")
+
+  # Step 3: Escape patched code for perl regex substitution
+  # This escapes special regex characters to make the text safe for perl -pe
+  escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
+
+  # Step 4: Replace alpha predecessor stitching section with patched code
+  perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
+
+  # Step 5: Clear code marked for removal (between start_remove/end_remove)
+  perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
+  perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
+
+  # Step 6: Update type annotations (Alpha predecessor markers)
+  perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.ml"
+  perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.mli"
+
+  # Step 7: Update Compare.String condition for protocol matching
+  replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
+  perl -0777 -pe "s/${type_to_remove}[ \t]+Compare.*${type_to_remove}/${type_to_remove}$replace_string${type_to_remove}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
+
+  # Reformat raw_context files
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
+
+  # === Process init_storage.ml (simpler variant) ===
+
+  # Extract, patch, escape, and replace (similar to raw_context but simpler)
+  prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_alpha/lib_protocol/init_storage.ml")
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source} stitching/alpha predecessor stitching/g")
+  # shellcheck disable=SC2001
+  prepare_first_block_patched=$(echo "${prepare_first_block_patched}" | sed "s/${capitalized_source}/${capitalized_label}/g")
+  escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
+  perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
+  ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
+
+  # Note: Commit message has "Alpha" capitalized (different from snapshot/copy mode)
+  commit "Alpha: add ${capitalized_label} as Alpha previous protocol"
+}
+
+function update_source() {
+
+  if [[ $skip_update_source ]]; then
+    echo "Skipping source update"
+    return 0
+  fi
+
+  source_commit_01_update_teztale
+
+  log_blue "update raw_context.ml"
+  # add  "else if Compare.String.(s = "$label") then return ($capitalized_label, ctxt)" before else Lwt.return @@ storage_error (Incompatible_protocol_version s)
+  #sed "/else Lwt.return @@ storage_error (Incompatible_protocol_version s)/i \  else if Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)" -i.old "src/proto_${protocol_source}/lib_protocol/raw_context.ml"
 
   log_blue "fix prepare_first_block"
 
   if [[ ${is_snapshot} == true ]] || [[ ${command} == "copy" ]]; then
-    if [[ ${command} == "copy" ]]; then
-      protocol_source_original="${protocol_source}"
-      #use first part of protocol_source + source_label as new protocol_source (e.g. 023_PtStockholm + stockholm -> stockholm_023)
-      protocol_source=$(echo "${protocol_source}" | cut -d'_' -f1)
-      protocol_source="${source_label}_${protocol_source}"
-      log_blue "protocol_source is now ${protocol_source}"
-
-      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}\"/g" \
-        "src/proto_alpha/lib_protocol/raw_context.ml"
-      protocol_source="${protocol_source_original}"
-    else
-      sed -i.old -e "s/s = \"${protocol_source}\"/s = \"${label}_${version}\"/g" \
-        "src/proto_alpha/lib_protocol/raw_context.ml"
-    fi
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/raw_context.mli"
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
-    sed -i.old -e "s/${capitalized_source}/${capitalized_label}/g" \
-      -e "s/${protocol_source}/${label}/g" "src/proto_alpha/lib_protocol/init_storage.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    commit "alpha: add ${capitalized_label} as Alpha previous protocol"
+    source_commit_02_fix_alpha_raw_context_snapshot
   else
-    prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_alpha/lib_protocol/raw_context.ml")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(sed "s/${capitalized_source} stitching/alpha predecessor stitching/g" <<< "${prepare_first_block}")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(sed "s/${capitalized_source}/${capitalized_label}/g" <<< "${prepare_first_block_patched}")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(sed "s/let module Previous = Constants_parametric_repr in/let module Previous = Constants_parametric_previous_repr in/" <<< "${prepare_first_block_patched}")
-    prepare_first_block_patched=$(perl -0777 -pe "s/${start_typechecker}.*${end_typechecker}//s" <<< "${prepare_first_block_patched}")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(sed -e "s/let\* c = get_constants ctxt in/let*! c = get_previous_protocol_constants ctxt in/" <<< "${prepare_first_block_patched}")
-    escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
-    #replace all multiline code between $start_predecessor and $end_predecessor with the content of prepare_first_block_patched in src/proto_alpha/lib_protocol/raw_context.ml using perl
-    perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    # remove all code between $start_remove and $end_remove in src/proto_alpha/lib_protocol/raw_context.ml and init_storage.ml
-    perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    perl -0777 -pe "s/${start_remove}.*${end_remove}/${start_remove}\n\n${remove_comment}\n\n${end_remove}\n/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    #replace code between "$type_to_remove' and '$type_to_remove' with capitalized_label in src/proto_alpha/lib_protocol/raw_context.ml
-    perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    perl -0777 -pe "s/${type_to_remove}[ \t]+[a-zA-Z0-9_]+[ \t]+${type_to_remove}/${type_to_remove}${capitalized_label}${type_to_remove}/" -i "src/proto_alpha/lib_protocol/raw_context.mli"
-    replace_string="Compare.String.(s = \"${label}\") then return (${capitalized_label}, ctxt)"
-    #replace  code between "$type_to_remove' and '$type_to_remove' with $replace_string in src/proto_alpha/lib_protocol/raw_context.ml
-    perl -0777 -pe "s/${type_to_remove}[ \t]+Compare.*${type_to_remove}/${type_to_remove}$replace_string${type_to_remove}/s" -i "src/proto_alpha/lib_protocol/raw_context.ml"
-
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/raw_context.mli"
-
-    prepare_first_block=$(sed -n "/${start_source}/,/${end_source}/p" "src/proto_alpha/lib_protocol/init_storage.ml")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(echo "${prepare_first_block}" | sed "s/${capitalized_source} stitching/alpha predecessor stitching/g")
-    # shellcheck disable=SC2001
-    prepare_first_block_patched=$(echo "${prepare_first_block_patched}" | sed "s/${capitalized_source}/${capitalized_label}/g")
-    escaped_prepare_first_block=$(printf '%s\n' "$prepare_first_block_patched" | sed 's/[`~!@#$%^&*()-_=+{}\|;:",<.>/?]/\\&/g')
-    #replace all code between '(* Start of alpha predecessor stitching. Used for automatic protocol snapshot *)' and '(* End of alpha predecessor stitching. Used for automatic protocol snapshot *)' with the content of prepare_first_block_patched in src/proto_alpha/lib_protocol/raw_context.ml
-    perl -0777 -pe "s/${start_predecessor}.*${end_predecessor}/${escaped_prepare_first_block}/s" -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    ocamlformat -i "src/proto_alpha/lib_protocol/init_storage.ml"
-    commit "Alpha: add ${capitalized_label} as Alpha previous protocol"
+    source_commit_03_fix_alpha_raw_context_stabilise
   fi
 
 }
