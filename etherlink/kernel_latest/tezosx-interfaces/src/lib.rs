@@ -84,10 +84,19 @@ pub trait RuntimeInterface {
         context: CrossRuntimeContext,
     ) -> Result<Vec<u8>, TezosXRuntimeError>;
 
-    /// Execute a call in this runtime.
+    /// Execute a cross-runtime call into this runtime.
     ///
-    /// Amounts should have been subtracted from the sender
-    /// before calling this function.
+    /// The caller's balance has already been debited by the source runtime
+    /// before this function is called.
+    ///
+    /// `from` is the caller's **alias** in this (destination) runtime, not the
+    /// native address from the source runtime. The alias is created by
+    /// `generate_alias` and resolved by the registry before being passed here.
+    /// For example, when an EVM address calls into the Tezos runtime, `from`
+    /// contains the binary-encoded KT1 alias of that EVM address.
+    ///
+    /// `to` is the destination address, encoded in this runtime's native
+    /// format.
     #[allow(clippy::too_many_arguments)]
     fn call<Host: Runtime>(
         &self,

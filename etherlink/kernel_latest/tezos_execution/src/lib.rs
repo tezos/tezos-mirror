@@ -598,6 +598,7 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
     tc_ctx: &mut TcCtx<'a, Host, C>,
     operation_ctx: &mut OperationCtx<'a, C::ImplicitAccountType>,
     registry: &impl Registry,
+    sender: &impl TezlinkAccount,
     amount: &Narith,
     dest: &Contract,
     parameters: &Parameters,
@@ -609,7 +610,7 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
         tc_ctx.host,
         Debug,
         "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameters:?}",
-        operation_ctx.source.pkh()
+        sender.contract()
     );
     let entrypoint = &parameters.entrypoint;
     let value = Micheline::decode_raw(&parser.arena, &parameters.value)?;
@@ -618,7 +619,7 @@ pub fn transfer_external<'a, Host: Runtime, C: Context>(
         tc_ctx,
         operation_ctx,
         registry,
-        operation_ctx.source,
+        sender,
         amount,
         dest,
         entrypoint,
@@ -1156,6 +1157,7 @@ fn apply_operation<Host: Runtime, C: Context>(
                 &mut tc_ctx,
                 &mut operation_ctx,
                 registry,
+                source_account,
                 amount,
                 destination,
                 parameters,
