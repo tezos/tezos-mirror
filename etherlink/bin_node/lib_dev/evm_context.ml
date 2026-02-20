@@ -3045,16 +3045,6 @@ let patch_kernel ?block_number kernel =
   in
   return_unit
 
-let patch_sequencer_key ?block_number pk =
-  worker_wait_for_request
-    (Patch_state
-       {
-         commit = false;
-         key = Durable_storage_path.sequencer_key;
-         patch = Fun.const (Some (Signature.Public_key.to_b58check pk));
-         block_number;
-       })
-
 let provision_balance ?block_number address value =
   let new_info u =
     String.of_bytes

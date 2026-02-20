@@ -591,6 +591,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ~tez_bootstrap_accounts
       ?evm_version
       ?with_runtimes
+      ?kernel_compat:(Kernel.name_of kernel)
       ?sequencer:
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)

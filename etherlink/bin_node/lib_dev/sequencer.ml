@@ -277,7 +277,12 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
           _;
         } ->
         let*? pk, _ = Signer.first_lexicographic_signer signer in
-        let* () = Evm_context.patch_sequencer_key pk in
+        let* () =
+          Evm_context.patch_state
+            ~key:Durable_storage_path.sequencer_key
+            ~value:(Signature.Public_key.to_b58check pk)
+            ()
+        in
         let*! () = Events.patched_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)

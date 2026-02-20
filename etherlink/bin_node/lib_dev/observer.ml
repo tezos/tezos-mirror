@@ -238,7 +238,10 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~evm_node_endpoint
         (Block_parameter (Number next_blueprint_number))
     in
-    Evm_context.patch_sequencer_key pk
+    Evm_context.patch_state
+      ~key:Durable_storage_path.sequencer_key
+      ~value:(Signature.Public_key.to_b58check pk)
+      ()
   in
 
   (* One domain for the Lwt scheduler, one domain for Evm_context, one domain

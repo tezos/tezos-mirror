@@ -71,7 +71,7 @@ let sequencer_governance = evm "/sequencer_governance"
 
 let ticketer = evm "/ticketer"
 
-let sequencer = evm "/sequencer"
+let sequencer = world_state "/sequencer"
 
 let sequencer_pool_address = evm "/sequencer_pool_address"
 

@@ -158,14 +158,6 @@ val provision_balance :
   Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
-(** [patch_sequencer_key public_key] modifies the in memory state of the
-    EVM node to replace the sequencer key with [public_key]. It does not
-    modify the current head.  *)
-val patch_sequencer_key :
-  ?block_number:Ethereum_types.quantity ->
-  Signature.public_key ->
-  unit tzresult Lwt.t
-
 (** [patch_state ~key ~value ()] writes [value] at [key]. *)
 val patch_state :
   ?block_number:Ethereum_types.quantity ->
