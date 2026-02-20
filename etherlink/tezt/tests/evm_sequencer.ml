@@ -10635,11 +10635,7 @@ let test_configuration_service =
       ])
   @@ fun protocol ->
   let* {sequencer; observer; _} =
-    Setup.setup_sequencer
-      ~mainnet_compat:false
-      ~enable_dal:false
-      ~enable_multichain:false
-      protocol
+    Setup.setup_sequencer ~enable_dal:false ~enable_multichain:false protocol
   in
   let* sequencer_config = Rpc.configuration sequencer in
   let* observer_config = Rpc.configuration observer in
@@ -12946,7 +12942,6 @@ let test_deposit_event =
     Setup.setup_sequencer
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
       protocol
@@ -13004,7 +12999,6 @@ let test_withdrawal_events =
     Setup.setup_sequencer
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fast_withdrawal:true
@@ -13092,7 +13086,6 @@ let test_fa_deposit_and_withdrawals_events =
     Setup.setup_sequencer
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fa_bridge:true
@@ -13718,7 +13711,6 @@ let test_claim_deposit_event =
     Setup.setup_sequencer
       ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
       ~time_between_blocks:Nothing
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
       ~enable_fa_bridge:true

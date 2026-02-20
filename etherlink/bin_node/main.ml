@@ -178,13 +178,19 @@ module Params = struct
       ~desc:
         "Either a root hash of the kernel to download, or the name of a \
          supported kernel (\"bifrost\", \"calypso\", \"calypso2\", \
-         \"dionysus\", \"dionysus-r1\", \"ebisu\", \"farfadet\" or \
-         \"farfadet-r1\")."
+         \"dionysus\", \"dionysus-r1\", \"ebisu\", \"farfadet\", \
+         \"farfadet-r1\" or \"farfadet-r2\")."
       (parameter (fun _ str ->
            let open Evm_node_lib_dev.Constants in
            let open Lwt_result_syntax in
            match kernel_from_string str with
-           | Some kernel -> return (root_hash_from_kernel kernel)
+           | Some kernel -> (
+               match root_hash_from_released_kernel kernel with
+               | Some hex -> return hex
+               | None ->
+                   failwith
+                     "%s is a known kernel but has no fixed root hash"
+                     str)
            | None ->
                trace
                  (error_of_fmt
@@ -543,13 +549,19 @@ let cors_allowed_origins_arg =
     ~doc:"List of accepted cors origins."
     Params.string_list
 
-let mainnet_compat_arg =
-  Tezos_clic.switch
-    ~long:"mainnet-compat"
+let kernel_compat_arg =
+  Tezos_clic.arg
+    ~long:"kernel-compat"
+    ~placeholder:"bifrost|calypso|..."
     ~doc:
-      "Generate a configuration compatible with the first Etherlink Mainnet \
-       kernel."
-    ()
+      "Generate a configuration compatible with the specified kernel version. \
+       Supported values: mainnet-beta, mainnet-gamma, bifrost, calypso, \
+       calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, \
+       farfadet-r2, latest."
+  @@ Tezos_clic.parameter (fun _ kernel_name ->
+         match Evm_node_lib_dev.Constants.kernel_from_string kernel_name with
+         | Some kernel -> Lwt.return_ok kernel
+         | None -> failwith "Unknown kernel name: %s" kernel_name)
 
 let profile_arg =
   Tezos_clic.arg_or_switch
@@ -2791,7 +2803,7 @@ let make_kernel_config_command =
     ~desc:"Create a configuration for the kernel installer."
     (merge_options
        (args24
-          mainnet_compat_arg
+          kernel_compat_arg
           (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
           (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
           (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -2849,7 +2861,7 @@ let make_kernel_config_command =
          ~desc:"File path where the config will be written to."
          Params.string
     @@ stop)
-    (fun ( ( mainnet_compat,
+    (fun ( ( kernel_compat,
              kernel_root_hash,
              chain_id,
              sequencer,
@@ -2890,7 +2902,7 @@ let make_kernel_config_command =
          ()
        ->
       Evm_node_lib_dev.Kernel_config.make
-        ~mainnet_compat
+        ?kernel_compat
         ~eth_bootstrap_balance
         ?l2_chain_ids
         ?kernel_root_hash

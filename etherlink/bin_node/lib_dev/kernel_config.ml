@@ -303,7 +303,7 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance
     tez_bootstrap_accounts
   |> List.flatten
 
-let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
+let make ?kernel_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
     ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
     ?kernel_security_governance ?minimum_base_fee_per_gas ?da_fee_per_byte
@@ -394,10 +394,11 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
       with_runtimes
   in
   let instrs =
-    (if mainnet_compat then make_instr ticketer
-     else
-       (* For compatibility reason for Mainnet and Ghostnet *)
-       make_instr ~path_prefix:["evm"; "world_state"] ticketer)
+    (match kernel_compat with
+    | Some Constants.Mainnet_beta -> make_instr ticketer
+    | Some _ | None ->
+        (* For compatibility with post-Beta kernels and Shadownet *)
+        make_instr ~path_prefix:["evm"; "world_state"] ticketer)
     @ make_instr
         ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
         kernel_root_hash

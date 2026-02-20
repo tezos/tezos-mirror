@@ -127,7 +127,6 @@ let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
   in
   let* setup =
     Setup.setup_sequencer
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
       ~l2_chains
@@ -617,7 +616,6 @@ let test_tezlink_constants =
   in
   let* {sequencer; client; _} =
     Setup.setup_sequencer
-      ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
       ~l2_chains

@@ -1610,7 +1610,7 @@ let wait_termination (evm_node : t) =
 let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
 
 let make_kernel_installer_config ?(l2_chain_ids = [])
-    ?max_delayed_inbox_blueprint_length ?(mainnet_compat = false)
+    ?max_delayed_inbox_blueprint_length ?kernel_compat
     ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
     ?eth_bootstrap_balance ?eth_bootstrap_accounts ?tez_bootstrap_balance
     ?tez_bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
@@ -1648,7 +1648,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
         "max-delayed-inbox-blueprint-length"
         Int.to_string
         max_delayed_inbox_blueprint_length
-    @ Cli_arg.optional_switch "mainnet-compat" mainnet_compat
+    @ Cli_arg.optional_arg "kernel-compat" Fun.id kernel_compat
     @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
     @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
     @ Cli_arg.optional_arg "chain-id" string_of_int chain_id

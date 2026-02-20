@@ -280,7 +280,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
   return observer
 
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
-    ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?kernel_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
@@ -312,7 +312,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
   let*! () =
     Evm_node.make_kernel_installer_config
       ?max_delayed_inbox_blueprint_length
-      ~mainnet_compat
+      ?kernel_compat
       ~sequencer
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
@@ -397,7 +397,7 @@ let generate_l2_kernel_config (l2_setup : Evm_node.l2_setup) client =
   return l2_config
 
 let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
-    ?max_delayed_inbox_blueprint_length ~mainnet_compat ?delayed_inbox_timeout
+    ?max_delayed_inbox_blueprint_length ?kernel_compat ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
@@ -457,7 +457,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
       ?chain_id
       ~l2_chain_ids
       ?max_delayed_inbox_blueprint_length
-      ~mainnet_compat
+      ?kernel_compat
       ~sequencer
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
@@ -492,7 +492,7 @@ let setup_kernel_multichain ~(l2_setups : Evm_node.l2_setup list) ~l1_contracts
   return output
 
 let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
-    ?max_delayed_inbox_blueprint_length ~mainnet_compat ~sequencer
+    ?max_delayed_inbox_blueprint_length ?kernel_compat ~sequencer
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?maximum_allowed_ticks
     ~enable_dal ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?dal_slots
     ?dal_publishers_whitelist ?max_blueprint_lookahead_in_seconds
@@ -504,7 +504,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
     setup_kernel_singlechain
       ~l1_contracts
       ?max_delayed_inbox_blueprint_length
-      ~mainnet_compat
+      ?kernel_compat
       ~sequencer:sequencer.Account.public_key
       ?minimum_base_fee_per_gas:chain_config.minimum_base_fee_per_gas
       ?da_fee_per_byte:chain_config.da_fee_per_byte
@@ -533,7 +533,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ~l2_setups:l2_chains
       ~l1_contracts
       ?max_delayed_inbox_blueprint_length
-      ~mainnet_compat
+      ?kernel_compat
       ~sequencer:sequencer.Account.public_key
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -553,11 +553,11 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
 
 let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?next_wasm_runtime ?sequencer_rpc_port
-    ?(sequencer_private_rpc_port : int option) ~mainnet_compat
-    ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
+    ?(sequencer_private_rpc_port : int option) ?kernel_compat ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?commitment_period
+    ?challenge_window ?(sequencer = Constant.bootstrap1)
     ?(additional_sequencer_keys = []) ?(kernel = Constant.WASM.evm_kernel)
     ?evm_version ?preimages_dir ?maximum_allowed_ticks
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
@@ -651,7 +651,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     setup_kernel
       ~l1_contracts
       ?max_delayed_inbox_blueprint_length
-      ~mainnet_compat
+      ?kernel_compat
       ~sequencer
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -820,7 +820,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     }
 
 let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
-    ?sequencer_rpc_port ?sequencer_private_rpc_port ~mainnet_compat
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?kernel_compat
     ?genesis_timestamp ?time_between_blocks ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
@@ -859,7 +859,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?next_wasm_runtime
       ?sequencer_rpc_port
       ?sequencer_private_rpc_port
-      ~mainnet_compat
+      ?kernel_compat
       ?commitment_period
       ?challenge_window
       ?genesis_timestamp
@@ -955,7 +955,6 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?max_delayed_inbox_blueprint_length
         ?sequencer_rpc_port
         ?sequencer_private_rpc_port
-        ~mainnet_compat:false
         ?commitment_period
         ?challenge_window
         ?genesis_timestamp

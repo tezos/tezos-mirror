@@ -20,6 +20,8 @@ val network_of_address :
   Configuration.supported_network option
 
 type kernel =
+  | Mainnet_beta
+  | Mainnet_gamma
   | Bifrost
   | Calypso
   | Calypso2
@@ -29,7 +31,18 @@ type kernel =
   | Farfadet
   | FarfadetR1
   | FarfadetR2
+  | Latest
 
 val kernel_from_string : string -> kernel option
 
-val root_hash_from_kernel : kernel -> Hex.t
+(** [kernel_is_older a ~than:b] returns [true] if kernel [a] is strictly
+    older than kernel [b]. *)
+val kernel_is_older : kernel -> than:kernel -> bool
+
+(** [kernel_is_newer a ~than:b] returns [true] if kernel [a] is strictly
+    newer than kernel [b]. *)
+val kernel_is_newer : kernel -> than:kernel -> bool
+
+(** Returns the root hash of a released kernel, or [None] for [Latest]
+    whose root hash changes over time. *)
+val root_hash_from_released_kernel : kernel -> Hex.t option

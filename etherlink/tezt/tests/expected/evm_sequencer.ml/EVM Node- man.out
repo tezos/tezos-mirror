@@ -824,8 +824,8 @@ Kernel commands:
       [--rollup <sr1...>] [--show-activation-timestamp]
     Create bytes payload for the upgrade entrypoint.
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
-      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu", "farfadet"
-      or "farfadet-r1").
+      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu",
+      "farfadet", "farfadet-r1" or "farfadet-r2").
     <activation_timestamp>: After activation timestamp, the kernel will upgrade to this
       value.
       Must follow one of the following format:
@@ -878,7 +878,7 @@ Kernel commands:
       replays of the successor block only.
     -f --force: Force patching the kernel.
   
-  make kernel installer config <kernel config file> [--mainnet-compat]
+  make kernel installer config <kernel config file> [--kernel-compat <bifrost|calypso|...>]
       [--kernel-root-hash <root hash>] [--chain-id <chain id>] [--sequencer <edpk...>]
       [--delayed-bridge <KT1...>] [--ticketer <KT1...>] [--admin <KT1..>]
       [--sequencer-governance <KT1...>] [--kernel-governance <KT1...>]
@@ -897,8 +897,10 @@ Kernel commands:
       [--tez-bootstrap-balance <3800000>] [--tez-bootstrap-account <edp...>]
     Create a configuration for the kernel installer.
     <kernel config file>: File path where the config will be written to.
-    --mainnet-compat: Generate a configuration compatible with the first Etherlink Mainnet
-      kernel.
+    --kernel-compat <bifrost|calypso|...>: Generate a configuration compatible with the
+      specified kernel version. Supported values: mainnet-beta, mainnet-gamma, bifrost,
+      calypso, calypso2, dionysus, dionysus-r1, ebisu, farfadet, farfadet-r1, farfadet-r2,
+      latest.
     --kernel-root-hash <root hash>: Value for kernel_root_hash in the installer config.
     --chain-id <chain id>: Value for chain_id in the installer config.
     --sequencer <edpk...>: Value for sequencer in the installer config.
@@ -997,8 +999,8 @@ Kernel commands:
       [--network <network>]
     Preemptively download a kernel before running the EVM node.
     <kernel-id>: Either a root hash of the kernel to download, or the name of a supported
-      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu", "farfadet"
-      or "farfadet-r1").
+      kernel ("bifrost", "calypso", "calypso2", "dionysus", "dionysus-r1", "ebisu",
+      "farfadet", "farfadet-r1" or "farfadet-r2").
     --data-dir <data-dir>: The path to the EVM node data directory. Default is
       $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`.
