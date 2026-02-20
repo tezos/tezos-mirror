@@ -1445,6 +1445,113 @@ let test_cross_runtime_transfer_to_evm =
       ~error_msg:"Expected gateway balance 0 but got %L") ;
   unit
 
+(* This test exercises nested cross-runtime calls:
+     Tezos Runtime (tz1 transfer) -> EVM Runtime (CRAC contract) -> Tezos Runtime (KT1 destination).
+     The goal is to see a modification in the storage of the KT1 destination in the Tezos runtime. *)
+let test_nested_crac =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime call from Tezos to EVM back to Tezos"
+    ~tags:["cross_runtime"; "bytecode"; "nested"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup protocol ->
+  (* Step 1: Deploy the Michelson contract (final destination of the nested
+     calls, whose storage we check to verify the full chain worked) and the
+     EVM CRAC contract (intermediary that forwards back to Michelson runtime).  *)
+  let contract_storage =
+    let module C = Tezos_protocol_alpha.Protocol.Contract_repr in
+    let contract =
+      Result.get_ok @@ C.of_b58check Constant.bootstrap1.public_key_hash
+    in
+    let (`Hex hex) =
+      Hex.of_bytes (Data_encoding.Binary.to_bytes_exn C.encoding contract)
+    in
+    hex
+  in
+  let* contract_hex, kt1_address =
+    let source = Constant.bootstrap5 in
+    let Tezt_etherlink.Setup.
+          {
+            client;
+            l1_contracts;
+            sc_rollup_address;
+            sc_rollup_node;
+            sequencer;
+            _;
+          } =
+      setup
+    in
+    originate_michelson_contract_via_delayed_inbox
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sequencer
+      ~source
+      ~counter:1
+      ~script_name:["opcodes"; "source"]
+      ~init_storage_data:(Format.sprintf "0x%s" contract_storage)
+      ~init_balance:0
+      protocol
+  in
+  (* Verify that the contract storage is correctly set *)
+  let* () =
+    check_michelson_storage_value
+      ~sc_rollup_node:setup.sc_rollup_node
+      ~contract_hex
+      ~expected:(`O [("bytes", `String contract_storage)])
+      ()
+  in
+  let* crac_contract = Solidity_contracts.transfer_crac setup.evm_version in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let bytecode = Tezt.Base.read_file crac_contract.bin in
+  let* evm_crac_address =
+    deploy_evm_contract
+      ~sequencer:setup.sequencer
+      ~sender
+      ~nonce:0
+      ~init_code:("0x" ^ bytecode)
+      ()
+  in
+  (* Step 2: Call the Michelson gateway with the deployed EVM contract
+     as destination. The gateway sends a cross-runtime call that
+     triggers the EVM contract's bytecode execution. *)
+  let transfer_amount = Tez.of_int 55 in
+  let selector = "crac(string)" in
+  let* args = Cast.calldata ~args:[kt1_address] selector in
+  let args = String.sub args 10 (String.length args - 10) in
+  let* () =
+    michelson_to_evm_transfer
+      ~source:Constant.bootstrap1
+      ~evm_destination:evm_crac_address
+      ~transfer_amount
+      ~call:(selector, args)
+      setup
+  in
+  (* Step 3: Verify the CRAC contract balance and the Michelson
+     contract storage after the nested cross-runtime call. *)
+  let*@ crac_contract_balance =
+    Rpc.get_balance ~address:evm_crac_address setup.sequencer
+  in
+  Check.(
+    (crac_contract_balance = Wei.zero)
+      Wei.typ
+      ~error_msg:"Expected EVM CRAC balance %R but got %L") ;
+  let* tez_client = tezos_client setup.sequencer in
+  let* kt1_balance = Client.get_balance_for ~account:kt1_address tez_client in
+  Check.(
+    (Tez.to_mutez kt1_balance = Tez.to_mutez transfer_amount)
+      int
+      ~error_msg:"Expected KT1 balance %R but got %L") ;
+  (* Verify that the contract storage has been changed because of the nested CRAC *)
+  check_michelson_storage_value
+    ~sc_rollup_node:setup.sc_rollup_node
+    ~contract_hex
+    ~expected:
+      (* The source of a CRAC is address zero for now *)
+      (`O [("bytes", `String "00000000000000000000000000000000000000000000")])
+    ()
+
 let test_cross_runtime_call_executes_evm_bytecode =
   Setup.register_fullstack_test
     ~time_between_blocks:Nothing
@@ -2699,4 +2806,5 @@ let () =
   test_get_tezos_ethereum_address_rpc ~runtime:Tezos () ;
   test_get_ethereum_tezos_address_rpc ~runtime:Tezos () ;
   test_tx_queue_mixed_transaction_types ~runtime:Tezos () ;
-  test_instant_confirmations ~runtime:Tezos ()
+  test_instant_confirmations ~runtime:Tezos () ;
+  test_nested_crac [Alpha]
