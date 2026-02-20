@@ -70,6 +70,9 @@ let init_logger () : logger =
   in
   {log_step}
 
+(* Returns [i; i+1; ...; j] *)
+let rec ( --> ) i j = if i > j then [] else i :: (succ i --> j)
+
 let store_path dal_node store_kind =
   Format.sprintf
     "/%s/store/%s_store"
@@ -4500,9 +4503,6 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
       first_level
       last_publication_level ;
     let rec loop loop_lvl =
-      Log.info "Currently at level %d, publishing and baking" loop_lvl ;
-      if loop_lvl = migration_level then
-        Log.info "Migration is happening in this level" ;
       let current_cryptobox =
         if loop_lvl <= migration_level then old_cryptobox else new_cryptobox
       in
@@ -4511,7 +4511,10 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
         else new_dal_parameters
       in
       if loop_lvl > last_publication_level then unit
-      else
+      else (
+        Log.info "Currently at level %d, publishing and baking" loop_lvl ;
+        if loop_lvl = migration_level then
+          Log.info "Migration is happening in this level" ;
         let* () =
           publish_and_store loop_lvl current_dal_params current_cryptobox
         in
@@ -4523,129 +4526,96 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
             wait_for_layer1_final_block dal_node (loop_lvl - 2)
           else unit
         in
-        loop (loop_lvl + 1)
+        loop (loop_lvl + 1))
     in
     let* () = loop first_level in
-    log_step "Baking 2 last blocks before doing the checks" ;
+    log_step "Baking %d last blocks before doing the checks" new_lag ;
     let* () =
       bake_for
-        ~count:2
+        ~count:new_lag
         ~dal_node_endpoint:(Dal_node.rpc_endpoint dal_node)
         client
     in
-    let check_if_metadata_contain_expected_dal attested_level =
-      let* metadata =
-        Node.RPC.call node
-        @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
+    let attested_levels =
+      first_level + old_lag + 2 --> (last_publication_level + new_lag)
+    in
+    let* all_slot_availabilities =
+      Dal.collect_slot_availabilities node ~attested_levels
+    in
+    let proto_and_dal_params attested_level =
+      if attested_level > migration_level then (migrate_to, new_dal_parameters)
+      else (migrate_from, dal_parameters)
+    in
+    let to_attested_levels ~published_level =
+      if published_level < migration_level then
+        let attested_level = published_level + old_lag in
+        let proto, dal_params = proto_and_dal_params attested_level in
+        let lag_index = 0 in
+        [(attested_level, lag_index, dal_params, proto)]
+      else
+        Dal.to_attested_levels
+          ~protocol:migrate_to
+          ~dal_parameters:new_dal_parameters
+          ~published_level
+    in
+
+    let check_if_metadata_contain_expected_dal published_level =
+      let is_attested =
+        Dal.is_slot_attested
+          ~published_level
+          ~slot_index
+          ~to_attested_levels
+          all_slot_availabilities
       in
-      (if attested_level <= migration_level then (
-         let number_of_lags = List.length dal_parameters.attestation_lags in
-         log_step
-           "Checking that level %d which is before migration is considered as \
-            attested"
-           attested_level ;
-         Check.is_true
-           ((function
-              | None -> false
-              | Some str ->
-                  let vec =
-                    (Dal.Slot_availability.decode
-                       migrate_from
-                       dal_parameters
-                       str).(number_of_lags - 1)
-                  in
-                  Array.length vec > slot_index && vec.(slot_index))
-              metadata.RPC.dal_attestation)
-           ~__LOC__
-           ~error_msg:"Slot before migration is expected to be attested")
-       else if attested_level = migration_level + 1 then (
-         let number_of_lags = List.length dal_parameters.attestation_lags in
-         log_step
-           "Checking that migration level %d is not considered as DAL attested \
-            (as it is not attested at all)"
-           attested_level ;
-         Check.is_false
-           ((function
-              | None -> false
-              | Some str ->
-                  let vec =
-                    (Dal.Slot_availability.decode
-                       migrate_from
-                       dal_parameters
-                       str).(number_of_lags - 1)
-                  in
-                  Array.fold_left ( || ) false vec)
-              metadata.dal_attestation)
-           ~__LOC__
-           ~error_msg:"The migration level block is not supposed to be attested")
-       else if attested_level <= migration_level + new_lag then (
-         let number_of_lags = List.length new_dal_parameters.attestation_lags in
-         log_step
-           "Checking that level %d which is after migration but refers to a \
-            publication before is attested only if the attestation_level did \
-            not change between the 2 protocols."
-           attested_level ;
-         if new_lag = old_lag then
-           Check.is_true
-             ((function
-                | None -> false
-                | Some str ->
-                    let vec =
-                      (Dal.Slot_availability.decode
-                         migrate_to
-                         new_dal_parameters
-                         str).(number_of_lags - 1)
-                    in
-                    Array.length vec > slot_index && vec.(slot_index))
-                metadata.dal_attestation)
-             ~__LOC__
-             ~error_msg:
-               "Slot published before migration is expected to be attested \
-                after migration"
-         else
-           Check.is_false
-             ((function
-                | None -> true
-                | Some str ->
-                    let vec =
-                      (Dal.Slot_availability.decode
-                         migrate_to
-                         dal_parameters
-                         str).(number_of_lags - 1)
-                    in
-                    Array.fold_left ( || ) false vec)
-                metadata.dal_attestation)
-             ~__LOC__
-             ~error_msg:
-               "Slot published before migration is expected to not be attested \
-                after migration")
-       else
-         let number_of_lags = List.length new_dal_parameters.attestation_lags in
-         log_step
-           "Checking that level %d which is after migration and refers to a \
-            publication after migration is considered as attested"
-           attested_level ;
-         Check.is_true
-           ((function
-              | None -> false
-              | Some str ->
-                  let vec =
-                    (Dal.Slot_availability.decode
-                       migrate_to
-                       new_dal_parameters
-                       str).(number_of_lags - 1)
-                  in
-                  vec.(slot_index))
-              metadata.dal_attestation)
-           ~__LOC__
-           ~error_msg:
-             "Slot published after migration is expected to be attested") ;
+      if published_level <= migration_level - old_lag then (
+        log_step
+          "Checking that published level %d which is at least %d before \
+           migration is considered as attested"
+          old_lag
+          published_level ;
+        Check.is_true
+          is_attested
+          ~__LOC__
+          ~error_msg:
+            "Slot before migration - old_lag is expected to be attested")
+      else if published_level + old_lag = migration_level + 1 then (
+        log_step
+          "Checking that migration level %d is not considered as DAL attested \
+           (as it is not attested at all)"
+          (migration_level + 1) ;
+        (* TODO: we could check that the dal_attestation is empty in this case. *)
+        Check.is_false
+          is_attested
+          ~__LOC__
+          ~error_msg:"The migration level block is not supposed to be attested")
+      else if published_level <= migration_level then (
+        log_step
+          "Checking that a slot published at level %d, just before migration \
+           is attested only if the attestation_level did not change between \
+           the 2 protocols."
+          published_level ;
+        let expected_attested = new_lag = old_lag in
+        Check.(
+          (is_attested = expected_attested)
+            bool
+            ~__LOC__
+            ~error_msg:
+              "Slot published before migration attested? Expected %R, got %L"))
+      else (
+        log_step
+          "Checking that published level %d which is after migration is \
+           attested"
+          published_level ;
+        Check.is_true
+          is_attested
+          ~__LOC__
+          ~error_msg:"Slot published after migration is expected to be attested") ;
       unit
     in
-    let rec loop attested_level =
-      if attested_level <= last_publication_level then
-        let* () = check_if_metadata_contain_expected_dal attested_level in
-        loop (attested_level + 1)
+    let rec loop published_level =
+      if published_level <= last_publication_level then
+        let* () = check_if_metadata_contain_expected_dal published_level in
+        loop (published_level + 1)
       else unit
     in
     let* () = loop (first_level + old_lag + 2) in
