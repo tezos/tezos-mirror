@@ -139,6 +139,12 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let block_hash _chain _block = failwith "Not Implemented Yet (%s)" __LOC__
 
-  let simulate_operation ~chain_id:_ ~skip_signature:_ _op _hash _block =
-    failwith "Not Implemented Yet (%s)" __LOC__
+  let simulate_operation ~chain_id:_ ~skip_signature:_
+      (op : Tezlink_imports.SeouLo_context.packed_operation) hash _block =
+    let open Lwt_result_syntax in
+    let op = op.protocol_data in
+    let*? mock_result =
+      Tezlink_mock.Operation_metadata.operation_metadata hash op
+    in
+    return mock_result
 end
