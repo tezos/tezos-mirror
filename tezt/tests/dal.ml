@@ -10437,14 +10437,16 @@ let test_attester_did_not_attest (protocol : Protocol.t)
       ~index
       message
   in
-  let* lvl_publish = Client.level client in
+  let* () = bake_for client in
+
+  let* published_level = Client.level client in
   let lag = dal_parameters.attestation_lag in
-  Log.info "We are at level %d and the lag is %d" lvl_publish lag ;
+  Log.info "We are at level %d and the lag is %d" published_level lag ;
   (* If one wants to see all the node events, they should use [Node.log_events node] *)
   (* We bake [lag] blocks, one which will include the publication of the commitment
      and [lag-1] just to wait. *)
   log_step "Let's wait for the attestation lag while baking" ;
-  let* () = bake_for ~count:lag client in
+  let* () = bake_for ~count:(lag - 1) client in
   log_step
     "Crafting attestation for [bootstrap3] (with expected DAL attestation)." ;
   let* op1 =
@@ -10500,21 +10502,22 @@ let test_attester_did_not_attest (protocol : Protocol.t)
         (`For (map_alias Constant.[bootstrap1; bootstrap4; bootstrap5]))
       client
   in
+  let* current_level = Node.get_level node in
   log_step "Attestation should be included in the head block." ;
-  let* meta =
-    Node.RPC.(call node @@ get_chain_block_metadata ~block:"head" ())
+  let attested_levels = published_level --> current_level in
+  let* all_slot_availabilities =
+    Dal.collect_slot_availabilities node ~attested_levels
   in
   let attestation_is_in_block =
-    match meta.dal_attestation with
-    | Some str ->
-        let number_of_lags = List.length dal_parameters.attestation_lags in
-        let vec = Dal.Slot_availability.decode protocol dal_parameters str in
-        vec.(number_of_lags - 1).(index)
-    | None -> false
+    Dal.is_slot_attested
+      ~published_level
+      ~slot_index:index
+      ~to_attested_levels:(Dal.to_attested_levels ~protocol ~dal_parameters)
+      all_slot_availabilities
   in
   Check.is_true
     attestation_is_in_block
-    ~error_msg:"Attestation is not included in the head block." ;
+    ~error_msg:"Slot from published level should be attested" ;
   log_step "Mempool should now be empty" ;
   let validated_mempool_is_empty mempool =
     let open JSON in
@@ -10541,7 +10544,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
       call producer_node
       (* The level the commitment is included in a block is the first one crafted
          after publication. *)
-      @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
+      @@ get_level_slot_status ~slot_level:published_level ~slot_index:index)
   in
   Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final checks." ;
@@ -10551,7 +10554,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
       producer_node
       ~expected_status:(Dal_RPC.Attested lag)
       ~check_attested_lag:`At_most
-      ~slot_level:(lvl_publish + 1)
+      ~slot_level:published_level
       ~slot_index:index
   in
   let not_attested_by_bootstrap2 =
