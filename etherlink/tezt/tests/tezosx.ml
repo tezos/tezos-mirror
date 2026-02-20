@@ -1343,35 +1343,48 @@ let abi_encoded_uint256_42 =
     See [tezos_execution/src/enshrined_contracts.rs:ERC20_WRAPPER_ADDRESS]. *)
 let erc20_wrapper_address = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb"
 
-let test_cross_runtime_transfer_to_evm =
-  Setup.register_fullstack_test
-    ~time_between_blocks:Nothing
-    ~title:"Cross-runtime transfer from Tezos to EVM via gateway"
-    ~tags:["cross_runtime"; "transfer"]
-    ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      _protocol
-    ->
-  let source = Constant.bootstrap5 in
-  let evm_destination = "0x1111111111111111111111111111111111111111" in
-  let transfer_amount = Tez.of_int 100 in
+(** [michelson_to_evm_transfer ~source ~destination ~transfer_amount setup]
+    transfers [transfer_amount] from the Michelson [source] to the EVM
+    [destination] address via the gateway contract. The operation is built
+    with optional [~counter] (default 1) and [~fee] (default 1000), then
+    sent through the delayed inbox and baked until the rollup is synced. *)
+let michelson_to_evm_transfer ~source ~evm_destination ~transfer_amount
+    ?(counter = 1) ?(fee = 1000) ?call
+    Tezt_etherlink.Setup.
+      {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
   let transfer_amount_mutez = Tez.to_mutez transfer_amount in
-  (* Build a Tezos operation that calls the gateway KT1 to transfer
-     funds to an EVM address. The gateway expects a Micheline string
-     parameter containing the EVM destination address. *)
+  (* Build a Tezos operation that calls the gateway KT1. When [call] is
+     provided as (fn_sig, calldata), uses the "call" entrypoint; otherwise
+     uses the default entrypoint for a simple transfer. *)
+  let* entrypoint, arg =
+    match call with
+    | None -> Lwt.return ("default", `O [("string", `String evm_destination)])
+    | Some (fn_sig, calldata) ->
+        let* arg =
+          Client.convert_data_to_json
+            ~data:
+              (sf
+                 {|Pair "%s" (Pair "%s" 0x%s)|}
+                 evm_destination
+                 fn_sig
+                 calldata)
+            client
+        in
+        Lwt.return ("call", arg)
+  in
   let* call_op =
     Operation.Manager.(
       operation
         [
           make
-            ~fee:1000
-            ~counter:1
+            ~fee
+            ~counter
             ~source
             (call
                ~dest:gateway_address
                ~amount:transfer_amount_mutez
-               ~arg:(`O [("string", `String evm_destination)])
+               ~entrypoint
+               ~arg
                ());
         ])
       client
@@ -1396,15 +1409,33 @@ let test_cross_runtime_transfer_to_evm =
     Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
   in
   let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  unit
+
+let test_cross_runtime_transfer_to_evm =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Cross-runtime transfer from Tezos to EVM via gateway"
+    ~tags:["cross_runtime"; "transfer"]
+    ~with_runtimes:[Tezos]
+  @@ fun setup _protocol ->
+  let evm_destination = "0x1111111111111111111111111111111111111111" in
+  let amount = Tez.of_int 100 in
+  let* () =
+    michelson_to_evm_transfer
+      ~source:Constant.bootstrap1
+      ~evm_destination
+      ~transfer_amount:amount
+      setup
+  in
   (* Check the EVM balance of the destination.
      The gateway passes the raw mutez amount to the EVM bridge,
      which credits it directly as the EVM balance. *)
-  let*@ balance = Rpc.get_balance ~address:evm_destination sequencer in
-  let expected_balance = Wei.of_tez (Tez.of_mutez_int transfer_amount_mutez) in
+  let*@ balance = Rpc.get_balance ~address:evm_destination setup.sequencer in
+  let expected_balance = Wei.of_tez amount in
   Check.(
     (balance = expected_balance) Wei.typ ~error_msg:"Expected %R but got %L") ;
   (* Check that the gateway did not retain any funds. *)
-  let* tez_client = tezos_client sequencer in
+  let* tez_client = tezos_client setup.sequencer in
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
@@ -1420,61 +1451,34 @@ let test_cross_runtime_call_executes_evm_bytecode =
     ~title:"Cross-runtime call from Tezos to EVM executes contract bytecode"
     ~tags:["cross_runtime"; "bytecode"]
     ~with_runtimes:[Tezos]
-  @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _}
-      _protocol
-    ->
+  @@ fun setup _protocol ->
   (* Step 1: Deploy a simple EVM contract that writes 0x42 to storage slot 1.
      Runtime bytecode: PUSH1 0x42, PUSH1 0x01, SSTORE, PUSH1 0x01, SLOAD
      Init code copies runtime code to memory and returns it. *)
   let init_code = "600880600b6000396000f36042600155600154" in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address =
-    deploy_evm_contract ~sequencer ~sender ~nonce:0 ~init_code ()
+    deploy_evm_contract
+      ~sequencer:setup.sequencer
+      ~sender
+      ~nonce:0
+      ~init_code
+      ()
   in
   (* Step 2: Call the Michelson gateway with the deployed EVM contract
      as destination. The gateway sends a cross-runtime call that
      triggers the EVM contract's bytecode execution. *)
-  let source = Constant.bootstrap5 in
-  let* call_op =
-    Operation.Manager.(
-      operation
-        [
-          make
-            ~fee:1000
-            ~counter:1
-            ~source
-            (call
-               ~dest:gateway_address
-               ~amount:0
-               ~arg:(`O [("string", `String contract_address)])
-               ());
-        ])
-      client
-  in
-  let* _ =
-    Delayed_inbox.send_tezos_operation_to_delayed_inbox
-      ~sc_rollup_address
-      ~sc_rollup_node
-      ~client
-      ~l1_contracts
-      ~tezosx_format:true
-      call_op
-  in
   let* () =
-    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
-      ~sequencer
-      ~sc_rollup_node
-      ~client
+    michelson_to_evm_transfer
+      ~source:Constant.bootstrap5
+      ~evm_destination:contract_address
+      ~transfer_amount:(Tez.of_int 0)
+      setup
   in
-  let* () =
-    Test_helpers.bake_until_sync ~sc_rollup_node ~sequencer ~client ()
-  in
-  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
   (* Step 3: Verify the contract's storage slot 1 contains 0x42,
      proving the EVM bytecode was executed via the cross-runtime call. *)
   let*@ storage =
-    Rpc.get_storage_at ~address:contract_address ~pos:"0x1" sequencer
+    Rpc.get_storage_at ~address:contract_address ~pos:"0x1" setup.sequencer
   in
   let expected_storage =
     "0x0000000000000000000000000000000000000000000000000000000000000042"
@@ -1484,7 +1488,7 @@ let test_cross_runtime_call_executes_evm_bytecode =
       string
       ~error_msg:"Expected storage slot 1 = %R but got %L") ;
   (* Check that the gateway did not retain any funds. *)
-  let* tez_client = tezos_client sequencer in
+  let* tez_client = tezos_client setup.sequencer in
   let* gateway_balance =
     Client.get_balance_for ~account:gateway_address tez_client
   in
