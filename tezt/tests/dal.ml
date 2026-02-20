@@ -1436,6 +1436,7 @@ let test_slot_management_logic protocol parameters cryptobox node client
       Mempool.classified_typ
       ~error_msg:"Expected all the operations to be applied. Got %L") ;
   let* () = bake_for client in
+  let* published_level = Node.get_level node in
   let* bytes = Node.RPC.call node @@ RPC.get_chain_block_context_raw_bytes () in
   if JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Expected the context to contain some information about the DAL" ;
@@ -1473,7 +1474,6 @@ let test_slot_management_logic protocol parameters cryptobox node client
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
   let attestation_lag = parameters.attestation_lag in
-  let number_of_lags = List.length parameters.attestation_lags in
   let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
   let* _ =
     inject_dal_attestations
@@ -1496,27 +1496,33 @@ let test_slot_management_logic protocol parameters cryptobox node client
     baker_for_round_zero node ~level:(level + 1)
   in
   let* () = bake_for ~delegates:(`For [baker]) client in
-  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-  let attestation =
-    match metadata.dal_attestation with
-    | None ->
-        (* Field is part of the encoding when the feature flag is true *)
-        Test.fail
-          "Field dal_attestation in block headers is mandatory when DAL is \
-           activated"
-    | Some v ->
-        (Dal.Slot_availability.decode protocol parameters v).(number_of_lags - 1)
+  let* current_level = Node.get_level node in
+  let min_lag = List.hd parameters.attestation_lags in
+  let max_lag = parameters.attestation_lag in
+  let attested_levels =
+    published_level + min_lag --> min (published_level + max_lag) current_level
   in
-  Check.(
-    (Array.length attestation >= 2)
-      int
-      ~error_msg:"The attestation should refer to at least 2 slots, got %L") ;
-  Check.(
-    (attestation.(0) = false)
-      bool
-      ~error_msg:"Expected slot 0 to be un-attested") ;
-  Check.(
-    (attestation.(1) = true) bool ~error_msg:"Expected slot 1 to be attested") ;
+  let* all_slot_availabilities =
+    Dal.collect_slot_availabilities node ~attested_levels
+  in
+
+  Check.is_false
+    (Dal.is_slot_attested
+       ~published_level
+       ~slot_index:0
+       ~to_attested_levels:
+         (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
+       all_slot_availabilities)
+    ~error_msg:"Expected slot 0 to not be attested" ;
+
+  Check.is_true
+    (Dal.is_slot_attested
+       ~published_level
+       ~slot_index:1
+       ~to_attested_levels:
+         (Dal.to_attested_levels ~protocol ~dal_parameters:parameters)
+       all_slot_availabilities)
+    ~error_msg:"Expected slot 1 to be attested" ;
   check_dal_raw_context node
 
 (** This test tests various situations related to DAL slots attestation.
