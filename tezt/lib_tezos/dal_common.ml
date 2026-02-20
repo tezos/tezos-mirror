@@ -371,6 +371,66 @@ module Slot_availability = struct
   let decode = Attestations.decode
 end
 
+module IntMap = Map.Make (Int)
+
+let collect_slot_availabilities node ~attested_levels =
+  Lwt_list.fold_left_s
+    (fun map attested_level ->
+      let* metadata =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
+      in
+      return (IntMap.add attested_level metadata.RPC.dal_attestation map))
+    IntMap.empty
+    attested_levels
+
+let to_attested_levels ~protocol ~dal_parameters ~published_level =
+  List.mapi
+    (fun lag_index lag ->
+      (published_level + lag, lag_index, dal_parameters, protocol))
+    dal_parameters.Parameters.attestation_lags
+
+let is_slot_attested ~published_level ~slot_index ~to_attested_levels
+    slot_availabilities =
+  let attested_levels = to_attested_levels ~published_level in
+  let is_attested_at (attested_level, lag_index, dal_params, protocol) =
+    match IntMap.find attested_level slot_availabilities with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Metadata not found for attested level %d"
+          attested_level
+    | Some slot_availability ->
+        let attestation_array =
+          Slot_availability.decode protocol dal_params slot_availability
+        in
+        let number_of_lags = List.length dal_params.attestation_lags in
+        let attestations_at_lag =
+          if lag_index >= number_of_lags then
+            Test.fail
+              ~__LOC__
+              "Unexpected lag_index %d for attested level %d, number_of_lags = \
+               %d"
+              lag_index
+              attested_level
+              number_of_lags
+          else
+            let len = Array.length attestation_array in
+            if lag_index >= len then
+              Test.fail
+                ~__LOC__
+                "Unexpected array length %d, when lag_index is %d for attested \
+                 level %d"
+                len
+                lag_index
+                attested_level
+            else attestation_array.(lag_index)
+        in
+        Array.length attestations_at_lag > slot_index
+        && attestations_at_lag.(slot_index)
+  in
+  List.exists is_attested_at attested_levels
+
 module Committee = struct
   type member = {attester : string; indexes : int list}
 
