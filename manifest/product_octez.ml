@@ -7724,38 +7724,69 @@ module Mldsa44 = Tezos_crypto.Signature.Mldsa44|})
           ]
         ~linkall:true
     in
+    let mockup_simulator =
+      opt_map baking @@ fun baking ->
+      only_if N.(number >= 012) @@ fun () ->
+      octez_protocol_lib
+        "bakings.mockup-simulator"
+        ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
+        ~path:(path // "lib_delegate/test/mockup_simulator")
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> error_monad_module N.(number <= 018);
+            main |> open_ |> open_ ~m:"Protocol";
+            client |> if_some |> open_;
+            octez_client_commands |> open_;
+            baking |> open_;
+            octez_stdlib_unix |> open_;
+            octez_client_base_unix |> open_;
+            parameters |> if_some |> open_;
+            octez_mockup;
+            octez_mockup_proxy;
+            octez_mockup_commands;
+            tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
+            tezt_core_lib |> open_;
+          ]
+        ~bisect_ppx:No
+        ~dune:[dune_client_keys_version_rule]
+    in
     let _baking_tests =
+      opt_map mockup_simulator @@ fun mockup_simulator ->
       opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
       only_if active @@ fun () ->
-      let mockup_simulator =
-        only_if N.(number >= 012) @@ fun () ->
-        octez_protocol_lib
-          "bakings.mockup-simulator"
-          ~internal_name:(sf "tezos_%s_mockup_simulator" name_underscore)
-          ~path:(path // "lib_delegate/test/mockup_simulator")
-          ~deps:
-            [
-              octez_base |> open_ ~m:"TzPervasives"
-              |> error_monad_module N.(number <= 018);
-              main |> open_ |> open_ ~m:"Protocol";
-              client |> if_some |> open_;
-              octez_client_commands |> open_;
-              baking |> open_;
-              octez_stdlib_unix |> open_;
-              octez_client_base_unix |> open_;
-              parameters |> if_some |> open_;
-              octez_mockup;
-              octez_mockup_proxy;
-              octez_mockup_commands;
-              tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
-              tezt_core_lib |> open_;
-            ]
-          ~bisect_ppx:No
-          ~dune:[dune_client_keys_version_rule]
-      in
       tezt
         ["test_scenario"]
         ~path:(path // "lib_delegate/test")
+        ~with_macos_security_framework:true
+        ~opam:(sf "octez-protocol-%s-libs" name_dash)
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> error_monad_module N.(number <= 018);
+            octez_protocol_environment |> if_ N.(number <= 011);
+            octez_test_helpers |> open_;
+            octez_micheline |> open_;
+            client |> if_some |> open_;
+            main |> open_;
+            test_helpers |> if_ N.(number <= 011) |> open_;
+            octez_base_test_helpers |> open_;
+            mockup_simulator |> if_some |> open_;
+            octez_client_base |> if_ N.(number <= 011);
+            baking |> open_;
+            parameters |> if_some |> if_ N.(number >= 012);
+            octez_crypto |> if_ N.(number >= 012);
+            octez_event_logging_test_helpers |> open_;
+            uri;
+          ]
+    in
+    let _forge_worker_tests =
+      opt_map mockup_simulator @@ fun mockup_simulator ->
+      opt_map (both baking test_helpers) @@ fun (baking, test_helpers) ->
+      only_if (active && N.(number >= 025)) @@ fun () ->
+      tezt
+        ["test_forge_worker"]
+        ~path:(path // "lib_delegate/test/workers")
         ~with_macos_security_framework:true
         ~opam:(sf "octez-protocol-%s-libs" name_dash)
         ~deps:
