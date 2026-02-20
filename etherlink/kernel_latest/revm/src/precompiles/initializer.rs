@@ -13,8 +13,9 @@ use crate::{
     custom,
     precompiles::constants::{
         ALIAS_FORWARDER_PRECOMPILE_ADDRESS, ALIAS_FORWARDER_SOL_CONTRACT,
-        FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
-        XTZ_BRIDGE_SOL_ADDR, XTZ_BRIDGE_SOL_CONTRACT,
+        FA12_WRAPPER_SOL_ADDR, FA12_WRAPPER_SOL_CONTRACT, FA_BRIDGE_SOL_ADDR,
+        FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT, XTZ_BRIDGE_SOL_ADDR,
+        XTZ_BRIDGE_SOL_CONTRACT,
     },
     storage::{code::CodeStorage, world_state_handler::StorageAccount},
     Error,
@@ -30,7 +31,8 @@ pub fn init_precompile_bytecodes<Host: Runtime>(host: &'_ mut Host) -> Result<()
         host,
         &ALIAS_FORWARDER_PRECOMPILE_ADDRESS,
         &ALIAS_FORWARDER_SOL_CONTRACT,
-    )
+    )?;
+    init_precompile_bytecode(host, &FA12_WRAPPER_SOL_ADDR, &FA12_WRAPPER_SOL_CONTRACT)
 }
 
 fn init_precompile_bytecode<Host: Runtime>(

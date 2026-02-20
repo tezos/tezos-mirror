@@ -9,6 +9,7 @@ use mir::{
     ast::{Entrypoint, Micheline},
     context::CtxTrait,
 };
+use num_bigint::BigInt;
 use primitive_types::U256;
 use sha3::{Digest, Keccak256};
 use std::collections::HashMap;
@@ -25,6 +26,7 @@ use crate::mir_ctx::{HasContractAccount, HasHost};
 #[derive(Debug, PartialEq)]
 pub enum EnshrinedContracts {
     TezosXGateway,
+    ERC20Wrapper,
 }
 
 /// prefix used to do a first quick check to eliminate most non enshrined contracts
@@ -32,6 +34,10 @@ const ENSHRINED_PREFIX: [u8; 6] = [2, 90, 121, 0, 0, 0];
 // KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw
 const GATEWAY_ADDRESS: &[u8] = &[
     2, 90, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+];
+// KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb
+const ERC20_WRAPPER_ADDRESS: &[u8] = &[
+    2, 90, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
 ];
 
 // Should be as transparent/cheap as possible for none-native contract (the
@@ -44,6 +50,7 @@ pub fn from_kt1(kt1: &ContractKt1Hash) -> Option<EnshrinedContracts> {
     }
     match bytes.as_slice() {
         GATEWAY_ADDRESS => Some(EnshrinedContracts::TezosXGateway),
+        ERC20_WRAPPER_ADDRESS => Some(EnshrinedContracts::ERC20Wrapper),
         _ => None,
     }
 }
@@ -83,6 +90,22 @@ pub(crate) fn execute_enshrined_contract<'a, Host: Runtime>(
                     "Unknown entrypoint: {entrypoint}"
                 )))
             }
+        }
+        EnshrinedContracts::ERC20Wrapper => {
+            let ep = entrypoint.as_str();
+            let method_sig = match ep {
+                "transfer" => "transfer(address,uint256)",
+                "approve" => "approve(address,uint256)",
+                _ => {
+                    return Err(TransferError::GatewayError(format!(
+                        "Unknown ERC-20 wrapper entrypoint: {entrypoint}"
+                    )))
+                }
+            };
+            let (evm_contract, addr_bytes, amount) =
+                extract_erc20_address_uint256_params(value)?;
+            let calldata = abi_encode_address_uint256(method_sig, &addr_bytes, &amount)?;
+            tezosx_cross_runtime_call(registry, ctx, &evm_contract, &calldata)
         }
     }
 }
@@ -132,6 +155,90 @@ fn extract_call_params(
             "Expected Pair(string, Pair(string, bytes)) for call parameters".into(),
         )),
     }
+}
+
+/// Extract (evm_contract, address_bytes, value) from a Micheline
+/// Pair(String(evm_contract), Pair(Bytes(address), Int(value))).
+fn extract_erc20_address_uint256_params(
+    value: Micheline<'_>,
+) -> Result<(String, Vec<u8>, BigInt), TransferError> {
+    match value {
+        Micheline::App(Prim::Pair, args, _) if args.len() == 2 => {
+            let evm_contract = match &args[0] {
+                Micheline::String(s) => s.clone(),
+                _ => {
+                    return Err(TransferError::GatewayError(
+                        "Expected string EVM contract address".into(),
+                    ))
+                }
+            };
+            match &args[1] {
+                Micheline::App(Prim::Pair, inner_args, _) if inner_args.len() == 2 => {
+                    let addr_bytes = match &inner_args[0] {
+                        Micheline::Bytes(b) => b.clone(),
+                        _ => {
+                            return Err(TransferError::GatewayError(
+                                "Expected bytes for EVM address".into(),
+                            ))
+                        }
+                    };
+                    let value = match &inner_args[1] {
+                        Micheline::Int(n) => n.clone(),
+                        _ => {
+                            return Err(TransferError::GatewayError(
+                                "Expected int for token amount".into(),
+                            ))
+                        }
+                    };
+                    Ok((evm_contract, addr_bytes, value))
+                }
+                _ => Err(TransferError::GatewayError(
+                    "Expected Pair(bytes, int) for address and amount".into(),
+                )),
+            }
+        }
+        _ => Err(TransferError::GatewayError(
+            "Expected Pair(string, Pair(bytes, int)) for ERC-20 parameters".into(),
+        )),
+    }
+}
+
+/// ABI-encode a call to an ERC-20 function with signature `method_sig` and
+/// arguments `(address, uint256)`. Returns the full calldata including the
+/// 4-byte selector.
+fn abi_encode_address_uint256(
+    method_sig: &str,
+    address_bytes: &[u8],
+    value: &BigInt,
+) -> Result<Vec<u8>, TransferError> {
+    if address_bytes.len() > 20 {
+        return Err(TransferError::GatewayError(
+            "EVM address exceeds 20 bytes".into(),
+        ));
+    }
+    let (sign, value_bytes) = value.to_bytes_be();
+    if sign == num_bigint::Sign::Minus {
+        return Err(TransferError::GatewayError(
+            "Token amount must be non-negative".into(),
+        ));
+    }
+    if value_bytes.len() > 32 {
+        return Err(TransferError::GatewayError(
+            "Token amount exceeds uint256".into(),
+        ));
+    }
+    let selector = compute_selector(method_sig);
+    let mut calldata = Vec::with_capacity(4 + 64);
+    calldata.extend_from_slice(&selector);
+    // ABI-encode address: left-pad to 32 bytes
+    let addr_padding = 32 - address_bytes.len();
+    calldata.extend_from_slice(&vec![0u8; addr_padding]);
+    calldata.extend_from_slice(address_bytes);
+    // ABI-encode uint256: left-pad to 32 bytes
+    let val_padding = 32 - value_bytes.len();
+    calldata.extend_from_slice(&vec![0u8; val_padding]);
+    calldata.extend_from_slice(&value_bytes);
+    Ok(calldata)
 }
 
 /// Compute the 4-byte Keccak256 function selector from a method signature.
@@ -251,6 +358,22 @@ pub(crate) fn get_enshrined_contract_entrypoint(
             );
             Some(entrypoints)
         }
+        EnshrinedContracts::ERC20Wrapper => {
+            let mut entrypoints = HashMap::new();
+            // %transfer: pair string (pair bytes int)
+            //   (evm_contract, (recipient_address, amount))
+            entrypoints.insert(
+                Entrypoint::try_from("transfer").ok()?,
+                Type::new_pair(Type::String, Type::new_pair(Type::Bytes, Type::Int)),
+            );
+            // %approve: pair string (pair bytes int)
+            //   (evm_contract, (spender_address, amount))
+            entrypoints.insert(
+                Entrypoint::try_from("approve").ok()?,
+                Type::new_pair(Type::String, Type::new_pair(Type::Bytes, Type::Int)),
+            );
+            Some(entrypoints)
+        }
     }
 }
 
@@ -267,6 +390,7 @@ mod tests {
     use crate::test_utils::MockRegistry;
 
     const GATEWAY_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVDiqsPw";
+    const ERC20_WRAPPER_KT1: &str = "KT18oDJJKXMKhfE1bSuAPGp92pYcwVKvCChb";
 
     #[test]
     fn test_gateway() {
@@ -274,6 +398,14 @@ mod tests {
         assert![is_enshrined(&contract)];
         assert![contract.to_base58_check().as_str() == GATEWAY_KT1];
         assert![from_kt1(&contract) == Some(EnshrinedContracts::TezosXGateway)];
+    }
+
+    #[test]
+    fn test_erc20_wrapper() {
+        let contract = ContractKt1Hash::try_from_bytes(ERC20_WRAPPER_ADDRESS).unwrap();
+        assert![is_enshrined(&contract)];
+        assert![contract.to_base58_check().as_str() == ERC20_WRAPPER_KT1];
+        assert![from_kt1(&contract) == Some(EnshrinedContracts::ERC20Wrapper)];
     }
 
     #[test]
